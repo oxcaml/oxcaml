@@ -2787,6 +2787,8 @@ and remove_unused_value_slots_and_shortcut_aliases_variant_extensions
     then extensions
     else Ext { when_immediate = when_immediate'; when_block = when_block' }
 
+exception Depth_variable_removed
+
 let rec project_variables_out ~to_project ~expand t =
   match t with
   | Value ty ->
@@ -3307,10 +3309,10 @@ and project_head_of_kind_rec_info ~to_project ~expand head =
             ~const:(fun const ->
               Misc.fatal_errorf "Depth variable %a was expanded to constant %a"
                 Variable.print var Reg_width_const.print const)
-        | Unknown | Bottom ->
-          Misc.fatal_errorf
-            "Depth variable %a was expanded to Unknown or Bottom" Variable.print
-            var
+        | Bottom ->
+          Misc.fatal_errorf "Depth variable %a was expanded to Bottom"
+            Variable.print var
+        | Unknown -> raise Depth_variable_removed
       end
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_int32 _
         | Naked_int64 _ | Naked_nativeint _ | Region _ ) as ty ->
@@ -3318,15 +3320,18 @@ and project_head_of_kind_rec_info ~to_project ~expand head =
           "Wrong kind while expanding %a: expecting [Rec_info], got type %a"
           Variable.print var print ty)
 
-and project_coercion ~to_project ~expand (coercion : Coercion.t) =
+and project_coercion ~to_project ~expand (coercion : Coercion.t) :
+    _ Or_unknown.t =
   match coercion with
-  | Id -> coercion
-  | Change_depth { from; to_ } ->
-    let from' = project_head_of_kind_rec_info ~to_project ~expand from in
-    let to_' = project_head_of_kind_rec_info ~to_project ~expand to_ in
-    if from == from' && to_ = to_'
-    then coercion
-    else Coercion.change_depth ~from:from' ~to_:to_'
+  | Id -> Known coercion
+  | Change_depth { from; to_ } -> (
+    try
+      let from' = project_head_of_kind_rec_info ~to_project ~expand from in
+      let to_' = project_head_of_kind_rec_info ~to_project ~expand to_ in
+      if from == from' && to_ = to_'
+      then Known coercion
+      else Known (Coercion.change_depth ~from:from' ~to_:to_')
+    with Depth_variable_removed -> Unknown)
 
 and project_head_of_kind_region ~to_project:_ ~expand:_ () = ()
 
