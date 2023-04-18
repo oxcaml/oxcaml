@@ -15,6 +15,9 @@
 
 (* Symbol table information for .cmo and .cma files *)
 
+(* Names of compilation units as represented in CMO files *)
+type compunit = Compunit of string [@@unboxed]
+
 (* Predefined symbols as represented in CMO files *)
 
 type predef =

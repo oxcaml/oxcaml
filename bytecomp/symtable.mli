@@ -17,6 +17,15 @@
 
 open Cmo_format
 
+module Compunit : sig
+  type t = compunit
+  val name : t -> string
+  val is_packed : compunit -> bool
+  val to_ident : compunit -> Ident.t
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+end
+
 module Predef : sig
   type t = predef
   module Set : Set.S with type elt = t

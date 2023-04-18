@@ -22,6 +22,15 @@ open Cmo_format
 module String = Misc.Stdlib.String
 module Style = Misc.Style
 
+module Compunit = struct
+  type t = compunit
+  let name (Compunit cu_name) = cu_name
+  let is_packed (Compunit name) = String.contains name '.'
+  let to_ident (Compunit cu_name) = Ident.create_persistent cu_name
+  module Set = Set.Make(struct type nonrec t = t let compare = compare end)
+  module Map = Map.Make(struct type nonrec t = t let compare = compare end)
+end
+
 let builtin_values = Predef.builtin_values
 
 module Predef = struct
