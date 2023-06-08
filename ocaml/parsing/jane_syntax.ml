@@ -27,12 +27,13 @@ module Ast_of (Ext : Extension_string) : sig
     ('ast, 'ast_desc) AST.t ->
     string list ->   (* these strings describe the bit of new syntax *)
     loc:Location.t ->
+    ?attrs:attributes ->
     ?payload:payload ->
     'ast ->
     'ast
 end = struct
-  let wrap_jane_syntax ast suffixes ~loc ?payload to_be_wrapped =
-    AST.wrap_desc ast ~loc ~attrs:[] @@
+  let wrap_jane_syntax ast suffixes ~loc ?(attrs=[]) ?payload to_be_wrapped =
+    AST.wrap_desc ast ~loc ~attrs @@
     AST.make_jane_syntax ast Ext.feature suffixes ?payload @@
     to_be_wrapped
 end
@@ -479,14 +480,14 @@ module Layouts = struct
     Ast_helper.Typ.constr (Location.mkloc
                              (Longident.Lident layout_string) layout.loc) []
 
-  let type_of ~loc typ =
+  let type_of ~loc ?attrs typ =
     (* See Note [Wrapping with make_entire_jane_syntax] *)
     AST.make_entire_jane_syntax Core_type ~loc feature begin fun () ->
       match typ with
       | Ltyp_var { name; layout } ->
         let layout = encode_layout_as_type layout in
         Ast_of.wrap_jane_syntax Core_type ["var"]
-          ~loc ~payload:(PTyp layout) @@
+          ~loc ?attrs ~payload:(PTyp layout) @@
           Option.fold
              ~none:(Ast_helper.Typ.any ~loc ())
              ~some:(Ast_helper.Typ.var ~loc)
@@ -498,7 +499,7 @@ module Layouts = struct
           | Some name -> "named", Ast_helper.Typ.alias aliased_type name
         in
         Ast_of.wrap_jane_syntax Core_type ["alias"; has_name]
-          ~loc:inner_typ.ptyp_loc ~payload:(PTyp layout) inner_typ
+          ~loc:inner_typ.ptyp_loc ?attrs ~payload:(PTyp layout) inner_typ
     end
 
   (*******************************************************)

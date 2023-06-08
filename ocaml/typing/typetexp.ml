@@ -415,48 +415,73 @@ let valid_tyvar_name name =
 let make_typed_univars vars layouts : (string * Layout.const option) list =
   List.map2 (fun v l -> v.txt, Option.map Location.get_txt l) vars layouts
 
-let transl_type_param_jst
-      _env _loc (etyp : Jane_syntax.Core_type.t) _attrs _layout =
-  match etyp with
-  | Jtyp_layout (Ltyp_var { name = _; layout = _ }) ->
-     assert false (* XXX layouts: use uniform representation *)
+let transl_type_param_var ~generic env loc attrs name_opt
+      (layout : layout) (layout_annot : const_layout option) =
+  let tvar = Ttyp_var (name_opt, layout_annot) in
+  let name =
+    match name_opt with
+    | None -> "_"
+    | Some name ->
+      if not (valid_tyvar_name name) then
+        raise (Error (loc, Env.empty, Invalid_variable_name ("'" ^ name)));
+      if TyVarEnv.is_in_scope name then
+        raise Already_bound;
+      name
+  in
+  let ty = if generic
+    then Btype.newgenvar ~name layout
+    else
+      let ty = new_global_var ~name layout in
+      Option.iter (fun name -> TyVarEnv.add name ty) name_opt;
+      ty
+  in
+  { ctyp_desc = tvar; ctyp_type = ty; ctyp_env = env;
+    ctyp_loc = loc; ctyp_attributes = attrs }
+
+let transl_type_param_jst ~generic env loc attrs path :
+  Jane_syntax.Core_type.t -> _ =
+  function
+  | Jtyp_layout (Ltyp_var { name; layout = annot }) ->
+     let layout =
+       Layout.of_annotation ~context:(Type_parameter (path, name)) annot
+     in
+     transl_type_param_var ~generic env loc attrs name layout (Some annot.txt),
+     layout
   | Jtyp_layout (Ltyp_alias _) -> assert false
 
-(* Here we take a layout argument and ignore any layout annotations in the styp.
-   The expectation is most callers will get the layout from the annotation, but
-   in some cases (objects) we don't want to support those annotations, so it
-   makes sense for the caller to do this. *)
-(* XXX layouts: remove the above treatment *)
-let transl_type_param env styp layout =
+let transl_type_param ~generic env path styp : Typedtree.core_type * layout =
   let loc = styp.ptyp_loc in
   match Jane_syntax.Core_type.of_ast styp with
-  | Some (etyp, attrs) -> transl_type_param_jst env loc etyp attrs layout
+  | Some (etyp, attrs) -> transl_type_param_jst ~generic env loc attrs path etyp
   | None ->
-  match styp.ptyp_desc with
-    Ptyp_any ->
-      let ty = new_global_var ~name:"_" layout in
-        { ctyp_desc = Ttyp_var (None, None); ctyp_type = ty; ctyp_env = env;
-          ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
-  | Ptyp_var name ->
-      let ty =
-          if not (valid_tyvar_name name) then
-            raise (Error (loc, Env.empty, Invalid_variable_name ("'" ^ name)));
-          if TyVarEnv.is_in_scope name then
-            raise Already_bound;
-          let v = new_global_var ~name layout in
-          TyVarEnv.add name v;
-          v
-      in
-        { ctyp_desc = Ttyp_var (Some name, None);
-          ctyp_type = ty; ctyp_env = env;
-          ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
-  | _ -> assert false
+  (* Our choice for now is that if you want a parameter of layout any, you have
+   to ask for it with an annotation.  Some restriction here seems necessary
+   for backwards compatibility (e.g., we wouldn't want [type 'a id = 'a] to
+   have layout any).  But it might be possible to infer any in some cases. *)
+  let layout = Layout.of_new_sort_var ~why:Unannotated_type_parameter in
+  let attrs = styp.ptyp_attributes in
+  let cty =
+    match styp.ptyp_desc with
+      Ptyp_any -> transl_type_param_var ~generic env loc attrs None layout None
+    | Ptyp_var name ->
+      transl_type_param_var ~generic env loc attrs (Some name) layout None
+    | _ -> assert false
+  in
+  cty, layout
 
-let transl_type_param env styp layout =
+let transl_type_param ~generic env path styp =
   (* Currently useless, since type parameters cannot hold attributes
      (but this could easily be lifted in the future). *)
   Builtin_attributes.warning_scope styp.ptyp_attributes
-    (fun () -> transl_type_param env styp layout)
+    (fun () -> transl_type_param ~generic env path styp)
+
+(* returns just the layout of the param *)
+let transl_type_param_layout env path styp =
+  snd (transl_type_param ~generic:false env path styp)
+
+(* most clients just want the core_type *)
+let transl_type_param ~generic env path styp =
+  fst (transl_type_param ~generic env path styp)
 
 let get_alloc_mode styp =
   match Builtin_attributes.has_local styp.ptyp_attributes with

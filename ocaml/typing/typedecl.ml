@@ -103,14 +103,17 @@ let get_unboxed_from_attributes sdecl =
   | false, true -> Some true
   | false, false -> None
 
-(* Used for layout error reporting *)
-(* CR layouts: This is wrong: type parameters can be other things, with
-   constraints *)
-let parameter_name sty = match sty.ptyp_desc with
-  | Ptyp_any -> "_"
-  | Ptyp_var name -> "'" ^ name
-  | _ -> Misc.fatal_error
-           "Type parameter was neither [Ptyp_any] nor [Ptyp_var _]"
+(* [make_params] creates sort variables - these can be defaulted away (as in
+   transl_type_decl) or unified with existing sort-variable-free types (as in
+   transl_with_constraint). *)
+let make_params ~generic env path params =
+  let make_param (sty, v) =
+    try
+      (transl_type_param ~generic env path sty, v)
+    with Already_bound ->
+      raise(Error(sty.ptyp_loc, Repeated_parameter))
+  in
+    List.map make_param params
 
 (* Enter all declared types in the environment as abstract types *)
 
@@ -197,8 +200,11 @@ let enter_type rec_flag env sdecl (id, uid) =
       ~default:(Layout.any ~why:Initial_typedecl_env)
       sdecl.ptype_attributes
   in
+  TyVarEnv.reset ();
   let decl =
-    { type_params =
+    { type_params = List.map (fun (ctyp, _) -> ctyp.ctyp_type)
+                      (make_params ~generic:true env path sdecl.ptype_params);
+          (* XXX layouts: this used to be generic *)
         (* CR layouts: At the moment, we're defaulting type parameters in
            recursive type declarations to layout value.  We could probably allow
            (Sort 'l) and default to value if it's not determined by use.
@@ -224,16 +230,7 @@ let enter_type rec_flag env sdecl (id, uid) =
            make_params defaults to a sort variable and this defaults to value.
            I'm worried that the value here will propagate somewhere and then
            conflict with an inferred e.g. float64 somewhere. *)
-        List.map
-          (fun (param, _) ->
-             let layout =
-               layout_of_attributes_default ~legacy_immediate:false
-                 ~context:(Type_parameter (path, parameter_name param))
-                 ~default:(Layout.value ~why:Type_argument)
-                 param.ptyp_attributes
-             in
-             Btype.newgenvar layout)
-          sdecl.ptype_params;
+        (* XXX layouts: clean up above comments *)
       type_arity = arity;
       type_kind = Type_abstract;
       type_layout = layout;
@@ -341,29 +338,6 @@ let set_private_row env loc p decl =
   set_type_desc rv (Tconstr (p, decl.type_params, ref Mnil))
 
 (* Translate one type declaration *)
-
-(* [make_params] creates sort variables - these can be defaulted away (as in
-   transl_type_decl) or unified with existing sort-variable-free types (as in
-   transl_with_constraint). *)
-let make_params env path params =
-  (* Our choice for now is that if you want a parameter of layout any, you have
-     to ask for it with an annotation.  Some restriction here seems necessary
-     for backwards compatibility (e.g., we wouldn't want [type 'a id = 'a] to
-     have layout any).  But it might be possible to infer any in some cases. *)
-  let make_param (sty, v) =
-    try
-      let layout =
-        layout_of_attributes_default ~legacy_immediate:false
-          ~context:(Type_parameter (path, parameter_name sty))
-          ~default:(Layout.of_new_sort_var ~why:Unannotated_type_parameter)
-          sty.ptyp_attributes
-      in
-      (transl_type_param env sty layout, v)
-    with Already_bound ->
-      raise(Error(sty.ptyp_loc, Repeated_parameter))
-  in
-    List.map make_param params
-
 
 let transl_global_flags loc attrs =
   let transl_global_flag loc (r : (bool,unit) result) =
@@ -627,7 +601,8 @@ let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
   TyVarEnv.reset ();
   Ctype.begin_def ();
-  let tparams = make_params env (Pident id) sdecl.ptype_params in
+  let path = Path.Pident id in
+  let tparams = make_params ~generic:false env path sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
     (fun (sty, sty', loc) ->
@@ -649,7 +624,7 @@ let transl_declaration env sdecl (id, uid) =
   let layout_annotation =
     (* We set legacy_immediate to true because you were already allowed to write
        [@@immediate] on declarations.  *)
-    layout_of_attributes ~legacy_immediate:true ~context:(Type_declaration (Pident id))
+    layout_of_attributes ~legacy_immediate:true ~context:(Type_declaration path)
       sdecl.ptype_attributes
   in
   let (tman, man) = match sdecl.ptype_manifest with
@@ -690,7 +665,7 @@ let transl_declaration env sdecl (id, uid) =
           let name = Ident.create_local scstr.pcd_name.txt in
           let targs, tret_type, args, ret_type =
             make_constructor env scstr.pcd_loc
-              ~cstr_path:(Path.Pident name) ~type_path:(Path.Pident id) params
+              ~cstr_path:(Path.Pident name) ~type_path:path params
               scstr.pcd_vars scstr.pcd_layouts scstr.pcd_args scstr.pcd_res
           in
           let mk_var_layout sv sl = sv.txt, Option.map Location.get_txt sl in
@@ -1748,7 +1723,9 @@ let transl_type_extension extend env loc styext =
   | None -> ()
   | Some err -> raise (Error(loc, Extension_mismatch (type_path, env, err)))
   end;
-  let ttype_params = make_params env type_path styext.ptyext_params in
+  let ttype_params =
+    make_params ~generic:false env type_path styext.ptyext_params
+  in
   let type_params = List.map (fun (cty, _) -> cty.ctyp_type) ttype_params in
   List.iter2 (Ctype.unify_var env)
     (Ctype.instance_list type_decl.type_params)
@@ -2050,7 +2027,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
      declaration [sdecl] in the outer environment [outer_env]. *)
   let env = outer_env in
   let loc = sdecl.ptype_loc in
-  let tparams = make_params env (Pident id) sdecl.ptype_params in
+  let tparams = make_params ~generic:false env (Pident id) sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let arity = List.length params in
   let constraints =
@@ -2216,26 +2193,23 @@ let abstract_type_decl ~injective layout params =
   generalize_decl decl;
   decl
 
-let approx_type_decl sdecl_list =
+let approx_type_decl env sdecl_list =
   let scope = Ctype.create_scope () in
   List.map
     (fun sdecl ->
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in
+       let path = Path.Pident id in
        let injective = sdecl.ptype_kind <> Ptype_abstract in
        let layout =
          (* We set legacy_immediate to true because you were already allowed
             to write [@@immediate] on declarations. *)
          layout_of_attributes_default ~legacy_immediate:true
-           ~context:(Type_declaration (Pident id))
+           ~context:(Type_declaration path)
            ~default:(Layout.value ~why:Default_type_layout)
            sdecl.ptype_attributes
        in
        let params =
-         List.map (fun (styp,_) ->
-           layout_of_attributes_default ~legacy_immediate:false
-             ~context:(Type_parameter (Pident id, parameter_name styp))
-             ~default:(Layout.value ~why:Type_argument)
-             styp.ptyp_attributes)
+         List.map (fun (param, _) -> transl_type_param_layout env path param)
            sdecl.ptype_params
        in
        (id, abstract_type_decl ~injective layout params))

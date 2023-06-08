@@ -3473,10 +3473,22 @@ layout_attr:
     { Attr.mk ~loc:layout.loc layout (PStr []) }
 ;
 
+%inline type_param_with_layout:
+  mktyp_jane_syntax(
+      name=tyvar_name_or_underscore
+      attrs=attributes
+      COLON
+      layout=layout_annotation
+        { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) ~attrs
+            (Ltyp_var { name; layout }) }
+    )
+    { $1 }
+;
+
 parenthesized_type_parameter:
     type_parameter { $1 }
-  | type_variance type_variable layout_annot=layout_attr
-      { Typ.attr $2 layout_annot, $1 }
+  | type_variance type_param_with_layout
+    { $2, $1 }
 ;
 
 type_parameter:
@@ -3484,13 +3496,20 @@ type_parameter:
       { {$2 with ptyp_attributes = $3}, $1 }
 ;
 
-type_variable:
+%inline type_variable:
   mktyp(
     QUOTE tyvar = ident
       { Ptyp_var tyvar }
   | UNDERSCORE
       { Ptyp_any }
   ) { $1 }
+;
+
+%inline tyvar_name_or_underscore:
+    QUOTE ident
+      { Some $2 }
+  | UNDERSCORE
+      { None }
 ;
 
 type_variance:
@@ -3791,13 +3810,13 @@ alias_type:
    { $1 }
   | mktyp_jane_syntax(
       aliased_type = alias_type AS
-             LPAREN QUOTE tyvar = ident COLON layout = layout_annotation RPAREN
-        { (Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc)
-               (Ltyp_alias { aliased_type; name = Some tyvar; layout })) }
-    | aliased_type = alias_type AS
-             LPAREN UNDERSCORE COLON layout = layout_annotation RPAREN
-        { (Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc)
-               (Ltyp_alias { aliased_type; name = None; layout })) }
+             LPAREN
+             name = tyvar_name_or_underscore
+             COLON
+             layout = layout_annotation
+             RPAREN
+        { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc)
+              (Ltyp_alias { aliased_type; name; layout }) }
     )
     { $1 }
 ;

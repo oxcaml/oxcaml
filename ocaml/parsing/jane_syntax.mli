@@ -134,7 +134,8 @@ module Layouts : sig
                     ; layout : Asttypes.layout_annotation }
 
   val type_of :
-    loc:Location.t -> core_type -> Parsetree.core_type_desc With_attributes.t
+    loc:Location.t -> ?attrs:Parsetree.attributes ->
+    core_type -> Parsetree.core_type_desc With_attributes.t
 end
 
 (******************************************)
