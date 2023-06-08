@@ -3928,11 +3928,16 @@ atomic_type:
         { Ptyp_extension $1 }
   )
   { $1 } /* end mktyp group */
-  | LPAREN QUOTE name=ident COLON layout=layout_annotation RPAREN
-    { let loc = $sloc in
-      mktyp_jane_syntax ~loc @@
-      Jane_syntax.Layouts.type_of ~loc:(make_loc loc) @@
-      Ltyp_var { name; layout } }
+  | mktyp_jane_syntax(
+      LPAREN QUOTE name=ident COLON layout=layout_annotation RPAREN
+      { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) @@
+        Ltyp_var { name = Some name; layout } }
+
+    | LPAREN UNDERSCORE COLON layout=layout_annotation RPAREN
+      { Jane_syntax.Layouts.type_of ~loc:(make_loc $sloc) @@
+        Ltyp_var { name = None; layout } }
+  )
+  { $1 }
 
 
 (* This is the syntax of the actual type parameters in an application of

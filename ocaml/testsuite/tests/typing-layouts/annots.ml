@@ -64,13 +64,31 @@ Error: Bad layout annotation:
 (* Test 2: Annotation on type parameter *)
 
 type ('a : immediate) t2_imm
+type (_ : immediate) t2_imm'
 type t = int t2_imm
 type t = bool t2_imm
 ;;
 [%%expect {|
 type ('a : immediate) t2_imm
+type (_ : immediate) t2_imm'
 type t = int t2_imm
 type t = bool t2_imm
+|}]
+
+module M1 : sig
+  type ('a : immediate) t
+end = struct
+  type (_ : immediate) t
+end
+
+module M2 : sig
+  type (_ : immediate) t
+end = struct
+  type ('a : immediate) t
+end
+
+[%%expect {|
+success
 |}]
 
 type t = string t2_imm
@@ -133,6 +151,27 @@ type ('a : immediate) t = 'a t2_imm
 ;;
 [%%expect {|
 type ('a : immediate) t = 'a t2_imm
+|}]
+
+let f : (_ : value) t2_imm -> unit = fun _ -> ()
+let g : (_ : immediate) t2_imm -> unit = fun _ -> ()
+
+[%%expect {|
+success
+|}]
+
+let f : (_ : immediate) -> unit = fun _ -> ()
+let g : (_ : value) -> unit = fun _ -> ()
+
+[%%expect {|
+success
+|}]
+
+let f : (_ : immediate) -> (_ : value) = fun _ -> assert false
+let g : (_ : value) -> (_ : immediate) = fun _ -> assert false
+
+[%%expect {|
+success
 |}]
 
 (********************************************)

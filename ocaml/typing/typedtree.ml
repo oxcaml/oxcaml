@@ -522,8 +522,7 @@ and core_type =
    }
 
 and core_type_desc =
-    Ttyp_any
-  | Ttyp_var of string * const_layout option
+  | Ttyp_var of string option * const_layout option
   | Ttyp_arrow of arg_label * core_type * core_type
   | Ttyp_tuple of core_type list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list

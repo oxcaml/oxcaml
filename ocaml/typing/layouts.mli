@@ -105,6 +105,7 @@ module Layout : sig
     | Constructor_type_parameter of Path.t * string
     | Univar of string
     | Type_variable of string
+    | Type_wildcard of Location.t
     | Type (* CR layouts: this should really carry a type_expr *)
 
    type value_creation_reason =

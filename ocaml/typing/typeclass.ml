@@ -325,7 +325,9 @@ let rec class_type_field env sign self_scope ctf =
                  Ctype.newvar (Layout.value ~why:Object_field)
                in
                add_method loc env lab priv virt expected_ty sign;
-               let returned_cty = ctyp Ttyp_any (Ctype.newty Tnil) env loc in
+               let returned_cty =
+                 ctyp (Ttyp_var (None, None)) (Ctype.newty Tnil) env loc
+               in
                delayed_meth_specs :=
                  Warnings.mk_lazy (fun () ->
                    let cty = transl_simple_type_univars env sty' in

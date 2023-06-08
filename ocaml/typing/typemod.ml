@@ -505,8 +505,8 @@ let () = Env.check_well_formed_module := check_well_formed_module
 let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
   let eq_vars x y =
     match Jane_syntax.Core_type.of_ast x, Jane_syntax.Core_type.of_ast y with
-    | Some (Jtyp_layout (Ltyp_var { name = nx; layout = lx }), _attrsx),
-      Some (Jtyp_layout (Ltyp_var { name = ny; layout = ly }), _attrsy) ->
+    | Some (Jtyp_layout (Ltyp_var { name = Some nx; layout = lx }), _attrsx),
+      Some (Jtyp_layout (Ltyp_var { name = Some ny; layout = ly }), _attrsy) ->
       String.equal nx ny &&
       Location.compare_txt Layout.equal_const lx ly
     | (Some _, _) | (_, Some _) -> false

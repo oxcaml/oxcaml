@@ -465,7 +465,9 @@ and core_type1_jane_syntax ctxt attrs f (x : Jane_syntax.Core_type.t) =
   if has_non_curry_attr attrs then core_type_jane_syntax ctxt attrs f x
   else
     match x with
-    | Jtyp_layout (Ltyp_var { name; layout }) ->
+    | Jtyp_layout (Ltyp_var { name = None; layout }) ->
+      pp f "(_ :@;%a)" layout_annotation layout
+    | Jtyp_layout (Ltyp_var { name = Some name; layout }) ->
       pp f "(%a@;:@;%a)" tyvar name layout_annotation layout
     | _ -> paren true (core_type_jane_syntax ctxt attrs) f x
 

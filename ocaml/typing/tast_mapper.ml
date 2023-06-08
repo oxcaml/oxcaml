@@ -692,7 +692,6 @@ let typ sub x =
   let ctyp_env = sub.env sub x.ctyp_env in
   let ctyp_desc =
     match x.ctyp_desc with
-    | Ttyp_any
     | Ttyp_var (_,None) as d -> d
     | Ttyp_var (s, Some layout) ->
         Ttyp_var (s, Some (sub.layout_annotation sub layout))

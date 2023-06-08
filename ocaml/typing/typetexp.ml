@@ -435,7 +435,7 @@ let transl_type_param env styp layout =
   match styp.ptyp_desc with
     Ptyp_any ->
       let ty = new_global_var ~name:"_" layout in
-        { ctyp_desc = Ttyp_any; ctyp_type = ty; ctyp_env = env;
+        { ctyp_desc = Ttyp_var (None, None); ctyp_type = ty; ctyp_env = env;
           ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
   | Ptyp_var name ->
       let ty =
@@ -447,7 +447,8 @@ let transl_type_param env styp layout =
           TyVarEnv.add name v;
           v
       in
-        { ctyp_desc = Ttyp_var (name, None); ctyp_type = ty; ctyp_env = env;
+        { ctyp_desc = Ttyp_var (Some name, None);
+          ctyp_type = ty; ctyp_env = env;
           ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
   | _ -> assert false
 
@@ -505,12 +506,11 @@ and transl_type_aux env policy mode styp =
   match styp.ptyp_desc with
     Ptyp_any ->
       let ty =
-        TyVarEnv.new_anon_var styp.ptyp_loc env
-          (Layout.any ~why:Wildcard) policy
+        TyVarEnv.new_anon_var loc env (Layout.any ~why:Wildcard) policy
       in
-      ctyp Ttyp_any ty
+      ctyp (Ttyp_var (None, None)) ty
   | Ptyp_var name ->
-      let desc, typ = transl_type_var env policy mode styp.ptyp_loc name None in
+      let desc, typ = transl_type_var env policy styp.ptyp_loc name None in
       ctyp desc typ
   | Ptyp_arrow _ ->
       let args, ret, ret_mode = extract_params styp in
@@ -863,12 +863,16 @@ and transl_type_aux_jst env policy mode _attrs loc :
 
 and transl_type_aux_jst_layout env policy mode loc :
       Jane_syntax.Layouts.core_type -> _ = function
-  | Ltyp_var { name; layout } ->
-    transl_type_var env policy mode loc name (Some layout)
+  | Ltyp_var { name = None; layout } ->
+    let tlayout = Layout.of_annotation ~context:(Type_wildcard loc) layout in
+    Ttyp_var (None, Some layout.txt),
+    TyVarEnv.new_anon_var loc env tlayout policy
+  | Ltyp_var { name = Some name; layout } ->
+    transl_type_var env policy loc name (Some layout)
   | Ltyp_alias { aliased_type; name; layout } ->
     transl_type_alias env policy mode loc aliased_type name (Some layout)
 
-and transl_type_var env policy _mode loc name layout_annot_opt =
+and transl_type_var env policy loc name layout_annot_opt =
   let print_name = "'" ^ name in
   if not (valid_tyvar_name name) then
     raise (Error (loc, env, Invalid_variable_name print_name));
@@ -894,7 +898,7 @@ and transl_type_var env policy _mode loc name layout_annot_opt =
       TyVarEnv.remember_used name ty loc;
       ty
   in
-  Ttyp_var (name, Option.map Location.get_txt layout_annot_opt), ty
+  Ttyp_var (Some name, Option.map Location.get_txt layout_annot_opt), ty
 
 and transl_type_alias env policy mode alias_loc styp name_opt layout_annot_opt =
   let cty = match name_opt with

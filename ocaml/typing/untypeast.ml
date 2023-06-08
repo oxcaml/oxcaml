@@ -910,8 +910,8 @@ let core_type sub ct =
     desc
   in
   let desc = match ct.ctyp_desc with
-      Ttyp_any -> Ptyp_any
-    | Ttyp_var (s, None) -> Ptyp_var s
+    | Ttyp_var (None, None) -> Ptyp_any
+    | Ttyp_var (Some s, None) -> Ptyp_var s
     | Ttyp_var (name, Some layout) ->
         Jane_syntax.Layouts.type_of ~loc
           (Ltyp_var { name; layout = mkloc layout loc }) |>

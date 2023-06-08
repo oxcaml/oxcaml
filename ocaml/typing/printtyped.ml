@@ -216,9 +216,8 @@ let rec core_type i ppf x =
   attributes i ppf x.ctyp_attributes;
   let i = i+1 in
   match x.ctyp_desc with
-  | Ttyp_any -> line i ppf "Ttyp_any\n";
   | Ttyp_var (s, layout) ->
-      line i ppf "Ttyp_var %s\n" s;
+      line i ppf "Ttyp_var %s\n" (Option.value ~default:"_" s);
       option i layout_annotation ppf layout
   | Ttyp_arrow (l, ct1, ct2) ->
       line i ppf "Ttyp_arrow\n";

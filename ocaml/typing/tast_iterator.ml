@@ -458,7 +458,6 @@ let class_type_field sub {ctf_desc; _} =
 let typ sub {ctyp_desc; ctyp_env; _} =
   sub.env sub ctyp_env;
   match ctyp_desc with
-  | Ttyp_any   -> ()
   | Ttyp_var (_, layout) ->
       Option.iter (sub.layout_annotation sub) layout
   | Ttyp_arrow (_, ct1, ct2) ->

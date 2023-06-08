@@ -458,7 +458,8 @@ module Layouts = struct
   include Ext
 
   type nonrec core_type =
-    | Ltyp_var of { name : string; layout : Asttypes.layout_annotation }
+    | Ltyp_var of { name : string option
+                  ; layout : Asttypes.layout_annotation }
     | Ltyp_alias of { aliased_type : core_type
                     ; name : string option
                     ; layout : Asttypes.layout_annotation }
@@ -486,7 +487,10 @@ module Layouts = struct
         let layout = encode_layout_as_type layout in
         Ast_of.wrap_jane_syntax Core_type ["var"]
           ~loc ~payload:(PTyp layout) @@
-          Ast_helper.Typ.var ~loc name
+          Option.fold
+             ~none:(Ast_helper.Typ.any ~loc ())
+             ~some:(Ast_helper.Typ.var ~loc)
+             name
       | Ltyp_alias { aliased_type; name; layout } ->
         let layout = encode_layout_as_type layout in
         let has_name, inner_typ = match name with
@@ -564,8 +568,10 @@ module Layouts = struct
     let lty = match names with
       | [ "var" ] ->
          begin match typ.ptyp_desc with
+         | Ptyp_any ->
+           Ltyp_var { name = None; layout }
          | Ptyp_var name ->
-           Ltyp_var { name; layout }
+           Ltyp_var { name = Some name; layout }
          | _ -> Desugaring_error.raise ~loc (Unexpected_wrapped_type typ)
          end
       | [ "alias"; "anon" ] ->

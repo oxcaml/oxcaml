@@ -262,6 +262,7 @@ module Layout = struct
     | Constructor_type_parameter of Path.t * string
     | Univar of string
     | Type_variable of string
+    | Type_wildcard of Location.t
     | Type
 
   type creation_reason =
@@ -584,6 +585,8 @@ module Layout = struct
             name
       | Type_variable name ->
           fprintf ppf "the type variable %s" name
+      | Type_wildcard loc ->
+          fprintf ppf "the wildcard _ at %a" Location.print_loc loc
       | Type ->
           fprintf ppf "a type"
 
@@ -1018,6 +1021,8 @@ module Layout = struct
           fprintf ppf "Univar %S" name
       | Type_variable name ->
           fprintf ppf "Type_variable %S" name
+      | Type_wildcard loc ->
+          fprintf ppf "Type_wildcard (%a)" Location.print_loc loc
       | Type ->
           fprintf ppf "Type"
 
