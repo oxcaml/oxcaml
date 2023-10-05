@@ -157,6 +157,10 @@ static int run_command_child(const command_settings *settings)
   int outputFlags =
     O_CREAT | O_WRONLY | (settings->append ? O_APPEND : O_TRUNC);
   int inputMode = 0400, outputMode = 0666;
+#if defined(O_CLOEXEC)
+  inputFlags |= O_CLOEXEC;
+  outputFlags |= O_CLOEXEC;
+#endif
 
   if (setpgid(0, 0) == -1)
   {
