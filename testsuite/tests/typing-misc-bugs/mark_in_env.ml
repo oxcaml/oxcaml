@@ -5,7 +5,7 @@
 (* At one point, this failed due to the fact that
    [Typemod.check_well_formed_module] puts marked types into the environment,
    causing a later substitution to fail (because a type_param wasn't
-   generic). *)
+   generic). This was fixed by https://github.com/ocaml/ocaml/pull/12943. *)
 
 module type Row = sig
   module Row_id_part : sig
@@ -55,7 +55,6 @@ module Bug : T = struct
   end
 end
 
-(* This should just be accepted. *)
 [%%expect{|
 module type Row =
   sig
