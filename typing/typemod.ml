@@ -413,9 +413,8 @@ let rec instance_name ~loc env syntax =
   | Error (Duplicate { name; value1 = _; value2 = _ }) ->
     raise (Error (loc, env, Duplicate_parameter_name name))
 
-let iterator_with_env env =
+let iterator_with_env super env =
   let env = ref (lazy env) in
-  let super = Btype.type_iterators in
   env, { super with
     Btype.it_signature = (fun self sg ->
       (* add all items to the env before recursing down, to handle recursive
@@ -494,7 +493,8 @@ let check_usage_of_path_of_substituted_item paths ~loc ~lid env super =
     }
 
 let do_check_after_substitution env ~loc ~lid paths sg =
-  let env, iterator = iterator_with_env env in
+  with_type_mark begin fun mark ->
+  let env, iterator = iterator_with_env (Btype.type_iterators mark) env in
   let last, rest = match List.rev paths with
     | [] -> assert false
     | last :: rest -> last, rest
@@ -507,8 +507,8 @@ let do_check_after_substitution env ~loc ~lid paths sg =
     | _ :: _ ->
         check_usage_of_path_of_substituted_item rest ~loc ~lid env iterator
   in
-  iterator.Btype.it_signature iterator sg;
-  Btype.(unmark_iterators.it_signature unmark_iterators) sg
+  iterator.Btype.it_signature iterator sg
+  end
 
 let check_usage_after_substitution env ~loc ~lid paths sg =
   match paths with
@@ -527,7 +527,7 @@ let check_well_formed_module env loc context mty =
   (* Format.eprintf "@[check_well_formed_module@ %a@]@."
      Printtyp.modtype mty; *)
   let open Btype in
-  let iterator =
+  let make_iterator mark =
     let rec check_signature env = function
       | [] -> ()
       | Sig_module (id, _, mty, Trec_first, _) :: rem ->
@@ -542,7 +542,8 @@ let check_well_formed_module env loc context mty =
       | _ :: rem ->
           check_signature env rem
     in
-    let env, super = iterator_with_env env in
+    let env, super =
+      iterator_with_env (Btype.type_iterators mark) env in
     { super with
       it_type_expr = (fun self ty ->
         (* Check that an unboxed path is valid because substitutions can
@@ -577,8 +578,9 @@ let check_well_formed_module env loc context mty =
         super.it_signature self sg);
     }
   in
-  iterator.it_module_type iterator mty;
-  Btype.(unmark_iterators.it_module_type unmark_iterators) mty
+  with_type_mark (fun mark ->
+    let iterator = make_iterator mark in
+    iterator.it_module_type iterator mty)
 
 let () = Env.check_well_formed_module := check_well_formed_module
 

@@ -2231,31 +2231,25 @@ let check_unboxed_paths decls ~unboxed_version_banned =
   (* We iterate on all subexpressions of the declaration to check "in depth"
      that no non-existent unboxed version is used. *)
   let open Btype in
-  let checked =
-    (* [checked] remembers the types that the iterator already
-        checked, to avoid looping on cyclic types. *)
-    ref TypeSet.empty
-  in
-  let check_ty loc ty =
-    match get_desc ty with
-    | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
-      when unboxed_version_banned path ->
-        raise (Error (loc, No_unboxed_version path))
-    | _ -> ()
-  in
-  let check_decl d =
-    let it =
-      {type_iterators with it_type_expr =
-        (fun self ty ->
-          if not (TypeSet.mem ty !checked) then begin
-            check_ty d.type_loc ty;
-            checked := TypeSet.add ty !checked;
-            self.it_do_type_expr self ty
-          end)}
+  with_type_mark (fun mark ->
+    let super = type_iterators mark in
+    let check_ty loc ty =
+      match get_desc ty with
+      | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
+        when unboxed_version_banned path ->
+          raise (Error (loc, No_unboxed_version path))
+      | _ -> ()
     in
-    it.it_type_declaration it (Ctype.generic_instance_declaration d)
-  in
-  List.iter (fun (_, d) -> check_decl d) decls
+    let check_decl d =
+      let it =
+        {super with it_do_type_expr =
+          (fun self ty ->
+              check_ty d.type_loc ty;
+              super.it_do_type_expr self ty)}
+      in
+      it.it_type_declaration it (Ctype.generic_instance_declaration d)
+    in
+    List.iter (fun (_, d) -> check_decl d) decls)
 
 (* Note: Well-foundedness for OCaml types
 
@@ -2484,11 +2478,8 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
   let open Btype in
   (* We iterate on all subexpressions of the declaration to check
      "in depth" that no ill-founded type exists. *)
-  let it =
-    let checked =
-      (* [checked] remembers the types that the iterator already
-         checked, to avoid looping on cyclic types. *)
-      ref TypeSet.empty in
+  with_type_mark begin fun mark ->
+    let super = type_iterators mark in
     let visited =
       (* [visited] remembers the inner visits performed by
          [check_well_founded] on each type expression reachable from
@@ -2496,14 +2487,14 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
          [check_well_founded] work when invoked on two parts of the
          type declaration that have common subexpressions. *)
       ref TypeMap.empty in
-    {type_iterators with it_type_expr =
-     (fun self ty ->
-       if TypeSet.mem ty !checked then () else begin
-         check_well_founded  ~abs_env env loc path to_check visited ty;
-         checked := TypeSet.add ty !checked;
-         self.it_do_type_expr self ty
-       end)} in
-  it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+    let it =
+      {super with it_do_type_expr =
+       (fun self ty ->
+         check_well_founded ~abs_env env loc path to_check visited ty;
+         super.it_do_type_expr self ty
+       )} in
+    it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+  end
 
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.

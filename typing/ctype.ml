@@ -617,9 +617,9 @@ exception Non_closed of type_expr * variable_kind
 
    It is marked [@inline] so that calls to [add_one] are not indirect.
  *)
-let[@inline] free_vars ~zero ~add_one ?env tys =
+let[@inline] free_vars ~zero ~add_one ?env mark tys =
   let rec fv ~kind acc ty =
-    if not (try_mark_node ty) then acc
+    if not (try_mark_node mark ty) then acc
     else match get_desc ty, env with
       | Tvar { jkind; _ }, _ ->
           add_one ty (Some jkind) kind acc
@@ -650,9 +650,7 @@ let[@inline] free_vars ~zero ~add_one ?env tys =
 
 let free_variables ?env ty =
   let add_one ty _jkind _kind acc = ty :: acc in
-  let tl = free_vars ~zero:[] ~add_one ?env [ty] in
-  unmark_type ty;
-  tl
+  with_type_mark (fun mark -> free_vars ~zero:[] ~add_one ?env mark [ty])
 
 let free_non_row_variables_of_list tyl =
   let add_one ty _jkind kind acc =
@@ -660,9 +658,7 @@ let free_non_row_variables_of_list tyl =
     | Type_variable -> ty :: acc
     | Row_variable -> acc
   in
-  let tl = free_vars ~zero:[] ~add_one tyl in
-  List.iter unmark_type tyl;
-  tl
+  with_type_mark (fun mark -> free_vars ~zero:[] ~add_one mark tyl)
 
 let free_variable_set_of_list env tys =
   let add_one ty jkind _kind acc =
@@ -670,9 +666,8 @@ let free_variable_set_of_list env tys =
     | None -> (* not a Tvar *) acc
     | Some _jkind -> TypeSet.add ty acc
   in
-  let ts = free_vars ~zero:TypeSet.empty ~add_one ~env tys in
-  List.iter unmark_type tys;
-  ts
+  with_type_mark (fun mark ->
+    free_vars ~zero:TypeSet.empty ~add_one ~env mark tys)
 
 let exists_free_variable f ty =
   let exception Exists in
@@ -682,40 +677,32 @@ let exists_free_variable f ty =
     | Some _ -> ()
     | None -> assert false (* this only happens passing ~env to [free_vars] *)
   in
-  let result =
-    try free_vars ~zero:() ~add_one [ty]; false
-    with Exists -> true
-  in
-  unmark_type ty;
-  result
+  with_type_mark (fun mark ->
+    try free_vars ~zero:() ~add_one mark [ty]; false
+    with Exists -> true)
 
-let closed_type ?env ty =
+let closed_type ?env mark ty =
   let add_one ty _jkind kind _acc = raise (Non_closed (ty, kind)) in
-  free_vars ~zero:() ~add_one ?env [ty]
+  free_vars ~zero:() ~add_one ?env mark [ty]
 
 let closed_type_expr ?env ty =
-  let closed =
-    try closed_type ?env ty; true
-    with Non_closed _ -> false
-  in
-  unmark_type ty;
-  closed
+  with_type_mark (fun mark ->
+    try closed_type ?env mark ty; true
+    with Non_closed _ -> false)
 
-let close_type ty =
+let close_type mark ty =
   remove_mode_and_jkind_variables ty;
-  closed_type ty
+  closed_type mark ty
 
 let closed_parameterized_type params ty =
-  List.iter mark_type params;
-  let ok =
-    try close_type ty; true with Non_closed _ -> false in
-  List.iter unmark_type params;
-  unmark_type ty;
-  ok
+  with_type_mark begin fun mark ->
+    List.iter (mark_type mark) params;
+    try close_type mark ty; true with Non_closed _ -> false
+  end
 
 let closed_type_decl decl =
-  try
-    List.iter mark_type decl.type_params;
+  with_type_mark begin fun mark -> try
+    List.iter (mark_type mark) decl.type_params;
     List.iter remove_mode_and_jkind_variables decl.type_params;
     begin match decl.type_kind with
       Type_abstract _ ->
@@ -735,28 +722,27 @@ let closed_type_decl decl =
                     remove_mode_and_jkind_variables l.ld_type) l
                 end;
                 remove_mode_and_jkind_variables res_ty
-            | None -> List.iter close_type (tys_of_constr_args cd_args)
+            | None -> List.iter (close_type mark) (tys_of_constr_args cd_args)
           )
           v
     | Type_record(r, _rep, _) ->
-        List.iter (fun l -> close_type l.ld_type) r
+        List.iter (fun l -> close_type mark l.ld_type) r
     | Type_record_unboxed_product(r, _rep, _) ->
-        List.iter (fun l -> close_type l.ld_type) r
+        List.iter (fun l -> close_type mark l.ld_type) r
     | Type_open -> ()
     end;
     begin match decl.type_manifest with
       None    -> ()
-    | Some ty -> close_type ty
+    | Some ty -> close_type mark ty
     end;
-    unmark_type_decl decl;
     None
   with Non_closed (ty, _) ->
-    unmark_type_decl decl;
     Some ty
+  end
 
 let closed_extension_constructor ext =
-  try
-    List.iter mark_type ext.ext_type_params;
+  with_type_mark begin fun mark -> try
+    List.iter (mark_type mark) ext.ext_type_params;
     begin match ext.ext_ret_type with
     | Some res_ty ->
         (* gadts cannot have free type variables, but they might
@@ -765,13 +751,12 @@ let closed_extension_constructor ext =
         iter_type_expr_cstr_args remove_mode_and_jkind_variables ext.ext_args;
         remove_mode_and_jkind_variables res_ty
     | None ->
-        iter_type_expr_cstr_args close_type ext.ext_args
+        iter_type_expr_cstr_args (close_type mark) ext.ext_args
     end;
-    unmark_extension_constructor ext;
     None
   with Non_closed (ty, _) ->
-    unmark_extension_constructor ext;
     Some ty
+  end
 
 type closed_class_failure = {
   free_variable: type_expr * variable_kind;
@@ -781,13 +766,14 @@ type closed_class_failure = {
 exception CCFailure of closed_class_failure
 
 let closed_class params sign =
-  List.iter mark_type params;
-  ignore (try_mark_node sign.csig_self_row);
+  with_type_mark begin fun mark ->
+  List.iter (mark_type mark) params;
+  ignore (try_mark_node mark sign.csig_self_row);
   try
     Meths.iter
       (fun lab (priv, _, ty) ->
         if priv = Mpublic then begin
-          try close_type ty with Non_closed (ty0, variable_kind) ->
+          try close_type mark ty with Non_closed (ty0, variable_kind) ->
             raise (CCFailure {
               free_variable = (ty0, variable_kind);
               meth = lab;
@@ -795,14 +781,10 @@ let closed_class params sign =
             })
         end)
       sign.csig_meths;
-    List.iter unmark_type params;
-    unmark_class_signature sign;
     None
   with CCFailure reason ->
-    List.iter unmark_type params;
-    unmark_class_signature sign;
     Some reason
-
+  end
 
                             (**********************)
                             (*  Type duplication  *)
@@ -934,35 +916,35 @@ let rec normalize_package_path env p =
           normalize_package_path env (Path.Pdot (p1', s))
       | _ -> p
 
-let rec check_scope_escape env level ty =
+let rec check_scope_escape mark env level ty =
   let orig_level = get_level ty in
-  if try_logged_mark_node ty then begin
+  if try_mark_node mark ty then begin
     if level < get_scope ty then
       raise_scope_escape_exn ty;
     begin match get_desc ty with
     | Tconstr (p, _, _) when level < Path.scope p ->
         begin match !forward_try_expand_safe env ty with
         | ty' ->
-            check_scope_escape env level ty'
+            check_scope_escape mark env level ty'
         | exception Cannot_expand ->
             raise_escape_exn (Constructor p)
         end
     | Tpackage (p, fl) when level < Path.scope p ->
         let p' = normalize_package_path env p in
         if Path.same p p' then raise_escape_exn (Module_type p);
-        check_scope_escape env level
+        check_scope_escape mark env level
           (newty2 ~level:orig_level (Tpackage (p', fl)))
     | _ ->
-        iter_type_expr (check_scope_escape env level) ty
+        iter_type_expr (check_scope_escape mark env level) ty
     end;
   end
 
 let check_scope_escape env level ty =
-  let snap = snapshot () in
-  try check_scope_escape env level ty; backtrack snap
+  with_type_mark begin fun mark -> try
+    check_scope_escape mark env level ty
   with Escape e ->
-    backtrack snap;
     raise (Escape { e with context = Some ty })
+  end
 
 let rec update_scope scope ty =
   if get_scope ty < scope then begin
@@ -1227,15 +1209,14 @@ let compute_univars ty =
 
 
 let fully_generic ty =
-  let rec aux ty =
-    if not_marked_node ty then
-      if get_level ty = generic_level then
-        (flip_mark_node ty; iter_type_expr aux ty)
-      else raise Exit
-  in
-  let res = try aux ty; true with Exit -> false in
-  unmark_type ty;
-  res
+  with_type_mark begin fun mark ->
+    let rec aux ty =
+      if try_mark_node mark ty then
+        if get_level ty = generic_level then iter_type_expr aux ty
+        else raise Exit
+    in
+    try aux ty; true with Exit -> false
+  end
 
 
                               (*******************)
@@ -1831,11 +1812,11 @@ let instance_prim_layout (desc : Primitive.description) ty =
       jkind (Concrete_creation Layout_poly_in_external)
   in
   For_copy.with_scope (fun copy_scope ->
-    let rec inner ty =
+    let rec inner mark ty =
       let level = get_level ty in
       (* only change type vars on generic_level to avoid modifying ones captured
          from an outer scope *)
-      if level = generic_level && try_mark_node ty then begin
+      if level = generic_level && try_mark_node mark ty then begin
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
           For_copy.redirect_desc copy_scope ty
@@ -1845,11 +1826,10 @@ let instance_prim_layout (desc : Primitive.description) ty =
             (Tunivar {r with jkind = get_jkind jkind})
         | _ -> ()
         end;
-        iter_type_expr inner ty
+        iter_type_expr (inner mark) ty
       end
     in
-    inner ty;
-    unmark_type ty;
+    with_type_mark (fun mark -> inner mark ty);
     match !new_sort with
     | Some sort ->
       (* We don't want to lower the type vars from generic_level due to usages
@@ -2831,9 +2811,9 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       Jkind.History.(update_reason jkind (Generalized (name, loc)))
     else jkind
   in
-  let rec inner ty =
+  let rec inner mark ty =
     let level = get_level ty in
-    if try_mark_node ty then begin
+    if try_mark_node mark ty then begin
       begin match get_desc ty with
       | Tvar ({ jkind; _ } as r) ->
         let new_jkind = immediacy_check jkind in
@@ -2845,11 +2825,10 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
         set_type_desc ty (Tunivar {r with jkind = new_jkind})
       | _ -> ()
       end;
-      iter_type_expr inner ty
+      iter_type_expr (inner mark) ty
     end
   in
-  inner ty;
-  unmark_type ty
+  with_type_mark (fun mark -> inner mark ty)
 
 let is_principal ty =
   not !Clflags.principal || get_level ty = generic_level
@@ -3060,10 +3039,11 @@ let unify_univar_for tr_exn t1 t2 jkind1 jkind2 univar_pairs =
 (* If [inj_only=true], only check injective positions *)
 let occur_univar ?(inj_only=false) env ty =
   let visited = ref TypeMap.empty in
+  with_type_mark begin fun mark ->
   let rec occur_rec bound ty =
-    if not_marked_node ty then
+    if not_marked_node mark ty then
       if TypeSet.is_empty bound then
-        (flip_mark_node ty; occur_desc bound ty)
+        (ignore (try_mark_node mark ty); occur_desc bound ty)
       else try
         let bound' = TypeMap.find ty !visited in
         if not (TypeSet.subset bound' bound) then begin
@@ -3102,10 +3082,8 @@ let occur_univar ?(inj_only=false) env ty =
           end
       | _ -> iter_type_expr (occur_rec bound) ty
   in
-  Misc.try_finally (fun () ->
-      occur_rec TypeSet.empty ty
-    )
-    ~always:(fun () -> unmark_type ty)
+  occur_rec TypeSet.empty ty
+  end
 
 let has_free_univars env ty =
   try occur_univar ~inj_only:false env ty; false with Escape _ -> true
@@ -3136,10 +3114,9 @@ let get_univar_family univar_pairs univars =
 (* Whether a family of univars escapes from a type *)
 let univars_escape env univar_pairs vl ty =
   let family = get_univar_family univar_pairs vl in
-  let visited = ref TypeSet.empty in
+  with_type_mark begin fun mark ->
   let rec occur t =
-    if TypeSet.mem t !visited then () else begin
-      visited := TypeSet.add t !visited;
+    if try_mark_node mark t then begin
       match get_desc t with
         Tpoly (t, tl) ->
           if List.exists (fun t -> TypeSet.mem t family) tl then ()
@@ -3161,6 +3138,7 @@ let univars_escape env univar_pairs vl ty =
     end
   in
   occur ty
+  end
 
 (* Wrapper checking that no variable escapes and updating univar_pairs *)
 let enter_poly env univar_pairs t1 tl1 t2 tl2 f =
@@ -3270,30 +3248,28 @@ let unexpanded_diff ~got ~expected =
 
 (**** Unification ****)
 
-let rec deep_occur_rec t0 ty =
-  if get_level ty >= get_level t0 && try_mark_node ty then begin
+let rec deep_occur_rec mark t0 ty =
+  if get_level ty >= get_level t0 && try_mark_node mark ty then begin
     if eq_type ty t0 then raise Occur;
-    iter_type_expr (deep_occur_rec t0) ty
+    iter_type_expr (deep_occur_rec mark t0) ty
   end
 
 (* Return whether [t0] occurs in any type in [tyl]. Objects are also traversed. *)
 let deep_occur_list t0 tyl =
-  try
-    List.iter (deep_occur_rec t0) tyl;
-    List.iter unmark_type tyl;
-    false
-  with Occur ->
-    List.iter unmark_type tyl;
-    true
+  with_type_mark (fun mark ->
+    try
+      List.iter (deep_occur_rec mark t0) tyl;
+      false
+    with Occur ->
+      true)
 
 let deep_occur t0 ty =
-  try
-    deep_occur_rec t0 ty;
-    unmark_type ty;
-    false
-  with Occur ->
-    unmark_type ty;
-    true
+  with_type_mark (fun mark ->
+    try
+      deep_occur_rec mark t0 ty;
+      false
+    with Occur ->
+      true)
 
 
 (* a local constraint can be added only if the rhs
@@ -3711,14 +3687,16 @@ let mcomp_for tr_exn env t1 t2 =
 
 let find_lowest_level ty =
   let lowest = ref generic_level in
-  let rec find ty =
-    if not_marked_node ty then begin
-      let level = get_level ty in
-      if level < !lowest then lowest := level;
-      flip_mark_node ty;
-      iter_type_expr find ty
-    end
-  in find ty; unmark_type ty; !lowest
+  with_type_mark begin fun mark ->
+    let rec find ty =
+      if try_mark_node mark ty then begin
+        let level = get_level ty in
+        if level < !lowest then lowest := level;
+        iter_type_expr find ty
+      end
+    in find ty
+  end;
+  !lowest
 
 let jkind_of_abstract_type_declaration env p =
   try
@@ -5160,16 +5138,17 @@ let generalize_class_signature_spine env sign =
    variables from the subject are not lowered.
 *)
 let moregen_occur env level ty =
-  let rec occur ty =
-    let lv = get_level ty in
-    if lv <= level then () else
-    if is_Tvar ty && lv >= generic_level - 1 then raise Occur else
-    if try_mark_node ty then iter_type_expr occur ty
-  in
-  begin try
-    occur ty; unmark_type ty
-  with Occur ->
-    unmark_type ty; raise_unexplained_for Moregen
+  with_type_mark begin fun mark ->
+    let rec occur ty =
+      let lv = get_level ty in
+      if lv <= level then () else
+      if is_Tvar ty && lv >= generic_level - 1 then raise Occur else
+      if try_mark_node mark ty then iter_type_expr occur ty
+    in
+    try
+      occur ty
+    with Occur ->
+      raise_unexplained_for Moregen
   end;
   (* also check for free univars *)
   occur_univar_for Moregen env ty;
@@ -5672,8 +5651,8 @@ module Rigidify = struct
    and check validity after unification *)
 (* Simpler, no? *)
 
-let rec rigidify_rec vars ty =
-  if try_mark_node ty then
+let rec rigidify_rec mark vars ty =
+  if try_mark_node mark ty then
     begin match get_desc ty with
     | Tvar { name; jkind } ->
         vars := TypeMap.add ty (name, jkind) !vars
@@ -5686,12 +5665,12 @@ let rec rigidify_rec vars ty =
               ~name ~closed
           in link_type more (newty2 ~level:(get_level ty) (Tvariant row'))
         end;
-        iter_row (rigidify_rec vars) row;
+        iter_row (rigidify_rec mark vars) row;
         (* only consider the row variable if the variant is not static *)
         if not (static_row row) then
-          rigidify_rec vars (row_more row)
+          rigidify_rec mark vars (row_more row)
     | _ ->
-        iter_type_expr (rigidify_rec vars) ty
+        iter_type_expr (rigidify_rec mark vars) ty
     end
 
 type var = { name : string option
@@ -5705,8 +5684,7 @@ type t = var list
    later. *)
 let rigidify_list tys =
   let vars = ref TypeMap.empty in
-  List.iter (rigidify_rec vars) tys;
-  List.iter unmark_type tys;
+  with_type_mark (fun mark -> List.iter (rigidify_rec mark vars) tys);
   List.map (fun (trans_expr, (name, original_jkind)) ->
              { ty = Transient_expr.type_expr trans_expr; name; original_jkind })
     (TypeMap.bindings !vars)
@@ -7069,9 +7047,8 @@ let nongen_vars_in_class_declaration cty =
 
 (* Normalize a type before printing, saving... *)
 (* Cannot use mark_type because deep_occur uses it too *)
-let rec normalize_type_rec visited ty =
-  if not (TypeSet.mem ty !visited) then begin
-    visited := TypeSet.add ty !visited;
+let rec normalize_type_rec mark ty =
+  if try_mark_node mark ty then begin
     let tm = row_of_type ty in
     begin if not (is_Tconstr ty) && is_constr_row ~allow_ident:false tm then
       match get_desc tm with (* PR#7348 *)
@@ -7130,11 +7107,11 @@ let rec normalize_type_rec visited ty =
         set_type_desc fi (get_desc fi')
     | _ -> ()
     end;
-    iter_type_expr (normalize_type_rec visited) ty;
+    iter_type_expr (normalize_type_rec mark) ty;
   end
 
 let normalize_type ty =
-  normalize_type_rec (ref TypeSet.empty) ty
+  with_type_mark (fun mark -> normalize_type_rec mark ty)
 
 
                               (*************************)
