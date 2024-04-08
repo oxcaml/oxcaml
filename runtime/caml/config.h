@@ -46,12 +46,11 @@
 
 #include <stddef.h>
 #include <limits.h>
+#include <stdint.h>
 
 #if defined(HAS_LOCALE_H) || defined(HAS_XLOCALE_H)
 #define HAS_LOCALE
 #endif
-
-#include <stdint.h>
 
 /* Disable the mingw-w64 *printf shims */
 #if defined(CAML_INTERNALS) && defined(__MINGW32__)
@@ -75,44 +74,28 @@
 /* Types for 32-bit integers, 64-bit integers, and
    native integers (as wide as a pointer type) */
 
-#ifndef ARCH_INT32_TYPE
+#define ARCH_INT32_TYPE int32_t
+#define ARCH_UINT32_TYPE uint32_t
+
 #if SIZEOF_INT == 4
-#define ARCH_INT32_TYPE int
-#define ARCH_UINT32_TYPE unsigned int
 #define ARCH_INT32_PRINTF_FORMAT ""
 #elif SIZEOF_LONG == 4
-#define ARCH_INT32_TYPE long
-#define ARCH_UINT32_TYPE unsigned long
 #define ARCH_INT32_PRINTF_FORMAT "l"
 #elif SIZEOF_SHORT == 4
-#define ARCH_INT32_TYPE short
-#define ARCH_UINT32_TYPE unsigned short
 #define ARCH_INT32_PRINTF_FORMAT ""
-#else
-#error "No 32-bit integer type available"
-#endif
 #endif
 
+#define ARCH_INT64_TYPE int64_t
+#define ARCH_UINT64_TYPE uint64_t
+
 #if defined(__MINGW32__) && !__USE_MINGW_ANSI_STDIO && !defined(_UCRT)
-  #define ARCH_INT64_TYPE long long
-  #define ARCH_UINT64_TYPE unsigned long long
-  #define ARCH_INT64_PRINTF_FORMAT "I64"
+#define ARCH_INT64_PRINTF_FORMAT "I64"
 #elif defined(_MSC_VER)
-  #define ARCH_INT64_TYPE int64_t
-  #define ARCH_UINT64_TYPE uint64_t
-  #define ARCH_INT64_PRINTF_FORMAT "I64"
-#else
-  #if SIZEOF_LONG == 8
-    #define ARCH_INT64_TYPE long
-    #define ARCH_UINT64_TYPE unsigned long
-    #define ARCH_INT64_PRINTF_FORMAT "l"
-  #elif SIZEOF_LONGLONG == 8
-    #define ARCH_INT64_TYPE long long
-    #define ARCH_UINT64_TYPE unsigned long long
-    #define ARCH_INT64_PRINTF_FORMAT "ll"
-  #else
-    #error "No 64-bit integer type available"
-  #endif
+#define ARCH_INT64_PRINTF_FORMAT "I64"
+#elif SIZEOF_LONGLONG == 8
+#define ARCH_INT64_PRINTF_FORMAT "ll"
+#elif SIZEOF_LONG == 8
+#define ARCH_INT64_PRINTF_FORMAT "l"
 #endif
 
 #if SIZEOF_PTR == SIZEOF_LONG
