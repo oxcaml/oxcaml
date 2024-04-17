@@ -360,7 +360,13 @@ CAMLprim value caml_make_local_unboxed_float64_vect(value len)
 }
 
 /* [len] is a [value] representing number of words or floats */
+<<<<<<< HEAD
 static value make_vect_gen(value len, value init, int local)
+||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+CAMLprim value caml_make_vect(value len, value init)
+=======
+CAMLprim value caml_array_make(value len, value init)
+>>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
 {
   CAMLparam2 (len, init);
   CAMLlocal1 (res);
@@ -568,7 +574,7 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
 
 /* [len] is a [value] representing number of floats */
 /* [ int -> float array ] */
-CAMLprim value caml_make_float_vect(value len)
+CAMLprim value caml_array_create_float(value len)
 {
 #ifdef FLAT_FLOAT_ARRAY
   return caml_floatarray_create (len);
@@ -585,7 +591,7 @@ CAMLprim value caml_make_float_vect(value len)
 #endif
   };
   value some_float = Val_hp(some_float_contents);
-  return caml_make_vect (len, some_float);
+  return caml_array_make (len, some_float);
 #endif
 }
 
@@ -783,7 +789,13 @@ CAMLprim value caml_make_untagged_int_vect_bytecode(value len)
    boxed floats and returns the corresponding flat-allocated [float array].
    In all other cases, it just returns its argument unchanged.
 */
+<<<<<<< HEAD
 static value make_array_gen(value init, int local)
+||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+CAMLprim value caml_make_array(value init)
+=======
+CAMLprim value caml_array_of_uniform_array(value init)
+>>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
 {
 #ifdef FLAT_FLOAT_ARRAY
   CAMLparam1 (init);
@@ -822,6 +834,7 @@ static value make_array_gen(value init, int local)
 #endif
 }
 
+<<<<<<< HEAD
 CAMLprim value caml_make_array(value init)
 {
   return make_array_gen(init, 0);
@@ -831,6 +844,28 @@ CAMLprim value caml_make_array_local(value init)
 {
   return make_array_gen(init, 1);
 }
+||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+=======
+
+/* #13003: previous names for array-creation primitives,
+   kept for backward-compatibility only. */
+
+CAMLprim value caml_make_vect(value len, value init)
+{
+  return caml_array_make(len, init);
+}
+
+CAMLprim value caml_make_float_vect(value len)
+{
+  return caml_array_create_float(len);
+}
+
+CAMLprim value caml_make_array(value array)
+{
+  return caml_array_of_uniform_array(array);
+}
+
+>>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
 
 /* Blitting */
 

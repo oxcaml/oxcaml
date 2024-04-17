@@ -59,8 +59,14 @@ external set : ('a : value_or_null mod separable).
    @raise Invalid_argument
    if [n] is outside the range 0 to [length a - 1]. *)
 
+<<<<<<< HEAD
 external make : ('a : value_or_null mod separable).
    int -> 'a -> 'a array = "caml_make_vect"
+||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+external make : int -> 'a -> 'a array = "caml_make_vect"
+=======
+external make : int -> 'a -> 'a array = "caml_array_make"
+>>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
 (** [make n x] returns a fresh array of length [n],
    initialized with [x].
    All the elements of this new array are initially
@@ -73,8 +79,14 @@ external make : ('a : value_or_null mod separable).
    If the value of [x] is a floating-point number, then the maximum
    size is only [Sys.max_array_length / 2].*)
 
+<<<<<<< HEAD
 external create_float : ('a : value_or_null mod separable).
    int -> float array = "caml_make_float_vect"
+||||||| parent of d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
+external create_float: int -> float array = "caml_make_float_vect"
+=======
+external create_float: int -> float array = "caml_array_create_float"
+>>>>>>> d0ac496c2d (Merge pull request #13003 from gasche/rename-array-make-runtime-functions)
 (** [create_float n] returns a fresh float array of length [n],
     with uninitialized data.
     @since 4.03 *)
