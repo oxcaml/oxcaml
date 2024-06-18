@@ -300,6 +300,7 @@ AC_DEFINE([MAGIC_NUMBER_PREFIX], ["][MAGIC_NUMBER__PREFIX]["])
 AC_DEFINE([MAGIC_NUMBER_VERSION], ["][MAGIC_NUMBER__VERSION]["])
 AC_SUBST([MAGIC_NUMBER_LENGTH], [MAGIC_NUMBER__LENGTH])
 AC_DEFINE([EXEC_MAGIC_LENGTH], [MAGIC_NUMBER__LENGTH])
+AC_SUBST([MAGIC_LENGTH], [MAGIC_NUMBER__LENGTH])
 AC_DEFINE([EXEC_FORMAT], ["][EXEC__FORMAT]["])
 AC_SUBST([EXEC_MAGIC_NUMBER], [EXEC__MAGIC_NUMBER])
 AC_SUBST([CMI_MAGIC_NUMBER], [CMI__MAGIC_NUMBER])
@@ -476,6 +477,7 @@ AC_CONFIG_FILES([stdlib/sys.ml])
 AC_CONFIG_FILES([manual/src/version.tex])
 AC_CONFIG_FILES([manual/src/html_processing/src/common.ml])
 AC_CONFIG_FILES([ocamltest/ocamltest_config.ml])
+AC_CONFIG_FILES([otherlibs/dynlink/dynlink_config.ml])
 AC_CONFIG_FILES([utils/config.common.ml])
 AC_CONFIG_FILES([utils/config.generated.ml])
 AC_CONFIG_FILES([tools/eventlog_metadata])
@@ -999,6 +1001,7 @@ AS_CASE([$host],
 
 otherlibraries="dynlink"
 lib_dynlink=true
+<<<<<<< HEAD
 
 AS_IF(
   [test x"$enable_runtime5" = x"yes"],
@@ -1006,6 +1009,16 @@ AS_IF(
    lib_runtime_events=true],
   [])
 
+||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
+lib_runtime_events=true
+=======
+dldir=otherlibs/dynlink
+AC_CONFIG_LINKS([
+  $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
+  $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
+])
+lib_runtime_events=true
+>>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
 AS_IF([test x"$enable_unix_lib" != "xno"],
   [enable_unix_lib=yes
   AC_CONFIG_FILES([otherlibs/unix/META])

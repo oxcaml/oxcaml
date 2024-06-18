@@ -12,6 +12,7 @@
 ;*                                                                        *
 ;**************************************************************************
 
+<<<<<<< HEAD
 (rule
  (targets dynlink_internal_byte.ml)
  (deps byte/dynlink.ml)
@@ -905,3 +906,35 @@
   (META as dynlink/META))
  (section lib)
  (package ocaml))
+||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
+; mshinwell: Disabled: this needs to build in the same way as the
+; Makefile does, with the [Dynlink_compilerlibs] pack.
+;
+; (library
+;   (name dynlink)
+;   (wrapped false)
+;   (modules dynlink dynlink_compilerlibs dynlink_common dynlink_types
+;      dynlink_platform_intf)
+;   ; the -33 is specific to the hackery done with dune.
+;   (flags (:standard -nostdlib -w -33))
+;   (modules_without_implementation dynlink)
+;   (libraries ocamlcommon stdlib))
+;
+; (rule
+;  (targets dynlink_compilerlibs.ml)
+;  (action (write-file %{targets}
+;            "(* empty because we are linking with ocamlcommon *)")))
+=======
+; mshinwell: Disabled: this needs to build in the same way as the
+; Makefile does, with the [Dynlink_compilerlibs] pack.
+;
+; (library
+;   (name dynlink)
+;   (wrapped false)
+;   (modules dynlink dynlink_common dynlink_types
+;      dynlink_platform_intf)
+;   ; the -33 is specific to the hackery done with dune.
+;   (flags (:standard -nostdlib -w -33))
+;   (modules_without_implementation dynlink)
+;   (libraries ocamlcommon stdlib))
+>>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
