@@ -51,12 +51,26 @@ module Global = struct
 
   let quote s = "`" ^ s ^ "'"
 
+<<<<<<< HEAD
   let description ppf = function
     | Glob_compunit cu ->
         Format_doc.fprintf ppf "compilation unit %a"
           Compilation_unit.print_as_inline_code cu
+||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
+  let description ppf = function
+    | Glob_compunit (Compunit cu) ->
+        Format_doc.fprintf ppf "compilation unit %a"
+          Style.inline_code (quote cu)
+=======
+  let description ppf g =
+    let open Format_doc in
+    match g with
+    | Glob_compunit (Compunit cu) ->
+        fprintf ppf "compilation unit %a"
+          Style.inline_code (quote cu)
+>>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
     | Glob_predef (Predef_exn exn) ->
-        Format_doc.fprintf ppf "predefined exception %a"
+        fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
 
   let of_compilation_unit cu = Glob_compunit cu
