@@ -2648,6 +2648,11 @@ AS_CASE([$enable_ocamltest,OCAML__DEVELOPMENT_VERSION],
     ocamltest_target=ocamltest
     ocamltest_opt_target=ocamltest.opt
     ocamltest='ocamltest'
+    AS_IF([$native_compiler],
+      [optional_native_tools="$optional_native_tools \
+testsuite/tools/test_in_prefix.opt"],
+      [optional_bytecode_tools="$optional_bytecode_tools \
+testsuite/tools/test_in_prefix"])
     testsuite_tools='testsuite/tools/codegen testsuite/tools/expect'
     optional_bytecode_tools="$optional_bytecode_tools $testsuite_tools"],
   [build_ocamltest=false

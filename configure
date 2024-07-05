@@ -23225,6 +23225,14 @@ case $enable_ocamltest,true in #(
     ocamltest_target=ocamltest
     ocamltest_opt_target=ocamltest.opt
     ocamltest='ocamltest'
+    if $native_compiler
+then :
+  optional_native_tools="$optional_native_tools \
+testsuite/tools/test_in_prefix.opt"
+else $as_nop
+  optional_bytecode_tools="$optional_bytecode_tools \
+testsuite/tools/test_in_prefix"
+fi
     testsuite_tools='testsuite/tools/codegen testsuite/tools/expect'
     optional_bytecode_tools="$optional_bytecode_tools $testsuite_tools" ;; #(
   *) :
