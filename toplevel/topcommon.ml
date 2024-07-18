@@ -444,8 +444,16 @@ let try_run_directive ppf dir_name pdir_arg =
 
 let loading_hint_printer ppf cu =
   let open Format_doc in
+<<<<<<< HEAD
   let global = Symtable.Global.Glob_compunit cu in
   Symtable.report_error ppf (Symtable.Undefined_global global);
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+  let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
+  Symtable.report_error ppf (Symtable.Undefined_global global);
+=======
+  let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
+  Symtable.report_error_doc ppf (Symtable.Undefined_global global);
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
   let find_with_ext ext =
     let leafname =
       (Compilation_unit.Name.to_string (Compilation_unit.name cu)) ^ ext

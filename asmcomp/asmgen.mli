@@ -78,6 +78,13 @@ type error =
   | Asm_generation of string * Emitaux.error
 
 exception Error of error
+<<<<<<< HEAD
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+val report_error: error Format_doc.printer
+=======
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
 
 val report_error : error Format_doc.printer
 

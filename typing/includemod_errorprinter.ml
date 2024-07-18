@@ -840,9 +840,17 @@ let core env id x =
         (Printtyp.tree_of_cltype_declaration id diff.got Trec_first)
         !Oprint.out_sig_item
         (Printtyp.tree_of_cltype_declaration id diff.expected Trec_first)
+<<<<<<< HEAD
         (Includeclass.report_error Type_scheme) diff.symptom
         Printtyp.Conflicts.print_explanations
   | Err.Class_declarations {got;expected;symptom=Class_type reason} ->
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+        (Includeclass.report_error Type_scheme) diff.symptom
+  | Err.Class_declarations {got;expected;symptom} ->
+=======
+        (Includeclass.report_error_doc Type_scheme) diff.symptom
+  | Err.Class_declarations {got;expected;symptom} ->
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
       let t1 = Printtyp.tree_of_class_declaration id got Trec_first in
       let t2 = Printtyp.tree_of_class_declaration id expected Trec_first in
       Fmt.dprintf
@@ -850,6 +858,7 @@ let core env id x =
          %a@;<1 -2>does not match@ %a@]@ %a%t"
         !Oprint.out_sig_item t1
         !Oprint.out_sig_item t2
+<<<<<<< HEAD
         (Includeclass.report_error Type_scheme) reason
         Printtyp.Conflicts.print_explanations
   | Err.Class_declarations {symptom=Class_mode e} ->
@@ -858,6 +867,11 @@ let core env id x =
         (Ident.name id)
         (Includecore.report_mode_sub_error "first is" "second is") e
         Printtyp.Conflicts.print_explanations
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+        (Includeclass.report_error Type_scheme) symptom
+=======
+        (Includeclass.report_error_doc Type_scheme) symptom
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
 
 let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in
@@ -1126,10 +1140,32 @@ let err_msgs ppf (env, err) =
   Printtyp.wrap_printing_env ~error:true env
     (fun () -> (coalesce @@ all env err)  ppf)
 
+<<<<<<< HEAD
 let report_error err =
   Location.errorf ~loc:Location.(in_file !input_name) "%a" err_msgs err
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+let report_error err =
+  Location.errorf
+    ~loc:Location.(in_file !input_name)
+    ~footnote:Printtyp.Conflicts.err_msg
+   "%a" err_msgs err
+=======
+let report_error_doc err =
+  Location.errorf
+    ~loc:Location.(in_file !input_name)
+    ~footnote:Printtyp.Conflicts.err_msg
+   "%a" err_msgs err
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
 
+<<<<<<< HEAD
 let report_apply_error ~loc env (app_name, mty_f, args) =
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+let report_apply_error ~loc env (app_name, mty_f, args) =
+  let footnote = Printtyp.Conflicts.err_msg in
+=======
+let report_apply_error_doc ~loc env (app_name, mty_f, args) =
+  let footnote = Printtyp.Conflicts.err_msg in
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
   let d = Functor_suberror.App.patch env ~f:mty_f ~args in
   match d with
   (* We specialize the one change and one argument case to remove the
@@ -1193,10 +1229,10 @@ let report_apply_error ~loc env (app_name, mty_f, args) =
 let register () =
   Location.register_error_of_exn
     (function
-      | Includemod.Error err -> Some (report_error err)
+      | Includemod.Error err -> Some (report_error_doc err)
       | Includemod.Apply_error {loc; env; app_name; mty_f; args} ->
           Some (Printtyp.wrap_printing_env env ~error:true (fun () ->
-              report_apply_error ~loc env (app_name, mty_f, args))
+              report_apply_error_doc ~loc env (app_name, mty_f, args))
             )
       | _ -> None
     )

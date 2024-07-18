@@ -454,6 +454,7 @@ let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
 
 open Format_doc
 
+<<<<<<< HEAD
 let report_error ppf = function
   | Dwarf_fission_objcopy_on_macos ->
     fprintf ppf
@@ -473,8 +474,127 @@ let report_error ppf = function
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
       CU.Name.print_as_inline_code impl
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+let report_error ppf = function
+  | File_not_found name ->
+      fprintf ppf "Cannot find file %a" Style.inline_code name
+  | Not_an_object_file name ->
+      fprintf ppf "The file %a is not a compilation unit description"
+        Location.Doc.quoted_filename name
+  | Inconsistent_interface(intf, file1, file2) ->
+      fprintf ppf
+       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
+              over interface %a@]"
+       Location.Doc.quoted_filename file1
+       Location.Doc.quoted_filename file2
+       Style.inline_code intf
+  | Inconsistent_implementation(intf, file1, file2) ->
+      fprintf ppf
+       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
+              over implementation %a@]"
+       Location.Doc.quoted_filename file1
+       Location.Doc.quoted_filename file2
+       Style.inline_code intf
+  | Assembler_error file ->
+      fprintf ppf "Error while assembling %a"
+        Location.Doc.quoted_filename file
+  | Linking_error exitcode ->
+      fprintf ppf "Error during linking (exit code %d)" exitcode
+  | Missing_cmx(filename, name) ->
+      fprintf ppf
+        "@[<hov>File %a@ was compiled without access@ \
+         to the %a file@ for module %a,@ \
+         which was produced by %a.@ \
+         Please recompile %a@ with the correct %a option@ \
+         so that %a@ is found.@]"
+        Location.Doc.quoted_filename filename
+        Style.inline_code ".cmx"
+        Style.inline_code name
+        Style.inline_code "ocamlopt -for-pack"
+        Location.Doc.quoted_filename filename
+        Style.inline_code "-I"
+        Style.inline_code (name^".cmx")
+  | Link_error e ->
+      Linkdeps.report_error ~print_filename:Location.Doc.filename ppf e
+=======
+let report_error_doc ppf = function
+  | File_not_found name ->
+      fprintf ppf "Cannot find file %a" Style.inline_code name
+  | Not_an_object_file name ->
+      fprintf ppf "The file %a is not a compilation unit description"
+        Location.Doc.quoted_filename name
+  | Inconsistent_interface(intf, file1, file2) ->
+      fprintf ppf
+       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
+              over interface %a@]"
+       Location.Doc.quoted_filename file1
+       Location.Doc.quoted_filename file2
+       Style.inline_code intf
+  | Inconsistent_implementation(intf, file1, file2) ->
+      fprintf ppf
+       "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
+              over implementation %a@]"
+       Location.Doc.quoted_filename file1
+       Location.Doc.quoted_filename file2
+       Style.inline_code intf
+  | Assembler_error file ->
+      fprintf ppf "Error while assembling %a"
+        Location.Doc.quoted_filename file
+  | Linking_error exitcode ->
+      fprintf ppf "Error during linking (exit code %d)" exitcode
+  | Missing_cmx(filename, name) ->
+      fprintf ppf
+        "@[<hov>File %a@ was compiled without access@ \
+         to the %a file@ for module %a,@ \
+         which was produced by %a.@ \
+         Please recompile %a@ with the correct %a option@ \
+         so that %a@ is found.@]"
+        Location.Doc.quoted_filename filename
+        Style.inline_code ".cmx"
+        Style.inline_code name
+        Style.inline_code "ocamlopt -for-pack"
+        Location.Doc.quoted_filename filename
+        Style.inline_code "-I"
+        Style.inline_code (name^".cmx")
+  | Link_error e ->
+      Linkdeps.report_error_doc ~print_filename:Location.Doc.filename ppf e
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
 
 let () =
+<<<<<<< HEAD
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error err)
     | _ -> None)
+||||||| parent of fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
+  Location.register_error_of_exn
+    (function
+      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | _ -> None
+    )
+
+let reset () =
+  Cmi_consistbl.clear crc_interfaces;
+  Cmx_consistbl.clear crc_implementations;
+  cmx_required := [];
+  interfaces := [];
+  implementations := [];
+  lib_ccobjs := [];
+  lib_ccopts := []
+=======
+  Location.register_error_of_exn
+    (function
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+      | _ -> None
+    )
+
+let report_error = Format_doc.compat report_error_doc
+
+let reset () =
+  Cmi_consistbl.clear crc_interfaces;
+  Cmx_consistbl.clear crc_implementations;
+  cmx_required := [];
+  interfaces := [];
+  implementations := [];
+  lib_ccobjs := [];
+  lib_ccopts := []
+>>>>>>> fb010ad9da (Format_doc: preserve the type of Foo.report_error, add Foo.report_error_doc (#13311))
