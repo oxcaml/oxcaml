@@ -87,6 +87,14 @@ Working version
 - #14020: Add Unix.unsetenv.
   (Nicolás Ojeda Bär, review by Antonin Décimo and David Allsopp)
 
+- #13447: Symmetrize shared `Sys` and `Unix` functions. Apply fixes
+  of #12072, #12184, #12320, and #13166, from `Sys.rename` to
+  `Unix.rename`.  Make `caml_sys_close` raise on error, allowing
+  `Filename.temp_file` retries if close fails. Flush buffers when
+  calling `caml_sys_system_command` on Windows. Error with EINVAL
+  instead of ENOENT if the command string is not a valid C string.
+  (Antonin Décimo, review by Gabriel Scherer and Nicolás Ojeda Bär)
+
 ### Tools:
 
 - #12139: BUILD_PATH_PREFIX_MAP rewriting in debug-event locations.
