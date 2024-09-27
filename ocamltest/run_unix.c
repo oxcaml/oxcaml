@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "run.h"
 #include "run_common.h"
@@ -35,7 +36,7 @@
 
 #define COREFILENAME "core"
 
-static volatile int timeout_expired = 0;
+static atomic_bool timeout_expired = false;
 
 #define error(msg, ...) \
 error_with_location(__FILE__, __LINE__, settings, msg, ## __VA_ARGS__)
@@ -95,13 +96,13 @@ realpath_error_with_location(__FILE__, __LINE__, settings, filename)
 
 static void handle_alarm(int sig)
 {
-  timeout_expired = 1;
+  timeout_expired = true;
 }
 
-static int paths_same_file(
+static bool paths_same_file(
   const command_settings *settings, const char * path1, const char * path2)
 {
-  int same_file = 0;
+  bool same_file = false;
 #ifdef __GLIBC__
   char *realpath1, *realpath2;
   realpath1 = realpath(path1, NULL);
@@ -111,7 +112,7 @@ static int paths_same_file(
   if (realpath2 == NULL)
   {
     free(realpath1);
-    if (errno == ENOENT) return 0;
+    if (errno == ENOENT) return false;
     else realpath_error(path2);
   }
 #else
@@ -120,12 +121,12 @@ static int paths_same_file(
     realpath_error(path1);
   if (realpath(path2, realpath2) == NULL)
   {
-    if (errno == ENOENT) return 0;
+    if (errno == ENOENT) return false;
     else realpath_error(path2);
   }
 #endif /* __GLIBC__ */
   if (strcmp(realpath1, realpath2) == 0)
-    same_file = 1;
+    same_file = true;
 #ifdef __GLIBC__
   free(realpath1);
   free(realpath2);
@@ -292,7 +293,8 @@ static int handle_process_termination(
 
 static int run_command_parent(const command_settings *settings, pid_t child_pid)
 {
-  int waiting = 1, status, code, child_code = 0;
+  int status, code, child_code = 0;
+  bool waiting = true;
   pid_t pid;
 
   if (settings->timeout>0)
@@ -315,13 +317,13 @@ static int run_command_parent(const command_settings *settings, pid_t child_pid)
         case EINTR:
           if ((settings->timeout > 0) && (timeout_expired))
           {
-            timeout_expired = 0;
+            timeout_expired = false;
             fprintf(stderr, "Timeout expired, killing all child processes\n");
             if (kill(-child_pid, SIGKILL) == -1) myperror("kill");
           };
           break;
         case ECHILD:
-          waiting = 0;
+          waiting = false;
           break;
         default:
           myperror("wait");
@@ -331,7 +333,7 @@ static int run_command_parent(const command_settings *settings, pid_t child_pid)
         settings, pid, status, settings->program);
       if (pid == child_pid) {
         child_code = code;
-        waiting = 0;
+        waiting = false;
       }
     }
   }
