@@ -70,6 +70,15 @@ OCaml 5.4.0
   (Ryan Tjoa and Chris Casinghino, review by Gabriel Scherer, Chris Casinghino,
   and Leo White)
 
+
+
+- RFCs#39, #13404: atomic record fields
+    `{ ...; mutable readers : int [@atomic]; ... }`
+    `Atomic.Loc.fetch_and_add [%atomic.loc data.readers] 1`
+  (Clément Allain and Gabriel Scherer, review by KC Sivaramakrishnan,
+   Basile Clément and Olivier Nicole)
+
+
 ### Runtime system:
 
 - #13819: Fix field initialisation bug in runtime events subsystem.
