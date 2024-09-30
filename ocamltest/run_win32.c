@@ -188,7 +188,7 @@ static LPVOID prepare_environment(WCHAR **localenv)
       wchar_t *pos_eq2 = wcschr(*q, L'=');
       /* Compare this name in localenv with the current one in processenv */
       if (pos_eq2) *pos_eq2 = L'\0';
-      if (!wcscmp(*q, p)) copy = false;
+      if (wcscmp(*q, p) == 0) copy = false;
       if (pos_eq2) *pos_eq2 = L'=';
     }
     *pos_eq = L'=';
@@ -260,7 +260,7 @@ if ( (condition) ) \
 
 static WCHAR *translate_finename(WCHAR *filename)
 {
-  if (!wcscmp(filename, L"/dev/null")) return L"NUL"; else return filename;
+  if (wcscmp(filename, L"/dev/null") == 0) return L"NUL"; else return filename;
 }
 
 int run_command(const command_settings *settings)
