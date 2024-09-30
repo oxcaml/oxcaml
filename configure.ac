@@ -2644,6 +2644,36 @@ AC_LINK_IFELSE(
     AC_DEFINE([HAS_BSD_GETAFFINITY_NP])],
     [AC_MSG_RESULT([pthread_getaffinity_np not found])])])
 
+## prctl
+AC_CHECK_DECL(
+  [prctl],
+  [AC_DEFINE([HAS_DECL_PRCTL] , [1])],
+  [],
+  [#include <sys/prctl.h>])
+
+## pthread_setname_np
+AC_CHECK_FUNCS(
+  [pthread_setname_np],
+  [AC_DEFINE([HAS_PTHREAD_SETNAME_NP], [1])])
+
+## pthread_set_name_np
+AC_CHECK_FUNCS(
+  [pthread_set_name_np],
+  [AC_DEFINE([HAS_PTHREAD_SET_NAME_NP], [1])])
+
+## SetThreadDescription
+AC_CHECK_FUNCS(
+  [SetThreadDescription],
+  [AC_DEFINE([HAS_SETTHREADDESCRIPTION], [1])])
+
+AC_CHECK_DECL(
+  [SetThreadDescription],
+  [AC_DEFINE([HAS_DECL_SETTHREADDESCRIPTION], [1])],
+  [],
+  [[#define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <processthreadsapi.h>]])
+
 ## Activate the systhread library
 
 AS_IF(

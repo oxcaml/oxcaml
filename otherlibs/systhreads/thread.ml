@@ -105,8 +105,12 @@ let select = Unix.select
 
 let wait_pid p = Unix.waitpid [] p
 
+
 external sigmask : Unix.sigprocmask_command -> int list -> int list @@ portable
    = "caml_thread_sigmask"
 external wait_signal : int list -> int @@ portable = "caml_wait_signal"
 
 external use_domains : unit -> unit @@ portable = "caml_thread_use_domains"
+
+external set_current_thread_name  : string -> unit @@ portable =
+  "caml_set_current_thread_name"
