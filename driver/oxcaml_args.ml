@@ -193,6 +193,14 @@ let mk_zero_alloc_checker_details_cutoff f =
      | No_details -> 0
      | At_most n -> n)
 
+let mk_zero_alloc_checker_details_extra f =
+  "-zero-alloc-checker-details-extra", Arg.Unit f,
+  " Show extra details in error messages from zero_alloc checker"
+
+let mk_no_zero_alloc_checker_details_extra f =
+  "-no-zero-alloc-checker-details-extra", Arg.Unit f,
+  " Do not show extra details in error messages from zero_alloc checker"
+
 let mk_zero_alloc_checker_join f =
   "-zero-alloc-checker-join", Arg.Int f,
   Printf.sprintf " How many abstract paths before losing precision \
@@ -802,6 +810,8 @@ module type Oxcaml_options = sig
   val disable_zero_alloc_checker : unit -> unit
   val disable_precise_zero_alloc_checker : unit -> unit
   val zero_alloc_checker_details_cutoff : int -> unit
+  val zero_alloc_checker_details_extra : unit -> unit
+  val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
 
   val function_layout : string -> unit
@@ -947,6 +957,8 @@ struct
     mk_disable_zero_alloc_checker F.disable_zero_alloc_checker;
     mk_disable_precise_zero_alloc_checker F.disable_precise_zero_alloc_checker;
     mk_zero_alloc_checker_details_cutoff F.zero_alloc_checker_details_cutoff;
+    mk_zero_alloc_checker_details_extra F.zero_alloc_checker_details_extra;
+    mk_no_zero_alloc_checker_details_extra F.no_zero_alloc_checker_details_extra;
     mk_zero_alloc_checker_join F.zero_alloc_checker_join;
 
     mk_function_layout F.function_layout;
@@ -1156,6 +1168,12 @@ module Oxcaml_options_impl = struct
       else At_most n
     in
     Oxcaml_flags.zero_alloc_checker_details_cutoff := c
+
+  let zero_alloc_checker_details_extra =
+    set' Oxcaml_flags.zero_alloc_checker_details_extra
+
+  let no_zero_alloc_checker_details_extra =
+    clear' Oxcaml_flags.zero_alloc_checker_details_extra
 
   let zero_alloc_checker_join n =
     let c : Oxcaml_flags.zero_alloc_checker_join =
@@ -1491,6 +1509,8 @@ module Extra_params = struct
     | "dump-zero-alloc" -> set' Oxcaml_flags.dump_zero_alloc
     | "disable-zero-alloc-checker" -> set' Oxcaml_flags.disable_zero_alloc_checker
     | "disable-precise-zero-alloc-checker" -> set' Oxcaml_flags.disable_precise_zero_alloc_checker
+    | "zero_alloc_checker_details_extra" ->
+      set' Oxcaml_flags.zero_alloc_checker_details_extra
     | "zero-alloc-checker-details-cutoff" ->
       begin match Compenv.check_int ppf name v with
       | Some i ->
