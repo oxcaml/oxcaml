@@ -72,7 +72,7 @@ static const int file_kind_table[] = {
    when the same file is accessed either from Windows or from Linux.
  */
 
-static double stat_timestamp(__time64_t tm)
+static double stat_timestamp(time_t tm)
 {
   /* Split the timestamp into seconds and remaining 100ns units */
   int64_t sec = tm / (NSEC_PER_SEC / 100);  /* 10^7 */
@@ -170,7 +170,7 @@ static int safe_do_stat(int do_lstat, int use_64, wchar_t* path, HANDLE fstat, i
   unsigned short mode;
   int is_symlink = 0;
   ULONGLONG stamp;
-  __time64_t mtime = 0;
+  time_t mtime = 0;
 
   if (!path) {
     h = fstat;
