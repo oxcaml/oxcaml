@@ -50,6 +50,7 @@
 #define First_frame(sp) (sp)
 #define Saved_gc_regs(sp) (*(value **)((sp) + 32 + 16 + 8))
 #define Stack_header_size (32 + 16 + 16)
+#define CODE_POINTER_MARK_BIT 0
 #endif
 
 #ifdef TARGET_s390x
@@ -82,6 +83,9 @@
 #define First_frame(sp) ((sp) + 16)
 #define Saved_gc_regs(sp) (*(value **)((sp) + 24))
 #define Stack_header_size 32
+#if defined(SYS_linux)
+#define CODE_POINTER_MARK_BIT 60
+#endif
 #endif
 
 #ifdef TARGET_riscv
@@ -92,6 +96,15 @@
 #define First_frame(sp) ((sp) + 16)
 #define Saved_gc_regs(sp) (*(value **)((sp) + 24))
 #define Stack_header_size 32
+#define CODE_POINTER_MARK_BIT 0
+#endif
+
+#ifdef CODE_POINTER_MARK_BIT
+#define CODE_POINTER_MARK_MASK ((uintnat) 1 << CODE_POINTER_MARK_BIT)
+#define Already_scanned(sp, retaddr) ((retaddr) & CODE_POINTER_MARK_MASK)
+#define Mask_already_scanned(retaddr) ((retaddr) & ~CODE_POINTER_MARK_MASK)
+#define Mark_scanned(sp, retaddr) \
+  Saved_return_address(sp) = (retaddr) | CODE_POINTER_MARK_MASK
 #endif
 
 /* Declaration of variables used in the asm code */
