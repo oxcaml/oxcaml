@@ -4794,6 +4794,7 @@ lambda/translmod.cmx : \
 lambda/translmod.cmi : \
     typing/typedtree.cmi \
     typing/primitive.cmi \
+    typing/path.cmi \
     parsing/location.cmi \
     lambda/lambda.cmi \
     typing/ident.cmi
