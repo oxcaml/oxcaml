@@ -50,6 +50,8 @@ jobs:
                 console.log('Full matrix requested');
                 // # Test Cygwin as well
                 compilers.push('gcc');
+                // # Test bytecode-only Cygwin
+                include.push({cc: 'gcc', x86_64: true, config_arg: '--disable-native-compiler');
               }
             }
             return {config_arg: [''], x86_64: [true], cc: compilers, include: include};
