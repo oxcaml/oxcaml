@@ -46,7 +46,7 @@
 
 #include <stddef.h>
 #include <limits.h>
-#include <stdint.h>
+#include <inttypes.h>
 
 #if defined(HAS_LOCALE_H) || defined(HAS_XLOCALE_H)
 #define HAS_LOCALE
