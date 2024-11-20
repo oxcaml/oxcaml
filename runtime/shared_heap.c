@@ -1499,18 +1499,14 @@ static void verify_swept (struct caml_heap_state* local) {
       verify_pool(p, i, &pool_stats);
     }
   }
-  caml_gc_log("Pooled memory: %" ARCH_INTNAT_PRINTF_FORMAT
-                "u alloced, %" ARCH_INTNAT_PRINTF_FORMAT
-                "u free, %" ARCH_INTNAT_PRINTF_FORMAT
-                "u fragmentation",
+  caml_gc_log("Pooled memory: %" CAML_PRIuNAT " alloced, "
+              "%" CAML_PRIuNAT " free, %" CAML_PRIuNAT " fragmentation",
               pool_stats.alloced, pool_stats.free, pool_stats.overhead);
 
   verify_large(local->swept_large, &large_stats);
   CAMLassert(local->unswept_large == NULL);
-  caml_gc_log("Large memory: %" ARCH_INTNAT_PRINTF_FORMAT
-                "u alloced, %" ARCH_INTNAT_PRINTF_FORMAT
-                "u free, %" ARCH_INTNAT_PRINTF_FORMAT
-                "u fragmentation",
+  caml_gc_log("Large memory: %" CAML_PRIuNAT " alloced, "
+              "%" CAML_PRIuNAT " free, %" CAML_PRIuNAT " fragmentation",
               large_stats.alloced, large_stats.free, large_stats.overhead);
 
   /* Check stats are being computed correctly */

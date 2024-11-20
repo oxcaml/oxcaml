@@ -65,11 +65,18 @@
   #define __USE_MINGW_ANSI_STDIO 0
 #endif
 
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) && !__USE_MINGW_ANSI_STDIO && !defined(_UCRT)
 #define ARCH_SIZET_PRINTF_FORMAT "I"
 #else
 #define ARCH_SIZET_PRINTF_FORMAT "z"
 #endif
+
+#define CAML_PRIdSZT ARCH_SIZET_PRINTF_FORMAT "d"
+#define CAML_PRIiSZT ARCH_SIZET_PRINTF_FORMAT "i"
+#define CAML_PRIoSZT ARCH_SIZET_PRINTF_FORMAT "o"
+#define CAML_PRIuSZT ARCH_SIZET_PRINTF_FORMAT "u"
+#define CAML_PRIxSZT ARCH_SIZET_PRINTF_FORMAT "x"
+#define CAML_PRIXSZT ARCH_SIZET_PRINTF_FORMAT "X"
 
 /* Types for 32-bit integers, 64-bit integers, and
    native integers (as wide as a pointer type) */
@@ -111,6 +118,13 @@ typedef uintptr_t uintnat;
 /* Win64 model: IL32P64 */
 #define ARCH_INTNAT_PRINTF_FORMAT ARCH_INT64_PRINTF_FORMAT
 #endif
+
+#define CAML_PRIdNAT PRIdPTR
+#define CAML_PRIiNAT PRIiPTR
+#define CAML_PRIoNAT PRIoPTR
+#define CAML_PRIuNAT PRIuPTR
+#define CAML_PRIxNAT PRIxPTR
+#define CAML_PRIXNAT PRIXPTR
 
 #define CAML_INTNAT_MIN INTPTR_MIN
 #define CAML_INTNAT_MAX INTPTR_MAX
