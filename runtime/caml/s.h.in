@@ -112,7 +112,7 @@
 
 #undef HAS_PTHREAD_NP_H
 
-#undef HAS_DECL_PRCTL
+#undef HAS_PRCTL
 
 #undef HAS_PTHREAD_SETNAME_NP
 

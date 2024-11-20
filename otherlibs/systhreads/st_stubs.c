@@ -21,14 +21,15 @@
 #if defined(_WIN32)
 #  include <windows.h>
 #  include <processthreadsapi.h>
-#  include <caml/osdeps.h>
+#  include "caml/osdeps.h"
 
 #  if defined(HAS_SETTHREADDESCRIPTION) && \
       !defined(HAS_DECL_SETTHREADDESCRIPTION)
-HRESULT SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
+WINBASEAPI HRESULT WINAPI
+SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #  endif
 
-#elif defined(HAS_DECL_PRCTL)
+#elif defined(HAS_PRCTL)
 #  include <sys/prctl.h>
 #elif defined(HAS_PTHREAD_SETNAME_NP) || defined(HAS_PTHREAD_SET_NAME_NP)
 #  include <pthread.h>
@@ -1129,7 +1130,7 @@ CAMLprim value caml_set_current_thread_name(value name)
   pthread_setname_np(pthread_self(), String_val(name));
 #  endif
 
-#elif defined(HAS_DECL_PRCTL)
+#elif defined(HAS_PRCTL)
   prctl(PR_SET_NAME, String_val(name));
 #elif defined(HAS_PTHREAD_SETNAME_NP)
 #  if defined(__APPLE__)
