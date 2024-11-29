@@ -52,9 +52,6 @@ frame_descr * caml_next_frame_descriptor
       /* Regular frame, update sp/pc and return the frame descriptor */
       *sp += frame_size(d);
       *pc = Saved_return_address(*sp);
-#ifdef Mask_already_scanned
-      *pc = Mask_already_scanned(*pc);
-#endif
       return d;
     } else {
       /* This marks the top of an ML stack chunk. Move sp to the previous stack
@@ -68,9 +65,6 @@ frame_descr * caml_next_frame_descriptor
       }
       *sp = First_frame(*sp);
       *pc = Saved_return_address(*sp);
-#ifdef Mask_already_scanned
-      *pc = Mask_already_scanned(*pc);
-#endif
     }
   }
 }

@@ -241,9 +241,6 @@ void caml_get_stack_sp_pc (struct stack_info* stack,
   char* p = (char*)stack->sp;
   p = First_frame(p);
   *pc = Saved_return_address(p); /* ret addr */
-#ifdef Mask_already_scanned
-  *pc = Mask_already_scanned(*pc);
-#endif
   *sp = p;                       /* pointer to first frame */
 }
 
@@ -266,7 +263,7 @@ Caml_inline void scan_stack_frames(
 next_chunk:
   if (sp == (char*)Stack_high(stack)) return;
   sp = First_frame(sp);
-  retaddr = Saved_return_address(sp);
+  retaddr = Saved_return_address_raw(sp);
 
   while(1) {
 #ifdef Already_scanned
@@ -295,7 +292,7 @@ next_chunk:
       }
       /* Move to next frame */
       sp += frame_size(d);
-      retaddr = Saved_return_address(sp);
+      retaddr = Saved_return_address_raw(sp);
     } else {
       /* This marks the top of an ML stack chunk. Move sp to the previous
        * stack chunk.  */
