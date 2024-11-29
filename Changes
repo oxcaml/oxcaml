@@ -7,6 +7,10 @@ Working version
 
 ### Runtime system:
 
+- #13574, #13594: Generational scanning of stack frames for ARM 64 bits, POWER,
+  and RISC-V.  This reduces minor GC work in the presence of deep call stacks.
+  (Xavier Leroy, review by Miod Vallat, Gabriel Scherer and Olivier Nicole)
+
 ### Code generation and optimizations:
 
 ### Standard library:
