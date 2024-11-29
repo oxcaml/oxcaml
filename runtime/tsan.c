@@ -332,6 +332,9 @@ CAMLno_tsan void caml_tsan_entry_on_resume(uintnat pc, char* sp,
 {
   caml_frame_descrs* fds = caml_get_frame_descrs();
   uintnat next_pc = pc;
+#ifdef Mask_already_scanned
+  next_pc = Mask_already_scanned(next_pc);
+#endif
 
   caml_next_frame_descriptor(fds, &next_pc, &sp, (struct stack_info*)stack);
   if (next_pc == 0) {
