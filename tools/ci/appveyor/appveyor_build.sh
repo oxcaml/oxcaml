@@ -148,17 +148,26 @@ case "$1" in
           $FULL_BUILD_PREFIX-$PORT/runtime/*.a \
           $FULL_BUILD_PREFIX-$PORT/otherlibs/*/lib*.a
     fi
-    # The testsuite is too slow to run on AppVeyor in full. Run the dynlink
-    # tests now (to include natdynlink)
-    run "test dynlink $PORT" \
-        $MAKE -C "$FULL_BUILD_PREFIX-$PORT/testsuite" parallel-lib-dynlink
-    # Now reconfigure ocamltest to run in bytecode-only mode
-    sed -i '/native_/s/true/false/' \
-           "$FULL_BUILD_PREFIX-$PORT/ocamltest/ocamltest_config.ml"
-    $MAKE -C "$FULL_BUILD_PREFIX-$PORT" -j ocamltest ocamltest.opt
-    # And run the entire testsuite, skipping all the native-code tests
-    run "test $PORT" \
-        make -C "$FULL_BUILD_PREFIX-$PORT/testsuite" SHOW_TIMINGS=1 all
+    run_testsuite=true
+    if [[ -n $APPVEYOR_PULL_REQUEST_NUMBER ]]; then
+      API_URL="https://api.github.com/repos/$APPVEYOR_REPO_NAME/issues/$APPVEYOR_PULL_REQUEST_NUMBER"
+      if curl --silent "$API_URL/labels" | grep -q "no-testsuite"; then
+        run_testsuite=false
+      fi
+    fi
+    if $run_testsuite; then
+      # The testsuite is too slow to run on AppVeyor in full. Run the dynlink
+      # tests now (to include natdynlink)
+      run "test dynlink $PORT" \
+          $MAKE -C "$FULL_BUILD_PREFIX-$PORT/testsuite" parallel-lib-dynlink
+      # Now reconfigure ocamltest to run in bytecode-only mode
+      sed -i '/native_/s/true/false/' \
+             "$FULL_BUILD_PREFIX-$PORT/ocamltest/ocamltest_config.ml"
+      $MAKE -C "$FULL_BUILD_PREFIX-$PORT" -j ocamltest ocamltest.opt
+      # And run the entire testsuite, skipping all the native-code tests
+      run "test $PORT" \
+          make -C "$FULL_BUILD_PREFIX-$PORT/testsuite" SHOW_TIMINGS=1 all
+    fi
     run "install $PORT" $MAKE -C "$FULL_BUILD_PREFIX-$PORT" install
     if [[ $PORT = 'msvc64' ]] ; then
       run "$MAKE check_all_arches" \

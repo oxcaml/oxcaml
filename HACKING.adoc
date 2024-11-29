@@ -676,6 +676,9 @@ triggered by setting a label on the pull request. See below:
 - `CI: Full matrix`: expands the test matrix considerably with additional
   configurations; useful for PRs which affect the "systems" side of the
   compiler;
+- `CI: Skip testsuite`: turns the tesuite *off* for a PR, which can be useful
+  for PRs which do not affect the compiler _at all_ or while a specific failure
+  is being investigated;
 - `run-crosscompiler-tests`: build various cross-compilers and test them;
 - `run-thread-sanitizer`: build the distribution with the Thread
   Sanitizer (TSAN), and run the whole testsuite instrumented with TSAN;

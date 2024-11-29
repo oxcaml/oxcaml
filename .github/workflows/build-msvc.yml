@@ -21,10 +21,11 @@ defaults:
     shell: bash -eo pipefail -o igncr {0}
 
 jobs:
-  matrix:
+  config:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.matrix.outputs.result }}
+      matrix: ${{ steps.matrix.outputs.result}}
+      skip-testsuite: ${{ steps.skip.outputs.result }}
     steps:
       - name: Compute matrix for the "build" job
         id: matrix
@@ -51,17 +52,30 @@ jobs:
                 // # Test Cygwin as well
                 compilers.push('gcc');
                 // # Test bytecode-only Cygwin
-                include.push({cc: 'gcc', x86_64: true, config_arg: '--disable-native-compiler');
+                include.push({cc: 'gcc', x86_64: true, config_arg: '--disable-native-compiler'});
               }
             }
             return {config_arg: [''], x86_64: [true], cc: compilers, include: include};
+      - name: Determine if the testsuite should be skipped
+        id: skip
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let skip_testsuite = false;
+            if (context.payload.pull_request) {
+              const { data: labels } =
+                await github.rest.issues.listLabelsOnIssue({...context.repo, issue_number: context.payload.pull_request.number});
+              skip_testsuite = labels.some(label => label.name === 'CI: Skip testsuite');
+            }
+            console.log('Skip testsuite: ' + skip_testsuite);
+            return skip_testsuite;
 
   build:
     permissions: {}
 
     runs-on: windows-latest
 
-    needs: matrix
+    needs: config
 
     timeout-minutes: ${{ matrix.cc == 'gcc' && 90 || 60 }}
 
@@ -170,6 +184,7 @@ jobs:
         if: matrix.x86_64 && matrix.cc != 'gcc'
 
       - name: Run the test suite
+        if: ${{ needs.config.outputs.skip-testsuite != 'true' }}
         run: |
           eval $(tools/msvs-promote-path)
           make tests
