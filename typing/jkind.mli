@@ -499,6 +499,9 @@ val get_externality_upper_bound :
     mode for the externality axis *)
 val set_externality_upper_bound : jkind_r -> Externality.t -> jkind_r
 
+(** Sets the layout in a jkind. *)
+val set_layout : 'd t -> Sort.t Layout.t -> 'd t
+
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just
     reuses the non-layout parts of the original jkind. Never does any mutation.

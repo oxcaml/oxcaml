@@ -1014,7 +1014,7 @@ let transl_declaration env sdecl (id, uid) =
         begin match Jkind.get_layout jkind with
         | Some Any ->
           (* [jkind_default] has just what we need here *)
-          jkind_default
+          Jkind.set_layout jkind (Jkind.extract_layout jkind_default)
         | _ -> jkind
         end
       | Type_abstract _ | Type_variant _ | Type_record _
