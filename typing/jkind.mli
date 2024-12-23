@@ -89,8 +89,12 @@ module Layout : sig
 
     val get_sort : t -> Sort.Const.t option
 
+    val of_sort_const : Sort.Const.t -> t
+
     val to_string : t -> string
   end
+
+  val of_const : Const.t -> Sort.t t
 end
 
 (** A Jkind.t is a full description of the runtime representation of values

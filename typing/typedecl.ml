@@ -1009,15 +1009,16 @@ let transl_declaration env sdecl (id, uid) =
          just barely good enough, such that [constain_type_jkind] can always
          decompose the product of [any]s and recurse on the labels.
          See https://github.com/ocaml-flambda/flambda-backend/pull/3399. *)
-      match sdecl.ptype_kind with
-      | Ptype_record_unboxed_product lbls ->
+      match kind with
+      | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout jkind with
-        | Some Any -> Jkind.Builtin.product ~why:Unboxed_record
-                        (List.map (fun _ -> jkind) lbls)
+        | Some Any ->
+          (* [jkind_default] has just what we need here *)
+          jkind_default
         | _ -> jkind
         end
-      | Ptype_abstract | Ptype_variant _ | Ptype_record _
-      | Ptype_open -> jkind
+      | Type_abstract _ | Type_variant _ | Type_record _
+      | Type_open -> jkind
     in
     let arity = List.length params in
     let decl =
