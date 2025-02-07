@@ -8,12 +8,6 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_flambda2_invalid.ml)
- (action (run %{bin:ocamlopt.opt} %{deps} -g -c -zero-alloc-check default -dcse -dzero-alloc -dump-into-file -O3 -warn-error +a)))
-
-(rule
- (alias   runtest)
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (deps t5.ml test_assume.ml)
  (action (run %{bin:ocamlopt.opt} %{deps} -g -c -zero-alloc-check default -dcse -dzero-alloc -dump-into-file -O3 -warn-error +a)))
 
@@ -38,7 +32,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -58,7 +52,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -78,7 +72,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -98,7 +92,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -118,7 +112,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -138,7 +132,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -158,7 +152,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -178,7 +172,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -198,7 +192,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -218,7 +212,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -238,7 +232,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -258,7 +252,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -278,7 +272,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -298,7 +292,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -318,7 +312,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -338,7 +332,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -358,7 +352,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -378,7 +372,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -398,7 +392,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -418,7 +412,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -438,7 +432,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 0 -O3))
     (run "./filter.sh")
    ))))
@@ -458,7 +452,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -478,7 +472,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -510,7 +504,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -530,7 +524,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -550,7 +544,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -570,7 +564,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check opt -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -590,7 +584,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check opt -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -622,8 +616,8 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
-          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+          -zero-alloc-checker-details-extra
+          -directory repo/root/relative/dir -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
 
@@ -642,8 +636,8 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
-          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+          -zero-alloc-checker-details-extra
+          -no-zero-alloc-checker-details-extra -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
 
@@ -662,7 +656,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -682,7 +676,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -702,7 +696,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -722,7 +716,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -742,7 +736,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -762,7 +756,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -788,7 +782,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -disable-precise-zero-alloc-checker -function-layout source -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -808,7 +802,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -disable-zero-alloc-checker -function-layout source -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -828,7 +822,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -848,7 +842,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -868,7 +862,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check opt -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -888,7 +882,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -915,7 +909,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -935,7 +929,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -962,7 +956,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -982,7 +976,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1002,7 +996,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1022,7 +1016,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1042,7 +1036,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1062,7 +1056,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-join -2 -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter_fatal_error.sh")
    ))))
@@ -1082,7 +1076,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-join 2 -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1102,7 +1096,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-join 0 -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1122,7 +1116,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-join 0 -zero-alloc-checker-details-cutoff 3 -O3))
     (run "./filter.sh")
    ))))
@@ -1142,7 +1136,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1162,7 +1156,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1182,7 +1176,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1208,7 +1202,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-assert all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1228,7 +1222,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-assert all_opt -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1248,7 +1242,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-assert default -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1268,7 +1262,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1288,7 +1282,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1315,7 +1309,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1342,7 +1336,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1369,7 +1363,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1389,7 +1383,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1415,7 +1409,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 0
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1435,7 +1429,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1455,7 +1449,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1475,7 +1469,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1495,7 +1489,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1515,7 +1509,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1535,7 +1529,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1555,7 +1549,7 @@
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check all -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
@@ -1568,14 +1562,14 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (targets test_arch_specific_witness.output.corrected)
- (deps (:ml test_arch_specific_witness.ml) filter.sh)
+ (targets test_sort_witnesses.output.corrected)
+ (deps (:ml test_sort_witnesses.ml) filter.sh)
  (action
-   (with-outputs-to test_arch_specific_witness.output.corrected
+   (with-outputs-to test_sort_witnesses.output.corrected
     (pipe-outputs
     (with-accepted-exit-codes 2
      (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-checker-details-extra
           -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
     (run "./filter.sh")
    ))))
