@@ -131,6 +131,17 @@ external readdir : string -> string array = "caml_sys_read_directory"
    in any specific order; they are not, in particular, guaranteed to
    appear in alphabetical order. *)
 
+val io_buffer_size: int
+(** Size of C buffers used by the runtime system and IO primitives of the [unix]
+    library.
+
+    Primitives that read from or write to values of type [string] or [bytes]
+    generally use an intermediate buffer of this size to avoid holding the
+    domain lock.
+
+    @since 5.4
+*)
+
 val interactive : bool ref @@ nonportable
 [@@alert unsynchronized_access
     "The interactive status is a mutable global state."
