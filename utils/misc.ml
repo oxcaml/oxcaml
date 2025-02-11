@@ -1612,7 +1612,7 @@ let is_print_longer_than size p =
   let out_spaces n = count_down n in
   let out_flush _ = () in
   let out_indent _ = () in
-  let out_width = Format.utf8_scalar_width in
+  let out_width = Format.utf_8_scalar_width in
   let out_functions : Format.formatter_out_functions = {
     out_string;
     out_flush;
