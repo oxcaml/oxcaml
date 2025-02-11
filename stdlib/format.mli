@@ -901,7 +901,7 @@ type formatter_out_functions = {
    {!Stdlib.out_channel} device, or [Buffer.add_substring] and
    {!Stdlib.ignore} for a [Buffer.t] output device),
 - field [out_width] is the number of unicode scalar values
-  (see {!utf8_scalar_width}) in the substring.
+  (see {!utf_8_scalar_width}) in the substring.
 - field [out_newline] is equivalent to [out_string "\n" 0 1];
 - fields [out_spaces] and [out_indent] are equivalent to
   [out_string (String.make n ' ') 0 n].
@@ -922,7 +922,7 @@ val set_formatter_out_functions : formatter_out_functions -> unit @@ nonportable
 
   Reasonable defaults for functions [out_spaces], [out_newline], and [out_width]
   are respectively [out_funs.out_string (String.make n ' ') 0 n],
-  [out_funs.out_string "\n" 0 1] and {!utf8_scalar_width}.
+  [out_funs.out_string "\n" 0 1] and {!utf_8_scalar_width}.
   @since 4.01
 *)
 
@@ -935,8 +935,8 @@ val get_formatter_out_functions : unit -> formatter_out_functions @@ nonportable
   @since 4.01
 *)
 
-val utf8_scalar_width: string -> pos:int -> len:int -> int
-(** [utf8_scalar_width s ~pos ~len] is the number of unicode scalar values in
+val utf_8_scalar_width: string -> pos:int -> len:int -> int
+(** [utf_8_scalar_width s ~pos ~len] is the number of unicode scalar values in
     the substring [String.sub s pos len]. Invalid byte sequences are implictly
     replaced by [U+FFFD] since this yields a better width approximation for
     other ascii-based encoding scheme like ISO-8859-15. This is the default
