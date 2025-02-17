@@ -1169,7 +1169,9 @@ AS_CASE([$ocaml_cc_vendor,$target],
     [oc_ldflags='-brtl -bexpfull'
     AC_DEFINE([HAS_ARCH_CODE32], [1])],
   [gcc-*,powerpc-*-linux*],
-    [oc_ldflags="-mbss-plt"])
+    [oc_ldflags="-mbss-plt"],
+  [*,*-*-none|*,*-*-elf*],
+    [ostype="None"])
 
 # How to build sak
 
@@ -1603,7 +1605,19 @@ AS_CASE([$target],
   [riscv64-*-linux*],
     [has_native_backend=yes; arch=riscv; model=riscv64; system=linux],
   [x86_64-*-gnu*],
-    [has_native_backend=yes; arch=amd64; system=gnu]
+    [has_native_backend=yes; arch=amd64; system=gnu],
+  [aarch64-*-none|arm64-*-none|aarch64-*-elf*|arm64-*-elf*],
+    [has_native_backend=yes; arch=arm64; system=none],
+  [powerpc64le*-*-none|powerpc64le*-*-elf*],
+    [has_native_backend=yes; arch=power; model=ppc64le; system=none],
+  [powerpc64*-*-none|powerpc64*-*-elf*],
+    [has_native_backend=yes; arch=power; model=ppc64; system=none],
+  [riscv64-*-none|riscv64-*-elf*],
+    [has_native_backend=yes; arch=riscv; model=riscv64; system=none],
+  [s390x*-*-none|s390x*-*-elf*],
+    [has_native_backend=yes; arch=s390x; model=z10; system=none],
+  [x86_64-*-none|x86_64-*-elf*],
+    [has_native_backend=yes; arch=amd64; system=none]
 )
 
 AS_CASE([$arch],
