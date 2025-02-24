@@ -290,7 +290,7 @@ type error =
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Modalities_on_atomic_field of Longident.t
-  | Literal_overflow of string
+  | Literal_overflow of Scalar.any_locality_mode Scalar.Integral.t
   | Unknown_literal of string * char
   | Float32_literal of string
   | Int8_literal of string
