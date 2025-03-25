@@ -1166,10 +1166,9 @@ let rec copy ?partial ?keep_names ?scope copy_scope ty =
     in
     if forget <> generic_level then newty2 ~level:forget (Tvar None) else
     let scope =
-      match scope, desc with
-      | None, _
-      | _, Tvar _ -> get_scope ty
-      | Some scope, _ -> Int.max scope (get_scope ty)
+      match scope with
+      | None -> get_scope ty
+      | Some scope -> Int.max scope (get_scope ty)
     in
     let t = newstub ~scope in
     For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
@@ -1362,8 +1361,9 @@ let instance_constructor existential_treatment cstr =
 
 let instance_parameterized_type ?keep_names ?scope sch_args sch =
   For_copy.with_scope (fun copy_scope ->
+    (* Only raise scope in body, not in parameters *)
     let ty_args =
-      List.map (fun t -> copy ?keep_names ?scope copy_scope t) sch_args in
+      List.map (fun t -> copy ?keep_names copy_scope t) sch_args in
     let ty = copy ?scope copy_scope sch in
     (ty_args, ty)
   )
@@ -1635,7 +1635,8 @@ let expand_abbrev_gen kind find_type_expansion env ty =
            ("found a "^string_of_kind kind^" expansion for "^Path.name path);*)
         if level <> generic_level then update_level env level ty';
         if not !Clflags.principal then update_scope scope ty'
-        else if get_scope ty' <> scope then raise_scope_escape_exn ty;
+        (* In principal mode, force re-expansion if scope increased *)
+        else if get_scope ty' < scope then raise_scope_escape_exn ty;
         Some ty'
     with Escape _ ->
       (* in case of Escape, discard the stale expansion and re-expand *)
