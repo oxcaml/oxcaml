@@ -11,6 +11,10 @@ Working version
 
 ### Standard library:
 
+- #13909: Add `Dynarray.unsafe_to_iarray`
+  (Olivier Nicole, review by Daniel Bünzli, Stefan Muenzel and Gabriel Scherer,
+  request by Daniel Bünzli)
+
 ### Other libraries:
 
 ### Tools:

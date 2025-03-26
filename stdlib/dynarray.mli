@@ -598,6 +598,20 @@ val reset : 'a t -> unit
     in the backing array at index [length a] or later.
 *)
 
+val unsafe_to_iarray : capacity:int -> ('a t -> unit) -> 'a iarray
+(** [unsafe_to_iarray ~capacity f] calls [f] on a new empty dynarray with the
+    given [capacity], then turns it into an immutable array without a copy,
+    when possible, that is, if two conditions hold:
+    - the array elements are not floats, and
+    - after [f] returned, the array's capacity is equal to its length.
+
+    Note that the [capacity] argument is only a hint. For example, nothing
+    prevents from calling {!val:fit_capacity} at the end of [f].
+
+    This function is unsafe because type safety may be broken by concurrent
+    writes to the dynarray from other domains, without proper synchronization,
+    before [f] returns. *)
+
 
 (** {1:examples Code examples}
 

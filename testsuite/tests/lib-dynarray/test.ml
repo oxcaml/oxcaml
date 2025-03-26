@@ -529,6 +529,51 @@ let () =
   assert (A.length a = 201);
   assert (A.length a = A.capacity a);;
 
+(** unsafe_to_iarray *)
+
+let () =
+  let n = 42 in
+  (* With unchanged capacity *)
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n - 1 do
+      A.add_last t i
+    done)
+  in
+  for i = 0 to n - 1 do
+    assert (Iarray.get a i = i)
+  done;
+  (* With a change in capacity *)
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n + 5 do
+      A.add_last t i
+    done)
+  in
+  for i = 0 to n + 5 do
+    assert (Iarray.get a i = i)
+  done;
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n / 2 do
+      A.add_last t i
+    done;
+    A.fit_capacity t)
+  in
+  for i = 0 to n / 2 do
+    assert (Iarray.get a i = i)
+  done;;
+
+(** unsafe_to_iarray with float *)
+
+let () =
+  let n = 42 in
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n - 1 do
+      A.add_last t (Float.of_int i)
+    done)
+  in
+  for i = 0 to n - 1 do
+    assert (Float.equal (Iarray.get a i) (Float.of_int i))
+  done;;
+
 
 (** check that comparisons and marshalling-with-sharing work as
     expected. *)
