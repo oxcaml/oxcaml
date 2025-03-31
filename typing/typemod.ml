@@ -658,6 +658,27 @@ and merge_info =
 
 module Merge = struct
 
+  let split_row_id s ghosts =
+    let srow = s ^ "#row" in
+    let rec split before = function
+      | Sig_type(id,_,_,_) :: rest when Ident.name id = srow ->
+          before, Some id, rest
+      | a :: rest -> split (a::before) rest
+      | [] -> before, None, []
+    in
+    split [] ghosts
+
+  let unsafe_signature_subst sub sg loc initial_env =
+    (* This signature will not be used directly, it will always be freshened
+       by the caller. So what we do with the scope doesn't really matter. But
+       making it local makes it unlikely that we will ever use the result of
+       this function unfreshened without issue. *)
+    match Subst.Unsafe.signature Make_local sub sg with
+    | Ok x -> x
+    | Error (Fcm_type_substituted_away (p,mty)) ->
+        let error = With_cannot_remove_packed_modtype(p,mty) in
+        raise (Error(loc,initial_env,error))
+
   let merge_constraint_aux initial_env loc sg lid constr : merge_result =
     let destructive_substitution =
       match constr with
@@ -673,27 +694,6 @@ module Merge = struct
       | _ -> false
     in
     let real_ids = ref [] in
-    let split_row_id s ghosts =
-      let srow = s ^ "#row" in
-      let rec split before = function
-        | Sig_type(id,_,_,_) :: rest when Ident.name id = srow ->
-            before, Some id, rest
-        | a :: rest -> split (a::before) rest
-        | [] -> before, None, []
-      in
-      split [] ghosts
-    in
-    let unsafe_signature_subst sub sg =
-      (* This signature will not be used directly, it will always be freshened
-        by the caller. So what we do with the scope doesn't really matter. But
-        making it local makes it unlikely that we will ever use the result of
-        this function unfreshened without issue. *)
-      match Subst.Unsafe.signature Make_local sub sg with
-      | Ok x -> x
-      | Error (Fcm_type_substituted_away (p,mty)) ->
-          let error = With_cannot_remove_packed_modtype(p,mty) in
-          raise (Error(loc,initial_env,error))
-    in
     let rec patch_item constr namelist outer_sig_env sg_for_env ~ghosts item =
       let return ?(ghosts=ghosts) ~replace_by info =
         Some (info, {Signature_group.ghosts; replace_by})
@@ -955,17 +955,17 @@ module Merge = struct
             let sub = List.fold_left how_to_extend_subst sub !real_ids in
             Some sub
         | Built_TypedTree {constr=Twith_modsubst (real_path, _)},_ ->
-          let sub = Subst.change_locs Subst.identity loc in
-          let sub =
-            List.fold_left
-              (fun s path -> Subst.Unsafe.add_module_path path real_path s)
-              sub
-              !real_ids
-          in
-          Some sub
-      | Built_TypedTree {constr=Twith_modtypesubst {mty_type=mty}}, _
-      | _, Approx_with_modtypesubst mty ->
-          let add s p = Subst.Unsafe.add_modtype_path p mty s in
+            let sub = Subst.change_locs Subst.identity loc in
+            let sub =
+              List.fold_left
+                (fun s path -> Subst.Unsafe.add_module_path path real_path s)
+                sub
+                !real_ids
+            in
+            Some sub
+        | Built_TypedTree {constr=Twith_modtypesubst {mty_type=mty}}, _
+        | _, Approx_with_modtypesubst mty ->
+            let add s p = Subst.Unsafe.add_modtype_path p mty s in
             let sub = Subst.change_locs Subst.identity loc in
             let sub = List.fold_left add sub !real_ids in
             Some sub
@@ -983,7 +983,7 @@ module Merge = struct
               by the caller. So what we do with the scope doesn't really matter. But
               making it local makes it unlikely that we will ever use the result of
               this function unfreshened without issue. *)
-            unsafe_signature_subst sub sg
+            unsafe_signature_subst sub sg loc initial_env
         | None -> sg
       in
       check_well_formed_module initial_env loc "this instantiated signature"
