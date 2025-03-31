@@ -52,9 +52,11 @@ let string_of_fd fd = Int.to_string (fd_of_file_descr fd)
 let status_checker = "fdstatus.exe"
 
 let _ =
-  let f0 = Unix.(openfile "tmp.txt" [O_WRONLY; O_CREAT; O_TRUNC] 0o600) in
-  let f1 = Unix.(openfile "tmp.txt" [O_RDONLY; O_KEEPEXEC] 0) in
-  let f2 = Unix.(openfile "tmp.txt" [O_RDONLY; O_CLOEXEC] 0) in
+  let f0 =
+    Unix.(openfile "tmp.txt" [O_WRONLY; O_CREAT; O_TRUNC; O_SHARE_DELETE] 0o600)
+  in
+  let f1 = Unix.(openfile "tmp.txt" [O_RDONLY; O_KEEPEXEC; O_SHARE_DELETE] 0) in
+  let f2 = Unix.(openfile "tmp.txt" [O_RDONLY; O_CLOEXEC; O_SHARE_DELETE] 0) in
   let d0 = Unix.dup f0 in
   let d1 = Unix.dup ~cloexec:false f1 in
   let d2 = Unix.dup ~cloexec:true f2 in
