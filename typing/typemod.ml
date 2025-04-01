@@ -454,9 +454,6 @@ type merge_constraint =
   | With_type_package of Typedtree.core_type
 
 
-type merge_result = Path.t * (Path.t list)
-                    * (Typedtree.type_declaration option) * Types.signature
-
 module Merge = struct
 
   (* Helpers *)
@@ -508,15 +505,9 @@ module Merge = struct
         (Mty_signature sg) in
     sg
 
-  let merge_constraint_aux ?(approx=false) initial_env loc sg lid constr
-    : merge_result =
-    let destructive =
-      match constr with
-      | With_type _ | With_module _ | With_modtype _
-      | With_type_package _ -> false
-      | With_typesubst _ | With_modsubst _ | With_modtypesubst _ -> true
-    in
-    let rec patch_item constr namelist outer_sig_env sg_for_env ~ghosts item =
+    (* broken indentation to limit diff *)
+  let patch_all ~destructive ?(approx=false) initial_env loc lid constr =
+    fun item s outer_sig_env sg_for_env ~ghosts ->
       let patch_modtype_item
           id (mtd: Types.modtype_declaration) priv mty  =
         let sig_env = Env.add_signature sg_for_env outer_sig_env in
@@ -539,8 +530,8 @@ module Merge = struct
           in Some(Sig_modtype(id, mtd', priv))
         else None
       in
-      match item, namelist, constr with
-      | Sig_type(id, decl, rs, priv), [s],
+      match item, constr with
+      | Sig_type(id, decl, rs, priv),
         With_type ({ptype_kind = Ptype_abstract} as sdecl)
         when Ident.name id = s && Typedecl.is_fixed_type sdecl ->
           let decl_row =
@@ -596,7 +587,7 @@ module Merge = struct
           let path = Pident id in
           return_payload ~ghosts ~payload:(Some tdecl)
             ~replace_by:(Some (Sig_type(id, newdecl, rs, priv))) path
-      | Sig_type(id, sig_decl, rs, priv) , [s],
+      | Sig_type(id, sig_decl, rs, priv),
         (With_type sdecl | With_typesubst sdecl)
         when Ident.name id = s ->
           let sig_env = Env.add_signature sg_for_env outer_sig_env in
@@ -614,7 +605,7 @@ module Merge = struct
             else None
           in
           return_payload ~ghosts ~payload:(Some tdecl) ~replace_by:item_opt path
-      | Sig_type(id, sig_decl, rs, priv), [s], With_type_package cty
+      | Sig_type(id, sig_decl, rs, priv), With_type_package cty
         when Ident.name id = s ->
           begin match sig_decl.type_manifest with
           | None -> ()
@@ -630,13 +621,13 @@ module Merge = struct
           let tdecl = { tdecl with type_manifest = None } in
           let path = Pident id in
           return ~ghosts ~replace_by:(Some(Sig_type(id, tdecl, rs, priv))) path
-      | Sig_modtype(id, mtd, priv), [s],
+      | Sig_modtype(id, mtd, priv),
         ( With_modtype mty | With_modtypesubst mty)
         when Ident.name id = s ->
           let new_item = patch_modtype_item id mtd priv mty in
           let path = Pident id in
           return ~ghosts ~replace_by:new_item path
-      | Sig_module(id, pres, md, rs, priv), [s],
+      | Sig_module(id, pres, md, rs, priv),
         With_module {lid=_; md=md'; path; remove_aliases}
         when Ident.name id = s ->
           let sig_env = Env.add_signature sg_for_env outer_sig_env in
@@ -651,7 +642,7 @@ module Merge = struct
           return ~ghosts
             ~replace_by:(Some(Sig_module(id, pres, newmd, rs, priv)))
             real_path
-      | Sig_module(id, _, md, _rs, _), [s], With_modsubst (_,path,md')
+      | Sig_module(id, _, md, _rs, _), With_modsubst (_,path,md')
         when Ident.name id = s ->
           let sig_env = Env.add_signature sg_for_env outer_sig_env in
           let real_path = Pident id in
@@ -660,16 +651,41 @@ module Merge = struct
             (Includemod.strengthened_module_decl ~loc ~mark:true
                ~aliasable sig_env md' path md);
           return ~ghosts ~replace_by:None real_path
+      | _ -> None
 
-      (* When the constraint affects a component of a submodule *)
-      | Sig_module(id, _, md, rs, priv) as current_item, s :: namelist, _
-        when Ident.name id = s ->
-          let sig_env = Env.add_signature sg_for_env outer_sig_env in
-          let sg = extract_sig sig_env loc md.md_type in
-          let subpath, paths, payload, newsg = merge_signature sig_env sg
-              namelist in
-          let path = path_concat id subpath in
-          begin match md.md_type, destructive with
+  (* Main recursive knot to handle deep merges *)
+  let rec merge_signature initial_env env sg namelist loc lid
+      ~patch ~destructive =
+    try
+      begin
+        match
+          Signature_group.replace_in_place
+            (patch_deep_item ~patch ~destructive
+               namelist initial_env env sg loc lid) sg
+        with
+        | Some ((p, paths, payload), sg) -> p, paths, payload, sg
+        | None -> raise(Error(loc, initial_env, With_no_component lid.txt))
+      end
+    with Includemod.Error explanation ->
+      raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
+
+  and patch_deep_item ~ghosts ~patch ~destructive
+      namelist initial_env (env: Env.t) outer_sg loc lid item =
+    match item, namelist with
+    (* Shallow constraints : call the patch function *)
+    | item, [s] -> patch item s env outer_sg ~ghosts
+
+    (* Deep constraints *)
+    | Sig_module(id, _, md, rs, priv) as current_item, s :: namelist
+      when Ident.name id = s ->
+        let sig_env = Env.add_signature outer_sg env in
+        let sg = extract_sig sig_env loc md.md_type in
+        let subpath, paths, payload, newsg =
+          merge_signature ~patch initial_env sig_env sg
+            namelist loc lid ~destructive in
+        let path = path_concat id subpath in
+        begin
+          match md.md_type, destructive with
           | Mty_alias _, false ->
               (* Deep substitutions inside aliases are checked, but do not
                  change the resulting signature *)
@@ -680,26 +696,20 @@ module Merge = struct
               let new_item = Sig_module(id, Mp_present, new_md, rs, priv) in
               return_paths ~ghosts ~replace_by:(Some new_item)
                 path (path::paths) ~payload
-          end
-      | _ -> None
-    and merge_signature env sg namelist =
-      match
-        Signature_group.replace_in_place (patch_item constr namelist env sg) sg
-      with
-      | Some ((path, paths, payload), sg) -> path, paths, payload, sg
-      | None -> raise(Error(loc, env, With_no_component lid.txt))
-    in
-    try
-      let names = Longident.flatten lid.txt in
-      let path, paths, payload, sg = merge_signature initial_env sg names in
-      (path, paths, payload, sg)
-    with Includemod.Error explanation ->
-      raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
+        end
+    | _ -> None
+
+  (* Entry point for merging *)
+  let merge ~patch ~destructive env sg loc lid =
+    let initial_env = env in
+    let names = Longident.flatten lid.txt in
+    merge_signature ~patch ~destructive initial_env env sg names loc lid
 
   (* Specialized merge function for package types *)
   let merge_package_constraint env loc sg lid cty =
-    let _, _, _, sg =
-      merge_constraint_aux env loc sg lid (With_type_package cty) in
+    let patch =
+      patch_all ~destructive:false env loc lid (With_type_package cty) in
+    let _, _, _, sg = merge ~patch ~destructive:false env sg loc lid in
     sg
 
   let check_package_with_type_constraints loc env mty constraints =
@@ -725,7 +735,8 @@ module Merge = struct
       else
         With_typesubst sdecl
     in
-    match (merge_constraint_aux env loc sg lid constr) with
+    let patch = patch_all ~destructive env loc lid constr in
+    match (merge ~patch ~destructive env sg loc lid) with
     | path, paths, Some tdecl, sg -> begin
         let replace =
           match type_decl_is_alias sdecl with
@@ -760,7 +771,8 @@ module Merge = struct
       else
         With_modsubst (lid, path, md')
     in
-    let real_path,paths,_,sg = (merge_constraint_aux env loc sg lid constr) in
+    let patch = patch_all ~destructive env loc lid constr in
+    let real_path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_module_path p path s in
     let sg = post_process ~destructive loc lid env paths sg replace in
     real_path, lid, sg
@@ -773,8 +785,8 @@ module Merge = struct
       else
         With_modtypesubst mty
     in
-    let path,paths,_,sg =
-      (merge_constraint_aux ~approx env loc sg lid constr) in
+    let patch = patch_all ~destructive ~approx env loc lid constr in
+    let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_modtype_path p mty s in
     let sg = post_process ~destructive loc lid env paths sg replace in
     path, lid, sg
