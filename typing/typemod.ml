@@ -626,13 +626,6 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
 
 type merge_constraint =
   (* Normal merging cases that returns a typed tree *)
-  | With_module of {
-        lid:Longident.t loc;
-        path:Path.t;
-        md:Types.module_declaration;
-        remove_aliases:bool
-      }
-  | With_modsubst of Longident.t loc * Path.t * Types.module_declaration
   | With_modtype of Types.module_type
   | With_modtypesubst of Types.module_type
 
@@ -720,33 +713,6 @@ module Merge = struct
           let new_item = patch_modtype_item id mtd priv mty in
           let path = Pident id in
           return ~ghosts ~replace_by:new_item path
-      | Sig_module(id, pres, md, rs, priv),
-        With_module {lid=_; md=md'; path; remove_aliases}
-        when Ident.name id = s ->
-          let sig_env = Env.add_signature sg_for_env outer_sig_env in
-          let real_path = Pident id in
-          let mty = md'.md_type in
-          let mty = Mtype.scrape_for_type_of ~remove_aliases sig_env mty in
-          let mty =
-            remove_modality_and_zero_alloc_variables_mty sig_env
-              ~zap_modality:Mode.Modality.Value.zap_to_id mty
-          in
-          let md'' = { md' with md_type = mty } in
-          let newmd = Mtype.strengthen_decl ~aliasable:false md'' path in
-          ignore(Includemod.modtypes  ~mark:true ~loc sig_env
-            ~modes:(Legacy None) newmd.md_type md.md_type);
-          return ~ghosts
-            ~replace_by:(Some(Sig_module(id, pres, newmd, rs, priv)))
-            real_path
-      | Sig_module(id, _, md, _rs, _), With_modsubst (_,path,md')
-        when Ident.name id = s ->
-          let sig_env = Env.add_signature sg_for_env outer_sig_env in
-          let real_path = Pident id in
-          let aliasable = not (Env.is_functor_arg path sig_env) in
-          ignore
-            (Includemod.strengthened_module_decl ~loc ~mark:true
-               ~aliasable sig_env ~mmodes:(Legacy None) md' path md);
-          return ~ghosts ~replace_by:None real_path
       | _ -> None
 
   (* Main recursive knot to handle deep merges *)
@@ -925,13 +891,36 @@ module Merge = struct
   (* md' is the module type of the module at [path], used for equiv checks *)
   let merge_module ~destructive env loc sg lid
       (md': Types.module_declaration) path remove_aliases =
-    let constr =
-      if not destructive then
-        With_module {lid; path; md=md'; remove_aliases}
-      else
-        With_modsubst (lid, path, md')
+    let patch item s sig_env sg_for_env ~ghosts =
+      match item with
+      | Sig_module(id, pres, md, rs, priv) when Ident.name id = s ->
+          let sig_env = Env.add_signature sg_for_env sig_env in
+          let real_path = Pident id in
+          if destructive then
+            let aliasable = not (Env.is_functor_arg path sig_env) in
+            (* Inclusion check with the strengthened definition *)
+            let _ =
+              Includemod.strengthened_module_decl ~loc ~mark:true
+                ~aliasable sig_env ~mmodes:(Legacy None) md' path md in
+            return ~ghosts ~replace_by:None real_path
+          else
+            let mty = md'.md_type in
+            let mty = Mtype.scrape_for_type_of ~remove_aliases sig_env mty in
+            let mty =
+              remove_modality_and_zero_alloc_variables_mty sig_env
+                ~zap_modality:Mode.Modality.Value.zap_to_id mty
+            in
+            let md'' = { md' with md_type = mty } in
+            let newmd =
+              Mtype.strengthen_decl ~aliasable:false sig_env md'' path in
+            (* Inclusion check with the original signature *)
+            let _ = Includemod.modtypes ~mark:true ~loc sig_env
+                ~modes:(Legacy None) newmd.md_type md.md_type in
+            return ~ghosts
+              ~replace_by:(Some(Sig_module(id, pres, newmd, rs, priv)))
+              real_path
+      | _ -> None
     in
-    let patch = patch_all ~destructive loc constr in
     let real_path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_module_path p path s in
     let sg = post_process ~destructive loc lid env paths sg replace in
