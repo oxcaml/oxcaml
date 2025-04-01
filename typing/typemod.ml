@@ -638,9 +638,6 @@ type merge_constraint =
   | With_modtype of Types.module_type
   | With_modtypesubst of Types.module_type
 
-  (* Package with type constraints only use this last case. *)
-  | With_type_package of Typedtree.core_type
-
 
 module Merge = struct
 
@@ -694,7 +691,7 @@ module Merge = struct
     sg
 
     (* broken indentation to limit diff *)
-  let patch_all ~destructive ?(approx=false) initial_env loc lid constr =
+  let patch_all ~destructive ?(approx=false) initial_env loc constr =
     fun item s outer_sig_env sg_for_env ~ghosts ->
       let patch_modtype_item
           id (mtd: Types.modtype_declaration) priv mty  =
@@ -796,30 +793,6 @@ module Merge = struct
             else None
           in
           return_payload ~ghosts ~payload:(Some tdecl) ~replace_by:item_opt path
-      | Sig_type(id, sig_decl, rs, priv), With_type_package cty
-        when Ident.name id = s ->
-          begin match sig_decl.type_manifest with
-          | None -> ()
-          | Some ty ->
-            raise (Error(loc, outer_sig_env, With_package_manifest (lid.txt, ty)))
-          end;
-          let tdecl =
-            Typedecl.transl_package_constraint ~loc cty.ctyp_type
-          in
-          (* Here we constrain the jkind of "with type" manifest by the jkind from
-            the declaration from the original signature.  Note that this is also
-            checked in [check_type_decl], but there it is check, not constrain,
-            which we need here to deal with type variables in package constraints
-            (see tests in [typing-modules/package_constraint.ml]). Because the
-            check is repeated later -- and with better handling for errors -- we
-            just drop any error here. *)
-          ignore
-            (* CR layouts v2.8: Does this type_jkind need to be instantiated? *)
-            (Ctype.constrain_decl_jkind initial_env tdecl sig_decl.type_jkind);
-          check_type_decl outer_sig_env sg_for_env loc id None tdecl sig_decl;
-          let tdecl = { tdecl with type_manifest = None } in
-          let path = Pident id in
-          return ~ghosts ~replace_by:(Some(Sig_type(id, tdecl, rs, priv))) path
       | Sig_modtype(id, mtd, priv),
         ( With_modtype mty | With_modtypesubst mty)
         when Ident.name id = s ->
@@ -922,7 +895,7 @@ module Merge = struct
       else
         With_typesubst sdecl
     in
-    let patch = patch_all ~destructive env loc lid constr in
+    let patch = patch_all ~destructive env loc constr in
     match (merge ~patch ~destructive env sg loc lid) with
     | path, paths, Some tdecl, sg -> begin
         let replace =
@@ -958,7 +931,7 @@ module Merge = struct
       else
         With_modsubst (lid, path, md')
     in
-    let patch = patch_all ~destructive env loc lid constr in
+    let patch = patch_all ~destructive env loc constr in
     let real_path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_module_path p path s in
     let sg = post_process ~destructive loc lid env paths sg replace in
@@ -972,7 +945,7 @@ module Merge = struct
       else
         With_modtypesubst mty
     in
-    let patch = patch_all ~destructive ~approx env loc lid constr in
+    let patch = patch_all ~destructive ~approx env loc constr in
     let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_modtype_path p mty s in
     let sg = post_process ~destructive loc lid env paths sg replace in
@@ -980,8 +953,34 @@ module Merge = struct
 
   (* Specialized merge function for package types *)
   let merge_package_constraint env loc sg lid cty =
-    let patch =
-      patch_all ~destructive:false env loc lid (With_type_package cty) in
+    let patch item s sig_env sg_for_env ~ghosts = match item with
+      | Sig_type(id, sig_decl, rs, priv)
+        when Ident.name id = s ->
+          begin match sig_decl.type_manifest with
+          | None -> ()
+          | Some ty ->
+              raise (Error(loc, sig_env, With_package_manifest (lid.txt, ty)))
+          end;
+          let tdecl =
+            Typedecl.transl_package_constraint ~loc sig_env cty.ctyp_type
+          in
+          (* Here we constrain the jkind of "with type" manifest by the jkind
+             from the declaration from the original signature. Note that this is
+             also checked in [check_type_decl], but there it is check, not
+             constrain, which we need here to deal with type variables in
+             package constraints (see tests in
+             [typing-modules/package_constraint.ml]). Because the check is
+             repeated later -- and with better handling for errors -- we just
+             drop any error here. *)
+          ignore
+            (* CR layouts v2.8: Does this type_jkind need to be instantiated? *)
+            (Ctype.constrain_decl_jkind initial_env tdecl sig_decl.type_jkind);
+          check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
+          let tdecl = { tdecl with type_manifest = None } in
+          let path = Pident id in
+          return ~ghosts ~replace_by:(Some(Sig_type(id, tdecl, rs, priv))) path
+      | _ -> None
+    in
     let _, _, _, sg = merge ~patch ~destructive:false env sg loc lid in
     sg
 
