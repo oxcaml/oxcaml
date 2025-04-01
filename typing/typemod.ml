@@ -438,8 +438,6 @@ let params_are_constrained =
 
 type merge_constraint =
   (* Normal merging cases that returns a typed tree *)
-  | With_type of Parsetree.type_declaration
-  | With_typesubst of Parsetree.type_declaration
   | With_module of {
         lid:Longident.t loc;
         path:Path.t;
@@ -503,7 +501,7 @@ module Merge = struct
     sg
 
     (* broken indentation to limit diff *)
-  let patch_all ~destructive ?(approx=false) initial_env loc constr =
+  let patch_all ~destructive ?(approx=false) loc constr =
     fun item s outer_sig_env sg_for_env ~ghosts ->
       let patch_modtype_item
           id (mtd: Types.modtype_declaration) priv mty  =
@@ -528,80 +526,6 @@ module Merge = struct
         else None
       in
       match item, constr with
-      | Sig_type(id, decl, rs, priv),
-        With_type ({ptype_kind = Ptype_abstract} as sdecl)
-        when Ident.name id = s && Typedecl.is_fixed_type sdecl ->
-          let decl_row =
-            let arity = List.length sdecl.ptype_params in
-            {
-              type_params =
-                List.map (fun _ -> Btype.newgenvar()) sdecl.ptype_params;
-              type_arity = arity;
-              type_kind = Type_abstract Definition;
-              type_private = Private;
-              type_manifest = None;
-              type_variance =
-                List.map
-                  (fun (_, (v, i)) ->
-                     let (c, n) =
-                       match v with
-                       | Covariant -> true, false
-                       | Contravariant -> false, true
-                       | NoVariance -> false, false
-                       | Bivariant -> true, true
-                     in
-                     make_variance (not n) (not c) (i = Injective)
-                  )
-                  sdecl.ptype_params;
-              type_separability =
-                Types.Separability.default_signature ~arity;
-              type_loc = sdecl.ptype_loc;
-              type_is_newtype = false;
-              type_expansion_scope = Btype.lowest_level;
-              type_attributes = [];
-              type_immediate = Unknown;
-              type_unboxed_default = false;
-              type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
-            }
-          and id_row = Ident.create_local (s^"#row") in
-          let initial_env =
-            Env.add_type ~check:false id_row decl_row initial_env
-          in
-          let sig_env = Env.add_signature sg_for_env outer_sig_env in
-          let tdecl =
-            Typedecl.transl_with_constraint id ~fixed_row_path:(Pident id_row)
-              ~sig_env ~sig_decl:decl ~outer_env:initial_env sdecl in
-          let newdecl = tdecl.typ_type in
-          let before_ghosts, row_id, after_ghosts = split_row_id s ghosts in
-          check_type_decl outer_sig_env sg_for_env sdecl.ptype_loc
-            id row_id newdecl decl;
-          let decl_row = {decl_row with type_params = newdecl.type_params} in
-          let rs' = if rs = Trec_first then Trec_not else rs in
-          let ghosts =
-            List.rev_append before_ghosts
-              (Sig_type(id_row, decl_row, rs', priv)::after_ghosts)
-          in
-          let path = Pident id in
-          return_payload ~ghosts ~payload:(Some tdecl)
-            ~replace_by:(Some (Sig_type(id, newdecl, rs, priv))) path
-      | Sig_type(id, sig_decl, rs, priv),
-        (With_type sdecl | With_typesubst sdecl)
-        when Ident.name id = s ->
-          let sig_env = Env.add_signature sg_for_env outer_sig_env in
-          let tdecl =
-            Typedecl.transl_with_constraint id
-              ~sig_env ~sig_decl ~outer_env:initial_env sdecl in
-          let newdecl = tdecl.typ_type and loc = sdecl.ptype_loc in
-          let before_ghosts, row_id, after_ghosts = split_row_id s ghosts in
-          let ghosts = List.rev_append before_ghosts after_ghosts in
-          check_type_decl outer_sig_env sg_for_env loc
-            id row_id newdecl sig_decl;
-          let path = Pident id in
-          let item_opt =
-            if not destructive then (Some(Sig_type(id, newdecl, rs, priv)))
-            else None
-          in
-          return_payload ~ghosts ~payload:(Some tdecl) ~replace_by:item_opt path
       | Sig_modtype(id, mtd, priv),
         ( With_modtype mty | With_modtypesubst mty)
         when Ident.name id = s ->
@@ -688,37 +612,109 @@ module Merge = struct
 
   (* sg with type lid = sdecl *)
   let merge_type ~destructive env loc sg lid sdecl =
-    let constr =
-      if not destructive then
-        With_type sdecl
-      else
-        With_typesubst sdecl
+    let patch item s sig_env sg_for_env ~ghosts =
+      match item, sdecl.ptype_kind with
+      | Sig_type(id, decl, rs, priv), Ptype_abstract
+        when Ident.name id = s && Typedecl.is_fixed_type sdecl ->
+
+          let decl_row =
+            let arity = List.length sdecl.ptype_params in
+            {
+              type_params =
+                List.map (fun _ -> Btype.newgenvar()) sdecl.ptype_params;
+              type_arity = arity;
+              type_kind = Type_abstract Definition;
+              type_private = Private;
+              type_manifest = None;
+              type_variance =
+                List.map
+                  (fun (_, (v, i)) ->
+                     let (c, n) =
+                       match v with
+                       | Covariant -> true, false
+                       | Contravariant -> false, true
+                       | NoVariance -> false, false
+                       | Bivariant -> true, true
+                     in
+                     make_variance (not n) (not c) (i = Injective)
+                  )
+                  sdecl.ptype_params;
+              type_separability =
+                Types.Separability.default_signature ~arity;
+              type_loc = sdecl.ptype_loc;
+              type_is_newtype = false;
+              type_expansion_scope = Btype.lowest_level;
+              type_attributes = [];
+              type_immediate = Unknown;
+              type_unboxed_default = false;
+              type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+            }
+          and id_row = Ident.create_local (s^"#row") in
+          let initial_env =
+            Env.add_type ~check:false id_row decl_row env
+          in
+          let sig_env = Env.add_signature sg_for_env sig_env in
+          let tdecl =
+            Typedecl.transl_with_constraint id ~fixed_row_path:(Pident id_row)
+              ~sig_env ~sig_decl:decl ~outer_env:initial_env sdecl in
+          let newdecl = tdecl.typ_type in
+          let before_ghosts, row_id, after_ghosts = split_row_id s ghosts in
+          check_type_decl sig_env sg_for_env sdecl.ptype_loc
+            id row_id newdecl decl;
+          let decl_row = {decl_row with type_params = newdecl.type_params} in
+          let rs' = if rs = Trec_first then Trec_not else rs in
+          let ghosts =
+            List.rev_append before_ghosts
+              (Sig_type(id_row, decl_row, rs', priv)::after_ghosts)
+          in
+          let path = Pident id in
+          return_payload ~ghosts ~payload:tdecl
+            ~replace_by:(Some (Sig_type(id, newdecl, rs, priv))) path
+
+      | Sig_type(id, sig_decl, rs, priv), _
+        when Ident.name id = s ->
+          let sig_env = Env.add_signature sg_for_env sig_env in
+          let tdecl =
+            Typedecl.transl_with_constraint id
+              ~sig_env ~sig_decl ~outer_env:env sdecl in
+          let newdecl = tdecl.typ_type in
+          let newloc = sdecl.ptype_loc in
+          let before_ghosts, row_id, after_ghosts = split_row_id s ghosts in
+          let ghosts = List.rev_append before_ghosts after_ghosts in
+          check_type_decl sig_env sg_for_env newloc
+            id row_id newdecl sig_decl;
+          let path = Pident id in
+          let item_opt =
+            if not destructive then (Some(Sig_type(id, newdecl, rs, priv)))
+            else None
+          in
+          return_payload ~ghosts ~payload:tdecl ~replace_by:item_opt path
+
+      | _ -> None
     in
-    let patch = patch_all ~destructive env loc constr in
-    match (merge ~patch ~destructive env sg loc lid) with
-    | path, paths, Some tdecl, sg -> begin
-        let replace =
-          match type_decl_is_alias sdecl with
-          | Some lid ->
-              (* if the type is an alias of [lid], replace by the definition *)
-              let replacement, _ =
-                try Env.find_type_by_name lid.txt env
-                with Not_found -> assert false
-              in
-              fun s path -> Subst.Unsafe.add_type_path path replacement s
-          | None ->
-              (* if the type is not an alias, try to inline it *)
-              let body = Option.get tdecl.typ_type.type_manifest in
-              let params = tdecl.typ_type.type_params in
-              if params_are_constrained params then
-                raise(Error(loc, env, With_cannot_remove_constrained_type));
-              fun s path ->
-                Subst.Unsafe.add_type_function path ~params ~body s
-        in
-        let sg = post_process ~destructive loc lid env paths sg replace in
-        tdecl, (path, lid, sg)
-      end
-    | _ -> assert false
+    (* Merging *)
+    let path, paths, tdecl, sg = merge ~patch ~destructive env sg loc lid in
+    (* Post processing *)
+    let replace =
+      match type_decl_is_alias sdecl with
+      | Some lid ->
+          (* if the type is an alias of [lid], replace by the definition *)
+          let replacement, _ =
+            try Env.find_type_by_name lid.txt env
+            with Not_found -> assert false
+          in
+          fun s path -> Subst.Unsafe.add_type_path path replacement s
+      | None ->
+          (* if the type is not an alias, try to inline it *)
+          let body = Option.get tdecl.typ_type.type_manifest in
+          let params = tdecl.typ_type.type_params in
+          if params_are_constrained params then
+            raise(Error(loc, env, With_cannot_remove_constrained_type));
+          fun s path ->
+            Subst.Unsafe.add_type_function path ~params ~body s
+    in
+    let sg = post_process ~destructive loc lid env paths sg replace in
+    (tdecl, (path, lid, sg))
 
   (* [sg with module lid = path] *)
   (* md' is the module type of the module at [path], used for equiv checks *)
@@ -730,7 +726,7 @@ module Merge = struct
       else
         With_modsubst (lid, path, md')
     in
-    let patch = patch_all ~destructive env loc constr in
+    let patch = patch_all ~destructive loc constr in
     let real_path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_module_path p path s in
     let sg = post_process ~destructive loc lid env paths sg replace in
@@ -744,7 +740,7 @@ module Merge = struct
       else
         With_modtypesubst mty
     in
-    let patch = patch_all ~destructive ~approx env loc constr in
+    let patch = patch_all ~destructive ~approx loc constr in
     let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_modtype_path p mty s in
     let sg = post_process ~destructive loc lid env paths sg replace in
