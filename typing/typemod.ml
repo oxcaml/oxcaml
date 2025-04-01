@@ -624,12 +624,6 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
       in
       Mty_strengthen (mty, path, alias)
 
-type merge_constraint =
-  (* Normal merging cases that returns a typed tree *)
-  | With_modtype of Types.module_type
-  | With_modtypesubst of Types.module_type
-
-
 module Merge = struct
 
   (* Helpers *)
@@ -680,40 +674,6 @@ module Merge = struct
     let _ = check_well_formed_module env loc "this instantiated signature"
         (Mty_signature sg) in
     sg
-
-    (* broken indentation to limit diff *)
-  let patch_all ~destructive ?(approx=false) loc constr =
-    fun item s outer_sig_env sg_for_env ~ghosts ->
-      let patch_modtype_item
-          id (mtd: Types.modtype_declaration) priv mty  =
-        let sig_env = Env.add_signature sg_for_env outer_sig_env in
-        (* Check for equivalence if the previous module type was not
-           empty. During approximation, the equivalence check is ignored. *)
-        let () = match approx, mtd.mtd_type with
-          | false, Some previous_mty ->
-              Includemod.check_modtype_equiv ~loc sig_env
-                id previous_mty mty
-          | _ -> ()
-        in
-        if not destructive then
-          let mtd': modtype_declaration =
-            {
-              mtd_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
-              mtd_type = Some mty;
-              mtd_attributes = [];
-              mtd_loc = loc;
-            }
-          in Some(Sig_modtype(id, mtd', priv))
-        else None
-      in
-      match item, constr with
-      | Sig_modtype(id, mtd, priv),
-        ( With_modtype mty | With_modtypesubst mty)
-        when Ident.name id = s ->
-          let new_item = patch_modtype_item id mtd priv mty in
-          let path = Pident id in
-          return ~ghosts ~replace_by:new_item path
-      | _ -> None
 
   (* Main recursive knot to handle deep merges *)
   let rec merge_signature initial_env env sg namelist loc lid
@@ -804,7 +764,6 @@ module Merge = struct
                        | Covariant -> true, false
                        | Contravariant -> false, true
                        | NoVariance -> false, false
-                       | Bivariant -> true, true
                      in
                      make_variance (not n) (not c) (i = Injective)
                   )
@@ -815,7 +774,6 @@ module Merge = struct
               type_is_newtype = false;
               type_expansion_scope = Btype.lowest_level;
               type_attributes = [];
-              type_immediate = Unknown;
               type_unboxed_default = false;
               type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
               type_unboxed_version = None;
@@ -912,7 +870,7 @@ module Merge = struct
             in
             let md'' = { md' with md_type = mty } in
             let newmd =
-              Mtype.strengthen_decl ~aliasable:false sig_env md'' path in
+              Mtype.strengthen_decl ~aliasable:false md'' path in
             (* Inclusion check with the original signature *)
             let _ = Includemod.modtypes ~mark:true ~loc sig_env
                 ~modes:(Legacy None) newmd.md_type md.md_type in
@@ -928,13 +886,32 @@ module Merge = struct
 
   (* [sg with module type lid = mty] *)
   let merge_modtype ?(approx=false) ~destructive env loc sg lid mty =
-    let constr =
-      if not destructive then
-        With_modtype mty
-      else
-        With_modtypesubst mty
+    let patch item s sig_env sg_for_env ~ghosts = match item with
+      | Sig_modtype(id, mtd, priv)
+        when Ident.name id = s ->
+          (* Check for equivalence if the previous module type was not
+             abstract. In approximation mode, the check is ignored *)
+          let () = match mtd.mtd_type, approx with
+            | Some previous_mty, false ->
+                let sig_env = Env.add_signature sg_for_env sig_env in
+                Includemod.check_modtype_equiv ~loc sig_env id previous_mty mty
+            | _, _ -> ()
+          in
+          (* Create replacement item *)
+          let new_item =
+            if destructive then None
+            else
+              let mtd': modtype_declaration = {
+                mtd_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+                mtd_type = Some mty;
+                mtd_attributes = [];
+                mtd_loc = loc; }
+              in Some(Sig_modtype(id, mtd', priv))
+          in
+          let path = Pident id in
+          return ~ghosts ~replace_by:new_item path
+      | _ -> None
     in
-    let patch = patch_all ~destructive ~approx loc constr in
     let path,paths,_,sg = merge ~patch ~destructive env sg loc lid in
     let replace s p = Subst.Unsafe.add_modtype_path p mty s in
     let sg = post_process ~destructive loc lid env paths sg replace in
@@ -951,7 +928,7 @@ module Merge = struct
               raise (Error(loc, sig_env, With_package_manifest (lid.txt, ty)))
           end;
           let tdecl =
-            Typedecl.transl_package_constraint ~loc sig_env cty.ctyp_type
+            Typedecl.transl_package_constraint ~loc cty.ctyp_type
           in
           (* Here we constrain the jkind of "with type" manifest by the jkind
              from the declaration from the original signature. Note that this is
@@ -963,7 +940,7 @@ module Merge = struct
              drop any error here. *)
           ignore
             (* CR layouts v2.8: Does this type_jkind need to be instantiated? *)
-            (Ctype.constrain_decl_jkind initial_env tdecl sig_decl.type_jkind);
+            (Ctype.constrain_decl_jkind env tdecl sig_decl.type_jkind);
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
           let tdecl = { tdecl with type_manifest = None } in
           let path = Pident id in
