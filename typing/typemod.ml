@@ -436,8 +436,48 @@ let params_are_constrained =
   in
   loop
 
-
 module Merge = struct
+  (* This module hosts the functions dealing with signature constraints. There
+     are of three forms :
+     - type constraint [... with type t = ... ], handled by [merge_type]
+     - module constraint [... with module X = ... ], handled by [merge_module]
+     - module type constraints [... with module type T = ...] handled by
+       [merge_modtype]
+
+     Each constraint can be *destructive*, (with the syntax [:=]) meaning that
+     the substituted identifier is removed from the signature. This imposes
+     additional checks to ensure wellformedness, handled by the [post_process]
+     function.
+
+     Each constraint can be *deep*, meaning that the substituted identifier
+     might be inside a submodule. This is handled by the [patch_deep_item]
+     function. Deep destructive substitutions inside submodules with an alias
+     signature are disallowed.
+
+     Each constraint can be *instantiating*, if the substitution replaces an
+     "abstract" field (for module constraints, "abstract" means "not already an
+     alias"). If the constraint is not instantiating, equivalence checks with
+     the old definition are performed.
+
+     Finally, merging is both used in (1) "normal" mode, to build a typed tree,
+     in (2) "approx" mode, during the signature approximation phase of
+     typechecking recursive modules, and in (3) "package" mode, for checking
+     signatures of first-class modules.
+
+     The overall structure is similar for each form:
+
+     1. A [patch] function is defined to identify the item to substitute, do the
+     equivalence checks if needed, and optionally build the new replacement item
+     (if the substitution is non-destructive)
+
+     2. The patch is applied to the module type by using the general
+     [merge_signature] function. It returns the path of the affected item (along
+     with the list of all suffixes, if the substitution was deep).
+
+     3. Some post processing is applied (actual replacement for destructive
+     substitutions, wellformedness checks)
+
+  *)
 
   (* Helpers *)
   let return ~ghosts ~replace_by path =
@@ -491,18 +531,13 @@ module Merge = struct
   (* Main recursive knot to handle deep merges *)
   let rec merge_signature initial_env env sg namelist loc lid
       ~patch ~destructive =
-    try
-      begin
-        match
-          Signature_group.replace_in_place
-            (patch_deep_item ~patch ~destructive
-               namelist initial_env env sg loc lid) sg
-        with
-        | Some ((p, paths, payload), sg) -> p, paths, payload, sg
-        | None -> raise(Error(loc, initial_env, With_no_component lid.txt))
-      end
-    with Includemod.Error explanation ->
-      raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
+    match
+      Signature_group.replace_in_place
+        (patch_deep_item ~patch ~destructive
+           namelist initial_env env sg loc lid) sg
+    with
+    | Some ((p, paths, payload), sg) -> p, paths, payload, sg
+    | None -> raise(Error(loc, initial_env, With_no_component lid.txt))
 
   and patch_deep_item ~ghosts ~patch ~destructive
       namelist initial_env (env: Env.t) outer_sg loc lid item =
@@ -538,7 +573,10 @@ module Merge = struct
   let merge ~patch ~destructive env sg loc lid =
     let initial_env = env in
     let names = Longident.flatten lid.txt in
-    merge_signature ~patch ~destructive initial_env env sg names loc lid
+    try
+      merge_signature ~patch ~destructive initial_env env sg names loc lid
+    with Includemod.Error explanation ->
+      raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
 
   (* sg with type lid = sdecl *)
   let merge_type ~destructive env loc sg lid sdecl =
@@ -714,8 +752,8 @@ module Merge = struct
     let sg = post_process ~destructive loc lid env paths sg replace in
     path, lid, sg
 
-  (* Specialized merge function for package types *)
-  let merge_package_constraint env loc sg lid cty =
+  (* sg with type lid = cty (inside a first class module type) *)
+  let merge_package env loc sg lid cty =
     let patch item s sig_env sg_for_env ~ghosts = match item with
       | Sig_type(id, sig_decl, rs, priv)
         when Ident.name id = s ->
@@ -741,7 +779,7 @@ module Merge = struct
     let sg =
       List.fold_left
         (fun sg (lid, cty) ->
-           merge_package_constraint env loc sg lid cty)
+           merge_package env loc sg lid cty)
         sg constraints
     in
     let scope = Ctype.create_scope () in
@@ -980,7 +1018,7 @@ and approx_constraint env body constr =
       let destructive =
         (match constr with | Pwith_modtypesubst _ -> true | _ -> false) in
       let approx_smty = approx_modtype env smty in
-      let _ ,_,sg = Merge.merge_modtype ~destructive ~approx:true
+      let _,_,sg = Merge.merge_modtype ~approx:true ~destructive
           env smty.pmty_loc body id approx_smty in
       sg
   (* module substitutions are ignored, but checked for cyclicity *)
@@ -1376,7 +1414,6 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_typeof tmty) mty env loc smty.pmty_attributes
   | Pmty_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
-
 
 and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
   let destructive = match constr with
