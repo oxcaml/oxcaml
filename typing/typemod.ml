@@ -705,28 +705,6 @@ module Merge = struct
     let names = Longident.flatten lid.txt in
     merge_signature ~patch ~destructive initial_env env sg names loc lid
 
-  (* Specialized merge function for package types *)
-  let merge_package_constraint env loc sg lid cty =
-    let patch =
-      patch_all ~destructive:false env loc lid (With_type_package cty) in
-    let _, _, _, sg = merge ~patch ~destructive:false env sg loc lid in
-    sg
-
-  let check_package_with_type_constraints loc env mty constraints =
-    let sg = extract_sig env loc mty in
-    let sg =
-      List.fold_left
-        (fun sg (lid, cty) ->
-           merge_package_constraint env loc sg lid cty)
-        sg constraints
-    in
-    let scope = Ctype.create_scope () in
-    Mtype.freshen ~scope (Mty_signature sg)
-
-  let () =
-    Typetexp.check_package_with_type_constraints :=
-      check_package_with_type_constraints
-
   (* sg with type lid = sdecl *)
   let merge_type ~destructive env loc sg lid sdecl =
     let constr =
@@ -791,6 +769,27 @@ module Merge = struct
     let sg = post_process ~destructive loc lid env paths sg replace in
     path, lid, sg
 
+  (* Specialized merge function for package types *)
+  let merge_package_constraint env loc sg lid cty =
+    let patch =
+      patch_all ~destructive:false env loc lid (With_type_package cty) in
+    let _, _, _, sg = merge ~patch ~destructive:false env sg loc lid in
+    sg
+
+  let check_package_with_type_constraints loc env mty constraints =
+    let sg = extract_sig env loc mty in
+    let sg =
+      List.fold_left
+        (fun sg (lid, cty) ->
+           merge_package_constraint env loc sg lid cty)
+        sg constraints
+    in
+    let scope = Ctype.create_scope () in
+    Mtype.freshen ~scope (Mty_signature sg)
+
+  let () =
+    Typetexp.check_package_with_type_constraints :=
+      check_package_with_type_constraints
 end
 
 (* Add recursion flags on declarations arising from a mutually recursive
