@@ -109,8 +109,15 @@ let eval_value_path env path =
       | Topprinters.Simple ty_arg ->
           Printval.install_printer path ty_arg
             (Obj.obj v : Format.formatter -> Obj.t -> unit)
-      | Topprinters.Generic _ ->
-          raise (Error (`Wrong_type lid))
+      | Topprinters.Generic { ty_path ; arity } ->
+          let rec build v = function
+            | 0 ->
+                Genprintval.User_printer.Zero
+                  (Obj.obj v : Format.formatter -> Obj.t -> unit)
+            | n ->
+                Genprintval.User_printer.Succ
+                  (fun fn -> build ((Obj.obj v : _ -> Obj.t) fn) (n - 1)) in
+          Printval.install_printer_generic_format path ty_path (build v arity)
 
 let remove_printer lid =
   match Topprinters.find_printer Env.empty lid with

@@ -8560,6 +8560,7 @@ debugger/loadprinter.cmo : \
     parsing/longident.cmi \
     utils/load_path.cmi \
     typing/ident.cmi \
+    toplevel/genprintval.cmi \
     utils/format_doc.cmi \
     typing/env.cmi \
     otherlibs/dynlink/dynlink.cmi \
@@ -8576,6 +8577,7 @@ debugger/loadprinter.cmx : \
     parsing/longident.cmx \
     utils/load_path.cmx \
     typing/ident.cmx \
+    toplevel/genprintval.cmx \
     utils/format_doc.cmx \
     typing/env.cmx \
     otherlibs/dynlink/dynlink.cmx \
@@ -8701,6 +8703,7 @@ debugger/printval.cmi : \
     typing/types.cmi \
     typing/path.cmi \
     debugger/parser_aux.cmi \
+    toplevel/genprintval.cmi \
     typing/env.cmi \
     debugger/debugcom.cmi
 debugger/program_loading.cmo : \
