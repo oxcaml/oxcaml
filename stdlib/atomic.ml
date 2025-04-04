@@ -108,6 +108,20 @@ external get_contended
   @@ portable
   = "%atomic_load"
 
+module Contended = struct
+  external get : ('a : value_or_null mod contended).
+    'a t @ contended local -> 'a @@ portable = "%atomic_load"
+  external set : ('a : value_or_null mod portable).
+    'a t @ contended local -> 'a -> unit @@ portable = "%atomic_set"
+  external exchange : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a @@ portable = "%atomic_exchange"
+  external compare_and_set : ('a : value_or_null mod portable).
+    'a t @ contended local -> 'a -> 'a -> bool @@ portable = "%atomic_cas"
+  external compare_exchange : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a -> 'a @@ portable =
+    "%atomic_compare_exchange"
+end
+
 module Loc = struct
   type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
   external get : ('a : value_or_null).
