@@ -933,6 +933,7 @@ DIFF_FLAGS
 encode_C_literal
 SAK
 SAK_BUILD
+ocaml_cc_vendor
 CC
 LINEAR_MAGIC_NUMBER
 CMT_MAGIC_NUMBER
@@ -3411,6 +3412,7 @@ CMXS_MAGIC_NUMBER=Caml1999D037
 CMT_MAGIC_NUMBER=Caml1999T037
 
 LINEAR_MAGIC_NUMBER=Caml1999L037
+
 
 
 
@@ -14819,7 +14821,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking C compiler vendor" >&5
 printf %s "checking C compiler vendor... " >&6; }
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 #if defined(_MSC_VER)
