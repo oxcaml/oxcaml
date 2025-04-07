@@ -332,6 +332,7 @@ let compute_static_size lam =
     | Parrayrefs _
     | Pisint _
     | Pisnull
+    | Pisimmediate
     | Pisout
     | Pbigarrayref _
     | Pbigarraydim _

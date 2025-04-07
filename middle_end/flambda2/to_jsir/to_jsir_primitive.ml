@@ -192,6 +192,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Is_null ->
     let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res Eq [x; Pc Null]
+  | Is_immediate -> use_prim' (Extern "caml_is_immediate")
   | Get_tag ->
     let var, env, res = get_tag ~env ~res x in
     Some var, env, res

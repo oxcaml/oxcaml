@@ -385,3 +385,8 @@ CAMLprim value caml_is_null(value v)
 {
   return Is_null(v) ? Val_true : Val_false;
 }
+
+CAMLprim value caml_is_immediate(value v)
+{
+  return Is_long(v) ? Val_true : Val_false;
+}

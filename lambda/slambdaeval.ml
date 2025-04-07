@@ -464,9 +464,9 @@ and eval_prim env prim =
   | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
   | Pbytessetu | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _
   | Pduparray _ | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _
-  | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _
-  | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _
-  | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
+  | Parrayrefs _ | Parraysets _ | Pisint _ | Pisnull | Pisimmediate | Pisout
+  | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_i8 _
+  | Pstring_load_i16 _ | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
   | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_i8 _
   | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
   | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _

@@ -637,6 +637,9 @@ let is_int =
 
 let is_null = D.(unary "%is_null" ~params:param0 (fun _ () -> P.Is_null))
 
+let is_immediate =
+  D.(unary "%is_immediate" ~params:param0 (fun _ () -> P.Is_immediate))
+
 let num_conv =
   D.(
     unary "%num_conv"
@@ -1056,6 +1059,7 @@ module OfFlambda = struct
     | Is_flat_float_array -> is_flat_float_array env ()
     | Is_int _ -> is_int env () (* CR vlaviron: discuss *)
     | Is_null -> is_null env ()
+    | Is_immediate -> is_immediate env ()
     | Make_lazy lt -> make_lazy env lt
     | Num_conv { src; dst } -> num_conv env (src, dst)
     | Opaque_identity _ -> opaque_identity env ()
