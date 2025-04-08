@@ -644,7 +644,7 @@ module type S = sig
 end
 
 module type S' = sig
-  include [@no_recursive_modalities] S @@ portable
+  include S @@ portable
 end
 
 [%%expect{|
@@ -653,7 +653,7 @@ module type S =
 module type S' =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a end
+    module M : sig val foo : 'a -> 'a end @@ portable
   end
 |}]
 
@@ -672,7 +672,7 @@ end
 Line 1, characters 18-26:
 1 | module F (X : S @ portable) = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (_ : S @ portable) = struct
@@ -681,15 +681,12 @@ end
 Line 1, characters 18-26:
 1 | module F (_ : S @ portable) = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-Line 1, characters 21-29:
-1 | module M' = (M : S @ portable)
-                         ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' : S
 |}]
 
 module F (M : S @ portable) : S @ portable = struct
@@ -698,7 +695,7 @@ end
 Line 1, characters 18-26:
 1 | module F (M : S @ portable) : S @ portable = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (M : S @ portable) @ portable = struct
@@ -707,43 +704,31 @@ end
 Line 1, characters 18-26:
 1 | module F (M : S @ portable) @ portable = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
 
-(* CR zqian: the similar syntax for expressions are not allowed because @ might
+(* the similar syntax for expressions are not allowed because @ might
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-Line 1, characters 17-25:
-1 | module M' = (M @ portable)
-                     ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' = M
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-Line 1, characters 21-29:
-1 | module M' = (M : S @ portable)
-                         ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' : S
 |}]
 
 module M @ portable = struct end
 [%%expect{|
-Line 1, characters 11-19:
-1 | module M @ portable = struct end
-               ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M : sig end
 |}]
 
 module M : S @ portable = struct end
 [%%expect{|
-Line 1, characters 15-23:
-1 | module M : S @ portable = struct end
-                   ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M : S
 |}]
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
@@ -751,7 +736,7 @@ module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portabl
 Line 1, characters 37-45:
 1 | module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
                                          ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
@@ -760,41 +745,30 @@ module type S' = () -> S @ portable -> S @ portable -> S @ portable
 Line 1, characters 27-35:
 1 | module type S' = () -> S @ portable -> S @ portable -> S @ portable
                                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module (F @ portable) () = struct end
 [%%expect{|
-Line 1, characters 12-20:
-1 | module (F @ portable) () = struct end
-                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module F : functor () -> sig end
 |}]
 
 module (G @ portable) () = F
 
 [%%expect{|
-Line 1, characters 12-20:
-1 | module (G @ portable) () = F
-                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module G : functor () () -> sig end
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-Line 1, characters 13-21:
-1 | module (G' @ portable) = F
-                 ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module G' = F
 |}]
 
 module rec (F @ portable) () = struct end
 and (G @ portable) () = struct end
 [%%expect{|
-Line 1, characters 16-24:
-1 | module rec (F @ portable) () = struct end
-                    ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+File "_none_", line 1:
+Error: Recursive modules require an explicit module type.
 |}]
 
 module type T = sig
@@ -824,10 +798,7 @@ let foo () =
   let module (F @ portable) () = struct end in
   ()
 [%%expect{|
-Line 2, characters 18-26:
-2 |   let module (F @ portable) () = struct end in
-                      ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+val foo : unit -> unit = <fun>
 |}]
 
 (**********)
