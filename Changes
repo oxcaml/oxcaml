@@ -557,6 +557,10 @@ Working version
 - #13942: Fix assertion on empty array case
   (Olivier Nicole, review by Gabriel Scherer)
 
+- #13950: Avoid tearing in `Array.sub`
+  (Gabriel Scherer and Olivier Nicole, report by Jan Midtgaard, review by
+   Gabriel Scherer)
+
 - #13928, #13944: Fix handling of excessively nested unboxed types
   (Vincent Laviron, review by Gabriel Scherer)
 
