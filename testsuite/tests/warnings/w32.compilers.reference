@@ -99,11 +99,6 @@ File "w32.ml", line 65, characters 18-29:
                        ^^^^^^^^^^^
 Warning 32 [unused-value-declaration]: unused value x.
 
-File "w32.ml", line 76, characters 20-34:
-76 |   module F (_ : sig val test : int end) : sig end
-                         ^^^^^^^^^^^^^^
-Warning 32 [unused-value-declaration]: unused value test.
-
 File "w32.ml", line 76, characters 2-49:
 76 |   module F (_ : sig val test : int end) : sig end
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -129,11 +124,6 @@ File "w32.ml", line 88, characters 0-27:
 88 | and Y: sig end = struct end
      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 60 [unused-module]: unused module Y.
-
-File "w32.ml", line 84, characters 17-26:
-84 |   module F(_:sig val x:int end): sig end
-                      ^^^^^^^^^
-Warning 32 [unused-value-declaration]: unused value x.
 
 File "w32.ml", line 84, characters 2-40:
 84 |   module F(_:sig val x:int end): sig end

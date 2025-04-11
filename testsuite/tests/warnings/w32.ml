@@ -70,7 +70,7 @@ module type S = sig
   module F:  sig val x : int end -> sig end
 end
 
-(* from ocaml/ocaml#13955 no unused warning should be triggered *)
+(* from ocaml/ocaml#13955 no unused warning should be triggered for [test] *)
 
 module I : sig
   module F (_ : sig val test : int end) : sig end
