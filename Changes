@@ -813,6 +813,8 @@ OCaml 5.4.0
 - #14025: fix data race between compaction and domain termination
   (Gabriel Scherer, review by Jan Midtgaard,
    report by Jan Midtgaard)
+- #13956 Fix a regression introduced in #13308 triggering wrong unused warnings.
+  (Ulysse Gérard, review by Florian Angeletti)
 
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
