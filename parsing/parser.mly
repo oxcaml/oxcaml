@@ -1030,7 +1030,7 @@ let maybe_pmod_constraint mode expr =
 %token INITIALIZER            "initializer"
 %token <string * char option> INT      "42"  (* just an example *)
 %token <string * char option> HASH_INT "#42l" (* just an example *)
-%token KIND_ABBREV            "kind_abbrev_"
+%token KIND                   "kind_"
 %token KIND_OF                "kind_of_"
 %token <string> LABEL         "~label:" (* just an example *)
 %token LAZY                   "lazy"
@@ -1801,10 +1801,8 @@ structure_item:
           Pstr_extension ($1, add_docs_attrs docs $2) }
     | floating_attribute
         { Pstr_attribute $1 }
-    | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Pstr_kind_abbrev (name, jkind)
-        })
+    | jkind_decl
+        { Pstr_jkind $1 })
   | wrap_mkstr_ext(
       primitive_declaration
         { pstr_primitive $1 }
@@ -2090,10 +2088,8 @@ signature_item:
   | mksig(
       floating_attribute
         { Psig_attribute $1 }
-     | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Psig_kind_abbrev (name, jkind)
-        }
+     | jkind_decl
+        { Psig_jkind $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -4062,7 +4058,7 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | ident {
+  | mkrhs(type_longident) {
       Pjk_abbreviation $1
     }
   | KIND_OF ty=core_type {
@@ -4088,17 +4084,29 @@ reverse_product_jkind :
     { jkind :: jkinds }
 
 jkind_annotation: (* : jkind_annotation *)
-  jkind_desc { { pjkind_loc = make_loc $sloc; pjkind_desc = $1 } }
+  jkind_desc { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
 ;
 
 jkind_constraint:
   COLON jkind_annotation { $2 }
 ;
 
-kind_abbreviation_decl:
-  KIND_ABBREV abbrev=mkrhs(LIDENT) EQUAL jkind=jkind_annotation {
-    (abbrev, jkind)
-  }
+%inline jkind_manifest:
+  | /* empty */ { None }
+  | EQUAL jkind=jkind_annotation { Some jkind }
+;
+
+jkind_decl:
+  KIND
+  attrs1=attributes
+  pjkind_name=mkrhs(LIDENT)
+  pjkind_manifest=jkind_manifest
+  attrs2=post_item_attributes
+    {
+      let pjkind_attributes = attrs1 @ attrs2 in
+      let pjkind_loc = make_loc $sloc in
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    }
 ;
 
 %inline type_param_with_jkind:

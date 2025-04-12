@@ -210,6 +210,7 @@ val list_argument_jkind : jkind_lr
 val build_initial_env:
   (Ident.t -> type_declaration -> 'a -> 'a) ->
   (Ident.t -> extension_constructor -> 'a -> 'a) ->
+  (Ident.t -> jkind_declaration -> 'a -> 'a) ->
   'a -> 'a
 
 (* Add simd types to an environment.  This is separate from [build_initial_env]

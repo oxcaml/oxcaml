@@ -1,0 +1,4 @@
+File "warnings.ml", line 7, characters 2-9:
+7 |   kind_ k
+      ^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind k.

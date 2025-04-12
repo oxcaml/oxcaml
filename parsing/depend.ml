@@ -138,9 +138,9 @@ and add_package_type bv (lid, l) =
 (* CR layouts: Remember to add this when jkinds can have module
    prefixes. *)
 and add_jkind bv (jkind : jkind_annotation) =
-  match jkind.pjkind_desc with
+  match jkind.pjka_desc with
   | Pjk_default -> ()
-  | Pjk_abbreviation _ -> ()
+  | Pjk_abbreviation l -> add bv l
   | Pjk_mod (jkind, (_ : modes)) -> add_jkind bv jkind
   | Pjk_with (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
@@ -180,7 +180,8 @@ let add_type_declaration bv td =
   | Ptype_record_unboxed_product lbls ->
       List.iter (fun pld -> add_type bv pld.pld_type) lbls
   | Ptype_open -> () in
-  add_tkind td.ptype_kind
+  add_tkind td.ptype_kind;
+  List.iter (fun (ty, _) -> add_type bv ty) td.ptype_params
 
 let add_extension_constructor bv ext =
   match ext.pext_kind with
@@ -196,6 +197,9 @@ let add_type_extension bv te =
 
 let add_type_exception bv te =
   add_extension_constructor bv te.ptyexn_constructor
+
+let add_jkind_declaration bv jd =
+  Option.iter (add_jkind bv) jd.pjkind_manifest
 
 let pattern_bv = ref String.Map.empty
 
@@ -547,8 +551,9 @@ and add_sig_item (bv, m) item =
   | Psig_extension (e, _) ->
       handle_extension e;
       (bv, m)
-  | Psig_kind_abbrev (_, jkind) ->
-      add_jkind bv jkind; (bv, m)
+  | Psig_jkind d ->
+      add_jkind_declaration bv d;
+      (bv, m)
 
 and open_description bv od =
   let Node(s, m) = add_module_alias bv od.popen_expr in
@@ -706,8 +711,9 @@ and add_struct_item (bv, m) item : _ String.Map.t * _ String.Map.t =
   | Pstr_extension (e, _) ->
       handle_extension e;
       (bv, m)
-  | Pstr_kind_abbrev (_name, jkind) ->
-      add_jkind bv jkind; (bv, m)
+  | Pstr_jkind d ->
+      add_jkind_declaration bv d;
+      (bv, m)
 
 and add_use_file bv top_phrs =
   ignore (List.fold_left add_top_phrase bv top_phrs)

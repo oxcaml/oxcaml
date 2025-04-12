@@ -36,36 +36,32 @@ Line 1, characters 12-13:
 Error: Unimplemented kind syntax
 |}]
 
-kind_abbrev_ immediate = value mod global aliased many sync contended
+kind_ immediate = value mod everything non_float
 
 [%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
+kind_ immediate = immediate
 |}]
 
-kind_abbrev_ immutable_data = value mod sync contended many
+kind_ immutable_data =
+  value mod many contended portable forkable unyielding immutable stateless
+            non_float
 
 [%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
+kind_ immutable_data = immutable_data
 |}]
 
-kind_abbrev_ immutable = value mod contended
+kind_ sync_data = value mod many contended portable forkable unyielding
+                            stateless non_float
 
 [%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
+kind_ sync_data = sync_data
 |}]
 
-kind_abbrev_ data = value mod sync many
+kind_ mutable_data = value mod many portable forkable unyielding stateless
+                               non_float
 
 [%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
+kind_ mutable_data = mutable_data
 |}]
 
 module type S = sig
@@ -73,10 +69,10 @@ module type S = sig
   type ('a, 'b) either : immutable_data with 'a * 'b
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global aliased many sync contended
-  kind_abbrev_ immutable_data = value mod sync contended many
-  kind_abbrev_ immutable = value mod contended
-  kind_abbrev_ data = value mod sync many
+  kind_ immediate = value mod global aliased many sync contended
+  kind_ immutable_data = value mod sync contended many
+  kind_ immutable = value mod contended
+  kind_ data = value mod sync many
 end
 
 [%%expect{|

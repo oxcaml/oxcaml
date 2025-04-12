@@ -40,6 +40,7 @@ type mapper =
       extension_constructor;
     jkind_annotation:
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
+    jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
     location: mapper -> Location.t -> Location.t;
     module_binding: mapper -> module_binding -> module_binding;
     module_coercion: mapper -> module_coercion -> module_coercion;

@@ -39,6 +39,7 @@ type iterator =
     expr: iterator -> expression -> unit;
     extension_constructor: iterator -> extension_constructor -> unit;
     jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
+    jkind_declaration: iterator -> jkind_declaration -> unit;
     location: iterator -> Location.t -> unit;
     module_binding: iterator -> module_binding -> unit;
     module_coercion: iterator -> module_coercion -> unit;

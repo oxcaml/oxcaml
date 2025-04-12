@@ -73,6 +73,8 @@ module Error = struct
     | Class_declarations of
         (class_declaration, class_declaration_symptom) mdiff
     | Modalities of Mode.Modality.error
+    | Jkind_declarations of
+        (jkind_declaration, Includecore.jkind_mismatch) diff
 
   type core_module_type_symptom =
     | Not_an_alias
@@ -303,6 +305,17 @@ let extension_constructors ~loc env ~direction subst id ext1 ext2 =
   | Some err ->
       Error Error.(Core(Extension_constructors(diff ext1 ext2 err)))
 
+(* Inclusion between jkind declarations *)
+let jkind_declarations ~loc env ~direction subst id decl1 decl2 =
+  let mark = Directionality.mark_as_used direction in
+  if mark then
+    Env.mark_jkind_used decl1.jkind_uid;
+  let decl2 = Subst.jkind_declaration subst decl2 in
+  match Includecore.jkind_declarations ~loc env (Ident.name id) decl1 decl2 with
+  | None -> Ok Tcoerce_none
+  | Some err ->
+     Error Error.(Core(Jkind_declarations (diff decl1 decl2 err)))
+
 (* Inclusion between class declarations *)
 
 let class_type_declarations ~loc env subst decl1 decl2 =
@@ -337,6 +350,7 @@ type field_kind =
   | Field_modtype
   | Field_class
   | Field_classtype
+  | Field_jkind
 
 
 
@@ -351,6 +365,7 @@ let kind_of_field_desc fd = match fd.kind with
   | Field_modtype -> "module type"
   | Field_class -> "class"
   | Field_classtype -> "class type"
+  | Field_jkind -> "kind"
 
 let field_desc kind id = { kind; name = Ident.name id }
 
@@ -379,6 +394,7 @@ let item_ident_name =
   | Sig_class(id, d, _, _) -> (id, d.cty_loc, field_desc Field_class id)
   | Sig_class_type(id, d, _, _) ->
       (id, d.clty_loc, field_desc Field_classtype id)
+  | Sig_jkind(id, d, _) -> (id, d.jkind_loc, field_desc Field_jkind id)
 
 let is_runtime_component =
   let open Subst.Lazy in
@@ -387,7 +403,8 @@ let is_runtime_component =
   | Sig_type(_,_,_,_)
   | Sig_module(_,Mp_absent,_,_,_)
   | Sig_modtype(_,_,_)
-  | Sig_class_type(_,_,_,_) -> false
+  | Sig_class_type(_,_,_,_)
+  | Sig_jkind (_,_,_) -> false
   | Sig_value(_,_,_)
   | Sig_typext(_,_,_,_)
   | Sig_module(_,Mp_present,_,_,_)
@@ -403,6 +420,7 @@ let item_visibility =
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
+  | Sig_jkind (_, _, vis) -> vis
 
 
 (* Print a coercion *)
@@ -518,6 +536,8 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_module id2 (Path.Pident id1) subst
           | Sig_modtype _ ->
               Subst.add_modtype id2 (Path.Pident id1) subst
+          | Sig_jkind _ ->
+              Subst.add_jkind id2 (Path.Pident id1) subst
           | Sig_value _ | Sig_typext _
           | Sig_class _ | Sig_class_type _ ->
               subst
@@ -1034,6 +1054,13 @@ and signature_components :
               Shape.Map.add_class_type_proj shape_map id1 orig_shape
             in
             id1, item, (info1.clty_uid, info2.clty_uid), shape_map, false
+        | Sig_jkind (id1, jd1, _), Sig_jkind (_id2, jd2, _) ->
+           let item =
+             jkind_declarations ~loc env ~direction subst id1 jd1 jd2
+           in
+           let item = mark_error_as_unrecoverable item in
+           let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in
+           id1, item, (jd1.jkind_uid, jd2.jkind_uid), shape_map, false
         | _ ->
             assert false
       in

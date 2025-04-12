@@ -451,9 +451,9 @@ and type_with_label ctxt f (label, c, mode) =
     pp f "?%a:%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
-and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
+and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-  | Pjk_abbreviation s -> pp f "%s" s
+  | Pjk_abbreviation s -> longident_loc f s
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
@@ -1461,10 +1461,15 @@ and sig_include ctxt f incl moda =
   include_ ctxt f ~contents:module_type incl;
   optional_space_atat_modalities f moda
 
-and kind_abbrev ctxt f name jkind =
-  pp f "@[<hov2>kind_abbrev_@ %a@ =@ %a@]"
-    string_loc name
-    (jkind_annotation ctxt) jkind
+and jkind_declaration ctxt f jd =
+  begin match jd.pjkind_manifest with
+  | None -> pp f "@[<hov2>kind_@ %a@]" string_loc jd.pjkind_name
+  | Some jkind ->
+     pp f "@[<hov2>kind_@ %a@ =@ %a@]"
+       string_loc jd.pjkind_name
+       (jkind_annotation ctxt) jkind
+  end;
+  item_attributes ctxt f jd.pjkind_attributes
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
@@ -1651,8 +1656,8 @@ and signature_item ctxt f x : unit =
   | Psig_extension(e, a) ->
       item_extension ctxt f e;
       item_attributes ctxt f a
-  | Psig_kind_abbrev (name, jkind) ->
-      kind_abbrev ctxt f name jkind
+  | Psig_jkind kd ->
+      jkind_declaration ctxt f kd
 
 and module_expr ctxt f x =
   if x.pmod_attributes <> [] then
@@ -2011,8 +2016,8 @@ and structure_item ctxt f x =
   | Pstr_extension(e, a) ->
       item_extension ctxt f e;
       item_attributes ctxt f a
-  | Pstr_kind_abbrev (name, jkind) ->
-      kind_abbrev ctxt f name jkind
+  | Pstr_jkind jd ->
+      jkind_declaration ctxt f jd
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)

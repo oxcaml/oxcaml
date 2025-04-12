@@ -346,8 +346,7 @@ module Sig:
     val class_type: ?loc:loc -> class_type_declaration list -> signature_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> signature_item
     val attribute: ?loc:loc -> attribute -> signature_item
-    val kind_abbrev: ?loc:loc -> label with_loc -> jkind_annotation ->
-      signature_item
+    val jkind: ?loc:loc -> jkind_declaration -> signature_item
     val text: text -> signature_item list
   end
 
@@ -376,8 +375,7 @@ module Str:
     val class_type: ?loc:loc -> class_type_declaration list -> structure_item
     val include_: ?loc:loc -> include_declaration -> structure_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> structure_item
-    val kind_abbrev: ?loc:loc -> label with_loc -> jkind_annotation ->
-      structure_item
+    val jkind: ?loc:loc -> jkind_declaration -> structure_item
     val attribute: ?loc:loc -> attribute -> structure_item
     val text: text -> structure_item list
   end

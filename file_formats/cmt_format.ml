@@ -104,6 +104,7 @@ let iter_on_declaration f decl =
   | Module_binding mb -> f mb.mb_uid decl
   | Class cd -> f cd.ci_decl.cty_uid decl
   | Class_type ct -> f ct.ci_decl.cty_uid decl
+  | Jkind jd -> f jd.jkind_jkind.jkind_uid decl
 
 let iter_on_declarations ~(f: Shape.Uid.t -> item_declaration -> unit) = {
   Tast_iterator.default_iterator with
@@ -372,7 +373,7 @@ let iter_on_occurrences
       | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_exception _
       | Tsig_module _ | Tsig_recmodule _ | Tsig_modtype _ | Tsig_modtypesubst _
       | Tsig_open _ | Tsig_include _ | Tsig_class _ | Tsig_class_type _
-      | Tsig_attribute _ -> ());
+      | Tsig_attribute _ | Tsig_jkind _ -> ());
       default_iterator.signature_item sub sig_item);
 
   structure_item =
@@ -386,7 +387,7 @@ let iter_on_occurrences
       | Tstr_eval _ | Tstr_value _ | Tstr_primitive _ | Tstr_type _
       | Tstr_exception _ | Tstr_module _ | Tstr_recmodule _
       | Tstr_modtype _ | Tstr_open _ | Tstr_class _ | Tstr_class_type _
-      | Tstr_include _ | Tstr_attribute _ -> ());
+      | Tstr_include _ | Tstr_attribute _ | Tstr_jkind _ -> ());
       default_iterator.structure_item sub str_item)
 }
 

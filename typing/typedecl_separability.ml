@@ -485,7 +485,7 @@ let worst_msig decl = List.map (fun _ -> Deepsep) decl.type_params
 let msig_of_external_type env decl =
   let context = Ctype.mk_jkind_context_check_principal env in
   let is_external =
-    match Jkind.get_externality_upper_bound ~context decl.type_jkind with
+    match Jkind.get_externality_upper_bound ~context env decl.type_jkind with
     | Internal -> false
     | External | External64 -> true
   in

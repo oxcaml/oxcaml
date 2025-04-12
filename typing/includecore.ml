@@ -177,9 +177,9 @@ let value_descriptions ~loc env name
          List.iter (fun loc ->
           List.iter (fun fork ->
            List.iter (fun yield ->
-             let ty1, _, _, _ = Ctype.instance_prim p1 vd1.val_type in
+             let ty1, _, _, _ = Ctype.instance_prim env p1 vd1.val_type in
              let ty2, mode_l2, mode_fy2, _ =
-               Ctype.instance_prim p2 vd2.val_type
+               Ctype.instance_prim env p2 vd2.val_type
              in
              let mode_f2 = Option.map fst mode_fy2 in
              let mode_y2 = Option.map snd mode_fy2 in
@@ -198,7 +198,7 @@ let value_descriptions ~loc env name
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-        let ty1, mode_l1, _, sort1 = Ctype.instance_prim p1 vd1.val_type in
+        let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
         (try Ctype.moregeneral env true ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
@@ -338,6 +338,10 @@ type type_mismatch =
   | With_null_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
+
+type jkind_mismatch =
+  | Manifest_missing
+  | Manifest_mismatch
 
 let report_modality_sub_error first second ppf e =
   let Modality.Error (ax, {left; right}) = e in
@@ -554,6 +558,7 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
       Format.fprintf ppf "%aA constructor, %a, is missing in %s %s."
         prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
   | Change Type {got; expected; reason} ->
+    Printtyp.wrap_printing_env ~error:true env (fun () ->
       Format.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
          %a@ is not the same as:\
@@ -561,7 +566,7 @@ let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
         prefix x
         (Style.as_inline_code Printtyp.constructor) got
         (Style.as_inline_code Printtyp.constructor) expected
-        (report_constructor_mismatch first second decl env) reason
+        (report_constructor_mismatch first second decl env) reason)
   | Change Name n ->
       Format.fprintf ppf
         "%aConstructors have different names, %a and %a."
@@ -678,7 +683,7 @@ let report_type_mismatch first second decl env ppf err =
       pr "The problem is in the kinds of a parameter:@,";
       Jkind.Violation.report_with_offender
         ~offender:(fun pp -> Printtyp.type_expr pp ty)
-        ~level:(Ctype.get_current_level ()) ppf v
+        ~level:(Ctype.get_current_level ()) env ppf v
   | Private_variant (_ty1, _ty2, mismatch) ->
       report_private_variant_mismatch first second decl env ppf mismatch
   | Private_object (_ty1, _ty2, mismatch) ->
@@ -707,12 +712,21 @@ let report_type_mismatch first second decl env ppf err =
       pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
-        ~level:(Ctype.get_current_level ()) ppf v
+        ~level:(Ctype.get_current_level ()) env ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->
          report_unsafe_mode_crossing_mismatch first second ppf mismatch)
       (first, second, mismatch)
+
+let report_jkind_mismatch first second ppf err =
+  let pr fmt = Format.fprintf ppf fmt in
+  pr "@ ";
+  match err with
+  | Manifest_missing ->
+      pr "The %s is abstract, but %s is not." first second
+  | Manifest_mismatch ->
+      pr "Their definitions are not equal."
 
 let compare_unsafe_mode_crossing ~env umc1 umc2 =
   match umc1, umc2 with
@@ -1503,7 +1517,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
   | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
      let context = Ctype.mk_jkind_context_always_principal env in
      Some (Parameter_jkind
-             (ty, Jkind.Violation.of_ ~context
+             (ty, Jkind.Violation.of_ ~context env
                     (Not_a_subjkind (Jkind.disallow_right original_jkind,
                                      Jkind.disallow_left inferred_jkind,
                                      []))))
@@ -1562,3 +1576,20 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
       match ext1.ext_private, ext2.ext_private with
       | Private, Public -> Some Constructor_privacy
       | _, _ -> None
+
+(* Inclusion between jkind declarations *)
+let jkind_declarations ~loc env name
+      (decl1 : Types.jkind_declaration) (decl2 : Types.jkind_declaration) =
+  Builtin_attributes.check_alerts_inclusion
+    ~def:decl1.jkind_loc
+    ~use:decl2.jkind_loc
+    loc
+    decl1.jkind_attributes decl2.jkind_attributes
+    name;
+  match decl1.jkind_manifest, decl2.jkind_manifest with
+  | _, None -> None
+  | None, Some _ -> Some Manifest_missing
+  | Some k1, Some k2 ->
+    if Jkind.Const.equal env k1 k2
+    then None
+    else Some Manifest_mismatch

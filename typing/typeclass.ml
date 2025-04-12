@@ -2395,7 +2395,8 @@ let report_error env ppf =
       "@[Variables bound in a class must have layout value.@ %a@]"
       (Jkind.Violation.report_with_name
          ~name:nm
-         ~level:(Ctype.get_current_level ()))
+         ~level:(Ctype.get_current_level ())
+         env)
       err
   | Non_value_let_binding (nm, sort) ->
     fprintf ppf

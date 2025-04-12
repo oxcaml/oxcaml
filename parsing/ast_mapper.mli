@@ -93,6 +93,7 @@ type mapper = {
       type *)
 
   jkind_annotation: mapper -> jkind_annotation -> jkind_annotation;
+  jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> label_declaration -> label_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> module_binding -> module_binding;

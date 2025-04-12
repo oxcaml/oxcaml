@@ -399,29 +399,32 @@ module Jkind0 : sig
 
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) with_bounds -> ('l * 'r) with_bounds
+
+    val is_empty : ('l * 'r) with_bounds -> bool
   end
 
-  module Layout_and_axes : sig
+  module Base_and_axes : sig
     include Allowance.Allow_disallow
-      with type (_, 'layout, 'd) sided = ('layout, 'd) layout_and_axes
+      with type (_, 'layout, 'd) sided = ('layout, 'd) base_and_axes
 
-    val map : ('a -> 'b) -> ('a, 'd) layout_and_axes -> ('b, 'd) layout_and_axes
+    val map_layout :
+      ('a -> 'b) -> ('a, 'd) base_and_axes -> ('b, 'd) base_and_axes
 
-    val map_option :
-      ('a -> 'b option) -> ('a, 'd) layout_and_axes ->
-      ('b, 'd) layout_and_axes option
+    val map_layout_option :
+      ('a -> 'b option) -> ('a, 'd) base_and_axes ->
+      ('b, 'd) base_and_axes option
 
     val try_allow_l :
-      ('layout, 'l * 'r) layout_and_axes ->
-      ('layout, allowed * 'r) layout_and_axes option
+      ('layout, 'l * 'r) base_and_axes ->
+      ('layout, allowed * 'r) base_and_axes option
 
     val try_allow_r :
-      ('layout, 'l * 'r) layout_and_axes ->
-      ('layout, 'l * allowed) layout_and_axes option
+      ('layout, 'l * 'r) base_and_axes ->
+      ('layout, 'l * allowed) base_and_axes option
   end
 
   module Const : sig
-    type 'd t = (Jkind_types.Layout.Const.t, 'd) layout_and_axes
+    type 'd t = 'd jkind_const_desc
 
     (** This returns [true] iff both kinds have no with-bounds and they are
         shallowly equal. Normally, we want an equality check to happen only on
@@ -558,8 +561,13 @@ module Jkind0 : sig
       (** The jkind of unboxed 512-bit vectors with mode crossing. *)
       val kind_of_unboxed_512bit_vectors : t
 
-      (** A list of all Builtin jkinds *)
-      val all : t list
+      (** A list of the core builtin jkinds exposed by predef. *)
+      val builtins : t list
+
+      (** A superset of [builtins], which also includes common kinds like
+          [float64 mod everything] (the kind of [float#]). Used in printing and
+          for memoization in subst. *)
+      val common_jkinds : t list
 
       val of_attribute : Builtin_attributes.jkind_attribute -> t
     end
@@ -570,6 +578,7 @@ module Jkind0 : sig
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
         | Layout_disagreement
+        | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
 
@@ -631,7 +640,7 @@ module Jkind0 : sig
     val mark_best : ('l * 'r) jkind -> ('l * disallowed) jkind
 
     val map_type_expr :
-      (type_expr -> type_expr) -> (allowed * 'r) jkind -> (allowed * 'r) jkind
+      (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
 
     val has_with_bounds : jkind_l -> bool
 

@@ -44,6 +44,7 @@ type mapper = {
                          -> extension_constructor;
   include_declaration: mapper -> T.include_declaration -> include_declaration;
   include_description: mapper -> T.include_description -> include_description;
+  jkind_declaration: mapper -> T.jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> T.label_declaration -> label_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> T.module_binding -> module_binding;
@@ -209,6 +210,8 @@ let structure_item sub item =
         Pstr_include (sub.include_declaration sub incl)
     | Tstr_attribute x ->
         Pstr_attribute x
+    | Tstr_jkind x ->
+        Pstr_jkind (sub.jkind_declaration sub x)
   in
   Str.mk ~loc desc
 
@@ -320,6 +323,12 @@ let extension_constructor sub ext =
     Te.constructor ~loc ~attrs name (Pext_decl (vs, args, ret))
   | Text_rebind (_p, lid) ->
     Te.constructor ~loc ~attrs name (Pext_rebind (map_loc sub lid))
+
+let jkind_declaration _sub decl =
+  { pjkind_name = decl.jkind_name;
+    pjkind_manifest = decl.jkind_annotation;
+    pjkind_attributes = decl.jkind_attributes;
+    pjkind_loc = decl.jkind_jkind.jkind_loc }
 
 let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let loc = sub.location sub pat.pat_loc in
@@ -824,6 +833,8 @@ let signature_item sub item =
         Psig_class_type (List.map (sub.class_type_declaration sub) list)
     | Tsig_attribute x ->
         Psig_attribute x
+    | Tsig_jkind x ->
+        Psig_jkind (sub.jkind_declaration sub x)
   in
   Sig.mk ~loc desc
 
@@ -1183,6 +1194,7 @@ let default_mapper =
     location = location;
     row_field = row_field ;
     object_field = object_field ;
+    jkind_declaration = jkind_declaration;
   }
 
 let untype_structure ?(mapper : mapper = default_mapper) structure =
