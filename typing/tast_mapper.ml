@@ -41,6 +41,8 @@ type mapper =
       extension_constructor;
     jkind_annotation:
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
+    jkind_declaration:
+      mapper -> jkind_declaration -> jkind_declaration;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -195,6 +197,7 @@ let structure_item sub {str_loc; str_desc; str_env} =
         Tstr_include (str_include_infos sub incl)
     | Tstr_open od -> Tstr_open (sub.open_declaration sub od)
     | Tstr_attribute attr -> Tstr_attribute (sub.attribute sub attr)
+    | Tstr_jkind d -> Tstr_jkind (sub.jkind_declaration sub d)
   in
   {str_desc; str_env; str_loc}
 
@@ -299,6 +302,18 @@ let extension_constructor sub x =
   in
   let ext_attributes = sub.attributes sub x.ext_attributes in
   {x with ext_loc; ext_name; ext_kind; ext_attributes}
+
+let[@warning "+9"] jkind_declaration sub
+     {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
+      jkind_loc} =
+  let jkind_name = map_loc sub jkind_name in
+  let jkind_annotation =
+    Option.map (sub.jkind_annotation sub) jkind_annotation
+  in
+  let jkind_attributes = sub.attributes sub jkind_attributes in
+  let jkind_loc = sub.location sub jkind_loc in
+  {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
+   jkind_loc}
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d
@@ -762,6 +777,7 @@ let signature_item sub x =
           (List.map (sub.class_type_declaration sub) list)
     | Tsig_open od -> Tsig_open (sub.open_description sub od)
     | Tsig_attribute attr -> Tsig_attribute (sub.attribute sub attr)
+    | Tsig_jkind jd -> Tsig_jkind (sub.jkind_declaration sub jd)
   in
   {sig_loc; sig_desc; sig_env}
 
@@ -1132,6 +1148,7 @@ let default =
     expr;
     extension_constructor;
     jkind_annotation;
+    jkind_declaration;
     location;
     modalities;
     modes;

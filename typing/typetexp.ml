@@ -374,11 +374,11 @@ end = struct
   let mk_poly_univars_tuple_with_jkind env ~context var jkind_annot stage =
     let { txt = name; loc } = var in
     let original_jkind =
-      Jkind.of_annotation ~context:(context name) jkind_annot
+      Jkind.of_annotation env ~context:(context name) jkind_annot
     in
     begin match Env.find_implicit_jkind name env with
     | Some implicit_jkind
-      when not (Jkind.equate original_jkind implicit_jkind) ->
+      when not (Jkind.equate env original_jkind implicit_jkind) ->
         raise (Error (loc, env,
           Mismatched_jkind_annotation { name; explicit_jkind = original_jkind;
                                         implicit_jkind }))
@@ -435,7 +435,7 @@ end = struct
   let check_jkind env loc name v jkind_info =
     match get_desc v with
     | Tvar { jkind } | Tunivar { jkind } when
-        not (Jkind.equate jkind jkind_info.original_jkind) ->
+        not (Jkind.equate env jkind jkind_info.original_jkind) ->
       let reason =
         Bad_univar_jkind { name; jkind_info; inferred_jkind = jkind }
       in
@@ -689,9 +689,10 @@ let transl_type_param env path jkind_default styp =
     | None, Some _, None -> jkind_default, None
     | Some jkind_annot, Some var_name, Some implicit_jkind ->
         let jkind =
-          Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot
+          Jkind.of_annotation ~context:(Type_parameter (path, name)) env
+            jkind_annot
         in
-        if not (Jkind.equate jkind implicit_jkind) then
+        if not (Jkind.equate env jkind implicit_jkind) then
           raise (Error (loc, env,
             Mismatched_jkind_annotation
               { name = var_name; explicit_jkind = jkind;
@@ -699,7 +700,8 @@ let transl_type_param env path jkind_default styp =
         jkind, Some jkind_annot
     | Some jkind_annot, _, None ->
         let jkind =
-          Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot
+          Jkind.of_annotation ~context:(Type_parameter (path, name)) env
+            jkind_annot
         in
         jkind, Some jkind_annot
     | Some _, None, Some _ -> assert false
@@ -723,10 +725,11 @@ let transl_type_param env path jkind_default styp =
   Builtin_attributes.warning_scope styp.ptyp_attributes
     (fun () -> transl_type_param env path jkind_default styp)
 
-let get_type_param_jkind path styp =
+let get_type_param_jkind env path styp =
   let of_annotation jkind name =
     let jkind =
-      Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind
+      Jkind.of_annotation env ~use_abstract_jkinds:false
+        ~context:(Type_parameter (path, name)) jkind
     in
     jkind
   in
@@ -808,9 +811,9 @@ let enrich_with_attributes attrs annotation_context =
   | Some msg -> Jkind.History.With_error_message (msg, annotation_context)
   | None -> annotation_context
 
-let jkind_of_annotation annotation_context attrs jkind =
+let jkind_of_annotation env annotation_context attrs jkind =
   Jkind.of_annotation ~context:(enrich_with_attributes attrs annotation_context)
-    jkind
+    env jkind
 
 (* translate the ['a 'b ('c : immediate) .] part of a polytype,
    returning a [poly_univars] *)
@@ -842,7 +845,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | None -> TyVarEnv.new_jkind ~is_named:false policy, None
         | Some jkind ->
             let tjkind =
-              jkind_of_annotation (Type_wildcard loc)
+              jkind_of_annotation env (Type_wildcard loc)
                 styp.ptyp_attributes jkind
             in
             tjkind, Some jkind
@@ -1202,7 +1205,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
   | Ptyp_of_kind jkind ->
       let tjkind =
-        jkind_of_annotation (Type_of_kind loc) styp.ptyp_attributes jkind
+        jkind_of_annotation env (Type_of_kind loc) styp.ptyp_attributes jkind
       in
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
@@ -1225,7 +1228,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   let print_name = "'" ^ name in
   if not (valid_tyvar_name name) then
     raise (Error (loc, env, Invalid_variable_name print_name));
-  let of_annot = jkind_of_annotation (Type_variable print_name) attrs in
+  let of_annot = jkind_of_annotation env (Type_variable print_name) attrs in
   let ty, stage = try
       TyVarEnv.lookup_local ~row_context name
     with Not_found ->
@@ -1255,7 +1258,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
       match constrain_type_jkind env ty jkind with
       | Ok () -> Some jkind_annot
       | Error err ->
-          raise (Error(jkind_annot.pjkind_loc, env, Bad_jkind_annot (ty, err)))
+          raise (Error(jkind_annot.pjka_loc, env, Bad_jkind_annot (ty, err)))
   in
   Ttyp_var (Some name, jkind_annot), ty
 
@@ -1303,7 +1306,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
       jkind_annot_opt =
   let jkind_for_fresh_var env alias alias_loc attrs jkind_annot_opt =
     let jkind_of_annot annot =
-      jkind_of_annotation (Type_variable ("'" ^ alias)) attrs annot
+      jkind_of_annotation env (Type_variable ("'" ^ alias)) attrs annot
     in
     match jkind_annot_opt, Env.find_implicit_jkind alias env with
     | None, None -> Jkind.Builtin.any ~why:Dummy_jkind, None
@@ -1311,7 +1314,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
     | Some jkind_annot, None -> jkind_of_annot jkind_annot, None
     | Some jkind_annot, Some implicit_jkind ->
       let jkind = jkind_of_annot jkind_annot in
-      if not (Jkind.equate jkind implicit_jkind) then
+      if not (Jkind.equate env jkind implicit_jkind) then
         raise (Error (alias_loc, env,
             Mismatched_jkind_annotation { name = alias; explicit_jkind = jkind;
                                           implicit_jkind }));
@@ -1332,12 +1335,13 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
         | None -> None
         | Some jkind_annot ->
           let jkind =
-            jkind_of_annotation (Type_variable ("'" ^ alias)) attrs jkind_annot
+            jkind_of_annotation env (Type_variable ("'" ^ alias)) attrs
+              jkind_annot
           in
           begin match constrain_type_jkind env t jkind with
           | Ok () -> ()
           | Error err ->
-            raise (Error(jkind_annot.pjkind_loc, env, Bad_jkind_annot(t, err)))
+            raise (Error(jkind_annot.pjka_loc, env, Bad_jkind_annot(t, err)))
           end;
           Some jkind_annot
         in
@@ -1379,13 +1383,13 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
         | Some jkind_annot -> jkind_annot
       in
       let jkind =
-        jkind_of_annotation (Type_wildcard jkind_annot.pjkind_loc)
+        jkind_of_annotation env (Type_wildcard jkind_annot.pjka_loc)
           attrs jkind_annot
       in
       begin match constrain_type_jkind env cty_expr jkind with
       | Ok () -> ()
       | Error err ->
-        raise (Error(jkind_annot.pjkind_loc, env,
+        raise (Error(jkind_annot.pjka_loc, env,
                      Bad_jkind_annot(cty_expr, err)))
       end;
       cty, Some jkind_annot
@@ -1667,7 +1671,7 @@ let report_error_doc env ppf =
     fprintf ppf "This type is recursive"
   | Type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
-      Printtyp.report_unification_error ppf Env.empty trace
+      Printtyp.report_unification_error ppf env trace
         (msg "This type")
         (msg "should be an instance of type")
   | Alias_type_mismatch trace ->
@@ -1736,15 +1740,15 @@ let report_error_doc env ppf =
         "@[<hov>The universal type variable %a was %s to have kind %a.@;%a@]"
         Pprintast.Doc.tyvar name
         (if jkind_info.defaulted then "defaulted" else "declared")
-        Jkind.format jkind_info.original_jkind
-        (Jkind.format_history ~intro:(
+        (Jkind.format env) jkind_info.original_jkind
+        (Jkind.format_history env ~intro:(
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
-              match desc.layout with
-              | Sort (Var _) -> fprintf ppf "a representable kind"
-              | Sort (Univar _) -> Misc.fatal_error "univar"
-              | Sort (Base _) | Any | Product _ ->
-                fprintf ppf "kind %a" Jkind.format
+              match desc.base with
+              | Layout (Sort (Var _)) -> fprintf ppf "a representable kind"
+              | Layout (Sort (Univar _)) -> Misc.fatal_error "univar"
+              | Layout (Sort (Base _) | Any | Product _) | Kconstr _ ->
+                fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
         inferred_jkind
   | Mismatched_jkind_annotation { name; explicit_jkind; implicit_jkind } ->
@@ -1753,8 +1757,8 @@ let report_error_doc env ppf =
          It has an explicit annotation %a@ \
          but was already implicitly annotated with %a@]"
         Pprintast.Doc.tyvar name
-        Jkind.format explicit_jkind
-        Jkind.format implicit_jkind
+        (Jkind.format env) explicit_jkind
+        (Jkind.format env) implicit_jkind
   | Multiple_constraints_on_type s ->
       fprintf ppf "Multiple constraints for type %a"
         (Style.as_inline_code longident) s
@@ -1790,7 +1794,7 @@ let report_error_doc env ppf =
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ())) err
+           ~level:(get_current_level ()) env) err
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -1801,13 +1805,13 @@ let report_error_doc env ppf =
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
                Style.as_inline_code Printtyp.type_expr ppf typ)
-           ~level:(get_current_level ())) err
+           ~level:(get_current_level ()) env) err
   | Bad_jkind_annot(ty, violation) ->
     fprintf ppf "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf ->
              Style.as_inline_code Printtyp.type_expr ppf ty)
-         ~level:(get_current_level ())) violation
+         ~level:(get_current_level ()) env) violation
   | Did_you_mean_unboxed lid ->
     fprintf ppf "@[%a isn't a class type.@ \
                  Did you mean the unboxed type %a?@]"
