@@ -73,3 +73,8 @@ let string_of_binding variable value =
 let get_registered_variables () =
   let f _variable_name variable variable_list = variable::variable_list in
   List.sort compare (Hashtbl.fold f variables [])
+
+let find_or_make name =
+  match find_variable name with
+  | Some var -> var
+  | None -> make (name, "User variable")

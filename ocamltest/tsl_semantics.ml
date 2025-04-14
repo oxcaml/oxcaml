@@ -29,43 +29,40 @@ let apply_modifiers env modifiers_name =
   let modifier = Environments.Include name in
   Environments.apply_modifier env modifier
 
-let rec add_to_env decl loc variable_name value env =
-  match (Variables.find_variable variable_name, decl) with
-    | (None, true) ->
-      let newvar = Variables.make (variable_name,"User variable") in
-      Variables.register_variable newvar;
-      add_to_env false loc variable_name value env
-    | (Some variable, false) ->
-      Environments.add variable value env
-    | (None, false) ->
-      raise (Variables.No_such_variable variable_name)
-    | (Some _, true) ->
+let add_to_env decl variable_name value env =
+  let var = Variables.find_or_make variable_name in
+  match (Variables.find_variable variable_name,
+         Environments.is_variable_defined var env,
+         decl)
+  with
+    | (None, false, true) ->
+      Environments.add var value env
+    | (_, _, true) ->
       raise (Variables.Variable_already_registered variable_name)
+    | (None, false, false) ->
+      raise (Variables.No_such_variable variable_name)
+    | (_, _, false) ->
+      Environments.add var value env
 
 let append_to_env variable_name value env =
-  let variable =
-    match Variables.find_variable variable_name with
-    | None ->
-        raise (Variables.No_such_variable variable_name)
-    | Some variable ->
-        variable
-  in
-  Environments.append variable value env
+  let variable = Variables.find_or_make variable_name in
+  match Variables.find_variable variable_name,
+        Environments.is_variable_defined variable env
+  with
+    | None, false ->
+      raise (Variables.No_such_variable variable_name)
+    | _ ->
+      Environments.append variable value env
 
 let interpret_environment_statement env statement = match statement.node with
   | Assignment (decl, var, value) ->
-      add_to_env decl statement.loc var.node value.node env
+      add_to_env decl var.node value.node env
   | Append (var, value) ->
       append_to_env var.node value.node env
   | Include modifiers_name ->
       apply_modifiers env modifiers_name
   | Unset var ->
-      let var =
-        match Variables.find_variable var.node with
-        | None -> Variables.make (var.node,"User variable")
-        | Some var -> var
-      in
-      Environments.unsetenv var env
+      Environments.unsetenv (Variables.find_or_make var.node) env
 
 type test_tree =
   | Node of
