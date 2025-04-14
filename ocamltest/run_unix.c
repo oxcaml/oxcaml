@@ -294,7 +294,7 @@ static int run_command_parent(const command_settings *settings, pid_t child_pid)
     sigemptyset(&action.sa_mask);
     action.sa_flags = SA_RESETHAND;
     if (sigaction(SIGALRM, &action, NULL) == -1) myperror("sigaction");
-    if (alarm(settings->timeout) == -1) myperror("alarm");
+    alarm(settings->timeout);
   }
 
   while (waiting)
