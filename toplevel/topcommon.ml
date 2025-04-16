@@ -119,8 +119,11 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
   let eval_class_path env path =
     eval_path Env.find_class_address env path
 
-
-  module Printer = Genprintval.Make(Obj)(struct
+  module My_obj = struct
+    include Obj
+    let base_obj = obj
+  end
+  module Printer = Genprintval.Make(My_obj)(struct
       type valu = Obj.t
       exception Error
       let eval_address addr =

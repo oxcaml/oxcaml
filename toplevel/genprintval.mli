@@ -22,7 +22,8 @@ module type OBJ =
   sig
     type t
     val repr : 'a -> t
-    val obj : t -> 'a
+    (* [base_obj] assumes that the value has a marshallable base type. *)
+    val base_obj : t -> 'a
     val is_block : t -> bool
     val tag : t -> int
     val size : t -> int
