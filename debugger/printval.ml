@@ -70,9 +70,9 @@ module EvalPath =
 
 module Printer = Genprintval.Make(Debugcom.Remote_value)(EvalPath)
 
-let install_printer = Printer.install_printer
-
-let remove_printer = Printer.remove_printer
+(* TODO: remove this glue below. *)
+let install_printer = Genprintval.User_printer.install_simple
+let remove_printer = Genprintval.User_printer.remove
 
 let max_printer_depth = ref 20
 let max_printer_steps = ref 300

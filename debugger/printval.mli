@@ -29,6 +29,5 @@ val reset_named_values : unit -> unit
 val find_named_value : int -> Debugcom.Remote_value.t * Types.type_expr
 
 val install_printer :
-  Path.t -> Types.type_expr ->
-    (formatter -> Debugcom.Remote_value.t -> unit) -> unit
+  Path.t -> Types.type_expr -> (formatter -> Obj.t -> unit) -> unit
 val remove_printer : Path.t -> unit

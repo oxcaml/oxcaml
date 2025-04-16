@@ -102,21 +102,13 @@ let eval_value_path env path =
         with Symtable.Error(Symtable.Undefined_global global) ->
           let s = Symtable.Global.name global in
           raise (Error (`Unavailable_module(s, lid))) in
-      let print_with_fallback ppf f remote_val =
-        try
-          f (Debugcom.Remote_value.obj remote_val)
-        with
-          Debugcom.Marshalling_error ->
-            fprintf ppf "<cannot fetch remote object>" in
       match kind with
       | Topprinters.Old ty_arg ->
-          let print_function ppf remote_val =
-            print_with_fallback ppf (Obj.obj v) remote_val in
-          Printval.install_printer path ty_arg print_function
+          Printval.install_printer path ty_arg
+            (fun _ppf -> (Obj.obj v : Obj.t -> unit))
       | Topprinters.Simple ty_arg ->
-          let print_function ppf remote_val =
-            print_with_fallback ppf (Obj.obj v ppf) remote_val in
-          Printval.install_printer path ty_arg print_function
+          Printval.install_printer path ty_arg
+            (Obj.obj v : Format.formatter -> Obj.t -> unit)
       | Topprinters.Generic _ ->
           raise (Error (`Wrong_type lid))
 

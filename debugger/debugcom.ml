@@ -257,8 +257,6 @@ let input_remote_value ic =
 let output_remote_value ic v =
   output_substring ic v 0 value_size
 
-exception Marshalling_error
-
 module Remote_value =
   struct
     type t = Remote of string | Local of Obj.t
@@ -266,19 +264,20 @@ module Remote_value =
     let repr x = Local (Obj.repr x)
 
     let obj = function
-    | Local obj -> Obj.obj obj
+    | Local obj -> Ok (Obj.obj obj)
     | Remote v ->
         output_char !conn.io_out 'M';
         output_remote_value !conn.io_out v;
         flush !conn.io_out;
         try
-          input_value !conn.io_in
+          Ok (input_value !conn.io_in)
         with End_of_file | Failure _ ->
-          raise Marshalling_error
+          Error "<cannot fetch remote object>"
 
     let base_obj v =
-      try obj v with
-      | Marshalling_error ->
+      match obj v with
+      | Ok o -> o
+      | Error _ ->
          invalid_arg "Debugcom.Remote_value.base_obj: marshalling error"
 
     let is_block = function
@@ -333,7 +332,7 @@ module Remote_value =
           output_binary_int !conn.io_out n;
           flush !conn.io_out;
           if input_byte !conn.io_in = 0 then
-            raise Marshalling_error
+            failwith "Debugcom.Remote_value.double_field"
           else begin
             let buf = really_input_string !conn.io_in 8 in
             let floatbuf = float n (* force allocation of a new float *) in
