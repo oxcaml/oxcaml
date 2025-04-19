@@ -21,6 +21,11 @@ Working version
 
 ### Manual and documentation:
 
+* #13975: documented the `[@remove_aliases]` built-in attribute for signatures
+  (introduced by #1652 in 2018). Small refactor of the code that fetches the
+  attribute.
+  (Clement Blaudeau, review by Gabriel Scherer)
+
 ### Compiler user-interface and warnings:
 
 ### Internal/compiler-libs changes:
