@@ -143,22 +143,33 @@ jobs:
         run: |
           MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh other-checks
 
-# MacOS build+testsuite run, and Linux O0 run.
+# macOS build+testsuite run, and other Linux configurations (-O0, etc.)
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.matrix.outputs.result }}
+    steps:
+      - name: Compute matrix for the "others" job
+        id: matrix
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // # Default jobs: Linux -O0, Linux arm64 & macOS
+            let jobs = [
+              {name: 'linux-O0', os: 'ubuntu-latest',
+               config_arg: "CFLAGS='-O0'"},
+              {name: 'linux-arm64', os: 'ubuntu-24.04-arm'},
+              {name: 'macos-x86_64', os: 'macos-13'},
+              {name: 'macos-arm64', os: 'macos-15'}];
+            return jobs;
+
   others:
     name: ${{ matrix.name }}
+    needs: matrix
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
-          - name: linux-O0
-            os: ubuntu-latest
-            config_arg: CFLAGS='-O0'
-          - name: linux-arm64
-            os: ubuntu-24.04-arm
-          - name: macos-x86_64
-            os: macos-13
-          - name: macos-arm64
-            os: macos-15
+        include: ${{ fromJSON(needs.matrix.outputs.jobs) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
