@@ -673,6 +673,9 @@ We use GitHub Actions workflows to test the OCaml compiler and runtime
 in various settings. Some tests are not run by default and are
 triggered by setting a label on the pull request. See below:
 
+- `CI: Full matrix`: expands the test matrix considerably with additional
+  configurations; useful for PRs which affect the "systems" side of the
+  compiler;
 - `run-crosscompiler-tests`: build various cross-compilers and test them;
 - `run-thread-sanitizer`: build the distribution with the Thread
   Sanitizer (TSAN), and run the whole testsuite instrumented with TSAN;
