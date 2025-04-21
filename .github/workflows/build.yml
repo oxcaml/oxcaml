@@ -195,20 +195,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: MacOS 13 Dependencies
-        if: matrix.os == 'macos-13'
-        run: |
-          brew install parallel
-          # Allows starting up lldb from a remote terminal
-          sudo DevToolsSecurity --enable
-          spctl developer-mode enable-terminal
-          # Select latest supported version
-          sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
-          lldb --version
-
-      - name: MacOS 15 Dependencies
-        if: matrix.os == 'macos-15'
+      - name: macOS Dependencies
+        if: startsWith(matrix.os, 'macos-')
         run: |
           brew install parallel
           # Allows starting up lldb from a remote terminal
@@ -217,9 +205,8 @@ jobs:
           sudo DevToolsSecurity --enable
           spctl developer-mode enable-terminal
           # Select latest supported version
-          sudo xcode-select -s /Applications/Xcode_16.3.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_${{ matrix.os == 'macos-13' && '15.2' || '16.3' }}.app/Contents/Developer
           lldb --version
-
       - name: configure tree
         run: |
           CONFIG_ARG='--enable-codegen-invariants ${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
