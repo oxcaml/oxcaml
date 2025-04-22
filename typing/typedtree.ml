@@ -119,6 +119,7 @@ and expression_desc =
       representation : Types.record_representation;
       extended_expression : expression option;
     }
+  | Texp_atomic_loc of expression * Longident.t loc * label_description
   | Texp_field of expression * Longident.t loc * label_description
   | Texp_setfield of
       expression * Longident.t loc * label_description * expression
