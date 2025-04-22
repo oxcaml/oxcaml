@@ -8,13 +8,13 @@ accident if this prospective calendar ever matches the real release calendar.
 
 
 # Main versions
-(Last updated on 14th April 2025)
+(Last updated on 22 April 2025)
 
 ## OCaml 5.4.0
 
 |    Release            | Expected (early) | Expected (late)  | Actual      |
 |-----------------------|------------------|------------------|-------------|
-| Feature freeze        | 15th April 2025  |  (same)          |             |
+| Feature freeze        | 15th April 2025  |  (same)          |  22 April   |
 | 1st beta release      | 15th May         |  15th June       |             |
 | 1st release candidate | 15th June        |  15th July       |             |
 | Release               | 21st June        |  1st August      |             |
