@@ -459,6 +459,32 @@ CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
 
 /* generic [gather] functions for extraction and concatenation of sub-arrays */
 
+/* [wo_memcpy] copies [nvals] values from [src] to [dst], assuming no
+   overlapping. If there is a single domain running, then we use [memcpy].
+   Otherwise, we copy one word at a time.
+
+   Since the [memcpy] implementation does not guarantee that the reads are
+   always word-sized, we explicitly perform word-sized reads of the relaxed
+   kind to avoid tearing (see #13950). Performing relaxed reads should be
+   sufficient to prevent smart compilers from coalescing the reads into vector
+   reads, and hence prevent tearing.
+
+   Note that unlike [wo_memmove], the writes are plain writes and no acquire
+   fence is emitted; to comply with OCaml's memory model, this should only be
+   used to write into unpublished values. [MM]
+   */
+static void wo_memcpy(value * const dst,
+                      atomic_value * const src,
+                      mlsize_t nvals)
+{
+  if (caml_domain_alone ()) {
+    memcpy((value*)dst, (value*)src, nvals * sizeof (value));
+  } else {
+    for (mlsize_t i = 0; i < nvals; i++)
+      dst[i] = atomic_load_relaxed(&src[i]);
+  }
+}
+
 /* The lengths are specified in number of floats,
    as returned by [caml_array_length]. */
 static value caml_floatarray_gather(intnat num_arrays,
@@ -518,16 +544,15 @@ static value caml_uniform_array_gather(intnat num_arrays,
     res = Atom(0);
   }
   else if (size <= Max_young_wosize) {
-    /* Array of values, small enough to fit in young generation.
-       We can use memcpy directly. */
+    /* Array of values, small enough to fit in young generation. */
     res = caml_alloc_small(size, 0);
     mlsize_t pos = 0;
     for (mlsize_t i = 0; i < num_arrays; i++) {
-      /* [res] is freshly allocated, and no other domain has a reference to it.
-         Hence, a plain [memcpy] is sufficient. */
-      memcpy((value*)&Field(res, pos),
-             (value*)&Field(arrays[i], offsets[i]),
-             lengths[i] * sizeof(value));
+      /* Here we can do a direct copy since this cannot create old-to-young
+         pointers, nor mess up with the incremental major GC. */
+      value *dst = (value *) &Field(res, pos);
+      atomic_value *src = (atomic_value *) &Field(arrays[i], offsets[i]);
+      wo_memcpy(dst, src, lengths[i]);
       pos += lengths[i];
     }
     CAMLassert(pos == size);
