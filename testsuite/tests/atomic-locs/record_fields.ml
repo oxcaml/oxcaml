@@ -222,3 +222,20 @@ module Float_records :
     val get : t -> float
   end
 |}];;
+
+
+(* Pattern-matching on atomic record fields is disallowed. *)
+module Pattern_matching = struct
+  type t = { x : int; mutable y : int [@atomic] }
+
+  let forbidden { x; y } = x + y
+end
+[%%expect{|
+Line 4, characters 16-24:
+4 |   let forbidden { x; y } = x + y
+                    ^^^^^^^^
+Error: Atomic fields (here "y") are forbidden in patterns,
+       as it is difficult to reason about when the atomic read
+       will happen during pattern matching: the field may be read
+       zero, one or several times depending on the patterns around it.
+|}]

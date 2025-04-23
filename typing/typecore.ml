@@ -7419,10 +7419,10 @@ let report_error ~loc env = function
         quoted_longident lid
   | Atomic_in_pattern lid ->
       Location.errorf ~loc
-        "Atomic fields (here %a) are forbidden in patterns, as it is difficult \
-         to reason about when the atomic read will happen during pattern \
-         matching: the field may be read zero, one or several times depending \
-         on the patterns around it."
+        "Atomic fields (here %a) are forbidden in patterns,@ \
+         as it is difficult to reason about when the atomic read@ \
+         will happen during pattern matching:@ the field may be read@ \
+         zero, one or several times depending on the patterns around it."
         quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
