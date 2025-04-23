@@ -154,6 +154,14 @@
 #define Handler_effect(REG)     16(REG)
 #define Handler_parent          24
 
+/* struct dynamic_thread_s */
+
+/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
+#define Dynamic_cache            0 /* offset of cache in dynamic_thread_t */
+#define Dynamic_binding_size     (2*8) /* dyn, val */
+#define Dynamic_binding_var      0 /* offset of var within a single binding */
+#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
+
 /* struct c_stack_link */
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
 #define Cstack_stack             32
@@ -195,6 +203,20 @@
 #define DW_OP_breg                0x70
 #define DW_OP_deref               0x06
 #define DW_OP_plus_uconst         0x23
+
+/******************************************************************************/
+/* Unrolled iteration. */
+/******************************************************************************/
+#define DO_0_7(X) \
+X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)
+
+#define DO_0_15(X) \
+DO_0_7(X) X(8) X(9) X(10) X(11) X(12) X(13) X(14) X(15)
+
+#define DO_0_31(X) \
+DO_0_15(X) \
+X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(29) X(30) X(31)
+
 
 /******************************************************************************/
 /* Access to the current domain state block. */
@@ -283,6 +305,19 @@
         movq    Caml_state(exn_handler), %rsp; \
         CFI_DEF_CFA_OFFSET(16);                \
         POP_EXN_HANDLER
+
+/* Flush the per-thread cache of dynamic binding values. Clobbers `reg`. */
+
+#define FLUSH_DYNAMIC_CACHE(reg)                    \
+        movq    Caml_state(dynamic_bindings), reg; \
+        movq    $0, (Dynamic_cache + 0*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 1*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 2*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 3*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 4*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
+        movq    $0, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)(reg)
 
 /* When ThreadSanitizer instrumentation is enabled, the code must call
    the C functions __tsan_func_entry and __tsan_func_exit to signal
@@ -496,13 +531,6 @@ G(caml_system__code_begin):
 /******************************************************************************/
 
 /* Loading and saving SIMD registers XMM/YMM/ZMM */
-
-#define DO_0_15(X) \
-X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11) X(12) X(13) X(14) X(15)
-
-#define DO_0_31(X) \
-DO_0_15(X) \
-X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(29) X(30) X(31)
 
 #define SIMD_REGS_OFFSET (13*8) /* gc_regs_bucket starts with 13 int64 regs */
 
@@ -1263,6 +1291,7 @@ LBL(do_perform):
         Handler_parent is needed to unwind the stack for backtraces */
         movq    $0, Handler_parent(%r11) /* Set parent of performer to NULL */
         movq    Handler_effect(%r11), %rsi  /* %rsi := effect handler */
+        FLUSH_DYNAMIC_CACHE(%r11)
         jmp     GCALL(caml_apply3)
 LBL(112):
     /* Switch back to original performer before raising Effect.Unhandled
@@ -1352,6 +1381,7 @@ CFI_STARTPROC
         that was not originally run here. */
         UPDATE_BASE_POINTER(%rdi)
         SWITCH_OCAML_STACKS
+        FLUSH_DYNAMIC_CACHE(%r12)
         jmp     *(%rbx)
 1:      ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
@@ -1414,6 +1444,7 @@ CFI_STARTPROC
         movq    %r11, Caml_state(exn_handler)
     /* Switch to the new stack */
         movq    %r11, %rsp
+        FLUSH_DYNAMIC_CACHE(%r11)
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3+3+2, \
@@ -1452,6 +1483,7 @@ LBL(frame_runstack):
         movq    %r11, Caml_state(local_top)
         movq    Stack_local_limit(%r10), %r11
         movq    %r11, Caml_state(local_limit)
+        FLUSH_DYNAMIC_CACHE(%r11)
     /* free old stack by switching directly to c_stack; is a no-alloc call */
         movq    Stack_sp(%r10), %r13 /* saved across C call */
         CFI_RESTORE_STATE
