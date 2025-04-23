@@ -1123,8 +1123,6 @@ let solve_Ppat_construct tps (penv : Pattern_env.t) loc constr no_existentials
 
 let solve_Ppat_record_field loc penv label label_lid record_ty =
   with_local_level_generalize_structure begin fun () ->
-    if not penv.Pattern_env.in_counterexample && label.lbl_atomic = Atomic then
-      raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt)) ;
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     begin try
       unify_pat_types_penv loc penv ty_res (instance record_ty)
@@ -1810,6 +1808,17 @@ let as_comp_pattern
   | Value -> as_computation_pattern pat
   | Computation -> pat
 
+let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
+  (* Pattern-matching under atomic record fields is not allowed. We
+     still allow wildcard patterns, so that it is valid to list all
+     record fields exhaustively. *)
+  let wildcard pat = match pat.pat_desc with
+    | Tpat_any -> true
+    | _ -> false
+  in
+  if label.lbl_atomic = Atomic && not (wildcard pat) then
+    raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -2104,6 +2113,7 @@ and type_pat_aux
       in
       let make_record_pat lbl_pat_list =
         check_recordpat_labels loc lbl_pat_list closed;
+        List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         {
           pat_desc = Tpat_record (lbl_pat_list, closed);
           pat_loc = loc; pat_extra=[];

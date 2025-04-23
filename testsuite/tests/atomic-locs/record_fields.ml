@@ -239,3 +239,33 @@ Error: Atomic fields (here "y") are forbidden in patterns,
        will happen during pattern matching: the field may be read
        zero, one or several times depending on the patterns around it.
 |}]
+
+(* ... except for wildcards, to allow exhaustive record patterns. *)
+module Pattern_matching_wildcard = struct
+  type t = { x : int; mutable y : int [@atomic] }
+
+  [@@@warning "+missing-record-field-pattern"]
+  let warning { x } = x
+
+  let allowed { x; y = _ } = x
+end
+[%%expect{|
+Line 5, characters 14-19:
+5 |   let warning { x } = x
+                  ^^^^^
+Warning 9 [missing-record-field-pattern]: the following labels are not bound
+  in this record pattern: "y".
+  Either bind these labels explicitly or add "; _" to the pattern.
+(apply (field_mut 1 (global Toploop!)) "Pattern_matching_wildcard/417"
+  (let
+    (warning = (function param : int (field_int 0 param))
+     allowed = (function param : int (field_int 0 param)))
+    (makeblock 0 warning allowed)))
+
+module Pattern_matching_wildcard :
+  sig
+    type t = { x : int; mutable y : int [@atomic]; }
+    val warning : t -> int
+    val allowed : t -> int
+  end
+|}]
