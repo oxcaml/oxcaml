@@ -121,9 +121,8 @@ external equal : int16# -> int16# -> bool = "%int16#_equal"
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 external compare : int16# -> int16# -> int = "%int16#_compare"
 
-(** Same as {!compare}, except that arguments are interpreted as
-    {e unsigned} integers. *)
-val unsigned_compare : int16# -> int16# -> int
+(** Same as {!compare}, except that arguments are interpreted as {e unsigned} integers. *)
+external unsigned_compare : int16# -> int16# -> int = "%int16#_unsigned_compare"
 
 (** Return the lesser of the two arguments. *)
 val min : int16# -> int16# -> int16#
@@ -145,8 +144,7 @@ external of_int16 : int16 -> int16# = "%int16#_of_int16"
 (** tag a naked int16 *)
 external to_int16 : int16# -> int16 = "%int16_of_int16#"
 
-(** Same as {!to_int}, but interprets the argument as an {e unsigned}
-    integer. *)
+(** Same as {!to_int}, but interprets the argument as an {e unsigned} integer. *)
 val unsigned_to_int : int16# -> int
 
 (** [to_float x] is [x] as a floating point number. *)

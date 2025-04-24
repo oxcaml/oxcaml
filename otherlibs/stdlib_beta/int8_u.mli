@@ -121,9 +121,8 @@ external equal : int8# -> int8# -> bool = "%int8#_equal"
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 external compare : int8# -> int8# -> int = "%int8#_compare"
 
-(** Same as {!compare}, except that arguments are interpreted as
-    {e unsigned} integers. *)
-val unsigned_compare : int8# -> int8# -> int
+(** Same as {!compare}, except that arguments are interpreted as {e unsigned} integers. *)
+external unsigned_compare : int8# -> int8# -> int = "%int8#_unsigned_compare"
 
 (** Return the lesser of the two arguments. *)
 val min : int8# -> int8# -> int8#
@@ -145,8 +144,7 @@ external of_int8 : int8 -> int8# = "%int8#_of_int8"
 (** tag a naked int8 *)
 external to_int8 : int8# -> int8 = "%int8_of_int8#"
 
-(** Same as {!to_int}, but interprets the argument as an {e unsigned}
-    integer. *)
+(** Same as {!to_int}, but interprets the argument as an {e unsigned} integer. *)
 val unsigned_to_int : int8# -> int
 
 (** [to_float x] is [x] as a floating point number. *)

@@ -189,6 +189,16 @@ val integral : 'a Integral.t -> 'a t
 
 val floating : 'a Floating.t -> 'a t
 
+module Signedness : sig
+  type t =
+    | Signed
+    | Unsigned
+
+  val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
 module Integer_comparison : sig
   type t =
     | Ceq
@@ -197,12 +207,23 @@ module Integer_comparison : sig
     | Cgt
     | Cle
     | Cge
+    | Cult
+    | Cugt
+    | Cule
+    | Cuge
+
+  val equal : t -> t -> bool
 
   val to_string : t -> string
 
   val swap : t -> t
 
   val negate : t -> t
+
+  (** Creates a comparison operator from the behavior that should happen in each
+      condition, with the given signedness. If every case is the same, returns [Error] of
+      that case *)
+  val create : Signedness.t -> lt:bool -> eq:bool -> gt:bool -> (t, bool) result
 end
 
 module Float_comparison : sig
@@ -327,7 +348,8 @@ module Operation : sig
       | Floating of 'mode Floating.t * Float_op.t
       | Icmp of any_locality_mode Integral.t * Integer_comparison.t
       | Fcmp of any_locality_mode Floating.t * Float_comparison.t
-      | Three_way_compare of any_locality_mode scalar
+      | Three_way_compare_int of Signedness.t * any_locality_mode Integral.t
+      | Three_way_compare_float of any_locality_mode Floating.t
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 

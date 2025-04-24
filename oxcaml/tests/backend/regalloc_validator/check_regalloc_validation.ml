@@ -922,7 +922,7 @@ let make_loop ~loop_loc_first n =
                     { lt = loop_loc_label;
                       eq = loop_reg_label;
                       gt = move_tmp_res_label;
-                      is_signed = true;
+                      is_signed = Signed;
                       imm = Some 0
                     };
                 arg = [| int_arg1 |];
@@ -953,7 +953,7 @@ let make_loop ~loop_loc_first n =
                     { lt = loop_loc_label;
                       eq = loop_reg_label;
                       gt = move_tmp_res_label;
-                      is_signed = true;
+                      is_signed = Signed;
                       imm = Some 1
                     };
                 arg = [| int_arg1 |];
@@ -978,7 +978,7 @@ let make_loop ~loop_loc_first n =
                     { lt = loop_reg_label;
                       eq = move_tmp_res_label;
                       gt = move_tmp_res_label;
-                      is_signed = true;
+                      is_signed = Signed;
                       imm = Some 2
                     };
                 arg = [| int_arg1 |];
