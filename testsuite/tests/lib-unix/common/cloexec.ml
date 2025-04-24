@@ -52,9 +52,11 @@ let string_of_fd fd = Int.to_string (fd_of_file_descr fd)
 let status_checker = "fdstatus.exe"
 
 let _ =
-  let f0 = Unix.(openfile "tmp.txt" [O_WRONLY; O_CREAT; O_TRUNC] 0o600) in
-  let f1 = Unix.(openfile "tmp.txt" [O_RDONLY; O_KEEPEXEC] 0) in
-  let f2 = Unix.(openfile "tmp.txt" [O_RDONLY; O_CLOEXEC] 0) in
+  let f0 =
+    Unix.(openfile "tmp.txt" [O_WRONLY; O_CREAT; O_TRUNC; O_SHARE_DELETE] 0o600)
+  in
+  let f1 = Unix.(openfile "tmp.txt" [O_RDONLY; O_KEEPEXEC; O_SHARE_DELETE] 0) in
+  let f2 = Unix.(openfile "tmp.txt" [O_RDONLY; O_CLOEXEC; O_SHARE_DELETE] 0) in
   let d0 = Unix.dup f0 in
   let d1 = Unix.dup ~cloexec:false f1 in
   let d2 = Unix.dup ~cloexec:true f2 in
@@ -78,6 +80,25 @@ let _ =
         the test step is not terminated until _all_ processes have completed, so
         we can use Unix.execv here, even on Windows. *)
   if Sys.argv.(1) = "execv" then
+    let () =
+      (* The Windows implementation of exec in the CRT uses CreateProcess and
+         then calls _exit to terminate itself. There is a race, which can be
+         seen on slower machines, where the test begins running before this
+         call has happened, and which results in tmp.txt still being locked when
+         fdstatus_main.ml tries to delete it, leading to a "Permission denied"
+         exception. To prevent this, lock.txt is created and locked for writing
+         by this process. If the checker then sees that lock.txt exists, it
+         attempts to acquire a write lock on it, which will succeed only after
+         this process has completely exited and its lock has been automatically
+         released via process termination.
+         This dance is strictly done on native on Windows only, because execv
+         hanging on to open files in this way with a Unix kernel is a very
+         serious misimplementation of execv! *)
+      if Sys.win32 then
+        let lock =
+          Unix.(openfile "lock.txt" [O_WRONLY; O_CREAT;
+                                     O_TRUNC; O_CLOEXEC] 0o600) in
+        Unix.lockf lock Unix.F_LOCK 0 in
     Unix.execv
       (Filename.concat Filename.current_dir_name status_checker)
       (Array.append [| status_checker; Sys.argv.(1) |] string_fds)
