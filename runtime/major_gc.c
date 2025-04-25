@@ -1120,6 +1120,19 @@ static void realloc_mark_stack (struct mark_stack* stk)
   mark_stack_prune(stk);
 }
 
+/* This function is used for reads that may race with a concurrent `caml_modify`
+   from the mutator. Without this, TSan would flag it as a race (see section
+   3.2 of comment in tsan.c); however, we have decided that these races are
+   benign. We therefore use this function instead, ensuring that the read is
+   not seen by TSan. */
+static CAMLno_tsan
+#if defined(WITH_THREAD_SANITIZER)
+Caml_noinline
+#endif
+value volatile_load_uninstrumented(volatile value* p) {
+  return *p;
+}
+
 Caml_inline void mark_stack_push_range(struct mark_stack* stk,
                                        value_ptr start, value_ptr end)
 {
@@ -1160,7 +1173,7 @@ static intnat mark_stack_push_block(struct mark_stack* stk, value block)
   end = (block_wsz < 8 ? block_wsz : 8);
 
   for (i = offset; i < end; i++) {
-    value v = Field(block, i);
+    value v = volatile_load_uninstrumented(&Field(block, i));
 
     if (Is_markable(v))
       break;
@@ -1250,14 +1263,6 @@ static void mark_slice_darken(struct mark_stack* stk, value child,
       }
     }
   }
-}
-
-static CAMLno_tsan
-#if defined(WITH_THREAD_SANITIZER)
-Caml_noinline
-#endif
-value volatile_load_uninstrumented(volatile value* p) {
-  return *p;
 }
 
 Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
@@ -1358,10 +1363,6 @@ again:
     for (; me.start < scan_end; me.start++) {
       CAMLassert(budget >= 0);
 
-      /* This load may race with a concurrent caml_modify. It does not
-         constitute a data race as this is a volatile load. However, TSan will
-         wrongly see a race here (see section 3.2 of comment in tsan.c). We
-         therefore make sure it is never TSan-instrumented. */
       value child = volatile_load_uninstrumented(me.start);
 
       budget--;
