@@ -15,24 +15,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Loc : sig
-  type 'a t = 'a atomic_loc
-
-  (* exposing 'external' primitives directly helps reasoning about
-     performance: it guarantees that all versions of the compiler
-     (including bytecode) remove the pair construction on direct
-     calls:
-       Atomic.Loc.foo [%atomic.loc r.x] ...  *)
-  external get : 'a t -> 'a = "%atomic_load_loc"
-  external exchange : 'a t -> 'a -> 'a = "%atomic_exchange_loc"
-  external compare_and_set : 'a t -> 'a -> 'a -> bool = "%atomic_cas_loc"
-  external fetch_and_add : int t -> int -> int = "%atomic_fetch_add_loc"
-
-  val set : 'a t -> 'a -> unit
-  val incr : int t -> unit
-  val decr : int t -> unit
-end
-
 (** Atomic references.
 
   See {{!examples} the examples} below.
@@ -85,6 +67,24 @@ val incr : int t -> unit
 
 (** [decr r] atomically decrements the value of [r] by [1]. *)
 val decr : int t -> unit
+
+module Loc : sig
+  type 'a t = 'a atomic_loc
+
+  (* exposing 'external' primitives directly helps reasoning about
+     performance: it guarantees that all versions of the compiler
+     (including bytecode) remove the pair construction on direct
+     calls:
+       Atomic.Loc.foo [%atomic.loc r.x] ...  *)
+  external get : 'a t -> 'a = "%atomic_load_loc"
+  external exchange : 'a t -> 'a -> 'a = "%atomic_exchange_loc"
+  external compare_and_set : 'a t -> 'a -> 'a -> bool = "%atomic_cas_loc"
+  external fetch_and_add : int t -> int -> int = "%atomic_fetch_add_loc"
+
+  val set : 'a t -> 'a -> unit
+  val incr : int t -> unit
+  val decr : int t -> unit
+end
 
 (** {1:examples Examples}
 
