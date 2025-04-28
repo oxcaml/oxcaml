@@ -1857,14 +1857,11 @@ ocamldoc/%: CAMLC = $(BEST_OCAMLC) $(STDLIBFLAGS)
 ocamldoc/%: CAMLOPT = $(BEST_OCAMLOPT) $(STDLIBFLAGS)
 
 .PHONY: ocamldoc
-ocamldoc: ocamldoc/ocamldoc$(EXE) ocamldoc/odoc_test.cmo
-
-ocamldoc/ocamldoc$(EXE): ocamlc ocamlyacc ocamllex
+ocamldoc: ocamldoc/ocamldoc$(EXE) ocamldoc/odoc_test.cmo \
+  ocamlc ocamlyacc ocamllex
 
 .PHONY: ocamldoc.opt
-ocamldoc.opt: ocamldoc/ocamldoc.opt$(EXE)
-
-ocamldoc/ocamldoc.opt$(EXE): ocamlopt ocamlyacc ocamllex
+ocamldoc.opt: ocamldoc/ocamldoc.opt$(EXE) ocamlopt ocamlyacc ocamllex
 
 # OCamltest
 
@@ -1950,7 +1947,8 @@ ocamltest/%: CAMLC = $(BEST_OCAMLC) $(STDLIBFLAGS)
 ocamltest/%: CAMLOPT = $(BEST_OCAMLOPT) $(STDLIBFLAGS)
 
 ocamltest: ocamltest/ocamltest$(EXE) \
-  testsuite/lib/lib.cmo testsuite/lib/testing.cma testsuite/tools/expect$(EXE)
+  testsuite/lib/lib.cmo testsuite/lib/testing.cma testsuite/tools/expect$(EXE) \
+  ocamlc ocamlyacc ocamllex
 
 testsuite/lib/%: VPATH += testsuite/lib
 
@@ -1989,12 +1987,9 @@ endif
 
 ocamltest/ocamltest$(EXE): OC_BYTECODE_LINKFLAGS += -custom -g
 
-ocamltest/ocamltest$(EXE): ocamlc ocamlyacc ocamllex
-
 ocamltest.opt: ocamltest/ocamltest.opt$(EXE) \
-  testsuite/lib/testing.cmxa $(asmgen_OBJECT) testsuite/tools/codegen$(EXE)
-
-ocamltest/ocamltest.opt$(EXE): ocamlopt ocamlyacc ocamllex
+  testsuite/lib/testing.cmxa $(asmgen_OBJECT) testsuite/tools/codegen$(EXE) \
+  ocamlopt ocamlyacc ocamllex
 
 # ocamltest does _not_ want to have access to the Unix interface by default,
 # to ensure functions and types are only used via Ocamltest_stdlib.Unix
@@ -2170,14 +2165,12 @@ ocamldebug_BYTECODE_LINKFLAGS = -linkall
 debugger/%: CAMLC = $(BEST_OCAMLC) $(STDLIBFLAGS)
 
 .PHONY: ocamldebug ocamldebugger
-ocamldebug: debugger/ocamldebug$(EXE)
-ocamldebugger: debugger/ocamldebug$(EXE)
+ocamldebug: debugger/ocamldebug$(EXE) ocamlc ocamlyacc ocamllex
+ocamldebugger: debugger/ocamldebug$(EXE) ocamlc ocamlyacc ocamllex
 # the 'ocamldebugger' target is an alias of 'ocamldebug' for
 # backward-compatibility with old ./configure scripts; it can be
 # removed after most contributors have re-run ./configure once, for
 # example after 5.2 is branched
-
-debugger/ocamldebug$(EXE): ocamlc ocamlyacc ocamllex
 
 $(ocamldebug_DEBUGGER_OBJECTS): OC_COMMON_COMPFLAGS += -for-pack ocamldebug
 debugger/ocamldebug.cmo: $(ocamldebug_DEBUGGER_OBJECTS)
