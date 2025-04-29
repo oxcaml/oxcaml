@@ -48,11 +48,11 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
         in
         let named = Named.create_simple arg in
         let machine_width = UE.machine_width (UA.uenv uacc) in
-          Expr_builder.Keep_binding
-            { let_bound;
-              simplified_defining_expr = Simplified_named.create ~machine_width named;
-              original_defining_expr = Some named
-            })
+        Expr_builder.Keep_binding
+          { let_bound;
+            simplified_defining_expr = Simplified_named.create ~machine_width named;
+            original_defining_expr = Some named
+          })
   in
   let expr, uacc =
     let uacc =
