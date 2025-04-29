@@ -669,14 +669,19 @@ module Merge = struct
   *)
 
   (* Helpers *)
-  let return ~ghosts ~replace_by path =
-    Some ((path, [path], None), {Signature_group.ghosts; replace_by})
 
-  let return_payload  ~payload ~ghosts ~replace_by path =
-    Some ((path, [path], payload), {Signature_group.ghosts; replace_by})
+  (** For the merging of type fields [S with type P.t = tdecl], the typedtree
+      for the right-hand side type declaration [tdecl] is built at the point of
+      the (possibly deep) constrained item [P.t] inside [S]. It is returned as
+      an extra payload by merge. Other cases (module, module types) don't use
+      the payload mechanism (the payload is [()]). *)
 
-  let return_paths  ~payload ~ghosts ~replace_by path paths =
-    Some ((path, paths, payload), {Signature_group.ghosts; replace_by})
+  let return_payload ~ghosts ~replace_by ?(paths=[]) path ~late_typedtree =
+    Some ((path, path::paths, late_typedtree),
+          {Signature_group.ghosts; replace_by})
+
+  let return = return_payload ~late_typedtree:()
+
 
   let split_row_id s ghosts =
     let srow = s ^ "#row" in
@@ -688,7 +693,7 @@ module Merge = struct
     in
     split [] ghosts
 
-  let unsafe_signature_subst sub sg loc initial_env =
+  let unsafe_signature_subst initial_env loc sg sub =
     (* This signature will not be used directly, it will always be freshened
        by the caller. So what we do with the scope doesn't really matter. But
        making it local makes it unlikely that we will ever use the result of
@@ -705,15 +710,15 @@ module Merge = struct
     let sg =
       if destructive then
         (* Check that the substitution will not make the signature ill-formed *)
-        let _ = check_usage_after_substitution ~loc ~lid env paths sg in
+        let () = check_usage_after_substitution ~loc ~lid env paths sg in
         (* Actually remove the identifiers *)
         let sub = Subst.change_locs Subst.identity loc in
         let sub = List.fold_left replace sub paths in
-        unsafe_signature_subst sub sg loc env
+        unsafe_signature_subst env loc sg sub
       else sg
     in
     (* check that the resulting signature is still wellformed *)
-    let _ = check_well_formed_module env loc "this instantiated signature"
+    let () = check_well_formed_module env loc "this instantiated signature"
         (Mty_signature sg) in
     sg
 
@@ -725,7 +730,7 @@ module Merge = struct
         (patch_deep_item ~patch ~destructive
            namelist initial_env env sg loc lid) sg
     with
-    | Some ((p, paths, payload), sg) -> p, paths, payload, sg
+    | Some ((p, paths, late_typedtree), sg) -> p, paths, late_typedtree, sg
     | None -> raise(Error(loc, initial_env, With_no_component lid.txt))
 
   and patch_deep_item ~ghosts ~patch ~destructive
@@ -739,7 +744,7 @@ module Merge = struct
       when Ident.name id = s ->
         let sig_env = Env.add_signature outer_sg env in
         let sg = extract_sig sig_env loc md.md_type in
-        let subpath, paths, payload, newsg =
+        let subpath, paths, late_typedtree, newsg =
           merge_signature ~patch initial_env sig_env sg
             namelist loc lid ~destructive in
         let newsg =
@@ -756,12 +761,12 @@ module Merge = struct
               (* Deep substitutions inside aliases are checked, but do not
                  change the resulting signature *)
               return_payload ~ghosts
-                ~replace_by:(Some current_item) path ~payload
+                ~replace_by:(Some current_item) path ~late_typedtree
           | _, _ ->
               let new_md = {md with md_type = Mty_signature newsg} in
               let new_item = Sig_module(id, Mp_present, new_md, rs, priv) in
-              return_paths ~ghosts ~replace_by:(Some new_item)
-                path (path::paths) ~payload
+              return_payload ~ghosts ~replace_by:(Some new_item)
+                path ~paths ~late_typedtree
         end
     | _ -> None
 
@@ -837,7 +842,7 @@ module Merge = struct
               (Sig_type(id_row, decl_row, rs', priv)::after_ghosts)
           in
           let path = Pident id in
-          return_payload ~ghosts ~payload:tdecl
+          return_payload ~ghosts ~late_typedtree:tdecl
             ~replace_by:(Some (Sig_type(id, newdecl, rs, priv))) path
 
       | Sig_type(id, sig_decl, rs, priv), _
@@ -857,7 +862,7 @@ module Merge = struct
             if not destructive then (Some(Sig_type(id, newdecl, rs, priv)))
             else None
           in
-          return_payload ~ghosts ~payload:tdecl ~replace_by:item_opt path
+          return_payload ~ghosts ~late_typedtree:tdecl ~replace_by:item_opt path
 
       | _ -> None
     in
