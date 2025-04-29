@@ -286,7 +286,7 @@ let iterator_with_env super env =
         match param with
         | None -> ()
         | Some id ->
-          env := lazy (Env.add_module ~arg:true id Mp_present
+          env := lazy (Env.add_module ~noalias:true id Mp_present
                        mty_arg (Lazy.force env_before))
       end;
       self.Btype.it_module_type self mty_body;
@@ -663,7 +663,7 @@ let merge_constraint_aux initial_env loc sg lid constr : merge_result =
     | Sig_module(id, _, md, _rs, _), [s], With_modsubst (lid',path,md')
       when Ident.name id = s ->
         let sig_env = Env.add_signature sg_for_env outer_sig_env in
-        let aliasable = not (Env.is_functor_arg path sig_env) in
+        let aliasable = Env.is_aliasable path sig_env in
         ignore
           (Includemod.strengthened_module_decl ~loc ~mark:true
              ~aliasable sig_env md' path md);
@@ -870,7 +870,7 @@ let rec approx_modtype env smty =
             let rarg = Mtype.scrape_for_functor_arg env arg in
             let scope = Ctype.create_scope () in
             let (id, newenv) =
-              Env.enter_module ~scope ~arg:true name Mp_present rarg env
+              Env.enter_module ~scope ~noalias:true name Mp_present rarg env
             in
             Types.Named (Some id, arg), newenv
       in
@@ -1404,8 +1404,8 @@ and transl_modtype_aux env smty =
                     md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
                   }
                 in
-                Env.enter_module_declaration ~scope ~arg:true name Mp_present
-                  arg_md env
+                Env.enter_module_declaration ~scope ~noalias:true
+                  name Mp_present arg_md env
               in
               Some id, newenv
           in
@@ -1551,7 +1551,7 @@ and transl_signature env sg =
             let pres =
               match tmty.mty_type with
               | Mty_alias p ->
-                  if Env.is_functor_arg p env then
+                  if not (Env.is_aliasable p env) then
                     raise (Error (pmd.pmd_loc, env, Cannot_alias p));
                   Mp_absent
               | _ -> Mp_present
@@ -1589,7 +1589,7 @@ and transl_signature env sg =
               Env.lookup_module ~loc:pms.pms_manifest.loc
                 pms.pms_manifest.txt env
             in
-            let aliasable = not (Env.is_functor_arg path env) in
+            let aliasable = Env.is_aliasable path env in
             let md =
               if not aliasable then
                 md
@@ -1808,7 +1808,7 @@ and transl_recmodule_modtypes env sdecls =
   let make_env curr =
     List.fold_left (fun env (id_shape, _, md, _) ->
       Option.fold ~none:env ~some:(fun (id, shape) ->
-        Env.add_module_declaration ~check:true ~shape ~arg:true
+        Env.add_module_declaration ~check:true ~shape ~noalias:true
           id Mp_present md env
       ) id_shape
     ) env curr
@@ -1924,7 +1924,7 @@ let rec nongen_modtype env = function
         | Unit
         | Named (None, _) -> env
         | Named (Some id, param) ->
-            Env.add_module ~arg:true id Mp_present param env
+            Env.add_module ~noalias:true id Mp_present param env
       in
       nongen_modtype env body
 
@@ -2054,7 +2054,8 @@ let check_recmodule_inclusion env bindings =
                  then mty_actual
                  else subst_and_strengthen env scope s (Some id) mty_actual
                in
-               Env.add_module ~arg:false ~shape id' Mp_present mty_actual' env)
+               Env.add_module ~noalias:false ~shape id'
+                 Mp_present mty_actual' env)
           env bindings1 in
       (* Build the output substitution Y_i <- X_i *)
       let s' =
@@ -2254,7 +2255,7 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
                  mod_env = env;
                  mod_attributes = smod.pmod_attributes;
                  mod_loc = smod.pmod_loc } in
-      let aliasable = not (Env.is_functor_arg path env) in
+      let aliasable = Env.is_aliasable path env in
       let shape =
         Env.shape_of_path ~namespace:Shape.Sig_component_kind.Module env path
       in
@@ -2321,7 +2322,7 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
               let id = Ident.create_scoped ~scope name in
               let shape = Shape.var md_uid id in
               let newenv = Env.add_module_declaration
-                ~shape ~arg:true ~check:true id Mp_present arg_md env
+                ~shape ~noalias:true ~check:true id Mp_present arg_md env
               in
               Some id, newenv, id
           in
@@ -2489,7 +2490,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
               | None -> env, mty_res
               | Some param ->
                   let env =
-                    Env.add_module ~arg:true param Mp_present arg.mod_type env
+                    Env.add_module ~noalias:true param
+                      Mp_present arg.mod_type env
                   in
                   check_well_formed_module env app_loc
                     "the signature of this functor application" mty_res;
@@ -3501,7 +3503,7 @@ let report_error ~loc _env = function
         (Style.as_inline_code path) p
   | Cannot_alias p ->
       Location.errorf ~loc
-        "Functor arguments, such as %a, cannot be aliased"
+        "Functor arguments and recursive modules, such as %a, cannot be aliased"
         (Style.as_inline_code path) p
   | Cannot_scrape_package_type p ->
       Location.errorf ~loc
