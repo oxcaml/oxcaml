@@ -920,6 +920,7 @@ let rec choice ctx t =
     | Pcpu_relax
     | Punbox_float _ | Pbox_float (_, _)
     | Punbox_int _ | Pbox_int _
+    | Puntag_int _ | Ptag_int _
     | Punbox_vector _ | Pbox_vector (_, _)
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)

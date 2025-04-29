@@ -229,8 +229,8 @@ let of_mixed_block_elements ~print_locality
     let is_value =
       match elem with
       | Value _ -> true
-      | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word ->
+      | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+      | Vec128 | Vec256 | Vec512 | Word ->
         false
     in
     if is_value
