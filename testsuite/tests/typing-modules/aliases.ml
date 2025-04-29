@@ -911,3 +911,29 @@ module M :
 module N : sig val s : string end
 val s : string = "hello"
 |}]
+
+
+(* Aliases of a recursive module (within the definition) are disallowed *)
+module rec X1 : sig end = struct
+  module Inner : sig module X = X2 end = struct end
+end
+and X2 : sig end = struct end
+[%%expect {|
+Line 2, characters 21-34:
+2 |   module Inner : sig module X = X2 end = struct end
+                         ^^^^^^^^^^^^^
+Error: Functor arguments and recursive modules (within the
+       recursive definition), such as "X2", cannot be aliased
+|}]
+
+
+(* Aliases of a recursive module (outside of the definition) are allowed *)
+module rec X1 : sig end = struct end
+and X2 : sig end = struct end
+
+module X3 : sig module Inner = X1 end = struct module Inner = X1 end
+[%%expect {|
+module rec X1 : sig end
+and X2 : sig end
+module X3 : sig module Inner = X1 end
+|}]

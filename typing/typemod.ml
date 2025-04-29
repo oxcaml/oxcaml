@@ -3503,7 +3503,8 @@ let report_error ~loc _env = function
         (Style.as_inline_code path) p
   | Cannot_alias p ->
       Location.errorf ~loc
-        "Functor arguments and recursive modules, such as %a, cannot be aliased"
+        "Functor arguments and@ recursive modules@ (within the@ recursive \
+         definition),@ such as %a,@ cannot be aliased"
         (Style.as_inline_code path) p
   | Cannot_scrape_package_type p ->
       Location.errorf ~loc
