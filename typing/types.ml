@@ -654,6 +654,8 @@ and mixed_block_element =
   | Float_boxed
   | Float64
   | Float32
+  | Bits8
+  | Bits16
   | Bits32
   | Bits64
   | Vec128
@@ -983,12 +985,12 @@ let compare_tag t1 t2 =
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
-  | Word, Word | Bits32, Bits32 | Bits64, Bits64
+  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits32 | Bits64
+  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32 | Bits64
     | Vec128 | Vec256 | Vec512 | Product _ ), _
     -> false
 
@@ -996,7 +998,7 @@ let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
-  | Word, Word | Bits32, Bits32 | Bits64, Bits64
+  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
     -> 0
   | Product es1, Product es2
@@ -1011,16 +1013,20 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Float32 -> 1
   | Word, _ -> -1
   | _, Word -> 1
+  | Bits8, _ -> -1
+  | _, Bits8 -> 1
+  | Bits16, _ -> -1
+  | _, Bits16 -> 1
   | Bits32, _ -> -1
   | _, Bits32 -> 1
+  | Bits64, _ -> -1
+  | _, Bits64 -> 1
   | Vec128, _ -> -1
   | _, Vec128 -> 1
   | Vec256, _ -> -1
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
-  | Product _, _ -> -1
-  | _, Product _ -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
@@ -1165,6 +1171,8 @@ let rec mixed_block_element_to_string = function
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
+  | Bits8 -> "Bits8"
+  | Bits16 -> "Bits16"
   | Bits32 -> "Bits32"
   | Bits64 -> "Bits64"
   | Vec128 -> "Vec128"
@@ -1182,6 +1190,8 @@ let mixed_block_element_to_lowercase_string = function
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
+  | Bits8 -> "bits8"
+  | Bits16 -> "bits16"
   | Bits32 -> "bits32"
   | Bits64 -> "bits64"
   | Vec128 -> "vec128"

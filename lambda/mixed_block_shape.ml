@@ -34,6 +34,8 @@ module Singleton_mixed_block_element = struct
     | Float_boxed of 'a
     | Float64
     | Float32
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
@@ -49,6 +51,8 @@ module Singleton_mixed_block_element = struct
       Format.fprintf ppf "@[<hov 1>(Float_boxed %a)@]" print_locality locality
     | Float64 -> Format.fprintf ppf "Float64"
     | Float32 -> Format.fprintf ppf "Float32"
+    | Bits8 -> Format.fprintf ppf "Bits8"
+    | Bits16 -> Format.fprintf ppf "Bits16"
     | Bits32 -> Format.fprintf ppf "Bits32"
     | Bits64 -> Format.fprintf ppf "Bits64"
     | Vec128 -> Format.fprintf ppf "Vec128"
@@ -164,6 +168,8 @@ let singleton_or_product_of_mixed_block_element
   | Float_boxed locality -> Singleton (Float_boxed locality)
   | Float64 -> Singleton Float64
   | Float32 -> Singleton Float32
+  | Bits8 -> Singleton Bits8
+  | Bits16 -> Singleton Bits16
   | Bits32 -> Singleton Bits32
   | Bits64 -> Singleton Bits64
   | Vec128 -> Singleton Vec128
@@ -229,8 +235,8 @@ let of_mixed_block_elements ~print_locality
     let is_value =
       match elem with
       | Value _ -> true
-      | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word ->
+      | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+      | Vec128 | Vec256 | Vec512 | Word ->
         false
     in
     if is_value

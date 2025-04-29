@@ -62,6 +62,10 @@ module T0 = struct
 
   let ( <= ) t1 t2 = Stdlib.( <= ) (Targetint_32_64.compare t1 t2) 0
 
+  let of_int8 i = Targetint_32_64.of_int (Numeric_types.Int8.to_int i)
+
+  let of_int16 i = Targetint_32_64.of_int (Numeric_types.Int16.to_int i)
+
   let ( >= ) t1 t2 = Stdlib.( >= ) (Targetint_32_64.compare t1 t2) 0
 
   let ( < ) t1 t2 = Stdlib.( < ) (Targetint_32_64.compare t1 t2) 0

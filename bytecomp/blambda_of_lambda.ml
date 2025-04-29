@@ -189,6 +189,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Punboxed_int_index Unboxed_int64 -> "_indexed_by_int64"
         | Punboxed_int_index Unboxed_int32 -> "_indexed_by_int32"
         | Punboxed_int_index Unboxed_nativeint -> "_indexed_by_nativeint"
+        | Punboxed_int_index Unboxed_int8 -> "_indexed_by_int8"
+        | Punboxed_int_index Unboxed_int16 -> "_indexed_by_int16"
       in
       Ccall (prefix ^ suffix)
     in
@@ -293,6 +295,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             Lconst (Const_base (Const_float32 "0.0"))
           | Punboxedfloatarray Unboxed_float64 ->
             Lconst (Const_base (Const_float "0.0"))
+          | Punboxedintarray Unboxed_int8 ->
+            Lconst (Const_base (Const_int 0))
+          | Punboxedintarray Unboxed_int16 ->
+            Lconst (Const_base (Const_int 0))
           | Punboxedintarray Unboxed_int32 ->
             Lconst (Const_base (Const_int32 0l))
           | Punboxedintarray Unboxed_int64 ->
@@ -309,6 +315,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 Lconst (Const_base (Const_float32 "0.0"))
               | Punboxedfloat_ignorable Unboxed_float64 ->
                 Lconst (Const_base (Const_float "0.0"))
+              | Punboxedint_ignorable Unboxed_int8 ->
+                Lconst (Const_base (Const_int 0))
+              | Punboxedint_ignorable Unboxed_int16 ->
+                Lconst (Const_base (Const_int 0))
               | Punboxedint_ignorable Unboxed_int32 ->
                 Lconst (Const_base (Const_int32 0l))
               | Punboxedint_ignorable Unboxed_int64 ->
@@ -741,6 +751,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punboxedintarray_set _ | Pfloatarray_set | Punboxedfloatarray_set _
       | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
         n_ary (Ccall "caml_array_blit") ~arity:5)
+    | Puntag_int _ | Ptag_int _ ->
+      Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
+        Printlambda.primitive primitive
     | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
