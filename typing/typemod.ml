@@ -1328,14 +1328,6 @@ end = struct
     List.filter_map simplify_item sg
 end
 
-let has_remove_aliases_attribute attr =
-  let remove_aliases =
-    Attr_helper.get_no_payload_attribute "remove_aliases" attr
-  in
-  match remove_aliases with
-  | None -> false
-  | Some _ -> true
-
 (* Check and translate a module type expression *)
 
 let transl_modtype_longident loc env lid =
@@ -1418,7 +1410,9 @@ and transl_modtype_aux env smty =
   | Pmty_with(sbody, constraints) ->
       let body = transl_modtype env sbody in
       let init_sg = extract_sig env sbody.pmty_loc body.mty_type in
-      let remove_aliases = has_remove_aliases_attribute smty.pmty_attributes in
+      let remove_aliases =
+        Builtin_attributes.has_remove_aliases smty.pmty_attributes
+      in
       let (rev_tcstrs, final_sg) =
         List.fold_left (transl_with ~loc:smty.pmty_loc env remove_aliases)
         ([],init_sg) constraints in
@@ -2989,7 +2983,8 @@ and normalize_signature_item = function
 (* Extract the module type of a module expression *)
 
 let type_module_type_of env smod =
-  let remove_aliases = has_remove_aliases_attribute smod.pmod_attributes in
+  let remove_aliases =
+    Builtin_attributes.has_remove_aliases smod.pmod_attributes in
   let tmty =
     match smod.pmod_desc with
     | Pmod_ident lid -> (* turn off strengthening in this case *)

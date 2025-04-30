@@ -304,6 +304,10 @@ Some attributes are understood by the compiler:
   "ocaml.poll" or "poll" with an "error" payload on a function definition emits
   an error whenever the compiler inserts a runtime polling point in the body of
   the annotated function.
+\item
+  "ocaml.remove_aliases" or "remove_aliases", defined on either a	"module type
+	of" signature expression or "with module" constraint instructs the typechecker
+	to drop module aliases in the resulting signature.
 \end{itemize}
 
 \begin{caml_example*}{verbatim}
