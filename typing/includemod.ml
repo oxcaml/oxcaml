@@ -511,7 +511,7 @@ let rec modtypes ~core ~direction ~loc env subst mty1 mty2 shape =
 and try_modtypes ~core ~direction ~loc env subst mty1 mty2 orig_shape =
   match mty1, mty2 with
   | (Mty_alias p1, Mty_alias p2) ->
-      if Env.is_functor_arg p2 env then
+      if not (Env.is_aliasable p2 env) then
         Error (Error.Invalid_module_alias p2)
       else if not (equal_module_paths env p1 subst p2) then
           Error Error.(Mt_core Incompatible_aliases)
@@ -1016,14 +1016,6 @@ and check_modtype_equiv ~core ~direction ~loc env mty1 mty2 =
 
 (* Simplified inclusion check between module types (for Env) *)
 
-let can_alias env path =
-  let rec no_apply = function
-    | Path.Pident _ -> true
-    | Path.Pdot(p, _) | Path.Pextra_ty (p, _) -> no_apply p
-    | Path.Papply _ -> false
-  in
-  no_apply path && not (Env.is_functor_arg path env)
-
 let core_inclusion = Core_inclusion.{
   type_declarations;
   value_descriptions;
@@ -1069,7 +1061,7 @@ exception Apply_error of {
   }
 
 let check_modtype_inclusion_raw ~loc env mty1 path1 mty2 =
-  let aliasable = can_alias env path1 in
+  let aliasable = Env.is_aliasable path1 env in
   let direction = Directionality.unknown ~mark:true in
   strengthened_modtypes ~core:core_inclusion ~direction ~loc ~aliasable env
     Subst.identity mty1 path1 mty2 Shape.dummy_mod
@@ -1088,7 +1080,7 @@ let check_functor_application_in_path
   | Error _errs ->
       if errors then
         let prepare_arg (arg_path, arg_mty) =
-          let aliasable = can_alias env arg_path in
+          let aliasable = Env.is_aliasable arg_path env in
           let smd = Mtype.strengthen ~aliasable env arg_mty arg_path in
           (Error.Named arg_path, smd)
         in
@@ -1278,7 +1270,7 @@ module Functor_app_diff = struct
            environment to track equalities with external components that the
            parameter might add. *)
         let mty = Subst.modtype Keep st.subst param_ty in
-        let env = Env.add_module ~arg:true param Mp_present mty st.env in
+        let env = Env.add_module ~noalias:true param Mp_present mty st.env in
         I.expand_params { st with env }
     | Keep ((Named arg,  _mty) , Named (Some param, _param), _) ->
         let res =
@@ -1294,7 +1286,7 @@ module Functor_app_diff = struct
     | Keep (((Anonymous|Empty_struct), mty),
             Named (Some param, _param), _) ->
         let mty' = Subst.modtype Keep st.subst mty in
-        let env = Env.add_module ~arg:true param Mp_present mty' st.env in
+        let env = Env.add_module ~noalias:true param Mp_present mty' st.env in
         let res = Option.map (Mtype.nondep_supertype env [param]) st.res in
         I.expand_params { st with env; res}
 

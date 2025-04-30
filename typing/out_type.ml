@@ -1828,7 +1828,7 @@ and tree_of_functor_parameter = function
         | None -> None, fun env -> env
         | Some id ->
             Some (Ident.name id),
-            Env.add_module ~arg:true id Mp_present ty_arg
+            Env.add_module ~noalias:true id Mp_present ty_arg
       in
       Some (name, tree_of_modtype ~ellipsis:false ty_arg), env
 

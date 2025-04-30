@@ -151,7 +151,7 @@ type summary =
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
   | Env_open of summary * Path.t
-  | Env_functor_arg of summary * Ident.t
+  | Env_not_aliasable of summary * Ident.t
   | Env_constraints of summary * type_declaration Path.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
@@ -168,7 +168,7 @@ let map_summary f = function
   | Env_class (s, id, d) -> Env_class (f s, id, d)
   | Env_cltype (s, id, d) -> Env_cltype (f s, id, d)
   | Env_open (s, p) -> Env_open (f s, p)
-  | Env_functor_arg (s, id) -> Env_functor_arg (f s, id)
+  | Env_not_aliasable (s, id) -> Env_not_aliasable (f s, id)
   | Env_constraints (s, m) -> Env_constraints (f s, m)
   | Env_copy_types s -> Env_copy_types (f s)
   | Env_persistent (s, id) -> Env_persistent (f s, id)
@@ -517,7 +517,7 @@ type t = {
   modtypes: (modtype_data, modtype_data) IdTbl.t;
   classes: (class_data, class_data) IdTbl.t;
   cltypes: (cltype_data, cltype_data) IdTbl.t;
-  functor_args: unit Ident.tbl;
+  not_aliasable: unit Ident.tbl;
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
   flags: int;
@@ -722,7 +722,7 @@ let empty = {
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = Path.Map.empty;
   flags = 0;
-  functor_args = Ident.empty;
+  not_aliasable = Ident.empty;
  }
 
 let in_signature b env =
@@ -1443,14 +1443,14 @@ let find_modtype_expansion_lazy path env =
 let find_modtype_expansion path env =
   Subst.Lazy.force_modtype (find_modtype_expansion_lazy path env)
 
-let rec is_functor_arg path env =
+let rec is_aliasable path env =
   match path with
     Pident id ->
-      begin try Ident.find_same id env.functor_args; true
-      with Not_found -> false
+      begin try Ident.find_same id env.not_aliasable; false
+      with Not_found -> true
       end
-  | Pdot (p, _) | Pextra_ty (p, _) -> is_functor_arg p env
-  | Papply _ -> true
+  | Pdot (p, _) | Pextra_ty (p, _) -> is_aliasable p env
+  | Papply _ -> false
 
 (* Copying types associated with values *)
 
@@ -2191,10 +2191,10 @@ let _ =
 
 (* Insertion of bindings by identifier *)
 
-let add_functor_arg id env =
+let mark_not_aliasable id env =
   {env with
-   functor_args = Ident.add id () env.functor_args;
-   summary = Env_functor_arg (env.summary, id)}
+   not_aliasable = Ident.add id () env.not_aliasable;
+   summary = Env_not_aliasable (env.summary, id)}
 
 let add_value ?check ?shape id desc env =
   let addr = value_declaration_address env id desc in
@@ -2210,11 +2210,15 @@ and add_extension ~check ?shape ~rebind id ext env =
   let shape = shape_or_leaf ext.ext_uid shape in
   store_extension ~check ~rebind id addr ext shape env
 
-and add_module_declaration ?(arg=false) ?shape ~check id presence md env =
+and add_module_declaration ?(noalias=false) ?shape ~check id presence md env =
   let check =
     if not check then
       None
-    else if arg && is_in_signature env then
+    else if noalias && is_in_signature env then
+      (* While recursive modules are also added with the noalias flag when
+         typing the recursive definitions, they are then added back without the
+         flag (to be aliased from the outside), and therefore could not throw
+         the warning, leaving only functor parameters *)
       Some (fun s -> Warnings.Unused_functor_parameter s)
     else
       Some (fun s -> Warnings.Unused_module s)
@@ -2223,7 +2227,7 @@ and add_module_declaration ?(arg=false) ?shape ~check id presence md env =
   let addr = module_declaration_address env id presence md in
   let shape = shape_or_leaf md.mdl_uid shape in
   let env = store_module ~check id addr presence md shape env in
-  if arg then add_functor_arg id env else env
+  if noalias then mark_not_aliasable id env else env
 
 and add_module_declaration_lazy ~update_summary id presence md env =
   let addr = module_declaration_address env id presence md in
@@ -2250,8 +2254,8 @@ and add_cltype ?shape id ty env =
   let shape = shape_or_leaf ty.clty_uid shape in
   store_cltype id ty shape env
 
-let add_module ?arg ?shape id presence mty env =
-  add_module_declaration ~check:false ?arg ?shape id presence (md mty) env
+let add_module ?noalias ?shape id presence mty env =
+  add_module_declaration ~check:false ?noalias ?shape id presence (md mty) env
 
 let add_module_lazy ~update_summary id presence mty env =
   let md = Subst.Lazy.{mdl_type = mty;
@@ -2289,9 +2293,9 @@ let enter_extension ~scope ~rebind name ext env =
   let env = store_extension ~check:true ~rebind id addr ext shape env in
   (id, env)
 
-let enter_module_declaration ~scope ?arg ?shape s presence md env =
+let enter_module_declaration ~scope ?noalias ?shape s presence md env =
   let id = Ident.create_scoped ~scope s in
-  (id, add_module_declaration ?arg ?shape ~check:true id presence md env)
+  (id, add_module_declaration ?noalias ?shape ~check:true id presence md env)
 
 let enter_modtype ~scope name mtd env =
   let id = Ident.create_scoped ~scope name in
@@ -2310,8 +2314,8 @@ let enter_cltype ~scope name desc env =
   let env = store_cltype id desc (Shape.leaf desc.clty_uid) env in
   (id, env)
 
-let enter_module ~scope ?arg s presence mty env =
-  enter_module_declaration ~scope ?arg s presence (md mty) env
+let enter_module ~scope ?noalias s presence mty env =
+  enter_module_declaration ~scope ?noalias s presence (md mty) env
 
 (* Insertion of all components of a signature *)
 
@@ -2454,7 +2458,7 @@ let remove_last_open root env0 =
     | Env_modtype _
     | Env_class _
     | Env_cltype _
-    | Env_functor_arg _
+    | Env_not_aliasable _
     | Env_constraints _
     | Env_persistent _
     | Env_copy_types _
@@ -3485,7 +3489,7 @@ let filter_non_loaded_persistent f env =
       | Env_class _
       | Env_cltype _
       | Env_open _
-      | Env_functor_arg _
+      | Env_not_aliasable _
       | Env_constraints _
       | Env_copy_types _
       | Env_persistent _

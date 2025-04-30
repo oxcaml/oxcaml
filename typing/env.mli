@@ -41,7 +41,7 @@ type summary =
   | Env_open of summary * Path.t
   (** The string set argument of [Env_open] represents a list of module names
       to skip, i.e. that won't be imported in the toplevel namespace. *)
-  | Env_functor_arg of summary * Ident.t
+  | Env_not_aliasable of summary * Ident.t
   | Env_constraints of summary * type_declaration Path.Map.t
   | Env_copy_types of summary
   | Env_persistent of summary * Ident.t
@@ -116,8 +116,12 @@ val find_constructor_address: Path.t -> t -> address
 val shape_of_path:
   namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t
 
-val add_functor_arg: Ident.t -> t -> t
-val is_functor_arg: Path.t -> t -> bool
+(** Indicates if a path [p] can be aliased, i.e. if
+    - it does not contain functor applications
+    - it does not start with a functor parameter
+    - it does not start with a recursive module (inside the recursive
+    definition) *)
+val is_aliasable: Path.t -> t -> bool
 
 val normalize_module_path: Location.t option -> t -> Path.t -> Path.t
 (* Normalize the path to a concrete module.
@@ -310,11 +314,11 @@ val add_type:
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
-val add_module: ?arg:bool -> ?shape:Shape.t ->
+val add_module: ?noalias:bool -> ?shape:Shape.t ->
   Ident.t -> module_presence -> module_type -> t -> t
 val add_module_lazy: update_summary:bool ->
   Ident.t -> module_presence -> Subst.Lazy.modtype -> t -> t
-val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool ->
+val add_module_declaration: ?noalias:bool -> ?shape:Shape.t -> check:bool ->
   Ident.t -> module_presence -> module_declaration -> t -> t
 val add_module_declaration_lazy: update_summary:bool ->
   Ident.t -> module_presence -> Subst.Lazy.module_decl -> t -> t
@@ -371,10 +375,10 @@ val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
 val enter_module:
-  scope:int -> ?arg:bool -> string -> module_presence ->
+  scope:int -> ?noalias:bool -> string -> module_presence ->
   module_type -> t -> Ident.t * t
 val enter_module_declaration:
-  scope:int -> ?arg:bool -> ?shape:Shape.t -> string -> module_presence ->
+  scope:int -> ?noalias:bool -> ?shape:Shape.t -> string -> module_presence ->
   module_declaration -> t -> Ident.t * t
 val enter_modtype:
   scope:int -> string -> modtype_declaration -> t -> Ident.t * t
