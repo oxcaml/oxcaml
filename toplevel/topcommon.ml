@@ -119,8 +119,12 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
   let eval_class_path env path =
     eval_path Env.find_class_address env path
 
-
-  module Printer = Genprintval.Make(Obj)(struct
+  module My_obj = struct
+    include Obj
+    let base_obj = obj
+    let obj v = Ok (obj v)
+  end
+  module Printer = Genprintval.Make(My_obj)(struct
       type valu = Obj.t
       exception Error
       let eval_address addr =
@@ -155,14 +159,18 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
           print_string b;
           backtrace := None
 
-  type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
+  module User_printer = Genprintval.User_printer
+
+  type ('a, 'b) gen_printer = ('a, 'b) User_printer.gen =
     | Zero of 'b
     | Succ of ('a -> ('a, 'b) gen_printer)
 
-  let install_printer = Printer.install_printer
-  let install_generic_printer = Printer.install_generic_printer
-  let install_generic_printer' = Printer.install_generic_printer'
-  let remove_printer = Printer.remove_printer
+  (* TODO: erase the glue below and use the new User_printer API
+     directly through the [User_printer] alias above. *)
+  let install_printer = User_printer.install_simple
+  let install_generic_printer = User_printer.install_generic_outcometree
+  let install_generic_printer' = User_printer.install_generic_format
+  let remove_printer = User_printer.remove
 
 end
 

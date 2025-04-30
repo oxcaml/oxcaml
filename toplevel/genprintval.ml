@@ -16,7 +16,6 @@
 (* To print values *)
 
 open Misc
-open Format
 open Longident
 open Path
 open Types
@@ -27,7 +26,9 @@ module type OBJ =
   sig
     type t
     val repr : 'a -> t
-    val obj : t -> 'a
+    (* [base_obj] assumes that the value has a marshallable base type. *)
+    val base_obj : t -> 'a
+    val obj : t -> (Obj.t, string) result
     val is_block : t -> bool
     val tag : t -> int
     val size : t -> int
@@ -44,26 +45,89 @@ module type EVALPATH =
     val same_value: valu -> valu -> bool
   end
 
-type ('a, 'b) gen_printer =
-  | Zero of 'b
-  | Succ of ('a -> ('a, 'b) gen_printer)
+let exn_printer path ppf exn =
+  Format_doc.fprintf ppf "<printer %a raised an exception: %s>"
+    Printtyp.Doc.path path
+    (Printexc.to_string exn)
+
+module User_printer = struct
+  type ('a, 'b) gen =
+    | Zero of 'b
+    | Succ of ('a -> ('a, 'b) gen)
+
+  type t =
+  | Simple of Types.type_expr * (Obj.t -> Outcometree.out_value)
+  | Generic of Path.t * (int -> (int -> Obj.t -> Outcometree.out_value,
+                                     Obj.t -> Outcometree.out_value) gen)
+
+  (* The user-defined printers. Also used for some builtin types. *)
+
+  let printers = ref ([
+    ( Pident(Ident.create_local "print_int"),
+      Simple (Predef.type_int,
+              (fun x -> Oval_int (Obj.obj x : int))) );
+    ( Pident(Ident.create_local "print_float"),
+      Simple (Predef.type_float,
+              (fun x -> Oval_float (Obj.obj x : float))) );
+    ( Pident(Ident.create_local "print_char"),
+      Simple (Predef.type_char,
+              (fun x -> Oval_char (Obj.obj x : char))) );
+    ( Pident(Ident.create_local "print_int32"),
+      Simple (Predef.type_int32,
+              (fun x -> Oval_int32 (Obj.obj x : int32))) );
+    ( Pident(Ident.create_local "print_nativeint"),
+      Simple (Predef.type_nativeint,
+              (fun x -> Oval_nativeint (Obj.obj x : nativeint))) );
+    ( Pident(Ident.create_local "print_int64"),
+      Simple (Predef.type_int64,
+              (fun x -> Oval_int64 (Obj.obj x : int64)) ))
+  ] : (Path.t * t) list)
+
+  let get_printers () = !printers
+
+  let user_printer path f ppf x =
+    Format_doc.deprecated_printer
+      (fun ppf ->
+         try f ppf x with
+         | exn -> Format_doc.compat1 exn_printer path ppf exn
+      )
+      ppf
+
+  let install_simple path ty fn =
+    let print_val ppf obj = user_printer path fn ppf obj in
+    let printer obj = Oval_printer (fun ppf -> print_val ppf obj) in
+    printers := (path, Simple (ty, printer)) :: !printers
+
+  let install_generic_outcometree function_path constr_path fn =
+    printers := (function_path, Generic (constr_path, fn))  :: !printers
+
+  let install_generic_format function_path ty_path fn =
+    let rec build gp depth =
+      match gp with
+      | Zero fn ->
+          let out_printer obj =
+            let printer ppf = user_printer function_path fn ppf obj in
+            Oval_printer printer in
+          Zero out_printer
+      | Succ fn ->
+          let print_val fn_arg =
+            let print_arg ppf o =
+              !Oprint.out_value ppf (fn_arg (depth+1) o) in
+            build (fn print_arg) depth in
+          Succ print_val in
+    printers := (function_path, Generic (ty_path, build fn)) :: !printers
+
+  let remove path =
+    let rec remove = function
+    | [] -> raise Not_found
+    | ((p, _) as printer) :: rem ->
+        if Path.same p path then rem else printer :: remove rem in
+    printers := remove !printers
+end
 
 module type S =
   sig
     type t
-    val install_printer :
-          Path.t -> Types.type_expr -> (formatter -> t -> unit) -> unit
-    val install_generic_printer :
-           Path.t -> Path.t ->
-           (int -> (int -> t -> Outcometree.out_value,
-                    t -> Outcometree.out_value) gen_printer) ->
-           unit
-    val install_generic_printer' :
-           Path.t -> Path.t ->
-           (formatter -> t -> unit,
-            formatter -> t -> unit) gen_printer ->
-           unit
-    val remove_printer : Path.t -> unit
     val outval_of_untyped_exception : t -> Outcometree.out_value
     val outval_of_value :
           int -> int ->
@@ -97,13 +161,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         for i = start_offset to O.size obj - 1 do
           let arg = O.field obj i in
           if not (O.is_block arg) then
-            list := Oval_int (O.obj arg : int) :: !list
+            list := Oval_int (O.base_obj arg : int) :: !list
                (* Note: this could be a char or a constant constructor... *)
           else if O.tag arg = Obj.string_tag then
             list :=
-              Oval_string ((O.obj arg : string), max_int, Ostr_string) :: !list
+              Oval_string ((O.base_obj arg : string), max_int, Ostr_string)
+              :: !list
           else if O.tag arg = Obj.double_tag then
-            list := Oval_float (O.obj arg : float) :: !list
+            list := Oval_float (O.base_obj arg : float) :: !list
           else
             list := Oval_constr (tree_of_name "_", []) :: !list
         done;
@@ -113,10 +178,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     let outval_of_untyped_exception bucket =
       if O.tag bucket <> 0 then
-        let name = (O.obj (O.field bucket 0) : string)in
+        let name = (O.base_obj (O.field bucket 0) : string)in
         Oval_constr (tree_of_name name, [])
       else
-      let name = (O.obj(O.field(O.field bucket 0) 0) : string) in
+      let name = (O.base_obj(O.field(O.field bucket 0) 0) : string) in
       let args =
         if (name = "Match_failure"
             || name = "Assert_failure"
@@ -127,80 +192,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         else outval_of_untyped_exception_args bucket 1 in
       Oval_constr (tree_of_name name, args)
 
-    (* The user-defined printers. Also used for some builtin types. *)
-
-    type printer =
-      | Simple of Types.type_expr * (O.t -> Outcometree.out_value)
-      | Generic of Path.t * (int -> (int -> O.t -> Outcometree.out_value,
-                                     O.t -> Outcometree.out_value) gen_printer)
-
-    let printers = ref ([
-      ( Pident(Ident.create_local "print_int"),
-        Simple (Predef.type_int,
-                (fun x -> Oval_int (O.obj x : int))) );
-      ( Pident(Ident.create_local "print_float"),
-        Simple (Predef.type_float,
-                (fun x -> Oval_float (O.obj x : float))) );
-      ( Pident(Ident.create_local "print_char"),
-        Simple (Predef.type_char,
-                (fun x -> Oval_char (O.obj x : char))) );
-      ( Pident(Ident.create_local "print_int32"),
-        Simple (Predef.type_int32,
-                (fun x -> Oval_int32 (O.obj x : int32))) );
-      ( Pident(Ident.create_local "print_nativeint"),
-        Simple (Predef.type_nativeint,
-                (fun x -> Oval_nativeint (O.obj x : nativeint))) );
-      ( Pident(Ident.create_local "print_int64"),
-        Simple (Predef.type_int64,
-                (fun x -> Oval_int64 (O.obj x : int64)) ))
-    ] : (Path.t * printer) list)
-
-    let exn_printer path ppf exn =
-      Format_doc.fprintf ppf "<printer %a raised an exception: %s>"
-        Printtyp.Doc.path path
-        (Printexc.to_string exn)
-
     let out_exn path exn =
       Oval_printer (fun ppf -> exn_printer path ppf exn)
-
-    let user_printer path f ppf x =
-      Format_doc.deprecated_printer
-        (fun ppf ->
-           try f ppf x with
-           | exn -> Format_doc.compat1 exn_printer path ppf exn
-        )
-        ppf
-
-    let install_printer path ty fn =
-      let print_val ppf obj = user_printer path fn ppf obj in
-      let printer obj = Oval_printer (fun ppf -> print_val ppf obj) in
-      printers := (path, Simple (ty, printer)) :: !printers
-
-    let install_generic_printer function_path constr_path fn =
-      printers := (function_path, Generic (constr_path, fn))  :: !printers
-
-    let install_generic_printer' function_path ty_path fn =
-      let rec build gp depth =
-        match gp with
-        | Zero fn ->
-            let out_printer obj =
-              let printer ppf = user_printer function_path fn ppf obj in
-              Oval_printer printer in
-            Zero out_printer
-        | Succ fn ->
-            let print_val fn_arg =
-              let print_arg ppf o =
-                !Oprint.out_value ppf (fn_arg (depth+1) o) in
-              build (fn print_arg) depth in
-            Succ print_val in
-      printers := (function_path, Generic (ty_path, build fn)) :: !printers
-
-    let remove_printer path =
-      let rec remove = function
-      | [] -> raise Not_found
-      | ((p, _) as printer) :: rem ->
-          if Path.same p path then rem else printer :: remove rem in
-      printers := remove !printers
 
     (* Print a constructor or label, giving it the same prefix as the type
        it comes from. Attempt to omit the prefix if the type comes from
@@ -306,9 +299,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         decr printer_steps;
         if !printer_steps < 0 || depth < 0 then Oval_ellipsis
         else begin
-        try
-          find_printer depth env ty obj
-        with Not_found ->
+        match find_user_printer depth env ty with
+        | user_printer ->
+           begin match O.obj obj with
+           | Ok v -> user_printer v
+           | Error msg -> Oval_stuff msg
+           end
+        | exception Not_found ->
           match get_desc ty with
           | Tvar _ | Tunivar _ ->
               Oval_stuff "<poly>"
@@ -332,16 +329,17 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
               | Tconstr(path, [], _)
                   when Path.same path Predef.path_string ->
-                Oval_string ((O.obj obj : string), !printer_steps, Ostr_string)
+                Oval_string ((O.base_obj obj : string),
+                             !printer_steps, Ostr_string)
 
               | Tconstr (path, [], _)
                   when Path.same path Predef.path_bytes ->
-                let s = Bytes.to_string (O.obj obj : bytes) in
+                let s = Bytes.to_string (O.base_obj obj : bytes) in
                 Oval_string (s, !printer_steps, Ostr_bytes)
 
               | Tconstr(path, [], _)
                   when Path.same path Predef.path_floatarray ->
-                Oval_floatarray (O.obj obj : floatarray)
+                Oval_floatarray (O.base_obj obj : floatarray)
 
               | Tconstr (path, [ty_arg], _)
                 when Path.same path Predef.path_lazy_t ->
@@ -483,7 +481,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           if unbx then Cstr_unboxed
           else if O.is_block obj
           then Cstr_block(O.tag obj)
-          else Cstr_constant(O.obj obj) in
+          else Cstr_constant(O.base_obj obj) (* immediate *) in
         match Datarepr.find_constr_by_tag tag constr_list with
         | exception Datarepr.Constr_not_found ->
             Oval_stuff "<unknown constructor>"
@@ -562,7 +560,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       and tree_of_polyvariant depth obj row =
         if O.is_block obj then
-          let tag : int = O.obj (O.field obj 0) in
+          let tag : int = O.base_obj (O.field obj 0) in
           let rec find = function
             | (l, f) :: fields ->
                 if Btype.hash_variant l = tag then
@@ -577,7 +575,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             | [] -> Oval_stuff "<variant>" in
           find (row_fields row)
         else
-          let tag : int = O.obj obj in
+          let tag : int = O.base_obj obj in
           let rec find = function
             | (l, _) :: fields ->
                 if Btype.hash_variant l = tag then
@@ -620,7 +618,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         if O.tag bucket <> 0 then bucket
         else O.field bucket 0
       in
-      let name = (O.obj(O.field slot 0) : string) in
+      let name = (O.base_obj (O.field slot 0) : string) in
       try
         (* Attempt to recover the constructor description for the exn
            from its name *)
@@ -668,28 +666,35 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     and instantiate_types env type_params ty_list args =
       List.map (instantiate_type env type_params ty_list) args
 
-    and find_printer depth env ty =
+    and find_user_printer depth env ty : Obj.t -> _ =
       let rec find = function
       | [] -> raise Not_found
-      | (_name, Simple (sch, printer)) :: remainder ->
+      | (_name, User_printer.Simple (sch, printer)) :: remainder ->
           if Ctype.is_moregeneral env false sch ty
           then printer
           else find remainder
-      | (_name, Generic (path, fn)) :: remainder ->
+      | (_name, User_printer.Generic (path, fn)) :: remainder ->
           begin match get_desc (Ctype.expand_head env ty) with
           | Tconstr (p, args, _) when Path.same p path ->
               begin try apply_generic_printer path (fn depth) args
               with exn -> (fun _obj -> out_exn path exn) end
           | _ -> find remainder end in
-      find !printers
+      find (User_printer.get_printers ())
 
-    and apply_generic_printer path printer args =
+    and apply_generic_printer
+      path (printer : _ User_printer.gen) args : Obj.t -> _ =
       match (printer, args) with
       | (Zero fn, []) ->
-          (fun (obj : O.t)-> try fn obj with exn -> out_exn path exn)
+          (fun obj -> try fn obj with exn -> out_exn path exn)
       | (Succ fn, arg :: args) ->
-          let printer = fn (fun depth obj -> tree_of_val depth obj arg) in
-          apply_generic_printer path printer args
+           let printer =
+             fn (fun depth obj ->
+                 (* user printers receive a whole Obj.t value, but the printers
+                    they call on their arguments is [tree_of_val],
+                    which expects a possibly-remote O.t value. *)
+                 let obj : O.t = O.repr (obj : Obj.t) in
+                 tree_of_val depth obj arg) in
+           apply_generic_printer path printer args
       | _ ->
           (fun _obj ->
             let printer ppf =

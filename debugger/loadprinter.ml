@@ -102,23 +102,22 @@ let eval_value_path env path =
         with Symtable.Error(Symtable.Undefined_global global) ->
           let s = Symtable.Global.name global in
           raise (Error (`Unavailable_module(s, lid))) in
-      let print_with_fallback ppf f remote_val =
-        try
-          f (Debugcom.Remote_value.obj remote_val)
-        with
-          Debugcom.Marshalling_error ->
-            fprintf ppf "<cannot fetch remote object>" in
       match kind with
       | Topprinters.Old ty_arg ->
-          let print_function ppf remote_val =
-            print_with_fallback ppf (Obj.obj v) remote_val in
-          Printval.install_printer path ty_arg print_function
+          Printval.install_printer path ty_arg
+            (fun _ppf -> (Obj.obj v : Obj.t -> unit))
       | Topprinters.Simple ty_arg ->
-          let print_function ppf remote_val =
-            print_with_fallback ppf (Obj.obj v ppf) remote_val in
-          Printval.install_printer path ty_arg print_function
-      | Topprinters.Generic _ ->
-          raise (Error (`Wrong_type lid))
+          Printval.install_printer path ty_arg
+            (Obj.obj v : Format.formatter -> Obj.t -> unit)
+      | Topprinters.Generic { ty_path ; arity } ->
+          let rec build v = function
+            | 0 ->
+                Genprintval.User_printer.Zero
+                  (Obj.obj v : Format.formatter -> Obj.t -> unit)
+            | n ->
+                Genprintval.User_printer.Succ
+                  (fun fn -> build ((Obj.obj v : _ -> Obj.t) fn) (n - 1)) in
+          Printval.install_printer_generic_format path ty_path (build v arity)
 
 let remove_printer lid =
   match Topprinters.find_printer Env.empty lid with
