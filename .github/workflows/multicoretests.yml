@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: ocaml/dune
-          ref: 3.18.0
+          ref: 3.18.2
           path: dune
           persist-credentials: false
       - name: Build and install dune
