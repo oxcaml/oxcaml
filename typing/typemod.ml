@@ -437,7 +437,7 @@ let params_are_constrained =
   loop
 
 module Merge = struct
-  (* This module hosts the functions dealing with signature constraints. There
+  (** This module hosts the functions dealing with signature constraints. There
      are of three forms :
      - type constraint [... with type t = ... ], handled by [merge_type]
      - module constraint [... with module X = ... ], handled by [merge_module]
@@ -479,20 +479,17 @@ module Merge = struct
 
   *)
 
-  (* Helpers *)
-
   (** For the merging of type fields [S with type P.t = tdecl], the typedtree
       for the right-hand side type declaration [tdecl] is built at the point of
       the (possibly deep) constrained item [P.t] inside [S]. It is returned as
       an extra payload by merge. Other cases (module, module types) don't use
-      the payload mechanism (the payload is [()]). *)
+      the payload mechanism (the payload is then [()]). *)
 
-  let return_payload ~ghosts ~replace_by ?(paths=[]) path ~late_typedtree =
+  let return_payload ~ghosts ~replace_by ~late_typedtree ?(paths=[]) path =
     Some ((path, path::paths, late_typedtree),
           {Signature_group.ghosts; replace_by})
 
   let return = return_payload ~late_typedtree:()
-
 
   let split_row_id s ghosts =
     let srow = s ^ "#row" in
@@ -515,8 +512,9 @@ module Merge = struct
         let error = With_cannot_remove_packed_modtype(p,mty) in
         raise (Error(loc,initial_env,error))
 
-  (* After the item has been patch, post processing does the actual destructive
-     substitution and checks wellformedness of the resulting signature *)
+  (* After the item has been patched, post processing does the actual
+     destructive substitution and checks wellformedness of the resulting
+     signature *)
   let post_process ~destructive loc lid env paths sg replace =
     let sg =
       if destructive then
@@ -564,8 +562,8 @@ module Merge = struct
         begin
           match md.md_type, destructive with
           | Mty_alias _, false ->
-              (* Deep substitutions inside aliases are checked, but do not
-                 change the resulting signature *)
+              (* Deep non-destructive substitutions inside aliases are checked,
+                 but do not change the resulting signature *)
               return_payload ~ghosts
                 ~replace_by:(Some current_item) path ~late_typedtree
           | _, _ ->
@@ -582,13 +580,19 @@ module Merge = struct
     let names = Longident.flatten lid.txt in
     merge_signature ~patch ~destructive initial_env env sg names loc lid
 
-  (* sg with type lid = sdecl *)
+  (* merge functions *)
+
+  (** Type constraint [sg with type lid = sdecl]
+
+      - [sdecl] is a parse tree, it will be translated into a typed tree [tdecl]
+      at the point of the constrained item (at [lid]), and returned via the
+      [late_typedtree] mechanism. It is then returned along the merged
+      signature *)
   let merge_type ~destructive env loc sg lid sdecl =
     let patch item s sig_env sg_for_env ~ghosts =
       match item, sdecl.ptype_kind with
       | Sig_type(id, decl, rs, priv), Ptype_abstract
         when Ident.name id = s && Typedecl.is_fixed_type sdecl ->
-
           let decl_row =
             let arity = List.length sdecl.ptype_params in
             {
@@ -688,8 +692,11 @@ module Merge = struct
     let sg = post_process ~destructive loc lid env paths sg replace in
     (tdecl, (path, lid, sg))
 
-  (* [sg with module lid = path] *)
-  (* md' is the module type of the module at [path], used for equiv checks *)
+  (** Module constraint [sg with module lid = path]
+
+      - [md'] is the module type of the module at [path], used for equivalence
+      checks
+  *)
   let merge_module ~destructive env loc sg lid
       (md': Types.module_declaration) path remove_aliases =
     let patch item s sig_env sg_for_env ~ghosts =
@@ -723,7 +730,11 @@ module Merge = struct
     let sg = post_process ~destructive loc lid env paths sg replace in
     real_path, lid, sg
 
-  (* [sg with module type lid = mty] *)
+  (** Module type constraint [sg with module type lid = mty]
+
+      - [~approx] is used to disable equivalence checking when merging module
+      types inside recursive module definitions
+  *)
   let merge_modtype ?(approx=false) ~destructive env loc sg lid mty =
     let patch item s sig_env sg_for_env ~ghosts = match item with
       | Sig_modtype(id, mtd, priv)
@@ -756,7 +767,8 @@ module Merge = struct
     let sg = post_process ~destructive loc lid env paths sg replace in
     path, lid, sg
 
-  (* sg with type lid = cty (inside a first class module type) *)
+  (** Type constraints inside a first class module type [(module sg with type
+      lid = cty)] *)
   let merge_package env loc sg lid cty =
     let patch item s sig_env sg_for_env ~ghosts = match item with
       | Sig_type(id, sig_decl, rs, priv)
