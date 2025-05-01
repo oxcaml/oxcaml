@@ -543,6 +543,8 @@ module Merge = struct
     with
     | Some ((p, paths, late_typedtree), sg) -> p, paths, late_typedtree, sg
     | None -> raise(Error(loc, initial_env, With_no_component lid.txt))
+    | exception Includemod.Error explanation ->
+      raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
 
   and patch_deep_item ~ghosts ~patch ~destructive
       namelist initial_env (env: Env.t) outer_sg loc lid item =
@@ -578,10 +580,7 @@ module Merge = struct
   let merge ~patch ~destructive env sg loc lid =
     let initial_env = env in
     let names = Longident.flatten lid.txt in
-    try
-      merge_signature ~patch ~destructive initial_env env sg names loc lid
-    with Includemod.Error explanation ->
-      raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
+    merge_signature ~patch ~destructive initial_env env sg names loc lid
 
   (* sg with type lid = sdecl *)
   let merge_type ~destructive env loc sg lid sdecl =
