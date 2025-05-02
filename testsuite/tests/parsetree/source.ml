@@ -7520,3 +7520,8 @@ type t = String.( t )
 
 (* Utf8 identifier *)
 let là = function ça -> ça
+
+(* PR #14008 *)
+let () =
+  (let module M = N in ());
+  (let open M in ())
