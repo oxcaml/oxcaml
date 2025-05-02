@@ -1022,7 +1022,7 @@ void caml_compact_heap(caml_domain_state* domain_state,
   caml_gc_log("Compacting heap start");
   CAML_EV_BEGIN(EV_COMPACT);
   /* Warning: caml_compact_heap must only be called from
-     [cycle_all_domains_callback] in major_gc.c as there are
+     [stw_cycle_all_domains] in major_gc.c as there are
      very specific conditions the compaction algorithm expects.
 
     The following code implements a compaction algorithm that is similar to
