@@ -817,7 +817,7 @@ and expression ctxt f x =
         paren true (expression reset_ctxt) f x
     | Pexp_ifthenelse _ | Pexp_sequence _ when ctxt.ifthenelse ->
         paren true (expression reset_ctxt) f x
-    | Pexp_let _ | Pexp_letop _
+    | Pexp_let _ | Pexp_letop _ | Pexp_struct_item _
         when ctxt.semi ->
         paren true (expression reset_ctxt) f x
     | Pexp_newtype (lid, e) ->
