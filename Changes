@@ -39,6 +39,11 @@ Working version
 
 ### Internal/compiler-libs changes:
 
+- #13839, #14008: Reimplement `let open`, `let module` and `let exception` in
+  terms of a single construct.
+  (Nicolás Ojeda Bär, review by Gabriel Scherer, Samuel Vivien, Ulysse Gérard
+  and Vincent Laviron)
+
 ### Build system:
 
 ### Bug fixes:
@@ -464,11 +469,6 @@ OCaml 5.4.0
   (Florian Angeletti, review by Gabriel Scherer)
 
 ### Internal/compiler-libs changes:
-
-- #13839: Reimplement `let open`, `let module` and `let exception` in terms of a
-  single construct.
-  (Nicolás Ojeda Bär, review by Gabriel Scherer, Samuel Vivien, Ulysse Gérard
-  and Vincent Laviron)
 
 - #13314: Comment the code of Translclass
   (Vincent Laviron and Nathanaëlle Courant, review by Olivier Nicole)
