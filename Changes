@@ -11,10 +11,6 @@ Working version
 
 ### Standard library:
 
-- #13909: Add `Dynarray.unsafe_to_iarray`
-  (Olivier Nicole, review by Daniel Bünzli, Stefan Muenzel and Gabriel Scherer,
-  request by Daniel Bünzli)
-
 ### Other libraries:
 
 ### Tools:
@@ -314,6 +310,10 @@ OCaml 5.4.0
 
 - #13859: Fix Weak.get_copy not darkening custom blocks
   (Josh Berdine, review by Stephen Dolan)
+
+- #13909: Add `Dynarray.unsafe_to_iarray`
+  (Olivier Nicole, review by Daniel Bünzli, Stefan Muenzel and Gabriel Scherer,
+  request by Daniel Bünzli)
 
 - #13932: Add List.singleton and Seq.singleton
   (David Allsopp, tariffs applied by Nicolás Ojeda Bär and Gabriel Scherer)
