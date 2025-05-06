@@ -7,8 +7,6 @@ Working version
 
 ### Runtime system:
 
-- #14015: Fix memory corruption when an exception is raised during demarshaling.
-
 ### Code generation and optimizations:
 
 ### Standard library:
@@ -677,6 +675,10 @@ OCaml 5.4.0
 
 - #13928, #13944: Fix handling of excessively nested unboxed types
   (Vincent Laviron, review by Gabriel Scherer)
+
+- #14007, #14015: Fix memory corruption when an exception is raised during
+  demarshaling.
+  (Benoît Vaugon, review by David Allsopp and Gabriel Scherer)
 
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
