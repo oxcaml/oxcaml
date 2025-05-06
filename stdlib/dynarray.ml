@@ -154,15 +154,23 @@ module Dummy : sig
       int -> (int -> 'a) -> dummy:'stamp dummy ->
       ('a, 'stamp) with_dummy array
 
-    val copy : 'a array -> dummy:'stamp dummy -> ('a, 'stamp) with_dummy array
+    val copy_from_array :
+      'a array -> dummy:'stamp dummy -> ('a, 'stamp) with_dummy array
 
-    val unsafe_nocopy :
-      'a array -> dummy:'stamp dummy ->
-      ('a, 'stamp) with_dummy array
+    val unsafe_nocopy_from_array :
+      'a array -> dummy:'stamp dummy -> ('a, 'stamp) with_dummy array
     (** [unsafe_nocopy] assumes that the input array was created
         locally and will not be used anymore (in the spirit of
         [Bytes.unsafe_to_string]), and avoids a copy of the input
         array when possible. *)
+
+    exception Dummy_found of int
+
+    val unsafe_nocopy_to_array :
+      ('a, 'stamp) with_dummy array -> dummy:'stamp dummy -> 'a array
+    (** Assumes, without checking, that the input array was created locally and
+        will not be used anymore. Performs no copy except when the elements are
+        floats. Raises [Dummy_found i] if there is a dummy at any index [i]. *)
 
     val blit_array :
       'a array -> int ->
@@ -241,7 +249,7 @@ end = struct
         arr
       end
 
-    let copy a ~dummy =
+    let copy_from_array a ~dummy =
       if Obj.(tag (repr a) <> double_array_tag) then
         Array.copy a
       else begin
@@ -254,10 +262,30 @@ end = struct
         arr
       end
 
-    let unsafe_nocopy a ~dummy =
+    let unsafe_nocopy_from_array a ~dummy =
       if Obj.(tag (repr a) <> double_array_tag) then
         a
-      else copy a ~dummy
+      else copy_from_array a ~dummy
+
+    exception Dummy_found of int
+
+    let unsafe_nocopy_to_array a ~dummy =
+      let arr =
+        if Array.length a = 0 || Obj.(tag (repr a.(0)) <> double_tag) then
+          a
+        else begin
+          let n = Array.length a in
+          let a' = Array.make n a.(0) in
+          for i = 1 to n - 1 do
+            Array.unsafe_set a' i (unsafe_get (Array.unsafe_get a i))
+          done;
+          a'
+        end
+      in
+      Array.iteri
+        (fun i v -> if is_dummy v dummy then raise (Dummy_found i))
+        arr;
+      arr
 
     let init n f ~dummy =
       let arr = Array.make n (of_dummy dummy) in
@@ -1156,7 +1184,7 @@ let compare cmp a1 a2 =
 let of_array a =
   let length = Array.length a in
   let Dummy.Fresh dummy = global_dummy in
-  let arr = Dummy.Array.copy a ~dummy in
+  let arr = Dummy.Array.copy_from_array a ~dummy in
   Pack {
     length;
     arr;
@@ -1176,7 +1204,7 @@ let of_list li =
   let a = Array.of_list li in
   let length = Array.length a in
   let Dummy.Fresh dummy = global_dummy in
-  let arr = Dummy.Array.unsafe_nocopy a ~dummy in
+  let arr = Dummy.Array.unsafe_nocopy_from_array a ~dummy in
   Pack {
     length;
     arr;
@@ -1247,3 +1275,27 @@ let to_seq_rev_reentrant a =
     end
   in
   aux (length a - 1)
+
+external unsafe_iarray_of_array : 'a array -> 'a iarray = "%opaque"
+
+let unsafe_to_iarray ~capacity (f : 'a t -> unit) =
+  let a = create () in
+  set_capacity a capacity;
+  f a;
+  let Pack {arr; length; dummy} = a in
+  reset a;
+  (* At this point further updates to [a] (from this domain) will not mutate
+     [arr]. *)
+  let capacity = Array.length arr in
+  check_valid_length length arr;
+  let values : ('a, _) Dummy.with_dummy array =
+    if length = capacity then
+      arr
+    else (* length < capacity: make a copy *)
+      Dummy.Array.prefix arr length
+  in
+  let values : 'a array =
+    try Dummy.Array.unsafe_nocopy_to_array ~dummy values
+    with Dummy.Array.Dummy_found i -> Error.missing_element ~i ~length
+  in
+  unsafe_iarray_of_array values
