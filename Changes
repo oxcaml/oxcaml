@@ -44,6 +44,12 @@ Working version
   (Nicolás Ojeda Bär, review by Gabriel Scherer, Samuel Vivien, Ulysse Gérard
   and Vincent Laviron)
 
+- #13911: Refactor the merging of signature constraints, by splitting the
+  monolithic merge function into separate, specialized functions (for merging
+  types, modules and module types) - sharing only the recursive part for
+  handling deep constraints.
+  (Clement Blaudeau, review by Florian Angeletti and Samuel Vivien)
+
 ### Build system:
 
 ### Bug fixes:
