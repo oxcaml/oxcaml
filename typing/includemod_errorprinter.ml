@@ -273,7 +273,7 @@ let print_out_mode
 : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> a -> _
 = fun ax mode ->
   let (module L) = Mode.Value.Const.lattice_of_axis ax in
-  Format.dprintf " /* at %a */" L.print mode
+  Format.dprintf " @@ %a" L.print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with
@@ -727,7 +727,7 @@ let subcase_list l ppf = match l with
 let core env id x =
   match x with
   | Err.Value_descriptions {symptom = Modality e} ->
-      Format.dprintf "@[<v>@[<hv>%s:@;%a@]@]"
+      Format.dprintf "@[<hv>%s:@;%a@]"
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Value_descriptions diff ->
@@ -747,7 +747,7 @@ let core env id x =
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
   | Err.Modalities e ->
-      Format.dprintf "@[<v>@[<hv>%s:@;%a@]@]"
+      Format.dprintf "@[<hv>%s:@;%a@]"
         ("Modalities on " ^ (Ident.name id) ^ " do not match")
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Type_declarations diff ->
