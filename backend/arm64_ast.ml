@@ -30,6 +30,17 @@ module Neon_reg_name = struct
       | V1D -> "1D"
       | V2D -> "2D"
 
+    let num_lanes t =
+      match t with
+      | V8B -> 8
+      | V16B -> 16
+      | V4H -> 4
+      | V8H -> 8
+      | V2S -> 2
+      | V4S -> 4
+      | V1D -> 1
+      | V2D -> 2
+
     let name t index = Printf.sprintf "V%d.%s" index (to_string t)
   end
 
@@ -41,24 +52,75 @@ module Neon_reg_name = struct
       | D
       | Q
 
+    let num_lanes t = match t with B -> 16 | H -> 8 | S -> 4 | D -> 2 | Q -> 1
+
     let to_string t =
       match t with B -> "b" | H -> "h" | S -> "s" | D -> "d" | Q -> "q"
 
     let name t index = Printf.sprintf "%s%d" (to_string t) index
   end
 
+  module Lane = struct
+    (** Support representation with and without the optional number of lanes, for
+        example Vn.4S[1] and Vn.S[1]. *)
+    type r =
+      | V of Vector.t
+      | S of Scalar.t
+
+    type t =
+      { r : r;
+        lane : int
+      }
+
+    let num_lanes r =
+      match r with V v -> Vector.num_lanes v | S s -> Scalar.num_lanes s
+
+    let check_index t =
+      let last = num_lanes t.r - 1 in
+      check_index 0 last t.lane
+
+    let name t index =
+      let suffix =
+        match t.r with V v -> Vector.to_string v | S s -> Scalar.to_string s
+      in
+      Printf.sprintf "V%d.%s[%d]" index suffix t.lane
+  end
+
+  module Struct_lane = struct
+    type t =
+      { r : Scalar.t;
+        lane : int
+      }
+
+    let check_index t =
+      let last = Scalar.num_lanes t.r - 1 in
+      check_index 0 last t.lane
+
+    let name t index =
+      Printf.sprintf "{V%d.%s}[%d]" index (Scalar.to_string t.r) t.lane
+  end
+
   type t =
     | Vector of Vector.t
     | Scalar of Scalar.t
+    | Lane of Lane.t
+    | Struct_lane of Struct_lane.t
 
   let last = 31
 
-  let check_index _t index = check_index 0 last index
+  let check_index t index =
+    check_index 0 last index;
+    match t with
+    | Vector _ | Scalar _ -> ()
+    | Lane l -> Lane.check_index l
+    | Struct_lane l -> Struct_lane.check_index l
 
   let name t index =
     match t with
     | Vector v -> Vector.name v index
     | Scalar s -> Scalar.name s index
+    | Lane l -> Lane.name l index
+    | Struct_lane l -> Struct_lane.name l index
 end
 
 (* General-purpose register description *)
@@ -140,6 +202,14 @@ module Reg = struct
   let reg_q_array =
     reg_array ~last:Neon_reg_name.last (Reg_name.Neon (Neon_reg_name.Scalar Q))
 
+  let reg_v2s_array =
+    reg_array ~last:Neon_reg_name.last
+      (Reg_name.Neon (Neon_reg_name.Vector V2S))
+
+  let reg_v4s_array =
+    reg_array ~last:Neon_reg_name.last
+      (Reg_name.Neon (Neon_reg_name.Vector V4S))
+
   let reg_v2d_array =
     reg_array ~last:Neon_reg_name.last
       (Reg_name.Neon (Neon_reg_name.Vector V2D))
@@ -151,6 +221,14 @@ module Reg = struct
   let reg_v16b_array =
     reg_array ~last:Neon_reg_name.last
       (Reg_name.Neon (Neon_reg_name.Vector V16B))
+
+  let reg_v8h_array =
+    reg_array ~last:Neon_reg_name.last
+      (Reg_name.Neon (Neon_reg_name.Vector V8H))
+
+  let reg_v4h_array =
+    reg_array ~last:Neon_reg_name.last
+      (Reg_name.Neon (Neon_reg_name.Vector V4H))
 
   (* for special GP registers we use the last index *)
   let sp = create (GP SP) GP_reg_name.last
@@ -292,8 +370,8 @@ module Instruction_name = struct
     | MUL
     | DIV
     | AND
-    | OR
-    | XOR
+    | ORR
+    | EOR
     | LSL
     | LSR
     | ASR
@@ -303,8 +381,10 @@ module Instruction_name = struct
     | CNT
     | SMULH
     | UMULH
-    | ORR
-    | EOR
+    | SQADD
+    | UQADD
+    | SQSUB
+    | UQSUB
     | B
     | BR
     | B_cond of Cond.t
@@ -368,15 +448,22 @@ module Instruction_name = struct
     | FNMSUB
     | FNEG
     | FABS
+    | ABS
     | FSQRT
     | FCVT
     | FCVTZS
     | FCVTNS
     | SCVTF
+    | FCVTL
+    | FCVTN
     | FRINT of Rounding_mode.t
     | FRINT64 of Rounding_mode.t
     | FMIN
     | FMAX
+    | SMIN
+    | SMAX
+    | UMIN
+    | UMAX
     | ZIP1
     | ZIP2
     | FCMP
@@ -384,10 +471,33 @@ module Instruction_name = struct
     | FRECPE
     | FRSQRTE
     | FADDP
+    | ADDP
     | FCM of Float_cond.t
     | CM of Cond.t
-    | FCVTL
     | ADDV
+    | MVN
+    | NEG
+    | SMOV
+    | LD1
+    | SHL
+    | USHL
+    | SSHL
+    | USHR
+    | SSHR
+    | SXTL
+    | UXTL
+    | XTN
+    | XTN2
+    | UQXTN
+    | UQXTN2
+    | SQXTN
+    | SQXTN2
+    | DUP
+    | EXT
+    | SMULL
+    | SMULL2
+    | UMULL
+    | UMULL2
 
   (* CR gyorsh: can some of this be automatically generated from the type? *)
   let to_string t =
@@ -398,8 +508,8 @@ module Instruction_name = struct
     | MUL -> "mul"
     | DIV -> "div"
     | AND -> "and"
-    | OR -> "or"
-    | XOR -> "xor"
+    | ORR -> "orr"
+    | EOR -> "eor"
     | LSL -> "lsl"
     | LSR -> "lsr"
     | ASR -> "asr"
@@ -409,8 +519,10 @@ module Instruction_name = struct
     | CNT -> "cnt"
     | SMULH -> "smulh"
     | UMULH -> "umulh"
-    | ORR -> "orr"
-    | EOR -> "eor"
+    | SQADD -> "sqadd"
+    | UQADD -> "uqadd"
+    | SQSUB -> "sqsub"
+    | UQSUB -> "uqsub"
     | B -> "b"
     | BR -> "br"
     | B_cond c -> "b." ^ Cond.to_string c
@@ -474,15 +586,21 @@ module Instruction_name = struct
     | FNMSUB -> "fnmsub"
     | FNEG -> "fneg"
     | FABS -> "fabs"
+    | ABS -> "abs"
     | FSQRT -> "fsqrt"
     | FCVT -> "fcvt"
     | FCVTZS -> "fcvtzs"
     | FCVTNS -> "fcvtns"
     | SCVTF -> "scvtf"
+    | FCVTN -> "fcvtn"
     | FRINT rm -> "frint" ^ Rounding_mode.to_string rm
     | FRINT64 rm -> "frint64" ^ Rounding_mode.to_string rm
     | FMIN -> "fmin"
     | FMAX -> "fmax"
+    | SMIN -> "smin"
+    | SMAX -> "smax"
+    | UMIN -> "umin"
+    | UMAX -> "umax"
     | ZIP1 -> "zip1"
     | ZIP2 -> "zip2"
     | FCMP -> "fcmp"
@@ -490,10 +608,34 @@ module Instruction_name = struct
     | FRECPE -> "frecpe"
     | FRSQRTE -> "frsqrte"
     | FADDP -> "faddp"
+    | ADDP -> "addp"
     | FCM cond -> "fcm" ^ Float_cond.to_string cond
     | CM cond -> "cm" ^ Cond.to_string cond
     | FCVTL -> "fcvtl"
     | ADDV -> "addv"
+    | MVN -> "mvn"
+    | NEG -> "neg"
+    | SMOV -> "smov"
+    | LD1 -> "ld1"
+    | SHL -> "shl"
+    | USHL -> "ushl"
+    | SSHL -> "sshl"
+    | USHR -> "ushr"
+    | SSHR -> "sshr"
+    | SXTL -> "sxtl"
+    | UXTL -> "uxtl"
+    | XTN -> "xtn"
+    | XTN2 -> "xtn2"
+    | UQXTN -> "uqxtn"
+    | UQXTN2 -> "uqxtn2"
+    | SQXTN -> "sqxtn"
+    | SQXTN2 -> "sqxtn2"
+    | DUP -> "dup"
+    | EXT -> "ext"
+    | SMULL -> "smull"
+    | SMULL2 -> "smull2"
+    | UMULL -> "umull"
+    | UMULL2 -> "umull2"
 end
 
 module Symbol = struct
@@ -672,11 +814,19 @@ module Operand = struct
 
   let reg_q = Array.map (fun x -> Reg x) Reg.reg_q_array
 
+  let reg_v2s = Array.map (fun x -> Reg x) Reg.reg_v2s_array
+
+  let reg_v4s = Array.map (fun x -> Reg x) Reg.reg_v4s_array
+
   let reg_v2d = Array.map (fun x -> Reg x) Reg.reg_v2d_array
 
   let reg_v8b = Array.map (fun x -> Reg x) Reg.reg_v8b_array
 
   let reg_v16b = Array.map (fun x -> Reg x) Reg.reg_v16b_array
+
+  let reg_v8h = Array.map (fun x -> Reg x) Reg.reg_v8h_array
+
+  let reg_v4h = Array.map (fun x -> Reg x) Reg.reg_v4h_array
 end
 
 module Instruction = struct
@@ -801,17 +951,52 @@ module DSL = struct
 
   let shift ~kind ~amount = Operand.Shift { kind; amount }
 
-  let reg_v2s index =
-    Operand.Reg (Reg.create (Reg_name.Neon (Vector V2S)) index)
+  let reglane index ~lane r =
+    let reg_name = Reg_name.(Neon Neon_reg_name.(Lane { r; lane })) in
+    Operand.Reg (Reg.create reg_name index)
 
-  let reg_v4s index =
-    Operand.Reg (Reg.create (Reg_name.Neon (Vector V4S)) index)
+  let reglane_v4s index ~lane =
+    let r = Neon_reg_name.(Lane.V Vector.V4S) in
+    reglane index ~lane r
+
+  let reglane_v2d index ~lane =
+    let r = Neon_reg_name.(Lane.V Vector.V2D) in
+    reglane index ~lane r
+
+  let reglane_b index ~lane =
+    let r = Neon_reg_name.(Lane.S Scalar.B) in
+    reglane index ~lane r
+
+  let reglane_h index ~lane =
+    let r = Neon_reg_name.(Lane.S Scalar.H) in
+    reglane index ~lane r
+
+  let reglane_s index ~lane =
+    let r = Neon_reg_name.(Lane.S Scalar.S) in
+    reglane index ~lane r
+
+  let reglane_d index ~lane =
+    let r = Neon_reg_name.(Lane.S Scalar.D) in
+    reglane index ~lane r
+
+  let struct_reglane_d index ~lane =
+    let r = Neon_reg_name.Scalar.D in
+    let reg_name = Reg_name.(Neon Neon_reg_name.(Struct_lane { r; lane })) in
+    Operand.Reg (Reg.create reg_name index)
+
+  let reg_v2s index = Operand.reg_v2s.(index)
+
+  let reg_v4s index = Operand.reg_v4s.(index)
 
   let reg_v2d index = Operand.reg_v2d.(index)
 
+  let reg_v8b index = Operand.reg_v8b.(index)
+
   let reg_v16b index = Operand.reg_v16b.(index)
 
-  let reg_v8b index = Operand.reg_v8b.(index)
+  let reg_v8h index = Operand.reg_v8h.(index)
+
+  let reg_v4h index = Operand.reg_v4h.(index)
 
   let reg_b index = Operand.reg_b.(index)
 

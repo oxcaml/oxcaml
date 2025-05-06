@@ -184,8 +184,8 @@ let select_operation_sse2 op args =
     instr cmppd ~i args
   | "caml_sse2_cvt_int32x4_float64x2" -> instr cvtdq2pd args
   | "caml_sse2_cvt_int32x4_float32x4" -> instr cvtdq2ps args
-  | "caml_sse2_cvt_float64x2_int32x4" -> instr cvtpd2dq args
-  | "caml_sse2_cvt_float64x2_float32x4" -> instr cvtpd2ps args
+  | "caml_sse2_cvt_float64x2_int32x2" -> instr cvtpd2dq args
+  | "caml_sse2_cvt_float64x2_float32x2" -> instr cvtpd2ps args
   | "caml_sse2_cvt_float32x4_int32x4" -> instr cvtps2dq args
   | "caml_sse2_cvt_float32x4_float64x2" -> instr cvtps2pd args
   | "caml_sse2_cvt_int16x8_int8x16_saturating" -> instr packsswb args
