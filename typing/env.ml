@@ -2983,26 +2983,26 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
 
 (* Make the initial environment, without language extensions *)
 let initial =
-  Predef.build_initial_env
-    (add_type ~check:false)
-(* CR sspies: Fix this. *)
-(*= let (initial_safe_string, initial_unsafe_string) =
-  let added_types = Ident.Tbl.create 42 in
+  (* We collect all the type declarations that are added to the initial
+     environment in a table. *)
+  let added_types = Ident.Tbl.create 16 in
   let add_type (type_ident : Ident.t) decl env =
     Ident.Tbl.add added_types type_ident decl;
     add_type type_ident decl env ~check:false
   in
-  let ret = Predef.build_initial_env
-    (add_type) *)
-    (add_extension ~check:false ~rebind:false)
-    empty
-  (* in
+  let initial_env = Predef.build_initial_env
+                      add_type
+                      (add_extension ~check:false ~rebind:false)
+                      empty
+  in
+  (* We record the type declarations for the type shapes. *)
   Ident.Tbl.iter (fun type_ident decl ->
-    let (env : t) = fst ret in
-    let uid_of_path path = Some (find_type path env).type_uid in
-    Type_shape.add_to_type_decls (Pident type_ident) decl uid_of_path;
+    Type_shape.add_to_type_decls (Pident type_ident) decl (fun path ->
+      let type_in_env = find_type path initial_env in
+      Some type_in_env.type_uid
+    );
   ) added_types;
-  ret *)
+  initial_env
 
 let add_language_extension_types env =
   let add ext lvl f env  =

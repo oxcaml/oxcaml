@@ -4251,14 +4251,6 @@ let type_implementation target modulename initial_env ast =
             let shape = Shape_reduce.local_reduce Env.empty shape in
             let annots = Cmt_format.Implementation str in
             save_cmt_and_cms target annots initial_env None (Some shape));
-            (* CR sspies: Fix this. *)
-            (*= Cmt_format.save_cmt (outputprefix ^ ".cmt") modulename
-              annots (Some sourcefile) initial_env None (Some shape);
-            (match !Clflags.native_code with
-            | true -> ()
-            | false -> Cms_format.save_cms (outputprefix ^ ".cms") modulename
-              (Some sourcefile) (Some shape));
-            gen_annot outputprefix sourcefile annots); *)
           { structure = str;
             coercion;
             shape;
@@ -4310,14 +4302,6 @@ let type_implementation target modulename initial_env ast =
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
               save_cmt_and_cms target annots initial_env (Some cmi) (Some shape));
-              (* CR sspies: fix*)
-              (*= Cmt_format.save_cmt  (outputprefix ^ ".cmt") modulename
-                annots (Some sourcefile) initial_env (Some cmi) (Some shape);
-              (match !Clflags.native_code with
-               | true -> ()
-               | false -> Cms_format.save_cms  (outputprefix ^ ".cms") modulename
-                (Some sourcefile) (Some shape));
-              gen_annot outputprefix sourcefile annots) *)
           end;
           { structure = str;
             coercion;

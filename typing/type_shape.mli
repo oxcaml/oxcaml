@@ -74,3 +74,6 @@ val type_name :
 
 val attach_compilation_unit_to_paths :
   Type_decl_shape.t -> compilation_unit:Compilation_unit.t -> Type_decl_shape.t
+
+
+val compilation_unit_from_path : Path.t -> string option
