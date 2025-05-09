@@ -50,28 +50,6 @@ let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
         else
           SLDL.compile
             (SLDL.of_rvalue (SLDL.Rvalue.in_register ~dwarf_reg_number))
-        (* CR sspies: Fix this. *)
-        (*= if Option.is_some reg.part
-  then None
-  else
-    match reg.loc with
-    | Unknown ->
-      None
-      (* CR tnowak for mshinwell: this was throwing when compiling the compiler
-         Misc.fatal_errorf "Register without location: %a" Printmach.reg reg *)
-    | Reg n -> (
-      let dwarf_reg_number =
-        let reg_class = Proc.register_class reg in
-        let first_available_reg = Proc.first_available_register.(reg_class) in
-        let num_hard_regs = Proc.num_available_registers.(reg_class) in
-        let n = n - first_available_reg in
-        (* This [None] case isn't an error to cover situations such as used to
-           be found in the i386 backend where [num_available_registers] does not
-           extend to the end of the register arrays (in that case for the x87
-           top of stack register). *)
-        if n < 0 || n >= num_hard_regs
-        then None
-        else Some (Proc.dwarf_register_numbers ~reg_class).(n) *)
       in
       Some location_description)
   | Stack _ -> (

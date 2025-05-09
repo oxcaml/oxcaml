@@ -66,18 +66,6 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in
-  let debug_print_shapes_and_decls = false in
-  if debug_print_shapes_and_decls
-  then (
-    let to_map uid_tbl =
-      Shape.Uid.Tbl.to_list uid_tbl |> Shape.Uid.Map.of_list
-    in
-    Format.eprintf "all_type_decls=%a\n%!"
-      (Shape.Uid.Map.print Type_shape.Type_decl_shape.print)
-      (to_map Type_shape.all_type_decls);
-    Format.eprintf "all_type_shapes=%a\n%!"
-      (Shape.Uid.Map.print Type_shape.Type_shape.print)
-      (to_map Type_shape.all_type_shapes));
   { state;
     asm_directives;
     emitted = false;
