@@ -174,7 +174,7 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
         | Some provenance ->
           let die_reference =
             Dwarf_type.variable_to_die state
-              (Backend_var.Provenance.uid provenance)
+              (Backend_var.Provenance.debug_uid provenance)
               ~parent_proto_die
           in
           die_reference

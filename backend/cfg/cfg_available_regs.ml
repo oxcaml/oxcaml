@@ -237,13 +237,18 @@ module Transfer = struct
              to be available. *)
           for part_of_value = 0 to num_parts_of_value - 1 do
             let reg = regs.(part_of_value) in
-            (* CR tnowak for mshinwell: that's the if that made local variables
-               not appear if RD.Set.mem_reg forgetting_ident reg then *)
-            let regd =
-              RD.create ~reg ~holds_value_of:ident ~part_of_value
-                ~num_parts_of_value ~which_parameter ~provenance
-            in
-            avail_after := RD.Set.add regd (RD.Set.filter_reg !avail_after reg)
+            (* CR sspies: In the previous version of this PR, this conditional
+               has prevented DWARF information from being generated for local
+               variables. It currently seems to work reasonably well even with
+               this conditional, but further investigation is needed. *)
+            if RD.Set.mem_reg forgetting_ident reg
+            then
+              let regd =
+                RD.create ~reg ~holds_value_of:ident ~part_of_value
+                  ~num_parts_of_value ~which_parameter ~provenance
+              in
+              avail_after
+                := RD.Set.add regd (RD.Set.filter_reg !avail_after reg)
           done;
           Some (ok avail_before), ok !avail_after
         | Op (Move | Reload | Spill) ->
