@@ -57,6 +57,9 @@ Working version
   handling deep constraints.
   (Clement Blaudeau, review by Florian Angeletti and Samuel Vivien)
 
+- #14024: Fix unterminated-string-initialization warnings from the C compiler.
+  (Antonin Décimo, review by David Allsopp and Miod Vallat)
+
 ### Build system:
 
 ### Bug fixes:
