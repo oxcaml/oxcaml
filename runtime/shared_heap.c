@@ -146,7 +146,7 @@ static int move_all_pools(pool** src, _Atomic(pool*)* dst,
   return count;
 }
 
-void caml_teardown_shared_heap(struct caml_heap_state* heap) {
+void caml_orphan_shared_heap(struct caml_heap_state* heap) {
   int released = 0, released_large = 0;
 
   caml_plat_lock_blocking(&pool_freelist.lock);
@@ -173,9 +173,23 @@ void caml_teardown_shared_heap(struct caml_heap_state* heap) {
   }
   orphan_heap_stats_with_lock(heap);
   caml_plat_unlock(&pool_freelist.lock);
-  caml_stat_free(heap);
-  caml_gc_log("Shutdown shared heap. Released %d active pools, %d large",
+  caml_gc_log("Orphan shared heap. Released %d active pools, %d large",
               released, released_large);
+}
+
+void caml_free_shared_heap(struct caml_heap_state* heap) {
+  // The shared heap must have been swept,
+  // and then emptied by [caml_orphan_shared_heap].
+  for (int i = 0; i < NUM_SIZECLASSES; i++) {
+    CAMLassert(!heap->avail_pools[i]);
+    CAMLassert(!heap->full_pools[i]);
+    CAMLassert(!heap->unswept_avail_pools[i]);
+    CAMLassert(!heap->unswept_full_pools[i]);
+  }
+  CAMLassert(!heap->unswept_large);
+  CAMLassert(!heap->swept_large);
+
+  caml_stat_free(heap);
 }
 
 

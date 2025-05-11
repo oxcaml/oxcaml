@@ -778,7 +778,9 @@ create_stack_cache_failure:
 reallocate_minor_heap_failure:
   caml_teardown_major_gc();
 init_major_gc_failure:
-  caml_teardown_shared_heap(d->state->shared_heap);
+  caml_orphan_shared_heap(d->state->shared_heap);
+  caml_free_shared_heap(d->state->shared_heap);
+  domain_state->shared_heap = NULL;
 init_shared_heap_failure:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
@@ -2072,6 +2074,11 @@ void caml_domain_terminate(bool last)
     caml_orphan_ephemerons(domain_state);
     caml_orphan_finalisers(domain_state);
 
+    if (domain_state->marking_done &&
+        domain_state->sweeping_done) {
+      caml_orphan_shared_heap(domain_state->shared_heap);
+    }
+
     /* No need to check for interrupts if we are the last domain running. */
     if (last) {
       CAML_EV_LIFECYCLE(EV_DOMAIN_TERMINATE, getpid());
@@ -2142,18 +2149,18 @@ void caml_domain_terminate(bool last)
   if (last)
     caml_finalise_heap();
 
-  caml_teardown_shared_heap(domain_state->shared_heap);
-  domain_state->shared_heap = 0;
+  caml_free_shared_heap(domain_state->shared_heap);
+  domain_state->shared_heap = NULL;
   caml_free_minor_tables(domain_state->minor_tables);
-  domain_state->minor_tables = 0;
+  domain_state->minor_tables = NULL;
 
-  caml_orphan_alloc_stats(domain_state);
-  /* Heap stats were orphaned by [caml_teardown_shared_heap] above.
-     At this point, the stats of the domain must be empty.
-
-     The sampled copy was also cleared by the minor collection(s)
-     performed above at [caml_empty_minor_heaps_once()], see the
-     termination-specific logic in [caml_collect_gc_stats_sample_stw].
+  /* At this point, the stats of the domain must be empty.
+     - heap stats were orphaned by [caml_orphan_shared_heap]
+     - alloc stats were orphaned by [caml_orphan_alloc_stats]
+     - the sampled copy in [sampled_gc_stats] was cleared by the minor
+       collection performed by [caml_empty_minor_heaps_once()], see
+       the termination-specific logic in
+       [caml_collect_gc_stats_sample_stw].
   */
 
   /* TODO: can this ever be NULL? can we remove this check? */
