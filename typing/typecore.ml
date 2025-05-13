@@ -170,7 +170,6 @@ type error =
       ; expected_type : type_expr
       ; explanation   : type_forcing_context option
       }
-  | Scoping_let_module of string * type_expr
   | Not_a_polymorphic_variant_type of Longident.t
   | Incoherent_label_order
   | Less_general of string * Errortrace.unification_error
@@ -2280,13 +2279,6 @@ let add_module_variables env module_variables =
   in
   List.fold_left (fun env { mv_id; mv_loc; mv_name; mv_uid } ->
     Typetexp.TyVarEnv.with_local_scope begin fun () ->
-      (* This code is parallel to the typing of Pexp_letmodule. However we
-         omit the call to [Mtype.lower_nongen] as it's not necessary here.
-         For Pexp_letmodule, the call to [type_module] is done in a raised
-         level and so needs to be modified to have the correct, outer level.
-         Here, on the other hand, we're calling [type_module] outside the
-         raised level, so there's no extra step to take.
-      *)
       let modl, md_shape =
         !type_module env
           Ast_helper.(
@@ -7312,13 +7304,6 @@ let report_error ~loc env = function
         (label ~long:true) got
         (if second_long then "being " else "")
         (label ~long:second_long) expected
-  | Scoping_let_module(id, ty) ->
-      Location.errorf ~loc
-        "This %a expression has type@ %a@ \
-         In this type, the locally bound module name %a escapes its scope"
-        Style.inline_code "let module"
-        (Style.as_inline_code Printtyp.type_expr) ty
-        Style.inline_code id
   | Private_type ty ->
       Location.errorf ~loc "Cannot create values of the private type %a"
         (Style.as_inline_code Printtyp.type_expr) ty
