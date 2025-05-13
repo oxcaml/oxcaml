@@ -26,6 +26,10 @@ Working version
   does with an unrecognised file.
   (David Allsopp, review by Antonin Décimo and Sébastien Hinderer)
 
+- #13987: Remove a spurious TSan report in case of benign data race between
+  major GC read and write from the mutator (fixes #13427)
+  (Olivier Nicole, report by Thomas Leonard, review by Gabriel Scherer)
+
 - #13966: Enable "generalized polymorphic #install_printer"
   in the debugger
   (Pierre Boutillier and Gabriel Scherer, review by Florian Angeletti)
