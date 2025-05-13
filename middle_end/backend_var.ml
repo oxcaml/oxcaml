@@ -38,6 +38,10 @@ module Provenance = struct
     debug_uid : Flambda2_identifiers.Flambda_debug_uid.t
   }
 
+  let print_debug_uid ppf duid =
+    if !Clflags.dump_debug_uids then
+      Format.fprintf ppf "%@{%a}" Flambda2_identifiers.Flambda_debug_uid.print duid
+
   let print ppf { module_path; location; original_ident; debug_uid } =
     let printf fmt = Format.fprintf ppf fmt in
     printf "@[<hov 1>(";
@@ -46,9 +50,9 @@ module Provenance = struct
     if !Clflags.locations then
       printf "@[<hov 1>(location@ %a)@]@ "
         Debuginfo.print_compact location;
-    printf "@[<hov 1>(original_ident@ %a,uid=%a)@]"
+    printf "@[<hov 1>(original_ident@ %a%a)@]"
       Ident.print original_ident
-      Flambda2_identifiers.Flambda_debug_uid.print debug_uid;
+      print_debug_uid debug_uid;
     printf ")@]"
 
   let create ~module_path ~location ~original_ident ~debug_uid =
