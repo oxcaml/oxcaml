@@ -47,6 +47,10 @@
     # Work around inconsistent name mangling
     gsub(/c_to_ocaml_[0-9]+/, "c_to_ocaml")
 
+    # Work around symbol versioning
+    gsub(/__libc_start_main_impl$/, "__libc_start_mainXXXX")
+    gsub(/__libc_start_main@@GLIBC_[0-9]+.[0-9]+$/, "__libc_start_mainXXXX")
+
     gsub("warning: This version of LLDB", "This version of LLDB")
     gsub("This version of LLDB has no plugin for the language \"assembler\". Inspection of frame variables will be limited.", "")
     # Replace printed match results
