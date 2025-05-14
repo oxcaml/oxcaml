@@ -342,7 +342,7 @@ val row_fields: row_desc -> (label * row_field) list
 (** [row_more] returns a [type_expr] with one of the following [type_desc]s
     (also described with the return from [row_fixed], which varies similarly):
 
-    * [Tvar]: This is a standard row variable; it would occur in e.g. [val f :
+    * [Tvar]: This is a row variable; it would occur in e.g. [val f :
     [> `A | `B] -> int]. When/if we learn more about a polymorphic variant, this
     variable might get unified with one of the other [type_desc]s listed here,
     or a [Tvariant] that represents a new set of constructors to add to the row.
@@ -369,6 +369,12 @@ val row_fields: row_desc -> (label * row_field) list
       incompletness in type inference.
 
     * [Tnil]: Used to denote a closed polymorphic variant.
+
+    ----------------------------------------
+
+    It is an invariant that row variables are never shared between different
+    types. That is, if [row_more row1 == row_more row2], then [row1] and [row2]
+    come from the same type_expr.
 *)
 val row_more: row_desc -> type_expr
 val row_closed: row_desc -> bool
