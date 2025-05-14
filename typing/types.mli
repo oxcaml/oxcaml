@@ -365,16 +365,18 @@ val row_fields: row_desc -> (label * row_field) list
       2. This is a locally abstract type created by [Ctype.reify], which happens
       when a row variable is free in the type of the scrutinee in a GADT pattern
       match. The [fixed_explanation] will be [Reified]. Note that any manifest
-      of a reified row variable is actually ignored; this causes some
-      incompletness in type inference.
+      of a reified row variable is actually ignored by [row_repr]; this causes
+      some incompletness in type inference.
 
-    * [Tnil]: Used to denote a closed polymorphic variant.
+    * [Tnil]: Used to denote a static polymorphic variant (with no [>] or [<]).
 
     ----------------------------------------
 
     It is an invariant that row variables are never shared between different
     types. That is, if [row_more row1 == row_more row2], then [row1] and [row2]
-    come from the same type_expr.
+    come from structurally identical [Tvariant]s (but they might not be
+    physically equal). When copying types, two types with the same [row_more]
+    field are replaced by the same copy.
 *)
 val row_more: row_desc -> type_expr
 val row_closed: row_desc -> bool
