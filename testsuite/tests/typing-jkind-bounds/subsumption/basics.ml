@@ -127,8 +127,8 @@ Line 2, characters 0-53:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "('a, 'b) u" is immutable_data with 'a with 'b
          because of the definition of u at line 1, characters 0-48.
-       But the kind of type "('a, 'b) u" must be a subkind of immutable_data
-         with 'a
+       But the kind of type "('a, 'b) u" must be a subkind of
+           immutable_data with 'a
          because of the definition of t at line 2, characters 0-53.
 |}]
 
@@ -283,8 +283,8 @@ Line 2, characters 0-44:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `foo of t ]" is value mod non_float
          because it's a polymorphic variant type.
-       But the kind of type "[ `foo of t ]" must be a subkind of immutable_data
-         with t
+       But the kind of type "[ `foo of t ]" must be a subkind of
+           immutable_data with t
          because of the definition of u at line 2, characters 0-44.
 |}]
 
@@ -324,8 +324,7 @@ module M :
     type b : immutable_data with t1
     val eq : (a, b) eq
   end
->> Fatal error: Abstract kind with [with]: immutable_data
-with t1
+>> Fatal error: Abstract kind with [with]: immutable_data with t1
 Uncaught exception: Misc.Fatal_error
 
 |}]

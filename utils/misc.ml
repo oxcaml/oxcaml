@@ -1314,7 +1314,7 @@ let pp_parens_if condition printer ppf arg =
     (if condition then ")" else "")
 
 let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
-  Format.fprintf ppf "@[%a@]"
+  Format.fprintf ppf "@[<hv>%a@]"
     (pp_parens_if nested
        (Format.pp_print_list ~pp_sep (pp_element ~nested:true)))
     arg

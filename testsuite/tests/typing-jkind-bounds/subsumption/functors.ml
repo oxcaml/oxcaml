@@ -61,8 +61,8 @@ Line 4, characters 0-48:
 Error: The kind of type "'a F(Ref).t" is mutable_data
          with 'a @@ unyielding many
          because of the definition of t at line 2, characters 2-40.
-       But the kind of type "'a F(Ref).t" must be a subkind of immutable_data
-         with 'a
+       But the kind of type "'a F(Ref).t" must be a subkind of
+           immutable_data with 'a
          because of the definition of t at line 4, characters 0-48.
 
        The first mode-crosses less than the second along:
@@ -130,6 +130,6 @@ Line 1, characters 0-47:
 Error: The kind of type "F(Int_abstract).t" is immediate with Int_abstract.u
          because of the definition of t at line 5, characters 2-38.
        But the kind of type "F(Int_abstract).t" must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of t at line 1, characters 0-47.
 |}]

@@ -785,7 +785,8 @@ Error: Non-value detected in [value_kind].
        Please report this error to the Jane Street compilers team.
        The layout of unboxed_inlined_void_rec is void
          because of the definition of unboxed_inlined_void_rec at lines 3-4, characters 0-43.
-       But the layout of unboxed_inlined_void_rec must be a sublayout of value
+       But the layout of unboxed_inlined_void_rec must be a sublayout of
+           value
          because it has to be value for the V1 safety check.
 |}]
 (* CR layouts v5: This was the expected behavior before removing the handling of
