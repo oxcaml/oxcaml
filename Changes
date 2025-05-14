@@ -645,7 +645,7 @@ OCaml 5.4.0
   (Vincent Laviron, report by Jean-Marie Madiot, review by Gabriel Scherer)
 
 - #13941, #13961: Fix `ocamltest` variable handing.
-  (Damien Doligez, report by Olivier Nicole, review by ???)
+  (Damien Doligez, report by Olivier Nicole, review by Gabriel Scherer)
 
 - #13942: Fix assertion on empty array case
   (Olivier Nicole, review by Gabriel Scherer)

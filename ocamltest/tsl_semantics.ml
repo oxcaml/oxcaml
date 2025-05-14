@@ -29,30 +29,29 @@ let apply_modifiers env modifiers_name =
   let modifier = Environments.Include name in
   Environments.apply_modifier env modifier
 
+(* `decl` is true iff the variable is being assigned with `set`. *)
 let add_to_env decl variable_name value env =
-  let var = Variables.find_or_make variable_name in
-  match (Variables.find_variable variable_name,
-         Environments.is_variable_defined var env,
-         decl)
-  with
-    | (None, false, true) ->
-      Environments.add var value env
-    | (_, _, true) ->
-      raise (Variables.Variable_already_registered variable_name)
-    | (None, false, false) ->
-      raise (Variables.No_such_variable variable_name)
-    | (_, _, false) ->
-      Environments.add var value env
+  let var = Variables.from_name variable_name in
+  let builtin = Option.is_some (Variables.find_variable variable_name) in
+  let defined = Environments.is_variable_defined var env in
+  let known = builtin || defined in
+  if decl then begin
+    (* Defining a new variable with `set var = value` *)
+    if known then raise (Variables.Variable_already_registered variable_name)
+  end else begin
+    (* Changing the value of an existing variable with `var = value` *)
+    if not known then raise (Variables.No_such_variable variable_name)
+  end;
+  Environments.add var value env
 
 let append_to_env variable_name value env =
-  let variable = Variables.find_or_make variable_name in
-  match Variables.find_variable variable_name,
-        Environments.is_variable_defined variable env
-  with
-    | None, false ->
-      raise (Variables.No_such_variable variable_name)
-    | _ ->
-      Environments.append variable value env
+  let variable = Variables.from_name variable_name in
+  let builtin = Option.is_some (Variables.find_variable variable_name) in
+  let defined = Environments.is_variable_defined variable env in
+  if builtin || defined then
+    Environments.append variable value env
+  else
+    raise (Variables.No_such_variable variable_name)
 
 let interpret_environment_statement env statement = match statement.node with
   | Assignment (decl, var, value) ->
@@ -62,7 +61,7 @@ let interpret_environment_statement env statement = match statement.node with
   | Include modifiers_name ->
       apply_modifiers env modifiers_name
   | Unset var ->
-      Environments.unsetenv (Variables.find_or_make var.node) env
+      Environments.unsetenv (Variables.from_name var.node) env
 
 type test_tree =
   | Node of

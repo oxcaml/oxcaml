@@ -47,6 +47,6 @@ val string_of_binding : t -> value -> string
 
 val get_registered_variables : unit -> t list
 
-(** Returns the variable if it exists, otherwise creates it as a
+(** Returns the variable if it is registered, otherwise creates it as a
     "User variable". Does not register the variable. *)
-val find_or_make : string -> t
+val from_name : string -> t
