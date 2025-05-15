@@ -508,7 +508,17 @@ CAMLprim value caml_sys_executable_name(value unit)
   return caml_copy_string_of_os(caml_params->exe_name);
 }
 
-void caml_sys_init(const char_os * exe_name, char_os **argv)
+CAMLprim value caml_sys_proc_self_exe(value unit)
+{
+  if (caml_params->proc_self_exe == NULL)
+    return Val_none;
+  else
+    return caml_alloc_some(caml_copy_string_of_os(caml_params->proc_self_exe));
+}
+
+void caml_sys_init(const char_os * proc_self_exe,
+                   const char_os * exe_name,
+                   char_os **argv)
 {
 #ifdef _WIN32
   /* Initialises the caml_win32_* globals on Windows with the version of
@@ -518,7 +528,7 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
   caml_setup_win32_terminal();
 #endif
 #endif
-  caml_init_exe_name(exe_name);
+  caml_init_exe_name(proc_self_exe, exe_name);
   main_argv = caml_alloc_array((void *)caml_copy_string_of_os,
                                (char const **) argv);
   caml_register_generational_global_root(&main_argv);
