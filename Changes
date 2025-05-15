@@ -55,6 +55,11 @@ Working version
 
 ### Compiler user-interface and warnings:
 
+- #12628: Improved error message for unsafe values: print out the full path for
+  the value that is unsafe when they are detected during the compilation of
+  recursive modules.
+  (Shivam Acharya, review by Gabriel Scherer and Florian Angeletti)
+
 ### Internal/compiler-libs changes:
 
 - #13839, #14008: Reimplement `let open`, `let module` and `let exception` in
