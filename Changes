@@ -80,6 +80,9 @@ Working version
 
 ### Bug fixes:
 
+- #13853: Format breaks some line too early when there
+  is a break hint at the end.
+  (Florian Angeletti, review by Gabriel Scherer)
 
 OCaml 5.4.0
 ---------------
