@@ -446,6 +446,10 @@ OCaml 5.4.0
   tests that fail on mono-core systems.
   (Stéphane Glondu, review by Nicolás Ojeda Bär)
 
+- #13962: Little ocamltest refactors. Fix error handling in C code,
+  leaking file descriptors, code style.
+  (Antonin Décimo, review by Gabriel Scherer)
+
 ### Manual and documentation:
 
 - #13694: Fix name for caml_hash_variant in the C interface.
