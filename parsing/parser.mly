@@ -60,6 +60,10 @@ let mkclass ~loc ?attrs d = Cl.mk ~loc:(make_loc loc) ?attrs d
 let mkcty ~loc ?attrs d = Cty.mk ~loc:(make_loc loc) ?attrs d
 let mkconst ~loc c = Const.mk ~loc:(make_loc loc) c
 
+let pstr_extension body attrs =
+  (Pstr_extension (body, attrs), None)
+let pstr_attribute body =
+  (Pstr_attribute body, None)
 let pstr_typext (te, ext) =
   (Pstr_typext te, ext)
 let pstr_primitive (vd, ext) =
@@ -83,6 +87,10 @@ let pstr_class (ext, l) =
 let pstr_class_type (ext, l) =
   (Pstr_class_type l, ext)
 
+let psig_extension body attrs =
+  (Psig_extension (body, attrs), None)
+let psig_attribute body =
+  (Psig_attribute body, None)
 let psig_typext (te, ext) =
   (Psig_typext te, ext)
 let psig_value (vd, ext) =
@@ -96,6 +104,22 @@ let psig_exception (te, ext) =
   (Psig_exception te, ext)
 let psig_include (body, ext) =
   (Psig_include body, ext)
+let psig_module (body, ext) =
+  (Psig_module body, ext)
+let psig_modsubst (body, ext) =
+  (Psig_modsubst body, ext)
+let psig_recmodule (ext, l) =
+  (Psig_recmodule l, ext)
+let psig_modtype (body, ext) =
+  (Psig_modtype body, ext)
+let psig_modtypesubst (body, ext) =
+  (Psig_modtypesubst body, ext)
+let psig_open (body, ext) =
+  (Psig_open body, ext)
+let psig_class (ext, l) =
+  (Psig_class l, ext)
+let psig_class_type (ext, l) =
+  (Psig_class_type l, ext)
 
 let mkctf ~loc ?attrs ?docs d =
   Ctf.mk ~loc:(make_loc loc) ?attrs ?docs d
@@ -1017,10 +1041,6 @@ The precedences must be listed from low to high.
     { mkpat ~loc:$sloc $1 }
 %inline mktyp(symb): symb
     { mktyp ~loc:$sloc $1 }
-%inline mkstr(symb): symb
-    { mkstr ~loc:$sloc $1 }
-%inline mksig(symb): symb
-    { mksig ~loc:$sloc $1 }
 %inline mkmod(symb): symb
     { mkmod ~loc:$sloc $1 }
 %inline mkmty(symb): symb
@@ -1523,12 +1543,10 @@ structure:
 structure_item:
     let_bindings(ext)
       { val_of_let_bindings ~loc:$sloc $1 }
-  | mkstr(
-      floating_attribute
-        { Pstr_attribute $1 }
-    )
   | wrap_mkstr_ext(
-      primitive_declaration
+      floating_attribute
+        { pstr_attribute $1 }
+    | primitive_declaration
         { pstr_primitive $1 }
     | value_description
         { pstr_primitive $1 }
@@ -1556,13 +1574,10 @@ structure_item:
 
 (* A local structure item (= can appear in let expressions) *)
 local_structure_item:
-  | mkstr(
-      item_extension post_item_attributes
-        { let docs = symbol_docs $sloc in
-          Pstr_extension ($1, add_docs_attrs docs $2) }
-    )
   | wrap_mkstr_ext(
-      sig_exception_declaration
+      item_extension post_item_attributes
+        { pstr_extension $1 (add_docs_attrs (symbol_docs $sloc) $2) }
+    | sig_exception_declaration
         { pstr_exception $1 }
     | module_binding
         { pstr_module $1 }
@@ -1777,16 +1792,12 @@ signature:
 
 (* A signature item. *)
 signature_item:
-  | item_extension post_item_attributes
-      { let docs = symbol_docs $sloc in
-        mksig ~loc:$sloc (Psig_extension ($1, (add_docs_attrs docs $2))) }
-  | mksig(
-      floating_attribute
-        { Psig_attribute $1 }
-    )
-    { $1 }
   | wrap_mksig_ext(
-      value_description
+      item_extension post_item_attributes
+        { psig_extension $1 (add_docs_attrs (symbol_docs $sloc) $2) }
+    | floating_attribute
+        { psig_attribute $1 }
+    | value_description
         { psig_value $1 }
     | primitive_declaration
         { psig_value $1 }
@@ -1799,25 +1810,25 @@ signature_item:
     | sig_exception_declaration
         { psig_exception $1 }
     | module_declaration
-        { let (body, ext) = $1 in (Psig_module body, ext) }
+        { psig_module $1 }
     | module_alias
-        { let (body, ext) = $1 in (Psig_module body, ext) }
+        { psig_module $1 }
     | module_subst
-        { let (body, ext) = $1 in (Psig_modsubst body, ext) }
+        { psig_modsubst $1 }
     | rec_module_declarations
-        { let (ext, l) = $1 in (Psig_recmodule l, ext) }
+        { psig_recmodule $1 }
     | module_type_declaration
-        { let (body, ext) = $1 in (Psig_modtype body, ext) }
+        { psig_modtype $1 }
     | module_type_subst
-        { let (body, ext) = $1 in (Psig_modtypesubst body, ext) }
+        { psig_modtypesubst $1 }
     | open_description
-        { let (body, ext) = $1 in (Psig_open body, ext) }
+        { psig_open $1 }
     | include_statement(module_type)
         { psig_include $1 }
     | class_descriptions
-        { let (ext, l) = $1 in (Psig_class l, ext) }
+        { psig_class $1 }
     | class_type_declarations
-        { let (ext, l) = $1 in (Psig_class_type l, ext) }
+        { psig_class_type $1 }
     )
     { $1 }
 
