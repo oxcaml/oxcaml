@@ -70,8 +70,18 @@ let pstr_exception (te, ext) =
   (Pstr_exception te, ext)
 let pstr_include (body, ext) =
   (Pstr_include body, ext)
+let pstr_module (body, ext) =
+  (Pstr_module body, ext)
 let pstr_recmodule (ext, bindings) =
   (Pstr_recmodule bindings, ext)
+let pstr_modtype (body, ext) =
+  (Pstr_modtype body, ext)
+let pstr_open (body, ext) =
+  (Pstr_open body, ext)
+let pstr_class (ext, l) =
+  (Pstr_class l, ext)
+let pstr_class_type (ext, l) =
+  (Pstr_class_type l, ext)
 
 let psig_typext (te, ext) =
   (Psig_typext te, ext)
@@ -1514,10 +1524,7 @@ structure_item:
     let_bindings(ext)
       { val_of_let_bindings ~loc:$sloc $1 }
   | mkstr(
-      item_extension post_item_attributes
-        { let docs = symbol_docs $sloc in
-          Pstr_extension ($1, add_docs_attrs docs $2) }
-    | floating_attribute
+      floating_attribute
         { Pstr_attribute $1 }
     )
   | wrap_mkstr_ext(
@@ -1531,20 +1538,36 @@ structure_item:
         { pstr_typext $1 }
     | str_exception_declaration
         { pstr_exception $1 }
-    | module_binding
-        { $1 }
     | rec_module_bindings
         { pstr_recmodule $1 }
     | module_type_declaration
-        { let (body, ext) = $1 in (Pstr_modtype body, ext) }
-    | open_declaration
-        { let (body, ext) = $1 in (Pstr_open body, ext) }
+        { pstr_modtype $1 }
     | class_declarations
-        { let (ext, l) = $1 in (Pstr_class l, ext) }
+        { pstr_class $1 }
     | class_type_declarations
-        { let (ext, l) = $1 in (Pstr_class_type l, ext) }
+        { pstr_class_type $1 }
     | include_statement(module_expr)
         { pstr_include $1 }
+    )
+    { $1 }
+  | local_structure_item
+    { $1 }
+;
+
+(* A local structure item (= can appear in let expressions) *)
+local_structure_item:
+  | mkstr(
+      item_extension post_item_attributes
+        { let docs = symbol_docs $sloc in
+          Pstr_extension ($1, add_docs_attrs docs $2) }
+    )
+  | wrap_mkstr_ext(
+      sig_exception_declaration
+        { pstr_exception $1 }
+    | module_binding
+        { pstr_module $1 }
+    | open_declaration
+        { pstr_open $1 }
     )
     { $1 }
 ;
@@ -1560,7 +1583,7 @@ structure_item:
       let loc = make_loc $sloc in
       let attrs = attrs1 @ attrs2 in
       let body = Mb.mk name body ~attrs ~loc ~docs in
-      Pstr_module body, ext }
+      body, ext }
 ;
 
 (* The body (right-hand side) of a module binding. *)
@@ -2440,20 +2463,8 @@ fun_expr:
   | or_function(fun_expr) { $1 }
 ;
 %inline fun_expr_attrs:
-  | LET MODULE ext_attributes mkrhs(module_name) module_binding_body IN seq_expr
-      { let loc = make_loc ($startpos($2), $endpos($5)) in
-        let si = Str.module_ ~loc (Mb.mk ~loc:(make_loc $loc($4)) $4 $5) in
-        Pexp_struct_item (si, $7), $3 }
-  | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
-      { let loc = make_loc ($startpos($2), $endpos($4)) in
-        let si =
-          Str.exception_ ~loc (Te.mk_exception ~loc:(make_loc $loc($4)) $4) in
-        Pexp_struct_item (si, $6), $3 }
-  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
-      { let open_loc = make_loc ($startpos($2), $endpos($5)) in
-        let si =
-          Str.open_ ~loc:open_loc (Opn.mk $5 ~override:$3 ~loc:open_loc) in
-        Pexp_struct_item(si, $7), $4 }
+  | LET ext_attributes local_structure_item IN seq_expr
+      { Pexp_struct_item($3, $5), $2 }
   /* Cf #5939: we used to accept (fun p when e0 -> e) */
   | FUN ext_attributes fun_params preceded(COLON, atomic_type)?
       MINUSGREATER fun_body
@@ -3424,9 +3435,7 @@ generic_constructor_declaration(opening):
     }
 ;
 str_exception_declaration:
-  sig_exception_declaration
-    { $1 }
-| EXCEPTION
+  EXCEPTION
   ext = ext
   attrs1 = attributes
   id = mkrhs(constr_ident)
@@ -3454,11 +3463,6 @@ sig_exception_declaration:
       Te.mk_exception ~attrs ~loc
         (Te.decl id ~vars ~args ?res ~attrs:(attrs1 @ attrs2) ~loc ~docs)
       , ext }
-;
-%inline let_exception_declaration:
-    mkrhs(constr_ident) generalized_constructor_arguments attributes
-      { let vars, args, res = $2 in
-        Te.decl $1 ~vars ~args ?res ~attrs:$3 ~loc:(make_loc $sloc) }
 ;
 generalized_constructor_arguments:
     /*empty*/                     { ([],Pcstr_tuple [],None) }
