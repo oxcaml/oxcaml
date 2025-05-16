@@ -16,6 +16,9 @@ Working version
 
 ### Runtime system:
 
+- #13675: Make Unix.map_file memory show up in Gc.Memprof.
+  (Stephen Dolan, review by Guillaume Munch-Maccagnoni and Gabriel Scherer)
+
 ### Code generation and optimizations:
 
 ### Standard library:
