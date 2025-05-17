@@ -16,9 +16,6 @@ Working version
 
 ### Runtime system:
 
-- #13675: Make Unix.map_file memory show up in Gc.Memprof.
-  (Stephen Dolan, review by Guillaume Munch-Maccagnoni and Gabriel Scherer)
-
 ### Code generation and optimizations:
 
 ### Standard library:
@@ -131,6 +128,9 @@ OCaml 5.4.0
 
 
 ### Runtime system:
+
+- #13675: Make Unix.map_file memory show up in Gc.Memprof.
+  (Stephen Dolan, review by Guillaume Munch-Maccagnoni and Gabriel Scherer)
 
 - #13819: Fix field initialisation bug in runtime events subsystem.
   (Nick Barnes, review by Gabriel Scherer).
