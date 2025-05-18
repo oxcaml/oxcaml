@@ -32,7 +32,9 @@ struct pool;
 
 struct caml_heap_state* caml_init_shared_heap(void);
 void caml_orphan_shared_heap(struct caml_heap_state* heap);
+void caml_adopt_all_orphan_heaps(struct caml_heap_state* heap);
 void caml_free_shared_heap(struct caml_heap_state* heap);
+
 
 value* caml_shared_try_alloc(struct caml_heap_state*,
                              mlsize_t, tag_t, reserved_t);

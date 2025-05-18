@@ -710,17 +710,13 @@ void caml_finalise_heap(void) {
   struct caml_heap_state *local = Caml_state->shared_heap;
   sizeclass sz;
 
-  /* to finalise the whole heap, first adopt
-     orphan pools. */
-  caml_adopt_all_orphan_heaps(local);
-
-  /* local pools */
+  /* Finalise and release unswept local pools. */
   for (sz = 0; sz < NUM_SIZECLASSES; sz++) {
     pool_finalise(local, &local->unswept_avail_pools[sz], sz);
     pool_finalise(local, &local->unswept_full_pools[sz], sz);
   }
 
-  /* global pools */
+  /* Finalise and free large unswept objects. */
   if (local->unswept_large)
     large_alloc_finalise(local);
 }
