@@ -43,7 +43,7 @@ Working version
   major GC read and write from the mutator (fixes #13427)
   (Olivier Nicole, report by Thomas Leonard, review by Gabriel Scherer)
 
-- #13966: Enable "generalized polymorphic #install_printer"
+- #13966, #13969: Enable "generalized polymorphic #install_printer"
   in the debugger
   (Pierre Boutillier and Gabriel Scherer, review by Florian Angeletti)
 
