@@ -95,6 +95,9 @@ Working version
 
 ### Build system:
 
+- #13810: Support build of cross compilers to native freestanding targets
+  (Samuel Hym, review by Antonin Décimo and Romain Calascibetta)
+
 ### Bug fixes:
 
 - #13853: Format breaks some line too early when there
