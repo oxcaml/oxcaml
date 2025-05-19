@@ -595,6 +595,10 @@ OCaml 5.4.0
   (Ulysse Gérard and Jules Aguillon, review by Jules Aguillon
    and Florian Angeletti)
 
+- #13781: Set scope of internal type nodes during abbreviation expansion
+  rather than recursing during unification.
+  (Jacques Garrigue, review by Gabriel Scherer)
+
 - #13820: Add a new option -i-variance to print the variance of every
   type parameter; bivariance is printed as `+-`, and for consistency,
   parser is modified too to accept `+-` and `-+` as `type_variance`.
