@@ -2136,7 +2136,7 @@ void caml_domain_terminate(bool last)
     caml_plat_unlock(&all_domains_lock);
   }
 
-  CAMLassert(last || marking_and_sweeping_done(domain_state));
+  if (!last) caml_assert_shared_heap_is_empty(domain_state->shared_heap);
 
   /* [domain_state] may be re-used by a fresh domain here, now that we
      have done [remove_from_stw_domains] and released the
@@ -2173,6 +2173,7 @@ void caml_domain_terminate(bool last)
     /* Then orphan all pools again. */
     caml_orphan_shared_heap(domain_state->shared_heap);
   }
+  caml_assert_shared_heap_is_empty(domain_state->shared_heap);
 
   caml_free_shared_heap(domain_state->shared_heap);
   domain_state->shared_heap = NULL;

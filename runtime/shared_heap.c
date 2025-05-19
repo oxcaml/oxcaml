@@ -210,9 +210,7 @@ void caml_adopt_all_orphan_heaps(struct caml_heap_state* local) {
   local->next_to_sweep = 0;
 }
 
-void caml_free_shared_heap(struct caml_heap_state* heap) {
-  // The shared heap must have been swept,
-  // and then emptied by [caml_orphan_shared_heap].
+void caml_assert_shared_heap_is_empty(struct caml_heap_state* heap) {
   for (int i = 0; i < NUM_SIZECLASSES; i++) {
     CAMLassert(!heap->avail_pools[i]);
     CAMLassert(!heap->full_pools[i]);
@@ -221,7 +219,10 @@ void caml_free_shared_heap(struct caml_heap_state* heap) {
   }
   CAMLassert(!heap->unswept_large);
   CAMLassert(!heap->swept_large);
+}
 
+void caml_free_shared_heap(struct caml_heap_state* heap) {
+  caml_assert_shared_heap_is_empty(heap);
   caml_stat_free(heap);
 }
 
