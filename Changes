@@ -32,6 +32,12 @@ Working version
   (Nicolás Ojeda Bär, review by Daniel Bünzli, Gabriel Scherer and David
   Allsopp)
 
+### Type system:
+
+- #13781: Set scope of internal type nodes during abbreviation expansion
+  rather than recursing during unification.
+  (Jacques Garrigue, review by Gabriel Scherer)
+
 ### Other libraries:
 
 - #14020: Add Unix.unsetenv.
@@ -39,13 +45,19 @@ Working version
 
 ### Tools:
 
+- #12139: BUILD_PATH_PREFIX_MAP rewriting in debug-event locations.
+  (Richard L. Ford, review by Gabriel Scherer)
+
 * #13638: ocamlmklib exits with code 4 if passed an unrecognised option, as it
   does with an unrecognised file.
   (David Allsopp, review by Antonin Décimo and Sébastien Hinderer)
 
-- #13987: Remove a spurious TSan report in case of benign data race between
-  major GC read and write from the mutator (fixes #13427)
-  (Olivier Nicole, report by Thomas Leonard, review by Gabriel Scherer)
+- #13941, #13961: Fix `ocamltest` variable handing.
+  (Damien Doligez, report by Olivier Nicole, review by Gabriel Scherer)
+
+- #13962: Little ocamltest refactors. Fix error handling in C code,
+  leaking file descriptors, code style.
+  (Antonin Décimo, review by Gabriel Scherer)
 
 - #13966, #13969: Enable "generalized polymorphic #install_printer"
   in the debugger
@@ -89,6 +101,9 @@ Working version
   types, modules and module types) - sharing only the recursive part for
   handling deep constraints.
   (Clement Blaudeau, review by Florian Angeletti and Samuel Vivien)
+
+- #13980 Refactor `type-approx` and improve some errors' locations.
+  (Leo White, Ulysse Gérard, review by Samuel Vivien and Florian Angeletti)
 
 - #14024: Fix unterminated-string-initialization warnings from the C compiler.
   (Antonin Décimo, review by David Allsopp and Miod Vallat)
@@ -463,10 +478,6 @@ OCaml 5.4.0
   tests that fail on mono-core systems.
   (Stéphane Glondu, review by Nicolás Ojeda Bär)
 
-- #13962: Little ocamltest refactors. Fix error handling in C code,
-  leaking file descriptors, code style.
-  (Antonin Décimo, review by Gabriel Scherer)
-
 ### Manual and documentation:
 
 - #13694: Fix name for caml_hash_variant in the C interface.
@@ -595,10 +606,6 @@ OCaml 5.4.0
   (Ulysse Gérard and Jules Aguillon, review by Jules Aguillon
    and Florian Angeletti)
 
-- #13781: Set scope of internal type nodes during abbreviation expansion
-  rather than recursing during unification.
-  (Jacques Garrigue, review by Gabriel Scherer)
-
 - #13820: Add a new option -i-variance to print the variance of every
   type parameter; bivariance is printed as `+-`, and for consistency,
   parser is modified too to accept `+-` and `-+` as `type_variance`.
@@ -633,11 +640,8 @@ OCaml 5.4.0
 - #13952: check and document the correctness of `caml_domain_alone ()`.
   (Gabriel Scherer, review by KC Sivaramakrishnan, report by Olivier Nicole)
 
-- #13971 Keep generalized structure from patterns when typing `let`
+- #13971: Keep generalized structure from patterns when typing `let`
   (Leo White, review by Samuel Vivien and Florian Angeletti)
-
-- #13980 Refactor `type-approx` and improve some errors' locations.
-  (Leo White, Ulysse Gérard, review by Samuel Vivien and Florian Angeletti)
 
 ### Build system:
 
@@ -745,9 +749,6 @@ OCaml 5.4.0
   the non-flambda native compiler
   (Vincent Laviron, report by Jean-Marie Madiot, review by Gabriel Scherer)
 
-- #13941, #13961: Fix `ocamltest` variable handing.
-  (Damien Doligez, report by Olivier Nicole, review by Gabriel Scherer)
-
 - #13942: Fix assertion on empty array case
   (Olivier Nicole, review by Gabriel Scherer)
 
@@ -757,6 +758,10 @@ OCaml 5.4.0
 
 - #13928, #13944: Fix handling of excessively nested unboxed types
   (Vincent Laviron, review by Gabriel Scherer)
+
+- #13987: Remove a spurious TSan report in case of benign data race between
+  major GC read and write from the mutator (fixes #13427)
+  (Olivier Nicole, report by Thomas Leonard, review by Gabriel Scherer)
 
 - #14007, #14015: Fix memory corruption when an exception is raised during
   demarshaling.
@@ -2756,9 +2761,6 @@ Some of those changes will benefit all OCaml packages.
   (Florian Angeletti and Gabriel Scherer, review by Jacques Garrigue)
 
 ### Code generation and optimizations:
-
-- #12139: BUILD_PATH_PREFIX_MAP support in bytecomp.
-  (Richard L ford, review by Gabriel Scherer)
 
 - #11967: Remove traces of Obj.truncate, which allows some mutable
   loads to become immutable.
