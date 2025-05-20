@@ -762,6 +762,10 @@ OCaml 5.4.0
   demarshaling.
   (Benoît Vaugon, review by David Allsopp and Gabriel Scherer)
 
+- #14025: fix data race between compaction and domain termination
+  (Gabriel Scherer, review by Jan Midtgaard,
+   report by Jan Midtgaard)
+
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
 
