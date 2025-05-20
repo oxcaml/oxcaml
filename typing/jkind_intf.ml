@@ -216,6 +216,7 @@ module History = struct
     | Peek_or_poke
     | Mutable_var_assignment
     | Old_style_unboxed_type
+    | Structure_element
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -260,7 +261,6 @@ module History = struct
     | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
-    | Structure_element
     | V1_safety_check
     | Probe
     | Captured_in_object
