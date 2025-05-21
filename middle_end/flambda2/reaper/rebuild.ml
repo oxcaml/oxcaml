@@ -185,11 +185,12 @@ let get_parameters params_decisions =
     (fun acc param_decision ->
       match param_decision with
       | Delete -> acc
-      | Keep (var, kind) -> Bound_parameter.create var kind :: acc
+      | Keep (var, kind) -> Bound_parameter.create var kind Flambda_uid.internal_not_actually_unique :: acc
       | Unbox fields ->
         fold_unboxed_with_kind
-          (fun kind v acc -> Bound_parameter.create v (KS.anything kind) :: acc)
+          (fun kind v acc -> Bound_parameter.create v (KS.anything kind) Flambda_uid.internal_not_actually_unique :: acc)
           fields acc)
+      (* CR sspies: Fix these. Propagate debugging uids here. *)
     [] params_decisions
   |> List.rev
 
@@ -198,12 +199,13 @@ let get_parameters_and_modes params_decisions modes =
     (fun acc (param_decision, mode) ->
       match param_decision with
       | Delete -> acc
-      | Keep (var, kind) -> (Bound_parameter.create var kind, mode) :: acc
+      | Keep (var, kind) -> (Bound_parameter.create var kind Flambda_uid.internal_not_actually_unique, mode) :: acc
       | Unbox fields ->
         fold_unboxed_with_kind
           (fun kind v acc ->
-            (Bound_parameter.create v (KS.anything kind), mode) :: acc)
+            (Bound_parameter.create v (KS.anything kind) Flambda_uid.internal_not_actually_unique, mode) :: acc)
           fields acc)
+      (* CR sspies: Fix these. Propagate debugging uids here. *)
     []
     (List.combine params_decisions modes)
   |> List.rev |> List.split
@@ -242,7 +244,8 @@ let bind_fields fields arg_fields hole =
   fold2_unboxed_subset
     (fun var arg hole ->
       let bp =
-        Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+        Bound_pattern.singleton (Bound_var.create var Flambda_uid.internal_not_actually_unique Name_mode.normal)
+        (* CR sspies: Fix these. Propagate debugging uids here. *)
       in
       RE.create_let bp (Named.create_simple (Simple.var arg)) ~body:hole)
     fields arg_fields hole
@@ -1005,7 +1008,8 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
       fold2_unboxed_subset
         (fun var (field, kind) hole ->
           let bp =
-            Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+            Bound_pattern.singleton (Bound_var.create var Flambda_uid.internal_not_actually_unique Name_mode.normal)
+            (* CR sspies: Fix these. *)
           in
           let named =
             Named.create_prim
@@ -1026,7 +1030,8 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
       fold2_unboxed_subset
         (fun var value_slot hole ->
           let bp =
-            Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+            Bound_pattern.singleton (Bound_var.create var Flambda_uid.internal_not_actually_unique Name_mode.normal)
+            (* CR sspies: Fix these. *)
           in
           let named =
             Named.create_prim
@@ -1086,7 +1091,8 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
               | Unboxed _ -> Misc.fatal_errorf "Trying to unbox non-unboxable"
             in
             let bp =
-              Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+              Bound_pattern.singleton (Bound_var.create var Flambda_uid.internal_not_actually_unique Name_mode.normal)
+              (* CR sspies: Fix these. *)
             in
             RE.create_let bp (Named.create_simple simple) ~body:hole
           | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
@@ -1162,7 +1168,8 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                 in
                 let bp =
                   Bound_pattern.singleton
-                    (Bound_var.create var Name_mode.normal)
+                    (Bound_var.create var Flambda_uid.internal_not_actually_unique Name_mode.normal)
+                  (* CR sspies: Fix these. *)
                 in
                 RE.create_let bp (Named.create_simple arg) ~body:hole
             | Block _ | Is_int | Get_tag | Function_slot _ | Code_of_closure
@@ -1538,7 +1545,8 @@ and rebuild_holed (env : env) res (rev_expr : Rev_expr.rev_expr_holed)
               | Some fields ->
                 fold_unboxed_with_kind
                   (fun kind v acc ->
-                    Bound_parameter.create v (KS.anything kind) :: acc)
+                    Bound_parameter.create v (KS.anything kind) Flambda_uid.internal_not_actually_unique :: acc)
+                    (* CR sspies: Fix these. *)
                   fields [])
             l
         in
@@ -1747,7 +1755,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       | Some fields ->
         ( fold_unboxed_with_kind
             (fun kind v acc ->
-              Bound_parameter.create v (KS.anything kind) :: acc)
+              Bound_parameter.create v (KS.anything kind) Flambda_uid.internal_not_actually_unique :: acc)
+            (* CR sspies: Fix these. *)
             fields [],
           Code_metadata.with_is_my_closure_used false code_metadata )
     in
