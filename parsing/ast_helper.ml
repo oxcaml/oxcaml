@@ -74,6 +74,8 @@ module Typ = struct
   let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
+  let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
+  let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
 
   let force_poly t =
     match t.ptyp_desc with
@@ -132,6 +134,10 @@ module Typ = struct
             Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
+        | Ptyp_quote core_type ->
+            Ptyp_quote core_type
+        | Ptyp_splice core_type ->
+            Ptyp_splice core_type
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
       in
@@ -251,6 +257,8 @@ module Exp = struct
   let stack ?loc ?attrs e = mk ?loc ?attrs (Pexp_stack e)
   let comprehension ?loc ?attrs e = mk ?loc ?attrs (Pexp_comprehension e)
   let overwrite ?loc ?attrs a b = mk ?loc ?attrs (Pexp_overwrite (a, b))
+  let quotation ?loc ?attrs e = mk ?loc ?attrs (Pexp_quotation e)
+  let splice ?loc ?attrs e = mk ?loc ?attrs (Pexp_splice e)
   let hole ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
 
   let case lhs ?guard rhs =

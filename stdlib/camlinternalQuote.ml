@@ -1598,7 +1598,7 @@ module Ast = struct
     | Ident id -> print_raw_ident_value env fmt id
     | Constant c -> print_const fmt c
     | Apply (exp, args) ->
-      Format.fprintf fmt "%a@[<hov>" (print_exp env) exp;
+      Format.fprintf fmt "%a@[<hov>" (print_exp_with_parens env) exp;
       List.iter
         (fun (arg_lab, exp) ->
           Format.fprintf fmt "@ %a@[%a@]" print_arg_lab arg_lab
@@ -1675,10 +1675,10 @@ module Ast = struct
     | Ifthenelse (cond, then_, else_) -> (
       Format.fprintf fmt "if@ %a@ then@ @;@[%a@]"
         (print_exp_with_parens env)
-        cond (print_exp env) then_;
+        cond (print_exp_with_parens env) then_;
       match else_ with
       | Some else_ ->
-        Format.fprintf fmt "@ @;else@ @;@[%a@]" (print_exp env) else_
+        Format.fprintf fmt "@ @;else@ @;@[%a@]" (print_exp_with_parens env) else_
       | None -> ())
     | Sequence (exp1, exp2) ->
       Format.fprintf fmt "%a;@ @,%a" (print_exp env) exp1 (print_exp env) exp2
@@ -1752,9 +1752,9 @@ module Ast = struct
     | Unboxed_field (exp, rec_field) ->
       Format.fprintf fmt "#%a.%a" (print_exp env) exp (print_field env)
         rec_field
-    | Quote exp -> Format.fprintf fmt "[%%quote@ @[%a@]]" (print_exp env) exp
+    | Quote exp -> Format.fprintf fmt "<<@ @[%a@]@ >>" (print_exp env) exp
     | Antiquote exp ->
-      Format.fprintf fmt "!#@[%a@]" (print_exp_with_parens env) exp
+      Format.fprintf fmt "$@[%a@]" (print_exp_with_parens env) exp
     | List_comprehension _ | Array_comprehension _ ->
       Format.fprintf fmt "(* comprehension *)"
     | Unreachable | Src_pos -> Format.fprintf fmt "."
@@ -2387,7 +2387,7 @@ module Code = struct
 
   let print fmt c =
     let ast_exp = With_free_vars.value ~free:(fun _ _ -> ()) c in
-    Format.fprintf fmt "[%%quote@ @[%a@]]"
+    Format.fprintf fmt "<<@ @[%a@]@ >>"
       (Ast.print_exp (new_env ()))
       ast_exp.exp
 end

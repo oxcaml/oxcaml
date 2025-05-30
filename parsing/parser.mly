@@ -940,6 +940,7 @@ let maybe_pmod_constraint mode expr =
 %token COMMA                  ","
 %token CONSTRAINT             "constraint"
 %token DO                     "do"
+%token DOLLAR                 "$"
 %token DONE                   "done"
 %token DOT                    "."
 %token DOTDOT                 ".."
@@ -961,6 +962,7 @@ let maybe_pmod_constraint mode expr =
 %token FUNCTOR                "functor"
 %token GLOBAL                 "global_"
 %token GREATER                ">"
+%token GREATERGREATER         ">>"
 %token GREATERRBRACE          ">}"
 %token GREATERRBRACKET        ">]"
 %token HASHLPAREN             "#("
@@ -996,6 +998,7 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKETPERCENT        "[%"
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
+%token LESSLESS               "<<"
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -1133,7 +1136,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT
+          NEW PREFIXOP STRING TRUE UIDENT DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR STACK HASHLBRACE HASHLPAREN
 
 
@@ -2896,6 +2899,10 @@ fun_expr:
       { mkexp ~loc:$sloc (Pexp_construct($1, Some $2)) }
   | name_tag simple_expr %prec below_HASH
       { mkexp ~loc:$sloc (Pexp_variant($1, Some $2)) }
+  | DOLLAR simple_expr
+      { mkexp ~loc:$sloc (Pexp_splice $2) }
+  | LESSLESS expr GREATERGREATER
+      { mkexp ~loc:$sloc (Pexp_quotation $2) }
   | e1 = fun_expr op = op(infix_operator) e2 = expr
       { mkexp ~loc:$sloc (mkinfix e1 op e2) }
 ;
@@ -4653,7 +4660,11 @@ delimited_type_supporting_local_open:
         { Ptyp_variant(fields, Closed, Some tags) }
     | HASHLPAREN unboxed_tuple_type_body RPAREN
         { Ptyp_unboxed_tuple $2 }
-  )
+    | LESSLESS type_ = core_type GREATERGREATER
+        { Ptyp_quote type_ }
+    | DOLLAR type_ = atomic_type
+        { Ptyp_splice type_ }
+)
   { $1 }
 ;
 

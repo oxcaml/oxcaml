@@ -220,6 +220,12 @@ let rec core_type i ppf x =
   | Ptyp_open (mod_ident, t) ->
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
       core_type i ppf t
+  | Ptyp_quote t ->
+      line i ppf "Ptyp_quote\n";
+      core_type i ppf t
+  | Ptyp_splice t ->
+      line i ppf "Ptyp_splice\n";
+      core_type i ppf t
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
@@ -452,6 +458,12 @@ and expression i ppf x =
       line i ppf "Pexp_overwrite\n";
       expression i ppf e1;
       expression i ppf e2;
+  | Pexp_quotation e ->
+    line i ppf "Pexp_quotation\n";
+    expression i ppf e
+  | Pexp_splice e ->
+      line i ppf "Pexp_splice\n";
+      expression i ppf e
   | Pexp_hole ->
     line i ppf "Pexp_hole"
 

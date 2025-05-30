@@ -5772,7 +5772,7 @@ and type_expect_
       {exp with exp_loc = loc}
   | Pexp_apply
       ({ pexp_desc = Pexp_ident({txt = Longident.Lident "!#"}) },
-       [Nolabel, sbody]) ->
+       [Nolabel, sbody]) ->  (* CR (aivaskovic): remove *)
     let argument_mode = mode_legacy in
     let ty = newgenconstr Predef.path_code [ty_expected] in
     let arg = type_expect env argument_mode sbody (mk_expected ty) in
@@ -6782,7 +6782,7 @@ and type_expect_
     end
   | Pexp_extension ({ txt = "src_pos"; _ }, _) ->
       rue (src_pos loc sexp.pexp_attributes env)
-  | Pexp_extension ({ txt = ("quote" | "ocaml.quote"); _ }, payload) ->
+  | Pexp_extension ({ txt = ("quote" | "ocaml.quote"); _ }, payload) -> (* CR (aivaskovic): remove *)
     let sarg =
       match payload with
       | PStr [{pstr_desc=Pstr_eval (sarg, _)}] -> sarg
@@ -6802,7 +6802,7 @@ and type_expect_
       exp_type = instance ty_expected;
       exp_attributes = sexp.pexp_attributes;
       exp_env = env }
-    | Pexp_extension ext ->
+  | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
   | Pexp_unreachable ->
@@ -6903,6 +6903,30 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
+  | Pexp_quotation exp ->
+    let argument_mode = mode_legacy in
+    let jkind = Jkind.Builtin.value ~why:Quotation_result in
+    let ty = newgenvar jkind in
+    let to_unify = Predef.type_code ty in
+    with_explanation (fun () ->
+      unify_exp_types loc env to_unify (generic_instance ty_expected));
+    let arg = type_expect env argument_mode exp (mk_expected ty) in
+    re {
+      exp_desc = Texp_quotation arg;
+      exp_loc = loc; exp_extra = [];
+      exp_type = instance ty_expected;
+      exp_attributes = sexp.pexp_attributes;
+      exp_env = env }
+  | Pexp_splice exp ->
+    let argument_mode = mode_legacy in
+    let ty = newgenconstr Predef.path_code [ty_expected] in
+    let arg = type_expect env argument_mode exp (mk_expected ty) in
+    re {
+      exp_desc = Texp_antiquotation arg;
+      exp_loc = loc; exp_extra = [];
+      exp_type = instance ty_expected;
+      exp_attributes = sexp.pexp_attributes;
+      exp_env = env }
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
