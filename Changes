@@ -814,6 +814,9 @@ OCaml 5.4.0
   (Gabriel Scherer, review by Jan Midtgaard,
    report by Jan Midtgaard)
 
+- #14070: also point to label mismatches in error messages for labelled tuples
+  (Florian Angeletti, review by Gabriel Scherer)
+
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
 
