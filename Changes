@@ -816,6 +816,8 @@ OCaml 5.4.0
 - #14025: fix data race between compaction and domain termination
   (Gabriel Scherer, review by Jan Midtgaard,
    report by Jan Midtgaard)
+- #13956 Fix a regression introduced in #13308 triggering wrong unused warnings.
+  (Ulysse Gérard, review by Florian Angeletti)
 
 - #14070: also point to label mismatches in error messages for labelled tuples
   (Florian Angeletti, review by Gabriel Scherer)
