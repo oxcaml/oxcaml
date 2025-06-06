@@ -484,13 +484,20 @@ module Size = struct
       and single = match memory_chunk with Single -> 2 | _ -> 1 in
       based + barrier + single
     | Lop (Istore (memory_chunk, addressing_mode, assignment)) ->
-      let based = match addressing_mode with Iindexed _ -> 0 | Ibased _ -> 1
-      and barrier =
-        match memory_chunk, assignment with
-        | (Word_int | Word_val), true -> 1
+      let based =
+        match addressing_mode with
+        | Iindexed _ -> 0
+        | Ibased _ -> 1
+      in
+      let pre_store =
+        match memory_chunk, assignment, macosx, addressing_mode with
+        | (Word_int | Word_val), true, true, Iindexed 0 -> 0
+        | (Word_int | Word_val), true, true, _ -> 1  (* Compute dest address *)
+        | (Word_int | Word_val), true, false, _ -> 1 (* Barrier instruction *)
         | _ -> 0
-      and single = match memory_chunk with Single -> 2 | _ -> 1 in
-      based + barrier + single
+      in
+      let store = match memory_chunk with Single -> 2 | _ -> 1 in
+      based + pre_store + store
     | Lop (Ialloc _) when f.fun_fast -> 5
     | Lop (Ispecific (Ialloc_far _)) when f.fun_fast -> 6
     | Lop (Ipoll {return_label=None}) -> 3
@@ -823,7 +830,7 @@ let emit_instr env i =
         end
     | Lop(Istore(size, addr, assignment)) ->
         (* NB: assignments other than Word_int and Word_val do not follow the
-        Multicore OCaml memory model and so do not emit a barrier *)
+           Multicore OCaml memory model and so do not emit a barrier *)
         let src = i.arg.(0) in
         let base =
           match addr with
@@ -843,9 +850,33 @@ let emit_instr env i =
             `	fcvt	s7, {emit_reg src}\n`;
             `	str	s7, {emit_addressing addr base}\n`;
         | Word_int | Word_val ->
-            (* memory model barrier for non-initializing store *)
-            if assignment then `	dmb	ishld\n`;
-            `	str	{emit_reg src}, {emit_addressing addr base}\n`
+            begin match assignment, macosx with
+            | true, true ->
+                (* Memory model barrier for non-initializing store on Apple
+                   Silicon processors. See
+                   https://github.com/ocaml/ocaml/issues/13262 *)
+                let dest_reg =
+                  begin match addr with
+                  | Iindexed 0 -> base
+                  | Iindexed ofs ->
+                      `	add	{emit_reg reg_tmp1}, {emit_reg base}, #{emit_int ofs}\n`;
+                      reg_tmp1
+                  | Ibased (s, ofs) ->
+                      assert (not !Clflags.dlcode);
+                      `	add	{emit_reg reg_tmp1}, {emit_reg base}, #:lo12:{emit_symbol_offset s ofs}\n`;
+                      reg_tmp1
+                  end
+                in
+                `	stlr	{emit_reg src}, [{emit_reg dest_reg}]\n`
+            | true, false ->
+                (* Memory model barrier for non-initializing store on non-Apple
+                   Silicon processors. *)
+                `	dmb	ishld\n`;
+                `	str	{emit_reg src}, {emit_addressing addr base}\n`
+            | _, _ ->
+                (* Initialising store *)
+                `	str	{emit_reg src}, {emit_addressing addr base}\n`
+            end
         | Double ->
             `	str	{emit_reg src}, {emit_addressing addr base}\n`
         end
