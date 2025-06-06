@@ -219,6 +219,7 @@ module Exp:
       ?loc:loc -> ?attrs:attrs -> comprehension_expression -> expression
     val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
     val quotation : ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val quotation_type : ?loc:loc -> ?attrs:attrs -> core_type -> expression
     val splice : ?loc:loc -> ?attrs:attrs -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 

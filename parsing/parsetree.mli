@@ -511,6 +511,7 @@ and expression_desc =
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Pexp_quotation of expression (** runtime metaprogramming: quotations *)
+  | Pexp_quotation_type of core_type (** runtime metaprogramming: quotations of types *)
   | Pexp_splice of expression (** runtime metaprogramming: quotations *)
   | Pexp_hole (** _ *)
 

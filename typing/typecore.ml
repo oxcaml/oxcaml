@@ -6917,6 +6917,8 @@ and type_expect_
       exp_type = instance ty_expected;
       exp_attributes = sexp.pexp_attributes;
       exp_env = env }
+  | Pexp_quotation_type _ ->
+    assert false
   | Pexp_splice exp ->
     let argument_mode = mode_legacy in
     let ty = newgenconstr Predef.path_code [ty_expected] in

@@ -620,6 +620,7 @@ module E = struct
     | Pexp_comprehension c -> comprehension ~loc ~attrs (map_cexp sub c)
     | Pexp_overwrite (e1, e2) -> overwrite ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
     | Pexp_quotation e -> quotation ~loc ~attrs (sub.expr sub e)
+    | Pexp_quotation_type t -> quotation_type ~loc ~attrs (sub.typ sub t)
     | Pexp_splice e -> splice ~loc ~attrs (sub.expr sub e)
     | Pexp_hole -> hole ~loc ~attrs ()
 

@@ -178,6 +178,15 @@ let prepare_error err =
   | Malformed_instance_identifier loc ->
       Location.errorf ~loc
         "Syntax error: Unexpected in module instance"
+  | Unspliceable loc ->
+      Location.errorf ~loc
+        "Syntax error: expression cannot be spliced.\n\
+         @{<hint>Hint@}: considering putting parentheses around the \
+         expression."
+  | Unsupported loc ->
+    Location.errorf ~loc
+      "Syntax error: expressions that are quotations of types are \
+       not currently supported."
 
 let () =
   Location.register_error_of_exn

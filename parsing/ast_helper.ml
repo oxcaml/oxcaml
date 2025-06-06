@@ -258,6 +258,7 @@ module Exp = struct
   let comprehension ?loc ?attrs e = mk ?loc ?attrs (Pexp_comprehension e)
   let overwrite ?loc ?attrs a b = mk ?loc ?attrs (Pexp_overwrite (a, b))
   let quotation ?loc ?attrs e = mk ?loc ?attrs (Pexp_quotation e)
+  let quotation_type ?loc ?attrs t = mk ?loc ?attrs (Pexp_quotation_type t)
   let splice ?loc ?attrs e = mk ?loc ?attrs (Pexp_splice e)
   let hole ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
 

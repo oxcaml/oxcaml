@@ -287,6 +287,12 @@ let unclosed opening_name opening_loc closing_name closing_loc =
   raise(Syntaxerr.Error(Syntaxerr.Unclosed(make_loc opening_loc, opening_name,
                                            make_loc closing_loc, closing_name)))
 
+let unspliceable loc =
+  raise(Syntaxerr.Error(Syntaxerr.Unspliceable (make_loc loc)))
+
+let unsupported loc =
+  raise(Syntaxerr.Error(Syntaxerr.Unsupported (make_loc loc)))
+
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
    [Generic_array] module provides (1) a type representing the possible results,
@@ -999,6 +1005,7 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
 %token LESSLESS               "<<"
+%token LESSLESSCOLON          "<<:"
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -1121,8 +1128,8 @@ The precedences must be listed from low to high.
 %nonassoc below_LBRACKETAT
 %nonassoc LBRACKETAT
 %right    COLONCOLON                    /* expr (e :: e :: e) */
-%left     INFIXOP2 PLUS PLUSDOT MINUS MINUSDOT PLUSEQ /* expr (e OP e OP e) */
-%left     PERCENT INFIXOP3 MOD STAR                 /* expr (e OP e OP e) */
+%left     GREATERGREATER INFIXOP2 PLUS PLUSDOT MINUS MINUSDOT PLUSEQ /* expr (e OP e OP e) */
+%left     PERCENT INFIXOP3 MOD STAR     /* expr (e OP e OP e) */
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
 %nonassoc prec_unary_minus prec_unary_plus /* unary - */
@@ -1136,7 +1143,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT DOLLAR
+          NEW PREFIXOP STRING TRUE UIDENT LESSLESS DOLLAR LESSLESSCOLON
           LBRACKETPERCENT QUOTED_STRING_EXPR STACK HASHLBRACE HASHLPAREN
 
 
@@ -2614,6 +2621,17 @@ fun_seq_expr:
       let payload = PStr [mkstrexp seq []] in
       mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
 ;
+fun_seq_expr_quoted:
+  | fun_expr %prec below_HASH  { $1 }
+  | fun_expr SEMI              { $1 }
+  | mkexp(fun_expr SEMI or_function(fun_seq_expr_quoted)
+    { Pexp_sequence($1, $3) })
+    { $1 }
+  | fun_expr SEMI PERCENT attr_id or_function(fun_seq_expr_quoted)
+    { let seq = mkexp ~loc:$sloc (Pexp_sequence ($1, $5)) in
+      let payload = PStr [mkstrexp seq []] in
+      mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
+;
 seq_expr:
   | or_function(fun_seq_expr) { $1 }
 ;
@@ -2899,12 +2917,22 @@ fun_expr:
       { mkexp ~loc:$sloc (Pexp_construct($1, Some $2)) }
   | name_tag simple_expr %prec below_HASH
       { mkexp ~loc:$sloc (Pexp_variant($1, Some $2)) }
-  | DOLLAR simple_expr
-      { mkexp ~loc:$sloc (Pexp_splice $2) }
-  | LESSLESS expr GREATERGREATER
-      { mkexp ~loc:$sloc (Pexp_quotation $2) }
   | e1 = fun_expr op = op(infix_operator) e2 = expr
       { mkexp ~loc:$sloc (mkinfix e1 op e2) }
+;
+
+spliceable_expr:
+  | LPAREN seq_expr RPAREN
+      { reloc_exp ~loc:$sloc $2 }
+  | LPAREN seq_expr error
+      { unclosed "(" $loc($1) ")" $loc($3) }
+  | LPAREN seq_expr type_constraint_with_modes RPAREN
+      { let (t, m) = $3 in
+        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+  | mkrhs(val_longident)
+      { mkexp ~loc:$sloc (Pexp_ident ($1)) }
+  | error
+      { unspliceable $sloc }
 ;
 
 simple_expr:
@@ -3133,6 +3161,12 @@ comprehension_clause:
       { unclosed "(" $loc($3) ")" $loc($8) }
   | HASHLPAREN labeled_tuple RPAREN
       { Pexp_unboxed_tuple $2 }
+  | DOLLAR spliceable_expr
+      { Pexp_splice $2 }
+  | LESSLESS or_function(fun_seq_expr_quoted) GREATERGREATER
+      { Pexp_quotation $2 }
+  | LESSLESSCOLON core_type GREATERGREATER
+      { unsupported $sloc }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
@@ -4621,6 +4655,7 @@ tuple_type:
     - object types                < x: t; ... >
     - variant types               [ `A ]
     - extension                   [%foo ...]
+    - quoted types                << t >>
 
   We support local opens on the following classes of types:
     - parenthesised
@@ -4660,11 +4695,9 @@ delimited_type_supporting_local_open:
         { Ptyp_variant(fields, Closed, Some tags) }
     | HASHLPAREN unboxed_tuple_type_body RPAREN
         { Ptyp_unboxed_tuple $2 }
-    | LESSLESS type_ = core_type GREATERGREATER
-        { Ptyp_quote type_ }
-    | DOLLAR type_ = atomic_type
-        { Ptyp_splice type_ }
-)
+    | LESSLESS core_type GREATERGREATER
+        { Ptyp_quote $2 }
+  )
   { $1 }
 ;
 
@@ -4693,6 +4726,18 @@ delimited_type:
     { $1 }
 ;
 
+spliceable_type:
+  | type_ = delimited_type_supporting_local_open
+      { type_ }
+  | mktyp( /* begin mktyp group */
+        tid = mkrhs(type_longident)
+          { Ptyp_constr (tid, []) }
+      | QUOTE ident = ident
+          { Ptyp_var (ident, None) }
+  )
+  { $1 } /* end mktyp group */
+;
+
 atomic_type:
   | type_ = delimited_type
       { type_ }
@@ -4715,14 +4760,15 @@ atomic_type:
         { Ptyp_var (ident, None) }
     | UNDERSCORE
         { Ptyp_any None }
+    | DOLLAR type_ = spliceable_type
+        { Ptyp_splice type_ }
   )
   { $1 } /* end mktyp group */
   | LPAREN QUOTE name=ident COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$sloc (Ptyp_var (name, Some jkind)) }
   | LPAREN UNDERSCORE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
-
-
+;
 (* This is the syntax of the actual type parameters in an application of
    a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
    We allow one of the following:
@@ -4904,25 +4950,26 @@ operator:
   /* Still support the two symbols as infix operators */
   | AT             {"@"}
   | ATAT           {"@@"}
-  | op = INFIXOP1 { op }
-  | op = INFIXOP2 { op }
-  | op = infixop3 { op }
-  | op = INFIXOP4 { op }
-  | PLUS           {"+"}
-  | PLUSDOT       {"+."}
-  | PLUSEQ        {"+="}
-  | MINUS          {"-"}
-  | MINUSDOT      {"-."}
-  | STAR           {"*"}
-  | PERCENT        {"%"}
-  | EQUAL          {"="}
-  | LESS           {"<"}
-  | GREATER        {">"}
-  | OR            {"or"}
-  | BARBAR        {"||"}
-  | AMPERSAND      {"&"}
-  | AMPERAMPER    {"&&"}
-  | COLONEQUAL    {":="}
+  | op = INFIXOP1  { op }
+  | op = INFIXOP2  { op }
+  | op = infixop3  { op }
+  | op = INFIXOP4  { op }
+  | PLUS            {"+"}
+  | PLUSDOT        {"+."}
+  | PLUSEQ         {"+="}
+  | MINUS           {"-"}
+  | MINUSDOT       {"-."}
+  | STAR            {"*"}
+  | PERCENT         {"%"}
+  | EQUAL           {"="}
+  | LESS            {"<"}
+  | GREATER         {">"}
+  | GREATERGREATER {">>"}
+  | OR             {"or"}
+  | BARBAR         {"||"}
+  | AMPERSAND       {"&"}
+  | AMPERAMPER     {"&&"}
+  | COLONEQUAL     {":="}
 ;
 index_mod:
 | { "" }

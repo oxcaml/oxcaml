@@ -520,12 +520,18 @@ let identchar_latin1 =
 
 let symbolchar =
   ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '?' '@' '^' '|' '~']
+let symbolchar_not_less =
+  ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '=' '>' '?' '@' '^' '|' '~']
+let symbolchar_not_greater =
+  ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '?' '@' '^' '|' '~']
 let dotsymbolchar =
   ['!' '$' '%' '&' '*' '+' '-' '/' ':' '=' '>' '?' '@' '^' '|']
 let symbolchar_or_hash =
   symbolchar | '#'
 let kwdopchar =
   ['$' '&' '*' '+' '-' '/' '<' '=' '>' '@' '^' '|']
+let opchar =
+  ['%' '&' '*' '.' '/' '<' '=' '?' '@' '^' '|' '~']
 
 let ident = (lowercase | uppercase) identchar*
 let extattrident = ident ('.' ident)*
@@ -734,86 +740,93 @@ rule token = parse
         then HASH
         else try directive Hash lexbuf with Failure _ -> HASH
       }
-  | "&"  { AMPERSAND }
-  | "&&" { AMPERAMPER }
-  | "`"  { BACKQUOTE }
-  | "\'" { QUOTE }
-  | "("  { LPAREN }
-  | ")"  { RPAREN }
-  | "#(" { HASHLPAREN }
-  | "#{" { HASHLBRACE }
-  | "*"  { STAR }
-  | ","  { COMMA }
-  | "->" { MINUSGREATER }
-  | "$"  { DOLLAR }
-  | "."  { DOT }
-  | ".." { DOTDOT }
-  | ".#" { DOTHASH }
+  | "&"    { AMPERSAND }
+  | "&&"   { AMPERAMPER }
+  | "`"    { BACKQUOTE }
+  | "\'"   { QUOTE }
+  | "("    { LPAREN }
+  | ")"    { RPAREN }
+  | "#("   { HASHLPAREN }
+  | "#{"   { HASHLBRACE }
+  | "*"    { STAR }
+  | ","    { COMMA }
+  | "->"   { MINUSGREATER }
+  | "$"    { DOLLAR }
+  | "."    { DOT }
+  | ".."   { DOTDOT }
+  | ".#"   { DOTHASH }
   | "." (dotsymbolchar symbolchar* as op) { DOTOP op }
-  | ":"  { COLON }
-  | "::" { COLONCOLON }
-  | ":=" { COLONEQUAL }
-  | ":>" { COLONGREATER }
-  | ";"  { SEMI }
-  | ";;" { SEMISEMI }
-  | "<"  { LESS }
-  | "<<"  { LESSLESS }
-  | "<-" { LESSMINUS }
-  | "="  { EQUAL }
-  | "["  { LBRACKET }
-  | "[|" { LBRACKETBAR }
-  | "[:" { LBRACKETCOLON }
-  | "[<" { LBRACKETLESS }
-  | "[>" { LBRACKETGREATER }
-  | "]"  { RBRACKET }
-  | "{"  { LBRACE }
-  | "{<" { LBRACELESS }
-  | "|"  { BAR }
-  | "||" { BARBAR }
-  | "|]" { BARRBRACKET }
-  | ":]" { COLONRBRACKET }
-  | ">"  { GREATER }
-  | ">>"  { GREATERGREATER }
-  | ">]" { GREATERRBRACKET }
-  | "}"  { RBRACE }
-  | ">}" { GREATERRBRACE }
-  | "[@" { LBRACKETAT }
+  | ":"    { COLON }
+  | "::"   { COLONCOLON }
+  | ":="   { COLONEQUAL }
+  | ":>"   { COLONGREATER }
+  | ";"    { SEMI }
+  | ";;"   { SEMISEMI }
+  | "<"    { LESS }
+  | "<<"   { LESSLESS }
+  | "<<:"  { LESSLESSCOLON }
+  | "<-"   { LESSMINUS }
+  | "="    { EQUAL }
+  | "["    { LBRACKET }
+  | "[|"   { LBRACKETBAR }
+  | "[:"   { LBRACKETCOLON }
+  | "[<"   { LBRACKETLESS }
+  | "[>"   { LBRACKETGREATER }
+  | "]"    { RBRACKET }
+  | "{"    { LBRACE }
+  | "{<"   { LBRACELESS }
+  | "|"    { BAR }
+  | "||"   { BARBAR }
+  | "|]"   { BARRBRACKET }
+  | ":]"   { COLONRBRACKET }
+  | ">"    { GREATER }
+  | ">>"   { GREATERGREATER }
+  | ">]"   { GREATERRBRACKET }
+  | "}"    { RBRACE }
+  | ">}"   { GREATERRBRACE }
+  | "[@"   { LBRACKETAT }
   | "[@@"  { LBRACKETATAT }
   | "[@@@" { LBRACKETATATAT }
   | "[%"   { LBRACKETPERCENT }
   | "[%%"  { LBRACKETPERCENTPERCENT }
-  | "!"  { BANG }
-  | "!=" { INFIXOP0 "!=" }
-  | "+"  { PLUS }
-  | "+." { PLUSDOT }
-  | "+=" { PLUSEQ }
-  | "-"  { MINUS }
-  | "-." { MINUSDOT }
+  | "!"    { BANG }
+  | "!="   { INFIXOP0 "!=" }
+  | "+"    { PLUS }
+  | "+."   { PLUSDOT }
+  | "+="   { PLUSEQ }
+  | "-"    { MINUS }
+  | "-."   { MINUSDOT }
 
   | "!" symbolchar_or_hash + as op
-            { PREFIXOP op }
+           { PREFIXOP op }
   | ['~' '?'] symbolchar_or_hash + as op
-            { PREFIXOP op }
-  | ['=' '<' '>' '|' '&' '$'] symbolchar * as op
-            { INFIXOP0 op }
-  | "@" { AT }
-  | "@@" { ATAT }
+           { PREFIXOP op }
+  | ['=' '|' '&' '>'] symbolchar * as op
+           { INFIXOP0 op }
+  | ['<'] symbolchar_not_less symbolchar * as op
+    { INFIXOP0 op }
+  | "<<" opchar + as op
+           { INFIXOP0 op }
+  | '$' symbolchar + as op
+           { INFIXOP0 op }
+  | "@"    { AT }
+  | "@@"   { ATAT }
   | ['@' '^'] symbolchar * as op
-            { INFIXOP1 op }
+           { INFIXOP1 op }
   | ['+' '-'] symbolchar * as op
-            { INFIXOP2 op }
+           { INFIXOP2 op }
   | "**" symbolchar * as op
-            { INFIXOP4 op }
-  | '%'     { PERCENT }
+           { INFIXOP4 op }
+  | '%'    { PERCENT }
   | ['*' '/' '%'] symbolchar * as op
-            { INFIXOP3 op }
+           { INFIXOP3 op }
   | '#' symbolchar_or_hash + as op
-            { HASHOP op }
+           { HASHOP op }
   | "let" kwdopchar dotsymbolchar * as op
-            { LETOP op }
+           { LETOP op }
   | "and" kwdopchar dotsymbolchar * as op
-            { ANDOP op }
-  | eof { EOF }
+           { ANDOP op }
+  | eof    { EOF }
   | (_ as illegal_char)
       { error lexbuf (Illegal_character illegal_char) }
 
