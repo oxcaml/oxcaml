@@ -818,9 +818,10 @@ let emit_instr env i =
         | Single ->
             `	ldr	s7, {emit_addressing addressing_mode base}\n`;
             `	fcvt	{emit_reg dst}, s7\n`
-        | Word_int | Word_val ->
+        | Sixtyfour | Word_int | Word_val ->
             if is_atomic then begin
               assert (addressing_mode = Iindexed 0);
+              assert (not (memory_chunk = Sixtyfour));
               `	dmb	ishld\n`;
               `	ldar	{emit_reg dst}, [{emit_reg i.arg.(0)}]\n`
             end else
@@ -849,6 +850,8 @@ let emit_instr env i =
         | Single ->
             `	fcvt	s7, {emit_reg src}\n`;
             `	str	s7, {emit_addressing addr base}\n`;
+        | Sixtyfour ->
+            `	str	{emit_reg src}, {emit_addressing addr base}\n`
         | Word_int | Word_val ->
             begin match assignment, macosx with
             | true, true ->
