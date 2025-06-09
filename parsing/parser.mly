@@ -968,7 +968,6 @@ let maybe_pmod_constraint mode expr =
 %token FUNCTOR                "functor"
 %token GLOBAL                 "global_"
 %token GREATER                ">"
-%token GREATERGREATER         ">>"
 %token GREATERRBRACE          ">}"
 %token GREATERRBRACKET        ">]"
 %token HASHLPAREN             "#("
@@ -1004,8 +1003,8 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKETPERCENT        "[%"
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
-%token LESSLESS               "<<"
-%token LESSLESSCOLON          "<<:"
+%token LESSLBRACKET           "<["
+%token LESSLBRACKETCOLON      "<[:"
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -1042,6 +1041,7 @@ let maybe_pmod_constraint mode expr =
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
+%token RBRACKETGREATER        "]>"
 %token REC                    "rec"
 %token RPAREN                 ")"
 %token SEMI                   ";"
@@ -1128,7 +1128,7 @@ The precedences must be listed from low to high.
 %nonassoc below_LBRACKETAT
 %nonassoc LBRACKETAT
 %right    COLONCOLON                    /* expr (e :: e :: e) */
-%left     GREATERGREATER INFIXOP2 PLUS PLUSDOT MINUS MINUSDOT PLUSEQ /* expr (e OP e OP e) */
+%left     INFIXOP2 PLUS PLUSDOT MINUS MINUSDOT PLUSEQ /* expr (e OP e OP e) */
 %left     PERCENT INFIXOP3 MOD STAR     /* expr (e OP e OP e) */
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
@@ -1143,7 +1143,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT LESSLESS DOLLAR LESSLESSCOLON
+          NEW PREFIXOP STRING TRUE UIDENT DOLLAR LESSLBRACKET LESSLBRACKETCOLON
           LBRACKETPERCENT QUOTED_STRING_EXPR STACK HASHLBRACE HASHLPAREN
 
 
@@ -2621,17 +2621,6 @@ fun_seq_expr:
       let payload = PStr [mkstrexp seq []] in
       mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
 ;
-fun_seq_expr_quoted:
-  | fun_expr %prec below_HASH  { $1 }
-  | fun_expr SEMI              { $1 }
-  | mkexp(fun_expr SEMI or_function(fun_seq_expr_quoted)
-    { Pexp_sequence($1, $3) })
-    { $1 }
-  | fun_expr SEMI PERCENT attr_id or_function(fun_seq_expr_quoted)
-    { let seq = mkexp ~loc:$sloc (Pexp_sequence ($1, $5)) in
-      let payload = PStr [mkstrexp seq []] in
-      mkexp ~loc:$sloc (Pexp_extension ($4, payload)) }
-;
 seq_expr:
   | or_function(fun_seq_expr) { $1 }
 ;
@@ -2782,21 +2771,21 @@ let_pattern_no_modes:
    { pat, Some cty }
 ;
 
-%inline indexop_expr(dot, index, right):
-  | array=simple_expr d=dot LPAREN i=index RPAREN r=right
+%inline indexop_expr(dot, index, expr_type, right):
+  | array=expr_type d=dot LPAREN i=index RPAREN r=right
     { array, d, Paren,   i, r }
-  | array=simple_expr d=dot LBRACE i=index RBRACE r=right
+  | array=expr_type d=dot LBRACE i=index RBRACE r=right
     { array, d, Brace,   i, r }
-  | array=simple_expr d=dot LBRACKET i=index RBRACKET r=right
+  | array=expr_type d=dot LBRACKET i=index RBRACKET r=right
     { array, d, Bracket, i, r }
 ;
 
-%inline indexop_error(dot, index):
-  | simple_expr dot _p=LPAREN index  _e=error
+%inline indexop_error(dot, index, expr_type):
+  | expr_type dot _p=LPAREN index  _e=error
     { indexop_unclosed_error $loc(_p)  Paren $loc(_e) }
-  | simple_expr dot _p=LBRACE index  _e=error
+  | expr_type dot _p=LBRACE index  _e=error
     { indexop_unclosed_error $loc(_p) Brace $loc(_e) }
-  | simple_expr dot _p=LBRACKET index  _e=error
+  | expr_type dot _p=LBRACKET index  _e=error
     { indexop_unclosed_error $loc(_p) Bracket $loc(_e) }
 ;
 
@@ -2820,7 +2809,7 @@ optional_atomic_constraint_:
 fun_expr:
     simple_expr %prec below_HASH
       { $1 }
-  | fun_expr_attrs
+  | fun_expr_attrs(seq_expr)
       { let desc, attrs = $1 in
         mkexp_attrs ~loc:$sloc desc attrs }
     /* Cf #5939: we used to accept (fun p when e0 -> e) */
@@ -2844,9 +2833,9 @@ fun_expr:
       { mkexp ~loc:$sloc (Pexp_setinstvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
-  | indexop_expr(DOT, seq_expr, LESSMINUS v=expr {Some v})
+  | indexop_expr(DOT, seq_expr, simple_expr, LESSMINUS v=expr {Some v})
     { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
-  | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})
+  | indexop_expr(qualified_dotop, expr_semi_list, simple_expr, LESSMINUS v=expr {Some v})
     { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
   | fun_expr attribute
       { Exp.attr $1 $2 }
@@ -2860,33 +2849,33 @@ fun_expr:
 %inline expr:
   | or_function(fun_expr) { $1 }
 ;
-%inline fun_expr_attrs:
-  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
+%inline fun_expr_attrs(expr_type):
+  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN expr_type
       {
         let name, modes = $4 in
         let body = maybe_pmod_constraint modes $5 in
         Pexp_letmodule(name, body, $7), $3 }
-  | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
+  | LET EXCEPTION ext_attributes let_exception_declaration IN expr_type
       { Pexp_letexception($4, $6), $3 }
-  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
+  | LET OPEN override_flag ext_attributes module_expr IN expr_type
       { let open_loc = make_loc ($startpos($2), $endpos($5)) in
         let od = Opn.mk $5 ~override:$3 ~loc:open_loc in
         Pexp_open(od, $7), $4 }
-  | MATCH ext_attributes seq_expr WITH match_cases
+  | MATCH ext_attributes expr_type WITH match_cases
       { Pexp_match($3, $5), $2 }
-  | TRY ext_attributes seq_expr WITH match_cases
+  | TRY ext_attributes expr_type WITH match_cases
       { Pexp_try($3, $5), $2 }
-  | TRY ext_attributes seq_expr WITH error
+  | TRY ext_attributes expr_type WITH error
       { syntax_error() }
-  | OVERWRITE ext_attributes seq_expr WITH expr
+  | OVERWRITE ext_attributes expr_type WITH expr
       { Pexp_overwrite($3, $5), $2 }
-  | IF ext_attributes seq_expr THEN expr ELSE expr
+  | IF ext_attributes expr_type THEN expr ELSE expr
       { Pexp_ifthenelse($3, $5, Some $7), $2 }
-  | IF ext_attributes seq_expr THEN expr
+  | IF ext_attributes expr_type THEN expr
       { Pexp_ifthenelse($3, $5, None), $2 }
-  | WHILE ext_attributes seq_expr do_done_expr
+  | WHILE ext_attributes expr_type do_done_expr
       { Pexp_while($3, $4), $2 }
-  | FOR ext_attributes pattern EQUAL seq_expr direction_flag seq_expr
+  | FOR ext_attributes pattern EQUAL expr_type direction_flag expr_type
     do_done_expr
       { Pexp_for($3, $5, $7, $6, $8), $2 }
   | ASSERT ext_attributes simple_expr %prec below_HASH
@@ -2943,14 +2932,14 @@ simple_expr:
   | LPAREN seq_expr type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
         mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
-  | indexop_expr(DOT, seq_expr, { None })
+  | indexop_expr(DOT, seq_expr, simple_expr, { None })
       { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   (* Immutable array indexing is a regular operator, so it doesn't need its own
      rule and is handled by the next case *)
-  | indexop_expr(qualified_dotop, expr_semi_list, { None })
+  | indexop_expr(qualified_dotop, expr_semi_list, simple_expr, { None })
       { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
-  | indexop_error (DOT, seq_expr) { $1 }
-  | indexop_error (qualified_dotop, expr_semi_list) { $1 }
+  | indexop_error (DOT, seq_expr, simple_expr) { $1 }
+  | indexop_error (qualified_dotop, expr_semi_list, simple_expr) { $1 }
   | simple_expr_attrs
     { let desc, attrs = $1 in
       mkexp_attrs ~loc:$sloc desc attrs }
@@ -3163,9 +3152,9 @@ comprehension_clause:
       { Pexp_unboxed_tuple $2 }
   | DOLLAR spliceable_expr
       { Pexp_splice $2 }
-  | LESSLESS or_function(fun_seq_expr_quoted) GREATERGREATER
+  | LESSLBRACKET fun_seq_expr RBRACKETGREATER
       { Pexp_quotation $2 }
-  | LESSLESSCOLON core_type GREATERGREATER
+  | LESSLBRACKETCOLON core_type RBRACKETGREATER
       { unsupported $sloc }
 ;
 labeled_simple_expr:
@@ -4695,7 +4684,7 @@ delimited_type_supporting_local_open:
         { Ptyp_variant(fields, Closed, Some tags) }
     | HASHLPAREN unboxed_tuple_type_body RPAREN
         { Ptyp_unboxed_tuple $2 }
-    | LESSLESS core_type GREATERGREATER
+    | LESSLBRACKET core_type RBRACKETGREATER
         { Ptyp_quote $2 }
   )
   { $1 }
@@ -4964,7 +4953,6 @@ operator:
   | EQUAL           {"="}
   | LESS            {"<"}
   | GREATER         {">"}
-  | GREATERGREATER {">>"}
   | OR             {"or"}
   | BARBAR         {"||"}
   | AMPERSAND       {"&"}
