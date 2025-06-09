@@ -488,15 +488,13 @@ module Size = struct
         match addressing_mode with
         | Iindexed _ -> 0
         | Ibased _ -> 1
-      in
-      let pre_store =
+      and pre_store =
         match memory_chunk, assignment, macosx, addressing_mode with
         | (Word_int | Word_val), true, true, Iindexed 0 -> 0
         | (Word_int | Word_val), true, true, _ -> 1  (* Compute dest address *)
         | (Word_int | Word_val), true, false, _ -> 1 (* Barrier instruction *)
         | _ -> 0
-      in
-      let store = match memory_chunk with Single -> 2 | _ -> 1 in
+      and store = match memory_chunk with Single -> 2 | _ -> 1 in
       based + pre_store + store
     | Lop (Ialloc _) when f.fun_fast -> 5
     | Lop (Ispecific (Ialloc_far _)) when f.fun_fast -> 6
@@ -688,8 +686,22 @@ let name_for_float_comparison = function
   | CFge -> "ge"
   | CFnge -> "lt"
 
-(* Output the assembly code for an instruction *)
+(* Output a release store [stlr] of register [src] at address [base + addr].
+   Since [stlr] does not support addressing modes, we compute [base + addr]
+   explicitly. *)
+let emit_stlr src base addr =
+  assert macosx;
+  let dest_reg =
+    match addr with
+    | Iindexed 0 -> base
+    | Iindexed ofs ->
+        `	add	{emit_reg reg_tmp1}, {emit_reg base}, #{emit_int ofs}\n`;
+        reg_tmp1
+    | Ibased _ -> assert false (* Ibased is not emitted under macOS *)
+  in
+  `	stlr	{emit_reg src}, [{emit_reg dest_reg}]\n`
 
+(* Output the assembly code for an instruction *)
 let emit_instr env i =
     emit_debug_info i.dbg;
     match i.desc with
@@ -855,29 +867,15 @@ let emit_instr env i =
         | Word_int | Word_val ->
             begin match assignment, macosx with
             | true, true ->
-                (* Memory model barrier for non-initializing store on Apple
-                   Silicon processors. See
-                   https://github.com/ocaml/ocaml/issues/13262 *)
-                let dest_reg =
-                  begin match addr with
-                  | Iindexed 0 -> base
-                  | Iindexed ofs ->
-                      `	add	{emit_reg reg_tmp1}, {emit_reg base}, #{emit_int ofs}\n`;
-                      reg_tmp1
-                  | Ibased (s, ofs) ->
-                      assert (not !Clflags.dlcode);
-                      `	add	{emit_reg reg_tmp1}, {emit_reg base}, #:lo12:{emit_symbol_offset s ofs}\n`;
-                      reg_tmp1
-                  end
-                in
-                `	stlr	{emit_reg src}, [{emit_reg dest_reg}]\n`
+                (* Release store for assignments on macOS. See
+                   https://github.com/ocaml/ocaml/issues/13262. *)
+                emit_stlr src base addr
             | true, false ->
-                (* Memory model barrier for non-initializing store on non-Apple
-                   Silicon processors. *)
+                (* Memory model barrier for assignments. *)
                 `	dmb	ishld\n`;
                 `	str	{emit_reg src}, {emit_addressing addr base}\n`
             | _, _ ->
-                (* Initialising store *)
+                (* Initializing store *)
                 `	str	{emit_reg src}, {emit_addressing addr base}\n`
             end
         | Double ->
