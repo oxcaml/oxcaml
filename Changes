@@ -22,6 +22,10 @@ Working version
 
 ### Runtime system:
 
+- #14035: Fix the alignment of _Atomic long long unsigned int fields
+  before GCC 11.1 on i686. Silence GCC note on newer versions.
+  (Antonin Décimo, review by Sadiq Jaffer)
+
 - #13574, #13594: Generational scanning of stack frames for ARM 64 bits, POWER,
   and RISC-V.  This reduces minor GC work in the presence of deep call stacks.
   (Xavier Leroy, review by Miod Vallat, Gabriel Scherer and Olivier Nicole)
