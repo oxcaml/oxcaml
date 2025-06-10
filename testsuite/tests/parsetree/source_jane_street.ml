@@ -1496,7 +1496,7 @@ let triangle_10 = let mutable x = 0 in
   for i = 1 to 10 do
     x <- x + i
   done;
-  x
+  (x : int)
 ;;
 
 [%%expect{|
