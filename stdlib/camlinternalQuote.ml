@@ -1713,7 +1713,7 @@ module Ast = struct
     | Ifthenelse (cond, then_, else_) -> (
       pp fmt "@[if@ %a@ @[<2>then@ %a@]"
         (print_exp_with_parens env)
-        cond (print_exp env) then_;
+        cond (print_exp_with_parens env) then_;
       match else_ with
       | Some else_ -> pp fmt "@ @[<2>else@ %a@]" (print_exp env) else_
       | None -> pp fmt "@]")

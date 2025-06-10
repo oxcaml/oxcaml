@@ -1055,6 +1055,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
+  | Ptyp_quote _ -> assert false
+  | Ptyp_splice _ -> assert false
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 

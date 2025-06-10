@@ -160,36 +160,36 @@ module Make (A : Asm_directives_intf.Arg) : Asm_directives_intf.S = struct
     if A.debugging_comments_in_asm_files then Option.iter D.comment comment;
     f x
 
-  let ( >> ) f g x = g (f x)
+  let ( >>. ) f g x = g (f x)
 
   let int8 =
-    with_comment (Int8.to_int >> Int64.of_int >> D.const_int64 >> D.byte)
+    with_comment (Int8.to_int >>. Int64.of_int >>. D.const_int64 >>. D.byte)
 
   let int16 =
-    with_comment (Int16.to_int >> Int64.of_int >> D.const_int64 >> D.word)
+    with_comment (Int16.to_int >>. Int64.of_int >>. D.const_int64 >>. D.word)
 
-  let int32 = with_comment (Int64.of_int32 >> D.const_int64 >> D.long)
+  let int32 = with_comment (Int64.of_int32 >>. D.const_int64 >>. D.long)
 
-  let int64 = with_comment (D.const_int64 >> D.qword)
+  let int64 = with_comment (D.const_int64 >>. D.qword)
 
   let uint8 =
-    with_comment (Uint8.to_int >> Int64.of_int >> D.const_int64 >> D.byte)
+    with_comment (Uint8.to_int >>. Int64.of_int >>. D.const_int64 >>. D.byte)
 
   let uint16 =
-    with_comment (Uint16.to_int >> Int64.of_int >> D.const_int64 >> D.word)
+    with_comment (Uint16.to_int >>. Int64.of_int >>. D.const_int64 >>. D.word)
 
-  let uint32 = with_comment (Uint32.to_int64 >> D.const_int64 >> D.long)
+  let uint32 = with_comment (Uint32.to_int64 >>. D.const_int64 >>. D.long)
 
-  let uint64 = with_comment (Uint64.to_int64 >> D.const_int64 >> D.qword)
+  let uint64 = with_comment (Uint64.to_int64 >>. D.const_int64 >>. D.qword)
 
   let targetint ?comment num =
     match Targetint.repr num with
     | Int32 n -> int32 ?comment n
     | Int64 n -> int64 ?comment n
 
-  let uleb128 = with_comment (Uint64.to_int64 >> D.const_int64 >> D.uleb128)
+  let uleb128 = with_comment (Uint64.to_int64 >>. D.const_int64 >>. D.uleb128)
 
-  let sleb128 = with_comment (D.const_int64 >> D.sleb128)
+  let sleb128 = with_comment (D.const_int64 >>. D.sleb128)
 
   let assert_string_has_no_null_bytes s =
     assert (not (String.contains s '\x00'))
