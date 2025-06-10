@@ -1,0 +1,212 @@
+(* TEST
+ expect;
+*)
+
+type unit_u : void
+
+(* Variants whose constructor arguments are all void are immediates *)
+
+type v : immediate = A of unit_u
+[%%expect{|
+type unit_u : void
+type v = A of unit_u
+|}]
+
+type v : immediate = A of unit_u | B of #(unit_u * #(unit_u * unit_u)) | C
+[%%expect{|
+type v = A of unit_u | B of #(unit_u * #(unit_u * unit_u)) | C
+|}]
+
+type bad : immediate = A of unit_u | B of int
+[%%expect{|
+Line 1, characters 0-45:
+1 | type bad : immediate = A of unit_u | B of int
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bad" is immutable_data with unit_u
+         because it's a boxed variant type.
+       But the kind of type "bad" must be a subkind of immediate
+         because of the annotation on the declaration of the type bad.
+|}]
+
+(* All-void records are not allowed *)
+type u1 = #{ a: unit_u }
+type u2 = #{ a: unit_u; b: unit_u }
+type u3 = { a : unit_u } [@@unboxed]
+type u4 = #{ a: u2 }
+type u5 = #{ a: u3 }
+[%%expect{|
+type u1 = #{ a : unit_u; }
+type u2 = #{ a : unit_u; b : unit_u; }
+type u3 = { a : unit_u; } [@@unboxed]
+type u4 = #{ a : u2; }
+type u5 = #{ a : u3; }
+|}]
+
+type bad = { a : unit_u }
+[%%expect{|
+Line 1, characters 0-25:
+1 | type bad = { a : unit_u }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = { a : #(unit_u * unit_u) }
+[%%expect{|
+Line 1, characters 0-37:
+1 | type bad = { a : #(unit_u * unit_u) }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = { a : u1 }
+[%%expect{|
+Line 1, characters 0-21:
+1 | type bad = { a : u1 }
+    ^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = { a : u2 }
+[%%expect{|
+Line 1, characters 0-21:
+1 | type bad = { a : u2 }
+    ^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = { a : u3 }
+[%%expect{|
+Line 1, characters 0-21:
+1 | type bad = { a : u3 }
+    ^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = { a : u4 }
+[%%expect{|
+Line 1, characters 0-21:
+1 | type bad = { a : u4 }
+    ^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = { a : u5 }
+[%%expect{|
+Line 1, characters 0-21:
+1 | type bad = { a : u5 }
+    ^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+
+type bad = A of { a : unit_u }
+[%%expect{|
+Line 1, characters 11-30:
+1 | type bad = A of { a : unit_u }
+               ^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = A of { a : #(unit_u * unit_u) }
+[%%expect{|
+Line 1, characters 11-42:
+1 | type bad = A of { a : #(unit_u * unit_u) }
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = A of { a : u1 }
+[%%expect{|
+Line 1, characters 11-26:
+1 | type bad = A of { a : u1 }
+               ^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = A of { a : u2 }
+[%%expect{|
+Line 1, characters 11-26:
+1 | type bad = A of { a : u2 }
+               ^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = A of { a : u3 }
+[%%expect{|
+Line 1, characters 11-26:
+1 | type bad = A of { a : u3 }
+               ^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = A of { a : u4 }
+[%%expect{|
+Line 1, characters 11-26:
+1 | type bad = A of { a : u4 }
+               ^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+type bad = A of { a : u5 }
+[%%expect{|
+Line 1, characters 11-26:
+1 | type bad = A of { a : u5 }
+               ^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+
+(* [void] in arrays is not yet allowed *)
+
+external length : ('a : any_non_null) . 'a array -> int = "%array_length"
+[@@layout_poly]
+external get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
+[@@layout_poly]
+[%%expect{|
+external length : ('a : any_non_null). 'a array -> int = "%array_length"
+  [@@layout_poly]
+external get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
+  [@@layout_poly]
+|}]
+
+let f (a : unit_u array) = length a
+[%%expect{|
+Line 1, characters 27-35:
+1 | let f (a : unit_u array) = length a
+                               ^^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
+
+let f (a : #(int * unit_u) array) = length a
+[%%expect{|
+Line 1, characters 36-44:
+1 | let f (a : #(int * unit_u) array) = length a
+                                        ^^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
+
+let f (a : unit_u array) i = get a i
+[%%expect{|
+Line 1, characters 29-36:
+1 | let f (a : unit_u array) i = get a i
+                                 ^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
+
+let f (a : #(int * unit_u) array) i = get a i
+[%%expect{|
+Line 1, characters 38-45:
+1 | let f (a : #(int * unit_u) array) i = get a i
+                                          ^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
+
+let f (a : u1 array) i = get a i
+[%%expect{|
+Line 1, characters 25-32:
+1 | let f (a : u1 array) i = get a i
+                             ^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
+
+let f (a : u2 array) i = get a i
+[%%expect{|
+Line 1, characters 25-32:
+1 | let f (a : u2 array) i = get a i
+                             ^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
+
+let f (a : u3 array) i = get a i
+[%%expect{|
+Line 1, characters 25-32:
+1 | let f (a : u3 array) i = get a i
+                             ^^^^^^^
+Error: Types whose layout contains [void] are yet supported in arrays.
+|}]
