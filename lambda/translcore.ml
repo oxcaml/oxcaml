@@ -41,18 +41,6 @@ exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
-(* CR layouts v7: In the places where this is used, we will want to allow
-   float#, but not void yet (e.g., the left of a semicolon and loop bodies).  we
-   still default to value before checking for void, to allow for sort variables
-   arising in situations like
-
-     let foo () = raise Foo; ()
-
-   When this sanity check is removed, consider whether we are still defaulting
-   appropriately.
-*)
-(* CR rtjoa: consider above *)
-
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
