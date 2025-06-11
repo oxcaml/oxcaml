@@ -79,7 +79,7 @@ Working version
   ```
   Before, it failed with a subtyping error. Now, it fails with a proper error,
   explaining that `X1` would keep an invalid alias to `F(X)`
-  (Clement Blaudeau, review by ?)
+  (Clement Blaudeau, review by Florian Angeletti)
 
 ### Other libraries:
 
