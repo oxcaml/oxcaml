@@ -49,6 +49,13 @@ module Unboxed_array_tags = struct
   let unboxed_nativeint_array_tag = 9
 end
 
+let check_equal_1 name f1 f2 arg1 =
+  let r1 = f1 arg1 in
+  let r2 = f2 arg1 in
+  if r1 = r2 then r1
+  else Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a"
+      name Printcmm.expression r1 Printcmm.expression r2
+
 let check_equal_3 name f1 f2 arg1 arg2 arg3 =
   let r1 = f1 arg1 arg2 arg3 in
   let r2 = f2 arg1 arg2 arg3 in
@@ -564,6 +571,17 @@ let ignore_low_bit_int = function
     c
   | Cop (Cor, [c; Cconst_int (1, _)], _) -> c
   | c -> c
+
+let ignore_low_bit_int' arg =
+  P.run arg [
+    When (Binop (Add, As (c, Binop (Lsl, Any c1, Const_int n)), Const_int_fixed 1),
+          (fun e -> e#.n > 0 && is_defined_shift e#.n))
+    => (fun e -> e#.c);
+    Binop (Or, Any c, Const_int_fixed 1) => (fun e -> e#.c)
+  ]
+
+let ignore_low_bit_int =
+  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
 
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
