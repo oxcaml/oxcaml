@@ -302,6 +302,12 @@ let rec core_type i ppf x =
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
+  | Ttyp_quote t ->
+      line i ppf "Ttyp_quote\n";
+      core_type i ppf t
+  | Ttyp_splice t ->
+      line i ppf "Ttyp_splice\n";
+      core_type i ppf t
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
 
 and labeled_core_type i ppf (l, t) =

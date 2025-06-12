@@ -338,6 +338,9 @@ type lock =
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
+  | Local_env_lock (* to allow reference of top-level names inside quotations *)
+  | Quotation_lock
+  | Splice_lock
 
 type locks = lock list
 
@@ -641,6 +644,7 @@ type t = {
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
   flags: int;
+  stage: int;
 }
 
 and module_components =
@@ -806,6 +810,7 @@ type lookup_error =
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | Error_from_persistent_env of Persistent_env.error
+  | Incompatible_stage of Longident.t * Location.t * int
 
 type error =
   | Missing_module of Location.t * Path.t * Path.t
@@ -911,6 +916,7 @@ let empty = {
   summary = Env_empty; local_constraints = Path.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
+  stage = 0;
  }
 
 let in_signature b env =
@@ -2607,6 +2613,15 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
+let add_local_env_lock env = add_lock Local_env_lock env
+
+let add_quotation_lock env = add_lock Quotation_lock {env with stage = env.stage + 1}
+
+let add_splice_lock env = add_lock Splice_lock {env with stage = env.stage - 1}
+
+let without_open_quotations env = env.stage = 0
+let has_open_quotations env = env.stage <> 0
+
 (* Insertion of all components of a signature *)
 
 let proj_shape map mod_shape item =
@@ -3137,13 +3152,40 @@ let walk_locks ~errors ~loc ~env ~item ~lid mode ty locks =
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc ~lid ty;
           vmode
+      | Quotation_lock | Splice_lock | Local_env_lock -> vmode
     ) vmode locks
+
+let quotation_locks_offset locks =
+  List.fold_right
+    (fun lock rel_stage ->
+       match rel_stage with
+       | None -> None
+       | Some n ->
+         match lock with
+         | Quotation_lock -> Some (n + 1)
+         | Splice_lock -> Some (n - 1)
+         | Local_env_lock -> None
+         | Escape_lock _
+         | Exclave_lock
+         | Region_lock
+         | Unboxed_lock
+         | Share_lock _
+         | Closure_lock _  -> Some n)
+    locks
+    (Some 0)
 
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
-  | Ok (path, locks, Val_bound vda) ->
-      use_value ~use ~loc path vda;
-      path, locks, vda
+  | Ok (path, locks, Val_bound vda) -> begin
+      match quotation_locks_offset locks with
+      | None | Some 0 -> begin
+          use_value ~use ~loc path vda;
+          path, locks, vda
+        end
+      | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident name, vda.vda_description.val_loc, n))
+    end
   | Ok (_, _, Val_unbound reason) ->
       report_value_unbound ~errors ~loc env reason (Lident name)
   | Error _ ->
@@ -4256,6 +4298,13 @@ let print_lock_item ppf (item, lid) =
 
 module Style = Misc.Style
 
+let format_stage_diff ppf = function
+  | 1 -> fprintf ppf "1 stage ahead of"
+  | -1 -> fprintf ppf "1 stage before"
+  | n ->
+      if n > 0 then fprintf ppf "%d stages ahead of" n
+      else fprintf ppf "%d stages before" n
+
 let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a"
@@ -4452,6 +4501,19 @@ let report_lookup_error _loc env ppf = function
            ~offender:(fun ppf -> !print_type_expr ppf typ)) err
   | Error_from_persistent_env err ->
       Persistent_env.report_error ppf err
+  | Incompatible_stage (lid, def_loc, stage_diff) ->
+      let (_, line, c_start) =
+        Location.get_pos_info def_loc.Location.loc_start
+      and (_, _, c_end) =
+        Location.get_pos_info def_loc.Location.loc_end
+      in
+      fprintf ppf
+        "@[Identifier %a is used inside a quotation (<[ ... ]>)@ \
+         or splice ($), %a its introduction on@ \
+         line %i, %i-%i@]"
+        (Style.as_inline_code !print_longident) lid
+        format_stage_diff stage_diff
+        line c_start c_end
 
 let report_error ppf = function
   | Missing_module(_, path1, path2) ->

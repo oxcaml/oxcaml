@@ -143,7 +143,7 @@ val check_partial:
         ?lev:int -> Env.t -> type_expr ->
         Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
 val type_expect:
-        Env.t -> Parsetree.expression -> type_expected -> Typedtree.expression
+        Env.t  -> Parsetree.expression -> type_expected -> Typedtree.expression
 val type_exp:
         Env.t -> Parsetree.expression -> Typedtree.expression
 val type_approx:
@@ -324,6 +324,9 @@ type error =
   | Impossible_function_jkind of type_expr * jkind_lr
   | Overwrite_of_invalid_term
   | Unexpected_hole
+  | Toplevel_splice
+  | Quotation_object
+  | Open_inside_quotation
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

@@ -170,7 +170,7 @@ let name_expression ~loc ~attrs sort exp =
 let execute_phrase print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
-      let oldenv = !toplevel_env in
+      let oldenv = Env.add_local_env_lock !toplevel_env in
       let oldsig = !toplevel_sig in
       incr phrase_seqid;
       let phrase_name = "TOP" ^ string_of_int !phrase_seqid in

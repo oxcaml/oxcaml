@@ -2911,6 +2911,8 @@ fun_expr:
 ;
 
 spliceable_expr:
+  | LESSLBRACKET seq_expr RBRACKETGREATER
+      { mkexp ~loc:$sloc (Pexp_quotation ($2)) }
   | LPAREN seq_expr RPAREN
       { reloc_exp ~loc:$sloc $2 }
   | LPAREN seq_expr error
@@ -3152,7 +3154,7 @@ comprehension_clause:
       { Pexp_unboxed_tuple $2 }
   | DOLLAR spliceable_expr
       { Pexp_splice $2 }
-  | LESSLBRACKET fun_seq_expr RBRACKETGREATER
+  | LESSLBRACKET seq_expr RBRACKETGREATER
       { Pexp_quotation $2 }
   | LESSLBRACKETCOLON core_type RBRACKETGREATER
       { unsupported $sloc }

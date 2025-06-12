@@ -1153,6 +1153,8 @@ module Ast = struct
     | TypeVariant of row_field list * variant_form
     | TypePoly of Name.t list * core_type
     | TypePackage of package_type
+    | TypeQuote of core_type
+    | TypeSplice of core_type
     | TypeCallPos
 
   and object_field =
@@ -1591,6 +1593,10 @@ module Ast = struct
             (print_core_type env) core_type)
         wcs;
       pp fmt "@]"
+    | TypeQuote core_type ->
+      pp fmt "@[<2><[@ %a@ ]>@]" (print_core_type env) core_type
+    | TypeSplice core_type ->
+      pp fmt "@[<2>$(@ %a)@ @]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
 
   and print_arg_lab fmt = function
@@ -1620,7 +1626,7 @@ module Ast = struct
   and print_attribute fmt attr = pp fmt "@ [%@%s]" (attribute_as_string attr)
 
   and print_apply env fmt exp args =
-    pp fmt "@[<2>%a" (print_exp env) exp;
+    pp fmt "@[<2>%a" (print_exp_with_parens env) exp;
     List.iter
       (fun (arg_lab, exp) ->
         pp fmt "@ %a@[%a@]" print_arg_lab arg_lab
@@ -2191,6 +2197,12 @@ module Type = struct
     in
     let+ specs = all s and+ m = m in
     Ast.TypePackage (m, specs)
+
+  let quote t =
+    let+ t = t in Ast.TypeQuote t
+
+  let splice t =
+    let+ t = t in Ast.TypeSplice t
 
   let call_pos = With_free_vars.return Ast.TypeCallPos
 end

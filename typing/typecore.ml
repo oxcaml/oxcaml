@@ -280,6 +280,9 @@ type error =
   | Impossible_function_jkind of type_expr * jkind_lr
   | Overwrite_of_invalid_term
   | Unexpected_hole
+  | Toplevel_splice
+  | Quotation_object
+  | Open_inside_quotation
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -3115,6 +3118,8 @@ and type_pat_aux
         { p with pat_extra = (Tpat_type (path, lid), loc, sp.ppat_attributes)
         :: p.pat_extra }
   | Ppat_open (lid,p) ->
+      if Env.has_open_quotations !!penv then
+        raise (Error (sp.ppat_loc, !!penv, Open_inside_quotation));
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
@@ -5771,18 +5776,6 @@ and type_expect_
       in
       {exp with exp_loc = loc}
   | Pexp_apply
-      ({ pexp_desc = Pexp_ident({txt = Longident.Lident "!#"}) },
-       [Nolabel, sbody]) ->  (* CR (aivaskovic): remove *)
-    let argument_mode = mode_legacy in
-    let ty = newgenconstr Predef.path_code [ty_expected] in
-    let arg = type_expect env argument_mode sbody (mk_expected ty) in
-    re {
-      exp_desc = Texp_antiquotation arg;
-      exp_loc = loc; exp_extra = [];
-      exp_type = instance ty_expected;
-      exp_attributes = sexp.pexp_attributes;
-      exp_env = env }
-  | Pexp_apply
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
        [Nolabel, sbody]) when is_exclave_extension_node txt ->
       if (txt = "extension.exclave") && not (Language_extension.is_enabled Mode) then
@@ -6525,6 +6518,8 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_object s ->
+      if Env.has_open_quotations env then
+        raise (Error (loc, env, Quotation_object));
       submode ~loc ~env Value.legacy expected_mode;
       let desc, meths = !type_object env loc s in
       rue {
@@ -6613,6 +6608,8 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_open (od, e) ->
+      if Env.has_open_quotations env then
+        raise (Error (loc, env, Open_inside_quotation));
       let tv = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
       let (od, _, newenv) = !type_open_decl env od in
       let exp = type_expect newenv expected_mode e ty_expected_explained in
@@ -6782,26 +6779,6 @@ and type_expect_
     end
   | Pexp_extension ({ txt = "src_pos"; _ }, _) ->
       rue (src_pos loc sexp.pexp_attributes env)
-  | Pexp_extension ({ txt = ("quote" | "ocaml.quote"); _ }, payload) -> (* CR (aivaskovic): remove *)
-    let sarg =
-      match payload with
-      | PStr [{pstr_desc=Pstr_eval (sarg, _)}] -> sarg
-      | _ ->
-        raise (Error (loc, env, Invalid_quote_payload))
-    in
-    let argument_mode = mode_legacy in
-    let jkind = Jkind.Builtin.value ~why:Quotation_result in
-    let ty = newgenvar jkind in
-    let to_unify = Predef.type_code ty in
-    with_explanation (fun () ->
-      unify_exp_types loc env to_unify (generic_instance ty_expected));
-    let arg = type_expect env argument_mode sarg (mk_expected ty) in
-    re {
-      exp_desc = Texp_quotation arg;
-      exp_loc = loc; exp_extra = [];
-      exp_type = instance ty_expected;
-      exp_attributes = sexp.pexp_attributes;
-      exp_env = env }
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -6904,31 +6881,37 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
   | Pexp_quotation exp ->
-    let argument_mode = mode_legacy in
-    let jkind = Jkind.Builtin.value ~why:Quotation_result in
-    let ty = newgenvar jkind in
-    let to_unify = Predef.type_code ty in
-    with_explanation (fun () ->
-      unify_exp_types loc env to_unify (generic_instance ty_expected));
-    let arg = type_expect env argument_mode exp (mk_expected ty) in
-    re {
-      exp_desc = Texp_quotation arg;
-      exp_loc = loc; exp_extra = [];
-      exp_type = instance ty_expected;
-      exp_attributes = sexp.pexp_attributes;
-      exp_env = env }
+      let expected_mode' =
+        mode_morph (Value.join_with (Comonadic Areality) Regionality.Const.Local)
+          expected_mode in
+      let jkind = Jkind.Builtin.value ~why:Quotation_result in
+      let new_env = Env.add_quotation_lock env in
+      let ty = newgenvar jkind in
+      let to_unify = Predef.type_code ty in
+      with_explanation (fun () ->
+        unify_exp_types loc new_env to_unify (generic_instance ty_expected));
+      let arg = type_expect new_env expected_mode' exp (mk_expected ty) in
+      re {
+        exp_desc = Texp_quotation arg;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance ty_expected;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = new_env }
   | Pexp_quotation_type _ ->
-    assert false
+      assert false
   | Pexp_splice exp ->
-    let argument_mode = mode_legacy in
-    let ty = newgenconstr Predef.path_code [ty_expected] in
-    let arg = type_expect env argument_mode exp (mk_expected ty) in
-    re {
-      exp_desc = Texp_antiquotation arg;
-      exp_loc = loc; exp_extra = [];
-      exp_type = instance ty_expected;
-      exp_attributes = sexp.pexp_attributes;
-      exp_env = env }
+      if Env.without_open_quotations env then
+        raise (Error (exp.pexp_loc, env, Toplevel_splice));
+      let argument_mode = mode_legacy in
+      let new_env = Env.add_splice_lock env in
+      let ty = newgenconstr Predef.path_code [ty_expected] in
+      let arg = type_expect new_env argument_mode exp (mk_expected ty) in
+      re {
+        exp_desc = Texp_antiquotation arg;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance ty_expected;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = new_env }
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
@@ -10734,7 +10717,7 @@ let report_error ~loc env = function
         "This constructor is not an extension constructor."
   | Invalid_quote_payload ->
       Location.errorf ~loc
-        "Invalid [%%quote] payload, an expression is expected."
+        "Invalid quotation payload, an expression is expected."
   | Probe_name_format name ->
       Location.errorf ~loc
         "Illegal characters in probe name `%s'. \
@@ -11024,6 +11007,17 @@ let report_error ~loc env = function
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
+  | Toplevel_splice ->
+      Location.errorf ~loc
+        "Splices ($) are not allowed in the initial stage.\n\
+         Did you forget to place it inside a quotation?"
+  | Quotation_object ->
+      Location.errorf ~loc
+        "Objects cannot be defined inside quotations using %a@ blocks."
+        Style.inline_code "object..end"
+  | Open_inside_quotation ->
+      Location.errorf ~loc
+        "Modules cannot be opened inside quotations."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

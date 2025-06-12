@@ -355,6 +355,10 @@ and Type : sig
 
   val package : Module_type.t -> (Fragment.t * t) list -> t
 
+  val quote : t -> t
+
+  val splice : t -> t
+
   val call_pos : t
 end
 

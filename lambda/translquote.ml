@@ -342,6 +342,10 @@ module Type = struct
 
   let package = combinator "Type" "package" 2
 
+  let quote = combinator "Type" "quote" 1
+
+  let splice = combinator "Type" "splice" 1
+
   let _object_ = combinator "Type" "object_" 2
 
   let _class_ = combinator "Type" "class_" 2
@@ -781,7 +785,7 @@ let type_for_path loc = function
       | "extension_constructor" -> use Identifier.Type.extension_constructor
       | "floatarray" -> use Identifier.Type.floatarray
       | "lexing_position" -> use Identifier.Type.lexing_position
-      | "code" -> use Identifier.Type.code
+      | "expr" -> use Identifier.Type.code
       | "unboxed_float" -> use Identifier.Type.unboxed_float
       | "unboxed_nativeint" -> use Identifier.Type.unboxed_nativeint
       | "unboxed_int32" -> use Identifier.Type.unboxed_int32
@@ -1216,6 +1220,8 @@ and quote_core_type ty =
         pack_fields
     in
     apply loc Type.package [mod_type; mk_list with_types]
+  | Ttyp_quote ty -> apply loc Type.quote [quote_core_type ty]
+  | Ttyp_splice ty -> apply loc Type.splice [quote_core_type ty]
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> fatal_error "Still not implemented."
 
