@@ -1010,15 +1010,6 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
   | Ok () -> ()
   | Error e -> error (Right_le_left, e))
 
-(** Given the parameter [m0] on mutable, return the mode of future writes. *)
-let mutable_mode m0 =
-  let m0 =
-    Alloc.Const.merge
-      {comonadic = m0;
-       monadic = Alloc.Monadic.Const.min}
-  in
-  m0 |> Const.alloc_as_value |> Value.of_const
-
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
     would be allowed. This applies to mutable arrays similarly. *)
@@ -1026,7 +1017,7 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
   | Mutable m0 ->
-      let m0 = mutable_mode m0 in
+      let m0 = m0 |> mutable_mode |> Value.disallow_right in
       let m0 = match ty with
       | Some ty -> cross_left env ty ?modalities m0
       | None -> m0
@@ -1284,9 +1275,11 @@ let add_pattern_variables ?check ?check_as env pv =
        let kind = match pv_mutable with
          | Immutable -> Val_reg
          | Mutable ->
+           let m0 = Value.Comonadic.newvar () in
            Val_mut
              (* CR-someday let_mutable: move the sort calculation elsewhere *)
-             (match
+             (m0,
+              match
                 Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
                   ~fixed:false env pv_type
               with
@@ -3094,7 +3087,7 @@ and type_pat_aux
   | Ppat_array (mut, spl) ->
       let mut =
         match mut with
-        | Mutable -> Mutable Alloc.Comonadic.Const.legacy
+        | Mutable -> Mutable Value.Comonadic.legacy
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -5775,12 +5768,12 @@ and type_expect_
                          match lid.txt with
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
-        | Val_mut _ -> begin
+        | Val_mut (m0, _) -> begin
             match path with
             | Path.Pident id ->
+              let modalities = Typemode.let_mutable_modalities m0 in
               submode ~loc ~env
-                (Mode.Modality.Value.Const.apply
-                  Env.modalities_for_mutvar actual_mode.mode)
+                (Mode.Modality.Value.Const.apply modalities actual_mode.mode)
                 expected_mode;
               Texp_mutvar {loc = lid.loc; txt = id}
             | _ ->
@@ -6312,7 +6305,7 @@ and type_expect_
   | Pexp_array(mut, sargl) ->
       let mutability =
         match mut with
-        | Mutable -> Mutable Alloc.Comonadic.Const.legacy
+        | Mutable -> Mutable Value.Comonadic.legacy
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -9249,9 +9242,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
        in
        match (mutable_flag : mutable_flag) with
        | Mutable ->
-         let mutability = Mutable Types.mutable_mode_for_mutvar in
+         let m0 = Value.Comonadic.newvar () in
+         let mutability = Mutable m0 in
          check_construct_mutability ~loc:spat.ppat_loc ~env
-           mutability exp_mode;
+          mutability exp_mode;
          let modalities =
            Typemode.transl_modalities ~maturity:Stable mutability [] in
          let exp_mode = mode_modality modalities exp_mode in
@@ -9924,7 +9918,7 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.list_argument_jkind
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
-          | Mutable   -> Predef.type_array, Mutable Alloc.Comonadic.Const.legacy
+          | Mutable   -> Predef.type_array, Mutable Value.Comonadic.legacy
           | Immutable ->
               Language_extension.assert_enabled ~loc Immutable_arrays ();
               Predef.type_iarray, Immutable
