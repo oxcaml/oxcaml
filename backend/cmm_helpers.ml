@@ -440,6 +440,7 @@ let rec add_const c n dbg =
         | _ -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
 
 let rec add_const' arg const dbg =
+  map_tail1 arg ~f:(fun arg ->
   let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
   let x = P.create_var Int "x" in
   P.run res [
@@ -459,7 +460,7 @@ let rec add_const' arg const dbg =
     When (Binop (Add, Binop (Sub, Any c, Const_int x), Const_int n),
           (fun e -> Misc.no_overflow_sub e#.n e#.x))
     => (fun e -> add_const' e#.c (e#.n - e#.x) dbg);
-  ]
+  ])
 
 let add_const = check_equal_3 "add_const" add_const add_const'
 
@@ -478,6 +479,7 @@ let rec add_int c1 c2 dbg =
       | _, _ -> Cop (Caddi, [c1; c2], dbg))
 
 let rec add_int' arg1 arg2 dbg =
+  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
   let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
   P.run res [
     Binop (Add, Const_int n, Any c) => (fun e -> add_const e#.c e#.n dbg);
@@ -486,7 +488,7 @@ let rec add_int' arg1 arg2 dbg =
     => (fun e -> add_const (add_int' e#.c1 e#.c2 dbg) e#.n1 dbg);
     Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2))
     => (fun e -> add_const (add_int' e#.c1 e#.c2 dbg) e#.n2 dbg);
-  ]
+  ])
 
 let add_int = check_equal_3 "add_int" add_int add_int'
 
@@ -501,6 +503,7 @@ let rec sub_int c1 c2 dbg =
       | _, _ -> Cop (Csubi, [c1; c2], dbg))
 
 let rec sub_int' arg1 arg2 dbg =
+  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
   let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
   P.run res [
     When (Binop (Sub, Any c1, Const_int n2),
@@ -511,7 +514,7 @@ let rec sub_int' arg1 arg2 dbg =
     => (fun e -> add_const (sub_int' e#.c1 e#.c2 dbg) (-e#.n2) dbg);
     Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2)
     => (fun e -> add_const (sub_int' e#.c1 e#.c2 dbg) e#.n1 dbg)
-  ]
+  ])
 
 let sub_int = check_equal_3 "sub_int" sub_int sub_int'
 
