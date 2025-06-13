@@ -327,6 +327,7 @@ type error =
   | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
+  | Unsupported_quotation_construct
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

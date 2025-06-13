@@ -283,6 +283,7 @@ type error =
   | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
+  | Unsupported_quotation_construct
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -6897,8 +6898,8 @@ and type_expect_
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = new_env }
-  | Pexp_quotation_type _ ->
-      assert false
+  | Pexp_quotation_type ty ->
+      raise (Error (ty.ptyp_loc, env, Unsupported_quotation_construct))
   | Pexp_splice exp ->
       if Env.without_open_quotations env then
         raise (Error (exp.pexp_loc, env, Toplevel_splice));
@@ -11018,6 +11019,9 @@ let report_error ~loc env = function
   | Open_inside_quotation ->
       Location.errorf ~loc
         "Modules cannot be opened inside quotations."
+  | Unsupported_quotation_construct ->
+      Location.errorf ~loc
+        "This quotation construct is not presently supported."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env
