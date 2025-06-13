@@ -52,6 +52,9 @@ Working version
   (Kate Deplaix, review by Daniel Bünzli, Gabriel Scherer,
    Nicolás Ojeda Bär, Florian Angeletti and Josh Berdine)
 
+- #14086: Add Domain.running_domain_count.
+  (Nicolás Ojeda Bär)
+
 ### Type system:
 
 - #13781: Set scope of internal type nodes during abbreviation expansion
