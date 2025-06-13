@@ -2325,6 +2325,11 @@ CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
   }
 }
 
+CAMLprim value caml_running_domain_count(value unused)
+{
+  return Val_long(atomic_load_relaxed(&caml_num_domains_running));
+}
+
 CAMLprim value caml_recommended_domain_count(value unused)
 {
   intnat n = -1;
