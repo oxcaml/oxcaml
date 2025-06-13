@@ -728,3 +728,8 @@ let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 - : ('_weak41 expr expr -> '_weak41 expr expr) expr =
 <[ fun x -> <[ <[ $ ($ x) ]> ]> ]>
 |}];;
+
+let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
+[%%expect {|
+- : int expr expr = <[ <[ $ <[ 42 ]> ]> ]>
+|}];;

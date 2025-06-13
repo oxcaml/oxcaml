@@ -1703,7 +1703,7 @@ and quote_expression_desc transl stage e =
     | Texp_antiquotation exp ->
       if stage > 0
       then
-        let exp = quote_expression transl stage exp in
+        let exp = quote_expression transl (stage - 1) exp in
         apply loc Exp_desc.antiquote [exp]
       else apply loc Exp_desc.splice [transl exp]
     | Texp_new (path, _, _, _) ->
