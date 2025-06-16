@@ -259,7 +259,9 @@ let destroyed_at_c_noalloc_call =
        stored in v8-v15 need to be preserved [8]; it is the
        responsibility of the caller to preserve larger values.
 
-       https://github.com/ARM-software/abi-aa/blob/3952cfbfd2404c442bb6bb6f59ff7b923ab0c148/aapcs64/aapcs64.rst?plain=1#L837
+       https://github.com/ARM-software/abi-aa/blob/
+       3952cfbfd2404c442bb6bb6f59ff7b923ab0c148/
+       aapcs64/aapcs64.rst?plain=1#L837
     *)
     hard_vec128_reg
   in
