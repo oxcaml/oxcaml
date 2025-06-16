@@ -94,13 +94,13 @@ let select_simd_instr op args dbg =
     let n, args = extract_constant args ~max:15 op dbg in
     let n' = 16 - n in
     let arg = one_arg op args in
-    let zero = Cmm.Cconst_vec128 ({ low = 0L; high = 0L }, dbg) in
+    let zero = Cmm.Cconst_vec128 ({ word0 = 0L; word1 = 0L }, dbg) in
     let args = [zero; arg] in
     Some (Extq_u8 n', args)
   | "caml_neon_vec128_shift_right_bytes" ->
     let n, args = extract_constant args ~max:15 op dbg in
     let arg = one_arg op args in
-    let zero = Cmm.Cconst_vec128 ({ low = 0L; high = 0L }, dbg) in
+    let zero = Cmm.Cconst_vec128 ({ word0 = 0L; word1 = 0L }, dbg) in
     let args = [arg; zero] in
     Some (Extq_u8 n, args)
   | "caml_simd_vec128_interleave_low_8" | "caml_neon_int8x16_zip1" ->
