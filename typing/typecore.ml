@@ -1332,7 +1332,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-    ?(kind = Val_reg) ty attrs =
+    ~kind ty attrs =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
   then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
@@ -2007,6 +2007,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
+            ~kind:Val_reg
             tps
             pv_loc
             name
@@ -2889,8 +2890,8 @@ and type_pat_aux
               | Ok sort -> sort
               | Error err -> raise(Error(loc, !!penv,
                                           Mutable_var_not_rep(ty, err)))
-            let kind = Val_mut (m0, sort)
             in
+            let kind = Val_mut (m0, sort) in
             mode, kind
       in
       let id, uid =
@@ -2921,7 +2922,7 @@ and type_pat_aux
              [Ppat_unpack] is a case identified by [may_contain_modules]. See
              the comment on [may_contain_modules]. *)
           let id, uid = enter_variable tps loc v alloc_mode.mode
-                          t ~is_module:true sp.ppat_attributes in
+                          t ~is_module:true ~kind:Val_reg sp.ppat_attributes in
           rvp {
             pat_desc = Tpat_var (id, v, uid, alloc_mode.mode);
             pat_loc = sp.ppat_loc;
@@ -2936,8 +2937,8 @@ and type_pat_aux
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
-        enter_variable ~is_as_variable:true tps name.loc name mode ty_var
-          sp.ppat_attributes
+        enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
+          ty_var sp.ppat_attributes
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, mode, ty_var);
             pat_loc = loc; pat_extra=[];
