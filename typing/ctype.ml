@@ -2297,6 +2297,43 @@ let rec estimate_type_jkind ~expand_component env ty =
      Jkind.Builtin.product
        ~why:Unboxed_tuple tys_modalities layouts |>
      close_open_jkind ~expand_component ~is_open env
+  | Tconstr (p, args, _) when Path.same p Predef.path_or_null ->
+    begin match args with
+    | [arg_ty] ->
+      let arg_jkind = estimate_type_jkind ~expand_component env arg_ty in
+      let arg_separability = Jkind.get_separability
+        ~jkind_of_type:(fun ty ->
+          Some (estimate_type_jkind ~expand_component env ty))
+        arg_jkind
+      in
+      begin try
+        let type_decl = Env.find_type p env in
+        let jkind = type_decl.type_jkind in
+        let modified_jkind =
+          if Jkind_axis.Separability.equal
+            arg_separability Jkind_axis.Separability.Non_float
+          then
+            Jkind.set_separability_upper_bound
+              jkind Jkind_axis.Separability.Non_float
+          else
+            jkind
+        in
+        let substituted_jkind =
+          if Jkind.has_with_bounds modified_jkind
+            && List.compare_length_with args 0 <> 0
+          then
+            let level = get_level ty in
+            jkind_subst env level type_decl.type_params args modified_jkind
+          else
+            modified_jkind
+        in
+        substituted_jkind
+      with
+      | Cannot_subst | Not_found -> Jkind.Builtin.any ~why:(Missing_cmi p)
+      end
+    | _ ->
+      Jkind.Builtin.any ~why:(Missing_cmi p)
+    end
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind = type_decl.type_jkind in
