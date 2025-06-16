@@ -1,7 +1,9 @@
 # The `let mutable` extension
 
-The `let mutable` extension provides a new type of `let` statement which
-declares a stack-local variable. It can be thought of as an unboxed `ref`.
+The `let mutable` extension provides a mechanism for creating mutable variables.
+This codifies a pre-existing optimization, where the compiler attempts to
+eliminate allocating a box for a `ref` when it can see the `ref` is only used
+locally in a given scope, instead simply storing the value in a register.
 
 ```ocaml
 let triangle n =
@@ -12,17 +14,18 @@ let triangle n =
   total
 ```
 
-Mutable variables must not escape their scope. For example, you can't
-return a closure that closes over a mutable variable. At the moment, the mode
-checker is, sadly, not sophisticated enough to allow some constructions which
-are obviously safe. For example, the following code is safe, but rejected by the
-mode checker.
+Mutable variables must not escape their scope. For example, a closure can't
+capture a mutable variable.
+
+Local data can be stored in a mutable variable. For example:
 
 ```ocaml
-let sum xs =
-  let mutable total = 0 in
-  List.iter xs ~f:(fun x -> total <- total + x);
-  total
+let triangle_list n =
+  let mutable to_sum = [] in
+  for i = 1 to n do exclave_
+    to_sum <- stack_ (i :: to_sum)
+  done;
+  List.sum (module Int) to_sum
 ```
 
 
@@ -33,3 +36,14 @@ structure level or in class definitions. The pattern of a mutable `let`
 statement must be a single variable, possibly with a type annotation, e.g. `let
 mutable x, y = ..` and `let mutable add x y = ..` are not allowed. Mutable `let`
 statements must also not use `and`s.
+
+Because closures may not capture mutable variables, some uses that are
+apparently safe from a scope perspective are not possible. For example, the
+following program is rejected:
+
+```ocaml
+let sum xs =
+  let mutable total = 0 in
+  List.iter xs ~f:(fun x -> total <- total + x);
+  total
+```
