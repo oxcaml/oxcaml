@@ -118,7 +118,7 @@
 (foreign_library
  (archive_name stubs)
  (language c)
- (names stubs stub_builtins)
+ (names stubs stubs256 stub_builtins)
  (flags
    (:standard
      (:include flags.sexp)))
@@ -133,7 +133,7 @@
  (action
   (with-stdout-to
    flags.sexp
-   (echo "-msse4.2"))))
+   (echo "-mavx2"))))
 
 (rule
  (targets flags.sexp)

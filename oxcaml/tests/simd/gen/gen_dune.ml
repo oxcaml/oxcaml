@@ -35,7 +35,7 @@ let compile ~enabled_if ~extra_flags name =
  (modules ${name})
  ${enabled_if}
  (ocamlopt_flags
-  (:standard ${extra_flags}))
+  (:standard -extension simd_beta ${extra_flags}))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 |}

@@ -4,7 +4,7 @@
  (modules basic)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -27,7 +27,7 @@
  (modules basic_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -46,11 +46,75 @@
    (diff empty.expected basic_u.out)))
 
 (executable
+ (name basic256)
+ (modules basic256)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic256.out
+   (run ./basic256.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected basic256.out)))
+
+(executable
+ (name basic256_u)
+ (modules basic256_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic256_u.out
+   (run ./basic256_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected basic256_u.out)))
+
+(executable
  (name ops_float32x4)
  (modules ops_float32x4)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -73,7 +137,7 @@
  (modules ops_float32x4_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -96,7 +160,7 @@
  (modules ops_float64x2)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -119,7 +183,7 @@
  (modules ops_float64x2_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -142,7 +206,7 @@
  (modules ops_int64x2)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -165,7 +229,7 @@
  (modules ops_int64x2_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -188,7 +252,7 @@
  (modules ops_int32x4)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -211,7 +275,7 @@
  (modules ops_int32x4_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -234,7 +298,7 @@
  (modules ops_int16x8)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -257,7 +321,7 @@
  (modules ops_int16x8_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -280,7 +344,7 @@
  (modules ops_int8x16)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -303,7 +367,7 @@
  (modules ops_int8x16_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -326,7 +390,7 @@
  (modules ops)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -349,7 +413,7 @@
  (modules ops_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -372,7 +436,7 @@
  (modules arrays)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -395,7 +459,7 @@
  (modules arrays_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -418,7 +482,7 @@
  (modules scalar_ops)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -441,7 +505,7 @@
  (modules consts)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -464,7 +528,7 @@
  (modules consts_u)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -487,7 +551,7 @@
  (modules callback)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -506,11 +570,43 @@
    (diff empty.expected callback.out)))
 
 (executable
+ (name callback256)
+ (modules callback256)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   callback256.out
+   (run ./callback256.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected callback256.out)))
+
+(executable
  (name test_callee_save_neon_regs)
  (modules test_callee_save_neon_regs)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -536,7 +632,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard ))
+  (:standard -extension simd_beta ))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -560,6 +656,38 @@
  (action
    (diff empty.expected probes.out)))
 
+(executable
+ (name probes256)
+ (modules probes256)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   probes256.out
+   (run ./probes256.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected probes256.out)))
+
 (rule
  (alias runtest)
  (enabled_if (= %{context_name} "main"))
@@ -571,7 +699,7 @@
  (modules basic_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -600,7 +728,7 @@
  (modules basic_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -620,6 +748,88 @@
 
 (rule
  (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy basic256.ml basic256_nodynlink.ml)))
+
+(executable
+ (name basic256_nodynlink)
+ (modules basic256_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic256_nodynlink.out
+   (run ./basic256_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected basic256_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy basic256_u.ml basic256_u_nodynlink.ml)))
+
+(executable
+ (name basic256_u_nodynlink)
+ (modules basic256_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic256_u_nodynlink.out
+   (run ./basic256_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected basic256_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
  (enabled_if (= %{context_name} "main"))
  (action
   (copy ops_float32x4.ml ops_float32x4_nodynlink.ml)))
@@ -629,7 +839,7 @@
  (modules ops_float32x4_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -658,7 +868,7 @@
  (modules ops_float32x4_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -687,7 +897,7 @@
  (modules ops_float64x2_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -716,7 +926,7 @@
  (modules ops_float64x2_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -745,7 +955,7 @@
  (modules ops_int64x2_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -774,7 +984,7 @@
  (modules ops_int64x2_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -803,7 +1013,7 @@
  (modules ops_int32x4_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -832,7 +1042,7 @@
  (modules ops_int32x4_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -861,7 +1071,7 @@
  (modules ops_int16x8_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -890,7 +1100,7 @@
  (modules ops_int16x8_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -919,7 +1129,7 @@
  (modules ops_int8x16_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -948,7 +1158,7 @@
  (modules ops_int8x16_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -977,7 +1187,7 @@
  (modules ops_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1006,7 +1216,7 @@
  (modules ops_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1035,7 +1245,7 @@
  (modules arrays_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1064,7 +1274,7 @@
  (modules arrays_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1093,7 +1303,7 @@
  (modules scalar_ops_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1122,7 +1332,7 @@
  (modules consts_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1151,7 +1361,7 @@
  (modules consts_u_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1180,7 +1390,7 @@
  (modules callback_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1200,6 +1410,47 @@
 
 (rule
  (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy callback256.ml callback256_nodynlink.ml)))
+
+(executable
+ (name callback256_nodynlink)
+ (modules callback256_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   callback256_nodynlink.out
+   (run ./callback256_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected callback256_nodynlink.out)))
+
+(rule
+ (alias runtest)
  (enabled_if (= %{context_name} "main"))
  (action
   (copy test_callee_save_neon_regs.ml test_callee_save_neon_regs_nodynlink.ml)))
@@ -1209,7 +1460,7 @@
  (modules test_callee_save_neon_regs_nodynlink)
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1244,7 +1495,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -nodynlink))
+  (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1275,6 +1526,47 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
+  (copy probes256.ml probes256_nodynlink.ml)))
+
+(executable
+ (name probes256_nodynlink)
+ (modules probes256_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   probes256_nodynlink.out
+   (run ./probes256_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected probes256_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
   (copy basic.ml basic_internal_assembler.ml)))
 
 (executable
@@ -1285,7 +1577,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1326,7 +1618,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1357,6 +1649,88 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
+  (copy basic256.ml basic256_internal_assembler.ml)))
+
+(executable
+ (name basic256_internal_assembler)
+ (modules basic256_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic256_internal_assembler.out
+   (run ./basic256_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected basic256_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy basic256_u.ml basic256_u_internal_assembler.ml)))
+
+(executable
+ (name basic256_u_internal_assembler)
+ (modules basic256_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic256_u_internal_assembler.out
+   (run ./basic256_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected basic256_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
   (copy ops_float32x4.ml ops_float32x4_internal_assembler.ml)))
 
 (executable
@@ -1367,7 +1741,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1408,7 +1782,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1449,7 +1823,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1490,7 +1864,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1531,7 +1905,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1572,7 +1946,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1613,7 +1987,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1654,7 +2028,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1695,7 +2069,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1736,7 +2110,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1777,7 +2151,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1818,7 +2192,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1859,7 +2233,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1900,7 +2274,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1941,7 +2315,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -1982,7 +2356,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2023,7 +2397,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2064,7 +2438,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2105,7 +2479,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2146,7 +2520,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2177,6 +2551,47 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
+  (copy callback256.ml callback256_internal_assembler.ml)))
+
+(executable
+ (name callback256_internal_assembler)
+ (modules callback256_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   callback256_internal_assembler.out
+   (run ./callback256_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected callback256_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
   (copy test_callee_save_neon_regs.ml test_callee_save_neon_regs_internal_assembler.ml)))
 
 (executable
@@ -2187,7 +2602,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2228,7 +2643,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (ocamlopt_flags
-  (:standard -internal-assembler))
+  (:standard -extension simd_beta -internal-assembler))
  (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
@@ -2251,3 +2666,44 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected probes_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy probes256.ml probes256_internal_assembler.ml)))
+
+(executable
+ (name probes256_internal_assembler)
+ (modules probes256_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   probes256_internal_assembler.out
+   (run ./probes256_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected probes256_internal_assembler.out)))
