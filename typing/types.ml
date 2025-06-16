@@ -33,6 +33,10 @@ let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
 
+let atomic = function
+  | Mutable { atomic; modal_upper_bound = _ } -> atomic
+  | Immutable -> Nonatomic
+
 (* Type expressions for the core language *)
 
 module Jkind_mod_bounds = struct

@@ -44,6 +44,9 @@ type mutability =
     if not interested in the payload of [Mutable] or [Atomic]. *)
 val is_mutable : mutability -> bool
 
+(** Is the given [mutable_flag] atomically mutable? *)
+val atomic : mutability -> atomic
+
 (** Type expressions for the core language.
 
     The [type_desc] variant defines all the possible type expressions one can
