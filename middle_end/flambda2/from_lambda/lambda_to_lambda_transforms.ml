@@ -23,15 +23,48 @@ type primitive_transform_result =
   | Transformed of L.lambda
 
 let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
-  let switch : L.lambda_switch =
-    { sw_numconsts = 2;
-      sw_consts = [0, ifnot; 1, ifso];
-      sw_numblocks = 0;
-      sw_blocks = [];
-      sw_failaction = None
-    }
+  let mk_switch ~cond ~ifso ~ifnot ~kind =
+    let switch : L.lambda_switch =
+      { sw_numconsts = 2;
+        sw_consts = [0, ifnot; 1, ifso];
+        sw_numblocks = 0;
+        sw_blocks = [];
+        sw_failaction = None
+      }
+    in
+    L.Lswitch (cond, switch, L.try_to_find_location cond, kind)
   in
-  L.Lswitch (cond, switch, L.try_to_find_location cond, kind)
+  let sequop () =
+    let ifso_cont = Lambda.next_raise_count () in
+    let ifso_jump = L.Lstaticraise (ifso_cont, []) in
+    let ifnot_cont = Lambda.next_raise_count () in
+    let ifnot_jump = L.Lstaticraise (ifnot_cont, []) in
+    let rec aux ~cond ~ifso ~ifnot =
+      match[@warning "-4"] cond with
+      (* CR gbury: should we try to use the locs here, or is it better to keep
+         using the locs from each individual condition ? *)
+      | L.Lprim (Psequand, [a; b], _loc) ->
+        aux ~cond:a ~ifnot ~ifso:(aux ~cond:b ~ifso ~ifnot)
+      | L.Lprim (Psequor, [a; b], _loc) ->
+        aux ~cond:a ~ifso ~ifnot:(aux ~cond:b ~ifso ~ifnot)
+      | L.Lprim (Pnot, [c], _loc) -> aux ~cond:c ~ifso:ifnot ~ifnot:ifso
+      | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
+    in
+    L.Lstaticcatch
+      ( L.Lstaticcatch
+          ( aux ~cond ~ifso:ifso_jump ~ifnot:ifnot_jump,
+            (ifnot_cont, []),
+            ifnot,
+            Same_region,
+            kind ),
+        (ifso_cont, []),
+        ifso,
+        Same_region,
+        kind )
+  in
+  match[@warning "-4"] cond with
+  | L.Lprim ((Psequand | Psequor | Pnot), _, _) -> sequop ()
+  | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
 
 let rec_catch_for_while_loop env cond body =
   let cont = L.next_raise_count () in
