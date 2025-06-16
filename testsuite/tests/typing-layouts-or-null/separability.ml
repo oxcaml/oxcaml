@@ -525,28 +525,12 @@ Error: This type "t_maybesep_val" should be an instance of type "('a : value)"
 type ('a : value mod non_float) should_succeed = 'a or_null accepts_nonfloat
 
 [%%expect{|
-Line 1, characters 49-59:
-1 | type ('a : value mod non_float) should_succeed = 'a or_null accepts_nonfloat
-                                                     ^^^^^^^^^^
-Error: This type "'a or_null" should be an instance of type
-         "('b : any mod non_float)"
-       The kind of 'a or_null is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
-       But the kind of 'a or_null must be a subkind of any mod non_float
-         because of the definition of accepts_nonfloat at line 3, characters 0-46.
+type ('a : value mod non_float) should_succeed = 'a or_null accepts_nonfloat
 |}]
 
 type ('a : value mod non_float) should_succeed = 'a or_null accepts_sep
 [%%expect{|
-Line 1, characters 49-59:
-1 | type ('a : value mod non_float) should_succeed = 'a or_null accepts_sep
-                                                     ^^^^^^^^^^
-Error: This type "'a or_null" should be an instance of type
-         "('b : any mod separable)"
-       The kind of 'a or_null is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
-       But the kind of 'a or_null must be a subkind of any mod separable
-         because of the definition of accepts_sep at line 2, characters 0-41.
+type ('a : value mod non_float) should_succeed = 'a or_null accepts_sep
 |}]
 
 type ('a : value mod non_float) succeeds = 'a or_null accepts_maybesep
@@ -618,7 +602,7 @@ Line 1, characters 22-33:
                           ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of int or_null is immediate_or_null
+       The kind of int or_null is immediate_or_null mod non_float
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -628,7 +612,7 @@ Line 1, characters 22-33:
                           ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of int or_null is immediate_or_null with int
+       The kind of int or_null is immediate_or_null mod non_float with int
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -643,7 +627,7 @@ Line 1, characters 22-36:
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of string or_null is
-         value_or_null mod many unyielding stateless immutable
+         value_or_null mod many unyielding stateless immutable non_float
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -653,7 +637,8 @@ Line 1, characters 22-36:
                           ^^^^^^^^^^^^^^
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of string or_null is immediate_or_null with string
+       The kind of string or_null is immediate_or_null mod non_float
+         with string
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -697,7 +682,7 @@ Line 1, characters 22-36:
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of string or_null is
-         value_or_null mod many unyielding stateless immutable
+         value_or_null mod many unyielding stateless immutable non_float
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -707,7 +692,8 @@ Line 1, characters 22-36:
                           ^^^^^^^^^^^^^^
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of string or_null is immediate_or_null with string
+       The kind of string or_null is immediate_or_null mod non_float
+         with string
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -721,7 +707,7 @@ Line 1, characters 22-33:
                           ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of int or_null is immediate_or_null
+       The kind of int or_null is immediate_or_null mod non_float
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -731,7 +717,7 @@ Line 1, characters 22-33:
                           ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of int or_null is immediate_or_null with int
+       The kind of int or_null is immediate_or_null mod non_float with int
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of any_non_null
          because it's the type argument to the array type.

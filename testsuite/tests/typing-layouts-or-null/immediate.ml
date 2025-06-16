@@ -96,7 +96,7 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : immediate_or_null)"
-       The kind of int or_null is immediate_or_null with int
+       The kind of int or_null is immediate_or_null mod non_float with int
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of immediate_or_null
          because of the definition of accept_immediate_or_null at line 1, characters 0-54.
@@ -135,7 +135,7 @@ Line 2, characters 16-36:
                     ^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "int or_null"
        but an expression was expected of type "('a : immediate_or_null)"
-       The kind of int or_null is immediate_or_null with int
+       The kind of int or_null is immediate_or_null mod non_float with int
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of immediate_or_null
          because of the definition of myref at line 1, characters 0-56.
