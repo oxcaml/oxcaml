@@ -161,7 +161,7 @@ let foo4_5 y =
       x <- local_ ((i*j) :: x)
     done
   done;
-  x
+  10
 ;;
 [%%expect{|
 Line 5, characters 11-30:
@@ -177,7 +177,7 @@ let foo4_6 y =
       x <- local_ ((i*j) :: x)
     done
   done;
-  x
+  10
 ;;
 [%%expect{|
 Line 5, characters 11-30:
@@ -186,6 +186,47 @@ Line 5, characters 11-30:
 Error: This value escapes its region.
 |}]
 
+(* This is valid since both regions are closed *)
+let foo4_7 y =
+  let mutable x = [] in
+  for i = 1 to y do exclave_
+    for j = 1 to y do exclave_
+      x <- local_ ((i*j) :: x)
+    done
+  done;
+  10
+;;
+[%%expect{|
+val foo4_7 : int -> int = <fun>
+|}]
+
+(* Can't return [x] if it is local *)
+let foo4_8 () =
+  let mutable x = [] in
+  (x <- stack_ (1 :: []));
+  x
+;;
+[%%expect{|
+Line 4, characters 2-3:
+4 |   x
+      ^
+Error: This value escapes its region.
+  Hint: Cannot return a local value without an "exclave_" annotation.
+|}]
+
+(* Can't return [x] if it is local in some cases *)
+let foo4_9 b =
+  let mutable x = [] in
+  (x <- if b then 2 :: [] else stack_ (1 :: []));
+  x
+;;
+[%%expect{|
+Line 4, characters 2-3:
+4 |   x
+      ^
+Error: This value escapes its region.
+  Hint: Cannot return a local value without an "exclave_" annotation.
+|}]
 
 (* Test 5: Allowed interactions with locals. *)
 let foo5_1 y =  (* Assignment of local allowed in same scope *)

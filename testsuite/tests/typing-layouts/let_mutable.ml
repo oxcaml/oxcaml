@@ -1,6 +1,7 @@
 (* TEST
  reference = "${test_source_directory}/let_mutable.reference";
  include stdlib_upstream_compatible;
+ include stdlib_stable;
  flambda2;
  {
    flags = "-extension let_mutable";
@@ -23,6 +24,7 @@
  }*)
 
 open Stdlib_upstream_compatible
+module Float32_u = Stdlib_stable.Float32_u
 
 let triangle_f64 n =
   let mutable sum = #0.0 in
@@ -33,16 +35,17 @@ let triangle_f64 n =
 
 let () = Printf.printf "%.2f\n" (triangle_f64 10 |> Float_u.to_float)
 
-(* CR jrayman: [Float32_u] is wrong. What is it supposed to be? *)
 
-(* let triangle_f32 n = *)
-(*   let mutable sum = #0.0s in *)
-(*   for i = 1 to n do *)
-(*     sum <- Float32_u.add sum (Float32_u.of_int i) *)
-(*   done; *)
-(*   sum *)
+let triangle_f32 n =
+  let mutable sum = #0.0s in
+  for i = 1 to n do
+    sum <- Float32_u.add sum (Float32_u.of_int i)
+  done;
+  sum
 
-(* let () = Printf.printf "%.2f\n" (triangle_f32 10 |> Float32_u.to_float) *)
+let () =
+  Printf.printf "%.2f\n"
+    (triangle_f32 10 |> Float32_u.to_float |> Float_u.to_float)
 
 
 let triangle_i64 n =
@@ -63,9 +66,6 @@ let triangle_i32 n =
   sum
 
 let () = Printf.printf "%d\n" (triangle_i32 10 |> Int32_u.to_int)
-
-
-(* CR jrayman: how do you create a vec128? *)
 
 let triangle_i64_i32_f64 n =
   let mutable sum = #(#0L, #(#0l, #0.)) in
