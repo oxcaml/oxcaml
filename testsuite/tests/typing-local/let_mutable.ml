@@ -279,18 +279,18 @@ val foo5_4 : int -> int = <fun>
 
 (* Test 6: Regionality *)
 (* 6.1: regional <- regional assignment is allowed *)
-let u_6_1 =
+let allowed_6_1 =
   let mutable x = [] in
   let y = stack_ (1 :: []) in
   for i = 0 to 1 do
     x <- y
   done
 [%%expect{|
-val u_6_1 : unit = ()
+val allowed_6_1 : unit = ()
 |}]
 
 (* 6.2: local <- regional assignment is not allowed *)
-let u_6_2 =
+let disallowed_6_2 =
   let mutable x = [] in
   for i = 0 to 1 do
     let z = stack_ (2 :: []) in
@@ -307,7 +307,7 @@ Error: This value escapes its region.
 
 (* 6.3: The mode system doesn't distinguish higher levels of regionality from
    global, so this is not allowed *)
-let u_6_3 =
+let disallowed_6_3 =
   let mutable x = [] in
   let y = stack_ (1 :: []) in
   for i = 0 to 1 do
@@ -377,7 +377,8 @@ Line 3, characters 12-13:
 Error: This value is "aliased" but expected to be "unique".
 |}]
 
-(* Test 13.3: Can't put a global in a local record *)
+(* Test 13.3: [let mutable x @ m] checks only that the initial value of x has
+   mode [m]. *)
 let x_13_3 = ref 0
 let y_13_3 =
   let mutable x @ local = ref (ref 0) in
@@ -388,6 +389,54 @@ let y_13_3 =
 val x_13_3 : int ref = {contents = 0}
 val y_13_3 : int ref = {contents = 0}
 |}]
+
+let require_portable (f : (int -> unit) @ portable) = ()
+[%%expect{|
+val require_portable : (int -> unit) @ portable -> unit = <fun>
+|}]
+
+(* Tests 13.4 to 13.7: Notice the [@ portable] does not prevent future values
+   from being non-portable, but the portability of future values of [f] is still
+   tracked. *)
+let allowed_13_4 =
+  let mutable f @ portable = fun _ -> () in
+  (f <- fun z -> ());
+  require_portable f
+[%%expect{|
+val allowed_13_4 : unit = ()
+|}]
+
+let allowed_13_5 =
+  let mutable f @ portable = fun _ -> () in
+  (f <- fun z -> x_13_3 := z)
+[%%expect{|
+val allowed_13_5 : unit = ()
+|}]
+
+let disallowed_13_6 =
+  let mutable f @ portable = fun _ -> () in
+  (f <- fun z -> x_13_3 := z);
+  require_portable f
+[%%expect{|
+Line 4, characters 19-20:
+4 |   require_portable f
+                       ^
+Error: This value is "nonportable" but expected to be "portable".
+|}]
+
+(* [f] remains non-portable even if a portable function is reassigned *)
+let disallowed_13_7 =
+  let mutable f @ portable = fun _ -> () in
+  (f <- fun z -> x_13_3 := z);
+  (f <- fun z -> ());
+  require_portable f
+[%%expect{|
+Line 5, characters 19-20:
+5 |   require_portable f
+                       ^
+Error: This value is "nonportable" but expected to be "portable".
+|}]
+
 
 (* Test 14: mutable functions *)
 let x_14 =
