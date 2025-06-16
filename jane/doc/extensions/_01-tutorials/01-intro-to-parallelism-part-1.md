@@ -280,7 +280,7 @@ for details).
 ```ocaml
 let test_add4 par = add4 par 1 10 100 1000
 
-let run_one_test ~(f : Parallel.t -> 'a) : 'a =
+let run_one_test ~(f : Parallel.t @ local -> 'a) : 'a =
   let module Scheduler = Parallel_scheduler_work_stealing in
   let scheduler = Scheduler.create () in
   let monitor = Parallel.Monitor.create_root () in
