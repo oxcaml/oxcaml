@@ -491,7 +491,11 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           | Mutable, is_atomic ->
               match record_form with
               | Legacy -> Mutable {
-                modal_upper_bound = Mode.Alloc.Comonadic.Const.legacy;
+                modal_upper_bound =
+                  if is_atomic
+                  then { Mode.Alloc.Comonadic.Const.legacy
+                         with portability = Portable }
+                  else Mode.Alloc.Comonadic.Const.legacy;
                 atomic = if is_atomic then Atomic else Nonatomic
               }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
