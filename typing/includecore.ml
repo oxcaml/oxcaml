@@ -345,7 +345,7 @@ let report_modality_sub_error first second ppf e =
 let report_mode_sub_error got expected ppf e =
   let Mode.Value.Error(ax, {left; right}) = e in
   match ax with
-  | Comonadic Areality -> Format.fprintf ppf "This escapes region."
+  | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
   | _ ->
     Format.fprintf ppf "%s %a but %s %a."
       (String.capitalize_ascii got)

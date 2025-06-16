@@ -272,7 +272,7 @@ Line 4, characters 19-23:
                        ^^^^
 Error: Modules do not match: sig end @ local is not included in
        Empty @ global
-     This escapes region.
+     This escapes its region.
 |}]
 
 let _ =
@@ -295,7 +295,7 @@ Error: This application of the functor "F" is ill-typed.
             N : sig end @ local
           is not included in
             Empty @ global
-          This escapes region.
+          This escapes its region.
 |}]
 
 let use_unique : 'a @ unique -> unit = fun _ -> ()
