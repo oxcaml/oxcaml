@@ -10,7 +10,7 @@ type t = {
 let get_y (t : t) = t.y
 let set_y (t : t) new_y = t.y <- new_y
 [%%expect{|
-type t = { x : int; mutable y : int; }
+type t = { x : int; mutable(<non-legacy>) y : int [@atomic]; }
 val get_y : t -> int = <fun>
 val set_y : t -> int -> unit = <fun>
 |}]

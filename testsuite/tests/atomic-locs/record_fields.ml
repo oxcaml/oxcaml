@@ -33,15 +33,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = { mutable x : int; } end
        is not included in
-         sig type t = { mutable x : int [@atomic]; } end
+         sig type t = { mutable(<non-legacy>) x : int [@atomic]; } end
        Type declarations do not match:
          type t = { mutable x : int; }
        is not included in
-         type t = { mutable x : int [@atomic]; }
+         type t = { mutable(<non-legacy>) x : int [@atomic]; }
        Fields do not match:
          "mutable x : int;"
        is not the same as:
-         "mutable x : int [@atomic];"
+         "mutable(<non-legacy>) x : int [@atomic];"
        The second is atomic and the first is not.
 |}];;
 
@@ -58,15 +58,15 @@ Lines 1-3, characters 17-3:
 3 | end......
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = { mutable x : int [@atomic]; } end
+         sig type t = { mutable(<non-legacy>) x : int [@atomic]; } end
        is not included in
          sig type t = { mutable x : int; } end
        Type declarations do not match:
-         type t = { mutable x : int [@atomic]; }
+         type t = { mutable(<non-legacy>) x : int [@atomic]; }
        is not included in
          type t = { mutable x : int; }
        Fields do not match:
-         "mutable x : int [@atomic];"
+         "mutable(<non-legacy>) x : int [@atomic];"
        is not the same as:
          "mutable x : int;"
        The first is atomic and the second is not.
@@ -79,7 +79,7 @@ end : sig
 end)
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Ok/305" (makeblock 0))
-module Ok : sig type t = { mutable x : int [@atomic]; } end
+module Ok : sig type t = { mutable(<non-legacy>) x : int [@atomic]; } end
 |}];;
 
 (* Inline records are supported, including in extensions. *)
@@ -91,10 +91,15 @@ module Inline_record = struct
 end
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Inline_record/313"
-  (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
+  (let
+    (test =
+       (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
     (makeblock 0 test)))
 module Inline_record :
-  sig type t = A of { mutable x : int [@atomic]; } val test : t -> int end
+  sig
+    type t = A of { mutable(<non-legacy>) x : int [@atomic]; }
+    val test : t -> int
+  end
 |}];;
 
 module Extension_with_inline_record = struct
@@ -118,7 +123,7 @@ end
          (caml_fresh_oo_id 0))
      test =
        (function {nlocal = 0} param : int
-         (if (== (field_imm 0 param) A) (field_int 1 param) 0))
+         (if (== (field_imm 0 param) A) (atomic_load_field_imm param 1) 0))
      *match* =[int]
        (if (== (apply test (makemutable 0 (*,int) A 42)) 42) 0
          (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
@@ -126,7 +131,7 @@ end
 module Extension_with_inline_record :
   sig
     type t = ..
-    type t += A of { mutable x : int [@atomic]; }
+    type t += A of { mutable(<non-legacy>) x : int [@atomic]; }
     val test : t -> int
   end
 |}]

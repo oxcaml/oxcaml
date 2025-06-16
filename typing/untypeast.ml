@@ -273,9 +273,17 @@ let constructor_declaration sub cd =
 let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
-  | Mutable { mode; atomic = _ } ->
+  | Mutable { mode; atomic } ->
       let open Mode.Value.Comonadic in
-      equate_exn mode legacy;
+      let expected_mode =
+        match atomic with
+        | Nonatomic -> legacy
+        | Atomic ->
+          Mode.Value.Comonadic.of_const
+            { Mode.Value.Comonadic.Const.legacy
+              with portability = Portable }
+      in
+      equate_exn mode expected_mode;
       Mutable
 
 let label_declaration sub ld =

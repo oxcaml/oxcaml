@@ -728,16 +728,12 @@ module Record_diffing = struct
           | Immutable, Immutable -> None
           | Mutable _, Immutable -> Some (Mutability First)
           | Immutable, Mutable _ -> Some (Mutability Second)
-          | Mutable { mode = m1; atomic = atomic1 },
-            Mutable { mode = m2; atomic = atomic2 } ->
+          | Mutable { mode = _; atomic = atomic1 },
+            Mutable { mode = _; atomic = atomic2 } ->
             begin match atomic1, atomic2 with
             | Atomic, Nonatomic -> Some (Atomicity First)
             | Nonatomic, Atomic -> Some (Atomicity Second)
-            | Atomic, Atomic | Nonatomic, Nonatomic ->
-                let open Mode.Value.Comonadic in
-                equate_exn m1 legacy;
-                equate_exn m2 legacy;
-                None
+            | Atomic, Atomic | Nonatomic, Nonatomic -> None
             end
         in
         begin match err with
