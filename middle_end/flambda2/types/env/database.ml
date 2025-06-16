@@ -541,7 +541,6 @@ let left_meet_simple_or_switch env sos1 sos2 : _ Or_bottom.t =
 let left_meet_properties env properties1 properties2 : _ Or_bottom.t =
   let exception Is_bottom in
   let env_ref = ref env in
-  let result_is_left = ref true in
   match
     Function_map.union
       (fun _ sos1 sos2 ->
@@ -551,14 +550,12 @@ let left_meet_properties env properties1 properties2 : _ Or_bottom.t =
           env_ref := env;
           match meet_sos with
           | Left_input -> Some sos1
-          | New_result sos ->
-            result_is_left := false;
-            Some sos))
+          | New_result sos -> Some sos))
       properties1 properties2
   with
   | properties ->
     let properties =
-      if !result_is_left then Left_input else New_result properties
+      if properties == properties1 then Left_input else New_result properties
     in
     Ok (properties, !env_ref)
   | exception Is_bottom -> Bottom
