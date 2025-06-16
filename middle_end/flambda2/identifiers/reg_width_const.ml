@@ -56,6 +56,8 @@ let kind t =
   | Naked_int64 _ -> Flambda_kind.naked_int64
   | Naked_nativeint _ -> Flambda_kind.naked_nativeint
   | Naked_vec128 _ -> Flambda_kind.naked_vec128
+  | Naked_vec256 _ -> Flambda_kind.naked_vec256
+  | Naked_vec512 _ -> Flambda_kind.naked_vec512
 
 let of_int_of_kind (kind : Flambda_kind.t) i =
   match kind with

@@ -1834,12 +1834,13 @@ and rebuild_static_const_or_code env res
   | Static_const (Other static_const) -> (
     match static_const with
     | Block _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-    | Boxed_nativeint _ | Boxed_vec128 _ | Immutable_float_block _
-    | Immutable_float_array _ | Immutable_float32_array _
-    | Immutable_int32_array _ | Immutable_int64_array _
-    | Immutable_nativeint_array _ | Immutable_vec128_array _
-    | Immutable_value_array _ | Empty_array _ | Mutable_string _
-    | Immutable_string _ ->
+    | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+    | Immutable_float_block _ | Immutable_float_array _
+    | Immutable_float32_array _ | Immutable_int32_array _
+    | Immutable_int64_array _ | Immutable_nativeint_array _
+    | Immutable_vec128_array _ | Immutable_vec256_array _
+    | Immutable_vec512_array _ | Immutable_value_array _ | Empty_array _
+    | Mutable_string _ | Immutable_string _ ->
       Static_const_or_code.create_static_const static_const, res
     | Set_of_closures _ ->
       Misc.fatal_errorf
