@@ -43,7 +43,7 @@ let optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind =
     (* CR gbury: should we try to use the locs here, or is it better to keep
        using the locs from each individual condition ? *)
     | L.Lprim (Psequand, [a; b], _loc) ->
-      aux ~cond:a ~ifnot ~ifso:(aux ~cond:b ~ifso ~ifnot)
+      aux ~cond:a ~ifso:(aux ~cond:b ~ifso ~ifnot) ~ifnot
     | L.Lprim (Psequor, [a; b], _loc) ->
       aux ~cond:a ~ifso ~ifnot:(aux ~cond:b ~ifso ~ifnot)
     | L.Lprim (Pnot, [c], _loc) -> aux ~cond:c ~ifso:ifnot ~ifnot:ifso
