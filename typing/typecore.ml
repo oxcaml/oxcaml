@@ -2676,8 +2676,8 @@ let rec type_pat
 
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
-         alloc_mode:expected_pat_mode -> mutable_flag:mutable_flag -> penv:_ -> _ ->
-         _ -> k general_pattern
+         alloc_mode:expected_pat_mode -> mutable_flag:mutable_flag -> penv:_ ->
+         _ -> _ -> k general_pattern
   = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv sp
         expected_ty ->
   let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) =
@@ -2876,17 +2876,20 @@ and type_pat_aux
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
-            let kind =
-              Val_mut
-              (* CR-someday let_mutable: move the sort calculation elsewhere *)
-              (m0,
+            (* Sort information is used when translating a [Texp_mutvar] into an
+               [Lassign]. We calculate [sort] here so we can store and reuse it.
+               However, since we already make sure pattern variables are
+               representable, we are already calculating [sort] elsewhere, but
+               that place is too far removed to easily pass it here. *)
+            let sort =
               match
                 Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
                   ~fixed:false !!penv ty
               with
               | Ok sort -> sort
               | Error err -> raise(Error(loc, !!penv,
-                                          Mutable_var_not_rep(ty, err))))
+                                          Mutable_var_not_rep(ty, err)))
+            let kind = Val_mut (m0, sort)
             in
             mode, kind
       in
