@@ -133,7 +133,7 @@
  (action
   (with-stdout-to
    flags.sexp
-   (echo "-msse4.2 -mavx2"))))
+   (echo "-mavx2"))))
 
 (rule
  (targets flags.sexp)
