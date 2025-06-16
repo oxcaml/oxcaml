@@ -22,48 +22,57 @@ type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
 
+let mk_switch ~cond ~ifso ~ifnot ~kind =
+  let switch : L.lambda_switch =
+    { sw_numconsts = 2;
+      sw_consts = [0, ifnot; 1, ifso];
+      sw_numblocks = 0;
+      sw_blocks = [];
+      sw_failaction = None
+    }
+  in
+  L.Lswitch (cond, switch, L.try_to_find_location cond, kind)
+
+let optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind =
+  let ifso_cont = Lambda.next_raise_count () in
+  let ifso_jump = L.Lstaticraise (ifso_cont, []) in
+  let ifnot_cont = Lambda.next_raise_count () in
+  let ifnot_jump = L.Lstaticraise (ifnot_cont, []) in
+  let rec aux ~cond ~ifso ~ifnot =
+    match[@warning "-4"] cond with
+    (* CR gbury: should we try to use the locs here, or is it better to keep
+       using the locs from each individual condition ? *)
+    | L.Lprim (Psequand, [a; b], _loc) ->
+      aux ~cond:a ~ifnot ~ifso:(aux ~cond:b ~ifso ~ifnot)
+    | L.Lprim (Psequor, [a; b], _loc) ->
+      aux ~cond:a ~ifso ~ifnot:(aux ~cond:b ~ifso ~ifnot)
+    | L.Lprim (Pnot, [c], _loc) -> aux ~cond:c ~ifso:ifnot ~ifnot:ifso
+    | L.Lprim ((Psequand | Psequor), _, _) ->
+      Misc.fatal_error "Psequand / Psequor must have exactly two arguments"
+    | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
+  in
+  L.Lstaticcatch
+    ( L.Lstaticcatch
+        ( aux ~cond ~ifso:ifso_jump ~ifnot:ifnot_jump,
+          (ifnot_cont, []),
+          ifnot,
+          Same_region,
+          kind ),
+      (ifso_cont, []),
+      ifso,
+      Same_region,
+      kind )
+
+let optimize_boolean_sequop_expr ~cond =
+  let const_true = L.Lconst (Const_base (Const_int 1)) in
+  let const_false = L.Lconst (Const_base (Const_int 0)) in
+  optimize_boolean_sequop ~cond ~ifso:const_true ~ifnot:const_false
+    ~kind:Lambda.layout_int
+
 let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
-  let mk_switch ~cond ~ifso ~ifnot ~kind =
-    let switch : L.lambda_switch =
-      { sw_numconsts = 2;
-        sw_consts = [0, ifnot; 1, ifso];
-        sw_numblocks = 0;
-        sw_blocks = [];
-        sw_failaction = None
-      }
-    in
-    L.Lswitch (cond, switch, L.try_to_find_location cond, kind)
-  in
-  let sequop () =
-    let ifso_cont = Lambda.next_raise_count () in
-    let ifso_jump = L.Lstaticraise (ifso_cont, []) in
-    let ifnot_cont = Lambda.next_raise_count () in
-    let ifnot_jump = L.Lstaticraise (ifnot_cont, []) in
-    let rec aux ~cond ~ifso ~ifnot =
-      match[@warning "-4"] cond with
-      (* CR gbury: should we try to use the locs here, or is it better to keep
-         using the locs from each individual condition ? *)
-      | L.Lprim (Psequand, [a; b], _loc) ->
-        aux ~cond:a ~ifnot ~ifso:(aux ~cond:b ~ifso ~ifnot)
-      | L.Lprim (Psequor, [a; b], _loc) ->
-        aux ~cond:a ~ifso ~ifnot:(aux ~cond:b ~ifso ~ifnot)
-      | L.Lprim (Pnot, [c], _loc) -> aux ~cond:c ~ifso:ifnot ~ifnot:ifso
-      | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
-    in
-    L.Lstaticcatch
-      ( L.Lstaticcatch
-          ( aux ~cond ~ifso:ifso_jump ~ifnot:ifnot_jump,
-            (ifnot_cont, []),
-            ifnot,
-            Same_region,
-            kind ),
-        (ifso_cont, []),
-        ifso,
-        Same_region,
-        kind )
-  in
   match[@warning "-4"] cond with
-  | L.Lprim ((Psequand | Psequor | Pnot), _, _) -> sequop ()
+  | L.Lprim ((Psequand | Psequor | Pnot), _, _) ->
+    optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind
   | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
 
 let rec_catch_for_while_loop env cond body =
@@ -651,48 +660,10 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
 
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
-  | Psequor, [arg1; arg2] ->
-    let const_true = Ident.create_local "const_true" in
-    let const_true_duid = Lambda.debug_uid_none in
-    let cond = Ident.create_local "cond_sequor" in
-    let cond_duid = Lambda.debug_uid_none in
-    Transformed
-      (L.Llet
-         ( Strict,
-           L.layout_int,
-           const_true,
-           const_true_duid,
-           Lconst (Const_base (Const_int 1)),
-           L.Llet
-             ( Strict,
-               L.layout_int,
-               cond,
-               cond_duid,
-               arg1,
-               switch_for_if_then_else ~cond:(L.Lvar cond)
-                 ~ifso:(L.Lvar const_true) ~ifnot:arg2 ~kind:L.layout_int ) ))
-  | Psequand, [arg1; arg2] ->
-    let const_false = Ident.create_local "const_false" in
-    let const_false_duid = Lambda.debug_uid_none in
-    let cond = Ident.create_local "cond_sequand" in
-    let cond_duid = Lambda.debug_uid_none in
-    Transformed
-      (L.Llet
-         ( Strict,
-           L.layout_int,
-           const_false,
-           const_false_duid,
-           Lconst (Const_base (Const_int 0)),
-           L.Llet
-             ( Strict,
-               L.layout_int,
-               cond,
-               cond_duid,
-               arg1,
-               switch_for_if_then_else ~cond:(L.Lvar cond) ~ifso:arg2
-                 ~ifnot:(L.Lvar const_false) ~kind:L.layout_int ) ))
-  | (Psequand | Psequor), _ ->
-    Misc.fatal_error "Psequand / Psequor must have exactly two arguments"
+  | Psequor, _ ->
+    Transformed (optimize_boolean_sequop_expr ~cond:(L.Lprim (prim, args, loc)))
+  | Psequand, _ ->
+    Transformed (optimize_boolean_sequop_expr ~cond:(L.Lprim (prim, args, loc)))
   | ( (Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray),
       [arg] ) ->
     Transformed arg
