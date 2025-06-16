@@ -277,6 +277,51 @@ let foo5_4 y = (* Assign of local works in _local_ while cond region *)
 val foo5_4 : int -> int = <fun>
 |}]
 
+(* Test 6: Regionality *)
+(* 6.1: regional <- regional assignment is allowed *)
+let u_6_1 =
+  let mutable x = [] in
+  let y = stack_ (1 :: []) in
+  for i = 0 to 1 do
+    x <- y
+  done
+[%%expect{|
+val u_6_1 : unit = ()
+|}]
+
+(* 6.2: local <- regional assignment is not allowed *)
+let u_6_2 =
+  let mutable x = [] in
+  for i = 0 to 1 do
+    let z = stack_ (2 :: []) in
+    for j = 0 to 1 do
+      x <- z
+    done
+  done
+[%%expect{|
+Line 6, characters 11-12:
+6 |       x <- z
+               ^
+Error: This value escapes its region.
+|}]
+
+(* 6.3: The mode system doesn't distinguish higher levels of regionality from
+   global, so this is not allowed *)
+let u_6_3 =
+  let mutable x = [] in
+  let y = stack_ (1 :: []) in
+  for i = 0 to 1 do
+    for j = 0 to 1 do
+      x <- y
+    done
+  done
+[%%expect{|
+Line 6, characters 11-12:
+6 |       x <- y
+               ^
+Error: This value escapes its region.
+|}]
+
 (* Test 11: binding a mutable variable shouldn't be simplified away *)
 let f_11 () =
   let mutable x = 10 in
