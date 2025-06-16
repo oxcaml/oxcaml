@@ -574,7 +574,6 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         in
         let call_kind =
           Call_kind.direct_function_call callee's_code_id apply_alloc_mode
-          (* Call_kind.indirect_function_call_known_arity apply_alloc_mode *)
         in
         let body, cost_metrics_of_body, free_names =
           (* [free_names] is going to be the free names of the whole resulting
