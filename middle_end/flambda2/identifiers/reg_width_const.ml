@@ -46,6 +46,19 @@ let is_tagged_immediate t =
   | Naked_vec512 _ | Null ->
     None
 
+let kind t =
+  match descr t with
+  | Tagged_immediate _ | Null -> Flambda_kind.value
+  | Naked_immediate _ -> Flambda_kind.naked_immediate
+  | Naked_float _ -> Flambda_kind.naked_float
+  | Naked_float32 _ -> Flambda_kind.naked_float32
+  | Naked_int32 _ -> Flambda_kind.naked_int32
+  | Naked_int64 _ -> Flambda_kind.naked_int64
+  | Naked_nativeint _ -> Flambda_kind.naked_nativeint
+  | Naked_vec128 _ -> Flambda_kind.naked_vec128
+  | Naked_vec256 _ -> Flambda_kind.naked_vec256
+  | Naked_vec512 _ -> Flambda_kind.naked_vec512
+
 let of_int_of_kind (kind : Flambda_kind.t) i =
   match kind with
   | Value -> tagged_immediate (Targetint_31_63.of_int i)
