@@ -192,7 +192,7 @@ module M :
     module type Foo = sig val foo : 'a -> 'a end
     module type Foo' = Foo
     module type S = sig module N : Foo' end
-  end @@ portable
+  end @@ stateless
 module type S' = sig module N : M.Foo' @@ portable end
 |}]
 
