@@ -666,7 +666,7 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
   (* For Psequor and Psequand, earlier passes (notably for region handling)
-     assume that if [b] is in tail-position, so we must keep it so. *)
+     assume that [b] is in tail-position, so we must keep it so. *)
   | Psequor, [a; b] ->
     let const_true = L.Lconst (Const_base (Const_int 1)) in
     Transformed
