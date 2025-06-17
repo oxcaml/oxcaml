@@ -47,3 +47,5 @@ let sum xs =
   List.iter xs ~f:(fun x -> total <- total + x);
   total
 ```
+
+Unboxed products are not yet supported.

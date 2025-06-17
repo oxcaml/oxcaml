@@ -565,16 +565,16 @@ Error: This expression has type "int" but an expression was expected of type
   Hint: Did you mean "3."?
 |}]
 
-(* some mode crossing *)
-let f () =
+(* Tests 19 and 20: some mode crossing *)
+let f_19 () =
   let mutable x : int = 42 in
   x <- (local_ 24);
   x
 [%%expect{|
-val f : unit -> int = <fun>
+val f_19 : unit -> int = <fun>
 |}]
 
-let foo1 y =
+let foo_20 y =
   let mutable x = y in
   (x <- stack_ (10 :: x));
   x
@@ -584,4 +584,16 @@ Line 4, characters 2-3:
       ^
 Error: This value escapes its region.
   Hint: Cannot return a local value without an "exclave_" annotation.
+|}]
+
+(* Test 21: Unboxed products not supported yet *)
+let foo_21 =
+  let mutable bar = #(123, 456) in
+  bar <- #(789, 101);
+  42
+[%%expect{|
+Line 2, characters 20-31:
+2 |   let mutable bar = #(123, 456) in
+                        ^^^^^^^^^^^
+Error: Mutable lets are not yet supported with unboxed products.
 |}]

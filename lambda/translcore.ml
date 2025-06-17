@@ -36,6 +36,7 @@ type error =
   | Void_sort of type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Unboxed_product_in_let_mutable
 
 exception Error of Location.t * error
 
@@ -1913,6 +1914,10 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
   let arg_sort = Jkind_types.Sort.default_to_value_and_get vb_sort in
+  (match arg_sort with
+   | Product _ ->
+     raise (Error(expr.exp_loc, Unboxed_product_in_let_mutable))
+   | _ -> ());
   let lam =
     transl_bound_exp ~scopes ~in_structure:false pat arg_sort expr vb_loc attr
   in
@@ -2512,6 +2517,9 @@ let report_error ppf = function
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \
          products."
+  | Unboxed_product_in_let_mutable ->
+      fprintf ppf
+        "Mutable lets are not yet supported with unboxed products."
 
 let () =
   Location.register_error_of_exn
