@@ -63,12 +63,6 @@ let optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind =
       Same_region,
       kind )
 
-let optimize_boolean_sequop_expr ~cond =
-  let const_true = L.Lconst (Const_base (Const_int 1)) in
-  let const_false = L.Lconst (Const_base (Const_int 0)) in
-  optimize_boolean_sequop ~cond ~ifso:const_true ~ifnot:const_false
-    ~kind:Lambda.layout_int
-
 let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
   match[@warning "-4"] cond with
   | L.Lprim ((Psequand | Psequor | Pnot), _, _) ->
@@ -660,10 +654,16 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
 
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
-  | Psequor, _ ->
-    Transformed (optimize_boolean_sequop_expr ~cond:(L.Lprim (prim, args, loc)))
-  | Psequand, _ ->
-    Transformed (optimize_boolean_sequop_expr ~cond:(L.Lprim (prim, args, loc)))
+  (* For Psequor and Psequand, earlier passes (notably for region handling)
+     assume that if [b] is in tail-position, so we must keep it so. *)
+  | Psequor, [a; b] ->
+    let const_true = L.Lconst (Const_base (Const_int 1)) in
+    Transformed
+      (mk_switch ~cond:a ~ifso:const_true ~ifnot:b ~kind:Lambda.layout_int)
+  | Psequand, [a; b] ->
+    let const_false = L.Lconst (Const_base (Const_int 0)) in
+    Transformed
+      (mk_switch ~cond:a ~ifso:b ~ifnot:const_false ~kind:Lambda.layout_int)
   | ( (Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray),
       [arg] ) ->
     Transformed arg
