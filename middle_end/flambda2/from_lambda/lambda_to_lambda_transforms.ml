@@ -45,7 +45,7 @@ let mk_switch ~cond ~ifso ~ifnot ~kind =
 let bind_expr ~kind ~expr k =
   let is_simple_duplicable expr =
     match[@warning "-4"] (expr : L.lambda) with
-    | Lvar _ | Lmutvar _ | Lconst _ -> true
+    | Lvar _ | Lconst _ -> true
     | _ -> false
   in
   match[@warning "-4"] (expr : L.lambda) with
@@ -77,10 +77,7 @@ let optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind =
 let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
   match[@warning "-4"] cond with
   | L.Lprim ((Psequand | Psequor | Pnot), _, _) ->
-    let res = optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind in
-    if Flambda_features.debug_flambda2 ()
-    then Format.eprintf "SWITCH: %a@\n@." Printlambda.lambda res;
-    res
+    optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind
   | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
 
 let rec_catch_for_while_loop env cond body =
