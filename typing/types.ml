@@ -26,7 +26,8 @@ let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
 
-(** Takes [m0] which is the parameter of [let mutable], returns the mode of new values in future writes. *)
+(** Takes [m0] which is the parameter of [let mutable], returns the
+    mode of new values in future writes. *)
 let mutable_mode m0 : _ Mode.Value.t =
   { comonadic = m0
   ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
