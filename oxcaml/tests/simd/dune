@@ -158,7 +158,7 @@
    (diff empty.expected basic256.out)
    (diff empty.expected basic256_u.out)
    (diff empty.expected let_mutable.out)
-   (diff empty.expected let_mutable_out.out)
+   (diff empty.expected let_mutable_u.out)
    (diff empty.expected ops.out)
    (diff empty.expected ops_u.out)
    (diff empty.expected arrays.out)
