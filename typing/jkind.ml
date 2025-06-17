@@ -38,12 +38,7 @@ module Sort = Jkind_types.Sort
 
 type sort = Sort.t
 
-module Sub_failure_reason = struct
-  type t =
-    | Axis_disagreement of Axis.packed
-    | Layout_disagreement
-    | Constrain_ran_out_of_fuel
-end
+module Sub_failure_reason = Jkind0.Violation.Sub_failure_reason
 
 module Sub_result = struct
   type t =
@@ -2324,24 +2319,7 @@ let format_history ~intro ppf t =
 
 module Violation = struct
   open Format
-  module Sub_failure_reason = Sub_failure_reason
-
-  type violation =
-    | Not_a_subjkind :
-        (allowed * 'r1) jkind * ('l * 'r2) jkind * Sub_failure_reason.t list
-        -> violation
-    | No_intersection : 'd jkind * ('l * allowed) jkind -> violation
-
-  type nonrec t =
-    { violation : violation;
-      missing_cmi : Path.t option
-    }
-  (* [missing_cmi]: is this error a result of a missing cmi file?
-     This is stored separately from the [violation] because it's
-     used to change the behavior of [value_kind], and we don't
-     want that function to inspect something that is purely about
-     the choice of error message. (Though the [Path.t] payload *is*
-     indeed just about the payload.) *)
+  include Jkind0.Violation
 
   let of_ ~context ?missing_cmi violation =
     (* Normalize for better printing *)
@@ -2561,6 +2539,8 @@ module Violation = struct
 
   let report_with_offender ~offender ~level =
     report_general ~level "" pp_t offender
+
+  let () = Env.report_jkind_violation_with_offender := report_with_offender
 
   let report_with_offender_sort ~offender ~level =
     report_general ~level "A representable layout was expected, but " pp_t
@@ -3128,6 +3108,8 @@ let () =
 
 (* See mli *)
 type temp_cycle_check_subst = Subst.t
+
+type temp_cycle_check_env = Env.t
 
 module type temp_cycle_check_datarepr = module type of Datarepr
 

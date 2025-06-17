@@ -60,7 +60,7 @@ end
 type sort = Sort.t
 
 module Sub_failure_reason : sig
-  type t =
+  type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
     | Layout_disagreement
     | Constrain_ran_out_of_fuel
@@ -187,7 +187,7 @@ type jkind_context =
 (* errors *)
 
 module Violation : sig
-  type violation =
+  type violation = Jkind0.Violation.violation =
     (* [Not_a_subjkind] allows l-jkinds on the right so that it can be used
        in [sub_jkind_l]. There is no downside to this, as the printing
        machinery works over l-jkinds. *)
@@ -198,7 +198,7 @@ module Violation : sig
         -> violation
     | No_intersection : 'd Types.jkind * ('l * allowed) Types.jkind -> violation
 
-  type t
+  type t = Jkind0.Violation.t
 
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
@@ -919,6 +919,8 @@ end
    will be removed in the PR that adds abstract kinds, and until then they
    ensure that the dependency structure needed for that PR isn't broken. *)
 type temp_cycle_check_subst = Subst.t
+
+type temp_cycle_check_env = Env.t
 
 module type temp_cycle_check_datarepr = module type of Datarepr
 

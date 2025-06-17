@@ -470,6 +470,32 @@ module Jkind0 : sig
     end
   end
 
+  module Violation : sig
+    module Sub_failure_reason : sig
+      type t =
+        | Axis_disagreement of Jkind_axis.Axis.packed
+        | Layout_disagreement
+        | Constrain_ran_out_of_fuel
+    end
+
+    type violation =
+      | Not_a_subjkind :
+          (allowed * 'r1) jkind * ('l * 'r2) jkind * Sub_failure_reason.t list
+          -> violation
+      | No_intersection : 'd jkind * ('l * allowed) jkind -> violation
+
+    type nonrec t =
+      { violation : violation;
+        missing_cmi : Path.t option
+      }
+    (* [missing_cmi]: is this error a result of a missing cmi file?
+       This is stored separately from the [violation] because it's
+       used to change the behavior of [value_kind], and we don't
+       want that function to inspect something that is purely about
+       the choice of error message. (Though the [Path.t] payload *is*
+       indeed just about the payload.) *)
+  end
+
   module Jkind : sig
     include Allowance.Allow_disallow with type (_, _, 'd) sided = 'd jkind
 
