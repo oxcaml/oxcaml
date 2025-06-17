@@ -87,6 +87,53 @@ Line 5, characters 11-12:
 Error: Mutable variable cannot be used inside closure.
 |}]
 
+(* Tests 3.1 and 3.2: Disallow closures created by [lazy] *)
+let disallowed_3_1 =
+  let mutable x = 42 in
+  lazy x
+[%%expect{|
+Line 3, characters 7-8:
+3 |   lazy x
+           ^
+Error: Mutable variable cannot be used inside closure.
+|}]
+
+let disallowed_3_2 =
+  let mutable x = 42 in
+  lazy (x + 1)
+[%%expect{|
+Line 3, characters 8-9:
+3 |   lazy (x + 1)
+            ^
+Error: Mutable variable cannot be used inside closure.
+|}]
+
+(* Test 3.3: Locally defined functors *)
+module type S_3_3 = sig module F () : sig val x : int end end
+
+let m_3_3 =
+  let mutable y = 42 in
+  (module (struct module F () = struct let x = y end end) : S_3_3)
+
+[%%expect{|
+module type S_3_3 = sig module F : functor () -> sig val x : int end end
+val m_3_3 : (module S_3_3) = <module>
+|}]
+
+(* Test 3.4: Disallow closures in monadic operators *)
+let disallowed_3_4 =
+  let (let*) x f = f x in
+  let mutable x = 42 in
+  let* y = 0 in
+  x + y
+[%%expect{|
+Line 5, characters 2-3:
+5 |   x + y
+      ^
+Error: Mutable variable cannot be used inside a letop.
+|}]
+
+
 (* Test 4: Disallowed interactions with locals *)
 let foo4_1 y =
   let mutable x = [] in
@@ -345,6 +392,17 @@ let y_12 =
 [%%expect{|
 type t_12 = Foo_12 of int
 val y_12 : t_12 = Foo_12 42
+|}]
+
+(* Test 12.1: Eta-expansion of reordered arguments *)
+let x_12_1 =
+  let f ~y ~x = (x, y) in
+  let mutable x = 42 in
+  let g = f ~x in
+  x <- 10;
+  g ~y:0
+[%%expect{|
+val x_12_1 : int * int = (42, 0)
 |}]
 
 (* Test 13.1: Can't put aliased in unique mutable variable *)
