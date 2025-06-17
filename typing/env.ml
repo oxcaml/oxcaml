@@ -3302,8 +3302,18 @@ let walk_locks ~errors ~loc ~env ~item ~lid mode ty locks =
           vmode
     ) vmode locks
 
-(** Take the parameter of [mutable(m0)] at declaration site,  *)
-let walk_locks_for_mutable_mode ~errors ~loc ~env  locks mode =
+(** Takes [m0] which is the parameter of [let mutable x] at declaration site,
+  and [locks] which is the locks between the declaration and the usage (either
+  reading or writing) of [x], and:
+- Raises error if the usage is forbidden by the locks
+- Returns the expected mode of the new value at the usage site (if the usage is
+  a write).
+*)
+let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
+  let mode =
+    m0
+    |> mutable_mode |> Mode.Value.disallow_left
+  in
   List.fold_left
     (fun (mode : Mode.Value.r) lock ->
       match lock with
@@ -3341,7 +3351,6 @@ let lookup_ident_value ~errors ~use ~loc name env =
       begin match vda with
       | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
           m0
-          |> mutable_mode |> Mode.Value.disallow_left
           |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
           |> ignore
       | _ -> () end;
@@ -4096,7 +4105,6 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let val_type = Subst.Lazy.force_type_expr desc.val_type in
           let mode =
             m0
-            |> mutable_mode |> Mode.Value.disallow_left
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
             |> Mode.Modality.Value.Const.apply
                 (Typemode.let_mutable_modalities m0)
