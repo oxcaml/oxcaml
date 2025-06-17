@@ -183,7 +183,7 @@ let x () = #( M.Null, M.This "hi" )
 [%%expect{|
 module M :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
-  portable
+  stateless
 val x : unit -> #('a M.t * string M.t) = <fun>
 |}]
 
@@ -664,7 +664,7 @@ module type S = sig end
 module M = struct end
 [%%expect{|
 module type S = sig end
-module M : sig end @@ portable
+module M : sig end @@ stateless
 |}]
 
 module F (X : S @ portable) = struct
@@ -687,7 +687,7 @@ Error: Mode annotations on functor parameters are not supported yet.
 
 module M' = (M : S @ portable)
 [%%expect{|
-module M' : S @@ portable
+module M' : S @@ stateless
 |}]
 
 module F (M : S @ portable) : S @ portable = struct
@@ -714,22 +714,22 @@ Error: Mode annotations on functor parameters are not supported yet.
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-module M' = M @@ portable
+module M' = M @@ stateless
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-module M' : S @@ portable
+module M' : S @@ stateless
 |}]
 
 module M @ portable = struct end
 [%%expect{|
-module M : sig end @@ portable
+module M : sig end @@ stateless
 |}]
 
 module M : S @ portable = struct end
 [%%expect{|
-module M : S @@ portable
+module M : S @@ stateless
 |}]
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
@@ -751,18 +751,18 @@ Error: Mode annotations on functor parameters are not supported yet.
 
 module (F @ portable) () = struct end
 [%%expect{|
-module F : functor () -> sig end @@ portable
+module F : functor () -> sig end @@ stateless
 |}]
 
 module (G @ portable) () = F
 
 [%%expect{|
-module G : functor () () -> sig end
+module G : functor () () -> sig end @@ stateless
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-module G' = F
+module G' = F @@ stateless
 |}]
 
 module rec (F @ portable) () = struct end
@@ -899,9 +899,9 @@ module type S = sig
 end;;
 
 [%%expect{|
-module F_struct : sig end -> sig end @@ portable
+module F_struct : sig end -> sig end @@ stateless
 module type F_sig = sig end -> sig end
-module T : sig end @@ portable
+module T : sig end @@ stateless
 module type S = sig end
 |}]
 
@@ -940,17 +940,17 @@ exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
-val x : x:int * y:int @@ portable = (~x:1, ~y:2)
-val x : x:int * y:int @@ portable = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
    (~x: 1, ~s: "a", ~y: 2, "ignore me")
 
 [%%expect{|
-val x0 : int @@ portable = 1
-val s : string @@ portable = "a"
-val y : int @@ portable = 2
+val x0 : int @@ stateless = 1
+val s : string @@ stateless = "a"
+val y : int @@ stateless = 2
 |}]
 
 module M : sig
@@ -970,8 +970,8 @@ module M :
   sig
     val f : (x:int * string) -> x:int * string
     val mk : unit -> x:bool * y:string
-  end @@ portable
-module X_int_int : sig type t = x:int * int end @@ portable
+  end @@ stateless
+module X_int_int : sig type t = x:int * int end @@ stateless
 |}]
 
 let foo xy k_good k_bad =
@@ -986,9 +986,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
-val x : int @@ portable = 1
+val x : int @@ stateless = 1
 val y : int = 2
-val x : int @@ portable = 1
+val x : int @@ stateless = 1
 val y : int = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
@@ -1301,7 +1301,7 @@ module type S2 = S with M
 
 [%%expect{|
 module type S = sig type t1 type t2 type t3 end
-module M : sig type t1 = int type t2 = K of string type t3 end @@ portable
+module M : sig type t1 = int type t2 = K of string type t3 end @@ stateless
 module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 |}]
 
@@ -1391,13 +1391,14 @@ module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_eras
 
 
 [%%expect{|
-module Base : sig end -> sig end -> sig end -> sig end -> sig end @@ portable
-module Name1 : sig end @@ portable
-module Name2 : sig end @@ portable
-module Value1 : sig end @@ portable
-module Value2 : sig end -> sig end -> sig end @@ portable
-module Name2_1 : sig end @@ portable
-module Name2_1 : sig end @@ portable
+module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
+  stateless
+module Name1 : sig end @@ stateless
+module Name2 : sig end @@ stateless
+module Value1 : sig end @@ stateless
+module Value2 : sig end -> sig end -> sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+module Name2_1 : sig end @@ stateless
 Line 9, characters 11-95:
 9 | module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_erasable.instances]
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

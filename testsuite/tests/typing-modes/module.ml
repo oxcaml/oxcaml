@@ -21,7 +21,7 @@ end
 val portable_use : 'a @ portable -> unit = <fun>
 module type S = sig val x : 'a -> unit end
 module type SL = sig type 'a t end
-module M : sig type 'a t = int val x : 'a -> unit end @@ portable
+module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
 module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
 |}]
 
@@ -153,7 +153,7 @@ module M : S = struct
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
-module M : S
+module M : S @@ stateless nonportable
 |}]
 
 let (bar @ portable) () =
