@@ -319,7 +319,7 @@ jobs:
       run: |
         for allocator in irc ls gi; do \
           find _build -name \*.cmir-cfg-regalloc -exec ./_build/default/tools/regalloc/regalloc.exe \
-            -validate -debug-output -regalloc $allocator {} \; ; \
+            -validate -regalloc $allocator {} \; ; \
         done
 
     - uses: actions/upload-artifact@v4
