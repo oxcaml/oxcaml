@@ -1382,6 +1382,36 @@ end
 
 (* This module exists here to resolve a dependency cycle: [Subst], [Predef],
    [Datarepr], and [Env] must not depend on [Jkind].  The portions intended for
+   use outside of those modules are re-exported as [Jkind.Violation] and
+   documented in [jkind.mli]. *)
+module Jkind_violation : sig
+  module Sub_failure_reason : sig
+    type t =
+      | Axis_disagreement of Jkind_axis.Axis.packed
+      | Layout_disagreement
+      | Constrain_ran_out_of_fuel
+  end
+
+  type violation =
+    | Not_a_subjkind :
+        (allowed * 'r1) jkind * ('l * 'r2) jkind * Sub_failure_reason.t list
+        -> violation
+    | No_intersection : 'd jkind * ('l * allowed) jkind -> violation
+
+  type nonrec t =
+    { violation : violation;
+      missing_cmi : Path.t option
+    }
+  (* [missing_cmi]: is this error a result of a missing cmi file?
+     This is stored separately from the [violation] because it's
+     used to change the behavior of [value_kind], and we don't
+     want that function to inspect something that is purely about
+     the choice of error message. (Though the [Path.t] payload *is*
+     indeed just about the payload.) *)
+end
+
+(* This module exists here to resolve a dependency cycle: [Subst], [Predef],
+   [Datarepr], and [Env] must not depend on [Jkind].  The portions intended for
    use outside of those modules are re-exported as [Jkind] and documented in
    [jkind.mli]. *)
 module Jkind_jkind : sig
