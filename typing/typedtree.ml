@@ -246,6 +246,9 @@ and expression_desc =
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
+  | Texp_atomic_loc of
+      expression * Jkind.sort * Longident.t loc * label_description *
+      alloc_mode
   | Texp_field of
       expression * Jkind.sort * Longident.t loc * label_description *
         texp_field_boxing * Unique_barrier.t
