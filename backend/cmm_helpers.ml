@@ -578,7 +578,7 @@ let rec max_signed_bit_length' e =
     When (Binop (Lsl, Any c, Const_int n), is_defined_shift' n)
     => (fun e -> Int.min arch_bits (max_signed_bit_length' e#.c + e#.n));
     When (Binop (Asr, Any c, Const_int n), is_defined_shift' n)
-    => (fun e -> Int.min arch_bits (max_signed_bit_length' e#.c - e#.n));
+    => (fun e -> Int.max 0 (max_signed_bit_length' e#.c - e#.n));
     When (Binop (Lsr, Any c, Const_int n), is_defined_shift' n)
     => (fun e -> if e#.n = 0 then max_signed_bit_length' e#.c else arch_bits - e#.n);
     Binop (Bitwise_op, Any c1, Any c2)
