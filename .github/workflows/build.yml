@@ -241,7 +241,6 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       working-directory: ocaml-414
       run: |
-        patch -p1 < $GITHUB_WORKSPACE/oxcaml/arm64-issue-debug-upstream.patch
         ./configure --prefix=$GITHUB_WORKSPACE/ocaml-414/_install
         make -j $J world.opt
         make install
