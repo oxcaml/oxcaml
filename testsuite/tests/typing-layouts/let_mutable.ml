@@ -66,19 +66,3 @@ let triangle_i32 n =
   sum
 
 let () = Printf.printf "%d\n" (triangle_i32 10 |> Int32_u.to_int)
-
-let triangle_i64_i32_f64 n =
-  let mutable sum = #(#0L, #(#0l, #0.)) in
-  for i = 1 to n do
-    let #(a, #(b, c)) = sum in
-    sum <- #(Int64_u.add a (Int64_u.of_int i),
-             #(Int32_u.add b (Int32_u.of_int i),
-               Float_u.add c (Float_u.of_int i)))
-  done;
-  sum
-
-let () =
-  let #(a, #(b, c)) = triangle_i64_i32_f64 10 in
-  Printf.printf "%d %d %.2f\n" (Int64_u.to_int a)
-                               (Int32_u.to_int b)
-                               (Float_u.to_float c)
