@@ -543,6 +543,9 @@ let expr sub x =
           ld,
           sub.expr sub exp2
         )
+    | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
+        Texp_atomic_loc
+          (sub.expr sub exp, sort, map_loc sub lid, ld, alloc_mode)
     | Texp_array (amut, sort, list, alloc_mode) ->
         Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
     | Texp_idx (ba, uas) ->

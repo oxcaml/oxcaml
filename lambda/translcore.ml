@@ -641,6 +641,18 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
+  | Texp_atomic_loc (arg, arg_sort, _id, lbl, alloc_mode) ->
+      let shape =
+        Some
+          [ Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type;
+            { raw_kind = Pintval; nullable = Non_nullable }
+          ]
+      in
+      let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl in
+      let loc = of_location ~scopes e.exp_loc in
+      Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
+             [arg; lbl], loc)
   | Texp_field(arg, arg_sort, _id, lbl, float, ubr) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
@@ -2275,6 +2287,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         Llet(Strict, Lambda.layout_block, init_id, init_id_duid,
              transl_exp ~scopes init_expr_sort init_expr, lam)
     end
+
+and transl_atomic_loc ~scopes arg arg_sort lbl =
+  let arg = transl_exp ~scopes arg_sort arg in
+  let lbl = Lconst (Const_base (Const_int (lbl.lbl_pos))) in
+  (arg, lbl)
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
