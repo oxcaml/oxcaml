@@ -33,40 +33,54 @@ let mk_switch ~cond ~ifso ~ifnot ~kind =
   in
   L.Lswitch (cond, switch, L.try_to_find_location cond, kind)
 
+(* This function helps bind expression to avoid duplicating them in the
+   generated code. Currently, this is only used for if-then-else optimization,
+   which guarantees that even if expressions are duplicated, they are still only
+   evaluated once (but could have been duplicated among multiple code paths), so
+   this is for code size optimization mainly.
+
+   One could want to duplicate constants, however the backend does not
+   deduplicate them, especially when they are the return value of the function,
+   so for now constants returned are shared via a static catch/raise. *)
+let bind_expr ~kind ~expr k =
+  let is_simple_duplicable expr =
+    match[@warning "-4"] (expr : L.lambda) with
+    | Lvar _ | Lmutvar _ | Lconst _ -> true
+    | _ -> false
+  in
+  match[@warning "-4"] (expr : L.lambda) with
+  | Lstaticraise (_, args) when List.for_all is_simple_duplicable args -> k expr
+  | _ ->
+    let cont = L.next_raise_count () in
+    let jump = L.Lstaticraise (cont, []) in
+    L.Lstaticcatch (k jump, (cont, []), expr, Same_region, kind)
+
 let optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind =
-  let ifso_cont = Lambda.next_raise_count () in
-  let ifso_jump = L.Lstaticraise (ifso_cont, []) in
-  let ifnot_cont = Lambda.next_raise_count () in
-  let ifnot_jump = L.Lstaticraise (ifnot_cont, []) in
-  let rec aux ~cond ~ifso ~ifnot =
+  let rec aux ~kind ~cond ~ifso ~ifnot =
     match[@warning "-4"] cond with
     (* CR gbury: should we try to use the locs here, or is it better to keep
        using the locs from each individual condition ? *)
     | L.Lprim (Psequand, [a; b], _loc) ->
-      aux ~cond:a ~ifso:(aux ~cond:b ~ifso ~ifnot) ~ifnot
+      bind_expr ~kind ~expr:(aux ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
+          aux ~kind ~cond:a ~ifso ~ifnot)
     | L.Lprim (Psequor, [a; b], _loc) ->
-      aux ~cond:a ~ifso ~ifnot:(aux ~cond:b ~ifso ~ifnot)
-    | L.Lprim (Pnot, [c], _loc) -> aux ~cond:c ~ifso:ifnot ~ifnot:ifso
+      bind_expr ~kind ~expr:(aux ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
+          aux ~kind ~cond:a ~ifso ~ifnot)
+    | L.Lprim (Pnot, [c], _loc) -> aux ~kind ~cond:c ~ifso:ifnot ~ifnot:ifso
     | L.Lprim ((Psequand | Psequor), _, _) ->
       Misc.fatal_error "Psequand / Psequor must have exactly two arguments"
     | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
   in
-  L.Lstaticcatch
-    ( L.Lstaticcatch
-        ( aux ~cond ~ifso:ifso_jump ~ifnot:ifnot_jump,
-          (ifnot_cont, []),
-          ifnot,
-          Same_region,
-          kind ),
-      (ifso_cont, []),
-      ifso,
-      Same_region,
-      kind )
+  bind_expr ~kind ~expr:ifso (fun ifso ->
+      bind_expr ~kind ~expr:ifnot (fun ifnot -> aux ~kind ~cond ~ifso ~ifnot))
 
 let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
   match[@warning "-4"] cond with
   | L.Lprim ((Psequand | Psequor | Pnot), _, _) ->
-    optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind
+    let res = optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind in
+    if Flambda_features.debug_flambda2 ()
+    then Format.eprintf "SWITCH: %a@\n@." Printlambda.lambda res;
+    res
   | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
 
 let rec_catch_for_while_loop env cond body =
@@ -659,11 +673,13 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | Psequor, [a; b] ->
     let const_true = L.Lconst (Const_base (Const_int 1)) in
     Transformed
-      (mk_switch ~cond:a ~ifso:const_true ~ifnot:b ~kind:Lambda.layout_int)
+      (switch_for_if_then_else ~cond:a ~ifso:const_true ~ifnot:b
+         ~kind:Lambda.layout_int)
   | Psequand, [a; b] ->
     let const_false = L.Lconst (Const_base (Const_int 0)) in
     Transformed
-      (mk_switch ~cond:a ~ifso:b ~ifnot:const_false ~kind:Lambda.layout_int)
+      (switch_for_if_then_else ~cond:a ~ifso:b ~ifnot:const_false
+         ~kind:Lambda.layout_int)
   | ( (Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray),
       [arg] ) ->
     Transformed arg
