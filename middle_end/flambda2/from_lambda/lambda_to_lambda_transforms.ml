@@ -42,7 +42,7 @@ let mk_switch ~cond ~ifso ~ifnot ~kind =
    One could want to duplicate constants, however the backend does not
    deduplicate them, especially when they are the return value of the function,
    so for now constants returned are shared via a static catch/raise. *)
-let bind_expr ~kind ~expr k =
+let share_expr ~kind ~expr k =
   let is_simple_duplicable expr =
     match[@warning "-4"] (expr : L.lambda) with
     | Lvar _ | Lconst _ -> true
@@ -61,18 +61,16 @@ let optimize_boolean_sequop ~cond ~ifso ~ifnot ~kind =
     (* CR gbury: should we try to use the locs here, or is it better to keep
        using the locs from each individual condition ? *)
     | L.Lprim (Psequand, [a; b], _loc) ->
-      bind_expr ~kind ~expr:(aux ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
+      share_expr ~kind ~expr:(aux ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
           aux ~kind ~cond:a ~ifso ~ifnot)
     | L.Lprim (Psequor, [a; b], _loc) ->
-      bind_expr ~kind ~expr:(aux ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
+      share_expr ~kind ~expr:(aux ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
           aux ~kind ~cond:a ~ifso ~ifnot)
     | L.Lprim (Pnot, [c], _loc) -> aux ~kind ~cond:c ~ifso:ifnot ~ifnot:ifso
-    | L.Lprim ((Psequand | Psequor), _, _) ->
-      Misc.fatal_error "Psequand / Psequor must have exactly two arguments"
     | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
   in
-  bind_expr ~kind ~expr:ifso (fun ifso ->
-      bind_expr ~kind ~expr:ifnot (fun ifnot -> aux ~kind ~cond ~ifso ~ifnot))
+  share_expr ~kind ~expr:ifso (fun ifso ->
+      share_expr ~kind ~expr:ifnot (fun ifnot -> aux ~kind ~cond ~ifso ~ifnot))
 
 let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
   match[@warning "-4"] cond with
@@ -677,6 +675,8 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     Transformed
       (switch_for_if_then_else ~cond:a ~ifso:b ~ifnot:const_false
          ~kind:Lambda.layout_int)
+  | (Psequand | Psequor), _ ->
+    Misc.fatal_error "Psequand / Psequor must have exactly two arguments"
   | ( (Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray),
       [arg] ) ->
     Transformed arg
