@@ -109,7 +109,7 @@ module type S = sig @@ portable
   module M' = M
 end
 [%%expect{|
-module M : T
+module M : T @@ stateless nonportable
 module type S = sig module M' = M @@ portable end
 |}]
 
@@ -131,7 +131,7 @@ Lines 1-3, characters 15-3:
 3 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig module M' = M @@ many unyielding end
+         sig module M' = M @@ unyielding many stateless nonportable end
        is not included in
          S
        Got "nonportable" but expected "portable".
