@@ -165,7 +165,7 @@ L(caml_call_gc):
         str     TMP, Caml_state(bottom_of_stack)
     /* Set up stack space, saving return address and frame pointer */
     /* (2 regs RA/GP, 24 allocatable int regs)*8 + (32 caller-save float regs)*16 */
-        sub	    sp, sp, #720
+        sub     sp, sp, #720
         CFI_ADJUST(720)
         CFI_OFFSET(29, 0)
         CFI_OFFSET(30, -8)
