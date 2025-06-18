@@ -37,11 +37,7 @@ let mk_switch ~cond ~ifso ~ifnot ~kind =
    generated code. Currently, this is only used for if-then-else optimization,
    which guarantees that even if expressions are duplicated, they are still only
    evaluated once (but could have been duplicated among multiple code paths), so
-   this is for code size optimization mainly.
-
-   One could want to duplicate constants, however the backend does not
-   deduplicate them, especially when they are the return value of the function,
-   so for now constants returned are shared via a static catch/raise. *)
+   this is for code size optimization mainly. *)
 let share_expr ~kind ~expr k =
   let is_simple_duplicable expr =
     match[@warning "-4"] (expr : L.lambda) with
