@@ -103,6 +103,9 @@ Working version
   leaking file descriptors, code style.
   (Antonin Décimo, review by Gabriel Scherer)
 
+- #14059: Fix flaky TSan tests
+  (Fabrice Buoro and Olivier Nicole, review by Gabriel Scherer)
+
 - #13966, #13969: Enable "generalized polymorphic #install_printer"
   in the debugger
   (Pierre Boutillier and Gabriel Scherer, review by Florian Angeletti)
