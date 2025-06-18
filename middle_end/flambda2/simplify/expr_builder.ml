@@ -758,22 +758,23 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
     | Continuation cont -> cont
     | Apply_cont apply_cont -> Apply_cont.continuation apply_cont
   in
-  let[@local] shortcut_this_continuation_if_possible () :
-      rewrite_fixed_arity_continuation0_result =
-    (* Apply the shortcut if we can, but not if we are rewriting a
-       [Continuation] since we would need to introduce a new wrapper anyway. *)
-    match cont_or_apply_cont with
-    | Continuation cont ->
-      This_continuation (apply_continuation_aliases uenv cont)
-    | Apply_cont apply_cont ->
-      Apply_cont (apply_continuation_shortcuts uenv apply_cont)
-  in
   let cont =
     match
       Continuation_callsite_map.find cont use_id (UA.specialization_map uacc)
     with
     | exception Not_found -> cont
     | specialized -> specialized
+  in
+  let[@local] shortcut_this_continuation_if_possible () :
+      rewrite_fixed_arity_continuation0_result =
+    (* Apply the shortcut if we can, but not if we are rewriting a
+       [Continuation] since we would need to introduce a new wrapper anyway. *)
+    match cont_or_apply_cont with
+    (* We must be careful to use the specialized continuation *)
+    | Continuation _ -> This_continuation (apply_continuation_aliases uenv cont)
+    | Apply_cont apply_cont ->
+      let apply_cont = Apply_cont.with_continuation apply_cont cont in
+      Apply_cont (apply_continuation_shortcuts uenv apply_cont)
   in
   match UE.find_apply_cont_rewrite uenv cont with
   | None -> shortcut_this_continuation_if_possible ()
