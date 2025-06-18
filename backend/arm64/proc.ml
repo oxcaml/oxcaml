@@ -44,6 +44,7 @@ let word_addressed = false
     d0 - d7               general purpose (caller-save)
     d8 - d15              general purpose (callee-save)
     d16 - d31             general purpose (caller-save)
+   Vector register map:   general purpose (caller-save)
 *)
 
 let types_are_compatible left right =
@@ -244,11 +245,25 @@ let destroyed_at_c_noalloc_call =
       116;117;118;119;120;121;122;123;
       124;125;126;127;128;129;130;131|]
   in
+  let vec128_regs_destroyed_at_c_noalloc_call =
+    (* Registers v8-v15 must be preserved by a callee across
+       subroutine calls; the remaining registers (v0-v7, v16-v31) do
+       not need to be preserved (or should be preserved by the
+       caller). Additionally, only the bottom 64 bits of each value
+       stored in v8-v15 need to be preserved [8]; it is the
+       responsibility of the caller to preserve larger values.
+
+       https://github.com/ARM-software/abi-aa/blob/
+       3952cfbfd2404c442bb6bb6f59ff7b923ab0c148/
+       aapcs64/aapcs64.rst?plain=1#L837
+    *)
+    hard_vec128_reg
+  in
   Array.concat [
     Array.map (phys_reg Int) int_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float) float_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float32) float_regs_destroyed_at_c_noalloc_call;
-    Array.map (phys_reg Vec128) float_regs_destroyed_at_c_noalloc_call;
+    vec128_regs_destroyed_at_c_noalloc_call;
   ]
 
 (* CSE needs to know that all versions of neon are destroyed. *)
