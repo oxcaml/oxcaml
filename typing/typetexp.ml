@@ -61,7 +61,7 @@ type jkind_info =
 
 type error =
   | Unbound_type_variable of string * string list * string option
-  | No_type_wildcards
+  | No_type_wildcards of string option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
   | Bound_type_variable of string
@@ -177,7 +177,8 @@ module TyVarEnv : sig
   (* see mli file *)
 
   type policy
-  val make_fixed_policy : jkind_initialization_choice -> policy
+  val make_fixed_policy :
+    ?hint_for_unbound_variables:string -> jkind_initialization_choice -> policy
     (* no wildcards allowed *)
   val make_extensible_policy : jkind_initialization_choice -> policy
     (* common case *)
@@ -217,8 +218,7 @@ module TyVarEnv : sig
   val remember_used : string -> type_expr -> Location.t -> unit
     (* remember that a given name is bound to a given type *)
 
-  val globalize_used_variables :
-    ?hint_for_unbound_variables:string -> policy -> Env.t -> unit -> unit
+  val globalize_used_variables : policy -> Env.t -> unit -> unit
    (* after finishing with a type signature, used variables are unified to the
       corresponding global type variables if they exist. Otherwise, in function
       of the policy, fresh used variables are either
@@ -451,24 +451,28 @@ end = struct
     flavor : flavor;
     extensibility : extensibility;
     jkind_initialization: jkind_initialization_choice;
+    hint_for_unbound_variables : string option;
   }
 
-  let make_fixed_policy jkind_initialization = {
+  let make_fixed_policy ?hint_for_unbound_variables jkind_initialization = {
     flavor = Unification;
     extensibility = Fixed;
     jkind_initialization;
+    hint_for_unbound_variables;
   }
 
   let make_extensible_policy jkind_initialization = {
     flavor = Unification;
     extensibility = Extensible;
     jkind_initialization;
+    hint_for_unbound_variables = None;
   }
 
   let univars_policy = {
     flavor = Universal;
     extensibility = Extensible;
     jkind_initialization = Sort;
+    hint_for_unbound_variables = None;
   }
 
   let add_pre_univar tv = function
@@ -498,11 +502,12 @@ end = struct
     | Sort -> Jkind.of_new_legacy_sort ~why:(if is_named then Unification_var else Wildcard)
 
   let new_any_var loc env jkind = function
-    | { extensibility = Fixed } -> raise(Error(loc, env, No_type_wildcards))
+    | { extensibility = Fixed; hint_for_unbound_variables; _ } ->
+      raise(Error(loc, env, No_type_wildcards hint_for_unbound_variables))
     | policy -> new_var jkind policy
 
-  let globalize_used_variables ?hint_for_unbound_variables
-      { flavor; extensibility } env =
+  let globalize_used_variables
+      { flavor; extensibility; hint_for_unbound_variables; _ } env =
     let r = ref [] in
     TyVarMap.iter
       (fun name (ty, loc) ->
@@ -1347,11 +1352,11 @@ let transl_simple_type env ~new_var_jkind ?univars ?hint_for_unbound_variables
   TyVarEnv.reset_locals ?univars ();
   let policy =
     if closed
-    then TyVarEnv.make_fixed_policy new_var_jkind
+    then TyVarEnv.make_fixed_policy ?hint_for_unbound_variables new_var_jkind
     else TyVarEnv.make_extensible_policy new_var_jkind
   in
   let typ = transl_type env policy mode styp in
-  TyVarEnv.globalize_used_variables ?hint_for_unbound_variables policy env ();
+  TyVarEnv.globalize_used_variables policy env ();
   make_fixed_univars typ.ctyp_type;
   typ
 
@@ -1455,9 +1460,10 @@ let report_error env ppf =
       Style.inline_code name
       did_you_mean (fun () -> Misc.spellcheck in_scope_names name );
     Option.iter (fprintf ppf "@.%s") hint
-  | No_type_wildcards ->
+  | No_type_wildcards hint ->
       fprintf ppf "A type wildcard %a is not allowed in this type declaration."
-        Style.inline_code "_"
+        Style.inline_code "_";
+      Option.iter (fprintf ppf "@.%s") hint
   | Undefined_type_constructor p ->
     fprintf ppf "The type constructor@ %a@ is not yet completely defined"
       (Style.as_inline_code path) p

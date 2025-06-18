@@ -150,7 +150,7 @@ type cannot_quantify_reason
 type jkind_info
 type error =
   | Unbound_type_variable of string * string list * string option
-  | No_type_wildcards
+  | No_type_wildcards of string option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
   | Bound_type_variable of string

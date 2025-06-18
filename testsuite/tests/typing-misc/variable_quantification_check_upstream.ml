@@ -25,4 +25,6 @@ Line 2, characters 24-25:
 2 |     val wildcard : 'a . _ option -> 'a
                             ^
 Error: A type wildcard "_" is not allowed in this type declaration.
+Hint: Explicit quantification requires quantifying all type variables for compatibility with upstream OCaml.
+Enable non-erasable extensions to disable this check.
 |}]
