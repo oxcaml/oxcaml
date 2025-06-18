@@ -934,8 +934,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
   | Lifthenelse (cond, ifso, ifnot, kind) ->
     let loc = L.try_to_find_location cond in
     let lam =
-      Lambda_to_lambda_transforms.switch_for_if_then_else ~loc ~cond ~ifso ~ifnot
-        ~kind
+      Lambda_to_lambda_transforms.switch_for_if_then_else ~loc ~cond ~ifso
+        ~ifnot ~kind
     in
     cps acc env ccenv lam k k_exn
   | Lsequence (lam1, lam2) ->

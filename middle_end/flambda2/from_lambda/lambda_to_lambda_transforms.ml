@@ -59,48 +59,50 @@ let share_expr ~kind ~expr k =
 let switch_for_if_then_else ~loc ~cond ~ifso ~ifnot ~kind =
   let rec aux ~loc ~kind ~cond ~ifso ~ifnot =
     match[@warning "-4"] ifso, ifnot with
-    | L.Lconst (Const_base (Const_int 1)),
-      L.Lconst (Const_base (Const_int 0)) -> cond
-    | L.Lconst (Const_base (Const_int 0)),
-      L.Lconst (Const_base (Const_int 1)) ->
-        L.Lprim (Pnot, [cond], loc)
-    | _ -> begin
-    match[@warning "-4"] cond with
-    | L.Lconst (Const_base (Const_int 1)) -> ifso
-    | L.Lconst (Const_base (Const_int 0)) -> ifnot
-    (* CR gbury: should we try to use the locs here, or is it better to keep
-       using the locs from each individual condition ? *)
-    | L.Lprim (Psequand, [a; b], loc)
+    | L.Lconst (Const_base (Const_int 1)), L.Lconst (Const_base (Const_int 0))
       ->
-      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
-          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
-    | L.Lifthenelse (a, b, Lconst (Const_base (Const_int 0)), _)
+      cond
+    | L.Lconst (Const_base (Const_int 0)), L.Lconst (Const_base (Const_int 1))
       ->
-      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
-          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
-    | L.Lprim (Psequor, [a; b], loc)
-      ->
-      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
-          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
-    | L.Lifthenelse (a, Lconst (Const_base (Const_int 1)), b, _)
-      ->
-      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
-          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
-    | L.Lprim (Pnot, [c], loc) -> aux ~loc ~kind ~cond:c ~ifso:ifnot ~ifnot:ifso
-    | L.Lifthenelse (cond, inner_ifso, inner_ifnot, _) ->
-        share_expr ~kind ~expr:(aux ~loc ~kind ~cond:inner_ifso ~ifso ~ifnot) (fun new_ifso ->
-            share_expr ~kind ~expr:(aux ~loc ~kind ~cond:inner_ifnot ~ifso ~ifnot) (fun new_ifnot ->
+      L.Lprim (Pnot, [cond], loc)
+    | _ -> (
+      match[@warning "-4"] cond with
+      | L.Lconst (Const_base (Const_int 1)) -> ifso
+      | L.Lconst (Const_base (Const_int 0)) -> ifnot
+      (* CR gbury: should we try to use the locs here, or is it better to keep
+         using the locs from each individual condition ? *)
+      | L.Lprim (Psequand, [a; b], loc) ->
+        share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot)
+          (fun ifso -> aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+      | L.Lifthenelse (a, b, Lconst (Const_base (Const_int 0)), _) ->
+        share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot)
+          (fun ifso -> aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+      | L.Lprim (Psequor, [a; b], loc) ->
+        share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot)
+          (fun ifnot -> aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+      | L.Lifthenelse (a, Lconst (Const_base (Const_int 1)), b, _) ->
+        share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot)
+          (fun ifnot -> aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+      | L.Lprim (Pnot, [c], loc) ->
+        aux ~loc ~kind ~cond:c ~ifso:ifnot ~ifnot:ifso
+      | L.Lifthenelse (cond, inner_ifso, inner_ifnot, _) ->
+        share_expr ~kind ~expr:(aux ~loc ~kind ~cond:inner_ifso ~ifso ~ifnot)
+          (fun new_ifso ->
+            share_expr ~kind
+              ~expr:(aux ~loc ~kind ~cond:inner_ifnot ~ifso ~ifnot)
+              (fun new_ifnot ->
                 aux ~loc ~kind ~cond ~ifso:new_ifso ~ifnot:new_ifnot))
-    | _ -> mk_switch ~cond ~ifso ~ifnot ~kind
-  end
+      | _ -> mk_switch ~cond ~ifso ~ifnot ~kind)
   in
   let res =
     share_expr ~kind ~expr:ifso (fun ifso ->
-        share_expr ~kind ~expr:ifnot (fun ifnot -> aux ~loc ~kind ~cond ~ifso ~ifnot))
-      in
-  if Flambda_features.debug_flambda2 () then
-    Format.eprintf "SWITCH:@\n%a@\n->@\n%a@\n@."
-      Printlambda.lambda (L.Lifthenelse(cond,ifso,ifnot,kind))
+        share_expr ~kind ~expr:ifnot (fun ifnot ->
+            aux ~loc ~kind ~cond ~ifso ~ifnot))
+  in
+  if Flambda_features.debug_flambda2 ()
+  then
+    Format.eprintf "SWITCH:@\n%a@\n->@\n%a@\n@." Printlambda.lambda
+      (L.Lifthenelse (cond, ifso, ifnot, kind))
       Printlambda.lambda res;
   res
 
