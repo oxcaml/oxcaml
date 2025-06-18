@@ -645,6 +645,10 @@ let free_variables_list ?env tyl =
     List.fold_left (fun acc ty -> free_vars ~init:acc ~add_one ?env mark ty)
       [] tyl)
 
+let contains_nongen_variables ?env ty =
+  let add_one ty _kind acc = acc || (get_level ty < generic_level) in
+  with_type_mark (fun mark -> free_vars ~init:false ~add_one ?env mark ty)
+
 let closed_type ?env mark ty =
   let add_one ty kind _acc = raise (Non_closed (ty, kind)) in
   free_vars ~init:() ~add_one ?env mark ty
