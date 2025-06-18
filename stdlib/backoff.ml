@@ -35,6 +35,7 @@ let recommended_domain_count =
   if is_runtime5 ()
   then Domain.recommended_domain_count
   else fun () -> 1
+
 let single_mask = Bool.to_int (recommended_domain_count () = 1) - 1
 let bits = 5
 let max_wait_log = 30 (* [Random.bits] returns 30 random bits. *)
