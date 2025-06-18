@@ -60,7 +60,7 @@ type jkind_info =
   }
 
 type error =
-  | Unbound_type_variable of string * string list
+  | Unbound_type_variable of string * string list * string option
   | No_type_wildcards
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
@@ -217,7 +217,8 @@ module TyVarEnv : sig
   val remember_used : string -> type_expr -> Location.t -> unit
     (* remember that a given name is bound to a given type *)
 
-  val globalize_used_variables : policy -> Env.t -> unit -> unit
+  val globalize_used_variables :
+    ?hint_for_unbound_variables:string -> policy -> Env.t -> unit -> unit
    (* after finishing with a type signature, used variables are unified to the
       corresponding global type variables if they exist. Otherwise, in function
       of the policy, fresh used variables are either
@@ -500,7 +501,8 @@ end = struct
     | { extensibility = Fixed } -> raise(Error(loc, env, No_type_wildcards))
     | policy -> new_var jkind policy
 
-  let globalize_used_variables { flavor; extensibility } env =
+  let globalize_used_variables ?hint_for_unbound_variables
+      { flavor; extensibility } env =
     let r = ref [] in
     TyVarMap.iter
       (fun name (ty, loc) ->
@@ -514,7 +516,8 @@ end = struct
             if extensibility = Fixed && Btype.is_Tvar ty then
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names ())));
+                                                 get_in_scope_names (),
+                                                 hint_for_unbound_variables)));
             let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
             let v2 = new_global_var jkind in
             r := (loc, v, v2) :: !r;
@@ -1339,7 +1342,8 @@ let make_fixed_univars ty =
   make_fixed_univars ty;
   Btype.unmark_type ty
 
-let transl_simple_type env ~new_var_jkind ?univars ~closed mode styp =
+let transl_simple_type env ~new_var_jkind ?univars ?hint_for_unbound_variables
+    ~closed mode styp =
   TyVarEnv.reset_locals ?univars ();
   let policy =
     if closed
@@ -1347,7 +1351,7 @@ let transl_simple_type env ~new_var_jkind ?univars ~closed mode styp =
     else TyVarEnv.make_extensible_policy new_var_jkind
   in
   let typ = transl_type env policy mode styp in
-  TyVarEnv.globalize_used_variables policy env ();
+  TyVarEnv.globalize_used_variables ?hint_for_unbound_variables policy env ();
   make_fixed_univars typ.ctyp_type;
   typ
 
@@ -1406,8 +1410,16 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       let univars = transl_bound_vars vars in
       let typed_vars = TyVarEnv.ttyp_poly_arg univars in
       let typ =
-        transl_simple_type ~new_var_jkind:Sort env ~univars ~closed:true Alloc.Const.legacy
-          inner_type
+        if Language_extension.erasable_extensions_only () then
+          transl_simple_type ~new_var_jkind:Sort env ~univars
+            ~hint_for_unbound_variables:
+              "Hint: Explicit quantification requires quantifying all type \
+               variables for compatibility with upstream OCaml.\n\
+               Enable non-erasable extensions to disable this check."
+            ~closed:true Alloc.Const.legacy inner_type
+        else
+          transl_simple_type ~new_var_jkind:Sort env ~univars ~closed:false
+            Alloc.Const.legacy inner_type
       in
       (typed_vars, univars, typ)
     end
@@ -1438,10 +1450,11 @@ let pp_tag ppf t = Format.fprintf ppf "`%s" t
 
 let report_error env ppf =
   function
-  | Unbound_type_variable (name, in_scope_names) ->
+  | Unbound_type_variable (name, in_scope_names, hint) ->
     fprintf ppf "The type variable %a is unbound in this type declaration.@ %a"
       Style.inline_code name
-      did_you_mean (fun () -> Misc.spellcheck in_scope_names name )
+      did_you_mean (fun () -> Misc.spellcheck in_scope_names name );
+    Option.iter (fprintf ppf "@.%s") hint
   | No_type_wildcards ->
       fprintf ppf "A type wildcard %a is not allowed in this type declaration."
         Style.inline_code "_"
