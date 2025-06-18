@@ -597,3 +597,29 @@ Line 2, characters 20-31:
                         ^^^^^^^^^^^
 Error: Mutable lets are not yet supported with unboxed products.
 |}]
+
+(* Test 18.1: unmutated mutable variable warning *)
+let x_18_1 =
+  let mutable x = 3 in x + 1
+;;
+[%%expect{|
+Line 2, characters 14-15:
+2 |   let mutable x = 3 in x + 1
+                  ^
+Warning 186 [unmutated-mut-var]: mutable variable x was never mutated.
+
+val x_18_1 : int = 4
+|}]
+
+(* Test 18.2: mutation doesn't count as use *)
+let x_18_2 =
+  let mutable x = 3 in x <- 4; 4
+;;
+[%%expect{|
+Line 2, characters 14-15:
+2 |   let mutable x = 3 in x <- 4; 4
+                  ^
+Warning 26 [unused-var]: unused variable x.
+
+val x_18_2 : int = 4
+|}]
