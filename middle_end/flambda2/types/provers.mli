@@ -72,17 +72,23 @@ val meet_naked_vec128s :
   Type_grammar.t ->
   Vector_types.Vec128.Bit_pattern.Set.t meet_shortcut
 
-type variant_like_proof = private
+type 'size variant_like_proof = private
   { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
-    non_const_ctors_with_sizes :
-      (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
+    non_const_ctors_with_sizes : 'size Tag.Scannable.Map.t
   }
 
 val meet_variant_like :
-  Typing_env.t -> Type_grammar.t -> variant_like_proof meet_shortcut
+  Typing_env.t ->
+  Type_grammar.t ->
+  (Targetint_31_63.t * Flambda_kind.Block_shape.t) Or_unknown.t
+  variant_like_proof
+  meet_shortcut
 
 val prove_variant_like :
-  Typing_env.t -> Type_grammar.t -> variant_like_proof proof_of_property
+  Typing_env.t ->
+  Type_grammar.t ->
+  (Targetint_31_63.t * Flambda_kind.Block_shape.t) variant_like_proof
+  proof_of_property
 
 type boxed_or_tagged_number = private
   | Boxed of

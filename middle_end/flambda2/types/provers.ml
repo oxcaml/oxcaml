@@ -410,21 +410,20 @@ let meet_naked_nativeints = meet_naked_number Nativeint
 
 let meet_naked_vec128s = meet_naked_number Vec128
 
-type variant_like_proof =
+type 'size variant_like_proof =
   { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
-    non_const_ctors_with_sizes :
-      (Targetint_31_63.t * K.Block_shape.t) Tag.Scannable.Map.t
+    non_const_ctors_with_sizes : 'size Tag.Scannable.Map.t
   }
 
-let prove_variant_like_generic_value env
-    (value_head : TG.head_of_kind_value_non_null) :
-    variant_like_proof generic_proof =
+let prove_variant_like_generic_value ~(all_tags_and_sizes : _ -> _ Or_unknown.t)
+    env (value_head : TG.head_of_kind_value_non_null) :
+    'size variant_like_proof generic_proof =
   match value_head with
   | Variant blocks_imms -> (
     match blocks_imms.blocks with
     | Unknown -> Unknown
     | Known blocks -> (
-      match TG.Row_like_for_blocks.all_tags_and_sizes blocks with
+      match all_tags_and_sizes blocks with
       | Unknown -> Unknown
       | Known non_const_ctors_with_sizes -> (
         let non_const_ctors_with_sizes =
@@ -461,10 +460,16 @@ let prove_variant_like_generic_value env
     Invalid
 
 let meet_variant_like env t =
-  gen_value_to_meet prove_variant_like_generic_value env t
+  gen_value_to_meet
+    (prove_variant_like_generic_value
+       ~all_tags_and_sizes:TG.Row_like_for_blocks.all_tags_and_sizes)
+    env t
 
 let prove_variant_like env t =
-  gen_value_to_proof prove_variant_like_generic_value env t
+  gen_value_to_proof
+    (prove_variant_like_generic_value
+       ~all_tags_and_sizes:TG.Row_like_for_blocks.all_tags_and_sizes_known)
+    env t
 
 type boxed_or_tagged_number =
   | Boxed of

@@ -592,16 +592,23 @@ val meet_naked_int64s :
 val meet_naked_nativeints :
   Typing_env.t -> t -> Targetint_32_64.Set.t meet_shortcut
 
-type variant_like_proof = private
+type 'size variant_like_proof = private
   { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
-    non_const_ctors_with_sizes :
-      (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
+    non_const_ctors_with_sizes : 'size Tag.Scannable.Map.t
   }
 
-val meet_variant_like : Typing_env.t -> t -> variant_like_proof meet_shortcut
+val meet_variant_like :
+  Typing_env.t ->
+  t ->
+  (Targetint_31_63.t * Flambda_kind.Block_shape.t) Or_unknown.t
+  variant_like_proof
+  meet_shortcut
 
 val prove_variant_like :
-  Typing_env.t -> t -> variant_like_proof proof_of_property
+  Typing_env.t ->
+  t ->
+  (Targetint_31_63.t * Flambda_kind.Block_shape.t) variant_like_proof
+  proof_of_property
 
 (** If [ty] is known to represent a boxed number or a tagged integer,
     [prove_is_a_boxed_number env ty] is [Proved (alloc_mode,kind,contents_ty)].

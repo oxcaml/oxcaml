@@ -2947,6 +2947,25 @@ module Row_like_for_blocks = struct
     { known_tags; other_tags; alloc_mode }
 
   let all_tags_and_sizes t :
+      (Targetint_31_63.t * K.Block_shape.t) Or_unknown.t Tag.Map.t Or_unknown.t
+      =
+    match t.other_tags with
+    | Ok _ -> Unknown
+    | Bottom ->
+      let by_tag =
+        Tag.Map.map
+          (fun case : _ Or_unknown.t ->
+            match (case : _ Or_unknown.t) with
+            | Unknown -> Unknown
+            | Known { index = { domain; shape }; _ } -> (
+              match domain with
+              | Known size -> Known (size, shape)
+              | At_least _size -> Unknown))
+          t.known_tags
+      in
+      Known by_tag
+
+  let all_tags_and_sizes_known t :
       (Targetint_31_63.t * K.Block_shape.t) Tag.Map.t Or_unknown.t =
     match t.other_tags with
     | Ok _ -> Unknown
