@@ -450,7 +450,7 @@ module IdTbl =
         | Nothing -> raise exn
         end
 
-    let find_same id (tbl : (empty, _, _) t) =
+    let find_same id (tbl : (_, _, _) t) =
       find_same_without_locks id tbl
 
     let rec find_same_and_locks id tbl macc =
@@ -635,7 +635,7 @@ type t = {
   constrs: constructor_data TycompTbl.t;
   labels: label_data TycompTbl.t;
   unboxed_labels: unboxed_label_description TycompTbl.t;
-  types: (empty, type_data, type_data) IdTbl.t;
+  types: (lock, type_data, type_data) IdTbl.t;
   modules: (lock, module_entry, module_data) IdTbl.t;
   modtypes: (empty, modtype_data, modtype_data) IdTbl.t;
   classes: (lock, class_data, class_data) IdTbl.t;
@@ -2588,6 +2588,7 @@ let enter_module ~scope ?arg s presence mty env =
 let add_lock lock env =
   { env with
     values = IdTbl.add_lock lock env.values;
+    types = IdTbl.add_lock lock env.types;
     modules = IdTbl.add_lock lock env.modules;
     classes = IdTbl.add_lock lock env.classes;
   }
@@ -3192,11 +3193,18 @@ let lookup_ident_value ~errors ~use ~loc name env =
       may_lookup_error errors loc env (Unbound_value (Lident name, No_hint))
 
 let lookup_ident_type ~errors ~use ~loc s env =
-  match IdTbl.find_name wrap_identity ~mark:use s env.types with
-  | (path, data) as res ->
-      use_type ~use ~loc path data;
-      res
-  | exception Not_found ->
+  match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
+  | Ok (path, locks, tda) -> begin
+      match quotation_locks_offset locks with
+      | None | Some 0 -> begin
+          use_type ~use ~loc path tda;
+          path, locks, tda
+        end
+      | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, tda.tda_declaration.type_loc, n))
+    end
+  | exception Not_found | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
@@ -3396,12 +3404,14 @@ let lookup_dot_value ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_value (Ldot(l, s), No_hint))
 
 let lookup_dot_type ~errors ~use ~loc l s env =
-  let (p, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
+  let (p, locks, comps) =
+    lookup_structure_components ~errors ~use ~loc l env
+  in
   match NameMap.find s comps.comp_types with
   | tda ->
       let path = Pdot(p, s) in
       use_type ~use ~loc path tda;
-      (path, tda)
+      (path, locks, tda)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
@@ -3492,7 +3502,7 @@ let add_components slot root env0 comps locks =
     add_v (fun x -> `Value x) comps.comp_values env0.values
   in
   let types =
-    add (fun x -> `Type x) comps.comp_types env0.types
+    add_v (fun x -> `Type x) comps.comp_types env0.types
   in
   let modtypes =
     add (fun x -> `Module_type x) comps.comp_modtypes env0.modtypes
@@ -3702,7 +3712,7 @@ let lookup_type_full ~errors ~use ~loc lid env =
   | Lapply _ -> assert false
 
 let lookup_type ~errors ~use ~loc lid env =
-  let (path, tda) = lookup_type_full ~errors ~use ~loc lid env in
+  let (path, _, tda) = lookup_type_full ~errors ~use ~loc lid env in
   path, tda.tda_declaration
 
 let lookup_modtype_lazy ~errors ~use ~loc lid env =

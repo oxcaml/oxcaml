@@ -85,6 +85,7 @@
                     stdlib__Printexc
                     stdlib__Printf
                     stdlib__Queue
+                    stdlib__Quote
                     stdlib__Random
                     stdlib__Result
                     stdlib__Scanf

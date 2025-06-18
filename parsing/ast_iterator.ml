@@ -542,7 +542,7 @@ module E = struct
     | Pexp_comprehension e -> iter_comp_exp sub e
     | Pexp_overwrite (e1, e2) -> sub.expr sub e1; sub.expr sub e2
     | Pexp_quotation e -> sub.expr sub e
-    | Pexp_quotation_type t -> sub.typ sub t
+    | Pexp_quoted_type_expr t -> sub.typ sub t
     | Pexp_splice e -> sub.expr sub e
     | Pexp_hole -> ()
 

@@ -294,6 +294,8 @@ module History = struct
     | Recmod_fun_arg
     | Quotation_result
     | Antiquotation_result
+    | Tquote
+    | Tsplice
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =

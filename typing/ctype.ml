@@ -803,7 +803,7 @@ let duplicate_class_type ty =
    [expand_abbrev] (via [subst]) requires these expansions to be
    preserved. Does it worth duplicating this code ?
 *)
-let rec generalize ty =
+let rec generalize ty =  (* FIXME: stage crossing *)
   let level = get_level ty in
   if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
@@ -868,6 +868,10 @@ let rec generalize_spine ty =
       set_level ty generic_level;
       memo := Mnil;
       List.iter generalize_spine tyl
+  | Tquote tyl ->
+      generalize_spine tyl
+  | Tsplice tyl ->
+      generalize_spine tyl
   | _ -> ()
 
 let forward_try_expand_safe = (* Forward declaration *)
@@ -2040,7 +2044,7 @@ let rec extract_concrete_typedecl env ty =
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ -> Has_no_typedecl
+  | Tvariant _ | Tpackage _ | Tquote _ | Tsplice _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
   | Tlink _ | Tsubst _ -> assert false
 
@@ -2126,8 +2130,8 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
-  | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ -> []
+  | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _
+  | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2183,6 +2187,8 @@ let rec estimate_type_jkind ~expand_component env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
+  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
+  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -2253,6 +2259,8 @@ and type_unboxed_jkind_deep env ty fuel =
     end
   | Tobject _ -> false, Jkind.for_object
   | Tfield _ -> false, Jkind.Builtin.value ~why:Tfield
+  | Tquote _ -> false, Jkind.Builtin.value ~why:Tquote
+  | Tsplice _ -> false, Jkind.Builtin.value ~why:Tsplice
   | Tnil -> false, Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3198,6 +3206,10 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
+        | (Tquote t1, Tquote t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1 t2
         | (_, _, _, _) ->
             raise Incompatible
       end
@@ -3905,6 +3917,10 @@ and unify3 uenv t1 t1' t2 t2' =
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
+      | (Tquote t1, Tquote t2) ->
+          unify uenv t1 t2
+      | (Tsplice t1, Tsplice t2) ->
+          unify uenv t1 t2
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
@@ -4980,6 +4996,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen variance type_pairs env)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5431,6 +5451,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
         end
@@ -6133,6 +6157,14 @@ let rec build_subtype env (visited : transient_expr list)
       let c = max_change c1 c2 in
       if c > Unchanged then (newty (Tfield(s, field_public, t1', t2')), c)
       else (t, Unchanged)
+  | Tquote t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tquote t1'), c)
+      else (t, Unchanged)
+  | Tsplice t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -6325,6 +6357,11 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Not_found ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
+    (* FIXME *)
+    | (Tquote t1, Tquote t2) ->
+         subtype_rec env trace t1 t2 cstrs
+    | (Tsplice t1, Tsplice t2) ->
+         subtype_rec env trace t1 t2 cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end

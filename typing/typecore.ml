@@ -4112,6 +4112,7 @@ let rec is_nonexpansive exp =
   | Texp_function _
   | Texp_probe_is_enabled _
   | Texp_src_pos
+  | Texp_quotation _
   | Texp_array (_, _, [], _) -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
@@ -4218,9 +4219,7 @@ let rec is_nonexpansive exp =
   | Texp_letexception _
   | Texp_letop _
   | Texp_extension_constructor _
-  | Texp_quotation _
-  | Texp_antiquotation _ ->
-    false
+  | Texp_antiquotation _ -> false
   | Texp_exclave e -> is_nonexpansive e
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
@@ -6888,7 +6887,8 @@ and type_expect_
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.add_quotation_lock env in
       let ty = newgenvar jkind in
-      let to_unify = Predef.type_code ty in
+      let quoted_ty = newgenty (Tquote ty) in
+      let to_unify = Predef.type_code quoted_ty in
       with_explanation (fun () ->
         unify_exp_types loc new_env to_unify (generic_instance ty_expected));
       let arg = type_expect new_env expected_mode' exp (mk_expected ty) in
@@ -6898,14 +6898,14 @@ and type_expect_
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = new_env }
-  | Pexp_quotation_type ty ->
+  | Pexp_quoted_type_expr ty ->
       raise (Error (ty.ptyp_loc, env, Unsupported_quotation_construct))
   | Pexp_splice exp ->
       if Env.without_open_quotations env then
         raise (Error (exp.pexp_loc, env, Toplevel_splice));
       let argument_mode = mode_legacy in
       let new_env = Env.add_splice_lock env in
-      let ty = newgenconstr Predef.path_code [ty_expected] in
+      let ty = newgenconstr Predef.path_code [newgenty (Tquote ty_expected)] in
       let arg = type_expect new_env argument_mode exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;

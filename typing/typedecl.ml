@@ -3099,6 +3099,12 @@ let rec parse_native_repr_attributes env core_type ty rmode
   | (Ptyp_poly (_, t) | Ptyp_alias (t, _, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr ~is_layout_poly
   | _ ->
+     let inner_env =
+       (match core_type.ptyp_desc with
+        | Ptyp_quote _ -> Env.add_quotation_lock env
+        | Ptyp_splice _ -> Env.add_splice_lock env
+        | _ -> env)
+     in
      let rmode =
        if Builtin_attributes.has_local_opt core_type.ptyp_attributes
        then Prim_poly
@@ -3106,7 +3112,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
      in
      let repr_res =
        make_native_repr
-        env core_type ty ~global_repr
+        inner_env core_type ty ~global_repr
         ~is_layout_poly ~why:External_result
      in
      ([], (rmode, repr_res))

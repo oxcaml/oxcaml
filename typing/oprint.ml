@@ -603,9 +603,16 @@ and print_out_type_3 ppf =
       fprintf ppf "@[<1>(%a [@@%s])@]"
         print_out_type_0 t attr.oattr_name
   | Otyp_jkind_annot (t, lay) ->
-    fprintf ppf "@[<1>(%a@ :@ %a)@]"
-      print_out_type_0 t
-      print_out_jkind lay
+      fprintf ppf "@[<1>(%a@ :@ %a)@]"
+        print_out_type_0 t
+        print_out_jkind lay
+  | Otyp_quote t ->
+      fprintf ppf "@[<1><[@ %a@ ]>@]"
+        print_out_type_0 t
+  | Otyp_splice t ->
+      fprintf ppf "@[<1>$@ (%a)@]"
+        print_out_type_0 t
+
 and print_out_type ppf typ =
   print_out_type_0 ppf typ
 and print_simple_out_type ppf typ =

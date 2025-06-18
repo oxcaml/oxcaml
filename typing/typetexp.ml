@@ -699,6 +699,8 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
   Builtin_attributes.warning_scope styp.ptyp_attributes
     (fun () -> transl_type_aux env ~policy ~aliased ~row_context mode styp)
 
+(* FIXME: add stage here;
+variables also should carry stages around *)
 and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   let loc = styp.ptyp_loc in
   let ctyp ctyp_desc ctyp_type =
@@ -1056,11 +1058,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
   | Ptyp_quote t ->
-      let cty = transl_type env ~policy ~row_context mode t in
-      ctyp (Ttyp_quote cty) cty.ctyp_type
+      let cty = transl_type (Env.add_quotation_lock env) ~policy ~row_context mode t in
+      ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
-      let cty = transl_type env ~policy ~row_context mode t in
-      ctyp (Ttyp_splice cty) cty.ctyp_type
+      let cty = transl_type (Env.add_splice_lock env) ~policy ~row_context mode t in
+      ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -1081,6 +1083,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
       TyVarEnv.remember_used name ty loc;
       ty
   in
+  (* Add stage check here! *)
   let jkind_annot =
     match jkind_annot_opt with
     | None -> None
