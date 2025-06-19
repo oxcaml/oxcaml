@@ -1101,8 +1101,8 @@ module Join_database = struct
                 acc)
         else acc)
     | Mutable_block _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _
-    | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _ | Closures _ | String _
-    | Array _ ->
+    | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _
+    | Boxed_vec512 _ | Closures _ | String _ | Array _ ->
       acc
 
   let relations_from_expanded_type env et set_relation acc =
@@ -1116,8 +1116,8 @@ module Join_database = struct
     in
     match ET.descr_oub et with
     | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int32 _
-    | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _ | Rec_info _ | Region _
-      ->
+    | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
+    | Naked_vec512 _ | Rec_info _ | Region _ ->
       acc
     | Value (Ok { is_null = Maybe_null; non_null = Bottom }) ->
       set_is_null true acc
@@ -1307,23 +1307,26 @@ module Join_database = struct
                   add_properties_of_const Database.Function.[tag_imm]
                 | Naked_number
                     ( Naked_float32 | Naked_float | Naked_int32 | Naked_int64
-                    | Naked_nativeint | Naked_vec128 )
+                    | Naked_nativeint | Naked_vec128 | Naked_vec256
+                    | Naked_vec512 )
                 | Region | Rec_info ->
                   expanded_relation)
               demoted_to_constants expanded_relation_from_database_and_types
           in
-          let input_cell = ref expanded_relation in
-          let properties_cell = ref Database.Function.Map.empty in
-          let name_iterator =
-            Name_in_target_env_iterator.create input_cell properties_cell
+          let _send_input, recv_input = Channel.create expanded_relation in
+          let send_properties, recv_properties =
+            Channel.create Database.Function.Map.empty
           in
-          let value_cell = ref Or_bottom.Bottom in
+          let name_iterator =
+            Name_in_target_env_iterator.create recv_input send_properties
+          in
+          let send_value, recv_value = Channel.create Or_bottom.Bottom in
           let function_iterator =
-            Function_iterator.create properties_cell value_cell
+            Function_iterator.create recv_properties send_value
           in
           ( name_iterator :: name_iterators,
             function_iterator :: function_iterators,
-            Index.Map.add index value_cell handlers ))
+            Index.Map.add index recv_value handlers ))
         relations_to_join ([], [], Index.Map.empty)
     in
     let name_iterator = Join_name_iterators.create name_iterators in
@@ -1337,8 +1340,8 @@ module Join_database = struct
         let exists_in_all_envs = ref true in
         let value =
           Index.Map.filter_map
-            (fun _index (handler : _ Or_bottom.t ref) ->
-              match !handler with
+            (fun _index (handler : _ Or_bottom.t Channel.receiver) ->
+              match Channel.recv handler with
               | Bottom ->
                 exists_in_all_envs := false;
                 None
