@@ -1,5 +1,3 @@
-(* [@@@ocaml.warning "-unused-value-declaration"] *)
-
 [@@@ocaml.warning "-unused-module"]
 
 open Utils

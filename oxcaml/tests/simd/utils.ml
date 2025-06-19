@@ -132,6 +132,10 @@ let eq_float64x2 ~result ~expect =
   eqf' hv h;
   ()
 
+let to_float64x2 f0 f1 =
+  let v0, v1 = Int64.bits_of_float f0, Int64.bits_of_float f1 in
+  float64x2_of_int64s v0 v1
+
 let () =
   (failmsg := fun () -> Printf.printf "basic_checks!");
   let a : int8x16 = int8x16_of_int64s 1L 2L in

@@ -20,10 +20,6 @@ let () =
   let f2 = low_to v2 in
   eqf f1 f2 1. 2.
 
-let to_float64x2 f0 f1 =
-  let v0, v1 = Int64.bits_of_float f0, Int64.bits_of_float f1 in
-  float64x2_of_int64s v0 v1
-
 (* Math *)
 
 let check_cmp msg scalar vector f0 f1 =

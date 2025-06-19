@@ -1,3 +1,5 @@
+[@@@ocaml.warning "-unused-module"]
+
 open Utils
 
 (* CR gyorsh: Move these tests to the parent directory after adding arm64
@@ -11,7 +13,7 @@ let eqi lv hv l h =
 
 module Float32x4 = struct
   include Builtins.Float32x4
-  include Sse_other_builtins.Float32x4
+  include Builtins.Sse_other_builtins.Float32x4
 
   let () =
     Float32.check_floats (fun f0 f1 ->
@@ -68,7 +70,7 @@ end
 
 module Float64x2 = struct
   include Builtins.Float64x2
-  include Sse_other_builtins.Float64x2
+  include Builtins.Sse_other_builtins.Float64x2
 
   let () =
     Test_helpers.run_if_not_under_rosetta2 ~f:(fun () ->
@@ -120,7 +122,7 @@ module Float64x2 = struct
 end
 
 module Int64 = struct
-  include Sse_other_builtins.Int64
+  include Builtins.Sse_other_builtins.Int64
 
   let eq' x y = if x <> y then Printf.printf "%016Lx <> %016Lx\n" x y
 
@@ -172,40 +174,46 @@ end
 module SSE_Util = struct
   let () =
     let v = Int32s.of_int32s 0xffffffffl 0x80000000l 0x7fffffffl 0x0l in
-    let i = Builtins.SSE_Utils.movemask_32 v in
+    let i = Builtins.SSE_Util.movemask_32 v in
     eqi i 0 0b0011 0
 end
 
 module Int32x4 = struct
-  Int32s.check_ints (fun l r ->
-      (failmsg := fun () -> Printf.printf "%08lx|%08lx mulsign\n%!" l r);
-      let v0 = Int32s.of_int32s l l r r in
-      let v1 = Int32s.of_int32s l r l r in
-      let result = mulsign v0 v1 in
-      let mulsign x y = Int32.mul (Int32.compare y 0l |> Int32.of_int) x in
-      let expect =
-        Int32s.of_int32s (mulsign l l) (mulsign l r) (mulsign r l) (mulsign r r)
-      in
-      eq (int32x4_low_int64 result)
-        (int32x4_high_int64 result)
-        (int32x4_low_int64 expect)
-        (int32x4_high_int64 expect));
-  Int32s.check_ints (fun l r ->
-      (failmsg := fun () -> Printf.printf "%08lx|%08lx hsub\n%!" l r);
-      let v0 = Int32s.of_int32s l r r l in
-      let v1 = Int32s.of_int32s r l l r in
-      let result = hsub v0 v1 in
-      let expect =
-        Int32s.of_int32s (Int32.sub l r) (Int32.sub r l) (Int32.sub r l)
-          (Int32.sub l r)
-      in
-      eq (int32x4_low_int64 result)
-        (int32x4_high_int64 result)
-        (int32x4_low_int64 expect)
-        (int32x4_high_int64 expect))
+  include Builtins.Sse_other_builtins.Int32x4
+
+  let () =
+    Int32s.check_ints (fun l r ->
+        (failmsg := fun () -> Printf.printf "%08lx|%08lx mulsign\n%!" l r);
+        let v0 = Int32s.of_int32s l l r r in
+        let v1 = Int32s.of_int32s l r l r in
+        let result = mulsign v0 v1 in
+        let mulsign x y = Int32.mul (Int32.compare y 0l |> Int32.of_int) x in
+        let expect =
+          Int32s.of_int32s (mulsign l l) (mulsign l r) (mulsign r l)
+            (mulsign r r)
+        in
+        eq (int32x4_low_int64 result)
+          (int32x4_high_int64 result)
+          (int32x4_low_int64 expect)
+          (int32x4_high_int64 expect));
+    Int32s.check_ints (fun l r ->
+        (failmsg := fun () -> Printf.printf "%08lx|%08lx hsub\n%!" l r);
+        let v0 = Int32s.of_int32s l r r l in
+        let v1 = Int32s.of_int32s r l l r in
+        let result = hsub v0 v1 in
+        let expect =
+          Int32s.of_int32s (Int32.sub l r) (Int32.sub r l) (Int32.sub r l)
+            (Int32.sub l r)
+        in
+        eq (int32x4_low_int64 result)
+          (int32x4_high_int64 result)
+          (int32x4_low_int64 expect)
+          (int32x4_high_int64 expect))
 end
 
 module Int16x8 = struct
+  include Builtins.Sse_other_builtins.Int16x8
+
   let () =
     Int16.check_ints (fun l r ->
         (failmsg := fun () -> Printf.printf "%04x|%04x mulsign\n%!" l r);
@@ -281,7 +289,7 @@ module Int16x8 = struct
         let min_v = Int16.minu l r in
         let idx = if min_v = l then 0 else 1 in
         let expect =
-          Int64.(
+          Stdlib.Int64.(
             logor
               (shift_left (of_int idx |> logand 0x3L) 16)
               (of_int min_v |> logand 0xffffL))
@@ -301,6 +309,8 @@ module Int16x8 = struct
 end
 
 module Int8x16 = struct
+  include Builtins.Sse_other_builtins.Int8x16
+
   let () =
     Int8.check_ints (fun l r ->
         (failmsg := fun () -> Printf.printf "%02x|%02x mulsign\n%!" l r);
@@ -348,7 +358,7 @@ module Int8x16 = struct
         let v1 = Int8.of_ints l r l r l r l r in
         let result = sadu v0 v1 in
         let lr = Int8.diffu l r in
-        let expect = Int64.of_int (4 * lr) in
+        let expect = Stdlib.Int64.of_int (4 * lr) in
         eq (int64x2_low_int64 result) (int64x2_high_int64 result) expect expect);
     Int8.check_ints (fun l r ->
         (failmsg := fun () -> Printf.printf "%02x|%02x msadu\n%!" l r);
@@ -363,7 +373,7 @@ module Int8x16 = struct
 end
 
 module SSSE3_Util = struct
-  include Builtins.SSSE3_Util
+  include Builtins.Sse_other_builtins.SSSE3_Util
 
   let () =
     let v0 = Int8.of_ints 0 1 2 3 4 5 6 7 in
@@ -388,7 +398,7 @@ module SSSE3_Util = struct
 end
 
 module SSE41_Util = struct
-  include Builtins.SSE41_Util
+  include Builtins.Sse_other_builtins.SSE41_Util
 
   let () =
     let v0 = Int16.of_ints 0 1 2 3 4 5 6 7 in
