@@ -1153,7 +1153,6 @@ and specialize_continuation_if_needed ~simplify_expr dacc
            these values should be kept so that these budgets are accurately
            respected. *)
         let lifting_budget = DA.get_continuation_lifting_budget dacc in
-        let spec_budget = DA.get_continuation_specialization_budget dacc in
         (* Save the replay history from the handler, using the dacc after
            traversal of the handler *)
         let replay =
@@ -1168,9 +1167,6 @@ and specialize_continuation_if_needed ~simplify_expr dacc
            the handler, see comment above. *)
         let dacc = data.dacc_after_body in
         let dacc = DA.with_continuation_lifting_budget dacc lifting_budget in
-        let dacc =
-          DA.with_continuation_specialization_budget dacc spec_budget
-        in
         (* Remove the (generic) continuation uses from the CUE, since we will
            then add uses for each of the specialized continuation. *)
         let cont_uses_env = CUE.remove data.cont_uses_env_after_body cont in

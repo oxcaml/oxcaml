@@ -94,11 +94,13 @@ let analyze ?(speculative = false) ?print_name ~return_continuation
       (* control flow graph *)
       let control = Control_flow_graph.create ~dummy_toplevel_cont t in
       let reference_analysis =
-              if true then Mutable_unboxing.empty else
-        Mutable_unboxing.create ~dom:aliases ~dom_graph ~source_info:t
-          ~control_flow_graph:control
-          ~required_names:dead_variable_result.required_names
-          ~return_continuation ~exn_continuation
+        if true
+        then Mutable_unboxing.empty
+        else
+          Mutable_unboxing.create ~dom:aliases ~dom_graph ~source_info:t
+            ~control_flow_graph:control
+            ~required_names:dead_variable_result.required_names
+            ~return_continuation ~exn_continuation
       in
       let pp_node = Mutable_unboxing.pp_node reference_analysis in
       let reference_result, unboxed_blocks =
