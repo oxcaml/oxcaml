@@ -144,6 +144,19 @@ struct stack_info** caml_alloc_stack_cache (void)
   return stack_cache;
 }
 
+static void free_stack_memory(struct stack_info*);
+void caml_free_stack_cache(struct stack_info** cache)
+{
+  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    while (cache[i] != NULL) {
+      struct stack_info* stk = cache[i];
+      cache[i] = (struct stack_info*)stk->exception_ptr;
+      free_stack_memory(stk);
+    }
+  }
+  caml_stat_free(cache);
+}
+
 /* Round up to a power of 2 */
 static uintnat round_up_p2(uintnat x, uintnat p2)
 {
@@ -942,6 +955,20 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
   return stk;
 }
 
+static void free_stack_memory(struct stack_info* stack)
+{
+#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+  memset(stack, 0x42, (char*)stack->handler - (char*)stack);
+#endif
+#ifdef USE_MMAP_MAP_STACK
+  munmap(stack, stack->size);
+#elif defined(STACK_GUARD_PAGES)
+  caml_mem_unmap(stack, stack->size);
+#else
+  caml_stat_free(stack);
+#endif
+}
+
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
@@ -962,16 +989,7 @@ void caml_free_stack (struct stack_info* stack)
            (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
   } else {
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-    memset(stack, 0x42, (char*)stack->handler - (char*)stack);
-#endif
-#ifdef USE_MMAP_MAP_STACK
-    munmap(stack, stack->size);
-#elif defined(STACK_GUARD_PAGES)
-    caml_mem_unmap(stack, stack->size);
-#else
-    caml_stat_free(stack);
-#endif
+    free_stack_memory(stack);
   }
 }
 
