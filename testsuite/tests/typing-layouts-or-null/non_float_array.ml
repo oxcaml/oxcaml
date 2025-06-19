@@ -84,7 +84,7 @@ end = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "X/370"
+(apply (field_imm 1 (global Toploop!)) "X/371"
   (let
     (x1 =[(consts ()) (non_consts ([0: *, [int]]))] [0: "first" 1]
      x2 =[(consts ()) (non_consts ([0: *, [int]]))] [0: "second" 2])
@@ -105,7 +105,7 @@ let () =
 
 [%%expect{|
 (let
-  (X = (apply (field_imm 0 (global Toploop!)) "X/370")
+  (X = (apply (field_imm 0 (global Toploop!)) "X/371")
    *match* =[int]
      (let (xs =[addrarray] (caml_make_vect 4 (field_imm 0 X)))
        (seq (array.set[addr indexed by int] xs 1 (field_imm 1 X))
