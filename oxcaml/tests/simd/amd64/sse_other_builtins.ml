@@ -1,6 +1,7 @@
-(* CR gyorsh: Add arm64 support for intrinsics below. This file contains amd64
-   intrinsics that don't have an equivalent arm64 neon intrinsic. They can be
-   implemented using a very short sequence of arm64 instructons. *)
+(* CR gyorsh: Add arm64 support for intrinsics below. This file contains amd64 intrinsics
+   that don't have an equivalent arm64 neon intrinsic. They can be implemented using a
+   very short sequence of arm64 instructons in a separate library [ocaml_simd_neon], but
+   we may need to add compiler intrinsics. *)
 module Float32x4 = struct
   external addsub : t -> t -> t
     = "caml_vec128_unreachable" "caml_sse3_float32x4_addsub"
