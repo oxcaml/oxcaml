@@ -1,6 +1,7 @@
 open Location
 open Mode
 open Jkind_axis
+module Jkind = Btype.Jkind0
 
 type 'ax annot_type =
   | Modifier : 'a Axis.t annot_type
@@ -336,7 +337,7 @@ let transl_mod_bounds annots =
     List.fold_left add Const.id Value.Axis.all
   in
   enforce_forbidden_modalities Modifier ~loc:bounds_loc modality;
-  let open Types.Jkind_mod_bounds in
+  let open Jkind.Mod_bounds in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
       raw_modifiers.externality
@@ -582,8 +583,8 @@ let least_modalities_implying mut (t : Modality.Const.t) =
   in
   exclude_implied @ overridden
 
-let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
-  let crossing = Types.Jkind_mod_bounds.crossing bounds in
+let untransl_mod_bounds (bounds : Jkind.Mod_bounds.t) : Parsetree.modes =
+  let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let modality_annots =
     least_modalities_implying Types.Immutable modality
@@ -594,7 +595,7 @@ let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
            { Location.txt = Parsetree.Mode s; loc = Location.none })
   in
   let nonmodal_annots =
-    let open Types.Jkind_mod_bounds in
+    let open Jkind.Mod_bounds in
     let mk_annot default print value =
       if value = default
       then None

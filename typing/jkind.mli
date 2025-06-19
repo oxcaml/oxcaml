@@ -13,6 +13,7 @@
 (**************************************************************************)
 
 open Allowance
+module Jkind0 = Btype.Jkind0
 
 (* This module is named Jkind, with a 'j', to distinguish jkinds
    as used here from type kinds (which might be abstract or record or variant,
@@ -110,7 +111,7 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  type t = Types.Jkind_mod_bounds.t
+  type t = Jkind0.Mod_bounds.t
 
   val to_mode_crossing : t -> Mode.Crossing.t
 end
@@ -918,3 +919,5 @@ end
    will be removed in the PR that adds abstract kinds, and until then they
    ensure that the dependency structure needed for that PR isn't broken. *)
 type temp_cycle_check_subst = Subst.t
+
+module type temp_cycle_check_datarepr = module type of Datarepr

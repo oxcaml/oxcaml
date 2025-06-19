@@ -16,6 +16,7 @@ open Mode
 open Jkind_types
 open Jkind_axis
 open Types
+module Jkind0 = Btype.Jkind0
 
 [@@@warning "+9"]
 
@@ -299,14 +300,7 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 
 (******************************)
 module Mod_bounds = struct
-  include Types.Jkind_mod_bounds
-
-  let join t1 t2 =
-    let crossing = Crossing.join (crossing t1) (crossing t2) in
-    let externality = Externality.join (externality t1) (externality t2) in
-    let nullability = Nullability.join (nullability t1) (nullability t2) in
-    let separability = Separability.join (separability t1) (separability t2) in
-    create crossing ~externality ~nullability ~separability
+  include Jkind0.Mod_bounds
 
   let meet t1 t2 =
     let crossing = Crossing.meet (crossing t1) (crossing t2) in
@@ -395,20 +389,11 @@ module Mod_bounds = struct
          (Separability.le Separability.max (separability t))
          (Nonmodal Separability)
 
-  let for_arrow =
-    let crossing =
-      Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
-        ~portability:false ~contention:true ~forkable:false ~yielding:false
-        ~statefulness:false ~visibility:true ~staticity:false
-    in
-    create crossing ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
-
   let to_mode_crossing t = crossing t
 end
 
 module With_bounds = struct
-  include Jkind_with_bounds
+  include Jkind0.With_bounds
 
   module Type_info = struct
     include With_bounds_type_info
@@ -538,7 +523,7 @@ type jkind_context =
   }
 
 module Layout_and_axes = struct
-  include Jkind_layout_and_axes
+  include Jkind0.Layout_and_axes
 
   let equal eq_layout
       { layout = lay1;
@@ -1052,7 +1037,7 @@ end
 
 (*********************************)
 
-include Jkind_jkind
+include Jkind0.Jkind
 
 (***********************)
 (*** constant jkinds ***)
@@ -1085,7 +1070,7 @@ let outcometree_of_modalities = ref (fun _ _ -> assert false)
 let set_outcometree_of_modalities p = outcometree_of_modalities := p
 
 module Const = struct
-  include Jkind_const
+  include Jkind0.Const
 
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [expanded] is
@@ -1445,27 +1430,6 @@ module Jkind_desc = struct
   let unsafely_set_bounds t ~from =
     { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
 
-  let add_with_bounds ~relevant_for_shallow ~type_expr ~modality t =
-    match Types.get_desc type_expr with
-    | Tarrow (_, _, _, _) ->
-      (* Optimization: all arrow types have the same (with-bound-free) jkind, so
-         we can just eagerly do a join on the mod-bounds here rather than having
-         to add them to our with bounds only to be normalized away later. *)
-      { t with
-        mod_bounds =
-          Mod_bounds.join t.mod_bounds
-            (Mod_bounds.set_min_in_set Mod_bounds.for_arrow
-               (Axis_set.complement
-                  (Mod_bounds.relevant_axes_of_modality ~modality
-                     ~relevant_for_shallow)))
-      }
-    | _ ->
-      { t with
-        with_bounds =
-          With_bounds.add_modality ~relevant_for_shallow ~type_expr ~modality
-            t.with_bounds
-      }
-
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
@@ -1529,15 +1493,6 @@ let is_best t = match t.quality with Best -> true | Not_best -> false
 
 let unsafely_set_bounds (type l r) ~(from : (l * r) jkind) t =
   { t with jkind = Jkind_desc.unsafely_set_bounds t.jkind ~from:from.jkind }
-
-let add_with_bounds ~modality ~type_expr t =
-  { t with
-    jkind =
-      Jkind_desc.add_with_bounds
-      (* We only care about types in fields of unboxed products for the
-         nullability of the overall kind *)
-        ~relevant_for_shallow:`Irrelevant ~type_expr ~modality t.jkind
-  }
 
 (******************************)
 (* construction *)
@@ -1619,47 +1574,6 @@ let of_type_decl_default ~context ~transl_type ~default
   | Some (t, _) -> t
   | None -> default
 
-let combine_mutability mut1 mut2 =
-  match mut1, mut2 with
-  | (Mutable { atomic = Nonatomic; mode = _ } as x), _
-  | _, (Mutable { atomic = Nonatomic; mode = _ } as x) ->
-    x
-  | (Mutable { atomic = Atomic; mode = _ } as x), _
-  | _, (Mutable { atomic = Atomic; mode = _ } as x) ->
-    x
-  | (Immutable as x), Immutable -> x
-
-let jkind_of_mutability mutability ~why =
-  (match mutability with
-  | Immutable -> Builtin.immutable_data
-  | Mutable { atomic = Atomic; _ } -> Builtin.sync_data
-  | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
-    ~why
-
-let all_void_labels lbls =
-  List.for_all
-    (fun (lbl : Types.label_declaration) -> Sort.Const.(all_void lbl.ld_sort))
-    lbls
-
-let add_labels_as_with_bounds lbls jkind =
-  List.fold_right
-    (fun (lbl : Types.label_declaration) ->
-      add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities)
-    lbls jkind
-
-let for_boxed_record lbls =
-  if all_void_labels lbls
-  then Builtin.immediate ~why:Empty_record
-  else
-    let base =
-      lbls
-      |> List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable)
-      |> List.fold_left combine_mutability Immutable
-      |> jkind_of_mutability ~why:Boxed_record
-      |> mark_best
-    in
-    add_labels_as_with_bounds lbls base
-
 let for_unboxed_record lbls =
   let open Types in
   let tys_modalities =
@@ -1671,15 +1585,6 @@ let for_unboxed_record lbls =
       lbls
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
-
-let for_non_float ~(why : History.value_creation_reason) =
-  let mod_bounds =
-    Mod_bounds.create Crossing.max ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
-  in
-  fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
-    ~annotation:None ~why:(Value_creation why)
 
 let for_or_null_argument ident =
   let why : History.value_creation_reason =
@@ -1710,245 +1615,6 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
-
-(* Note [With-bounds for GADTs]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-   Inferring the with-bounds for a variant requires gathering bounds from each
-   constructor. We thus loop over each constructor:
-
-   A. If a constructor is not a GADT constructor, just add its fields and their
-   modalities as with-bounds.
-
-   B. If a constructor uses GADT syntax:
-
-   GADT constructors introduce their own local scope. That is, when we see
-
-   {[
-     type 'a t = K : 'b option -> 'b t
-   ]}
-
-   the ['b] in the constructor is distinct from the ['a] in the type header.
-   This would be true even if we wrote ['a] in the constructor: the variables
-   introduced in the type head never scope over GADT constructors.
-
-   So in order to get properly-scoped with-bounds, we must substitute.  But
-   what, exactly, do we substitute? The domain is the bare variables that appear
-   as arguments in the return type. The range is the corresponding variables in
-   the type head (even if those are written as [_]s; which are turned into
-   proper type variables by now).
-
-   We use [Ctype.apply] (passed in as [type_apply]) to perform the substitution.
-
-   We thus have
-
-   * STEP B1. Gather such variables from the result type, matching them with
-   their corresponding variables in the type head. We'll call these B1
-   variables.
-
-   We do not actually substitute quite yet.
-
-   There may still be other free type variables in the constructor type. Here
-   are some examples:
-
-   {[
-     type 'a t =
-       | K1 : 'o -> int t
-       | K2 : 'o -> 'o option t
-       | K3 : 'o -> 'b t
-   ]}
-
-   In each constructor, the type variable ['o] is not a B1 variable.  (The ['b]
-   in [K3] /is/ a B1 variable.) We call these variables /orphaned/. All
-   existential variables are orphans (as we see in [K1] and [K3]), but even
-   non-existential variables can be orphan (as we see in [K2]; note that ['o]
-   appears in the result).
-
-   We wish to replace each orphaned type variable with a [Tof_kind], holding
-   just its kind. Since [Tof_kind] has a *best* kind, they'll just get
-   normalized away during normalization, except in the case that they show up as
-   an argument to a type constructor representing an abstract type - in which
-   case, they still end up in the (fully normalized) with-bounds. For example,
-   the following type:
-
-   {[
-     type t : A : ('a : value mod portable). 'a abstract -> t
-   ]}
-
-   has kind:
-
-   {[
-     immutable_data with (type : value mod portable) abstract
-   ]}
-
-   This use of the [(type : <<kind>>)] construct is the reason we have
-   [Tof_kind] in the first place.
-
-   We thus have
-
-   * STEP B2. Gather the orphaned variables
-   * STEP B3. Build the [Tof_kind] types to use in the substitution
-   * STEP B4. Perform the substitution
-
-   There are wrinkles:
-
-   BW1. For repeated types on arguments, e.g. in the following type:
-
-   {[
-     type ('x, 'y) t = A : 'a -> ('a, 'a) t
-   ]}
-
-   we substitute only the *first* time we see an argument.  That means that in
-   the above type, we'll map all instances of ['a] to ['x] and infer a kind of
-   [immutable_data with 'x]. This is sound, but somewhat restrictive; in a
-   perfect world, we'd infer a kind of [immutable_data with ('x OR 'y)], but
-   that goes beyond what with-bounds can describe (which, if we implemented it,
-   would introduce a disjunction in type inference, requiring backtracking). At
-   some point in the future, we should at least change the subsumption algorithm
-   to accept either [immutable_data with 'x] or [immutable_data with 'y]
-   (* CR layouts v2.8: do that *)
-
-   BW2. All of the above applies for row variables. Here is an example:
-
-   {[
-     type t = K : [> `A] -> t
-   ]}
-
-   The row variable in the [ [> `A] ] is existential, and thus gets transformed
-   into a [(type : value)] when computing the kind of [t].
-
-   This fact has a few consequences:
-
-   * [Tof_kind] can appear as a [row_more].
-   * When [Tof_kind] is a [row_more], that row is considered fixed; it thus
-     needs a [fixed_explanation]. The [fixed_explanation] is [Existential], used
-     only for this purpose.
-*)
-let for_boxed_variant ~loc ~decl_params ~type_apply ~free_vars cstrs =
-  let open Types in
-  let base =
-    let all_args_void =
-      List.for_all
-        (fun cstr ->
-          match cstr.cd_args with
-          | Cstr_tuple args ->
-            List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
-          | Cstr_record lbls -> all_void_labels lbls)
-        cstrs
-    in
-    if all_args_void
-    then (
-      let has_args =
-        List.exists
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
-            | Cstr_tuple [] | Cstr_record [] -> false)
-          cstrs
-      in
-      if has_args && Language_extension.erasable_extensions_only ()
-      then
-        Location.prerr_warning loc
-          (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
-      Builtin.immediate ~why:Enumeration)
-    else
-      List.concat_map
-        (fun cstr ->
-          match cstr.cd_args with
-          | Cstr_tuple _ -> [Immutable]
-          | Cstr_record lbls ->
-            List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable) lbls)
-        cstrs
-      |> List.fold_left combine_mutability Immutable
-      |> jkind_of_mutability ~why:Boxed_variant
-  in
-  let base = mark_best base in
-  let add_with_bounds_for_cstr jkind_so_far cstr =
-    let cstr_arg_tys, cstr_arg_modalities =
-      match cstr.cd_args with
-      | Cstr_tuple args ->
-        List.fold_left
-          (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-          ([], []) args
-      | Cstr_record lbls ->
-        List.fold_left
-          (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-          ([], []) lbls
-    in
-    let cstr_arg_tys =
-      match cstr.cd_res with
-      | None -> cstr_arg_tys
-      | Some res ->
-        (* See Note [With-bounds for GADTs] for an overview *)
-        let apply_subst domain range tys =
-          if Misc.Stdlib.List.is_empty domain
-          then tys
-          else List.map (fun ty -> type_apply domain ty range) tys
-        in
-        (* STEP B1 from Note [With-bounds for GADTs]: *)
-        let res_args =
-          match Types.get_desc res with
-          | Tconstr (_, args, _) -> args
-          | _ -> Misc.fatal_error "cd_res must be Tconstr"
-        in
-        let domain, range, seen =
-          List.fold_left2
-            (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
-              (fun ((domain, range, seen) as acc) arg param ->
-              if Btype.TypeSet.mem arg seen
-              then
-                (* We've already seen this type parameter, so don't add it
-                   again.  See wrinkle BW1 from Note [With-bounds for GADTs]
-                *)
-                acc
-              else
-                match Types.get_desc arg with
-                | Tvar _ ->
-                  (* Only add types which are direct variables. Note that
-                     types which aren't variables might themselves /contain/
-                     variables; if those variables don't show up on another
-                     parameter, they're treated as orphaned. See example K2
-                     from Note [With-bounds for GADTs] *)
-                  arg :: domain, param :: range, Btype.TypeSet.add arg seen
-                | _ -> acc)
-            ([], [], Btype.TypeSet.empty)
-            res_args decl_params
-        in
-        (* STEP B2 from Note [With-bounds for GADTs]: *)
-        let free_var_set = free_vars cstr_arg_tys in
-        let orphaned_type_var_set = Btype.TypeSet.diff free_var_set seen in
-        let orphaned_type_var_list =
-          Btype.TypeSet.elements orphaned_type_var_set
-        in
-        (* STEP B3 from Note [With-bounds for GADTs]: *)
-        let mk_type_of_kind ty =
-          match Types.get_desc ty with
-          (* use [newgenty] not [newty] here because we've already
-             generalized the decl and want to keep things at
-             generic_level *)
-          | Tvar { jkind; name = _ } -> Btype.newgenty (Tof_kind jkind)
-          | _ ->
-            Misc.fatal_error
-              "post-condition of [free_variable_set_of_list] violated"
-        in
-        let type_of_kind_list =
-          List.map mk_type_of_kind orphaned_type_var_list
-        in
-        (* STEP B4 from Note [With-bounds for GADTs]: *)
-        let cstr_arg_tys =
-          apply_subst
-            (orphaned_type_var_list @ domain)
-            (type_of_kind_list @ range)
-            cstr_arg_tys
-        in
-        cstr_arg_tys
-    in
-    List.fold_left2
-      (fun jkind type_expr modality ->
-        add_with_bounds ~modality ~type_expr jkind)
-      jkind_so_far cstr_arg_tys cstr_arg_modalities
-  in
-  List.fold_left add_with_bounds_for_cstr base cstrs
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2181,7 +1847,8 @@ let get_nullability ~context jk =
 
 let set_nullability_upper_bound jk nullability_upper_bound =
   let new_bounds =
-    Jkind_mod_bounds.set_nullability nullability_upper_bound jk.jkind.mod_bounds
+    Jkind0.Mod_bounds.set_nullability nullability_upper_bound
+      jk.jkind.mod_bounds
   in
   { jk with jkind = { jk.jkind with mod_bounds = new_bounds } }
 
@@ -3493,3 +3160,5 @@ let () =
 
 (* See mli *)
 type temp_cycle_check_subst = Subst.t
+
+module type temp_cycle_check_datarepr = module type of Datarepr

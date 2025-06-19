@@ -22,6 +22,8 @@ open Btype
 
 open Local_store
 
+module Jkind = Btype.Jkind0
+
 type jkind_error =
   | Unconstrained_jkind_variable
 
@@ -133,10 +135,10 @@ let with_additional_action =
     | Duplicate_variables -> Duplicate_variables
     | Prepare_for_saving ->
         let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
-          match Jkind_jkind.get_const jkind with
+          match Jkind.get_const jkind with
           | Some const ->
             let memoized =
-              Jkind_builtins_memo.find
+              Jkind.Builtins_memo.find
                 ~quality:jkind.quality
                 ~ran_out_of_fuel_during_normalize:
                   jkind.ran_out_of_fuel_during_normalize
@@ -145,7 +147,7 @@ let with_additional_action =
             begin match memoized with
             | Some jkind -> jkind
             | None ->
-              Jkind_jkind.of_const
+              Jkind.of_const
                 ~quality:jkind.quality
                 ~ran_out_of_fuel_during_normalize:
                   jkind.ran_out_of_fuel_during_normalize
@@ -309,7 +311,7 @@ let apply_type_function params args body =
       | Tsubst (ty, _) -> ty
       | Tvariant row ->
           let t = newgenstub ~scope:(get_scope ty)
-            (Jkind_jkind.Builtin.any ~why:Dummy_jkind) in
+            (Jkind.Builtin.any ~why:Dummy_jkind) in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
           let more = row_more row in
           assert (get_level more = generic_level);
@@ -353,7 +355,7 @@ let apply_type_function params args body =
           t
       | desc ->
           let t = newgenstub ~scope:(get_scope ty)
-            (Jkind_jkind.Builtin.any ~why:Dummy_jkind) in
+            (Jkind.Builtin.any ~why:Dummy_jkind) in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
           let desc' = copy_type_desc copy desc in
           Transient_expr.set_stub_desc t desc';
@@ -398,7 +400,7 @@ let rec typexp copy_scope s ty =
     let has_fixed_row =
       not (is_Tconstr ty) && is_constr_row ~allow_ident:false tm in
     (* Make a stub *)
-    let jkind = Jkind_jkind.Builtin.any ~why:Dummy_jkind in
+    let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
     let ty' =
       if should_duplicate_vars then newpersty (Tvar {name = None; jkind})
       else newgenstub ~scope:(get_scope ty) jkind
@@ -554,7 +556,7 @@ let unsafe_mode_crossing copy_scope s loc
       { unsafe_mod_bounds; unsafe_with_bounds } =
   { unsafe_mod_bounds;
     unsafe_with_bounds =
-      Jkind_with_bounds.map_type_expr (typexp copy_scope s loc)
+      Jkind.With_bounds.map_type_expr (typexp copy_scope s loc)
         unsafe_with_bounds }
 
 let rec type_declaration' copy_scope s decl =
@@ -595,7 +597,7 @@ let rec type_declaration' copy_scope s decl =
             prepare_jkind decl.type_loc decl.type_jkind
           | Duplicate_variables | No_action -> decl.type_jkind
         in
-        Jkind_jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
+        Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
     type_private = decl.type_private;
     type_variance = decl.type_variance;
