@@ -90,6 +90,22 @@ let copy_file ~enabled_if name new_name =
   (copy ${source} ${target})))
 |}
 
+let make_ops_u name =
+  let subst = function "name" -> name | _ -> assert false in
+  rule ~subst
+    {|
+(rule
+ (targets ${name}_u.ml)
+ (deps ${name}.ml)
+ (action
+  (with-stdout-to
+   ${name}_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "${name}.ml")))))
+|}
+
 let mangle flag =
   (* convert dashes to underscores *)
   let dash_to_underscore c = match c with '-' -> '_' | c -> c in
@@ -110,6 +126,18 @@ let print_test ?extra_flag (name, enabled_if) =
   ()
 
 let () =
+  let ops =
+    [ "ops";
+      "ops_float32x4";
+      "ops_float64x2";
+      "ops_int64x2";
+      "ops_int32x4";
+      "ops_int16x8";
+      "ops_int8x16";
+      "sse_other_ops";
+      "sse42_string_ops" ]
+  in
+  List.iter make_ops_u ops;
   let tests =
     [ "basic", enabled_if_main;
       "basic_u", enabled_if_main;

@@ -1,4 +1,103 @@
 
+(rule
+ (targets ops_u.ml)
+ (deps ops.ml)
+ (action
+  (with-stdout-to
+   ops_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops.ml")))))
+
+(rule
+ (targets ops_float32x4_u.ml)
+ (deps ops_float32x4.ml)
+ (action
+  (with-stdout-to
+   ops_float32x4_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_float32x4.ml")))))
+
+(rule
+ (targets ops_float64x2_u.ml)
+ (deps ops_float64x2.ml)
+ (action
+  (with-stdout-to
+   ops_float64x2_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_float64x2.ml")))))
+
+(rule
+ (targets ops_int64x2_u.ml)
+ (deps ops_int64x2.ml)
+ (action
+  (with-stdout-to
+   ops_int64x2_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int64x2.ml")))))
+
+(rule
+ (targets ops_int32x4_u.ml)
+ (deps ops_int32x4.ml)
+ (action
+  (with-stdout-to
+   ops_int32x4_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int32x4.ml")))))
+
+(rule
+ (targets ops_int16x8_u.ml)
+ (deps ops_int16x8.ml)
+ (action
+  (with-stdout-to
+   ops_int16x8_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int16x8.ml")))))
+
+(rule
+ (targets ops_int8x16_u.ml)
+ (deps ops_int8x16.ml)
+ (action
+  (with-stdout-to
+   ops_int8x16_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int8x16.ml")))))
+
+(rule
+ (targets sse_other_ops_u.ml)
+ (deps sse_other_ops.ml)
+ (action
+  (with-stdout-to
+   sse_other_ops_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "sse_other_ops.ml")))))
+
+(rule
+ (targets sse42_string_ops_u.ml)
+ (deps sse42_string_ops.ml)
+ (action
+  (with-stdout-to
+   sse42_string_ops_u.ml
+   (progn
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "sse42_string_ops.ml")))))
+
 (executable
  (name basic)
  (modules basic)
