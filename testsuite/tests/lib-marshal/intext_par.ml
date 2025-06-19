@@ -1,5 +1,5 @@
 (* TEST
- flags += "-alert -unsafe_parallelism -alert -unsafe_multidomain";
+ flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  modules = "intextaux_par.c";
  no-tsan;
  runtime5;

@@ -1,5 +1,5 @@
 (* TEST
- flags = "-g";
+ flags = "-g -alert -do_not_spawn_domains";
  modules = "swapgil_stubs.c";
  include systhreads;
  runtime5;
@@ -16,6 +16,6 @@ external swap_gil : unit -> unit = "swap_gil"
 
 let () = (swap_gil ();
           try
-            Domain.join ((Domain.Safe.spawn [@alert "-unsafe_parallelism"]) (fun () -> ()))
+            Domain.join (Domain.Safe.spawn (fun () -> ()))
           with exn ->
             print_endline (Printexc.to_string exn))
