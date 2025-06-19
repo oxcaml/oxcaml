@@ -287,9 +287,9 @@ module Expert = struct
     !Oxcaml_flags.Flambda2.Expert.cont_lifting_budget
     |> with_default ~f:(fun d -> d.cont_lifting_budget)
 
-  let cont_spec_budget () =
-    !Oxcaml_flags.Flambda2.Expert.cont_spec_budget
-    |> with_default ~f:(fun d -> d.cont_spec_budget)
+  let cont_spec_threshold () =
+    !Oxcaml_flags.Flambda2.Expert.cont_spec_threshold
+    |> with_default ~f:(fun d -> d.cont_spec_threshold)
 end
 
 let stack_allocation_enabled () = Config.stack_allocation
