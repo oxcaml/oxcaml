@@ -1736,3 +1736,34 @@ end
 [%%expect{|
 module M : sig type t : value mod non_float end
 |}]
+
+(**************************)
+(* Test 18: identity type *)
+
+(* This tests a bug seen in practice *)
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = 'a
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = 'a
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = 'a end
+       is not included in
+         sig type 'a t : value mod portable with 'a end
+       Type declarations do not match:
+         type 'a t = 'a
+       is not included in
+         type 'a t : value mod portable with 'a
+       The kind of the first is value
+         because of the definition of t at line 2, characters 2-40.
+       But the kind of the first must be a subkind of value mod portable
+         with 'a
+         because of the definition of t at line 2, characters 2-40.
+|}]
