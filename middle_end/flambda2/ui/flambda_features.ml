@@ -69,7 +69,7 @@ let use_n_way_join () =
   | N_way -> true
 
 let types_database () =
-  !Flambda_backend_flags.Flambda2.types_database
+  !Oxcaml_flags.Flambda2.types_database
   |> with_default ~f:(fun d -> d.types_database)
 
 let enable_reaper () =

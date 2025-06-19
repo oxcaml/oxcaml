@@ -287,7 +287,8 @@ end = struct
     (* others *)
     | ( _,
         ( Naked_float32 _ | Naked_float _ | Naked_int32 _ | Naked_int64 _
-        | Naked_nativeint _ | Naked_vec128 _ ) ) ->
+        | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+          ) ) ->
       Bottom
 end
 
