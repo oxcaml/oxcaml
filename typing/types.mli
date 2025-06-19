@@ -124,8 +124,10 @@ module Jkind_mod_bounds : sig
 
   val min : t
   val max : t
+  val for_arrow : t
 
   val equal : t -> t -> bool
+  val join : t -> t -> t
 
   val relevant_axes_of_modality :
     relevant_for_shallow:[ `Irrelevant | `Relevant ] ->
@@ -1442,6 +1444,21 @@ module Jkind_jkind : sig
       why:Jkind_intf.History.product_creation_reason -> level:int -> int ->
       jkind_l
   end
+
+  val add_with_bounds :
+    modality:Mode.Modality.Const.t ->
+    type_expr:type_expr ->
+    jkind_l ->
+    jkind_l
+
+  val jkind_of_mutability :
+    mutability -> why:Jkind_intf.History.value_creation_reason ->
+    ('a * 'b) jkind
+
+  val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
+  val for_boxed_record : label_declaration list -> jkind_l
+  val for_boxed_variant :
+    loc:Location.t -> constructor_declaration list -> jkind_l
 end
 
 (** Memoize the built-in jkinds, either best or not-best. Primarily for use by

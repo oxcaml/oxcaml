@@ -901,3 +901,5 @@ end
    will be removed in the PR that adds abstract kinds, and until then they
    ensure that the dependency structure needed for that PR isn't broken. *)
 type temp_cycle_check_subst = Subst.t
+
+module type temp_cycle_check_datarepr = module type of Datarepr

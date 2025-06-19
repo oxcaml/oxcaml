@@ -301,13 +301,6 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 module Mod_bounds = struct
   include Types.Jkind_mod_bounds
 
-  let join t1 t2 =
-    let crossing = Crossing.join (crossing t1) (crossing t2) in
-    let externality = Externality.join (externality t1) (externality t2) in
-    let nullability = Nullability.join (nullability t1) (nullability t2) in
-    let separability = Separability.join (separability t1) (separability t2) in
-    create crossing ~externality ~nullability ~separability
-
   let meet t1 t2 =
     let crossing = Crossing.meet (crossing t1) (crossing t2) in
     let externality = Externality.meet (externality t1) (externality t2) in
@@ -394,15 +387,6 @@ module Mod_bounds = struct
     |> add_if
          (Separability.le Separability.max (separability t))
          (Nonmodal Separability)
-
-  let for_arrow =
-    let crossing =
-      Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
-        ~portability:false ~contention:true ~forkable:false ~yielding:false
-        ~statefulness:false ~visibility:true ~staticity:false
-    in
-    create crossing ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
 
   let to_mode_crossing t = crossing t
 end
@@ -1437,27 +1421,6 @@ module Jkind_desc = struct
   let unsafely_set_bounds t ~from =
     { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
 
-  let add_with_bounds ~relevant_for_shallow ~type_expr ~modality t =
-    match Types.get_desc type_expr with
-    | Tarrow (_, _, _, _) ->
-      (* Optimization: all arrow types have the same (with-bound-free) jkind, so
-         we can just eagerly do a join on the mod-bounds here rather than having
-         to add them to our with bounds only to be normalized away later. *)
-      { t with
-        mod_bounds =
-          Mod_bounds.join t.mod_bounds
-            (Mod_bounds.set_min_in_set Mod_bounds.for_arrow
-               (Axis_set.complement
-                  (Mod_bounds.relevant_axes_of_modality ~modality
-                     ~relevant_for_shallow)))
-      }
-    | _ ->
-      { t with
-        with_bounds =
-          With_bounds.add_modality ~relevant_for_shallow ~type_expr ~modality
-            t.with_bounds
-      }
-
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
@@ -1520,15 +1483,6 @@ let is_best t = match t.quality with Best -> true | Not_best -> false
 
 let unsafely_set_bounds (type l r) ~(from : (l * r) jkind) t =
   { t with jkind = Jkind_desc.unsafely_set_bounds t.jkind ~from:from.jkind }
-
-let add_with_bounds ~modality ~type_expr t =
-  { t with
-    jkind =
-      Jkind_desc.add_with_bounds
-      (* We only care about types in fields of unboxed products for the
-         nullability of the overall kind *)
-        ~relevant_for_shallow:`Irrelevant ~type_expr ~modality t.jkind
-  }
 
 (******************************)
 (* construction *)
@@ -1610,47 +1564,6 @@ let of_type_decl_default ~context ~transl_type ~default
   | Some (t, _) -> t
   | None -> default
 
-let combine_mutability mut1 mut2 =
-  match mut1, mut2 with
-  | (Mutable { atomic = Nonatomic; mode = _ } as x), _
-  | _, (Mutable { atomic = Nonatomic; mode = _ } as x) ->
-    x
-  | (Mutable { atomic = Atomic; mode = _ } as x), _
-  | _, (Mutable { atomic = Atomic; mode = _ } as x) ->
-    x
-  | (Immutable as x), Immutable -> x
-
-let jkind_of_mutability mutability ~why =
-  (match mutability with
-  | Immutable -> Builtin.immutable_data
-  | Mutable { atomic = Atomic; _ } -> Builtin.sync_data
-  | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
-    ~why
-
-let all_void_labels lbls =
-  List.for_all
-    (fun (lbl : Types.label_declaration) -> Sort.Const.(all_void lbl.ld_sort))
-    lbls
-
-let add_labels_as_with_bounds lbls jkind =
-  List.fold_right
-    (fun (lbl : Types.label_declaration) ->
-      add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities)
-    lbls jkind
-
-let for_boxed_record lbls =
-  if all_void_labels lbls
-  then Builtin.immediate ~why:Empty_record
-  else
-    let base =
-      lbls
-      |> List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable)
-      |> List.fold_left combine_mutability Immutable
-      |> jkind_of_mutability ~why:Boxed_record
-      |> mark_best
-    in
-    add_labels_as_with_bounds lbls base
-
 let for_unboxed_record lbls =
   let open Types in
   let tys_modalities =
@@ -1662,15 +1575,6 @@ let for_unboxed_record lbls =
       lbls
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
-
-let for_non_float ~(why : History.value_creation_reason) =
-  let mod_bounds =
-    Mod_bounds.create Crossing.max ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
-  in
-  fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
-    ~annotation:None ~why:(Value_creation why)
 
 let for_or_null_argument ident =
   let why : History.value_creation_reason =
@@ -1701,77 +1605,6 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
-
-let for_boxed_variant ~loc cstrs =
-  let open Types in
-  let has_gadt_constructor =
-    List.exists
-      (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
-      cstrs
-  in
-  if has_gadt_constructor
-  then
-    let no_args =
-      List.for_all
-        (fun cstr ->
-          match cstr.cd_args with
-          | Cstr_tuple [] | Cstr_record [] -> true
-          | Cstr_tuple _ | Cstr_record _ -> false)
-        cstrs
-    in
-    if no_args
-    then Builtin.immediate ~why:Enumeration
-    else for_non_float ~why:Boxed_variant
-  else
-    let base =
-      let all_args_void =
-        List.for_all
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
-            | Cstr_record lbls -> all_void_labels lbls)
-          cstrs
-      in
-      if all_args_void
-      then (
-        let has_args =
-          List.exists
-            (fun cstr ->
-              match cstr.cd_args with
-              | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
-              | Cstr_tuple [] | Cstr_record [] -> false)
-            cstrs
-        in
-        if has_args && Language_extension.erasable_extensions_only ()
-        then
-          Location.prerr_warning loc
-            (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
-        Builtin.immediate ~why:Enumeration)
-      else
-        List.concat_map
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple _ -> [Immutable]
-            | Cstr_record lbls ->
-              List.map
-                (fun (ld : Types.label_declaration) -> ld.ld_mutable)
-                lbls)
-          cstrs
-        |> List.fold_left combine_mutability Immutable
-        |> jkind_of_mutability ~why:Boxed_variant
-    in
-    let base = mark_best base in
-    let add_cstr_args cstr jkind =
-      match cstr.cd_args with
-      | Cstr_tuple args ->
-        List.fold_right
-          (fun arg ->
-            add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
-          args jkind
-      | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
-    in
-    List.fold_right add_cstr_args cstrs base
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -3301,3 +3134,5 @@ let () =
 
 (* See mli *)
 type temp_cycle_check_subst = Subst.t
+
+module type temp_cycle_check_datarepr = module type of Datarepr
