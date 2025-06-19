@@ -1841,7 +1841,9 @@ let solve_Ppat_variant ~refine loc env tag no_arg expected_ty =
   let make_row more =
     create_row ~fields ~closed:false ~more ~fixed:None ~name:None
   in
-  let row = make_row (newgenvar (Jkind.Builtin.value ~why:Row_variable)) in
+  let row =
+    make_row (newgenvar (Jkind.Builtin.value ~why:Row_variable))
+  in
   let expected_ty = generic_instance expected_ty in
   (* PR#7404: allow some_private_tag blindly, as it would not unify with
      the abstract row variable *)
@@ -8261,8 +8263,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
-      List.map (fun (label, _) -> label,
-                                  newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
+      List.map
+        (fun (label, _) -> label, newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
       sexpl
     in
     let to_unify = newgenty (Ttuple labeled_subtypes) in

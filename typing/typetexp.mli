@@ -171,6 +171,8 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
+  | Invalid_variable_stage of
+      {name : string; usage_loc : Location.t; usage_stage : int}
 
 exception Error of Location.t * Env.t * error
 

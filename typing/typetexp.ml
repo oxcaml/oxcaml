@@ -90,6 +90,8 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
+  | Invalid_variable_stage of
+      {name : string; usage_loc : Location.t; usage_stage : int}
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -366,7 +368,7 @@ end = struct
            match get_desc v with
            | Tvar { name; jkind } when get_level v = Btype.generic_level ->
                set_type_desc v (Tunivar { name; jkind });
-               v :: acc
+               v::acc
            | _ -> acc
         )
         promoted vars
@@ -413,7 +415,7 @@ end = struct
     vs |> List.iter (fun v ->
       match get_desc v with
       | Tunivar { name; jkind } ->
-         set_type_desc v (Tvar { name; jkind })
+          set_type_desc v (Tvar { name; jkind })
       | _ -> assert false);
     vs
 
@@ -699,8 +701,6 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
   Builtin_attributes.warning_scope styp.ptyp_attributes
     (fun () -> transl_type_aux env ~policy ~aliased ~row_context mode styp)
 
-(* FIXME: add stage here;
-variables also should carry stages around *)
 and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   let loc = styp.ptyp_loc in
   let ctyp ctyp_desc ctyp_type =
@@ -1083,7 +1083,12 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
       TyVarEnv.remember_used name ty loc;
       ty
   in
-  (* Add stage check here! *)
+  if Env.stage env <> 0 then
+    raise
+      (Error (loc, env,
+              Invalid_variable_stage {name = print_name;
+                                      usage_loc = loc;
+                                      usage_stage = Env.stage env}));
   let jkind_annot =
     match jkind_annot_opt with
     | None -> None
@@ -1429,6 +1434,13 @@ open Printtyp
 module Style = Misc.Style
 let pp_tag ppf t = Format.fprintf ppf "`%s" t
 
+let print_stage ppf stage =
+  if stage = 0 then fprintf ppf "no quotations or splices"
+  else if stage = 1 then fprintf ppf "one layer of quotation (<[ ... ]>)"
+  else if stage = -1 then fprintf ppf "one layer of splicing ($)"
+  else if stage > 1 then fprintf ppf "%d layers of quotation (<[ ... ]>)" stage
+  else fprintf ppf "%d layers of splicing ($)" stage
+
 
 let report_error env ppf = function
   | Unbound_type_variable (name, in_scope_names) ->
@@ -1595,6 +1607,14 @@ let report_error env ppf = function
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
         | Labelled _ -> assert false )
+  | Invalid_variable_stage {name; usage_loc; usage_stage} ->
+    fprintf ppf
+      "@[Type variable %a is used at %a@ \
+       in a context with %a;@ \
+       it should only be used in a context without quotations or splices.@]"
+      Style.inline_code name
+      Location.print_loc usage_loc
+      print_stage usage_stage
 
 let () =
   Location.register_error_of_exn

@@ -810,7 +810,7 @@ type lookup_error =
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | Error_from_persistent_env of Persistent_env.error
-  | Incompatible_stage of Longident.t * Location.t * int
+  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
 
 type error =
   | Missing_module of Location.t * Path.t * Path.t
@@ -2622,6 +2622,7 @@ let add_splice_lock env = add_lock Splice_lock {env with stage = env.stage - 1}
 
 let without_open_quotations env = env.stage = 0
 let has_open_quotations env = env.stage <> 0
+let stage env = env.stage
 
 (* Insertion of all components of a signature *)
 
@@ -3185,7 +3186,8 @@ let lookup_ident_value ~errors ~use ~loc name env =
         end
       | Some n ->
           may_lookup_error errors loc env
-            (Incompatible_stage (Lident name, vda.vda_description.val_loc, n))
+            (Incompatible_stage (Lident name, loc, env.stage,
+                                 vda.vda_description.val_loc, env.stage - n))
     end
   | Ok (_, _, Val_unbound reason) ->
       report_value_unbound ~errors ~loc env reason (Lident name)
@@ -3202,7 +3204,8 @@ let lookup_ident_type ~errors ~use ~loc s env =
         end
       | Some n ->
           may_lookup_error errors loc env
-            (Incompatible_stage (Lident s, tda.tda_declaration.type_loc, n))
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 tda.tda_declaration.type_loc, env.stage - n))
     end
   | exception Not_found | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
@@ -4308,12 +4311,12 @@ let print_lock_item ppf (item, lid) =
 
 module Style = Misc.Style
 
-let format_stage_diff ppf = function
-  | 1 -> fprintf ppf "1 stage ahead of"
-  | -1 -> fprintf ppf "1 stage before"
-  | n ->
-      if n > 0 then fprintf ppf "%d stages ahead of" n
-      else fprintf ppf "%d stages before" n
+let print_stage ppf stage =
+  if stage = 0 then fprintf ppf "no quotations or splices"
+  else if stage = 1 then fprintf ppf "one layer of quotation (<[ ... ]>)"
+  else if stage = -1 then fprintf ppf "one layer of splicing ($)"
+  else if stage > 1 then fprintf ppf "%d layers of quotation (<[ ... ]>)" stage
+  else fprintf ppf "%d layers of splicing ($)" stage
 
 let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
@@ -4511,19 +4514,17 @@ let report_lookup_error _loc env ppf = function
            ~offender:(fun ppf -> !print_type_expr ppf typ)) err
   | Error_from_persistent_env err ->
       Persistent_env.report_error ppf err
-  | Incompatible_stage (lid, def_loc, stage_diff) ->
-      let (_, line, c_start) =
-        Location.get_pos_info def_loc.Location.loc_start
-      and (_, _, c_end) =
-        Location.get_pos_info def_loc.Location.loc_end
-      in
+  | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
       fprintf ppf
-        "@[Identifier %a is used inside a quotation (<[ ... ]>)@ \
-         or splice ($), %a its introduction on@ \
-         line %i, %i-%i@]"
+        "@[Identifier %a is used at %a@ \
+         in a context with %a;@ \
+         it is introduced at %a@ \
+         in a context with %a.@]"
         (Style.as_inline_code !print_longident) lid
-        format_stage_diff stage_diff
-        line c_start c_end
+        Location.print_loc usage_loc
+        print_stage usage_stage
+        Location.print_loc intro_loc
+        print_stage intro_stage
 
 let report_error ppf = function
   | Missing_module(_, path1, path2) ->

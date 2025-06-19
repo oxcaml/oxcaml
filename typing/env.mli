@@ -247,7 +247,7 @@ type lookup_error =
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | Error_from_persistent_env of Persistent_env.error
-  | Incompatible_stage of Longident.t * Location.t * int
+  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
 
@@ -507,6 +507,7 @@ val add_splice_lock : t -> t
 
 val without_open_quotations : t -> bool
 val has_open_quotations : t -> bool
+val stage : t -> int
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
