@@ -92,6 +92,12 @@ module Sort : sig
   (** Decompose a sort into a list (of the given length) of fresh sort variables,
       equating the input sort with the product of the output sorts. *)
   val decompose_into_product : level:int -> t -> int -> t list option
+
+  module Flat : sig
+    type t =
+      | Var of Var.id
+      | Base of base
+  end
 end
 
 module Layout : sig
@@ -108,5 +114,23 @@ module Layout : sig
       | Any
       | Base of Sort.base
       | Product of t list
+
+    val equal : t -> t -> bool
+
+    val max : t
+
+    val of_flat_sort : Sort.Flat.t -> t option
+
+    val of_sort : Sort.t -> t option
   end
+
+  val of_const : Const.t -> Sort.t t
+
+  val of_new_sort_var : level:int -> Sort.t t * Sort.t
+
+  val get_const : Sort.t t -> Const.t option
+
+  val get_flat_const : Sort.Flat.t t -> Const.t option
+
+  val product : 'a t list -> 'a t
 end
