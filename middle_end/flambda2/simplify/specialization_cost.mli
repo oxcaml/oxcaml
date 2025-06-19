@@ -49,7 +49,7 @@ type reason =
   | Contains_static_consts
   | Contains_set_of_closures
 
-type cost = { size_of_primitives : int }
+type cost
 
 (** The current specialization status, stored in the dacc. *)
 type t = private
@@ -71,10 +71,20 @@ val cannot_specialize : reason -> t
 (** {2 Updating Costs} *)
 
 (** Add a primitive of the given size to the cost of specialization *)
-val add_prim :
-  machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> t -> t
+val add_prim : Bound_var.t -> Flambda_primitive.t -> t -> t
 
 (** Add a set of closure containing [~num] closures to the cost of specialization. *)
 val add_set_of_closures : Set_of_closures.t -> t -> t
 
 val add_lifted_set_of_closures : Set_of_closures.t -> t -> t
+
+(** {2 Estimating Costs} *)
+
+val cost_metrics :
+  Typing_env.t ->
+  switch:Switch_expr.t ->
+  join_info:Apply_cont_rewrite_id.t Flambda2_types.Join_analysis.t ->
+  specialized:Apply_cont_rewrite_id.t list ->
+  generic:Apply_cont_rewrite_id.t list ->
+  cost ->
+  Cost_metrics.t

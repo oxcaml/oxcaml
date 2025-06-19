@@ -633,9 +633,9 @@ let mk_flambda2_expert_cont_lifting_budget f =
       " Set the limit of extra parameters introduced\n\
       \ when lifting continuations (per function)" )
 
-let mk_flambda2_expert_cont_spec_budget f =
+let mk_flambda2_expert_cont_spec_threshold f =
   ( "-flambda2-expert-cont-specialization-budget",
-    Arg.Int f,
+    Arg.Float f,
     Printf.sprintf
       " Set the limit on the number of continuations \n\
       \ copied/generated when specializing a continuation (per function)" )
@@ -1072,7 +1072,7 @@ module type Oxcaml_options = sig
   val flambda2_expert_shorten_symbol_names : unit -> unit
   val no_flambda2_expert_shorten_symbol_names : unit -> unit
   val flambda2_expert_cont_lifting_budget : int -> unit
-  val flambda2_expert_cont_spec_budget : int -> unit
+  val flambda2_expert_cont_spec_threshold : float -> unit
   val flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
   val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
   val flambda2_debug_keep_invalid_handlers : unit -> unit
@@ -1138,11 +1138,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
       mk_no_cfg_eliminate_dead_trap_handlers
         F.no_cfg_eliminate_dead_trap_handlers;
-      mk_cfg_prologue_validate F.cfg_prologue_validate;
-      mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
-      mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
-      mk_no_cfg_prologue_shrink_wrap F.no_cfg_prologue_shrink_wrap;
-      mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1225,7 +1220,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_expert_shorten_symbol_names;
       mk_flambda2_expert_cont_lifting_budget
         F.flambda2_expert_cont_lifting_budget;
-      mk_flambda2_expert_cont_spec_budget F.flambda2_expert_cont_spec_budget;
+      mk_flambda2_expert_cont_spec_threshold
+        F.flambda2_expert_cont_spec_threshold;
       mk_flambda2_debug_concrete_types_only_on_canonicals
         F.flambda2_debug_concrete_types_only_on_canonicals;
       mk_no_flambda2_debug_concrete_types_only_on_canonicals
@@ -1496,15 +1492,10 @@ module Oxcaml_options_impl = struct
     Flambda2.Expert.shorten_symbol_names := Oxcaml_flags.Set false
 
   let flambda2_expert_cont_lifting_budget budget =
-    (* continuation lifting requires the advanced meet algorithm *)
-    if budget <> 0 then flambda2_advanced_meet ();
     Flambda2.Expert.cont_lifting_budget := Oxcaml_flags.Set budget
 
-  let flambda2_expert_cont_spec_budget budget =
-    (* continuation lifting and specialization requires the advanced meet
-       algorithm *)
-    if budget <> 0 then flambda2_advanced_meet ();
-    Flambda2.Expert.cont_spec_budget := Oxcaml_flags.Set budget
+  let flambda2_expert_cont_spec_threshold threshold =
+    Flambda2.Expert.cont_spec_threshold := Oxcaml_flags.Set threshold
 
   let flambda2_debug_concrete_types_only_on_canonicals =
     set' Flambda2.Debug.concrete_types_only_on_canonicals
@@ -1920,9 +1911,11 @@ module Extra_params = struct
         | Some i -> Flambda2.Expert.cont_lifting_budget := Oxcaml_flags.Set i
         | None -> ());
         true
-    | "flambda2-expert-cont-spec-budget" ->
+    | "flambda2-expert-cont-spec-threshold" ->
         (match Compenv.check_int ppf name v with
-        | Some i -> Flambda2.Expert.cont_spec_budget := Oxcaml_flags.Set i
+        | Some i ->
+            Flambda2.Expert.cont_spec_threshold :=
+              Oxcaml_flags.Set (Float.of_int i)
         | None -> ());
         true
     | "flambda2-inline-max-depth" ->
