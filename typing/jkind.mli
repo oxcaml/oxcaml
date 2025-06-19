@@ -101,8 +101,6 @@ module Layout : sig
     val to_string : t -> string
   end
 
-  val of_const : Const.t -> Sort.t t
-
   val sub : level:int -> Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
@@ -256,12 +254,18 @@ module Const : sig
 
   val to_out_jkind_const : 'd t -> Outcometree.out_jkind_const
 
-  (** This returns [true] iff both types have no with-bounds and they are equal.
-      Normally, we want an equality check to happen only on values that are
-      allowed on both the left and the right. But a type with no with-bounds is
-      allowed on the left and the right, so we test for that condition first
-      before doing the proper equality check. *)
-  val no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
+  (** This returns [true] iff both kinds have no with-bounds and they are
+      shallowly equal. Normally, we want an equality check to happen only on
+      values that are allowed on both the left and the right. But a type with no
+      with-bounds is allowed on the left and the right, so we test for that
+      condition first before doing the proper equality check.
+
+      Note that this function IS NOT SEMANTIC EQUALITY - in particular it does
+      not expand kind aliases, so it may return false for semantically equal
+      kinds.  That's fine for the places where it is used (printing and a memo
+      table), but be aware of this if adding new uses.
+  *)
+  val shallow_no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
 
   (* CR layouts: Remove this once we have a better story for printing with jkind
      abbreviations. *)
@@ -490,15 +494,6 @@ val of_new_legacy_sort :
     Defaulting the sort variable produces exactly the sort [value].  *)
 val of_new_non_float_sort_var :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
-
-(** Construct a jkind from a constant jkind, at quality [Not_best] *)
-val of_const :
-  annotation:Parsetree.jkind_annotation option ->
-  why:History.creation_reason ->
-  quality:'d Types.jkind_quality ->
-  ran_out_of_fuel_during_normalize:bool ->
-  'd Const.t ->
-  'd Types.jkind
 
 (** Construct a jkind from a builtin kind, at quality [Best]. *)
 val of_builtin :
@@ -917,3 +912,9 @@ module Debug_printers : sig
     val t : Format.formatter -> 'd Const.t -> unit
   end
 end
+
+(* These aliases are here to make sure various modules don't depend on [jkind] -
+   they would create a cycle causing the build system to error otherwise.  They
+   will be removed in the PR that adds abstract kinds, and until then they
+   ensure that the dependency structure needed for that PR isn't broken. *)
+type temp_cycle_check_subst = Subst.t
