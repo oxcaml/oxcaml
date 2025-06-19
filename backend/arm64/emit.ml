@@ -384,7 +384,8 @@ end = struct
       check_reg Int i.res.(0)
     | Rs32x4_to_Rs32 _ | Rs64x2_to_Rs64 _ | Rs16x8_to_Rs16 _ | Rs8x16_to_Rs8 _
       ->
-      check_reg Vec128 i.arg.(0)
+      check_reg Vec128 i.arg.(0);
+      check_reg Int i.res.(0)
     | Rs64x2_Rs64x2_to_First _ | Rs16x8_Rs32x4_to_First | Rs8x16_Rs16x8_to_First
     | Rs32x4_Rs64x2_to_First ->
       check_reg Vec128 i.arg.(0);
@@ -393,6 +394,7 @@ end = struct
     | Rs32x4_Rs32_to_First _ | Rs64x2_Rs64_to_First _ | Rs16x8_Rs16_to_First _
     | Rs8x16_Rs8_to_First _ ->
       check_reg Vec128 i.arg.(0);
+      check_reg Int i.arg.(1);
       assert (Reg.same_loc i.res.(0) i.arg.(0))
 
   let src_operands ops =
