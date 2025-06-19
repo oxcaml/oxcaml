@@ -89,6 +89,12 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
            } ])
   | Prim (prim, dbg) -> (
     let bound_var = Bound_pattern.must_be_singleton bound_pattern in
+    let dacc =
+      DA.map_denv dacc
+        ~f:
+          (DE.map_specialization_cost
+             ~f:(Specialization_cost.add_prim bound_var prim))
+    in
     let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
     let { Simplify_primitive_result.simplified_named;
           extra_bindings;
