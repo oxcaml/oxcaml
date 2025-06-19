@@ -115,7 +115,7 @@ val transl_label_from_expr :
 val transl_simple_type:
         Env.t -> new_var_jkind:jkind_initialization_choice
         -> ?univars:TyVarEnv.poly_univars
-        -> ?hint_for_unbound_variables:string -> closed:bool -> Alloc.Const.t
+        -> closed:bool -> Alloc.Const.t
         -> Parsetree.core_type -> Typedtree.core_type
 val transl_simple_type_univars:
         Env.t -> Parsetree.core_type -> Typedtree.core_type
@@ -148,9 +148,10 @@ type sort_loc =
 
 type cannot_quantify_reason
 type jkind_info
+type unbound_variable_reason
 type error =
-  | Unbound_type_variable of string * string list * string option
-  | No_type_wildcards of string option
+  | Unbound_type_variable of string * string list * unbound_variable_reason option
+  | No_type_wildcards of unbound_variable_reason option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
   | Bound_type_variable of string
