@@ -1989,6 +1989,16 @@ module Jkind0 = struct
         quality
       }
 
+    let of_builtin ~why Const.Builtin.{ jkind; name } =
+      jkind
+      |> Layout_and_axes.allow_left
+      |> Layout_and_axes.disallow_right
+      |> of_const ~annotation:(mk_annot name)
+           ~why
+             (* The [Best] is OK here because this function is used only in
+                Predef. *)
+           ~quality:Best ~ran_out_of_fuel_during_normalize:false
+
     let get_const t = Jkind_desc.get_const t.jkind
 
     let map_type_expr f t =
@@ -2284,6 +2294,47 @@ module Jkind0 = struct
         jkind_so_far cstr_arg_tys cstr_arg_modalities
     in
     List.fold_left add_with_bounds_for_cstr base cstrs
+
+    let for_float ident =
+      let crossing =
+        Mode.Crossing.create ~regionality:false ~linearity:true
+          ~portability:true ~forkable:true ~yielding:true ~uniqueness:false
+          ~contention:true ~statefulness:true ~visibility:true ~staticity:false
+      in
+      let mod_bounds =
+        Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max
+          ~nullability:Non_null ~separability:Separable
+      in
+      fresh_jkind
+        { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+        ~annotation:None ~why:(Primitive ident)
+      |> mark_best
+
+    let for_array_argument =
+      let mod_bounds =
+        Mod_bounds.create Mode.Crossing.max
+          ~externality:Mod_bounds.Externality.max
+          ~nullability:Maybe_null ~separability:Separable
+      in
+      fresh_jkind
+        { layout = Any; mod_bounds; with_bounds = No_with_bounds }
+        ~annotation:None ~why:(Any_creation Array_type_argument)
+
+    let for_or_null_argument ident =
+      let why : Jkind_intf.History.value_creation_reason =
+        Type_argument
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      let mod_bounds =
+        Mod_bounds.create Mode.Crossing.max
+          ~externality:Mod_bounds.Externality.max
+          ~nullability:Non_null ~separability:Maybe_separable
+      in
+      fresh_jkind
+        { layout = Sort (Base Value);
+          mod_bounds;
+          with_bounds = No_with_bounds }
+        ~annotation:None ~why:(Value_creation why)
   end
 
   module Builtins_memo = struct

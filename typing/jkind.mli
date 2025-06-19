@@ -921,3 +921,5 @@ end
 type temp_cycle_check_subst = Subst.t
 
 module type temp_cycle_check_datarepr = module type of Datarepr
+
+module type temp_cycle_check_predef = module type of Predef

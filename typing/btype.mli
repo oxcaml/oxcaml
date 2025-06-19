@@ -485,6 +485,10 @@ module Jkind0 : sig
 
     val get_const : 'd jkind -> 'd Const.t option
 
+    val of_builtin :
+      why:Jkind_intf.History.creation_reason ->
+      Const.Builtin.t -> ('a * disallowed) jkind
+
     val fresh_jkind :
       (allowed * allowed) jkind_desc ->
       annotation:Parsetree.jkind_annotation option ->
@@ -544,6 +548,7 @@ module Jkind0 : sig
       ('a * 'b) jkind
 
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
+    val for_float : Ident.t -> jkind_l
     val for_boxed_record : label_declaration list -> jkind_l
     val for_boxed_variant :
       loc:Location.t ->
@@ -556,6 +561,8 @@ module Jkind0 : sig
       free_vars:(Types.type_expr list -> TypeSet.t) ->
       Types.constructor_declaration list ->
       Types.jkind_l
+    val for_array_argument : jkind_lr
+    val for_or_null_argument : Ident.t -> 'd jkind
   end
 
   (** Memoize the built-in jkinds, either best or not-best. Primarily for use by
