@@ -122,9 +122,6 @@ module DSL : sig
 
   val emit_reg_v16b : Reg.t -> Arm64_ast.Operand.t
 
-  val emit_struct_reglane_d : Reg.t -> lane:int -> Arm64_ast.Operand.t
-    [@@warning "-32"]
-
   val imm : int -> Arm64_ast.Operand.t
 
   val imm_float : float -> Arm64_ast.Operand.t
@@ -247,8 +244,6 @@ end = struct
   let emit_reglane_s reg ~lane = reglane_s (reg_index reg) ~lane
 
   let emit_reglane_d reg ~lane = reglane_d (reg_index reg) ~lane
-
-  let emit_struct_reglane_d reg ~lane = struct_reglane_d (reg_index reg) ~lane
 
   let emit_reg_v2s reg = reg_v2s (reg_index reg)
 
