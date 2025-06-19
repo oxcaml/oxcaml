@@ -1748,22 +1748,45 @@ end = struct
 end
 
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type 'a t = 'a
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a end
-       is not included in
-         sig type 'a t : value mod portable with 'a end
-       Type declarations do not match:
-         type 'a t = 'a
-       is not included in
-         type 'a t : value mod portable with 'a
-       The kind of the first is value
-         because of the definition of t at line 2, characters 2-40.
-       But the kind of the first must be a subkind of value mod portable
-         with 'a
-         because of the definition of t at line 2, characters 2-40.
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = { x : 'a } [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = Mk of { x : 'a } [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = Mk of 'a [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = #{ x : 'a }
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
 |}]
