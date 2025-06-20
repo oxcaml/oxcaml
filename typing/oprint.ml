@@ -648,18 +648,16 @@ and print_out_jkind_const ppf ojkind =
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
-        | Some base -> fprintf ppf "%a " (pp_element ~nested:true) base
+        | Some base -> fprintf ppf "%a@ " (pp_element ~nested:true) base
         | None -> ()
       in
       Misc.pp_parens_if nested (fun ppf (base, modes) ->
-        fprintf ppf "%amod @[%a@]" pp_base base
-          (pp_print_list
-              ~pp_sep:(fun ppf () -> fprintf ppf "@ ")
-              (fun ppf -> fprintf ppf "%s"))
+        fprintf ppf "%amod @[<hv>%a@]" pp_base base
+          (pp_print_list ~pp_sep:pp_print_space pp_print_string)
           modes
       ) ppf (base, modes)
     | Ojkind_const_product ts ->
-      let pp_sep ppf () = Format.fprintf ppf "@ & " in
+      let pp_sep ppf () = Format.fprintf ppf " &@ " in
       Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     | Ojkind_const_with _ -> failwith "XXX unreachable (stripped off earlier)"
     | Ojkind_const_kind_of _ ->
@@ -668,18 +666,14 @@ and print_out_jkind_const ppf ojkind =
     match withs with
     | [] -> ()
     | withs ->
-      fprintf ppf "@[<hov>";
-      pp_print_custom_break ppf ~fits:("", 0, "") ~breaks:("", 2, "");
       pp_print_list
         (fun ppf ->
-           Format.fprintf ppf "@ @[<hv 2>with %a@]"
-             (pp_print_list
-                ~pp_sep:(fun ppf () -> fprintf ppf "@ ") pp_print_string))
+           Format.fprintf ppf "@ with @[<hv 2>%a@]"
+             (pp_print_list ~pp_sep:pp_print_space pp_print_string))
         ppf
         withs;
-      fprintf ppf "@]"
   in
-  pp_element ~nested:false ppf ojkind
+  fprintf ppf "@[<hv 2>%a@]" (pp_element ~nested:false) ojkind
 
 and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =
