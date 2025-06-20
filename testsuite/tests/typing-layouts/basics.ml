@@ -2922,4 +2922,5 @@ Line 9, characters 10-15:
 Error: This expression is used as a function, but its type "'a"
        has kind "immediate", which cannot be the kind of a function.
        (Functions always have kind "value mod aliased immutable non_float".)
+       Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]

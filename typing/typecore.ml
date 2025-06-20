@@ -281,7 +281,8 @@ type error =
   | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
-  | Impossible_function_jkind of type_expr * jkind_lr
+  | Impossible_function_jkind of
+      { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
 
@@ -3965,8 +3966,10 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                 in
                 let locs = funct.exp_loc :: List.filter_map get_loc rev_args in
                 let loc = Location.merge ~ghost:false locs in
+                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
                 raise(Error(loc, env,
-                            Impossible_function_jkind (ty_fun, jkind)))
+                            Impossible_function_jkind
+                              { some_args_ok; ty_fun; jkind }))
               end;
               (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
         | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
@@ -11163,14 +11166,21 @@ let report_error ~loc env =
       print_unsupported_stack_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
-  | Impossible_function_jkind (ty, jkind) ->
+  | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
+      let hint ppf =
+        if some_args_ok
+        then Format.fprintf ppf
+              "@ Hint: Perhaps you have over-applied the function or used an \
+               incorrect label."
+      in
       Location.errorf ~loc
         "@[@[This expression is used as a function, but its type@ %a@]@ \
          has kind %a, which cannot be the kind of a function.@ \
-         (Functions always have kind %a.)@]"
-        (Style.as_inline_code Printtyp.type_expr) ty
+         (Functions always have kind %a.)%t@]"
+        (Style.as_inline_code Printtyp.type_expr) ty_fun
         (Style.as_inline_code Jkind.format) jkind
         (Style.as_inline_code Jkind.format) Jkind.for_arrow
+        hint
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
         "Overwriting is only supported on tuples, constructors and boxed records."
