@@ -1871,8 +1871,9 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immediate with int with string & immediate with int with string
-           & immediate with int with string
+           immediate with int with string &
+           immediate with int with string &
+           immediate with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_

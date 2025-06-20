@@ -339,7 +339,7 @@ module Layout = struct
       | Any -> fprintf ppf "any"
       | Sort s -> Sort.format ppf s
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf " & " in
+        let pp_sep ppf () = Format.fprintf ppf " &@ " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
@@ -1855,7 +1855,7 @@ module Desc = struct
       (* Analyze a product before calling [get_const]: the machinery in
          [Const.format] works better for atomic layouts, not products. *)
       | Product lays ->
-        let pp_sep ppf () = fprintf ppf "@ & " in
+        let pp_sep ppf () = fprintf ppf " &@ " in
         Misc.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
           (List.map (fun layout -> { desc with layout }) lays)
       | _ -> (
@@ -1863,7 +1863,7 @@ module Desc = struct
         | Some c -> Const.format ppf c
         | None -> assert false (* handled above *))
     in
-    format_desc ~nested:false ppf t
+    fprintf ppf "@[<hv>%a@]" (format_desc ~nested:false) t
 end
 
 module Jkind_desc = struct
