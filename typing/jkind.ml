@@ -3048,9 +3048,8 @@ module Violation = struct
         pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
       in
       match mismatch_type with
-      | Mode -> fprintf ppf "%t@[<hov 2>%a@]" indent format jkind
-      | Layout ->
-        fprintf ppf "%t@[<hov 2>%a@]" indent Layout.format jkind.jkind.layout
+      | Mode -> fprintf ppf "%t%a" indent format jkind
+      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
