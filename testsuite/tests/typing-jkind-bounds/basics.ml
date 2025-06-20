@@ -1736,3 +1736,57 @@ end
 [%%expect{|
 module M : sig type t : value mod non_float end
 |}]
+
+(**************************)
+(* Test 18: identity type *)
+
+(* This tests a bug seen in practice *)
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = 'a
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = { x : 'a } [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = Mk of { x : 'a } [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = Mk of 'a [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t = #{ x : 'a }
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable with 'a end
+|}]

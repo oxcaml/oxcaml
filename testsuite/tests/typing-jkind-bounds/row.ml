@@ -111,12 +111,18 @@ module type S2 = S with type 'a abstract = 'a simple
 [%%expect{|
 type 'a test : immutable_data with 'a
 module type S = sig type 'a abstract : immutable_data with 'a test end
-Line 7, characters 24-52:
+Line 7, characters 17-52:
 7 | module type S2 = S with type 'a abstract = 'a simple
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a simple" is immutable_data with 'a
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "abstract"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type 'a abstract = 'a simple
+       is not included in
+         type 'a abstract : immutable_data with 'a test
+       The kind of the first is immutable_data with 'a
          because of the definition of simple at line 1, characters 0-39.
-       But the kind of type "'a simple" must be a subkind of immutable_data
+       But the kind of the first must be a subkind of immutable_data
          with 'a test
          because of the definition of abstract at line 4, characters 2-48.
 |}]
