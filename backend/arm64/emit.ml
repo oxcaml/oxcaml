@@ -1875,9 +1875,6 @@ let emit_instr i =
     | Onetwentyeight_aligned ->
       DSL.check_reg Vec128 src;
       DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_addressing addr base |]
-    (* CR gyorsh: should the above line be:
-
-       DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_mem base |] *)
     | Onetwentyeight_unaligned ->
       DSL.check_reg Vec128 src;
       (match addr with
