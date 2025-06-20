@@ -1000,14 +1000,7 @@ let emit_literals p align emit_literal =
 
 let emit_float32_literal (f, lbl) =
   D.define_label lbl;
-  let comment =
-    if !Clflags.keep_asm_file
-    then Some (Printf.sprintf "%.12f" (Int32.float_of_bits f))
-    else None
-  in
-  (* Do not use [D.float32] to aviod conversion [Int32.float_of_bits f] that
-     does not preserve single precision. *)
-  D.int32 ?comment f;
+  D.float32 (Int32.float_of_bits f);
   (* padding to 8 bytes *)
   D.int32 0xDEAD_BEEFl;
   ()
