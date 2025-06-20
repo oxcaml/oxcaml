@@ -530,7 +530,7 @@ Error: The kind of type "int list list list list list list list list list list
                         list list list list" is
            immutable_data
              with int list list list list list list list list list list list list list list
-list list list list list list
+                  list list list list list list
          because it's a boxed variant type.
        But the kind of type "int list list list list list list list list list
                             list list list list list list list list list list

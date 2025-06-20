@@ -631,9 +631,19 @@ and print_out_jkind_const ppf ojkind =
     let rec strip_withs ojkind =
       match ojkind with
       | Ojkind_const_with (base, ty, modalities) ->
+        let fix_indentation ppf =
+          let { out_newline; out_indent } as out_functions =
+            pp_get_formatter_out_functions ppf ()
+          in
+          let out_newline () =
+            out_newline ();
+            out_indent 18  (* this works well in practice *)
+          in
+          pp_set_formatter_out_functions ppf { out_functions with out_newline }
+        in
         let base, withs = strip_withs base in
         let with_ =
-          Format.asprintf "%a" print_out_type ty
+          Format.asprintf "%t%a" fix_indentation print_out_type ty
           :: (match modalities with
             | [] -> []
             | modalities -> "@@" :: modalities)
