@@ -56,7 +56,7 @@ Error: Signature mismatch:
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
        But the kind of the first must be a subkind of
-         value mod portable with a
+           value mod portable with a
          because of the definition of t at line 3, characters 2-36.
 |}]
 
@@ -156,7 +156,7 @@ Error: Signature mismatch:
        The kind of the first is value mod portable
          because of the definition of t at line 13, characters 2-29.
        But the kind of the first must be a subkind of
-         value mod contended portable with M.t
+           value mod contended portable with M.t
          because of the definition of t at line 11, characters 2-48.
 |}]
 
@@ -196,7 +196,7 @@ Error: Signature mismatch:
        The kind of the first is value mod portable
          because of the definition of t at line 15, characters 2-29.
        But the kind of the first must be a subkind of
-         value mod contended portable with M.u
+           value mod contended portable with M.u
          because of the definition of t at line 13, characters 2-48.
 |}]
 
@@ -265,7 +265,7 @@ Error: Signature mismatch:
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
        But the kind of the first must be a subkind of
-         value mod global with [< `a of string | `b ] u
+           value mod global with [< `a of string | `b ] u
          because of the definition of t at line 3, characters 2-40.
 |}]
 
@@ -302,7 +302,7 @@ Error: Signature mismatch:
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
        But the kind of the first must be a subkind of
-         value mod portable with [> `a of string | `b ] u
+           value mod portable with [> `a of string | `b ] u
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -461,7 +461,7 @@ Error: Signature mismatch:
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
        But the kind of the first must be a subkind of
-         value mod contended with a
+           value mod contended with a
          because of the definition of t at line 3, characters 2-37.
 |}]
 
@@ -495,7 +495,7 @@ Error: Signature mismatch:
        The kind of the first is value
          because of the definition of t at line 8, characters 2-8.
        But the kind of the first must be a subkind of
-         value mod portable with s
+           value mod portable with s
          because of the definition of t at line 6, characters 2-36.
 |}]
 

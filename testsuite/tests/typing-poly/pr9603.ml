@@ -29,7 +29,7 @@ Line 2, characters 4-53:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
        The layout of "'left 'right. < left : 'left; right : 'right > pair" is
-         any
+           any
          because the .cmi file for pair is missing.
        But the layout of "'left 'right. < left : 'left; right : 'right > pair" must be a sublayout of
          value

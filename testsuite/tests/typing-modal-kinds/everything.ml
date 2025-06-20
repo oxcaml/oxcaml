@@ -107,7 +107,7 @@ Line 1, characters 0-42:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod aliased
+           float64 mod aliased
          because of the definition of bad at line 1, characters 0-42.
 |}]
 
@@ -141,7 +141,7 @@ Line 1, characters 0-43:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod portable
+           float64 mod portable
          because of the definition of bad at line 1, characters 0-43.
 |}]
 
@@ -175,7 +175,7 @@ Line 1, characters 0-44:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod contended
+           float64 mod contended
          because of the definition of bad at line 1, characters 0-44.
 |}]
 
@@ -209,7 +209,7 @@ Line 1, characters 0-45:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod unyielding
+           float64 mod unyielding
          because of the definition of bad at line 1, characters 0-45.
 |}]
 
@@ -243,7 +243,7 @@ Line 1, characters 0-44:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod external_
+           float64 mod external_
          because of the definition of bad at line 1, characters 0-44.
 |}]
 

@@ -3044,9 +3044,13 @@ module Violation = struct
       | Sort (Base _) | Any -> false
     in
     let format_layout_or_kind ppf jkind =
+      let indent =
+        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
+      in
       match mismatch_type with
-      | Mode -> fprintf ppf "@[<hov 4>%a@]" format jkind
-      | Layout -> fprintf ppf "@[<hov 4>%a@]" Layout.format jkind.jkind.layout
+      | Mode -> fprintf ppf "%t@[<hov 2>%a@]" indent format jkind
+      | Layout ->
+        fprintf ppf "%t@[<hov 2>%a@]" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout

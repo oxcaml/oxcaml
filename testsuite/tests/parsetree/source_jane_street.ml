@@ -1264,7 +1264,7 @@ Lines 2-3, characters 0-67:
 Error: The kind of type "existential_abstract" is value
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
-         immutable_data with (type : value mod portable) abstract
+           immutable_data with (type : value mod portable) abstract
          because of the annotation on the declaration of the type existential_abstract.
 |}]
 

@@ -208,10 +208,10 @@ Line 2, characters 0-36:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
        The layout of r_bad# is
-         '_representable_layout_1 & '_representable_layout_2
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed record.
        But the layout of r_bad# must be a sublayout of
-         value & float64 & value
+           value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 

@@ -137,11 +137,11 @@ Line 1, characters 64-65:
 Error: This expression has type "(string -> string) t"
        but an expression was expected of type "('a : value & value)"
        The kind of (string -> string) t is
-         immediate with string -> string @@ global & immediate
-         with string -> string @@ global
+           immediate with string -> string @@ global
+           & immediate with string -> string @@ global
          because of the definition of t at line 4, characters 0-51.
        But the kind of (string -> string) t must be a subkind of
-         value & value
+           value & value
          because of the definition of use_portable at line 3, characters 4-16.
 
        The first mode-crosses less than the second along:

@@ -134,7 +134,7 @@ Error: Signature mismatch:
        The kind of the first is immutable_data with a
          because of the definition of t at line 6, characters 4-45.
        But the kind of the first must be a subkind of
-         immutable_data with a @@ portable
+           immutable_data with a @@ portable
          because of the definition of t at line 3, characters 2-44.
 
        The first mode-crosses less than the second along:
@@ -214,7 +214,7 @@ Line 3, characters 11-25:
 Error: This type "(int -> int) u" should be an instance of type
          "('a : immutable_data)"
        The kind of (int -> int) u is
-         immutable_data with int -> int @@ portable
+           immutable_data with int -> int @@ portable
          because of the definition of u at line 1, characters 0-33.
        But the kind of (int -> int) u must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
@@ -274,7 +274,7 @@ Error: Signature mismatch:
        The kind of the first is value mod contended with 'a
          because of the definition of t at line 4, characters 2-41.
        But the kind of the first must be a subkind of
-         value mod portable with 'a
+           value mod portable with 'a
          because of the definition of t at line 2, characters 2-40.
 |}]
 
@@ -300,7 +300,7 @@ Error: Signature mismatch:
        The kind of the first is value mod contended with 'a
          because of the definition of t at line 4, characters 2-41.
        But the kind of the first must be a subkind of
-         value mod contended portable with 'a
+           value mod contended portable with 'a
          because of the definition of t at line 2, characters 2-50.
 |}]
 
@@ -351,7 +351,7 @@ Error: Signature mismatch:
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
        But the kind of the first must be a subkind of
-         mutable_data with 'a @@ many unyielding
+           mutable_data with 'a @@ many unyielding
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:

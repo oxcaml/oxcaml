@@ -246,7 +246,7 @@ Line 2, characters 0-37:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
        The layout of r_bad is
-         '_representable_layout_1 & '_representable_layout_2
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed record.
        But the layout of r_bad must be a sublayout of value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
@@ -771,10 +771,10 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-         value mod aliased immutable & value mod aliased immutable
+           value mod aliased immutable & value mod aliased immutable
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
-         value_or_null mod portable & value_or_null mod portable
+           value_or_null mod portable & value_or_null mod portable
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without

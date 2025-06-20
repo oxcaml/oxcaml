@@ -128,7 +128,7 @@ Line 2, characters 0-53:
 Error: The kind of type "('a, 'b) u" is immutable_data with 'a with 'b
          because of the definition of u at line 1, characters 0-48.
        But the kind of type "('a, 'b) u" must be a subkind of
-         immutable_data with 'a
+           immutable_data with 'a
          because of the definition of t at line 2, characters 0-53.
 |}]
 
@@ -148,7 +148,7 @@ Line 7, characters 23-51:
 Error: The kind of type "('a, 'b) t" is immutable_data with 'a with 'b
          because of the definition of t at line 1, characters 0-48.
        But the kind of type "('a, 'b) t" must be a subkind of
-         immutable_data with 'a
+           immutable_data with 'a
          because of the definition of t at line 4, characters 2-42.
 |}]
 
@@ -184,7 +184,7 @@ Error: Signature mismatch:
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
        But the kind of the first must be a subkind of
-         mutable_data with 'a @@ many unyielding
+           mutable_data with 'a @@ many unyielding
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
@@ -279,7 +279,7 @@ Line 2, characters 0-44:
 Error: The kind of type "[ `foo of t ]" is value
          because it's a polymorphic variant type.
        But the kind of type "[ `foo of t ]" must be a subkind of
-         immutable_data with t
+           immutable_data with t
          because of the definition of u at line 2, characters 0-44.
 |}]
 
