@@ -799,9 +799,9 @@ OCaml 5.4.0
   (Gabriel Scherer, review by Jan Midtgaard and Miod Vallat,
    report by Jan Midtgaard)
 
-- #13896, #?????: ocamldoc, do not wrap module description in a paragraph tag
+- #13896, #14098: ocamldoc, do not wrap module description in a paragraph tag
   inside the table of modules
-  (Florian Angeletti, review by ????)
+  (Florian Angeletti, report by John Whitington, review by Gabriel Scherer)
 
 - #13703: wrong explanation for some polymorphic-variant subtyping errors
   (Gabriel Scherer, review by Jacques Garrigue,
