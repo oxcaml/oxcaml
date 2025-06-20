@@ -1914,10 +1914,6 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
   let arg_sort = Jkind_types.Sort.default_to_value_and_get vb_sort in
-  (match arg_sort with
-   | Product _ ->
-     raise (Error(expr.exp_loc, Unboxed_product_in_let_mutable))
-   | _ -> ());
   let lam =
     transl_bound_exp ~scopes ~in_structure:false pat arg_sort expr vb_loc attr
   in
