@@ -188,6 +188,9 @@ Working version
 - #14024: Fix unterminated-string-initialization warnings from the C compiler.
   (Antonin Décimo, review by David Allsopp and Miod Vallat)
 
+- #14094: toplevel, simplify check on installed printer types
+  (Florian Angeletti, review by Gabriel Scherer)
+
 ### Build system:
 
 - #13810: Support build of cross compilers to native freestanding targets
