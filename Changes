@@ -46,8 +46,9 @@ Working version
   (Kate Deplaix, review by Daniel Bünzli, Gabriel Scherer,
    Nicolás Ojeda Bär, Florian Angeletti and Josh Berdine)
 
-- #14086: Add Domain.running_domain_count.
-  (Nicolás Ojeda Bär, review by David Allsopp and Gabriel Scherer)
+- #14086: Add Domain.count.
+  (Nicolás Ojeda Bär, review by David Allsopp, Gabriel Scherer, Daniel Bünzli
+  and KC Sivaramakrishnan)
 
 - #13920: add Option.{for_all, exists}
   (Gabriel Scherer, review by Kate Deplaix, Nicolás Ojeda Bär, Richard Eisenberg

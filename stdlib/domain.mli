@@ -85,8 +85,9 @@ val cpu_relax : unit -> unit
 val is_main_domain : unit -> bool
 (** [is_main_domain ()] returns true if called from the initial domain. *)
 
-val running_domain_count : unit -> int
-(** The number of currently running domains.
+val count : unit -> int
+(** The number of domains that have been spawned (including the initial domain)
+    and have not yet terminated.
 
     @since 5.5 *)
 
