@@ -24,6 +24,7 @@ let standard_library_default = {@QS@|@ocaml_libdir@|@QS@}
 
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
+let c_compiler_vendor = {@QS@|@ocaml_cc_vendor@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
 let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}
@@ -116,6 +117,7 @@ let no_stack_checks = "@enable_stack_checks@" <> "yes"
 let multidomain = "@enable_multidomain@" = "yes"
 
 let tsan = @tsan@
+<<<<<<< OxCaml
 
 let has_popcnt = "@has_popcnt@" = "yes"
 
@@ -151,3 +153,8 @@ let objcopy = {@QS@|@objcopy@|@QS@}
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
 
 let default_keyword_edition = @default_keyword_edition@
+||||||| Upstream OCaml
+=======
+
+let shebangscripts = @shebangscripts@
+>>>>>>> ocaml/ocaml#14014
