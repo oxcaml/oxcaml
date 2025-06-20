@@ -61,19 +61,32 @@ let one_arg name args =
    Some intrinsics have both names to make it easier to correlate with both
    amd64 intrinsics and arm64 instructions, depending on context. *)
 
+(* CR-soon gyorsh: fix [caml_neon_*] to match C intrinsic names from
+   arm_neon.h *)
 let select_simd_instr op args dbg =
   match op with
-  | "caml_simd_float32_round_neg_inf" -> Some (Round_f32 Neg_inf, args)
-  | "caml_simd_float64_round_neg_inf" -> Some (Round_f64 Neg_inf, args)
-  | "caml_simd_float32_round_pos_inf" -> Some (Round_f32 Pos_inf, args)
-  | "caml_simd_float64_round_pos_inf" -> Some (Round_f64 Pos_inf, args)
-  | "caml_simd_float32_round_towards_zero" -> Some (Round_f32 Zero, args)
-  | "caml_simd_float64_round_towards_zero" -> Some (Round_f64 Zero, args)
-  | "caml_simd_float32_round_current" -> Some (Round_f32 Current, args)
+  | "caml_simd_float32_round_neg_inf" | "caml_neon_float32_round_neg_inf" ->
+    Some (Round_f32 Neg_inf, args)
+  | "caml_simd_float64_round_neg_inf" | "caml_neon_float64_round_neg_inf" ->
+    Some (Round_f64 Neg_inf, args)
+  | "caml_simd_float32_round_pos_inf" | "caml_neon_float32_round_pos_inf" ->
+    Some (Round_f32 Pos_inf, args)
+  | "caml_simd_float64_round_pos_inf" | "caml_neon_float64_round_pos_inf" ->
+    Some (Round_f64 Pos_inf, args)
+  | "caml_simd_float32_round_towards_zero"
+  | "caml_neon_float32_round_towards_zero" ->
+    Some (Round_f32 Zero, args)
+  | "caml_simd_float64_round_towards_zero"
+  | "caml_neon_float64_round_towards_zero" ->
+    Some (Round_f64 Zero, args)
+  | "caml_simd_float32_round_current" | "caml_neon_float32_round_current" ->
+    Some (Round_f32 Current, args)
   | "caml_neon_float64_round_current" -> Some (Round_f64 Current, args)
-  | "caml_simd_float32_round_near" -> Some (Round_f32 Nearest, args)
+  | "caml_simd_float32_round_near" | "caml_neon_float32_round_near" ->
+    Some (Round_f32 Nearest, args)
   | "caml_neon_float64_round_near" -> Some (Round_f64 Nearest, args)
-  | "caml_simd_cast_float32_int64" -> Some (Round_f32_s64, args)
+  | "caml_simd_cast_float32_int64" | "caml_neon_cast_float32_int64" ->
+    Some (Round_f32_s64, args)
   (* min/max that match amd64 behavior, regardless of the value of FPCR.AH.
      implemented as a sequence of instructions *)
   | "caml_simd_float32_min" -> Some (Min_scalar_f32, args)
@@ -119,9 +132,11 @@ let select_simd_instr op args dbg =
     Some (Zip1q_f64, args)
   | "caml_simd_vec128_interleave_high_64" | "caml_neon_float64x2_zip2" ->
     Some (Zip2q_f64, args)
-  | "caml_simd_vec128_high_64_to_low_64" ->
+  | "caml_simd_vec128_high_64_to_low_64" | "caml_neon_vec128_high_64_to_low_64"
+    ->
     Some (Copyq_laneq_s64 { src_lane = 1; dst_lane = 0 }, args)
-  | "caml_simd_vec128_low_64_to_high_64" ->
+  | "caml_simd_vec128_low_64_to_high_64" | "caml_neon_vec128_low_64_to_high_64"
+    ->
     Some (Copyq_laneq_s64 { src_lane = 0; dst_lane = 1 }, args)
   | "caml_simd_int64x2_add" | "caml_neon_int64x2_add" -> Some (Addq_s64, args)
   | "caml_simd_int64x2_sub" | "caml_neon_int64x2_sub" -> Some (Subq_s64, args)
