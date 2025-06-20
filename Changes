@@ -54,6 +54,9 @@ Working version
   (Gabriel Scherer, review by Kate Deplaix, Nicolás Ojeda Bär, Richard Eisenberg
   and Jeremy Yallop)
 
+- #12877: Dynarray.rev_iter, Dynarray.rev_iteri
+  (Gabriel Scherer, review by Léo Andrès, Jeremy Yallop and Nicolás Ojeda Bär)
+
 ### Type system:
 
 - #13781: Set scope of internal type nodes during abbreviation expansion
