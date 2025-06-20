@@ -324,31 +324,19 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            type ('a, 'b) t
-             : immutable_data
-             with 'a @@ contended
-
-             with 'b @@ portable
+             : immutable_data with 'a @@ contended with 'b @@ portable
          end
        is not included in
          sig
            type ('a, 'b) t
-             : immutable_data
-             with 'a @@ portable
-
-             with 'b @@ contended
+             : immutable_data with 'a @@ portable with 'b @@ contended
          end
        Type declarations do not match:
          type ('a, 'b) t
-           : immutable_data
-           with 'a @@ contended
-
-           with 'b @@ portable
+           : immutable_data with 'a @@ contended with 'b @@ portable
        is not included in
          type ('a, 'b) t
-           : immutable_data
-           with 'a @@ portable
-
-           with 'b @@ contended
+           : immutable_data with 'a @@ portable with 'b @@ contended
        The kind of the first is
            immutable_data with 'a @@ contended with 'b @@ portable
          because of the definition of t at line 4, characters 2-75.

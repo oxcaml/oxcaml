@@ -319,8 +319,7 @@ module M :
     type b : immutable_data with t1
     val eq : (a, b) eq
   end
->> Fatal error: Abstract kind with [with]: immutable_data
-with t1
+>> Fatal error: Abstract kind with [with]: immutable_data with t1
 Uncaught exception: Misc.Fatal_error
 
 |}]
