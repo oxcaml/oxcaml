@@ -2897,3 +2897,29 @@ let f (x : ('a : value mod uncontended)) = x ()
 val f : (unit -> 'a) -> 'a = <fun>
 val f : (unit -> 'a) -> 'a = <fun>
 |}]
+
+(***************************************)
+(* Test 47: Error message on bad label *)
+
+(* reduced from a test case in the wild *)
+
+type ('v : immediate) t
+
+module M : sig
+  val f : 'v t -> int -> 'v
+end = struct
+  let f _ _ = assert false
+end
+
+let g t = M.f t ~key:0
+
+[%%expect{|
+type ('v : immediate) t
+module M : sig val f : ('v : immediate). 'v t -> int -> 'v end
+Line 9, characters 10-13:
+9 | let g t = M.f t ~key:0
+              ^^^
+Error: This expression is used as a function, but its type "'a"
+       has kind "immediate", which cannot be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
+|}]
