@@ -274,7 +274,8 @@ let destroyed_at_c_noalloc_call =
 
 (* CSE needs to know that all versions of neon are destroyed. *)
 let destroy_neon_reg n =
-  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n); phys_reg Vec128 (100 + n); |]
+  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n);
+     phys_reg Vec128 (100 + n); |]
 
 let destroy_neon_reg7 = destroy_neon_reg 7
 
