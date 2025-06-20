@@ -1863,7 +1863,7 @@ module Desc = struct
         | Some c -> Const.format ppf c
         | None -> assert false (* handled above *))
     in
-    fprintf ppf "@[<hv>%a@]" (format_desc ~nested:false) t
+    format_desc ppf ~nested:false t
 end
 
 module Jkind_desc = struct
