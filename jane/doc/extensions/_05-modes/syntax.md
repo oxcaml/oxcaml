@@ -278,19 +278,13 @@ exist, all to lower users' annotation burden, all applying both to modes
 and modalities, according to this table:
 
 
-+---------------+--------------+
 | this          | implies this |
-+---------------+--------------+
+|---------------|--------------|
 | `global`      | `unyielding` |
-+---------------+--------------+
 | `local`       | `yielding`   |
-+---------------+--------------+
 | `stateless`   | `portable`   |
-+---------------+--------------+
 | `immutable`   | `contended`  |
-+---------------+--------------+
 | `read`        | `shared`     |
-+---------------+--------------+
 
 These implications exist only in the surface syntax for mode and modality
 expressions. Mode inference does not necessarily follow these implications.
