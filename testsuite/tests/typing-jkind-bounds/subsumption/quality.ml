@@ -55,8 +55,8 @@ Error: Signature mismatch:
          type t : value mod portable with a
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod portable
-         with a
+       But the kind of the first must be a subkind of
+         value mod portable with a
          because of the definition of t at line 3, characters 2-36.
 |}]
 
@@ -264,8 +264,8 @@ Error: Signature mismatch:
            constraint 'a = [< `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of value mod global
-         with [< `a of string | `b ] u
+       But the kind of the first must be a subkind of
+         value mod global with [< `a of string | `b ] u
          because of the definition of t at line 3, characters 2-40.
 |}]
 
@@ -301,8 +301,8 @@ Error: Signature mismatch:
            constraint 'a = [> `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of value mod portable
-         with [> `a of string | `b ] u
+       But the kind of the first must be a subkind of
+         value mod portable with [> `a of string | `b ] u
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -460,8 +460,8 @@ Error: Signature mismatch:
          type t : value mod contended with a
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod contended
-         with a
+       But the kind of the first must be a subkind of
+         value mod contended with a
          because of the definition of t at line 3, characters 2-37.
 |}]
 
@@ -494,8 +494,8 @@ Error: Signature mismatch:
          type t : value mod portable with s
        The kind of the first is value
          because of the definition of t at line 8, characters 2-8.
-       But the kind of the first must be a subkind of value mod portable
-         with s
+       But the kind of the first must be a subkind of
+         value mod portable with s
          because of the definition of t at line 6, characters 2-36.
 |}]
 

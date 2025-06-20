@@ -1966,7 +1966,8 @@ Line 5, characters 6-7:
           ^
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
-       The layout of #(float# * a * int * int64#) is float64 & any & value & bits64
+       The layout of #(float# * a * int * int64#) is
+         float64 & any & value & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -1998,7 +1999,8 @@ Line 2, characters 53-54:
                                                          ^
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
-       The layout of #(float# * a * int * int64#) is float64 & any & value & bits64
+       The layout of #(float# * a * int * int64#) is
+         float64 & any & value & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration

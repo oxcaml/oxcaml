@@ -260,7 +260,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-55.
 |}]
 
@@ -294,7 +295,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-50.
 |}]
 
@@ -312,7 +314,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-70.
 |}]
 
@@ -330,7 +333,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-65.
 |}]
 
@@ -732,7 +736,8 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because it's the type of the field of a polymorphic variant.
 |}];;
 

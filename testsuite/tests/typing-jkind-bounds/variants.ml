@@ -324,8 +324,8 @@ Line 1, characters 0-51:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod external_
-         with 'a
+       But the kind of type "t" must be a subkind of
+         value mod external_ with 'a
          because of the annotation on the declaration of the type t.
 |}]
 
