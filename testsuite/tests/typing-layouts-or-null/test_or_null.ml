@@ -98,7 +98,7 @@ Line 1, characters 14-25:
 1 | type nested = int or_null or_null
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is immediate_or_null
+       The kind of int or_null is immediate_or_null mod non_float
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of value
          because the type argument of or_null has kind value.
@@ -107,7 +107,7 @@ Line 1, characters 14-25:
 1 | type nested = int or_null or_null
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type "('a : value)"
-       The kind of int or_null is immediate_or_null with int
+       The kind of int or_null is immediate_or_null mod non_float with int
          because it is the primitive immediate_or_null type or_null.
        But the kind of int or_null must be a subkind of value
          because the type argument of or_null has kind value.
@@ -294,7 +294,7 @@ Line 1, characters 26-42:
 1 | type object_with_null = < x : int or_null; .. >
                               ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The kind of "int or_null" is immediate_or_null
+       The kind of "int or_null" is immediate_or_null mod non_float
          because it is the primitive immediate_or_null type or_null.
        But the kind of "int or_null" must be a subkind of value
          because it's the type of an object field.
@@ -303,7 +303,7 @@ Line 1, characters 26-42:
 1 | type object_with_null = < x : int or_null; .. >
                               ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The kind of "int or_null" is immediate_or_null with int
+       The kind of "int or_null" is immediate_or_null mod non_float with int
          because it is the primitive immediate_or_null type or_null.
        But the kind of "int or_null" must be a subkind of value
          because it's the type of an object field.

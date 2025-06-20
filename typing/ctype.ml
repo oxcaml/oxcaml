@@ -2265,6 +2265,26 @@ let get_unboxed_type_approximation env ty =
   | Ok ty | Error ty -> ty
 
 
+let determine_separability_for_or_null ~jkind_of_type args substituted_jkind =
+  match args with
+  | [arg_ty] ->
+    let arg_jkind = jkind_of_type arg_ty in
+    let arg_separability = Jkind.get_separability
+      ~jkind_of_type:(fun ty -> Some (jkind_of_type ty)) arg_jkind
+    in
+    if Jkind_axis.Separability.equal
+      arg_separability Jkind_axis.Separability.Non_float
+    then
+      Jkind.set_separability_upper_bound
+        substituted_jkind Jkind_axis.Separability.Non_float
+    else
+      substituted_jkind
+  | _ ->
+    (* Hitting this code path means that someone passed an incorrect number
+       of arguments to [or_null] or its alias. We don't do anything here
+       and return the same jkind, as we'll report the error later. *)
+    substituted_jkind
+
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
 let type_jkind_purely_if_principal' =
@@ -2303,15 +2323,24 @@ let rec estimate_type_jkind ~expand_component env ty =
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
-      if Jkind.has_with_bounds jkind && List.compare_length_with args 0 <> 0
-      then
-        let level = get_level ty in
-        (* CR layouts v2.8: We could possibly skip this substitution if we're
-           called from [constrain_type_jkind]; the jkind returned without
-           substing is just weaker than the one we would get by substing. *)
-        jkind_subst env level type_decl.type_params args jkind
+      let substituted_jkind =
+        if Jkind.has_with_bounds jkind && List.compare_length_with args 0 <> 0
+        then
+          let level = get_level ty in
+          (* CR layouts v2.8: We could possibly skip this substitution if we're
+             called from [constrain_type_jkind]; the jkind returned without
+             substing is just weaker than the one we would get by substing. *)
+          jkind_subst env level type_decl.type_params args jkind
+        else
+          jkind
+      in
+      (* CR dkalinichenko: come up with a more elegant solution. *)
+      if Path.same p Predef.path_or_null
+        || Builtin_attributes.has_or_null_reexport type_decl.type_attributes then
+        let jkind_of_type ty = estimate_type_jkind ~expand_component env ty in
+        determine_separability_for_or_null ~jkind_of_type args substituted_jkind
       else
-        jkind
+        substituted_jkind
     with
     (* CR layouts v2.8: It will be confusing when a [Cannot_subst] leads to
        a [Missing_cmi]. *)
