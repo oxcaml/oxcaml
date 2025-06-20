@@ -2916,9 +2916,9 @@ let g t = M.f t ~key:0
 [%%expect{|
 type ('v : immediate) t
 module M : sig val f : ('v : immediate). 'v t -> int -> 'v end
-Line 9, characters 10-13:
+Line 9, characters 10-15:
 9 | let g t = M.f t ~key:0
-              ^^^
+              ^^^^^
 Error: This expression is used as a function, but its type "'a"
        has kind "immediate", which cannot be the kind of a function.
        (Functions always have kind "value mod aliased immutable non_float".)

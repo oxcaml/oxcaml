@@ -3955,7 +3955,17 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                   (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
               with
               | Unify _ ->
-                raise(Error(funct.exp_loc, env,
+                (* need to calculate a location containing the function
+                   and any arguments already processed *)
+                let get_loc (_, arg) = match arg with
+                  | Arg (Known_arg { sarg }
+                         | Unknown_arg { sarg }) -> Some sarg.pexp_loc
+                  | Arg (Eliminated_optional_arg _) -> None
+                  | Omitted _ -> None
+                in
+                let locs = funct.exp_loc :: List.filter_map get_loc rev_args in
+                let loc = Location.merge ~ghost:false locs in
+                raise(Error(loc, env,
                             Impossible_function_jkind (ty_fun, jkind)))
               end;
               (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
