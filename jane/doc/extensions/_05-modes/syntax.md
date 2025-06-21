@@ -127,6 +127,12 @@ fun x y @ modes -> ..
 We don't support `fun x y : ty @ modes -> 42` due to a limitation in the
 parser.
 
+## Including signatures
+The following includes all items from `S` with extra modality `portable` applied.
+```ocaml
+include S @@ portable
+```
+
 ## Expressions
 ```ocaml
 (expression : ty @ modes)

@@ -640,6 +640,7 @@ module type S =
     module P : sig module I = N.I end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(P.I).t) eq end
+      @@ stateless nonportable
   end
 |}];;
 
@@ -663,12 +664,10 @@ module type S =
   sig
     module N : sig module I = Int end
     module P :
-      sig
-        module I :
-          sig type t = int val compare : 'a -> 'a -> int @@ portable end
-      end
+      sig module I : sig type t = int val compare : 'a -> 'a -> int end end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(N.I).t) eq end
+      @@ stateless nonportable
   end
 |}];;
 
@@ -824,7 +823,28 @@ end = struct
 end;;
 [%%expect{|
 module X : sig module N : sig end end
-module Y : sig module type S = sig module N = X.N end end
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   module type S = module type of struct include X end
+6 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig module type S = sig module N = X.N @@ stateless end end
+       is not included in
+         sig module type S = sig module N = X.N end end
+       Module type declarations do not match:
+         module type S = sig module N = X.N @@ stateless end
+       does not match
+         module type S = sig module N = X.N end
+       The second module type is not included in the first
+       At position "module type S = <here>"
+       Module types do not match:
+         sig module N = X.N end
+       is not equal to
+         sig module N = X.N @@ stateless end
+       At position "module type S = <here>"
+       Modalities on N do not match:
+       The second is portable and the first is not.
 |}];;
 
 module type S = sig

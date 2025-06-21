@@ -2222,6 +2222,11 @@ let extension_only_constructor id ppf ext =
       ocstr_return_type = ret;
     }
 
+let get_zap_modalities () =
+  if Language_extension.(is_at_least Mode Alpha)
+    then Mode.Modality.Value.zap_to_floor
+    else Mode.Modality.Value.zap_to_id
+
 (* Print a value declaration *)
 
 let tree_of_value_description id decl =
@@ -2231,7 +2236,7 @@ let tree_of_value_description id decl =
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   let snap = Btype.snapshot () in
-  let moda = Mode.Modality.Value.zap_to_id decl.val_modalities in
+  let moda = get_zap_modalities () decl.val_modalities in
   let qtvs = extract_qtvs [decl.val_type] in
   let apparent_arity =
     let rec count n typ =
@@ -2637,7 +2642,7 @@ and tree_of_functor_parameter ?abbrev = function
         | None -> None, fun env -> env
         | Some id ->
             Some (Ident.name id),
-            Env.add_module ~arg:true id Mp_present ty_arg
+            fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
       Some (name, tree_of_modtype ?abbrev ty_arg), env
 
@@ -2716,7 +2721,7 @@ and tree_of_sigitem ?abbrev = function
           then Some (Abbrev.ellipsis ())
           else abbrev
       in
-      tree_of_module ?abbrev id md.md_type rs
+      tree_of_module ?abbrev id md rs
   | Sig_modtype(id, decl, _) ->
       tree_of_modtype_declaration ?abbrev id decl
   | Sig_class(id, decl, rs, _) ->
@@ -2732,8 +2737,16 @@ and tree_of_modtype_declaration ?abbrev id decl =
   in
   Osig_modtype (Ident.name id, mty)
 
-and tree_of_module ?abbrev id mty rs =
-  Osig_module (Ident.name id, tree_of_modtype ?abbrev mty, tree_of_rec rs)
+and tree_of_module ?abbrev id md rs =
+  let snap = Btype.snapshot () in
+  let moda = get_zap_modalities () md.md_modalities in
+  let r =
+    Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
+    tree_of_modalities_new Immutable moda,
+    tree_of_rec rs)
+  in
+  Btype.backtrack snap;
+  r
 
 let rec functor_parameters ~sep custom_printer = function
   | [] -> ignore
