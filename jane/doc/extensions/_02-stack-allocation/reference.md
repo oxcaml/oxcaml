@@ -15,7 +15,7 @@ garbage collected heap. Instead of waiting for the next GC, the memory
 used by stack-allocated values is reclaimed when their stack frame
 is popped, and can be immediately reused. Whether the compiler
 stack-allocates certain values is inferred or controlled from new keywords
-`stack_` and `local_`, whose effects are explained below.
+`stack_` and `local`, whose effects are explained below.
 
 ## Stack allocation
 
@@ -108,15 +108,15 @@ implicitly weakened to local (because both branches of an `if` must have the
 same locality), making the whole
 expression local.
 
-You can also use the `local_` keyword to explicitly weaken a value to local. For
+You can also use the `local` keyword to explicitly weaken a value to local. For
 example:
 
 ```ocaml
-let l = local_ if n > 0 then n :: x else x in
+let l @ local = if n > 0 then n :: x else x in
 ...
 ```
 
-The `local_` keyword doesn't force stack allocation. However, it does weaken `l`
+The `local` keyword doesn't force stack allocation. However, it does weaken `l`
 to local, which prevents `l` from escaping the current region, and as a result
 the compiler will optimize `n :: x` to be stack-allocated in the current
 region. However, users may wish to use `stack_` to ensure stack allocation,
@@ -175,9 +175,9 @@ For instance:
 
 ```ocaml
 let f () =
-  let local_ outer = ref 42 in
+  let outer @ local = ref 42 in
   let g () =
-    let local_ inner = ref 42 in
+    let inner @ local = ref 42 in
     ??
   in
   ...
@@ -202,8 +202,8 @@ compiler know that it is safe to still refer to `outer` from within the closure
 This situation also arises with local parameters. For example:
 
 ```ocaml
-let f (local_ x) =
-  let local_ y = 3 :: x in
+let f (x @ local) =
+  let y @ local = 3 :: x in
   ??
 ```
 
@@ -221,7 +221,7 @@ and therefore cannot be stack-allocated. With the keyword, an error
 will be reported, while without the keyword the allocations will occur
 on the GC heap as usual. Similarly, whether a value is global or local (and
 hence whether certain allocation can be optimized to be on stack) is inferred by
-the type-checker, although the `local_` keyword may be used to specify it.
+the type-checker, although the `local` keyword may be used to specify it.
 
 Inference does not cross file boundaries. If local annotations subject to
 inference appear in the type of a module (e.g. since they can appear in
@@ -235,7 +235,7 @@ be local internally to `a.ml`, so `foo:(Some x)` can be stack-allocated.
 
 ```ocaml
 (* in a.mli *)
-val f1 : foo:local_ int option -> unit
+val f1 : foo:int option @ local -> unit
 val f2 : int -> unit
 
 (* in a.ml *)
@@ -249,7 +249,7 @@ let f2 x = f1 ~foo:(Some x) (* [Some x] is stack allocated *)
 -->
 However, a missing mli *does* affect inference within the ml file. As a conservative
 rule of thumb, function arguments in an mli-less file will default to global
-unless the function parameter or argument is annotated with `local_`. This is
+unless the function parameter or argument is annotated with `local`. This is
 due to an implementation detail of the type-checker and is not fundamental, but
 for now, it's yet another reason to prefer writing mlis.
 
@@ -261,34 +261,34 @@ let f2 x = f1 ~foo:(Some x) (* [Some x] is heap allocated *)
 
 ## Function types and local arguments
 
-Function types now accept the `local_` keyword in both argument and return
+Function types now accept the `local` keyword in both argument and return
 positions, leading to four distinct types of function:
 
     a -> b
-    local_ a -> b
-    a -> local_ b
-    local_ a -> local_ b
+    a @ local -> b
+    a -> b @ local
+    a @ local -> b @ local
 
-In all cases, the `local_` annotation means "local to the call site's surrounding
+In all cases, the `local` annotation means "local to the call site's surrounding
 region" , or equivalently "outer-local to the function's region".
 
-In argument positions, `local_` indicates that the function may be passed
-local values. As always, the `local_` keyword does not *require*
+In argument positions, `local` indicates that the function may be passed
+local values. As always, the `local` keyword does not *require*
 a local value, and you may pass global values to such functions. (This is an
 example of the fact that global values can always be weakened to local ones.) In
-effect, a function of type `local_ a -> b` is a function accepting `a`
+effect, a function of type `a @ local -> b` is a function accepting `a`
 and returning `b` that promises not to capture any reference to its argument.
 
-In return positions, `local_` indicates that the function may return values that
+In return positions, `local` indicates that the function may return values that
 are local (See "Use `exclave_` to return a local value" below). A function of
-type `local_ a -> local_ b` promises not to capture any reference to its
+type `a @ local -> b @ local` promises not to capture any reference to its
 argument except possibly in its return value.
 
 A function with a local argument can be defined by annotating the argument as
-`local_`:
+`local`:
 
 ```ocaml
-let f (local_ x) = ...
+let f (x @ local) = ...
 ```
 
 As we saw above, inside the definition of `f`, the argument `x` is outer-local: that is,
@@ -296,14 +296,14 @@ while it may be stack-allocated, it is known not to have been allocated during
 `f` itself, and thus may safely be returned from `f`. For example:
 
 ```ocaml
-# let f1 (local_ x : int list) = [1; 2; 3]
-val f1 : local_ int list -> int list
+# let f1 (x : int list @ local) = [1; 2; 3]
+val f1 : int list @ local -> int list
 
-# let f2 (local_ x : int list) = x
-val f2 : local_ int list -> local_ int list
+# let f2 (x : int list @ local) = x
+val f2 : int list @ local -> int list @ local
 
-# let f3 (local_ x : int list) = (42 :: x)
-                                        ^
+# let f3 (x : int list @ local) = (42 :: x)
+                                         ^
 Error: This value escapes its region
 ```
 
@@ -323,7 +323,7 @@ unintentionally.  See "Use `exclave_` to return a local value" below.
 
 Like local variables, inference can determine whether function arguments are
 local. However, note that for arguments of exported functions to be local, the
-`local_` keyword must appear in their declarations in the corresponding mli
+`local` keyword must appear in their declarations in the corresponding mli
 file.
 
 
@@ -356,7 +356,7 @@ will only run before `f` has ended, which is what makes it safe to refer to
 `outer` from within `g`.
 
 Higher-order functions should usually mark their function arguments as
-`local_`, to allow local closures to be passed in. For instance, consider the
+`local`, to allow local closures to be passed in. For instance, consider the
 following function for computing the length of a list:
 
 ```ocaml
@@ -387,7 +387,7 @@ closure to such a function, hence the error.
 Instead, `List.iter` and similar functions should be given the following type:
 
 ```ocaml
-val iter : 'a list -> f:local_ ('a -> unit) -> unit
+val iter : 'a list -> f:('a -> unit) @ local -> unit
 ```
 
 This type carries the additional promise that `iter` does not capture its `f`
@@ -400,10 +400,10 @@ elements themselves. To specify that `f` may _not_ capture its
 argument, the type of iter would have to be:
 
 ```ocaml
-val iter : 'a list -> f:local_ (local_ 'a -> unit) -> unit
+val iter : 'a list -> f:('a @ local -> unit) @ local -> unit
 ```
 
-The two occurrences of `local_` are independent: the first is a promise
+The two occurrences of `local` are independent: the first is a promise
 by `iter` not to capture `f`, while the second is a requirement by
 `iter` to be given an `f` that does not itself capture.
 
@@ -482,7 +482,7 @@ Note that values which are outer-local (see "Nested regions") may be used in
 tail calls, as the early closing of the region does not affect them:
 
 ```ocaml
-let f3 (local_ x) =
+let f3 (x @ local) =
   some_func x
 ```
 
@@ -506,7 +506,7 @@ let f () =
 ```
 
 Here, inference will detect that `counter` does not escape and will stack-allocate
-the reference (assuming that `incr` takes its argument `local_`ly). However, this changes if we try to abstract out
+the reference (assuming that `incr` takes its argument `local`ly). However, this changes if we try to abstract out
 `counter` to its own module:
 
 ```ocaml
@@ -532,7 +532,7 @@ let f () =
 In this code, the counter will *not* be stack-allocated. The reason is the
 `Counter.make` function: the allocation of `ref 0` escapes the region of
 `Counter.make`, and the compiler will therefore not allow it to be
-stack-allocated. This remains the case no matter how many `local_` annotations we
+stack-allocated. This remains the case no matter how many `local` annotations we
 write inside `f`: the issue is the definition of `make`, not its uses.
 
 To allow the counter to be stack-allocated, we need to make `Counter.make` end
@@ -556,8 +556,8 @@ which allows allocating and returning in the caller's region. This approach,
 however, has certain disadvantages. Consider the following example:
 
 ```ocaml
-let f (local_ x) = exclave_
-  let local_ y = (complex computation on x) in
+let f (x @ local) = exclave_
+  let y @ local = (complex computation on x) in
   if y then None
   else (Some x)
 ```
@@ -568,8 +568,8 @@ program exits the caller's region. To allow temporary allocations to be released
 upon the function's return, we delay `exclave_` as follows:
 
 ```ocaml
-let f (local_ x) =
-  let local_ y = (complex computation on x) in
+let f (x @ local) =
+  let y @ local = (complex computation on x) in
   if y then exclave_ None
   else exclave_ Some x
 ```
@@ -599,7 +599,7 @@ let rec maybe_length p l = exclave_
 This function is intended to have the type:
 
 ```ocaml
-val maybe_length : ('a -> bool) -> 'a list -> local_ int option
+val maybe_length : ('a -> bool) -> 'a list -> int option @ local
 ```
 It is designed not to allocate heap memory by using the stack for all `Some`
 allocations. However, it will currently use O(N) stack space because all
@@ -624,10 +624,10 @@ Now the function uses O(1) stack space.
 cannot be used inside `exclave_`. For example, the following code produces an
 error:
 ```ocaml
-  let local_ x = "hello" in
+  let x @ local = "hello" in
   exclave_ (
-    let local_ y = "world" in
-    local_ (x ^ y)
+    let y @ local = "world" in
+    (x ^ y : _ @ local)
   )
 ```
 
@@ -635,12 +635,12 @@ Similarly, `exclave_` can only appear at the tail position of a region since one
 cannot re-enter a terminated region. The following code is an error for this
 reason:
 ```ocaml
-  let local_ x = "hello" in
+  let x @ local = "hello" in
   exclave_ (
-    let local_ y = "world" in
+    let y @ local = "world" in
     ()
   );
-  local_ (x ^ "world")
+  (x ^ "world" : _ @ local)
 ```
 
 ## Records and mutability
@@ -732,12 +732,12 @@ These both describe a two-argument function which is curried, and therefore may
 be partially applied to the first argument, yielding a closure that accepts the
 second.
 
-The situation is more complicated when `local_` is involved. The following two
+The situation is more complicated when `local` is involved. The following two
 types are *not* equivalent:
 
 ```ocaml
-local_ string -> string -> string
-local_ string -> (string -> string)
+string @ local -> string -> string
+string @ local -> (string -> string)
 ```
 
 The former is a two-argument function which accepts as its first argument
@@ -748,37 +748,37 @@ itself. Thus, if applied to a single argument, this function in fact returns
 a _local_ closure, making its type equal to the following:
 
 ```ocaml
-local_ string -> local_ (string -> string)
+string @ local -> (string -> string) @ local
 ```
 
-By contrast, the type `local_ string -> (string -> string)` means a function
+By contrast, the type `string @ local -> (string -> string)` means a function
 that accepts a local string but returns a global function. Necessarily, this
 global function cannot refer to the local string that was passed, so this
 cannot be an ordinary two-argument function. (It could be something like `fun
 s -> print s; fun x -> x`, however)
 
 In general, in a curried function type `... -> ... -> ...` (without
-parentheses), then after the first use of `local_`, all arrow types except the
-last will implicitly be given `local_` return types, enabling the expected
+parentheses), then after the first use of `local`, all arrow types except the
+last will implicitly be given `local` return types, enabling the expected
 partial application behavior.
 
-Finally, this transformation applies also to types marked with the `local_`
+Finally, this transformation applies also to types marked with the `local`
 keyword. For instance, the following type:
 
 ```ocaml
-local_ (a -> b -> c -> d) -> e -> f -> g
+(a -> b -> c -> d) @ local -> e -> f -> g
 ```
 
 is read as:
 
 ```ocaml
-local_ (a -> local_ (b -> local_ (c -> d))) -> local_ (e -> local_ (f -> g))
+(a -> (b -> (c -> d) @ local) @ local) @ local -> (e -> (f -> g) @ local) @ local
 ```
 
-Note the implicit `local_` both in the returned `e -> f` closure (as described
+Note the implicit `local` both in the returned `e -> f` closure (as described
 above), and also in the type of the `b -> c` argument. The propagation of
-`local_` into the function argument is necessary to allow a stack-allocated
-function (which would have type `a -> local_ (b -> local_ (c -> d))`) to be
+`local` into the function argument is necessary to allow a stack-allocated
+function (which would have type `a -> (b -> (c -> d) @ local) @ local`) to be
 passed as an argument. Functions are different than other types in that, because
 of currying, a stack-allocated function has a different type than a
 heap-allocated one.
@@ -791,7 +791,7 @@ seemingly-identical definitions, the first is accepted and the second is
 rejected:
 
 ```ocaml
-let local_ f : int -> int -> int = fun a b -> a + b + !counter in
+let f : (int -> int -> int) @ local = fun a b -> a + b + !counter in
 ...
 
 let g : int -> int -> int = stack_ fun a b -> a + b + !counter in
@@ -800,11 +800,11 @@ let g : int -> int -> int = stack_ fun a b -> a + b + !counter in
 
 Both define a closure which accepts two integers and returns an integer. The
 closure must be local, since it refers to the local value `counter`. In the
-definition of `f`, the type of the function appears under the `local_` keyword,
+definition of `f`, the type of the function appears under the `local` keyword,
 and as described above is interpreted as:
 
 ```ocaml
-int -> local_ (int -> int)
+int -> (int -> int) @ local
 ```
 
 This is the correct type for this function: if we partially apply it to
@@ -823,7 +823,7 @@ case here. For this reason, this version is rejected. It would be accepted if
 written as follows:
 
 ```ocaml
-let g : int -> local_ (int -> int) = stack_ fun a b -> a + b + !counter in
+let g : int -> (int -> int) @ local = stack_ fun a b -> a + b + !counter in
 ...
 ```
 
@@ -886,15 +886,15 @@ external id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
 This declaration means that `id` can have either of the following types:
 
 ```ocaml
-id : local_ 'a -> local_ 'a
+id : 'a @ local -> 'a @ local
 id : 'a -> 'a
 ```
 
-Notice that the two `[@local_opt]`s act in unison: either both `local_`s are
+Notice that the two `[@local_opt]`s act in unison: either both `local`s are
 present or neither is. Nothing checks that the locality ascriptions are sound,
 though, so use this feature with much caution. In the case of `id`, all is well,
 but if the two `[@local_opt]`s did not act in unison (that is, they varied
-independently), it would not be: `id : local_ 'a -> 'a` allows a local value to
+independently), it would not be: `id : 'a @ local -> 'a` allows a local value to
 escape.
 
 ### Stack allocation
@@ -905,7 +905,7 @@ allocation) at each use site. For example, primitives that return allocated
 values will allocate the value on stack if declared to be local-returning:
 
 ```ocaml
-external ref_stack : 'a -> local_ 'a ref = "%makemutable"
+external ref_stack : 'a -> 'a ref @ local = "%makemutable"
 external ref_heap : 'a -> 'a ref = "%makemutable"
 
 let r_stack = ref_stack "hello" in

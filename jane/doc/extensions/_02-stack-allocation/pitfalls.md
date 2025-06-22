@@ -53,7 +53,7 @@ particularly those of higher-order functions. For instance, an
 unlabeled `iter` function may become:
 
 ```ocaml
-val iter : local_ ('a -> unit) -> 'a t -> unit
+val iter : ('a -> unit) @ local -> 'a t -> unit
 ```
 
 thus allowing stack-allocated closures to be used as the first
@@ -79,7 +79,7 @@ let print_each_foo x = iter print_foo x
 Note that this pitfall does not apply to the final parameter of a
 function. So a labeled `iter` function with a type like:
 ```ocaml
-val iter : 'a t -> f:local_ ('a -> unit) -> unit
+val iter : 'a t -> f:('a -> unit) @ local -> unit
 ```
 can be partially-applied without issue:
 ```ocaml
