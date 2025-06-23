@@ -508,16 +508,34 @@ end = struct
           if match_prefix i prefix bit
           then
             if zero_bit i bit
-            then branch1 t1 t10 t11 prefix bit (merge t0 t10) ((only_right[@inlined hint]) t11)
-            else branch1 t1 t10 t11 prefix bit ((only_right[@inlined hint]) t10) (merge t0 t11)
-          else join i ((only_left[@inlined hint]) t0) prefix ((only_right[@inlined hint]) t1)
+            then
+              branch1 t1 t10 t11 prefix bit (merge t0 t10)
+                ((only_right [@inlined hint]) t11)
+            else
+              branch1 t1 t10 t11 prefix bit
+                ((only_right [@inlined hint]) t10)
+                (merge t0 t11)
+          else
+            join i
+              ((only_left [@inlined hint]) t0)
+              prefix
+              ((only_right [@inlined hint]) t1)
         | Branch (prefix, bit, t00, t01), Leaf (i, _) ->
           if match_prefix i prefix bit
           then
             if zero_bit i bit
-            then branch0 t0 t00 t01 prefix bit (merge t00 t1) ((only_left[@inlined hint]) t01)
-            else branch0 t0 t00 t01 prefix bit ((only_left[@inlined hint]) t00) (merge t01 t1)
-          else join i ((only_right[@inlined hint]) t1) prefix ((only_left[@inlined hint]) t0)
+            then
+              branch0 t0 t00 t01 prefix bit (merge t00 t1)
+                ((only_left [@inlined hint]) t01)
+            else
+              branch0 t0 t00 t01 prefix bit
+                ((only_left [@inlined hint]) t00)
+                (merge t01 t1)
+          else
+            join i
+              ((only_right [@inlined hint]) t1)
+              prefix
+              ((only_left [@inlined hint]) t0)
         (* Branch/Branch case *)
         | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
           if equal_prefix prefix0 bit0 prefix1 bit1
@@ -527,14 +545,28 @@ end = struct
           else if includes_prefix prefix0 bit0 prefix1 bit1
           then
             if zero_bit prefix1 bit0
-            then branch0 t0 t00 t01 prefix0 bit0 (merge t00 t1) ((only_left[@inlined hint]) t01)
-            else branch0 t0 t00 t01 prefix0 bit0 ((only_left[@inlined hint]) t00) (merge t01 t1)
+            then
+              branch0 t0 t00 t01 prefix0 bit0 (merge t00 t1)
+                ((only_left [@inlined hint]) t01)
+            else
+              branch0 t0 t00 t01 prefix0 bit0
+                ((only_left [@inlined hint]) t00)
+                (merge t01 t1)
           else if includes_prefix prefix1 bit1 prefix0 bit0
           then
             if zero_bit prefix0 bit1
-            then branch1 t1 t10 t11 prefix1 bit1 (merge t0 t10) ((only_right[@inlined hint]) t11)
-            else branch1 t1 t10 t11 prefix1 bit1 ((only_right[@inlined hint]) t10) (merge t0 t11)
-          else join prefix0 ((only_left[@inlined hint]) t0) prefix1 ((only_right[@inlined hint]) t1))
+            then
+              branch1 t1 t10 t11 prefix1 bit1 (merge t0 t10)
+                ((only_right [@inlined hint]) t11)
+            else
+              branch1 t1 t10 t11 prefix1 bit1
+                ((only_right [@inlined hint]) t10)
+                (merge t0 t11)
+          else
+            join prefix0
+              ((only_left [@inlined hint]) t0)
+              prefix1
+              ((only_right [@inlined hint]) t1))
     in
     merge t0 t1
 
