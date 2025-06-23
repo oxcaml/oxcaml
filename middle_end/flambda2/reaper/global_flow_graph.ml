@@ -226,6 +226,8 @@ module CoConstructor_rel =
   Datalog.Schema.Relation3 (Code_id_or_name) (CoFieldC) (Code_id_or_name)
 module Any_usage_pred = Datalog.Schema.Relation1 (Code_id_or_name)
 module Any_source_pred = Datalog.Schema.Relation1 (Code_id_or_name)
+module Code_id_my_closure_rel =
+  Datalog.Schema.Relation2 (Code_id_or_name) (Code_id_or_name)
 
 type graph =
   { mutable alias_rel : Alias_rel.t;
@@ -236,7 +238,8 @@ type graph =
     mutable coconstructor_rel : CoConstructor_rel.t;
     mutable propagate_rel : Propagate_rel.t;
     mutable any_usage_pred : Any_usage_pred.t;
-    mutable any_source_pred : Any_source_pred.t
+    mutable any_source_pred : Any_source_pred.t;
+    mutable code_id_my_closure_rel : Code_id_my_closure_rel.t
   }
 
 let print_iter_edges ~print_edge graph =
@@ -285,6 +288,9 @@ let any_usage_pred = Any_usage_pred.create ~name:"any_usage"
 
 let any_source_pred = Any_source_pred.create ~name:"any_source"
 
+let code_id_my_closure_rel =
+  Code_id_my_closure_rel.create ~name:"code_id_my_closure"
+
 let to_datalog graph =
   Datalog.set_table alias_rel graph.alias_rel
   @@ Datalog.set_table use_rel graph.use_rel
@@ -295,6 +301,7 @@ let to_datalog graph =
   @@ Datalog.set_table propagate_rel graph.propagate_rel
   @@ Datalog.set_table any_usage_pred graph.any_usage_pred
   @@ Datalog.set_table any_source_pred graph.any_source_pred
+  @@ Datalog.set_table code_id_my_closure_rel graph.code_id_my_closure_rel
   @@ Datalog.empty
 
 type 'a rel0 = [> `Atom of Datalog.atom] as 'a
@@ -335,6 +342,9 @@ let any_usage_pred var = Datalog.atom any_usage_pred [var]
 
 let any_source_pred var = Datalog.atom any_source_pred [var]
 
+let code_id_my_closure_rel code_id var =
+  Datalog.atom code_id_my_closure_rel [code_id; var]
+
 let create () =
   { alias_rel = Alias_rel.empty;
     use_rel = Use_rel.empty;
@@ -344,7 +354,8 @@ let create () =
     coconstructor_rel = CoConstructor_rel.empty;
     propagate_rel = Propagate_rel.empty;
     any_usage_pred = Any_usage_pred.empty;
-    any_source_pred = Any_source_pred.empty
+    any_source_pred = Any_source_pred.empty;
+    code_id_my_closure_rel = Code_id_my_closure_rel.empty
   }
 
 let add_alias t ~to_ ~from =
@@ -400,3 +411,9 @@ let add_use t (var : Code_id_or_name.t) =
 
 let add_any_source t (var : Code_id_or_name.t) =
   t.any_source_pred <- Any_source_pred.add_or_replace [var] () t.any_source_pred
+
+let add_code_id_my_closure t code_id my_closure =
+  t.code_id_my_closure_rel
+    <- Code_id_my_closure_rel.add_or_replace
+         [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
+         () t.code_id_my_closure_rel

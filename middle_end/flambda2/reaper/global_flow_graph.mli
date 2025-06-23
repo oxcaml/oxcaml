@@ -95,6 +95,8 @@ val any_usage_pred : (Code_id_or_name.t, _) rel1
 
 val any_source_pred : (Code_id_or_name.t, _) rel1
 
+val code_id_my_closure_rel : (Code_id_or_name.t, Code_id_or_name.t, _) rel2
+
 val create : unit -> graph
 
 val add_opaque_let_dependency :
@@ -127,6 +129,8 @@ val add_coaccessor_dep :
 
 val add_coconstructor_dep :
   graph -> base:Code_id_or_name.t -> CoField.t -> from:Code_id_or_name.t -> unit
+
+val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
 val print_iter_edges :
   print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
