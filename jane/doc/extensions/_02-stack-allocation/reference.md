@@ -14,8 +14,8 @@ stack-allocate some values, placing them on a stack rather than the
 garbage collected heap. Instead of waiting for the next GC, the memory
 used by stack-allocated values is reclaimed when their stack frame
 is popped, and can be immediately reused. Whether the compiler
-stack-allocates certain values is inferred or controlled from new keywords
-`stack_` and `local`, whose effects are explained below.
+stack-allocates certain values is inferred or controlled via `local` mode
+annotations and the `stack_` keyword, whose effects are explained below.
 
 ## Stack allocation
 
@@ -108,15 +108,15 @@ implicitly weakened to local (because both branches of an `if` must have the
 same locality), making the whole
 expression local.
 
-You can also use the `local` keyword to explicitly weaken a value to local. For
-example:
+You can also use a `local` mode annotation to explicitly weaken a value to
+local. For example:
 
 ```ocaml
 let l @ local = if n > 0 then n :: x else x in
 ...
 ```
 
-The `local` keyword doesn't force stack allocation. However, it does weaken `l`
+The `local` mode doesn't force stack allocation. However, it does weaken `l`
 to local, which prevents `l` from escaping the current region, and as a result
 the compiler will optimize `n :: x` to be stack-allocated in the current
 region. However, users may wish to use `stack_` to ensure stack allocation,
@@ -221,7 +221,7 @@ and therefore cannot be stack-allocated. With the keyword, an error
 will be reported, while without the keyword the allocations will occur
 on the GC heap as usual. Similarly, whether a value is global or local (and
 hence whether certain allocation can be optimized to be on stack) is inferred by
-the type-checker, although the `local` keyword may be used to specify it.
+the type-checker, although a `local` mode annotation may be used to specify it.
 
 Inference does not cross file boundaries. If local annotations subject to
 inference appear in the type of a module (e.g. since they can appear in
@@ -261,7 +261,7 @@ let f2 x = f1 ~foo:(Some x) (* [Some x] is heap allocated *)
 
 ## Function types and local arguments
 
-Function types now accept the `local` keyword in both argument and return
+Function types now accept `local` mode annotations in both argument and return
 positions, leading to four distinct types of function:
 
     a -> b
@@ -273,7 +273,7 @@ In all cases, the `local` annotation means "local to the call site's surrounding
 region" , or equivalently "outer-local to the function's region".
 
 In argument positions, `local` indicates that the function may be passed
-local values. As always, the `local` keyword does not *require*
+local values. As always, the `local` mode annotation does not *require*
 a local value, and you may pass global values to such functions. (This is an
 example of the fact that global values can always be weakened to local ones.) In
 effect, a function of type `a @ local -> b` is a function accepting `a`
@@ -323,8 +323,8 @@ unintentionally.  See "Use `exclave_` to return a local value" below.
 
 Like local variables, inference can determine whether function arguments are
 local. However, note that for arguments of exported functions to be local, the
-`local` keyword must appear in their declarations in the corresponding mli
-file.
+`local` mode annotation must appear in their declarations in the corresponding
+mli file.
 
 
 ## Closures
@@ -762,8 +762,8 @@ parentheses), then after the first use of `local`, all arrow types except the
 last will implicitly be given `local` return types, enabling the expected
 partial application behavior.
 
-Finally, this transformation applies also to types marked with the `local`
-keyword. For instance, the following type:
+Finally, this transformation applies also to types marked with a `local` mode
+annotation. For instance, the following type:
 
 ```ocaml
 (a -> b -> c -> d) @ local -> e -> f -> g
@@ -800,8 +800,8 @@ let g : int -> int -> int = stack_ fun a b -> a + b + !counter in
 
 Both define a closure which accepts two integers and returns an integer. The
 closure must be local, since it refers to the local value `counter`. In the
-definition of `f`, the type of the function appears under the `local` keyword,
-and as described above is interpreted as:
+definition of `f`, the type of the function appears under a `local` mode
+annotation, and as described above is interpreted as:
 
 ```ocaml
 int -> (int -> int) @ local

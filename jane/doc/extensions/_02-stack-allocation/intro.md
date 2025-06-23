@@ -68,8 +68,8 @@ them in globals, etc. This is a problem when trying to pass around
 stack-allocated values, since we need to guarantee they do not
 escape.
 
-The remedy is that we allow the `local` keyword to appear on
-function parameters:
+The solution is for functions to specify that they take their arguments
+`local`ly:
 
 ```ocaml
 let f (x @ local) = ...
