@@ -94,6 +94,10 @@ val float32 : float -> unit
 (** Emit a 64-bit-wide floating point number. *)
 val float64 : float -> unit
 
+(** Emit a 32-bit-wide floating point number whose bits are contained
+    in an [Int32.t]. *)
+val float32_from_bits : Int32.t -> unit
+
 (** Emit a 64-bit-wide floating point number whose bits are contained
     in an [Int64.t]. *)
 val float64_from_bits : Int64.t -> unit

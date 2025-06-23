@@ -81,10 +81,12 @@ let select_simd_instr op args dbg =
     Some (Round_f64 Zero, args)
   | "caml_simd_float32_round_current" | "caml_neon_float32_round_current" ->
     Some (Round_f32 Current, args)
-  | "caml_neon_float64_round_current" -> Some (Round_f64 Current, args)
+  | "caml_simd_float64_round_current" | "caml_neon_float64_round_current" ->
+    Some (Round_f64 Current, args)
   | "caml_simd_float32_round_near" | "caml_neon_float32_round_near" ->
     Some (Round_f32 Nearest, args)
-  | "caml_neon_float64_round_near" -> Some (Round_f64 Nearest, args)
+  | "caml_simd_float64_round_near" | "caml_neon_float64_round_near" ->
+    Some (Round_f64 Nearest, args)
   | "caml_simd_cast_float32_int64" | "caml_neon_cast_float32_int64" ->
     Some (Round_f32_s64, args)
   (* min/max that match amd64 behavior, regardless of the value of FPCR.AH.

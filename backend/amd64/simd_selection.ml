@@ -365,18 +365,32 @@ let select_operation_sse41 op args =
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
       instr roundsd ~i args
+    | "caml_simd_float64_round_current" | "caml_sse41_float64_round_current" ->
+      instr roundsd ~i:(int_of_float_rounding RoundCurrent) args
+    | "caml_simd_float64_round_neg_inf" | "caml_sse41_float64_round_neg_inf" ->
+      instr roundsd ~i:(int_of_float_rounding RoundDown) args
+    | "caml_simd_float64_round_pos_inf" | "caml_sse41_float64_round_pos_inf" ->
+      instr roundsd ~i:(int_of_float_rounding RoundUp) args
+    | "caml_simd_float64_round_towards_zero"
+    | "caml_sse41_float64_round_towards_zero" ->
+      instr roundsd ~i:(int_of_float_rounding RoundTruncate) args
+    | "caml_simd_float64_round_near" | "caml_sse41_float64_round_near" ->
+      instr roundsd ~i:(int_of_float_rounding RoundNearest) args
     | "caml_sse41_float32_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
       instr roundss ~i args
-    | "caml_simd_float32_round_current" ->
+    | "caml_simd_float32_round_current" | "caml_sse41_float32_round_current" ->
       instr roundss ~i:(int_of_float_rounding RoundCurrent) args
-    | "caml_simd_float32_round_neg_inf" ->
+    | "caml_simd_float32_round_neg_inf" | "caml_sse41_float32_round_neg_inf" ->
       instr roundss ~i:(int_of_float_rounding RoundDown) args
-    | "caml_simd_float32_round_pos_inf" ->
+    | "caml_simd_float32_round_pos_inf" | "caml_sse41_float32_round_pos_inf" ->
       instr roundss ~i:(int_of_float_rounding RoundUp) args
-    | "caml_simd_float32_round_towards_zero" ->
+    | "caml_simd_float32_round_towards_zero"
+    | "caml_sse41_float32_round_towards_zero" ->
       instr roundss ~i:(int_of_float_rounding RoundTruncate) args
+    | "caml_simd_float32_round_near" | "caml_sse41_float32_round_near" ->
+      instr roundss ~i:(int_of_float_rounding RoundNearest) args
     | "caml_sse41_int8x16_max" -> instr pmaxsb args
     | "caml_sse41_int32x4_max" -> instr pmaxsd args
     | "caml_sse41_int16x8_max_unsigned" -> instr pmaxuw args

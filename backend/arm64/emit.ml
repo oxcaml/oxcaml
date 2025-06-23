@@ -1000,10 +1000,9 @@ let emit_literals p align emit_literal =
 
 let emit_float32_literal (f, lbl) =
   D.define_label lbl;
-  D.float32 (Int32.float_of_bits f);
+  D.float32_from_bits f;
   (* padding to 8 bytes *)
-  D.int32 0xDEAD_BEEFl;
-  ()
+  D.int32 0xDEAD_BEEFl
 
 let emit_float_literal (f, lbl) =
   D.define_label lbl;

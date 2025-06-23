@@ -667,12 +667,15 @@ let const_machine_width ?comment constant =
   | Thirty_two -> const ?comment constant Thirty_two
   | Sixty_four -> const ?comment constant Sixty_four
 
-let float32 f =
+let float32_core f f_int32 =
   let comment =
-    if !Clflags.keep_asm_file then Some (Printf.sprintf "%.9f" f) else None
+    if !Clflags.keep_asm_file then Some (Printf.sprintf "%.9g" f) else None
   in
-  let f_int32 = Int64.of_int32 (Int32.bits_of_float f) in
-  const ?comment (Signed_int f_int32) Thirty_two
+  const ?comment (Signed_int (Int64.of_int32 f_int32)) Thirty_two
+
+let float32 f = float32_core f (Int32.bits_of_float f)
+
+let float32_from_bits f = float32_core (Int32.float_of_bits f) f
 
 let float64_core f f_int64 =
   match TS.machine_width () with
