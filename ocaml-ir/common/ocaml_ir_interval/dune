@@ -1,0 +1,2 @@
+(library (name ocaml_ir_interval_tree)
+         (flags :standard -w -18))
