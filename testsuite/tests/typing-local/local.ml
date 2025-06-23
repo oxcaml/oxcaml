@@ -671,7 +671,7 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is local, so cannot be used inside a module.
+Error: The value "x" is local, so cannot be used inside a functor.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -683,7 +683,10 @@ let foo (local_ x) =
   let module _ = Foo(struct end) in
   ()
 [%%expect{|
-val foo : local_ string ref -> unit = <fun>
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is local, so cannot be used inside a functor.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -695,7 +698,10 @@ let foo (local_ x) =
   let module _ = Foo() in
   ()
 [%%expect{|
-val foo : local_ string ref -> unit = <fun>
+Line 3, characters 27-28:
+3 |     let () = print_string !x
+                               ^
+Error: The value "x" is local, so cannot be used inside a functor.
 |}]
 
 (* Don't escape through a class method *)
