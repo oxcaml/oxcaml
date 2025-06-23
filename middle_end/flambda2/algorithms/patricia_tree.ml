@@ -470,20 +470,20 @@ end = struct
     let check1 =
       match check1 with Some check1 -> check1 | None -> fun _ _ _ _ _ -> None
     in
-    let branch0 t0 t00 t01 prefix bit t0' t1' =
+    let branch0 ~t0 ~t00 ~t01 prefix bit t0' t1' =
       match (check0 [@inlined hint]) t0 t00 t01 t0' t1' with
       | None -> branch prefix bit t0' t1'
       | Some t' -> t'
     in
-    let branch1 t1 t10 t11 prefix bit t0' t1' =
+    let branch1 ~t1 ~t10 ~t11 prefix bit t0' t1' =
       match (check1 [@inlined hint]) t1 t10 t11 t0' t1' with
       | None -> branch prefix bit t0' t1'
       | Some t' -> t'
     in
-    let branch01 t0 t00 t01 t1 t10 t11 prefix bit t0' t1' =
+    let branch01 ~t0 ~t00 ~t01 ~t1 ~t10 ~t11 prefix bit t0' t1' =
       match (check0 [@inlined hint]) t0 t00 t01 t0' t1' with
       | Some t' -> t'
-      | None -> branch1 t1 t10 t11 prefix bit t0' t1'
+      | None -> branch1 ~t1 ~t10 ~t11 prefix bit t0' t1'
     in
     let rec merge t0 t1 =
       match (shortcut [@inlined hint]) t0 t1 with
@@ -509,10 +509,10 @@ end = struct
           then
             if zero_bit i bit
             then
-              branch1 t1 t10 t11 prefix bit (merge t0 t10)
+              branch1 ~t1 ~t10 ~t11 prefix bit (merge t0 t10)
                 ((only_right [@inlined hint]) t11)
             else
-              branch1 t1 t10 t11 prefix bit
+              branch1 ~t1 ~t10 ~t11 prefix bit
                 ((only_right [@inlined hint]) t10)
                 (merge t0 t11)
           else
@@ -525,10 +525,10 @@ end = struct
           then
             if zero_bit i bit
             then
-              branch0 t0 t00 t01 prefix bit (merge t00 t1)
+              branch0 ~t0 ~t00 ~t01 prefix bit (merge t00 t1)
                 ((only_left [@inlined hint]) t01)
             else
-              branch0 t0 t00 t01 prefix bit
+              branch0 ~t0 ~t00 ~t01 prefix bit
                 ((only_left [@inlined hint]) t00)
                 (merge t01 t1)
           else
@@ -540,26 +540,26 @@ end = struct
         | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
           if equal_prefix prefix0 bit0 prefix1 bit1
           then
-            branch01 t0 t00 t01 t1 t10 t11 prefix0 bit0 (merge t00 t10)
+            branch01 ~t0 ~t00 ~t01 ~t1 ~t10 ~t11 prefix0 bit0 (merge t00 t10)
               (merge t01 t11)
           else if includes_prefix prefix0 bit0 prefix1 bit1
           then
             if zero_bit prefix1 bit0
             then
-              branch0 t0 t00 t01 prefix0 bit0 (merge t00 t1)
+              branch0 ~t0 ~t00 ~t01 prefix0 bit0 (merge t00 t1)
                 ((only_left [@inlined hint]) t01)
             else
-              branch0 t0 t00 t01 prefix0 bit0
+              branch0 ~t0 ~t00 ~t01 prefix0 bit0
                 ((only_left [@inlined hint]) t00)
                 (merge t01 t1)
           else if includes_prefix prefix1 bit1 prefix0 bit0
           then
             if zero_bit prefix0 bit1
             then
-              branch1 t1 t10 t11 prefix1 bit1 (merge t0 t10)
+              branch1 ~t1 ~t10 ~t11 prefix1 bit1 (merge t0 t10)
                 ((only_right [@inlined hint]) t11)
             else
-              branch1 t1 t10 t11 prefix1 bit1
+              branch1 ~t1 ~t10 ~t11 prefix1 bit1
                 ((only_right [@inlined hint]) t10)
                 (merge t0 t11)
           else
