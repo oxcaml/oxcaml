@@ -150,7 +150,8 @@ type cannot_quantify_reason
 type jkind_info
 type unbound_variable_reason
 type error =
-  | Unbound_type_variable of string * string list * unbound_variable_reason option
+  | Unbound_type_variable of
+    string * string list * unbound_variable_reason option
   | No_type_wildcards of unbound_variable_reason option
   | Undefined_type_constructor of Path.t
   | Type_arity_mismatch of Longident.t * int * int
