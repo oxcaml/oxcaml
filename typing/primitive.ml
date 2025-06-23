@@ -453,12 +453,18 @@ module Repr_check = struct
     | Untagged_immediate -> true
     | Same_as_ocaml_repr _ | Repr_poly -> false
 
-  let is_not_product_sort : Jkind_types.Sort.Const.t -> bool = function
-    | Base _ -> true
-    | Product _ -> false
+  let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
+    | Product _ -> true
+    | Base _ -> false
+
+  let rec sort_contains_void : Jkind_types.Sort.Const.t -> bool = function
+    | Base Void -> true
+    | Base _ -> false
+    | Product sorts -> List.exists sort_contains_void sorts
 
   let valid_c_stub_arg = function
-    | Same_as_ocaml_repr s -> is_not_product_sort s
+    | Same_as_ocaml_repr s ->
+      not (sort_is_product s) && not (sort_contains_void s)
     | Unboxed_float _ | Unboxed_integer _ | Unboxed_vector _
     | Untagged_immediate | Repr_poly -> true
 
@@ -466,8 +472,10 @@ module Repr_check = struct
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_integer _ | Unboxed_vector _
     | Untagged_immediate | Repr_poly -> true
-    | Same_as_ocaml_repr (Product [s1; s2]) ->
-      is_not_product_sort s1 && is_not_product_sort s2
+    | Same_as_ocaml_repr (Product [s1; s2] as s) ->
+      not (sort_contains_void s) &&
+      not (sort_is_product s1) &&
+      not (sort_is_product s2)
     | Same_as_ocaml_repr (Product _) -> false
 
   let check checks prim =
