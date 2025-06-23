@@ -62,8 +62,8 @@ let kind fn =
 
 (* some test directories contain files that intentionally violate the
    expectations of ast-invariants *)
-let is_ok_dir dir =
-  not (String.ends_with ~suffix:"tests/parse-errors" dir)
+let is_ok_dir dir = true
+  (* not (String.ends_with ~suffix:"tests/parse-errors" dir) *)
 
 let rec walk dir =
   if is_ok_dir dir then
