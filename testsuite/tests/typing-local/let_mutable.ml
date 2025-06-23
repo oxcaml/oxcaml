@@ -9,7 +9,7 @@ let foo1 y =
   for i = 1 to 10 do
     x <- x + i
   done;
-  (x : int)
+  x
 
 let () = assert (Int.equal (foo1 0) 55)
 let () = assert (Int.equal (foo1 42) 97)
@@ -34,7 +34,7 @@ type t_1_3 = { str_1_3 : string }
 let x_1_3 =
   let mutable x = { str_1_3 = "Hi" } in
   x <- { str_1_3 = "Bye" };
-  (x : t_1_3)
+  x
 [%%expect{|
 type t_1_3 = { str_1_3 : string; }
 val x_1_3 : t_1_3 = {str_1_3 = "Bye"}
@@ -45,7 +45,7 @@ type t_1_4 = { str_1_4 : string ref }
 let x_1_4 =
   let mutable x = { str_1_4 = ref "Hi" } in
   x <- { str_1_4 = ref "Bye" };
-  (x : t_1_4)
+  x
 [%%expect{|
 type t_1_4 = { str_1_4 : string ref; }
 val x_1_4 : t_1_4 = {str_1_4 = {contents = "Bye"}}
@@ -377,7 +377,7 @@ let f_11 () =
   let mutable x = 10 in
   let y = x in
   x <- x + 10;
-  ((y : int), (x : int))
+  (y, x)
 
 let () = assert (f_11 () = (10,20))
 [%%expect{|

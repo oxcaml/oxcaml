@@ -20,12 +20,17 @@ capture a mutable variable.
 Local data can be stored in a mutable variable. For example:
 
 ```ocaml
+let rec sum (to_sum @ local) =
+  match to_sum with
+  | [] -> 0
+  | hd :: tl -> hd + sum tl
+
 let triangle_list n =
   let mutable to_sum = [] in
   for i = 1 to n do exclave_
     to_sum <- stack_ (i :: to_sum)
   done;
-  List.sum (module Int) to_sum
+  sum to_sum [@nontail]
 ```
 
 
@@ -48,4 +53,4 @@ let sum xs =
   total
 ```
 
-Unboxed products are not yet supported.
+Mutable variables may not contain unboxed products.
