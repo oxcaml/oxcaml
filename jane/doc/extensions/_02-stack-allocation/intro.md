@@ -68,11 +68,11 @@ them in globals, etc. This is a problem when trying to pass around
 stack-allocated values, since we need to guarantee they do not
 escape.
 
-The remedy is that we allow the `local_` keyword to appear on
-function parameters:
+The solution is for functions to specify that they take their arguments
+`local`ly:
 
 ```ocaml
-let f (local_ x) = ...
+let f (x @ local) = ...
 ```
 
 A local parameter is a promise by a function not to let a particular
@@ -81,11 +81,11 @@ if x escapes, but when calling f you can freely pass stack-allocated values as
 the argument. This promise is visible in the type of f:
 
 ```ocaml
-val f : local_ 'a -> ...
+val f : 'a @ local -> ...
 ```
 
 The function f may be equally be called with stack- or
-heap-allocated values: the `local_` annotation places obligations only on the
+heap-allocated values: the `local` annotation places obligations only on the
 definition of f, not its uses.
 
 <!-- CR zqian: factor the generic mode stuff into a dedicated document. -->
@@ -107,12 +107,12 @@ let uses_callback ~f =
 Part of the contract of `uses_callback` is that it expects `f` not to
 capture its argument: unexpected results could ensue if `f` stored a
 reference to this table somewhere, and it was later used and modified
-after it was added to the global registry. Using `local_`
+after it was added to the global registry. Using `local`
 annotations allows this constraint to be made explicit and checked at
 compile time, by giving `uses_callback` the signature:
 
 ```ocaml
-val uses_callback : f:(local_ int Foo.Table.t -> 'a) -> 'a
+val uses_callback : f:(int Foo.Table.t @ local -> 'a) -> 'a
 ```
 
 ## Inference

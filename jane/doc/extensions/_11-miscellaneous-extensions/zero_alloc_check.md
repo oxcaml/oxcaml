@@ -42,7 +42,7 @@ A caller of `iter` can be shown to be non-allocating, for example
 the check succeeds when `sum` is compiled with `-O3` and `iter` is inlined:
 ```ocaml
 let[@zero_alloc opt] sum l =
-  let local_ c = ref 0 in
+  let c @ local = ref 0 in
   iter (fun n -> c := add (no_overflow !c n) !c n) l;
   !c
 ```
