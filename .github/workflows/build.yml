@@ -192,6 +192,11 @@ jobs:
             os: ubuntu-latest
             cc: clang
 
+          - name: address_sanitizer_runtime5
+            config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-runtime5
+            os: ubuntu-latest
+            cc: clang
+
     env:
       J: "3"
       run_testsuite: "true"
