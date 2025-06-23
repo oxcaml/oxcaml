@@ -1019,7 +1019,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       end;
       let name = !name in
       let make_row more =
-        create_row ~fields ~more ~closed:(closed = Asttypes.Closed) ~fixed:None ~name
+        create_row ~fields ~more ~closed:(closed = Asttypes.Closed)
+          ~fixed:None ~name
       in
       let more =
         if Btype.static_row
@@ -1313,7 +1314,8 @@ and transl_fields env ~policy ~row_context o fields =
   let ty_init =
      match o with
      | Asttypes.Closed -> newty Tnil
-     | Asttypes.Open -> TyVarEnv.new_var (Jkind.Builtin.value ~why:Row_variable) policy
+     | Asttypes.Open ->
+        TyVarEnv.new_var (Jkind.Builtin.value ~why:Row_variable) policy
   in
   let ty = List.fold_left (fun ty (s, ty') ->
       newty (Tfield (s, field_public, ty', ty))) ty_init fields in
@@ -1419,7 +1421,8 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       let typ =
         if Language_extension.erasable_extensions_only () then
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Closed_for_upstream_compatibility Alloc.Const.legacy inner_type
+            ~policy:Closed_for_upstream_compatibility Alloc.Const.legacy
+            inner_type
         else
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
             Alloc.Const.legacy inner_type
@@ -1452,8 +1455,8 @@ let pp_tag ppf t = Format.fprintf ppf "`%s" t
 
 let report_unbound_variable_reason ppf = function
   | Some Upstream_compatibility ->
-      fprintf ppf "@.Hint: Explicit quantification requires quantifying all type \
-                   variables for compatibility with upstream OCaml.\n\
+      fprintf ppf "@.Hint: Explicit quantification requires quantifying all \
+                   type variables for compatibility with upstream OCaml.\n\
                    Enable non-erasable extensions to disable this check."
   | None -> ()
 
