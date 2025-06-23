@@ -704,6 +704,30 @@ Line 3, characters 27-28:
 Error: The value "x" is local, so cannot be used inside a functor.
 |}]
 
+(* Don't escape through a functor with underscore parameter *)
+
+let foo (local_ x) =
+  let module Foo (_ : sig end) = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+val foo : local_ string ref -> unit = <fun>
+|}]
+
+(* Don't escape through a generative functor *)
+
+let foo (local_ x) =
+  let module Foo () = struct
+    let () = print_string !x
+  end in
+  let module _ = Foo() in
+  ()
+[%%expect{|
+val foo : local_ string ref -> unit = <fun>
+|}]
+
 (* Don't escape through a class method *)
 
 let foo (local_ x) =
