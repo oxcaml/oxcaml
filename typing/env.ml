@@ -3331,10 +3331,10 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Escape_lock (Letop | Probe | Class | Module as ctx) ->
+      | Escape_lock (Letop | Probe | Class as ctx) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure (`Escape ctx))
-      | Share_lock (Letop | Probe | Class | Module as ctx) ->
+      | Share_lock (Letop | Probe | Class as ctx) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure (`Shared ctx))
       | Share_lock (For_loop | While_loop | Comprehension) ->

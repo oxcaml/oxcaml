@@ -117,7 +117,10 @@ let m_3_3 =
 
 [%%expect{|
 module type S_3_3 = sig module F : functor () -> sig val x : int end end
-val m_3_3 : (module S_3_3) = <module>
+Line 5, characters 47-48:
+5 |   (module (struct module F () = struct let x = y end end) : S_3_3)
+                                                   ^
+Error: Mutable variable cannot be used inside closure.
 |}]
 
 (* Test 3.4: Disallow closures in monadic operators *)
