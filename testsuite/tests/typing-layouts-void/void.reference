@@ -52,13 +52,91 @@ after definition
 after definition
 bar
 42 (expected 42)
+#(void, void) | 100
 foo
 foo2
 FOO
 FOO
 FOO
 FOO
+#(void, void) | -100
 FOO
 FOO
 FOO
+FOO
+#(void, int) | 100
+foo
+foo2
+FOO
+100
+FOO
+100
+#(void, int) | -100
+FOO
+-100
+FOO
+-100
+#(void, int, void) | 100
+foo
+foo2
+FOO
+100
+FOO
+FOO
+100
+FOO
+#(void, int, void) | -100
+FOO
+-100
+FOO
+FOO
+-100
+FOO
+#(#(void, void), int) | 100
+foo
+foo2
+FOO
+FOO
+100
+FOO
+FOO
+100
+#(#(void, void), int) | -100
+FOO
+FOO
+-100
+FOO
+FOO
+-100
+#{ void } | 100
+foo
+foo2
+FOO
+FOO
+#{ void } | -100
+FOO
+FOO
+#{ void; void } | 100
+foo
+foo2
+FOO
+FOO
+#{ void; void } | -100
+FOO
+FOO
+#{ void; int; void } | 100
+foo
+foo2
+FOO
+100
+FOO
+FOO
+100
+FOO
+#{ void; int; void } | -100
+FOO
+-100
+FOO
+FOO
+-100
 FOO

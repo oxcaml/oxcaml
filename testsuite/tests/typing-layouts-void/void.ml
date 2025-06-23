@@ -157,6 +157,9 @@ let () =
   Printf.printf "after definition\n%!";
   Printf.printf "%d (expected 42)\n%!" (p (void_from_product_inlined ()))
 
+let print_foo (_ : void) = Printf.printf "FOO\n%!"
+let print_int (x : int) = Printf.printf "%d\n%!" x
+
 (* version without printing to declutter Cmm *)
 let[@inline never] returns_unboxed_pair_of_voids_not_inlined0 x =
   #(void (), void ())
@@ -175,9 +178,8 @@ let[@inline] returns_unboxed_pair_of_voids_inlined x =
     #(void (), void ())
   )
 
-let print_foo (_ : void) = Printf.printf "FOO\n%!"
-
 let[@inline never] call_functions_returning_unboxed_pair_of_voids x =
+  Printf.printf "#(void, void) | %d\n%!" x;
   let p1 = returns_unboxed_pair_of_voids_not_inlined x in
   let p2 = returns_unboxed_pair_of_voids_inlined x in
   print_foo (fst_u p1);
@@ -188,5 +190,173 @@ let[@inline never] call_functions_returning_unboxed_pair_of_voids x =
 let () = call_functions_returning_unboxed_pair_of_voids 100
 let () = call_functions_returning_unboxed_pair_of_voids (-100)
 
+let[@inline never] returns_unboxed_pair_of_void_int_not_inlined x =
+  if x < 0 then #(void (), x)
+  else (
+    Printf.printf "foo\n%!";
+    #(void (), x)
+  )
+
+let[@inline] returns_unboxed_pair_of_void_int_inlined x =
+  if x < 0 then #(void (), x)
+  else (
+    Printf.printf "foo2\n%!";
+    #(void (), x)
+  )
+
+let[@inline never] call_functions_returning_unboxed_pair_of_void_int x =
+  Printf.printf "#(void, int) | %d\n%!" x;
+  let p1 = returns_unboxed_pair_of_void_int_not_inlined x in
+  let p2 = returns_unboxed_pair_of_void_int_inlined x in
+  let #(a1, b1) = p1 in
+  let #(a2, b2) = p2 in
+  print_foo a1;
+  print_int b1;
+  print_foo a2;
+  print_int b2
+
+let () = call_functions_returning_unboxed_pair_of_void_int 100
+let () = call_functions_returning_unboxed_pair_of_void_int (-100)
+
 let[@inline never] returns_unboxed_triple_of_void_int_void_not_inlined x =
-  #(void (), x, void ())
+  if x < 0 then #(void (), x, void ())
+  else (
+    Printf.printf "foo\n%!";
+    #(void (), x, void ())
+  )
+
+let[@inline] returns_unboxed_triple_of_void_int_void_inlined x =
+  if x < 0 then #(void (), x, void ())
+  else (
+    Printf.printf "foo2\n%!";
+    #(void (), x, void ())
+  )
+
+let[@inline never] call_functions_returning_unboxed_triple_of_void_int_void x =
+  Printf.printf "#(void, int, void) | %d\n%!" x;
+  let p1 = returns_unboxed_triple_of_void_int_void_not_inlined x in
+  let p2 = returns_unboxed_triple_of_void_int_void_inlined x in
+  let #(a1, b1, c1) = p1 in
+  let #(a2, b2, c2) = p2 in
+  print_foo a1;
+  print_int b1;
+  print_foo c1;
+  print_foo a2;
+  print_int b2;
+  print_foo c2
+
+let () = call_functions_returning_unboxed_triple_of_void_int_void 100
+let () = call_functions_returning_unboxed_triple_of_void_int_void (-100)
+
+
+let[@inline never] returns_unboxed_pair_of_voidvoid_int_not_inlined x =
+  if x < 0 then #(#(void (), void ()), x)
+  else (
+    Printf.printf "foo\n%!";
+    #(#(void (), void ()), x)
+  )
+
+let[@inline] returns_unboxed_pair_of_voidvoid_int_inlined x =
+  if x < 0 then #(#(void (), void ()), x)
+  else (
+    Printf.printf "foo2\n%!";
+    #(#(void (), void ()), x)
+  )
+
+let[@inline never] call_functions_returning_unboxed_pair_of_voidvoid_int x =
+  Printf.printf "#(#(void, void), int) | %d\n%!" x;
+  let p1 = returns_unboxed_pair_of_voidvoid_int_not_inlined x in
+  let p2 = returns_unboxed_pair_of_voidvoid_int_inlined x in
+  let #(#(a1, b1), c1) = p1 in
+  let #(#(a2, b2), c2) = p2 in
+  print_foo a1;
+  print_foo b1;
+  print_int c1;
+  print_foo a2;
+  print_foo b2;
+  print_int c2
+
+let () = call_functions_returning_unboxed_pair_of_voidvoid_int 100
+let () = call_functions_returning_unboxed_pair_of_voidvoid_int (-100)
+
+type r_of_void = #{ v1 : void }
+
+let[@inline never] returns_unboxed_record_of_void_not_inlined x =
+  if x < 0 then #{ v1 = void () }
+  else (
+    Printf.printf "foo\n%!";
+    #{ v1 = void () }
+  )
+
+let[@inline] returns_unboxed_record_of_void_inlined x =
+  if x < 0 then #{ v1 = void () }
+  else (
+    Printf.printf "foo2\n%!";
+    #{ v1 = void () }
+  )
+
+let[@inline never] call_functions_returning_unboxed_record_of_void x =
+  Printf.printf "#{ void } | %d\n%!" x;
+  let p1 = returns_unboxed_record_of_void_not_inlined x in
+  let p2 = returns_unboxed_record_of_void_inlined x in
+  print_foo p1.#v1;
+  print_foo p2.#v1
+
+let () = call_functions_returning_unboxed_record_of_void 100
+let () = call_functions_returning_unboxed_record_of_void (-100)
+
+type r_of_void_void = #{ v1 : void; v2 : void }
+
+let[@inline never] returns_unboxed_record_of_void_void_not_inlined x =
+  if x < 0 then #{ v1 = void (); v2 = void () }
+  else (
+    Printf.printf "foo\n%!";
+    #{ v1 = void (); v2 = void () }
+  )
+
+let[@inline] returns_unboxed_record_of_void_void_inlined x =
+  if x < 0 then #{ v1 = void (); v2 = void () }
+  else (
+    Printf.printf "foo2\n%!";
+    #{ v1 = void (); v2 = void () }
+  )
+
+let[@inline never] call_functions_returning_unboxed_record_of_void_void x =
+  Printf.printf "#{ void; void } | %d\n%!" x;
+  let p1 = returns_unboxed_record_of_void_void_not_inlined x in
+  let p2 = returns_unboxed_record_of_void_void_inlined x in
+  print_foo p1.#v1;
+  print_foo p2.#v1
+
+let () = call_functions_returning_unboxed_record_of_void_void 100
+let () = call_functions_returning_unboxed_record_of_void_void (-100)
+
+type r_of_void_int_void = #{ v1 : void; v2 : int; v3 : void }
+
+let[@inline never] returns_unboxed_record_of_void_int_void_not_inlined x =
+  if x < 0 then #{ v1 = void (); v2 = x; v3 = void () }
+  else (
+    Printf.printf "foo\n%!";
+    #{ v1 = void (); v2 = x; v3 = void () }
+  )
+
+let[@inline] returns_unboxed_record_of_void_int_void_inlined x =
+  if x < 0 then #{ v1 = void (); v2 = x; v3 = void () }
+  else (
+    Printf.printf "foo2\n%!";
+    #{ v1 = void (); v2 = x; v3 = void () }
+  )
+
+let[@inline never] call_functions_returning_unboxed_record_of_void_int_void x =
+  Printf.printf "#{ void; int; void } | %d\n%!" x;
+  let p1 = returns_unboxed_record_of_void_int_void_not_inlined x in
+  let p2 = returns_unboxed_record_of_void_int_void_inlined x in
+  print_foo p1.#v1;
+  print_int p1.#v2;
+  print_foo p1.#v3;
+  print_foo p2.#v1;
+  print_int p2.#v2;
+  print_foo p2.#v3
+
+let () = call_functions_returning_unboxed_record_of_void_int_void 100
+let () = call_functions_returning_unboxed_record_of_void_int_void (-100)
