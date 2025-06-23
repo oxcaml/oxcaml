@@ -15,6 +15,7 @@
 
 (*  bytegen.ml : translation of lambda terms to lists of instructions. *)
 
+open Iarray_shim
 open Misc
 open Asttypes
 open Primitive
@@ -974,7 +975,7 @@ and comp_expr stack_info env exp sz cont =
          no ceremony is needed to box values before inserting them into
          the (normal, unmixed) block.
       *)
-      let total_len = Array.length shape in
+      let total_len = Iarray.length shape in
       let cont = add_pseudo_event loc !compunit_name cont in
       comp_args stack_info env args sz
         (Kmake_faux_mixedblock (total_len, tag) :: cont)

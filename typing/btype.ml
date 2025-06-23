@@ -248,6 +248,10 @@ let set_static_row_name decl path =
                   (*  Utilities for type traversal  *)
                   (**********************************)
 
+let printtyp_type_expr_fwd = ref (fun _ _ -> assert false)
+
+exception Fold_type_expr_of_subst of type_expr
+
 let fold_row f init row =
   let result =
     List.fold_left
@@ -292,8 +296,8 @@ let fold_type_expr f init ty =
       let result = f init ty1 in
       f result ty2
   | Tnil                -> init
-  | Tlink _
-  | Tsubst _            -> assert false
+  | Tlink _             -> assert false
+  | Tsubst (ty, _)      -> f init ty
   | Tunivar _           -> init
   | Tpoly (ty, tyl)     ->
     let result = f init ty in

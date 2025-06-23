@@ -331,3 +331,7 @@ val print_raw: (Format.formatter -> type_expr -> unit) ref
 (**** Type information getter ****)
 
 val cstr_type_path : constructor_description -> Path.t
+
+val printtyp_type_expr_fwd : (Format.formatter -> type_expr -> unit) ref
+
+exception Fold_type_expr_of_subst of type_expr

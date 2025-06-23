@@ -20,8 +20,11 @@ type ('a : value & value) t = #{ x : 'a ; y : string }
 let f : #(int * string) t -> #(string * int) t =
   fun (#{ x = #(i, s); y } as r) -> #{ r with x = #(s, i) }
 [%%expect{|
-type ('a : value & value) t = #{ x : 'a; y : string; }
-val f : #(int * string) t -> #(string * int) t = <fun>
+Line 8, characters 0-54:
+8 | type ('a : value & value) t = #{ x : 'a ; y : string }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "'a" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 (* Patterns, as-patterns, partial patterns *)
@@ -133,8 +136,11 @@ let add t =
   let #(x, y) = t.#is in
   x + y
 [%%expect{|
-type t = #{ is : #(int * int); }
-val add : t -> int = <fun>
+Line 1, characters 0-30:
+1 | type t = #{ is: #(int * int) }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "#(int * int)" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 (* An unboxed record is not an allocation, but a regular record is *)
@@ -245,7 +251,7 @@ Line 2, characters 0-37:
 2 | and r_bad = #{ y : float#; z : s t2 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r_bad is '_representable_layout_1 & '_representable_layout_2
+       The layout of r_bad is any & any
          because it is an unboxed record.
        But the layout of r_bad must be a sublayout of value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
@@ -692,7 +698,7 @@ val update_t : t -> unit = <fun>
 
 type ('a : any) t = #{ x : int; y : 'a }
 [%%expect{|
-type 'a t = #{ x : int; y : 'a; }
+type ('a : any) t = #{ x : int; y : 'a; }
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind (right
@@ -700,12 +706,15 @@ type 'a t = #{ x : int; y : 'a; }
    error saying that records being projected from must be representable. *)
 let f : ('a : any). 'a t -> 'a = fun t -> t.#y
 [%%expect{|
-Line 1, characters 8-30:
+Line 1, characters 33-46:
 1 | let f : ('a : any). 'a t -> 'a = fun t -> t.#y
-            ^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind any.
-       But it was inferred to have kind value_or_null
-         because of the definition of t at line 1, characters 0-40.
+                                     ^^^^^^^^^^^^^
+Error: This definition has type "'b t -> 'b" which is less general than
+         "('a : any). 'a t -> 'a"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind
@@ -715,12 +724,15 @@ Error: The universal type variable 'a was declared to have kind any.
 *)
 let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
 [%%expect{|
-Line 1, characters 8-30:
+Line 1, characters 33-59:
 1 | let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
-            ^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind any.
-       But it was inferred to have kind value_or_null
-         because of the definition of t at line 1, characters 0-40.
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'b -> 'b t" which is less general than
+         "('a : any). 'a -> 'a t"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be a sublayout of value
+         because we must know concretely how to pass a function argument.
 |}]
 
 
@@ -735,20 +747,14 @@ Error: The universal type variable 'a was declared to have kind any.
 type a = B of b
 and b : any = #{ i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-15:
-1 | type a = B of b
-             ^^^^^^
-Error: Type "b" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b
+and b = #{ i : int; j : int; }
 |}]
 type a = B of b_portable
 and b_portable : any mod portable = #{ i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-24:
-1 | type a = B of b_portable
-             ^^^^^^^^^^^^^^^
-Error: Type "b_portable" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b_portable
+and b_portable = #{ i : int; j : int; }
 |}]
 type a = B of b
 and b : any & any & any = #{ i : int ; j : int }
@@ -756,11 +762,10 @@ and b : any & any & any = #{ i : int ; j : int }
 Line 2, characters 0-48:
 2 | and b : any & any & any = #{ i : int ; j : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of b is any & any & any
+Error: The layout of type "b" is value & value
+         because it is an unboxed record.
+       But the layout of type "b" must be a sublayout of any & any & any
          because of the annotation on the declaration of the type b.
-       But the layout of b must be representable
-         because it's the type of a constructor field.
 |}]
 
 type q : any mod portable = #{ x : int -> int; y : int -> q }
@@ -773,7 +778,7 @@ Error: The kind of type "q" is
          value mod aliased immutable & value mod aliased immutable
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
-         value_or_null mod portable & value_or_null mod portable
+         any mod portable & any mod portable
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without

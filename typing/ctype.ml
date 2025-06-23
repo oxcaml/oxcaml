@@ -15,6 +15,7 @@
 
 (* Operations on core types *)
 
+open Iarray_shim
 open Misc
 open Asttypes
 open Types
@@ -1420,43 +1421,55 @@ type existential_treatment =
   | Keep_existentials_flexible
   | Make_existentials_abstract of Pattern_env.t
 
+let instance_constructor' copy_scope existential_treatment cstr =
+  let name_counter = ref 0 in
+  let copy_existential =
+    match existential_treatment with
+    | Keep_existentials_flexible -> copy copy_scope
+    | Make_existentials_abstract penv ->
+        fun existential ->
+          (* CR layouts v1.5: Add test case that hits this once we have syntax
+             for it *)
+          let jkind =
+            match get_desc existential with
+            | Tvar { jkind } -> jkind
+            | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
+                (* Existential row variable *)
+            | _ -> assert false
+          in
+          let decl = new_local_type (Existential cstr.cstr_name) jkind in
+          let name = existential_name name_counter existential in
+          let env = penv.env in
+          let fresh_constr_scope = penv.equations_scope in
+          let (id, new_env) =
+            Env.enter_type (get_new_abstract_name env name) decl env
+              ~scope:fresh_constr_scope in
+          Pattern_env.set_env penv new_env;
+          let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
+          let tv = copy copy_scope existential in
+          assert (is_Tvar tv);
+          link_type tv to_unify;
+          tv
+  in
+  let ty_ex = List.map copy_existential cstr.cstr_existentials in
+  let ty_res = copy copy_scope cstr.cstr_res in
+  let ty_args =
+    List.map (fun ca -> {ca with ca_type = copy copy_scope ca.ca_type}) cstr.cstr_args
+  in
+  (ty_args, ty_res, ty_ex)
+
 let instance_constructor existential_treatment cstr =
   For_copy.with_scope (fun copy_scope ->
-    let name_counter = ref 0 in
-    let copy_existential =
-      match existential_treatment with
-      | Keep_existentials_flexible -> copy copy_scope
-      | Make_existentials_abstract penv ->
-          fun existential ->
-            (* CR layouts v1.5: Add test case that hits this once we have syntax
-               for it *)
-            let jkind =
-              match get_desc existential with
-              | Tvar { jkind } -> jkind
-              | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
-                  (* Existential row variable *)
-              | _ -> assert false
-            in
-            let decl = new_local_type (Existential cstr.cstr_name) jkind in
-            let name = existential_name name_counter existential in
-            let env = penv.env in
-            let fresh_constr_scope = penv.equations_scope in
-            let (id, new_env) =
-              Env.enter_type (get_new_abstract_name env name) decl env
-                ~scope:fresh_constr_scope in
-            Pattern_env.set_env penv new_env;
-            let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
-            let tv = copy copy_scope existential in
-            assert (is_Tvar tv);
-            link_type tv to_unify;
-            tv
+    instance_constructor' copy_scope existential_treatment cstr
+  )
+
+let instance_constructors existential_treatment cstrs ty =
+  For_copy.with_scope (fun copy_scope ->
+    let cstrs =
+      List.map (instance_constructor' copy_scope existential_treatment) cstrs
     in
-    let ty_ex = List.map copy_existential cstr.cstr_existentials in
-    let ty_res = copy copy_scope cstr.cstr_res in
-    let ty_args =
-      List.map (fun ca -> {ca with ca_type = copy copy_scope ca.ca_type}) cstr.cstr_args
-    in
-    (ty_args, ty_res, ty_ex)
+    let ty = copy copy_scope ty in
+    cstrs, ty
   )
 
 let instance_parameterized_type ?keep_names sch_args sch =
@@ -1648,19 +1661,80 @@ let instance_poly ?(keep_names=false) ~fixed univars sch =
     instance_poly' copy_scope ~keep_names ~fixed univars sch
   )
 
+let instance_label_type' copy_scope ~fixed lbl_arg =
+  match get_desc lbl_arg with
+    Tpoly (ty, tl) ->
+      instance_poly' copy_scope ~keep_names:false ~fixed tl ty
+  | _ ->
+      [], copy copy_scope lbl_arg
+
+let instance_label' copy_scope ~fixed lbl =
+  let vars, ty_arg =
+    try instance_label_type' copy_scope ~fixed lbl.lbl_arg with
+    | Btype.Fold_type_expr_of_subst ty ->
+      Misc.fatal_errorf "lbl %s@.lbl ty %a@.ty %a@.%!"
+        lbl.lbl_name
+        !Btype.printtyp_type_expr_fwd lbl.lbl_arg
+        !Btype.printtyp_type_expr_fwd ty
+  in
+  (* call [copy] after [instance_poly] to avoid introducing [Tsubst] *)
+  let ty_res = copy copy_scope lbl.lbl_res in
+  (vars, ty_arg, ty_res)
+
 let instance_label ~fixed lbl =
+  For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
+
+let instance_labels ~fixed lbls ty_res =
   For_copy.with_scope (fun copy_scope ->
-    let vars, ty_arg =
-      match get_desc lbl.lbl_arg with
-        Tpoly (ty, tl) ->
-          instance_poly' copy_scope ~keep_names:false ~fixed tl ty
-      | _ ->
-          [], copy copy_scope lbl.lbl_arg
+    let vars_and_ty_args =
+      List.map
+        (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
+        lbls
     in
-    (* call [copy] after [instance_poly] to avoid introducing [Tsubst] *)
-    let ty_res = copy copy_scope lbl.lbl_res in
-    (vars, ty_arg, ty_res)
+    let ty_res = copy copy_scope ty_res in
+    (vars_and_ty_args, ty_res)
   )
+
+let instance_label_update' copy_scope ~fixed ~all lbl =
+  let vars, ty_arg, ty_res = instance_label' copy_scope ~fixed lbl in
+  let ty_arg =
+    match vars with
+    | [] -> ty_arg
+    | tl ->
+      (* CR lmaurer: Check that this is right *)
+      newty3 ~level:(get_level ty_arg) ~scope:(get_scope ty_arg)
+        (Tpoly (ty_arg, tl))
+  in
+  { lbl with lbl_arg = ty_arg; lbl_res = ty_res; lbl_all = all }
+
+let instance_labels_update ~fixed lbls =
+  begin fun f ->
+    if (Sys.getenv_opt "NOISY" |> Option.is_some) && Iarray.length lbls > 1 then begin
+      let pp_lbl ppf lbl =
+        Format.fprintf ppf "%s : %a" lbl.lbl_name !Btype.printtyp_type_expr_fwd lbl.lbl_arg
+      in
+      let pp_lbls ppf lbls =
+        Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
+          pp_lbl ppf (lbls |> Iarray.to_list)
+      in
+      Format.eprintf "OH BOY SO MANY LABELS!!@.%a@.%!" pp_lbls lbls;
+      let ans = f () in
+      Format.eprintf "WELL THAT WAS FUN@.%a@.%!" pp_lbls ans;
+      ans
+    end else f ()
+  end @@ fun () ->
+  For_copy.with_scope (fun copy_scope ->
+    let rec new_lbls = lazy (
+      Iarray.map
+        (fun lbl -> instance_label_update' copy_scope ~fixed lbl ~all:new_lbls)
+        lbls)
+    in
+    Lazy.force new_lbls
+  )
+
+let instance_label_update ~fixed lbl =
+  let lbls = instance_labels_update ~fixed (Lazy.force lbl.lbl_all) in
+  lbls.:(lbl.lbl_num)
 
 (* CR dkalinichenko: we must vary yieldingness together with locality to get
    sane behavior around [@local_opt]. Remove once we have mode polymorphism. *)
@@ -2182,11 +2256,11 @@ let unbox_once env ty =
                   is_open = not (Misc.Stdlib.List.is_empty existentials);
                   modality }
       | None -> begin match decl.type_kind with
-        | Type_record_unboxed_product ([_], Record_unboxed_product, _) ->
+        | Type_record_unboxed_product ([_], _, _) ->
           (* [find_unboxed_type] would have returned [Some] *)
           Misc.fatal_error "Ctype.unbox_once"
         | Type_record_unboxed_product
-            ((_::_::_ as lbls), Record_unboxed_product, _) ->
+            ((_::_::_ as lbls), _, _) ->
           Stepped_record_unboxed_product
             (List.map (fun ld -> { ty = apply ld.ld_type;
                                    is_open = false;
@@ -2557,11 +2631,15 @@ let constrain_type_jkind ~fixed env ty jkind =
   loop ~fuel:100 ~expanded:false ty ~is_open:false
     (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
 
-let type_sort ~why ~fixed env ty =
+let type_jkind_and_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~why in
   match constrain_type_jkind ~fixed env ty jkind with
-  | Ok _ -> Ok sort
+  | Ok _ -> Ok (Jkind.allow_left jkind, sort)
   | Error _ as e -> e
+
+let type_sort ~why ~fixed env ty =
+  type_jkind_and_sort ~why ~fixed env ty
+  |> Result.map snd
 
 let check_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:true env ty jkind
@@ -3451,13 +3529,13 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     else
       match decl.type_kind, decl'.type_kind with
       | Type_record (lst,r,umc), Type_record (lst',r',umc')
-        when equal_record_representation r r' ->
+        when Option.equal equal_record_representation r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'
       | Type_record_unboxed_product (lst,r,umc),
         Type_record_unboxed_product (lst',r',umc')
-        when equal_record_unboxed_product_representation r r' ->
+        when Option.equal equal_record_unboxed_product_representation r r' ->
           mcomp_list type_pairs env tl1 tl2;
           mcomp_record_description type_pairs env lst lst';
           mcomp_unsafe_mode_crossing type_pairs env umc umc'

@@ -401,7 +401,11 @@ type bad_4 = #{ a : int64#; enum : bad_3; }
 type bad_5 = bad_3 with_i64s
 type bad_6 =
     #(float * #(float * float) * #(float * #(float * float * float)))
-type bad_7 = #{ i : int64#; bad_4 : bad_4; j : int64#; }
+Line 12, characters 0-57:
+12 | type bad_7 = #{ i : int64# ; bad_4 : bad_4 ; j : int64# }
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "bad_4" has layout "bits64 & value".
+       Records may not yet contain types of this layout.
 |}]
 
 (* Allowed usages *)
@@ -528,12 +532,11 @@ Error: %makearray_dynamic_uninit can only be used for GC-ignorable arrays
 let _ =
   (makearray_dynamic_uninit 0 : bad_7 array)
 [%%expect{|
-Line 2, characters 3-29:
+Line 2, characters 32-37:
 2 |   (makearray_dynamic_uninit 0 : bad_7 array)
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: %makearray_dynamic_uninit can only be used for GC-ignorable arrays
-       not involving tagged immediates; and arrays of unboxed numbers.
-       Use %makearray instead, providing an initializer.
+                                    ^^^^^
+Error: Unbound type constructor "bad_7"
+Hint: Did you mean "bad_1", "bad_2", "bad_3", "bad_4", "bad_5" or "bad_6"?
 |}]
 
 (* Allowed usages (local) *)
@@ -654,10 +657,9 @@ let _ =
   let _ = (makearray_dynamic_uninit_local 0 : bad_7 array) in
   ()
 [%%expect{|
-Line 2, characters 11-43:
+Line 2, characters 46-51:
 2 |   let _ = (makearray_dynamic_uninit_local 0 : bad_7 array) in
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: %makearray_dynamic_uninit can only be used for GC-ignorable arrays
-       not involving tagged immediates; and arrays of unboxed numbers.
-       Use %makearray instead, providing an initializer.
+                                                  ^^^^^
+Error: Unbound type constructor "bad_7"
+Hint: Did you mean "bad_1", "bad_2", "bad_3", "bad_4", "bad_5" or "bad_6"?
 |}]

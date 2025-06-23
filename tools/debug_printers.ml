@@ -1,4 +1,4 @@
-let type_expr = Printtyp.raw_type_expr
+let location = Location.print_loc
 let row_field = Printtyp.raw_field
 let ident = Ident.print_with_scope
 let path = Path.print
@@ -23,3 +23,5 @@ let mod_bounds ppf m = Types.Jkind_mod_bounds.debug_print ppf m
 let with_bounds ppf w = Jkind.With_bounds.debug_print ppf w
 let with_bounds_types ppf w = Jkind.With_bounds.debug_print_types ppf w
 let modalities = Mode.Modality.Value.Const.print
+let longident = Pprintast.longident
+let uid = Shape.Uid.print

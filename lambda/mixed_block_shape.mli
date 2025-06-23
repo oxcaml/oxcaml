@@ -26,12 +26,14 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open Iarray_shim
+
 (** A mixed block shape is essentially the runtime representation of a block
     ({i i.e.}) value prefix and flat suffix), and the permutation from the
     type definition in the surface language to that representation. *)
 type 'a t
 
-val of_mixed_block_elements : 'a Lambda.mixed_block_element array -> 'a t
+val of_mixed_block_elements : 'a Lambda.mixed_block_element iarray -> 'a t
 
 (** Applies the permutation corresponding to the reordering to the passed array. *)
 val reorder_array : 'a t -> 'b array -> 'b array
@@ -39,22 +41,22 @@ val reorder_array : 'a t -> 'b array -> 'b array
 (** Get an element from the {i reordered} shape. *)
 val get_reordered : 'a t -> int -> 'a Lambda.mixed_block_element
 
-val value_prefix : 'a t -> 'a Lambda.mixed_block_element array
+val value_prefix : 'a t -> 'a Lambda.mixed_block_element iarray
 
-val flat_suffix : 'a t -> 'a Lambda.mixed_block_element array
+val flat_suffix : 'a t -> 'a Lambda.mixed_block_element iarray
 
 val value_prefix_len : 'a t -> int
 
 val flat_suffix_len : 'a t -> int
 
 (** Access to the shape passed to [of_mixed_block_elements] to build the value. *)
-val original_shape : 'a t -> 'a Lambda.mixed_block_element array
+val original_shape : 'a t -> 'a Lambda.mixed_block_element iarray
 
 (** Access to the shape, as reordered to follow the runtime restriction. *)
-val reordered_shape : 'a t -> 'a Lambda.mixed_block_element array
+val reordered_shape : 'a t -> 'a Lambda.mixed_block_element iarray
 
 (** (Same as [reordered_shape]). *)
-val reordered_shape_unit : 'a t -> unit Lambda.mixed_block_element array
+val reordered_shape_unit : 'a t -> unit Lambda.mixed_block_element iarray
 
 val old_index_to_new_index : 'a t -> int -> int
 

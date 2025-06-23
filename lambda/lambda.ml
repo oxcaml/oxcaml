@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Iarray_shim
+
 open Misc
 open Asttypes
 
@@ -410,10 +412,10 @@ and 'a mixed_block_element =
   | Vec128
   | Word
 
-and mixed_block_shape = unit mixed_block_element array
+and mixed_block_shape = unit mixed_block_element iarray
 
 and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
+  = locality_mode mixed_block_element iarray
 
 and constructor_shape =
   | Constructor_uniform of value_kind list
@@ -579,7 +581,7 @@ and equal_mixed_block_element :
      | Word), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
-  Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
+  Misc.Stdlib.Iarray.equal (equal_mixed_block_element Unit.equal) shape1 shape2
 
 and equal_constructor_shape x y =
   match x, y with
@@ -1395,7 +1397,7 @@ let transl_prim mod_name name =
       fatal_error ("Primitive " ^ name ^ " not found.")
 
 let transl_mixed_product_shape ~get_value_kind shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
+  Iarray.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
     | Value -> Value (get_value_kind i)
     | Float_boxed -> Float_boxed ()
@@ -1408,7 +1410,7 @@ let transl_mixed_product_shape ~get_value_kind shape =
   ) shape
 
 let transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
+  Iarray.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
     | Value -> Value (get_value_kind i)
     | Float_boxed -> Float_boxed (get_mode i)
@@ -1833,10 +1835,10 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pfloatfield (_, _, m) -> Some m
   | Pufloatfield _ -> None
   | Pmixedfield (field, shape, _) -> (
-      if field < 0 || field >= Array.length shape then
+      if field < 0 || field >= Iarray.length shape then
         Misc.fatal_errorf "primitive_may_allocate: field index out of bounds \
           for Pmixedfield:@ %d" field;
-      match shape.(field) with
+      match shape.:(field) with
       | Float_boxed mode -> Some mode
       | Value _
       | Float64
@@ -2276,7 +2278,7 @@ let primitive_result_layout (p : primitive) =
   | Punbox_float f -> layout_unboxed_float (Primitive.unboxed_float f)
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
-  | Pmixedfield (i, shape, _) -> layout_of_mixed_block_element shape.(i)
+  | Pmixedfield (i, shape, _) -> layout_of_mixed_block_element shape.:(i)
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
   | Psequor | Psequand | Pnot

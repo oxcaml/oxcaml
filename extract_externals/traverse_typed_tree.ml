@@ -198,12 +198,10 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           value_kind_record env subst ~visited ~depth labels rep
-        | Type_record_unboxed_product
-            ([{ ld_type; _ }], Record_unboxed_product, _) ->
+        | Type_record_unboxed_product ([{ ld_type; _ }], _, _) ->
           let depth = depth + 1 in
           value_kind env subst ~visited ~depth ld_type
-        | Type_record_unboxed_product
-            (([] | _ :: _ :: _), Record_unboxed_product, _) ->
+        | Type_record_unboxed_product (([] | _ :: _ :: _), _, _) ->
           Misc.fatal_error
             "Traverse_typed_tree.value_kind: non-unary unboxed record can't \
              have kind value"
@@ -305,16 +303,17 @@ and value_kind_variant env subst ~visited ~depth
 and value_kind_record env subst ~visited ~depth
     (labels : Types.label_declaration list) rep =
   match rep with
-  | Record_mixed _ ->
+  | Some (Record_mixed _) ->
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields.
     *)
     failwith "No support for mixed records"
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
+  | None -> failwith "No support for field of kind [any]"
+  | Some (Record_unboxed | Record_inlined (_, _, Variant_unboxed)) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type
     | [] | _ :: _ :: _ -> assert false)
-  | _ ->
+  | Some rep ->
     let fields =
       List.map
         (fun (label : Types.label_declaration) ->

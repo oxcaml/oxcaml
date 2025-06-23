@@ -15,7 +15,10 @@ type t_void  : void
 type ('a : void) t = #{ x : 'a ; y : t_void }
 [%%expect{|
 type t_void : void
-type ('a : void) t = #{ x : 'a; y : t_void; }
+Line 3, characters 0-45:
+3 | type ('a : void) t = #{ x : 'a ; y : t_void }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Records must contain at least one runtime value.
 |}]
 
 type t = { x : t_void } [@@unboxed]
@@ -52,14 +55,7 @@ type t3 : any mod non_null = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any_non_null
 type t2
-Line 3, characters 32-41:
-3 | type t3 : any mod non_null = #{ t1 : t1 ; t2 : t2};;
-                                    ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-26.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
 (* CR layouts v7.2: once [any] is allowed in unboxed record declarations, check
@@ -71,14 +67,7 @@ type t3 : any & value mod non_null = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any_non_null
 type t2
-Line 3, characters 40-49:
-3 | type t3 : any & value mod non_null = #{ t1 : t1 ; t2 : t2};;
-                                            ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-26.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
 type t1 : any mod non_null
@@ -87,14 +76,7 @@ type t3 : (any mod non_null) & (value mod non_null) = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
 type t1 : any_non_null
 type t2
-Line 3, characters 57-66:
-3 | type t3 : (any mod non_null) & (value mod non_null) = #{ t1 : t1 ; t2 : t2};;
-                                                             ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-26.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
 type t1 : any
@@ -103,14 +85,7 @@ type t3 : any & (any mod non_null) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any_non_null
-Line 3, characters 40-49:
-3 | type t3 : any & (any mod non_null) = #{ t1 : t1 ; t2 : t2 };;
-                                            ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-13.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+type t3 = #{ t1 : t1; t2 : t2; }
 |}]
 
 (* Should not be allowed for either unboxed tuples or (un)boxed records. *)
@@ -120,14 +95,16 @@ type t3 : any mod non_null = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any_non_null
-Line 3, characters 32-41:
+Line 3, characters 0-51:
 3 | type t3 : any mod non_null = #{ t1 : t1 ; t2 : t2 };;
-                                    ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-13.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t3" is
+         any_non_null mod everything with t1 with t2
+         & any_non_null mod everything with t1 with t2
+         because it is an unboxed record.
+       But the kind of type "t3" must be a subkind of
+         any_non_null & any_non_null
+         because of the annotation on the declaration of the type t3.
 |}]
 
 type t1 : any
@@ -136,14 +113,16 @@ type t3 : any & any mod non_null = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any_non_null
-Line 3, characters 38-47:
+Line 3, characters 0-57:
 3 | type t3 : any & any mod non_null = #{ t1 : t1 ; t2 : t2 };;
-                                          ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-13.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t3" is
+         any_non_null mod everything with t1 with t2
+         & any_non_null mod everything with t1 with t2
+         because it is an unboxed record.
+       But the kind of type "t3" must be a subkind of
+         any_non_null & any_non_null
+         because of the annotation on the declaration of the type t3.
 |}]
 
 type t1 : any
@@ -152,14 +131,16 @@ type t3 : (any mod non_null) & (any mod non_null) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
 type t2 : any_non_null
-Line 3, characters 55-64:
+Line 3, characters 0-74:
 3 | type t3 : (any mod non_null) & (any mod non_null) = #{ t1 : t1 ; t2 : t2 };;
-                                                           ^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 1, characters 0-13.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t3" is
+         any_non_null mod everything with t1 with t2
+         & any_non_null mod everything with t1 with t2
+         because it is an unboxed record.
+       But the kind of type "t3" must be a subkind of
+         any_non_null & any_non_null
+         because of the annotation on the declaration of the type t3.
 |}]
 
 type ur1 = #{ a : int64#; b : float# }

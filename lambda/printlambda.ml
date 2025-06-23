@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Iarray_shim
 open Format
 open Asttypes
 open Primitive
@@ -154,7 +155,7 @@ let constructor_shape print_value_kind ppf shape =
   | Constructor_mixed shape->
     fprintf ppf "%a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-         (mixed_block_element print_value_kind)) (Array.to_list shape)
+         (mixed_block_element print_value_kind)) (Iarray.to_list shape)
 
 let tag_and_constructor_shape print_value_kind ppf (tag, shape) =
   fprintf ppf "@[<hov 1>[%d:@ %a]@]"
@@ -379,11 +380,11 @@ let mixed_block_element print_mode ppf (elt : _ mixed_block_element) =
   | Word -> fprintf ppf "word"
 
 let mixed_block_shape print_mode ppf shape =
-  match Array.length shape with
+  match Iarray.length shape with
   | 0 -> ()
-  | 1 -> fprintf ppf " (%a)" (mixed_block_element print_mode) shape.(0)
+  | 1 -> fprintf ppf " (%a)" (mixed_block_element print_mode) shape.:(0)
   | _ -> begin
-    Array.iteri (fun i elt ->
+    Iarray.iteri (fun i elt ->
       if i = 0 then
         fprintf ppf " (%a" (mixed_block_element print_mode) elt
       else

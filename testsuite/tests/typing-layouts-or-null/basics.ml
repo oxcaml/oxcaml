@@ -35,14 +35,7 @@ Error: This pattern matches values of type "t_any_non_null"
 type t = { x : t_any_non_null }
 
 [%%expect{|
-Line 1, characters 11-29:
-1 | type t = { x : t_any_non_null }
-               ^^^^^^^^^^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any_non_null is any
-         because of the definition of t_any_non_null at line 2, characters 0-34.
-       But the layout of t_any_non_null must be representable
-         because it is the type of record field x.
+type t = { x : t_any_non_null; }
 |}]
 
 module type S1 = sig

@@ -21,6 +21,7 @@
 
 *)
 
+open Iarray_shim
 open Asttypes
 module Uid = Shape.Uid
 
@@ -184,7 +185,8 @@ and 'k pattern_desc =
          *)
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
-        value general_pattern list *
+        Types.constructor_representation *
+        (Jkind.sort * value general_pattern) list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
       value pattern_desc
@@ -207,8 +209,9 @@ and 'k pattern_desc =
             See {!Types.row_desc} for an explanation of the last parameter.
          *)
   | Tpat_record :
-      (Longident.t loc * Types.label_description * value general_pattern) list *
-        closed_flag ->
+      (Longident.t loc * Types.label_description * Jkind.sort *
+          value general_pattern) list *
+        Types.record_representation * closed_flag ->
       value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -216,8 +219,9 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
-      (Longident.t loc * Types.unboxed_label_description * value general_pattern) list *
-        closed_flag ->
+      (Longident.t loc * Types.unboxed_label_description * Jkind.sort *
+          value general_pattern) list *
+        Types.record_unboxed_product_representation * closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -394,7 +398,8 @@ and expression_desc =
           *)
   | Texp_construct of
       Longident.t loc * Types.constructor_description *
-      expression list * alloc_mode option
+      Types.constructor_representation * (Jkind.sort * expression) list *
+      alloc_mode option
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -409,7 +414,7 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
-      fields : ( Types.label_description * record_label_definition ) array;
+      fields : ( Types.label_description * Jkind.sort * record_label_definition ) iarray;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
@@ -429,7 +434,8 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record_unboxed_product of {
-      fields : ( Types.unboxed_label_description * record_label_definition ) array;
+      fields : ( Types.unboxed_label_description * Jkind.sort *
+                 record_label_definition ) iarray;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -444,18 +450,32 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
-  | Texp_field of expression * Jkind.sort * Longident.t loc *
-      Types.label_description * texp_field_boxing * Unique_barrier.t
-    (** - The sort is the sort of the whole record (which may be non-value if
-          the record is @@unboxed).
+  | Texp_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      field_sort : Jkind.sort;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+    (** - The [record_sort] is the sort of the whole record (which may be
+          non-value if the record is @@unboxed).
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
         unique_use
-  | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc *
-      Types.label_description * expression
+  | Texp_setfield of {
+      record : expression;
+      record_repres : Types.record_representation;
+      field_sort : Jkind.sort;
+      modality : Mode.Locality.l;
+      lid : Longident.t loc;
+      label : Types.label_description;
+      newval : expression;
+    }
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_list_comprehension of comprehension

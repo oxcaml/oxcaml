@@ -613,7 +613,7 @@ Error: Layout void is more experimental than allowed by the enabled layouts exte
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
-type 'a any4 = Any4 of 'a
+type ('a : any) any4 = Any4 of 'a
 |}];;
 
 (************************************************************)

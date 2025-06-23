@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Iarray_shim
 open Asttypes
 open Typedtree
 
@@ -77,6 +78,7 @@ type mapper =
 let id x = x
 let tuple2 f1 f2 (x, y) = (f1 x, f2 y)
 let tuple3 f1 f2 f3 (x, y, z) = (f1 x, f2 y, f3 z)
+let tuple4 f1 f2 f3 f4 (x, y, z, w) = (f1 x, f2 y, f3 z, f4 w)
 let map_loc sub {loc; txt} = {loc=sub.location sub loc; txt}
 
 let location _sub l = l
@@ -307,21 +309,24 @@ let pat
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
-    | Tpat_construct (loc, cd, l, vto) ->
+    | Tpat_construct (loc, cd, rep, l, vto) ->
         let vto = Option.map (fun (vl,cty) ->
           List.map
             (fun (v, jk) ->
                (map_loc sub v,
                 Option.map (sub.jkind_annotation sub) jk))
             vl, sub.typ sub cty) vto in
-        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto)
+        Tpat_construct (map_loc sub loc, cd, rep,
+                        List.map (fun (sort, pat) -> sort, sub.pat sub pat) l,
+                        vto)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
-    | Tpat_record (l, closed) ->
-        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_record_unboxed_product (l, closed) ->
+    | Tpat_record (l, rep, closed) ->
+        Tpat_record (List.map (tuple4 (map_loc sub) id id (sub.pat sub)) l, rep,
+                     closed)
+    | Tpat_record_unboxed_product (l, rep, closed) ->
         Tpat_record_unboxed_product
-          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
+          (List.map (tuple4 (map_loc sub) id id (sub.pat sub)) l, rep, closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias (p, id, s, uid, m, ty) ->
         Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, m, ty)
@@ -444,10 +449,10 @@ let expr sub x =
     }
   in
   let map_fields fields =
-    Array.map (function
-      | label, Kept (t, mut, uu) -> label, Kept (t, mut, uu)
-      | label, Overridden (lid, exp) ->
-          label, Overridden (map_loc sub lid, sub.expr sub exp))
+    Iarray.map (function
+      | label, sort, Kept (t, mut, uu) -> label, sort, Kept (t, mut, uu)
+      | label, sort, Overridden (lid, exp) ->
+          label, sort, Overridden (map_loc sub lid, sub.expr sub exp))
       fields
   in
   let exp_desc =
@@ -490,8 +495,11 @@ let expr sub x =
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
-    | Texp_construct (lid, cd, args, am) ->
-        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am)
+    | Texp_construct (lid, cd, rep, args, am) ->
+        Texp_construct (map_loc sub lid, cd, rep,
+                        List.map (fun (sort, arg) -> sort, sub.expr sub arg)
+                          args,
+                        am)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
     | Texp_record { fields; representation; extended_expression; alloc_mode } ->
@@ -510,18 +518,23 @@ let expr sub x =
             Option.map
               (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
         }
-    | Texp_field (exp, sort, lid, ld, float, ubr) ->
-        Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr)
+    | Texp_field { record; record_sort; record_repres; field_sort; lid; label;
+                   boxing; unique_barrier; } ->
+        Texp_field { record = sub.expr sub record;
+                     lid = map_loc sub lid;
+                     record_sort; record_repres; field_sort; label; boxing;
+                     unique_barrier;
+                   }
     | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
         Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
-    | Texp_setfield (exp1, am, lid, ld, exp2) ->
-        Texp_setfield (
-          sub.expr sub exp1,
-          am,
-          map_loc sub lid,
-          ld,
-          sub.expr sub exp2
-        )
+    | Texp_setfield { record; record_repres; field_sort; modality; lid; label;
+                      newval } ->
+        Texp_setfield {
+          record = sub.expr sub record;
+          lid = map_loc sub lid;
+          newval = sub.expr sub newval;
+          record_repres; field_sort; modality; label;
+        }
     | Texp_array (amut, sort, list, alloc_mode) ->
         Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
     | Texp_list_comprehension comp ->

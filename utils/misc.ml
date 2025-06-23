@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Iarray_shim
+
 (* Errors *)
 
 exception Fatal_error
@@ -202,6 +204,17 @@ module Stdlib = struct
       in
       aux l1 l2 []
 
+    let mapi_result f l =
+      let rec aux l i acc =
+        match l with
+        | [] -> Ok (List.rev acc)
+        | x :: xs ->
+          match f i x with
+          | Error e -> Error e
+          | Ok x -> aux xs (i + 1) (x :: acc)
+      in
+      aux l 0 []
+
     let split_at n l =
       let rec aux n acc l =
         if n = 0
@@ -322,6 +335,13 @@ module Stdlib = struct
       | None -> Format.pp_print_string ppf "None"
       | Some contents ->
         Format.fprintf ppf "@[(Some@ %a)@]" print_contents contents
+
+    exception Option_is_none
+
+    let get_exn t =
+      match t with
+      | Some a -> a
+      | None -> raise Option_is_none
   end
 
   module Array = struct
@@ -402,6 +422,31 @@ module Stdlib = struct
         let a = Array.make (1 + List.length tl) (f hd) in
         List.iteri (fun i x -> Array.unsafe_set a (i+1) (f x)) tl;
         a
+  end
+
+  module Iarray = struct
+    let equal eq_elt l1 l2 =
+      (* Basically inlines [Array.for_all2] to avoid the [raise] *)
+      let n = Iarray.length l1 in
+      Int.equal n (Iarray.length l2) &&
+      let rec loop i =
+        if Int.equal i n then
+          true
+        else if eq_elt (Iarray.unsafe_get l1 i) (Iarray.unsafe_get l2 i) then
+          loop (succ i)
+        else
+          false
+      in
+      loop 0
+
+    let all_somes a =
+      try
+        Some (Iarray.map (function None -> raise_notrace Exit | Some x -> x) a)
+      with
+      | Exit -> None
+
+    let of_list_map f l =
+      Array.of_list_map f l |> Iarray.unsafe_of_array
   end
 
   module String = struct

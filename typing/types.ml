@@ -15,6 +15,8 @@
 
 (* Representation of types and declarations *)
 
+open Iarray_shim
+
 open Allowance
 open Asttypes
 
@@ -591,10 +593,10 @@ and unsafe_mode_crossing =
 
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
-  | Type_record of 'lbl list * record_representation * unsafe_mode_crossing option
+  | Type_record of 'lbl list * record_representation option * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
-      record_unboxed_product_representation *
+      record_unboxed_product_representation option *
       unsafe_mode_crossing option
   | Type_variant of 'cstr list * variant_representation * unsafe_mode_crossing option
   | Type_open
@@ -619,23 +621,23 @@ and mixed_block_element =
   | Vec128
   | Word
 
-and mixed_product_shape = mixed_block_element array
+and mixed_product_shape = mixed_block_element iarray
 
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
-  | Record_boxed of Jkind_types.Sort.Const.t array
+  | Record_boxed of Jkind_types.Sort.Const.t iarray
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
 
 and record_unboxed_product_representation =
-  | Record_unboxed_product
+  | Record_unboxed_product of Jkind_types.Sort.Const.t iarray
 
 and variant_representation =
   | Variant_unboxed
   | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t array) array
+                      Jkind_types.Sort.Const.t iarray) option iarray
   | Variant_extensible
   | Variant_with_null
 
@@ -649,7 +651,7 @@ and label_declaration =
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Value.Const.t;
     ld_type: type_expr;
-    ld_sort: Jkind_types.Sort.Const.t;
+    ld_sort: Jkind_types.Sort.Const.t option;
     ld_loc: Location.t;
     ld_attributes: Parsetree.attributes;
     ld_uid: Uid.t;
@@ -669,7 +671,7 @@ and constructor_argument =
   {
     ca_modalities: Mode.Modality.Value.Const.t;
     ca_type: type_expr;
-    ca_sort: Jkind_types.Sort.Const.t;
+    ca_sort: Jkind_types.Sort.Const.t option;
     ca_loc: Location.t;
   }
 
@@ -903,7 +905,7 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
+    cstr_shape: constructor_representation option; (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if all args are void *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
@@ -963,7 +965,7 @@ let compare_mixed_block_element e1 e2 =
   | _, Vec128 -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
+  Misc.Stdlib.Iarray.equal equal_mixed_block_element r1 r2
 
 let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
@@ -975,10 +977,10 @@ let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-      Misc.Stdlib.Array.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
+      Misc.Stdlib.Iarray.equal (Option.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
           equal_constructor_representation cstr1 cstr2
-          && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
-               sorts1 sorts2)
+          && Misc.Stdlib.Iarray.equal Jkind_types.Sort.Const.equal
+               sorts1 sorts2))
         cstrs_and_sorts1
         cstrs_and_sorts2
   | Variant_extensible, Variant_extensible ->
@@ -997,7 +999,7 @@ let equal_record_representation r1 r2 = match r1, r2 with
       ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
   | Record_boxed sorts1, Record_boxed sorts2 ->
-      Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal sorts1 sorts2
+      Misc.Stdlib.Iarray.equal Jkind_types.Sort.Const.equal sorts1 sorts2
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
@@ -1008,7 +1010,8 @@ let equal_record_representation r1 r2 = match r1, r2 with
       false
 
 let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
-  | Record_unboxed_product, Record_unboxed_product -> true
+  | Record_unboxed_product sorts1, Record_unboxed_product sorts2 ->
+      Misc.Stdlib.Iarray.equal Jkind_types.Sort.Const.equal sorts1 sorts2
 
 let may_equal_constr c1 c2 =
   c1.cstr_arity = c2.cstr_arity
@@ -1025,11 +1028,13 @@ type 'a gen_label_description =
     lbl_arg: type_expr;                 (* Type of the argument *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Value.Const.t;(* Modalities on the field *)
-    lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
+    lbl_sort: Jkind_types.Sort.Const.t option;
+                                        (* Sort of the argument *)
     lbl_pos: int;                       (* Position in block *)
     lbl_num: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
-    lbl_repres: 'a;                     (* Representation for outer record *)
+    lbl_all: 'a gen_label_description iarray Lazy.t;
+                                        (* All the labels in this type *)
+    lbl_repres: 'a option;              (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
     lbl_loc: Location.t;
     lbl_attributes: Parsetree.attributes;
@@ -1040,6 +1045,23 @@ type label_description = record_representation gen_label_description
 
 type unboxed_label_description =
   record_unboxed_product_representation gen_label_description
+
+let label_declaration_of_label_description lbl =
+  let ld_id =
+    (* This has the wrong stamp but as far as I can tell the stamp is used for
+       absolutely nothing *)
+    Ident.create_local lbl.lbl_name
+  in
+  {
+    ld_id;
+    ld_mutable = lbl.lbl_mut;
+    ld_modalities = lbl.lbl_modalities;
+    ld_type = lbl.lbl_arg;
+    ld_sort = lbl.lbl_sort;
+    ld_loc = lbl.lbl_loc;
+    ld_attributes = lbl.lbl_attributes;
+    ld_uid = lbl.lbl_uid;
+  }
 
 type _ record_form =
   | Legacy : record_representation record_form
@@ -1055,18 +1077,19 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
 
 let find_unboxed_type decl =
   match decl.type_kind with
-    Type_record ([{ld_type = arg; ld_modalities = ms; _}], Record_unboxed, _)
+    Type_record ([{ld_type = arg; ld_modalities = ms; _}], Some Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }], Record_inlined (_, _, Variant_unboxed), _)
+      ([{ld_type = arg; ld_modalities = ms; _ }], Some (Record_inlined (_, _, Variant_unboxed)), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }], Record_unboxed_product, _)
+      ([{ld_type = arg; ld_modalities = ms; _ }], Some (Record_unboxed_product _), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
-  | Type_record (_, ( Record_inlined _ | Record_unboxed
-                    | Record_boxed _ | Record_float | Record_ufloat
-                    | Record_mixed _), _)
-  | Type_record_unboxed_product (_, Record_unboxed_product, _)
+  | Type_record (_, ( Some ( Record_inlined _ | Record_unboxed
+                           | Record_boxed _ | Record_float | Record_ufloat
+                           | Record_mixed _)
+                    | None), _)
+  | Type_record_unboxed_product (_, (Some (Record_unboxed_product _) | None), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
                      | Variant_extensible | Variant_with_null), _)
   | Type_abstract _ | Type_open ->

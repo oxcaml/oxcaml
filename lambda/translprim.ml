@@ -2005,8 +2005,8 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
   end;
   let has_constant_constructor =
     match arg_exps with
-    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _)}]
-    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _)}; _] -> cstr_constant
+    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] -> cstr_constant
     | [_; {exp_desc = Texp_variant(_, None)}]
     | [{exp_desc = Texp_variant(_, None)}; _] -> true
     | _ -> false

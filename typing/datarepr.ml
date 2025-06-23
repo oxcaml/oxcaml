@@ -16,7 +16,8 @@
 (* Compute constructor and label descriptions from type declarations,
    determining their representation. *)
 
-open Asttypes
+open Iarray_shim
+
 open Types
 open Btype
 
@@ -98,7 +99,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Jkind.Sort.Const.value;
+          ca_sort = Some Jkind.Sort.Const.value;
           ca_modalities = Mode.Modality.Value.Const.id;
           ca_loc = Location.none
         }
@@ -122,9 +123,12 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          written here should be irrelevant, and so would like to understand
          this interaction better. *)
       begin match cd_args with
-      | Cstr_tuple [{ ca_sort = sort }]
-      | Cstr_record [{ ld_sort = sort }] ->
-        [| Constructor_uniform_value, [| sort |] |]
+      | Cstr_tuple [{ ca_sort = Some sort }]
+      | Cstr_record [{ ld_sort = Some sort }] ->
+        Iarray.make 1 (Some (Constructor_uniform_value, Iarray.make 1 sort))
+      | Cstr_tuple [{ ca_sort = None }]
+      | Cstr_record [{ ld_sort = None }] ->
+        Misc.fatal_error "Type with kind any in [@@unboxed] variant"
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -134,17 +138,23 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       (* CR layouts v3.5: this hardcodes ['a or_null]. Fix when we allow
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
-      [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind.Sort.Const.value |] |]
+      [| Some (Constructor_uniform_value, Iarray.empty)
+       ; Some (Constructor_uniform_value, Iarray.make 1 Jkind.Sort.Const.value) |]
+      |> Iarray.of_array
   in
-  let all_void sorts = Array.for_all Jkind.Sort.Const.(equal void) sorts in
+  let all_void sorts = Iarray.for_all Jkind.Sort.Const.(equal void) sorts in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
-    Array.map
-      (fun (_, sorts) ->
-         let all_void = all_void sorts in
-         if all_void then incr num_consts else incr num_nonconsts;
-         all_void)
+    Iarray.map
+      (function
+       | None ->
+           (* This will be broken when [void] is actually supported since we could learn
+              that all the fields are actually [void] and thus it's a constant *)
+           false
+       | Some (_, sorts) ->
+           let all_void = all_void sorts in
+           if all_void then incr num_consts else incr num_nonconsts;
+           all_void)
       cstr_shapes_and_arg_jkinds
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
@@ -155,8 +165,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Some ty_res' -> ty_res'
       | None -> ty_res
     in
-    let cstr_shape, _ = cstr_shapes_and_arg_jkinds.(src_index) in
-    let cstr_constant = cstr_constant.(src_index) in
+    let cstr_shape = Option.map fst cstr_shapes_and_arg_jkinds.:(src_index) in
+    let cstr_constant = cstr_constant.:(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
       if cstr_constant
       then const_tag, 1 + const_tag, nonconst_tag
@@ -169,7 +179,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_existentials, cstr_args, cstr_inlined =
       (* This is the representation of the inner record, IF there is one *)
-      let record_repr = Record_inlined (cstr_tag, cstr_shape, rep) in
+      let record_repr =
+        Option.map (fun shape -> Record_inlined (cstr_tag, shape, rep))
+          cstr_shape
+      in
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
     in
@@ -207,7 +220,7 @@ let extension_descr ~current_unit path_ext ext =
   let existentials, cstr_args, cstr_inlined =
     constructor_args ~current_unit ext.ext_private ext.ext_args ext.ext_ret_type
       Path.(Pextra_ty (path_ext, Pext_ty))
-      (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible))
+      (Some (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible)))
   in
     { cstr_name = Path.last path_ext;
       cstr_res = ty_res;
@@ -216,7 +229,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_arity = List.length cstr_args;
       cstr_tag;
       cstr_repr = Variant_extensible;
-      cstr_shape = ext.ext_shape;
+      cstr_shape = Some ext.ext_shape;
       cstr_constant = ext.ext_constant;
       cstr_consts = -1;
       cstr_nonconsts = -1;
@@ -228,53 +241,41 @@ let extension_descr ~current_unit path_ext ext =
       cstr_uid = ext.ext_uid;
     }
 
-let none =
-  create_expr (Ttuple []) ~level:(-1) ~scope:Btype.generic_level ~id:(-1)
-    (* Clearly ill-formed type *)
-
-let dummy_label (type rep) (record_form : rep record_form)
-    : rep gen_label_description =
-  let repres : rep = match record_form with
-  | Legacy -> Record_unboxed
-  | Unboxed_product -> Record_unboxed_product
+let label_descrs ty_res lbls repres priv =
+  let rec ids_and_labels =
+    lazy begin
+      List.mapi
+        (fun num l ->
+          (* CR lmaurer: Remove lbl_pos *)
+          let pos = num in
+          let lbl =
+            { lbl_name = Ident.name l.ld_id;
+              lbl_res = ty_res;
+              lbl_arg = l.ld_type;
+              lbl_mut = l.ld_mutable;
+              lbl_modalities = l.ld_modalities;
+              lbl_sort = l.ld_sort;
+              lbl_pos = pos;
+              lbl_num = num;
+              lbl_all = all_labels;
+              lbl_repres = repres;
+              lbl_private = priv;
+              lbl_loc = l.ld_loc;
+              lbl_attributes = l.ld_attributes;
+              lbl_uid = l.ld_uid;
+            } in
+          l.ld_id, lbl)
+      lbls
+    end
+  and all_labels =
+    lazy begin
+      List.map (fun (_, lbl) -> lbl) (Lazy.force ids_and_labels)
+      |> Iarray.of_list
+    end
   in
-  { lbl_name = ""; lbl_res = none; lbl_arg = none;
-    lbl_mut = Immutable; lbl_modalities = Mode.Modality.Value.Const.id;
-    lbl_sort = Jkind.Sort.Const.void;
-    lbl_num = -1; lbl_pos = -1; lbl_all = [||];
-    lbl_repres = repres;
-    lbl_private = Public;
-    lbl_loc = Location.none;
-    lbl_attributes = [];
-    lbl_uid = Uid.internal_not_actually_unique;
-  }
-
-let label_descrs record_form ty_res lbls repres priv =
-  let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
-  let rec describe_labels num pos = function
-      [] -> []
-    | l :: rest ->
-        let is_void = Jkind.Sort.Const.(equal void l.ld_sort) in
-        let lbl =
-          { lbl_name = Ident.name l.ld_id;
-            lbl_res = ty_res;
-            lbl_arg = l.ld_type;
-            lbl_mut = l.ld_mutable;
-            lbl_modalities = l.ld_modalities;
-            lbl_sort = l.ld_sort;
-            lbl_pos = if is_void then lbl_pos_void else pos;
-            lbl_num = num;
-            lbl_all = all_labels;
-            lbl_repres = repres;
-            lbl_private = priv;
-            lbl_loc = l.ld_loc;
-            lbl_attributes = l.ld_attributes;
-            lbl_uid = l.ld_uid;
-          } in
-        all_labels.(num) <- lbl;
-        let pos = if is_void then pos else pos+1 in
-        (l.ld_id, lbl) :: describe_labels (num+1) pos rest in
-  describe_labels 0 0 lbls
+  (* Make sure this can all be marshalled by forcing it now *)
+  ignore (Lazy.force all_labels : _ gen_label_description iarray);
+  Lazy.force ids_and_labels
 
 exception Constr_not_found
 
@@ -303,7 +304,7 @@ let constructors_of_type ~current_unit ty_path decl =
 let labels_of_type ty_path decl =
   match decl.type_kind with
   | Type_record(labels, rep, _) ->
-      label_descrs Legacy (newgenconstr ty_path decl.type_params)
+      label_descrs (newgenconstr ty_path decl.type_params)
         labels rep decl.type_private
   | Type_record_unboxed_product _
   | Type_variant _ | Type_abstract _ | Type_open -> []
@@ -311,7 +312,7 @@ let labels_of_type ty_path decl =
 let unboxed_labels_of_type ty_path decl =
   match decl.type_kind with
   | Type_record_unboxed_product(labels, rep, _) ->
-      label_descrs Unboxed_product (newgenconstr ty_path decl.type_params)
+      label_descrs (newgenconstr ty_path decl.type_params)
         labels rep decl.type_private
   | Type_record _
   | Type_variant _ | Type_abstract _ | Type_open -> []

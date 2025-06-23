@@ -85,11 +85,10 @@ and bad = F : 'a r# -> bad [@@unboxed]
 Line 3, characters 0-38:
 3 | and bad = F : 'a r# -> bad [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is value_or_null & void
+Error: The layout of type "bad" is any & any
          because it is an unboxed record.
-       But the kind of type "bad" must be a subkind of value & void
-         because it's an [@@unboxed] type,
-         chosen to have kind value & void.
+       But the layout of type "bad" must be representable
+         because it's an [@@unboxed] type.
 |}]
 
 type t_void : void
@@ -99,9 +98,8 @@ and bad = F : { x : 'a r# } -> bad [@@unboxed]
 Line 3, characters 0-46:
 3 | and bad = F : { x : 'a r# } -> bad [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is value_or_null & void
+Error: The layout of type "bad" is any & any
          because it is an unboxed record.
-       But the kind of type "bad" must be a subkind of value & void
-         because it's an [@@unboxed] type,
-         chosen to have kind value & void.
+       But the layout of type "bad" must be representable
+         because it's an [@@unboxed] type.
 |}]

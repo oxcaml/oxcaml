@@ -499,11 +499,16 @@ let () =
            if desc.cstr_generalized then Some desc.cstr_res
            else None
          in
+         let cstr_shape =
+           match desc.cstr_shape with
+           | Some shape -> shape
+           | None -> Misc.fatal_error "extension constructor must have shape"
+         in
          let ext =
            { ext_type_path = path;
              ext_type_params = type_decl.type_params;
              ext_args = Cstr_tuple desc.cstr_args;
-             ext_shape = desc.cstr_shape;
+             ext_shape = cstr_shape;
              ext_constant = desc.cstr_constant;
              ext_ret_type = ret_type;
              ext_private = Asttypes.Public;
@@ -532,11 +537,16 @@ let () =
          if desc.cstr_generalized then Some Predef.type_exn
          else None
        in
+       let cstr_shape =
+         match desc.cstr_shape with
+         | Some shape -> shape
+         | None -> Misc.fatal_error "exception constructor must have shape"
+       in
        let ext =
          { ext_type_path = Predef.path_exn;
            ext_type_params = [];
            ext_args = Cstr_tuple desc.cstr_args;
-           ext_shape = desc.cstr_shape;
+           ext_shape = cstr_shape;
            ext_constant = desc.cstr_constant;
            ext_ret_type = ret_type;
            ext_private = Asttypes.Public;

@@ -124,6 +124,7 @@ type type_mismatch =
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
+  | Fixed_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 

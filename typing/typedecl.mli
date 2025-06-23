@@ -68,6 +68,24 @@ val check_coherence:
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
 
+type unrepresentable_constructor =
+  | Unrepresentable_argument of int
+  | Unrepresentable_argument_field of string
+
+val update_constructor_representation:
+    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
+    loc:Location.t -> is_extension_constructor:bool ->
+    (Types.constructor_representation, unrepresentable_constructor) Result.t
+
+type unrepresentable_record =
+  | Unrepresentable_field of string
+
+val update_record_representation:
+    Env.t -> Location.t -> 'rep Types.record_form ->
+    Types.label_declaration list ->
+    'rep option ->
+    ('rep, unrepresentable_record) Result.t
+
 type native_repr_kind = Unboxed | Untagged
 
 (* Records reason for a jkind representability requirement in errors. *)

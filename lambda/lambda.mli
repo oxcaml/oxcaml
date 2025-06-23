@@ -15,6 +15,8 @@
 
 (* The "lambda" intermediate code *)
 
+open Iarray_shim
+
 open Asttypes
 
 type constant = Typedtree.constant
@@ -491,10 +493,10 @@ and 'a mixed_block_element =
   | Vec128
   | Word
 
-and mixed_block_shape = unit mixed_block_element array
+and mixed_block_shape = unit mixed_block_element iarray
 
 and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
+  = locality_mode mixed_block_element iarray
 
 and constructor_shape =
   | Constructor_uniform of value_kind list

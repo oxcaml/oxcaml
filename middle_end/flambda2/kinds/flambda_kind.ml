@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open! Iarray_shim
 module Mixed_block_lambda_shape = Mixed_block_shape
 
 module Naked_number_kind = struct
@@ -306,11 +307,13 @@ module Mixed_block_shape = struct
   let from_lambda (shape : Lambda.mixed_block_shape) : t =
     let shape = Mixed_block_shape.of_mixed_block_elements shape in
     let value_prefix_kinds =
-      Array.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
+      Iarray.map (fun _ -> value) (Mixed_block_shape.value_prefix shape)
+      |> Iarray.to_array
     in
     let flat_suffix =
-      Array.map Flat_suffix_element0.from_lambda
+      Iarray.map Flat_suffix_element0.from_lambda
         (Mixed_block_shape.flat_suffix shape)
+      |> Iarray.to_array
     in
     let flat_suffix_kinds = Array.map Flat_suffix_element0.kind flat_suffix in
     { flat_suffix;
@@ -912,8 +915,8 @@ module With_subkind = struct
                         | Vec128 -> naked_vec128
                         | Word -> naked_nativeint
                       in
-                      let fields : t array =
-                        Array.map from_mixed_block_element
+                      let fields : t iarray =
+                        Iarray.map from_mixed_block_element
                           (Mixed_block_lambda_shape.reordered_shape
                              mixed_block_shape)
                       in
@@ -923,7 +926,7 @@ module With_subkind = struct
                              mixed_block_shape)
                       in
                       ( Scannable (Mixed_record mixed_block_shape),
-                        Array.to_list fields )
+                        Iarray.to_list fields )
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->

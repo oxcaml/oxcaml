@@ -102,6 +102,7 @@ desired mode of use [m] as *input*, and returns a context [G] as
 of modes [G] for the variables of [e] such that [G |- e : m] holds.
 *)
 
+open Iarray_shim
 open Asttypes
 open Typedtree
 open Types
@@ -170,22 +171,46 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_exclave e ->
         classify_expression env e
 
-    | Texp_construct (_, {cstr_repr = Variant_unboxed}, [e], _) ->
+    | Texp_construct (_, {cstr_repr = Variant_unboxed}, _, [_, e], _) ->
         classify_expression env e
     | Texp_construct _ ->
         Static
 
     | Texp_record { representation = Record_unboxed;
-                    fields = [| _, Overridden (_,e) |] } ->
-        classify_expression env e
+                    fields }
+      (* CR-someday lmaurer: replace this fake pattern guard with a real iarray
+         pattern *)
+      when
+        match Iarray.to_array fields with
+        | [| _, _, Overridden (_, _e) |] -> true
+        | _ -> false
+      ->
+        begin match Iarray.to_array fields with
+        | [| _, _, Overridden (_, e) |] ->
+            classify_expression env e
+        | _ ->
+            assert false
+        end
     | Texp_record { representation = Record_ufloat; _ } ->
         Dynamic
     | Texp_record _ ->
         Static
 
-    | Texp_record_unboxed_product { representation = Record_unboxed_product;
-                                    fields = [| _, Overridden (_,e) |] } ->
-        classify_expression env e
+    | Texp_record_unboxed_product { representation = Record_unboxed_product _;
+                                    fields }
+      (* CR-someday lmaurer: replace this fake pattern guard with a real iarray
+         pattern *)
+      when
+        match Iarray.to_array fields with
+        | [| _, _, Overridden (_, _e) |] -> true
+        | _ -> false
+      ->
+        begin match Iarray.to_array fields with
+        | [| _, _, Overridden (_, e) |] ->
+            classify_expression env e
+        | _ ->
+            assert false
+        end
     | Texp_record_unboxed_product _ ->
         Dynamic
 
@@ -575,9 +600,9 @@ let listi : 'a. (int -> 'a -> term_judg) -> 'a list -> term_judg =
     List.fold_left (fun (idx, env) item -> idx+1, Env.join env (f idx item m))
       (0, Env.empty) li
     |> (snd : (int * Env.t) -> Env.t)
-let array : 'a. ('a -> term_judg) -> 'a array -> term_judg =
+let iarray : 'a. ('a -> term_judg) -> 'a iarray -> term_judg =
   fun f ar m ->
-    Array.fold_left (fun env item -> Env.join env (f item m)) Env.empty ar
+    Iarray.fold_left (fun env item -> Env.join env (f item m)) Env.empty ar
 
 let single : Ident.t -> term_judg = Env.single
 let remove_id : Ident.t -> term_judg -> term_judg =
@@ -727,7 +752,7 @@ let rec expression : Typedtree.expression -> term_judg =
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       join ((expression comp_body << array_mode exp elt_sort) ::
             comprehension_clauses comp_clauses)
-    | Texp_construct (_, desc, exprs, _) ->
+    | Texp_construct (_, desc, shape, exprs, _) ->
       let access_constructor =
         match desc.cstr_tag with
         | Extension pth ->
@@ -738,15 +763,15 @@ let rec expression : Typedtree.expression -> term_judg =
         | Variant_unboxed | Variant_with_null ->
           Return
         | Variant_boxed _ | Variant_extensible ->
-           (match desc.cstr_shape with
+           (match shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
-                (match mixed_shape.(i) with
+                (match mixed_shape.:(i) with
                  | Value | Float_boxed -> Guard
                  | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word ->
                    Dereference))
       in
-      let arg i e = expression e << arg_mode i in
+      let arg i (_sort, e) = expression e << arg_mode i in
       join [
         access_constructor;
         listi arg exprs;
@@ -767,12 +792,12 @@ let rec expression : Typedtree.expression -> term_judg =
               Guard
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
-            (match mixed_shape.(i) with
+            (match mixed_shape.:(i) with
              | Value | Float_boxed -> Guard
              | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word ->
                Dereference)
         in
-        let field (label, field_def) =
+        let field (label, _sort, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -781,14 +806,14 @@ let rec expression : Typedtree.expression -> term_judg =
           env << field_mode label.lbl_num
         in
         join [
-          array field es;
+          iarray field es;
           option expression (Option.map Misc.fst3 eo) << Dereference
         ]
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->
       begin match rep with
-      | Record_unboxed_product ->
-        let field (_, field_def) =
+      | Record_unboxed_product _ ->
+        let field (_, _, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -797,7 +822,7 @@ let rec expression : Typedtree.expression -> term_judg =
           env << Return
         in
         join [
-          array field es;
+          iarray field es;
           option expression (Option.map fst eo) << Dereference
         ]
       end
@@ -817,7 +842,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression ifso;
         option expression ifnot;
       ]
-    | Texp_setfield (e1, _, _, _, e2) ->
+    | Texp_setfield { record = e1; newval = e2 } ->
       (*
         G1 |- e1: m[Dereference]
         G2 |- e2: m[Dereference]
@@ -865,7 +890,7 @@ let rec expression : Typedtree.expression -> term_judg =
       join [
         expression e1 << Dereference
       ]
-    | Texp_field (e, _, _, _, _, _) ->
+    | Texp_field { record = e; _ } ->
       (*
         G |- e: m[Dereference]
         -----------------------
@@ -1465,8 +1490,8 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_unboxed_tuple _ -> true
     | Tpat_construct _ -> true
     | Tpat_variant _ -> true
-    | Tpat_record (_, _) -> true
-    | Tpat_record_unboxed_product (_, _) -> true
+    | Tpat_record _ -> true
+    | Tpat_record_unboxed_product _ -> true
     | Tpat_array _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)

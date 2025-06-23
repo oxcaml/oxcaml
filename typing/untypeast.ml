@@ -16,6 +16,7 @@
 [@@@ocaml.warning "-60"] module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
+open Iarray_shim
 open Asttypes
 open Parsetree
 open Ast_helper
@@ -366,7 +367,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         Ppat_unboxed_tuple
           (List.map (fun (label, p, _) -> label, sub.pat sub p) list,
            Closed)
-    | Tpat_construct (lid, _, args, vto) ->
+    | Tpat_construct (lid, _, _, args, vto) ->
         let tyo =
           match vto with
             None -> None
@@ -379,8 +380,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         let arg =
           match args with
             []    -> None
-          | [arg] -> Some (sub.pat sub arg)
-          | args  -> Some (Pat.tuple ~loc (List.map (fun p -> None, sub.pat sub p) args) Closed)
+          | [(_, arg)] -> Some (sub.pat sub arg)
+          | args  ->
+              Some (Pat.tuple ~loc (List.map (fun (_, p) -> None, sub.pat sub p) args)
+                      Closed)
         in
         Ppat_construct (map_loc sub lid,
           match tyo, arg with
@@ -391,11 +394,11 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
         Ppat_variant (label, Option.map (sub.pat sub) pato)
-    | Tpat_record (list, closed) ->
-        Ppat_record (List.map (fun (lid, _, pat) ->
+    | Tpat_record (list, _, closed) ->
+        Ppat_record (List.map (fun (lid, _, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
-    | Tpat_record_unboxed_product (list, closed) ->
-        Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
+    | Tpat_record_unboxed_product (list, _, closed) ->
+        Ppat_record_unboxed_product (List.map (fun (lid, _, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
@@ -570,39 +573,40 @@ let expression sub exp =
     | Texp_unboxed_tuple list ->
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
-    | Texp_construct (lid, _, args, _) ->
+    | Texp_construct (lid, _, _, args, _) ->
         Pexp_construct (map_loc sub lid,
           (match args with
               [] -> None
-          | [ arg ] -> Some (sub.expr sub arg)
+          | [ (_, arg) ] -> Some (sub.expr sub arg)
           | args ->
               Some
-                (Exp.tuple ~loc (List.map (fun e -> None, sub.expr sub e) args))
+                (Exp.tuple ~loc
+                   (List.map (fun (_, e) -> None, sub.expr sub e) args))
           ))
     | Texp_variant (label, expo) ->
         Pexp_variant (label, Option.map (fun (e, _) -> sub.expr sub e) expo)
     | Texp_record { fields; extended_expression; _ } ->
-        let list = Array.fold_left (fun l -> function
-            | _, Kept _ -> l
-            | _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
+        let list = Iarray.fold_left (fun l -> function
+            | _, _, Kept _ -> l
+            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
         Pexp_record (list, Option.map (fun (exp, _, _) -> sub.expr sub exp)
                              extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
-        let list = Array.fold_left (fun l -> function
-            | _, Kept _ -> l
-            | _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
+        let list = Iarray.fold_left (fun l -> function
+            | _, _, Kept _ -> l
+            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
         Pexp_record_unboxed_product
           (list,
            Option.map (fun (exp, _) -> sub.expr sub exp) extended_expression)
-    | Texp_field (exp, _sort, lid, _label, _, _) ->
+    | Texp_field { record = exp; lid; _ } ->
         Pexp_field (sub.expr sub exp, map_loc sub lid)
     | Texp_unboxed_field (exp, _, lid, _label, _) ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_setfield (exp1, _, lid, _label, exp2) ->
+    | Texp_setfield { record = exp1; lid; newval = exp2 } ->
         Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->

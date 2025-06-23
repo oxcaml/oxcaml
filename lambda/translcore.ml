@@ -16,6 +16,7 @@
 (* Translation from typed abstract syntax to lambda terms,
    for the core language *)
 
+open Iarray_shim
 open Misc
 open Asttypes
 open Primitive
@@ -504,9 +505,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Lprim(Pmake_unboxed_product shape,
             ll,
             of_location ~scopes e.exp_loc)
-  | Texp_construct(_, cstr, args, alloc_mode) ->
+  | Texp_construct(_, cstr, shape, args, alloc_mode) ->
       let args_with_sorts =
-        List.map2 (fun { ca_sort } e -> e, ca_sort) cstr.cstr_args args
+        List.map
+          (fun (sort, e) -> e, Jkind.Sort.default_for_transl_and_get sort)
+          args
       in
       let ll =
         List.map (fun (e, sort) -> transl_exp ~scopes sort e) args_with_sorts
@@ -530,7 +533,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             match List.map extract_constant ll with
             | exception Not_constant -> None
             | constants -> (
-              match cstr.cstr_shape with
+              match shape with
               | Constructor_mixed shape ->
                   if !Clflags.native_code then
                     let shape =
@@ -552,7 +555,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           | None ->
               let alloc_mode = transl_alloc_mode (Option.get alloc_mode) in
               let makeblock =
-                match cstr.cstr_shape with
+                match shape with
                 | Constructor_uniform_value ->
                     let shape =
                       List.map (fun (e, sort) ->
@@ -585,7 +588,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                value kind for the poly variant hash? *)
             let makeblock =
               match cstr.cstr_shape with
-              | Constructor_uniform_value ->
+              | Some Constructor_uniform_value ->
                   let shape =
                     List.map (fun (e, sort) ->
                         Lambda.must_be_value (layout_exp sort e))
@@ -593,7 +596,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   in
                   Pmakeblock(0, Immutable, Some (Lambda.generic_value :: shape),
                             alloc_mode)
-              | Constructor_mixed shape ->
+              | Some (Constructor_mixed shape) ->
                   let shape =
                     Lambda.transl_mixed_product_shape
                       ~get_value_kind:(fun _i -> Lambda.generic_value)
@@ -604,9 +607,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                        always stay in the same place because the reordering
                        sorting is stable and immediates are always put in the
                        value prefix of a mixed block. *)
-                    Array.append [| Lambda.Value Lambda.generic_value |] shape
+                    Iarray.append (Iarray.make 1 (Lambda.Value Lambda.generic_value)) shape
                   in
                   Pmakemixedblock(0, Immutable, shape, alloc_mode)
+              | None ->
+                  fatal_error "Unexpected indeterminate representation in extensible \
+                               variant"
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
       | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_with_null)
@@ -637,15 +643,18 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
-  | Texp_field(arg, arg_sort, id, lbl, float, ubr) ->
+  | Texp_field { record = arg; record_sort = arg_sort; record_repres;
+                 field_sort; lid = id; label = lbl; boxing = float;
+                 unique_barrier = ubr } ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let field_sort = Jkind.Sort.default_for_transl_and_get field_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
-      check_record_field_sort id.loc lbl.lbl_sort;
-      begin match lbl.lbl_repres with
+      check_record_field_sort id.loc field_sort;
+      begin match record_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let ptr_or_imm, _ = maybe_pointer e in
@@ -668,11 +677,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let ptr_or_imm, _ = maybe_pointer e in
           Lprim (Pfield (lbl.lbl_pos + 1, ptr_or_imm, sem), [targ],
                  of_location ~scopes e.exp_loc)
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+        | Record_inlined (_, (Constructor_mixed _), Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, (Constructor_mixed shape), Variant_boxed _)
         | Record_mixed shape ->
           let shape =
             Lambda.transl_mixed_product_shape_for_read
@@ -702,29 +711,32 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       end
   | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
     begin match lbl.lbl_repres with
-    | Record_unboxed_product ->
-      let lbl_layout l = layout e.exp_env l.lbl_loc l.lbl_sort l.lbl_arg in
-      let layouts = Array.to_list (Array.map lbl_layout lbl.lbl_all) in
+    | Some (Record_unboxed_product _) ->
+      let lbl_layout l = layout e.exp_env l.lbl_loc (Option.get l.lbl_sort) l.lbl_arg in
+      let layouts = Iarray.to_list (Iarray.map lbl_layout (Lazy.force lbl.lbl_all)) in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
-      if Array.length lbl.lbl_all == 1 then
+      if Iarray.length (Lazy.force lbl.lbl_all) == 1 then
         (* erase singleton unboxed records before lambda *)
         targ
       else
         Lprim (Punboxed_product_field (lbl.lbl_num, layouts), [targ],
                of_location ~scopes e.exp_loc)
+    | None -> fatal_error "Unexpected indeterminate representation of unboxed record"
     end
-  | Texp_setfield(arg, arg_mode, id, lbl, newval) ->
+  | Texp_setfield{ record = arg; record_repres; field_sort; modality = arg_mode;
+                   lid = id; label = lbl; newval } ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
          then. *)
-      check_record_field_sort id.loc lbl.lbl_sort;
+      check_record_field_sort id.loc
+        (Jkind.Sort.default_for_transl_and_get field_sort);
       let mode =
         Assignment (transl_modify_mode arg_mode)
       in
       let access =
-        match lbl.lbl_repres with
+        match record_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let ptr_or_imm, _ = maybe_pointer newval in
@@ -766,8 +778,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            above. *)
         Jkind.Sort.Const.for_boxed_record
       in
+      let sort_newval =
+        Jkind.Sort.default_for_transl_and_get field_sort
+      in
       Lprim(access, [transl_exp ~scopes sort_arg arg;
-                     transl_exp ~scopes lbl.lbl_sort newval],
+                     transl_exp ~scopes sort_newval newval],
             of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
@@ -995,7 +1010,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
-  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)}, loc) ->
+  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)}, loc) ->
       assert_failed loc ~scopes e
   | Texp_assert (cond, loc) ->
       if !Clflags.noassert
@@ -1889,7 +1904,7 @@ and transl_setinstvar ~scopes loc self var expr =
 and transl_record ~scopes loc env mode fields repres opt_init_expr =
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
-  let size = Array.length fields in
+  let size = Iarray.length fields in
   let on_heap = match mode with
     | None -> false (* unboxed is not on heap *)
     | Some m -> is_heap_mode m
@@ -1900,9 +1915,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     (* Take a shallow copy of the init record, then mutate the fields
        of the copy *)
     let copy_id = Ident.create_local "newrecord" in
-    let update_field cont (lbl, definition) =
+    let update_field cont (lbl, lbl_sort, definition) =
+      let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
       (* CR layouts v5: allow more unboxed types here. *)
-      check_record_field_sort lbl.lbl_loc lbl.lbl_sort;
+      check_record_field_sort lbl.lbl_loc lbl_sort;
       match definition with
       | Kept _ -> cont
       | Overridden (_lid, expr) ->
@@ -1950,7 +1966,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
-                                transl_exp ~scopes lbl.lbl_sort expr],
+                                transl_exp ~scopes lbl_sort expr],
                           of_location ~scopes loc),
                     cont)
     in
@@ -1962,18 +1978,19 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
          Lprim(Pduprecord (repres, size),
                [transl_exp ~scopes init_expr_sort init_expr],
                of_location ~scopes loc),
-         Array.fold_left update_field (Lvar copy_id) fields)
+         Iarray.fold_left update_field (Lvar copy_id) fields)
   | Some _ | None ->
     (* Allocate new record with given fields (and remaining fields
        taken from init_expr if any *)
     (* CR layouts v5: allow non-value fields beyond just float# *)
     let init_id = Ident.create_local "init" in
     let lv =
-      Array.mapi
-        (fun i (lbl, definition) ->
+      Iarray.mapi
+        (fun i (lbl, lbl_sort, definition) ->
+           let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
            match definition with
            | Kept (typ, mut, _) ->
-               let field_layout = layout env lbl.lbl_loc lbl.lbl_sort typ in
+               let field_layout = layout env lbl.lbl_loc lbl_sort typ in
                let sem =
                  if Types.is_mutable mut then Reads_vary else Reads_agree
                in
@@ -2030,13 +2047,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                      of_location ~scopes loc),
                field_layout
            | Overridden (_lid, expr) ->
-               let field_layout = layout_exp lbl.lbl_sort expr in
-               transl_exp ~scopes lbl.lbl_sort expr, field_layout)
+               let field_layout = layout_exp lbl_sort expr in
+               transl_exp ~scopes lbl_sort expr, field_layout)
         fields
     in
-    let ll, shape = List.split (Array.to_list lv) in
+    let ll, shape = List.split (Iarray.to_list lv) in
     let mut : Lambda.mutable_flag =
-      if Array.exists (fun (lbl, _) -> Types.is_mutable lbl.lbl_mut) fields
+      if Iarray.exists (fun (lbl, _, _) -> Types.is_mutable lbl.lbl_mut) fields
       then Mutable
       else Immutable in
     let lam =
@@ -2139,28 +2156,30 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
-  | Record_unboxed_product ->
+  | Record_unboxed_product _ ->
     let init_id = Ident.create_local "init" in
     let shape =
-      Array.map
-        (fun (lbl, definition) ->
+      Iarray.map
+        (fun (lbl, lbl_sort, definition) ->
+            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
-            | Kept (typ, _mut, _) -> layout env lbl.lbl_loc lbl.lbl_sort typ
-            | Overridden (_lid, expr) -> layout_exp lbl.lbl_sort expr)
+            | Kept (typ, _mut, _) -> layout env lbl.lbl_loc lbl_sort typ
+            | Overridden (_lid, expr) -> layout_exp lbl_sort expr)
         fields
-      |> Array.to_list
+      |> Iarray.to_list
     in
     let ll =
-      Array.mapi
-        (fun i (lbl, definition) ->
+      Iarray.mapi
+        (fun i (_lbl, lbl_sort, definition) ->
+            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
             | Kept (_typ, _mut, _) ->
               let access = Punboxed_product_field (i, shape) in
               Lprim (access, [Lvar init_id], of_location ~scopes loc)
             | Overridden (_lid, expr) ->
-              transl_exp ~scopes lbl.lbl_sort expr)
+              transl_exp ~scopes lbl_sort expr)
         fields
-      |> Array.to_list
+      |> Iarray.to_list
     in
     let lam = match ll with
       | [l] -> l (* erase singleton unboxed records before lambda *)

@@ -434,9 +434,9 @@ Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of r# is value_or_null & float64
+       The layout of r# is any & any
          because it is an unboxed record.
-       But the kind of r# must be a subkind of value & float64
+       But the layout of r# must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
 
@@ -448,9 +448,9 @@ Line 3, characters 0-10:
 3 | and q = r#
     ^^^^^^^^^^
 Error:
-       The kind of q is value_or_null & float64
+       The layout of q is any & any
          because it is an unboxed record.
-       But the kind of q must be a subkind of value & float64
+       But the layout of q must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
 
@@ -1081,12 +1081,11 @@ module type Bad = sig
   type uu = #{ uu : #(t# * t#) }
 end with type t := float id
 [%%expect{|
-Lines 1-4, characters 18-27:
-1 | ..................sig
-2 |   type t = float
+Line 3, characters 2-32:
 3 |   type uu = #{ uu : #(t# * t#) }
-4 | end with type t := float id
-Error: In this instantiated signature: The type "id" has no unboxed version.
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "#(t# * t#)" has layout "float64 & float64".
+       Records may not yet contain types of this layout.
 |}]
 
 (* The check for bad unboxed paths looks through nested modules *)

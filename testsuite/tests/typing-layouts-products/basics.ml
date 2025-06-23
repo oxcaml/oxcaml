@@ -34,8 +34,11 @@ type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option }
 type t4 = #{ s : string; t4_inner : t4_inner }
 [%%expect{|
 type t4_inner2 = #{ b : bool; i : int; }
-type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option; }
-type t4 = #{ s : string; t4_inner : t4_inner; }
+Line 2, characters 0-69:
+2 | type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "t4_inner2" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 (* But you can't put unboxed products into normal tuples (yet) *)
@@ -79,7 +82,11 @@ type t1 : float64 & value = #{ f : float#; b : bool }
 type t2 : value & (float64 & value) = #{ so : string option ; t1 : t1 }
 [%%expect{|
 type t1 = #{ f : float#; b : bool; }
-type t2 = #{ so : string option; t1 : t1; }
+Line 2, characters 0-71:
+2 | type t2 : value & (float64 & value) = #{ so : string option ; t1 : t1 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "t1" has layout "float64 & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type t2_wrong : value & float64 & value = #(string option * t1)
@@ -99,10 +106,8 @@ type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
 Line 1, characters 0-74:
 1 | type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t2_wrong" is value & (float64 & value)
-         because it is an unboxed record.
-       But the layout of type "t2_wrong" must be a sublayout of value & float64 & value
-         because of the annotation on the declaration of the type t2_wrong.
+Error: Type "t1" has layout "float64 & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type ('a : value & bits64) t3 = 'a
@@ -226,9 +231,9 @@ Line 1, characters 0-54:
 1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of t6_wrong_inner_record is value_or_null & bits64
+       The layout of t6_wrong_inner_record is any & any
          because it is an unboxed record.
-       But the kind of t6_wrong_inner_record must be a subkind of
+       But the layout of t6_wrong_inner_record must be a sublayout of
          value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
@@ -335,8 +340,11 @@ type t1 = t1_left -> t1_right
 [%%expect{|
 type t1_left = #{ i : int; b : bool; }
 type t1_right_inner = #{ i64 : int64#; so : string option; }
-type t1_right = #{ i : int; f : float#; inner : t1_right_inner; }
-type t1 = t1_left -> t1_right
+Line 3, characters 0-64:
+3 | type t1_right = #{ i : int; f : float#; inner : t1_right_inner }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "t1_right_inner" has layout "bits64 & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type make_record_result = #{ f : float#; s : string }
@@ -355,9 +363,11 @@ let f_pull_apart_an_unboxed_record (x : t) =
 type make_record_result = #{ f : float#; s : string; }
 val f_make_an_unboxed_record : string -> float# -> make_record_result = <fun>
 type inner = #{ f1 : float#; f2 : float#; }
-type t = #{ s : string; inner : inner; }
-val f_pull_apart_an_unboxed_record :
-  t -> Stdlib_upstream_compatible.Float_u.t = <fun>
+Line 5, characters 0-39:
+5 | type t = #{ s : string; inner : inner }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "inner" has layout "float64 & float64".
+       Records may not yet contain types of this layout.
 |}]
 
 
@@ -400,41 +410,11 @@ end
 [%%expect{|
 module type S =
   sig type a type b type c type d type e type f type g type h end
-module F :
-  functor (X : S) ->
-    sig
-      type a = X.a
-      type b = X.b
-      type c = X.c
-      type d = X.d
-      type e = X.e
-      type f = X.f
-      type g = X.g
-      type h = X.h
-      type mix_input_inner2 = #{ d : d; e : e; }
-      type mix_input_inner = #{ c : c; inner2 : mix_input_inner2; }
-      type mix_input = #{ a : a; b : b; inner : mix_input_inner; f : f; }
-      type mix_output_inner2 = #{ f : f; e : e; }
-      type mix_output_inner = #{ c : c; inner2 : mix_output_inner2; }
-      type mix_output = #{ b : b; inner : mix_output_inner; a : a; d : d; }
-      val f_mix_up_an_unboxed_record : mix_input -> mix_output
-      type take_few_input1 = #{ a : a; b : b; }
-      type take_few_input3 = #{ d : d; e : e; }
-      type take_few_input5 = #{ g : g; h : h; }
-      type take_few_output = #{
-        h : h;
-        g2 : g;
-        x4 : f;
-        e2 : e;
-        d : d;
-        x2 : c;
-        b : b;
-        a2 : a;
-      }
-      val f_take_a_few_unboxed_records :
-        take_few_input1 ->
-        c -> take_few_input3 -> f -> take_few_input5 -> take_few_output
-    end
+Line 15, characters 2-62:
+15 |   type mix_input_inner = #{ c : c; inner2 : mix_input_inner2 }
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "mix_input_inner2" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 (***************************************************)
@@ -944,14 +924,8 @@ module type S_coherence_deep = sig
   type t2 = #{ i : int; t1 : t1 }
 end
 [%%expect{|
-Line 3, characters 24-31:
-3 |   type t2 = #{ i : int; t1 : t1 }
-                            ^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = #{ i : int; t1 : t1; } end
 |}]
 
 module type S_coherence_deep = sig
@@ -959,14 +933,13 @@ module type S_coherence_deep = sig
   type t2 = { t1 : t1 } [@@unboxed]
 end
 [%%expect{|
-Line 3, characters 14-21:
+Line 3, characters 2-35:
 3 |   type t2 = { t1 : t1 } [@@unboxed]
-                  ^^^^^^^
-Error: [@@unboxed] record element types must have a representable layout.
-       The layout of t1/2 is any
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t2" is any
          because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1/2 must be representable
-         because it is the type of record field t1.
+       But the layout of type "t2" must be representable
+         because it's an [@@unboxed] type.
 |}]
 
 (*************************************************)
@@ -1052,9 +1025,11 @@ let f_external_urecord_mode_crosses_local_2
   : local_ local_cross2 -> local_cross2 = fun x -> x
 [%%expect{|
 type local_cross2_inner = #{ b : bool; i : int; }
-type local_cross2 = #{ i : int; inner : local_cross2_inner; }
-val f_external_urecord_mode_crosses_local_2 :
-  local_ local_cross2 -> local_cross2 = <fun>
+Line 2, characters 0-60:
+2 | type local_cross2 = #{ i : int; inner : local_cross2_inner }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "local_cross2_inner" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type local_nocross2_inner = #{ b : bool; s : string }
@@ -1063,11 +1038,11 @@ let f_internal_urecord_does_not_mode_cross_local_2
   : local_ local_nocross2 -> local_nocross2 = fun x -> x
 [%%expect{|
 type local_nocross2_inner = #{ b : bool; s : string; }
-type local_nocross2 = #{ i : int; inner : local_nocross2_inner; }
-Line 4, characters 55-56:
-4 |   : local_ local_nocross2 -> local_nocross2 = fun x -> x
-                                                           ^
-Error: This value escapes its region.
+Line 2, characters 0-64:
+2 | type local_nocross2 = #{ i : int; inner : local_nocross2_inner }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "local_nocross2_inner" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type t = #{ i1 : int; i2 : int }
@@ -1077,10 +1052,11 @@ let f_external_urecord_mode_crosses_local_3
   : local_ local_cross3 -> local_cross3 = fun x -> x
 [%%expect{|
 type t = #{ i1 : int; i2 : int; }
-type local_cross3_inner = #{ t : t; i : int; }
-type local_cross3 = #{ i : int; inner : local_cross3_inner; }
-val f_external_urecord_mode_crosses_local_3 :
-  local_ local_cross3 -> local_cross3 = <fun>
+Line 2, characters 0-45:
+2 | type local_cross3_inner = #{ t : t; i : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "t" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type t = #{ s : string; i : int }
@@ -1090,12 +1066,11 @@ let f_internal_urecord_does_not_mode_cross_local_3
   : local_ local_nocross3 -> local_nocross3 = fun x -> x
 [%%expect{|
 type t = #{ s : string; i : int; }
-type local_nocross3_inner = #{ t : t; b : bool; }
-type local_nocross3 = #{ i : int; inner : local_nocross3_inner; }
-Line 5, characters 55-56:
-5 |   : local_ local_nocross3 -> local_nocross3 = fun x -> x
-                                                           ^
-Error: This value escapes its region.
+Line 2, characters 0-48:
+2 | type local_nocross3_inner = #{ t : t; b : bool }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "t" has layout "value & value".
+       Records may not yet contain types of this layout.
 |}]
 
 (****************************************************)
@@ -1558,8 +1533,11 @@ type ('a : bits64 & (value & float64)) t2 = 'a array
 type t3_record = #{ i : int; b : bool; }
 type t3 = t3_record array
 type t4_inner = #{ f : float#; bo : bool option; }
-type t4_record = #{ s : string; inner : t4_inner; }
-type t4 = t4_record array
+Line 8, characters 0-50:
+8 | type t4_record = #{ s : string; inner : t4_inner }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "t4_inner" has layout "float64 & value".
+       Records may not yet contain types of this layout.
 |}]
 
 type array_record = #{ i1 : int; i2 : int }

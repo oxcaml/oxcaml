@@ -15,6 +15,7 @@
 
 (* Auxiliaries for type-based optimizations, e.g. array kinds *)
 
+open Iarray_shim
 open Path
 open Types
 open Typedtree
@@ -449,7 +450,7 @@ let fallback_if_missing_cmi ~default f =
    check the sorts of the relevant types.  Ideally this wouldn't involve
    expensive layout computation, because the sorts are stored somewhere (e.g.,
    [record_representation]).  But that's not currently the case for tuples. *)
-let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   : int * value_kind =
   let[@inline] cannot_proceed () =
     Numbers.Int.Set.mem (get_id ty) visited
@@ -553,20 +554,22 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited cstrs rep)
-        | Type_record (labels, rep, _) ->
+        | Type_record (labels, Some rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
-        | Type_record_unboxed_product ([{ld_type}], Record_unboxed_product, _) ->
+        | Type_record_unboxed_product ([{ld_type}],
+                                       Some (Record_unboxed_product _), _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () ->
                value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type)
         | Type_record_unboxed_product (([] | _::_::_),
-                                       Record_unboxed_product, _) ->
+                                       (Some (Record_unboxed_product _) | None),
+                                       _) ->
           Misc.fatal_error
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
@@ -574,6 +577,15 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
           add_nullability_from_jkind env decl.type_jkind
             (value_kind_of_value_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
+        | Type_record (_, None, _)
+        | Type_record_unboxed_product (_, None, _) ->
+          (* TODO: Write a test case demonstrating that this can cause
+             unnecessary calls to ocaml_modify *)
+          (* TODO: Test that we don't get into trouble assuming non-nullable
+             (in particular, you should get an error declaring a custom
+             or_null type with an any) *)
+          num_nodes_visited, non_nullable Pgenval
+
     end
   | Ttuple labeled_fields ->
     if cannot_proceed () then
@@ -630,12 +642,12 @@ and value_kind_mixed_block
       (fun (i, num_nodes_visited) typ ->
          let num_nodes_visited, kind =
            value_kind_mixed_block_field env ~loc ~visited ~depth
-             ~num_nodes_visited shape.(i) typ
+             ~num_nodes_visited shape.:(i) typ
          in
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
   in
-  num_nodes_visited, Constructor_mixed (Array.of_list shape)
+  num_nodes_visited, Constructor_mixed (Iarray.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       (cstrs : Types.constructor_declaration list) rep =
@@ -729,23 +741,25 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let cstr_shape, _ = cstrs_and_sorts.(idx) in
-            let (is_mutable, num_nodes_visited), fields =
-              for_one_constructor constructor ~depth ~num_nodes_visited
-                ~cstr_shape
-            in
-            if is_mutable then None
-            else match fields with
-            | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
-            | Constructor_mixed _ | Constructor_uniform _ ->
-              let non_consts =
-                (next_tag, fields) :: non_consts
-              in
-              Some (num_nodes_visited,
-                    next_const, consts, next_tag + 1, non_consts))
+            match cstrs_and_sorts.:(idx) with
+            | None -> None
+            | Some (cstr_shape, _) ->
+                let (is_mutable, num_nodes_visited), fields =
+                  for_one_constructor constructor ~depth ~num_nodes_visited
+                    ~cstr_shape
+                in
+                if is_mutable then None
+                else match fields with
+                | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
+                  let consts = next_const :: consts in
+                  Some (num_nodes_visited,
+                        next_const + 1, consts, next_tag, non_consts)
+                | Constructor_mixed _ | Constructor_uniform _ ->
+                  let non_consts =
+                    (next_tag, fields) :: non_consts
+                  in
+                  Some (num_nodes_visited,
+                        next_const, consts, next_tag + 1, non_consts))
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in
@@ -974,7 +988,7 @@ let classify_lazy_argument : Typedtree.expression ->
         | Const_float32 _ (* There is no float32 array optimization *)
         | Const_int32 _ | Const_int64 _ | Const_nativeint _ )
     | Texp_function _
-    | Texp_construct (_, {cstr_arity = 0}, _, _) ->
+    | Texp_construct (_, {cstr_arity = 0}, _, _, _) ->
        `Constant_or_function
     | Texp_constant(Const_float _) ->
        if Config.flat_float_array

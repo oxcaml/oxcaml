@@ -30,28 +30,14 @@ Error: This expression has type "t_any" but an expression was expected of type
 type t = A of t_any
 
 [%%expect{|
-Line 1, characters 9-19:
-1 | type t = A of t_any
-             ^^^^^^^^^^
-Error: Constructor argument types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be representable
-         because it's the type of a constructor field.
+type t = A of t_any
 |}]
 
 (* Label_declaration *)
 type t = {a: t_any}
 
 [%%expect{|
-Line 1, characters 10-18:
-1 | type t = {a: t_any}
-              ^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field a.
+type t = { a : t_any; }
 |}]
 
 (* Unannotated_type_parameter *)

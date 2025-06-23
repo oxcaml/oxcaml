@@ -307,14 +307,14 @@ module M : sig type ('a : any) opaque_id : any end
 type a = #{ b : b M.opaque_id }
 and b = #{ a : a M.opaque_id }
 [%%expect{|
-Line 1, characters 12-29:
+Line 1, characters 0-31:
 1 | type a = #{ b : b M.opaque_id }
-                ^^^^^^^^^^^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of b M.opaque_id is any
-         because of the definition of opaque_id at line 2, characters 2-33.
-       But the layout of b M.opaque_id must be representable
-         because it is the type of record field b.
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "a" is recursive without boxing:
+         "a" contains "b M.opaque_id",
+         "b M.opaque_id" contains "b",
+         "b" contains "a M.opaque_id",
+         "a M.opaque_id" contains "a"
 |}]
 
 (* Make sure we look through [as] types *)
@@ -472,17 +472,21 @@ end
 module rec M : S = struct
   include F(M)
   type t = #{ a : u ; b : u }
-  let rec u = #{ u ; u }
+  let rec u = #{ a = u ; b = u }
 end
 [%%expect{|
-Line 3, characters 14-21:
-3 |   type t = #{ a : u ; b : u }
-                  ^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of u is any
-         because of the definition of u at line 2, characters 2-14.
-       But the layout of u must be representable
-         because it is the type of record field a.
+module type S = sig type u : any type t = #{ a : u; b : u; } end
+module F : functor (X : S) -> sig type u = X.t = #{ a : X.u; b : X.u; } end
+Line 12, characters 17-18:
+12 |   let rec u = #{ a = u ; b = u }
+                      ^
+Error: The unboxed record field "a" belongs to the type "t" = "M.t"
+       but is mixed here with fields of type
+         "('a : '_representable_layout_1 & '_representable_layout_2)"
+       The layout of t is any & any
+         because of the definition of t at line 3, characters 2-29.
+       But the layout of t must be representable
+         because it's the record type used in an assignment.
 |}]
 
 (* CR layouts v7.2: improve this error message *)
@@ -495,8 +499,8 @@ Line 3, characters 0-26:
 3 | and r = #{ x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of r is value_or_null & float64
+       The layout of r is any & any
          because it is an unboxed record.
-       But the kind of r must be a subkind of value & float64
+       But the layout of r must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]

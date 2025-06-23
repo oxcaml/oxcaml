@@ -26,9 +26,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type subst = int array
+open Iarray_shim
 
-type 'a shape = 'a Lambda.mixed_block_element array
+type subst = int iarray
+
+type 'a shape = 'a Lambda.mixed_block_element iarray
 
 type 'a t =
   { (* CR-soon xclerc for xclerc: once the nesting/flatenning work is done,
@@ -44,8 +46,8 @@ type 'a t =
 let of_mixed_block_elements (original_shape : 'a shape) : 'a t =
   let prefix = ref [] in
   let suffix = ref [] in
-  for idx = Array.length original_shape - 1 downto 0 do
-    let elem = original_shape.(idx) in
+  for idx = Iarray.length original_shape - 1 downto 0 do
+    let elem = original_shape.:(idx) in
     let is_value =
       match elem with
       | Value _ -> true
@@ -56,21 +58,22 @@ let of_mixed_block_elements (original_shape : 'a shape) : 'a t =
     then prefix := (elem, idx) :: !prefix
     else suffix := (elem, idx) :: !suffix
   done;
-  let prefix = Array.of_list !prefix in
-  let suffix = Array.of_list !suffix in
-  let reordered_shape_with_indices = Array.append prefix suffix in
+  let prefix = Iarray.of_list !prefix in
+  let suffix = Iarray.of_list !suffix in
+  let reordered_shape_with_indices = Iarray.append prefix suffix in
   let reordered_shape, new_index_to_old_index =
-    Array.split reordered_shape_with_indices
+    Iarray.split reordered_shape_with_indices
   in
   let old_index_to_new_index =
-    Array.make (Array.length new_index_to_old_index) (-1)
+    Array.make (Iarray.length new_index_to_old_index) (-1)
   in
-  Array.iteri
+  Iarray.iteri
     (fun new_index old_index -> old_index_to_new_index.(old_index) <- new_index)
     new_index_to_old_index;
+  let old_index_to_new_index = Iarray.of_array old_index_to_new_index in
   { original_shape;
-    prefix = Array.map fst prefix;
-    suffix = Array.map fst suffix;
+    prefix = Iarray.map fst prefix;
+    suffix = Iarray.map fst suffix;
     reordered_shape;
     new_index_to_old_index;
     old_index_to_new_index
@@ -82,27 +85,27 @@ let reorder_array t src =
   | len ->
     let dst = Array.make len src.(0) in
     for old_index = 0 to pred len do
-      let new_index = t.old_index_to_new_index.(old_index) in
+      let new_index = t.old_index_to_new_index.:(old_index) in
       dst.(new_index) <- src.(old_index)
     done;
     dst
 
-let get_reordered t i = t.reordered_shape.(i)
+let get_reordered t i = t.reordered_shape.:(i)
 
 let value_prefix t = t.prefix
 
 let flat_suffix t = t.suffix
 
-let value_prefix_len t = Array.length t.prefix
+let value_prefix_len t = Iarray.length t.prefix
 
-let flat_suffix_len t = Array.length t.suffix
+let flat_suffix_len t = Iarray.length t.suffix
 
 let original_shape t = t.original_shape
 
 let reordered_shape t = t.reordered_shape
 
 let reordered_shape_unit t =
-  Array.map
+  Iarray.map
     (fun (elt : _ Lambda.mixed_block_element) : _ Lambda.mixed_block_element ->
       match elt with
       | Float_boxed _ -> Float_boxed ()
@@ -111,6 +114,6 @@ let reordered_shape_unit t =
         elem)
     t.reordered_shape
 
-let old_index_to_new_index t i = t.old_index_to_new_index.(i)
+let old_index_to_new_index t i = t.old_index_to_new_index.:(i)
 
-let new_index_to_old_index t i = t.new_index_to_old_index.(i)
+let new_index_to_old_index t i = t.new_index_to_old_index.:(i)

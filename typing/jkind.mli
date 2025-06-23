@@ -384,7 +384,7 @@ module Builtin : sig
   (** Build a jkind of unboxed products, given only an arity. This jkind will not
       mode-cross (and has kind [Not_best] accordingly), even though unboxed products
       generally should. This is useful when creating an initial jkind in Typedecl. *)
-  val product_of_sorts :
+  val product_of_any :
     why:History.product_creation_reason -> int -> Types.jkind_l
 end
 
@@ -545,6 +545,10 @@ val is_void_defaulting : 'd Types.jkind -> bool
 (** Returns the sort corresponding to the jkind.  Call only on representable
     jkinds - raises on Any. *)
 val sort_of_jkind : Types.jkind_l -> sort
+
+(** Returns the sort corresponding to the jkind, unless the layout is Any or a product
+    containing Any. *)
+val sort_option_of_jkind : Types.jkind_l -> sort option
 
 (** Gets the layout of a jkind; returns [None] if the layout is still unknown.
     Never does mutation. *)

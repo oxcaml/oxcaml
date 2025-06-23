@@ -20,6 +20,8 @@
 
 *)
 
+open Iarray_shim
+
 (** {1 Reporting fatal errors} *)
 
 val fatal_error: string -> 'a
@@ -137,6 +139,13 @@ module Stdlib : sig
     (** [map_option f l] is [some_if_all_elements_are_some (map f l)], but with
         short circuiting. *)
 
+    val mapi_result
+       : (int -> 'a -> ('b, 'e) Result.t)
+      -> 'a t
+      -> ('b t, 'e) Result.t
+    (** [mapi_result f l] is similar to [map_option f l] but returns the first
+        error result if [f] returns one. *)
+
     val map2_option : ('a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t option
 
     val map2_prefix : ('a -> 'b -> 'c) -> 'a t -> 'b t -> ('c t * 'b t)
@@ -252,6 +261,11 @@ module Stdlib : sig
       -> Format.formatter
       -> 'a t
       -> unit
+
+    exception Option_is_none
+
+    (** Raises [Option_is_none] specifically *)
+    val get_exn : 'a option -> 'a
   end
 
 (** {2 Extensions to the Array module} *)
@@ -286,6 +300,17 @@ module Stdlib : sig
         [f e == e] then [map_sharing f a == a] *)
 
     val of_list_map : ('a -> 'b) -> 'a list -> 'b array
+  end
+
+(** {2 Extensions to the Iarray module} *)
+  module Iarray : sig
+    val equal : ('a -> 'a -> bool) -> 'a iarray -> 'a iarray -> bool
+    (** Compare two arrays for equality, using the supplied predicate for
+        element equality *)
+
+    val all_somes : 'a option iarray -> 'a iarray option
+
+    val of_list_map : ('a -> 'b) -> 'a list -> 'b iarray
   end
 
 (** {2 Extensions to the String module} *)
