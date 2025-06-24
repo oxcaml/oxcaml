@@ -1,13 +1,6 @@
-; Helpers
-
-(library
- (name simd_test_helpers)
- (wrapped false)
- (modules test_helpers))
 
 ;; CR-someday mslater: with layout polymorphism, the tests could be
 ;; functorized instead concatenating files.
-
 
 (rule
  (targets utils_u.ml)

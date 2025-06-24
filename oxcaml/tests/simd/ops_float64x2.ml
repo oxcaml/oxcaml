@@ -116,14 +116,13 @@ let () =
       eq_float32x4 ~result:res ~expect:iv)
 
 let () =
-  Test_helpers.run_if_not_under_rosetta2 ~f:(fun () ->
-      Float64.check_floats (fun f0 f1 ->
-          (failmsg := fun () -> Printf.printf "hadd: %f | %f\n%!" f0 f1);
-          let fv0 = to_float64x2 f0 f0 in
-          let fv1 = to_float64x2 f1 f1 in
-          let result = hadd fv0 fv1 in
-          let expect = to_float64x2 (f0 +. f0) (f1 +. f1) in
-          eq_float64x2 ~result ~expect))
+  Float64.check_floats (fun f0 f1 ->
+      (failmsg := fun () -> Printf.printf "hadd: %f | %f\n%!" f0 f1);
+      let fv0 = to_float64x2 f0 f0 in
+      let fv1 = to_float64x2 f1 f1 in
+      let result = hadd fv0 fv1 in
+      let expect = to_float64x2 (f0 +. f0) (f1 +. f1) in
+      eq_float64x2 ~result ~expect)
 
 let () =
   Float64.check_floats (fun f0 f1 ->
