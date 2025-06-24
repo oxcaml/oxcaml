@@ -2,7 +2,7 @@
  include stdlib_stable;
  include stdlib_beta;
  include stdlib_upstream_compatible;
- modules = "stubs.c";
+ modules = "idx_repr.ml stubs.c";
  flags = "-extension simd_beta -extension layouts_alpha";
  flambda2;
  stack-allocation;
@@ -63,6 +63,8 @@ let mark_test_run test_id =
 (* Various interesting values *)
 
 let sizes = [ 0; 1; 2; 30 ]
+
+let indices_in_deepening_tests = [0; 100_000]
 
 type packed = P : 'a -> packed
 let ref_to_force_heap_allocation : packed ref = ref (P 0)
