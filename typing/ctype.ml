@@ -2168,6 +2168,8 @@ type unbox_result =
   | Stepped of unwrapped_type_expr
   (* unboxing process unboxed a product. Invariant: length >= 2 *)
   | Stepped_record_unboxed_product of unwrapped_type_expr list
+  (* unboxing process unboxed an [or_null] type *)
+  | Stepped_or_null of unwrapped_type_expr
   (* no step to make; we're all done here *)
   | Final_result
   (* definition not in environment: missing cmi *)
@@ -2207,6 +2209,14 @@ let unbox_once env ty =
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
+        | Type_variant ([_; cd2], Variant_with_null, _) ->
+          begin match cd2.cd_args with
+          | Cstr_tuple [arg] ->
+            Stepped_or_null { ty = apply arg.ca_type;
+                              is_open = false;
+                              modality = arg.ca_modalities }
+          | _ -> Final_result
+          end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result
         end
@@ -2223,6 +2233,7 @@ let contained_without_boxing env ty =
   | Tconstr _ ->
     begin match unbox_once env ty with
     | Stepped { ty; is_open = _; modality = _ } -> [ty]
+    | Stepped_or_null { ty; is_open = _; modality = _ } -> [ty]
     | Stepped_record_unboxed_product tys ->
       List.map (fun { ty; _ } -> ty) tys
     | Final_result | Missing _ -> []
@@ -2251,7 +2262,7 @@ let rec get_unboxed_type_representation
       in
       get_unboxed_type_representation
         ~is_open ~modality env ty ty2 (fuel - 1)
-    | Stepped_record_unboxed_product _ | Final_result ->
+    | Stepped_or_null _ | Stepped_record_unboxed_product _ | Final_result ->
       Ok { ty; is_open; modality }
     | Missing _ -> Ok { ty = ty_prev; is_open; modality }
 
@@ -2264,26 +2275,6 @@ let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
   | Ok ty | Error ty -> ty
 
-
-let determine_separability_for_or_null ~jkind_of_type args substituted_jkind =
-  match args with
-  | [arg_ty] ->
-    let arg_jkind = jkind_of_type arg_ty in
-    let arg_separability = Jkind.get_separability
-      ~jkind_of_type:(fun ty -> Some (jkind_of_type ty)) arg_jkind
-    in
-    if Jkind_axis.Separability.equal
-      arg_separability Jkind_axis.Separability.Non_float
-    then
-      Jkind.set_separability_upper_bound
-        substituted_jkind Jkind_axis.Separability.Non_float
-    else
-      substituted_jkind
-  | _ ->
-    (* Hitting this code path means that someone passed an incorrect number
-       of arguments to [or_null] or its alias. We don't do anything here
-       and return the same jkind, as we'll report the error later. *)
-    substituted_jkind
 
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
@@ -2323,24 +2314,15 @@ let rec estimate_type_jkind ~expand_component env ty =
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
-      let substituted_jkind =
-        if Jkind.has_with_bounds jkind && List.compare_length_with args 0 <> 0
-        then
-          let level = get_level ty in
-          (* CR layouts v2.8: We could possibly skip this substitution if we're
-             called from [constrain_type_jkind]; the jkind returned without
-             substing is just weaker than the one we would get by substing. *)
-          jkind_subst env level type_decl.type_params args jkind
-        else
-          jkind
-      in
-      (* CR dkalinichenko: come up with a more elegant solution. *)
-      if Path.same p Predef.path_or_null
-        || Builtin_attributes.has_or_null_reexport type_decl.type_attributes then
-        let jkind_of_type ty = estimate_type_jkind ~expand_component env ty in
-        determine_separability_for_or_null ~jkind_of_type args substituted_jkind
+      if Jkind.has_with_bounds jkind && List.compare_length_with args 0 <> 0
+      then
+        let level = get_level ty in
+        (* CR layouts v2.8: We could possibly skip this substitution if we're
+           called from [constrain_type_jkind]; the jkind returned without
+           substing is just weaker than the one we would get by substing. *)
+        jkind_subst env level type_decl.type_params args jkind
       else
-        substituted_jkind
+        jkind
     with
     (* CR layouts v2.8: It will be confusing when a [Cannot_subst] leads to
        a [Missing_cmi]. *)
@@ -2552,6 +2534,41 @@ let constrain_type_jkind ~fixed env ty jkind =
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
           in
+          let or_null ~fuel ty is_open modality =
+            let jkind_nullability =
+              Jkind.get_nullability
+                ~jkind_of_type:(fun ty -> Some (estimate_type_jkind env ty)) jkind
+            in
+            begin match jkind_nullability with
+            | Jkind_axis.Nullability.Maybe_null ->
+              let jkind = Jkind.apply_modality_r modality jkind in
+              let jkind =
+                Jkind.set_nullability_upper_bound
+                  jkind
+                  Jkind_axis.Nullability.Non_null
+              in
+              let jkind_separability =
+                Jkind.get_separability
+                  ~jkind_of_type:(fun ty -> Some (estimate_type_jkind env ty))
+                  jkind
+              in
+              let jkind =
+                match jkind_separability with
+                | Jkind_axis.Separability.Maybe_separable -> jkind
+                (* If the target jkind is separable, the jkind of the type
+                   inside [_ or_null] must be non-float.  *)
+                | Separable | Non_float ->
+                  Jkind.set_separability_upper_bound jkind
+                    Jkind_axis.Separability.Non_float
+              in
+              loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
+                (estimate_type_jkind env ty) jkind
+            | Non_null ->
+              (* [_ or_null] fails against a non-null jkind. *)
+              Error (Jkind.Violation.of_ ~jkind_of_type
+                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            end
+          in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
@@ -2574,6 +2591,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                  let jkind = Jkind.apply_modality_r modality jkind in
                  loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
                    (estimate_type_jkind env ty) jkind
+               | Stepped_or_null { ty; is_open = is_open2; modality } ->
+                 or_null ~fuel:(fuel - 1) ty (is_open || is_open2) modality
                | Stepped_record_unboxed_product tys_modalities ->
                  product ~fuel:(fuel - 1) tys_modalities
                end
