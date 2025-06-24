@@ -695,6 +695,12 @@ let add_or_null add_type env =
      the most argument types, and forbid arrays from accepting [or_null]s.
      In the future, we will track separability in the jkind system. *)
   ~kind:or_null_kind
+  ~param_jkind:(Jkind.for_or_null_argument ~why:(
+    Type_argument {
+      parent_path = Path.Pident ident_or_null;
+      position = 1;
+      arity = 1}
+  ))
   ~jkind:or_null_jkind
 
 let builtin_values =
