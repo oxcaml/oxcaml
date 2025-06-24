@@ -775,6 +775,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   goto domain_init_complete;
 
 alloc_main_stack_failure:
+  caml_free_stack_cache(domain_state->stack_cache);
 create_stack_cache_failure:
   caml_remove_generational_global_root(&domain_state->dls_root);
 reallocate_minor_heap_failure:

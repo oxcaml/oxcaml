@@ -960,7 +960,7 @@ static void free_stack_memory(struct stack_info* stack)
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
   memset(stack, 0x42, (char*)stack->handler - (char*)stack);
 #endif
-#ifdef USE_MMAP_MAP_STACK
+#if defined(USE_MMAP_MAP_STACK)
   munmap(stack, stack->size);
 #elif defined(STACK_GUARD_PAGES)
   caml_mem_unmap(stack, stack->size);
