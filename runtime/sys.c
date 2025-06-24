@@ -160,33 +160,23 @@ CAMLexport void caml_do_exit(int retcode)
         top_heap_words = caml_top_heap_words(Caml_state->shared_heap);
       }
 
-      CAML_GC_MESSAGE(STATS,
-          "allocated_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          (intnat)allocated_words);
-      CAML_GC_MESSAGE(STATS,
-          "minor_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          (intnat) minwords);
-      CAML_GC_MESSAGE(STATS,
-          "promoted_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          (intnat) s.alloc_stats.promoted_words);
-      CAML_GC_MESSAGE(STATS,
-          "major_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          (intnat) majwords);
-      CAML_GC_MESSAGE(STATS,
-          "minor_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          (intnat) atomic_load(&caml_minor_collections_count));
-      CAML_GC_MESSAGE(STATS,
-          "major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          caml_major_cycles_completed);
-      CAML_GC_MESSAGE(STATS,
-          "forced_major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          (intnat)s.alloc_stats.forced_major_collections);
-      CAML_GC_MESSAGE(STATS,
-          "heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          heap_words);
-      CAML_GC_MESSAGE(STATS,
-          "top_heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
-          top_heap_words);
+      CAML_GC_MESSAGE(STATS, "allocated_words: %" CAML_PRIdNAT "\n",
+                      (intnat) allocated_words);
+      CAML_GC_MESSAGE(STATS, "minor_words: %" CAML_PRIdNAT "\n",
+                      (intnat) minwords);
+      CAML_GC_MESSAGE(STATS, "promoted_words: %" CAML_PRIdNAT "\n",
+                      (intnat) s.alloc_stats.promoted_words);
+      CAML_GC_MESSAGE(STATS, "major_words: %" CAML_PRIdNAT "\n",
+                      (intnat) majwords);
+      CAML_GC_MESSAGE(STATS, "minor_collections: %" CAML_PRIdNAT "\n",
+                      (intnat) atomic_load(&caml_minor_collections_count));
+      CAML_GC_MESSAGE(STATS, "major_collections: %" CAML_PRIdNAT "\n",
+                      caml_major_cycles_completed);
+      CAML_GC_MESSAGE(STATS, "forced_major_collections: %" CAML_PRIdNAT "\n",
+                      (intnat) s.alloc_stats.forced_major_collections);
+      CAML_GC_MESSAGE(STATS, "heap_words: %" CAML_PRIdNAT "\n", heap_words);
+      CAML_GC_MESSAGE(STATS, "top_heap_words: %" CAML_PRIdNAT "\n",
+                      top_heap_words);
     }
   }
 
