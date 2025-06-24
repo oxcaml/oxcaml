@@ -929,8 +929,12 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Float, Reg _, Float, Reg _
   | Float32, Reg _, Float32, Reg _
   | (Vec128 | Valx2), (Reg _ | Stack _), (Vec128 | Valx2), (Reg _ | Stack _) ->
-    (* Vec128 stack slots are always aligned. *)
-    if distinct then I.movapd (reg src) (reg dst)
+    if distinct
+    then
+      (* Vec128 stack slots are aligned, domainstate slots are not. *)
+      if Reg.is_domainstate src || Reg.is_domainstate dst
+      then I.movupd (reg src) (reg dst)
+      else I.movapd (reg src) (reg dst)
   | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
