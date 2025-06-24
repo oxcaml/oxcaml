@@ -248,7 +248,7 @@ module Tree_operations (Tree : Tree) : sig
 
   val union_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
-  val frobnicate : (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
+  val update_and_extend : (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
 
   val subset : 'a t -> 'a t -> bool
 
@@ -1101,15 +1101,15 @@ end = struct
     | Branch (prefix, bit, t0, t1) ->
       branch prefix bit (filter_map iv f t0) (filter_map iv f t1)
 
-  let combine_frobnicate iv f t0 t1 =
+  let combine_update_and_extend iv f t0 t1 =
     combine_union iv (fun k v0 v1 -> f k (Some v0) v1) t0 t1
 
-  let frobnicate f t0 t1 =
+  let update_and_extend f t0 t1 =
     let iv = is_value_of t0 in
     universal_merge
       ~only_left:(fun t0 -> t0)
       ~only_right:(fun t1 -> filter_map iv (fun k v1 -> f k None v1) t1)
-      iv (combine_frobnicate iv f) t0 t1
+      iv (combine_update_and_extend iv f) t0 t1
 
   let rec filter_map_sharing f t =
     let iv = is_value_of t in
