@@ -28,7 +28,7 @@
 (executables
  (names bytecode)
  (modules bytecode)
- (modes byte)
+ (modes byte exe)
  (ocamlopt_flags
   (:standard -extension simd_beta)))
 
