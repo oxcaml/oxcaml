@@ -919,12 +919,6 @@ let emit_global_label ~section s =
   let lbl = Cmm_helpers.make_symbol s in
   emit_global_label_for_symbol ~section lbl
 
-let loc_is_domainstate = function
-  | { loc = Stack (Domainstate _); _ } -> true
-  | { loc = Stack (Incoming _ | Outgoing _ | Reg.Local _) | Reg _ | Unknown; _ }
-    ->
-    false
-
 let move (src : Reg.t) (dst : Reg.t) =
   let open Amd64_simd_instrs in
   let distinct = not (Reg.same_loc src dst) in
@@ -938,7 +932,7 @@ let move (src : Reg.t) (dst : Reg.t) =
     if distinct
     then
       (* Vec128 stack slots are aligned, domainstate slots are not. *)
-      if loc_is_domainstate src || loc_is_domainstate dst
+      if Reg.is_domainstate src || Reg.is_domainstate dst
       then I.movupd (reg src) (reg dst)
       else I.movapd (reg src) (reg dst)
   | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
