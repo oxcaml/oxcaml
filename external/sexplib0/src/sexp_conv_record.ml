@@ -26,7 +26,7 @@ module Fields = struct
 
   let length =
     let rec length_loop : type a. a t -> int -> int =
-      fun t acc ->
+     fun t acc ->
       match t with
       | Field { rest; _ } -> length_loop rest (acc + 1)
       | Empty -> acc
@@ -95,7 +95,7 @@ end
 let rec parse_value_malformed
   : type a b. Malformed.t -> fields:(a * b) Fields.t -> state:State.t -> pos:int -> a
   =
-  fun malformed ~fields ~state ~pos ->
+ fun malformed ~fields ~state ~pos ->
   let (Field field) = fields in
   let malformed =
     match parse_values ~fields:field.rest ~state ~pos:(pos + 1) with
@@ -105,7 +105,7 @@ let rec parse_value_malformed
   raise (Malformed malformed)
 
 and parse_value : type a b. fields:(a * b) Fields.t -> state:State.t -> pos:int -> a * b =
-  fun ~fields ~state ~pos ->
+ fun ~fields ~state ~pos ->
   let (Field { name; kind; conv; rest }) = fields in
   let value : a =
     match kind, State.unsafe_get state pos with
@@ -137,7 +137,7 @@ and parse_value : type a b. fields:(a * b) Fields.t -> state:State.t -> pos:int 
   value, parse_values ~fields:rest ~state ~pos:(pos + 1)
 
 and parse_values : type a. fields:a Fields.t -> state:State.t -> pos:int -> a =
-  fun ~fields ~state ~pos ->
+ fun ~fields ~state ~pos ->
   match fields with
   | Field _ -> parse_value ~fields ~state ~pos
   | Empty -> ()
@@ -210,7 +210,7 @@ let rec parse_field_fast
     -> Sexp.t list
     -> a * b
   =
-  fun ~fields ~index ~extra ~seen sexps ->
+ fun ~fields ~index ~extra ~seen sexps ->
   let (Field { name; kind; conv; rest }) = fields in
   match sexps with
   | List (Atom atom :: args) :: others when String.equal atom name ->
@@ -246,7 +246,7 @@ and parse_spine_fast
     -> Sexp.t list
     -> a
   =
-  fun ~fields ~index ~extra ~seen sexps ->
+ fun ~fields ~index ~extra ~seen sexps ->
   match fields with
   | Field _ -> parse_field_fast ~fields ~index ~extra ~seen sexps
   | Empty ->

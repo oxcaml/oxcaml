@@ -786,21 +786,21 @@ module Arg : sig
     line to an OCaml value. {{!converters}Predefined converters}
     are provided for many types of the standard library. *)
 
-  type 'a parser = string -> [ `Ok of 'a | `Error of string ]
   (** The type for argument parsers.
 
       {b Deprecated.} Use parser signatures of {!val-conv} or {!val-conv'}. *)
+  type 'a parser = string -> [ `Ok of 'a | `Error of string ]
   [@@ocaml.deprecated "Use Arg.conv or Arg.conv' instead."]
 
-  type 'a printer = Format.formatter -> 'a -> unit
   (** The type for converted argument printers. *)
+  type 'a printer = Format.formatter -> 'a -> unit
   [@@@alert "-deprecated"] (* Need to be able to mention them ! *)
 
-  type 'a conv = 'a parser * 'a printer
   (** The type for argument converters.
 
       {b Warning.} Do not use directly, use {!val-conv} or {!val-conv'}.
       This type will become abstract in the next major version of cmdliner. *)
+  type 'a conv = 'a parser * 'a printer
   [@@@alert "+deprecated"] (* Need to be able to mention them ! *)
 
   val conv :

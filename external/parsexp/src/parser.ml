@@ -7,11 +7,11 @@ let kind_to_stack
     ('state, stack) Automaton_state.Kind.t -> (module Stack with type t = stack)
   =
   fun (type state) (kind : (state, stack) Automaton_state.Kind.t) ->
-  match kind with
-  | Sexp -> (module Automaton_stack : Stack with type t = stack)
-  | Positions -> (module Automaton_stack.Just_positions : Stack with type t = stack)
-  | Sexp_with_positions -> (module Automaton_stack : Stack with type t = stack)
-  | Cst -> (module Automaton_stack.For_cst : Stack with type t = stack)
+   match kind with
+   | Sexp -> (module Automaton_stack : Stack with type t = stack)
+   | Positions -> (module Automaton_stack.Just_positions : Stack with type t = stack)
+   | Sexp_with_positions -> (module Automaton_stack : Stack with type t = stack)
+   | Cst -> (module Automaton_stack.For_cst : Stack with type t = stack)
 ;;
 
 let make (type stack state parsed_value) kind mode make_value

@@ -614,7 +614,7 @@ let gen_input_rev_sexps my_parse ~ws_buf ?parse_pos ?(buf = Bytes.create 8192) i
       | Error cont_state ->
         failwith
           ("Sexplib.Sexp.input_rev_sexps: reached EOF while in state "
-           ^ Cont_state.to_string cont_state))
+          ^ Cont_state.to_string cont_state))
   in
   let len = input ic buf 0 buf_len in
   let this_parse = mk_this_parse ?parse_pos my_parse in

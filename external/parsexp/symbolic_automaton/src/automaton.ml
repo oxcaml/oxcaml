@@ -17,7 +17,7 @@ type context =
 let quoted_string_transition
   : context -> State.Quoted_string.t * char -> Quoted_string_transition.t
   =
-  fun context x ->
+ fun context x ->
   (* Distinguishing atom and block comments is to optimize block comments. But
      we musn't optimize the exception on things like \321. *)
   let if_atom then_ else_ : Action.t =

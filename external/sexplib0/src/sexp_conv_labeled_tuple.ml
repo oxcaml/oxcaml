@@ -9,11 +9,11 @@ module Fields = struct
     | Empty : unit t
 
   let rec length_loop : type a. a t -> int -> int =
-    fun t acc ->
+   fun t acc ->
     match t with
     | Empty -> acc
     | Field field -> length_loop field.rest (acc + 1)
-  ;;
+ ;;
 
   let length t = length_loop t 0
 end
@@ -28,7 +28,7 @@ let[@tail_mod_cons] rec of_list
     -> Sexp.t list
     -> a
   =
-  fun ~caller ~fields ~len ~original_sexp ~pos list ->
+ fun ~caller ~fields ~len ~original_sexp ~pos list ->
   match fields with
   | Empty ->
     (match list with

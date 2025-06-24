@@ -202,8 +202,8 @@ let memory_footprint_in_bytes (lazy t) =
     let n =
       div_ceil
         (Chunk.length
-         + 1 (* NUL terminating bytes *)
-         + 1 (* number of wasted bytes to fill a word *))
+        + 1 (* NUL terminating bytes *)
+        + 1 (* number of wasted bytes to fill a word *))
         word_bytes
     in
     n + header_words
@@ -212,9 +212,9 @@ let memory_footprint_in_bytes (lazy t) =
   let pos_words = header_words + pos_fields in
   let list_cons_words = header_words + 2 in
   (header_words
-   + num_fields
-   + pos_words
-   + (List.length t.chunks * (chunk_words + list_cons_words)))
+  + num_fields
+  + pos_words
+  + (List.length t.chunks * (chunk_words + list_cons_words)))
   * word_bytes
 ;;
 

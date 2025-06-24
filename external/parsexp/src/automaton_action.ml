@@ -3,7 +3,7 @@ open Automaton_state
 open State
 
 let raise_error : type a b. (a, b) Automaton_state.t -> _ =
-  fun state ~at_eof reason ->
+ fun state ~at_eof reason ->
   set_error_state state;
   Parse_error.Private.raise
     reason
@@ -44,7 +44,7 @@ let set_automaton_state state x = state.automaton_state <- x
 let advance state = state.offset <- state.offset + 1
 
 let advance_eol : type u s. (u, s) Automaton_state.t -> unit =
-  fun state ->
+ fun state ->
   let newline_offset = state.offset in
   state.offset <- newline_offset + 1;
   state.bol_offset <- state.offset;
@@ -59,7 +59,7 @@ let advance_eol : type u s. (u, s) Automaton_state.t -> unit =
 let block_comment_depth state = state.block_comment_depth
 
 let add_token_char : type u s. (u, s) t =
-  fun state char stack ->
+ fun state char stack ->
   match state.kind with
   | Cst ->
     Buffer.add_char state.user_state.token_buffer char;
@@ -100,7 +100,7 @@ let add_pos state ~delta =
 ;;
 
 let add_first_char : type u s. (u, s) t =
-  fun state char stack ->
+ fun state char stack ->
   check_new_sexp_allowed state;
   Buffer.add_char state.atom_buffer char;
   (* For non-quoted atoms, we save both positions at the end. We can always determine the
@@ -112,14 +112,14 @@ let add_first_char : type u s. (u, s) t =
 ;;
 
 let eps_add_first_char_hash : type u s. (u, s) Epsilon.t =
-  fun state stack ->
+ fun state stack ->
   check_new_sexp_allowed state;
   Buffer.add_char state.atom_buffer '#';
   stack
 ;;
 
 let start_quoted_string : type u s. (u, s) t =
-  fun state _char stack ->
+ fun state _char stack ->
   check_new_sexp_allowed state;
   match state.kind with
   | Positions ->
@@ -198,7 +198,7 @@ let add_last_hex_escape_char state c stack =
 ;;
 
 let opening : type u s. (u, s) Automaton_state.t -> char -> s -> s =
-  fun state _char stack ->
+ fun state _char stack ->
   check_new_sexp_allowed state;
   state.depth <- state.depth + 1;
   match state.kind with
@@ -225,7 +225,7 @@ let do_reset_positions state =
 ;;
 
 let reset_positions : type u s. (u, s) Automaton_state.t -> unit =
-  fun state ->
+ fun state ->
   match state.kind with
   | Positions -> do_reset_positions state
   | Sexp_with_positions -> do_reset_positions state
@@ -272,7 +272,7 @@ let maybe_pop_ignoring_stack state =
 ;;
 
 let sexp_added : type u s. (u, s) Automaton_state.t -> s -> delta:int -> s =
-  fun state stack ~delta ->
+ fun state stack ~delta ->
   let is_comment = maybe_pop_ignoring_stack state in
   if is_top_level state
   then (
@@ -327,7 +327,7 @@ let rec make_list_cst end_pos acc : Automaton_stack.For_cst.t -> Automaton_stack
 ;;
 
 let closing : type u s. (u, s) Automaton_state.t -> char -> s -> s =
-  fun state _char stack ->
+ fun state _char stack ->
   if state.depth > 0
   then (
     let stack : s =
@@ -370,7 +370,7 @@ let add_non_quoted_atom_pos state ~atom =
 ;;
 
 let eps_push_atom : type u s. (u, s) Epsilon.t =
-  fun state stack ->
+ fun state stack ->
   let str = Buffer.contents state.atom_buffer in
   Buffer.clear state.atom_buffer;
   let stack : s =
@@ -398,7 +398,7 @@ let eps_push_atom : type u s. (u, s) Epsilon.t =
 ;;
 
 let push_quoted_atom : type u s. (u, s) t =
-  fun state _char stack ->
+ fun state _char stack ->
   let str = Buffer.contents state.atom_buffer in
   Buffer.clear state.atom_buffer;
   let stack : s =
@@ -427,7 +427,7 @@ let push_quoted_atom : type u s. (u, s) t =
 ;;
 
 let start_sexp_comment : type u s. (u, s) t =
-  fun state _char stack ->
+ fun state _char stack ->
   state.ignoring_stack <- state.depth :: state.ignoring_stack;
   match state.kind with
   | Cst ->
@@ -437,7 +437,7 @@ let start_sexp_comment : type u s. (u, s) t =
 ;;
 
 let start_block_comment : type u s. (u, s) Automaton_state.t -> char -> s -> s =
-  fun state char stack ->
+ fun state char stack ->
   state.block_comment_depth <- state.block_comment_depth + 1;
   match state.kind with
   | Positions -> stack
@@ -453,7 +453,7 @@ let start_block_comment : type u s. (u, s) Automaton_state.t -> char -> s -> s =
 ;;
 
 let end_block_comment : type u s. (u, s) Automaton_state.t -> char -> s -> s =
-  fun state char stack ->
+ fun state char stack ->
   state.block_comment_depth <- state.block_comment_depth - 1;
   match state.kind with
   | Positions -> stack
@@ -475,7 +475,7 @@ let end_block_comment : type u s. (u, s) Automaton_state.t -> char -> s -> s =
 ;;
 
 let start_line_comment : type u s. (u, s) t =
-  fun state char stack ->
+ fun state char stack ->
   match state.kind with
   | Cst ->
     state.user_state.token_start_pos <- current_pos state;
@@ -485,7 +485,7 @@ let start_line_comment : type u s. (u, s) t =
 ;;
 
 let end_line_comment : type u s. (u, s) Epsilon.t =
-  fun state stack ->
+ fun state stack ->
   match state.kind with
   | Positions -> stack
   | Sexp -> stack
@@ -500,7 +500,7 @@ let end_line_comment : type u s. (u, s) Epsilon.t =
 ;;
 
 let eps_eoi_check : type u s. (u, s) Epsilon.t =
-  fun state stack ->
+ fun state stack ->
   if state.depth > 0 then raise_error state ~at_eof:true Unclosed_paren;
   if is_ignoring state then raise_error state ~at_eof:true Sexp_comment_without_sexp;
   if state.full_sexps = 0

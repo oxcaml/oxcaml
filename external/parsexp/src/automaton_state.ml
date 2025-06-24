@@ -6,7 +6,7 @@ type ('u, 's) t = ('u, 's) State.t
 open State
 
 let initial_user_state : type u s. (u, s) Kind.t -> Positions.pos -> u =
-  fun kind initial_pos ->
+ fun kind initial_pos ->
   match kind with
   | Positions -> Positions.Builder.create ~initial_pos ()
   | Sexp -> ()
@@ -49,7 +49,7 @@ let column state = state.offset - state.bol_offset
 let position t = { Positions.col = column t; line = line t; offset = offset t }
 
 let reset_user_state : type u s. (u, s) t -> unit =
-  fun t ->
+ fun t ->
   match t.kind with
   | Positions -> Positions.Builder.reset t.user_state (position t)
   | Sexp -> ()
