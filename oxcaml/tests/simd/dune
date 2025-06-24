@@ -23,6 +23,39 @@
   (:standard -mavx2))
  (include_dirs "../../../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}"))
 
+; Bytecode
+
+(executables
+ (names bytecode)
+ (modules bytecode)
+ (modes byte)
+ (ocamlopt_flags
+  (:standard -extension simd_beta)))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets bytecode.out)
+ (deps bytecode.bc)
+ (action
+  (progn
+   (with-outputs-to
+    bytecode.out
+    (run
+     bash
+     -c
+     "./bytecode.bc 2>&1 | head -n 1; echo \"Exit status: ${PIPESTATUS[0]}\"")))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (progn
+   (diff bytecode.expected bytecode.out))))
+
 ; Tests with external assembler
 
 (executables

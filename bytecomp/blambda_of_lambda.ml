@@ -148,7 +148,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   | Lifused (_, exp) | Lregion (exp, _) | Lexclave exp -> comp_expr exp
   | Lprim (primitive, args, loc) -> (
     let simd_is_not_supported () =
-      Misc.fatal_error "SIMD is not supported in bytecode mode."
+      let args = List.map comp_arg args in
+      Blambda.Prim (Ccall "caml_simd_bytecode_not_supported", args)
     in
     let wrong_arity ~expected =
       Misc.fatal_errorf "Blambda_of_lambda: %a takes exactly %d %s"
@@ -279,7 +280,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
-      let init : Lambda.lambda =
+      try let init : Lambda.lambda =
         match kind with
         | Pgenarray | Paddrarray | Pintarray | Pfloatarray
         | Pgcscannableproductarray _ ->
@@ -295,7 +296,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Punboxedintarray Unboxed_int64 -> Lconst (Const_base (Const_int64 0L))
         | Punboxedintarray Unboxed_nativeint ->
           Lconst (Const_base (Const_nativeint 0n))
-        | Punboxedvectorarray _ -> simd_is_not_supported ()
+        | Punboxedvectorarray _ -> raise Not_found
         | Pgcignorableproductarray ignorables ->
           let rec convert_ignorable
               (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
@@ -326,7 +327,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                [len; init],
                loc )
             : Lambda.lambda)
-      | _ -> wrong_arity ~expected:1)
+      | _ -> wrong_arity ~expected:1
+      with Not_found -> simd_is_not_supported ())
     | Pduparray (kind, mutability) -> (
       match args with
       | [Lprim (Pmakearray (kind', _, m), args, _)] ->
@@ -731,8 +733,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
       | Punboxedintarray_set _ | Pfloatarray_set | Punboxedfloatarray_set _
       | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
-        ());
-      n_ary (Ccall "caml_array_blit") ~arity:5
+        n_ary (Ccall "caml_array_blit") ~arity:5)
     | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
