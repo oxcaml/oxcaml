@@ -132,3 +132,21 @@ let () =
       let result = round_near fv in
       let expect = to_float64x2 (Float64.c_round f0) (Float64.c_round f1) in
       eq_float64x2 ~result ~expect)
+
+let () =
+  Float64.check_floats (fun f0 f1 ->
+      (failmsg := fun () -> Printf.printf "cvti32 %g | %g\n%!" f0 f1);
+      let i0 =
+        Int32.of_float (Float64.c_round f0)
+        |> Int64.of_int32 |> Int64.logand 0xffffffffL
+      in
+      let i1 =
+        Int32.of_float (Float.round f1)
+        |> Int64.of_int32 |> Int64.logand 0xffffffffL
+      in
+      let ii = Int64.(logor (shift_left i1 32) i0) in
+      let iv = int32x4_of_int64s ii 0L in
+      let fv = to_float64x2 f0 f1 in
+      let res = cvt_int32x4 fv in
+      eq (int32x4_low_int64 res) (int32x4_high_int64 res) (int32x4_low_int64 iv)
+        (int32x4_high_int64 iv))

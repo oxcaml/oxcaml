@@ -158,6 +158,9 @@ let select_simd_instr op args dbg =
   | "caml_neon_int16x8_mul_high_long" -> Some (Mullq_high_s16, args)
   | "caml_neon_int16x8_mul_low_long_unsigned" -> Some (Mullq_u16, args)
   | "caml_neon_int16x8_mul_high_long_unsigned" -> Some (Mullq_high_u16, args)
+  | "caml_neon_cvt_int64x2_to_int32x4_high_saturating" ->
+    Some (Qmovn_high_s64, args)
+  | "caml_neon_cvt_int64x2_to_int32x4_low_saturating" -> Some (Qmovn_s64, args)
   | "caml_neon_cvt_int32x4_to_int16x8_high_saturating" ->
     Some (Qmovn_high_s32, args)
   | "caml_neon_cvt_int32x4_to_int16x8_low_saturating" -> Some (Qmovn_s32, args)

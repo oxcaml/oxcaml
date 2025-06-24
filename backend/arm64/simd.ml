@@ -283,6 +283,8 @@ type operation =
       { src_lane : int;
         dst_lane : int
       }
+  | Qmovn_high_s64
+  | Qmovn_s64
   | Qmovn_high_s32
   | Qmovn_s32
   | Qmovn_high_u32
@@ -464,6 +466,8 @@ let print_name op =
   | Dupq_lane_s8 { lane } -> "Setq_lane_s8_" ^ Int.to_string lane
   | Copyq_laneq_s64 { src_lane; dst_lane } ->
     Printf.sprintf "Copyq_laneq_s64_%d_to_%d" src_lane dst_lane
+  | Qmovn_high_s64 -> "Qmovn_high_s64"
+  | Qmovn_s64 -> "Qmovn_s64"
   | Qmovn_high_s32 -> "Qmovn_high_s32"
   | Qmovn_s32 -> "Qmovn_s32"
   | Qmovn_high_u32 -> "Qmovn_high_u32"
@@ -613,6 +617,8 @@ let equal_operation op1 op2 =
   | Cntq_u8, Cntq_u8
   | Shlq_u8, Shlq_u8
   | Shlq_s8, Shlq_s8
+  | Qmovn_high_s64, Qmovn_high_s64
+  | Qmovn_s64, Qmovn_s64
   | Qmovn_high_s32, Qmovn_high_s32
   | Qmovn_s32, Qmovn_s32
   | Qmovn_high_u32, Qmovn_high_u32
@@ -704,11 +710,11 @@ let equal_operation op1 op2 =
       | Maxq_s8 | Minq_u8 | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8 | Eorq_s8
       | Negq_s8 | Cntq_u8 | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _
       | Shlq_n_u8 _ | Shrq_n_u8 _ | Shrq_n_s8 _ | Getq_lane_s8 _
-      | Setq_lane_s8 _ | Dupq_lane_s8 _ | Copyq_laneq_s64 _ | Qmovn_high_s32
-      | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16
-      | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64 | Movn_s64 | Movn_high_s32
-      | Movn_s32 | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16
-      | Mullq_high_s16 | Mullq_high_u16 ),
+      | Setq_lane_s8 _ | Dupq_lane_s8 _ | Copyq_laneq_s64 _ | Qmovn_high_s64
+      | Qmovn_s64 | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32
+      | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64
+      | Movn_s64 | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16
+      | Mullq_s16 | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 ),
       _ ) ->
     false
 
@@ -740,11 +746,11 @@ let class_of_operation op =
   | Minq_s8 | Maxq_s8 | Minq_u8 | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8
   | Eorq_s8 | Negq_s8 | Cntq_u8 | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _
   | Shlq_n_u8 _ | Shrq_n_u8 _ | Shrq_n_s8 _ | Getq_lane_s8 _ | Setq_lane_s8 _
-  | Dupq_lane_s8 _ | Copyq_laneq_s64 _ | Qmovn_high_s32 | Qmovn_s32
-  | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16
-  | Qmovn_u16 | Movn_high_s64 | Movn_s64 | Movn_high_s32 | Movn_s32
-  | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16 | Mullq_high_s16
-  | Mullq_high_u16 ->
+  | Dupq_lane_s8 _ | Copyq_laneq_s64 _ | Qmovn_high_s64 | Qmovn_s64
+  | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16
+  | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64 | Movn_s64
+  | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16
+  | Mullq_high_s16 | Mullq_high_u16 ->
     Pure
 
 let operation_is_pure op = match class_of_operation op with Pure -> true
