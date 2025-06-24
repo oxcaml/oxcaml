@@ -117,20 +117,19 @@ let () =
       eq_float64x2 ~result:res ~expect:iv)
 
 let () =
-  Test_helpers.run_if_not_under_rosetta2 ~f:(fun () ->
-      Float32.check_floats (fun f0 f1 ->
-          (failmsg
-             := fun () ->
-                  Printf.printf "%f | %f\n%!" (Int32.float_of_bits f0)
-                    (Int32.float_of_bits f1));
-          let fv0 = Float32.to_float32x4 f0 f0 f1 f1 in
-          let fv1 = Float32.to_float32x4 f1 f1 f0 f0 in
-          let result = hadd fv0 fv1 in
-          let expect =
-            Float32.to_float32x4 (Float32.add f0 f0) (Float32.add f1 f1)
-              (Float32.add f1 f1) (Float32.add f0 f0)
-          in
-          eq_float32x4 ~result ~expect))
+  Float32.check_floats (fun f0 f1 ->
+      (failmsg
+         := fun () ->
+              Printf.printf "%f | %f\n%!" (Int32.float_of_bits f0)
+                (Int32.float_of_bits f1));
+      let fv0 = Float32.to_float32x4 f0 f0 f1 f1 in
+      let fv1 = Float32.to_float32x4 f1 f1 f0 f0 in
+      let result = hadd fv0 fv1 in
+      let expect =
+        Float32.to_float32x4 (Float32.add f0 f0) (Float32.add f1 f1)
+          (Float32.add f1 f1) (Float32.add f0 f0)
+      in
+      eq_float32x4 ~result ~expect)
 
 let () =
   Float32.check_floats (fun f0 f1 ->
