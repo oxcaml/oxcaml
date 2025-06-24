@@ -116,6 +116,8 @@ module type Sort = sig
     val for_predef_value : t (* Predefined value types, e.g. int and string *)
 
     val for_tuple : t
+
+    val for_idx : t
   end
 
   module Var : sig
@@ -214,6 +216,7 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
+    | Idx_element
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -296,6 +299,7 @@ module History = struct
     | Univar
     | Default_type_jkind
     | Existential_type_variable
+    | Idx_base
     | Array_comprehension_element
     | List_comprehension_iterator_element
     | Array_comprehension_iterator_element
@@ -329,6 +333,11 @@ module History = struct
     | Wildcard
     | Unification_var
     | Array_type_argument
+    | Type_argument of
+        { parent_path : Path.t;
+          position : int;
+          arity : int
+        }
 
   type product_creation_reason =
     | Unboxed_tuple

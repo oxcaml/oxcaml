@@ -357,7 +357,9 @@ let compute_static_size lam =
     | Popaque _
     | Pdls_get
     | Ppeek _
-    | Ppoke _ ->
+    | Ppoke _
+    | Pget_idx _
+    | Pset_idx _ ->
         dynamic_size lam
 
     (* Primitives specific to oxcaml *)
@@ -377,6 +379,7 @@ let compute_static_size lam =
     | Punboxed_int64_array_set_128 _
     | Punboxed_nativeint_array_set_128 _
     | Parray_element_size_in_bytes _
+    | Pidx_field _ | Pidx_mixed_field _ | Pidx_array _ | Pidx_deepen _
     | Punbox_unit ->
         Constant
 
