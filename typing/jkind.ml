@@ -1444,7 +1444,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Non_float;
         name = "immediate_or_null"
       }
 
