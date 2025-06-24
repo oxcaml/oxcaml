@@ -2844,7 +2844,7 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
 AS_IF([test x"$enable_multidomain" = "xyes"],
   [AS_IF([test x"$enable_runtime5" = "xyes" &&
           test x"$enable_poll_insertion" = "xyes"],
-    [AC_DEFINE([MULTIDOMAIN]), enable_multidomain=true],
+    [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=true],
     [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
 poll insertion enabled.])])], [])
 
