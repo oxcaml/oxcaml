@@ -44,7 +44,7 @@
     (run
      bash
      -c
-     "./bytecode.bc 2>&1 | head -n 1; echo \"Exit status: ${PIPESTATUS[0]}\"")))))
+     "./%{exe:bytecode.bc} 2>&1 | head -n 1; echo \"Exit status: ${PIPESTATUS[0]}\"")))))
 
 (rule
  (alias runtest)
