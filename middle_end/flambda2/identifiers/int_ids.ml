@@ -549,9 +549,9 @@ module Name = struct
   let[@inline always] pattern_match t ~var ~symbol =
     let flags = Id.flags t in
     if flags = var_flags
-    then (var[@inline hint]) t
+    then (var[@inlined hint]) t
     else if flags = symbol_flags
-    then (symbol[@inline hint]) t
+    then (symbol[@inlined hint]) t
     else assert false
 
   module T0 = struct
