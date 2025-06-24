@@ -280,54 +280,59 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
-      try let init : Lambda.lambda =
-        match kind with
-        | Pgenarray | Paddrarray | Pintarray | Pfloatarray
-        | Pgcscannableproductarray _ ->
-          Misc.fatal_errorf
-            "Array kind %s should have been ruled out by the frontend for \
-             %%makearray_dynamic_uninit"
-            (Printlambda.array_kind kind)
-        | Punboxedfloatarray Unboxed_float32 ->
-          Lconst (Const_base (Const_float32 "0.0"))
-        | Punboxedfloatarray Unboxed_float64 ->
-          Lconst (Const_base (Const_float "0.0"))
-        | Punboxedintarray Unboxed_int32 -> Lconst (Const_base (Const_int32 0l))
-        | Punboxedintarray Unboxed_int64 -> Lconst (Const_base (Const_int64 0L))
-        | Punboxedintarray Unboxed_nativeint ->
-          Lconst (Const_base (Const_nativeint 0n))
-        | Punboxedvectorarray _ -> raise Not_found
-        | Pgcignorableproductarray ignorables ->
-          let rec convert_ignorable
-              (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
-            match ign with
-            | Pint_ignorable -> Lconst (Const_base (Const_int 0))
-            | Punboxedfloat_ignorable Unboxed_float32 ->
-              Lconst (Const_base (Const_float32 "0.0"))
-            | Punboxedfloat_ignorable Unboxed_float64 ->
-              Lconst (Const_base (Const_float "0.0"))
-            | Punboxedint_ignorable Unboxed_int32 ->
-              Lconst (Const_base (Const_int32 0l))
-            | Punboxedint_ignorable Unboxed_int64 ->
-              Lconst (Const_base (Const_int64 0L))
-            | Punboxedint_ignorable Unboxed_nativeint ->
-              Lconst (Const_base (Const_nativeint 0n))
-            | Pproduct_ignorable ignorables ->
-              let fields = List.map convert_ignorable ignorables in
-              Lprim
-                (Pmakeblock (0, Immutable, None, Lambda.alloc_heap), fields, loc)
-          in
-          convert_ignorable (Pproduct_ignorable ignorables)
-      in
-      match args with
-      | [len] ->
-        comp_expr
-          (Lprim
-             ( Pmakearray_dynamic (kind, locality, With_initializer),
-               [len; init],
-               loc )
-            : Lambda.lambda)
-      | _ -> wrong_arity ~expected:1
+      try
+        let init : Lambda.lambda =
+          match kind with
+          | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+          | Pgcscannableproductarray _ ->
+            Misc.fatal_errorf
+              "Array kind %s should have been ruled out by the frontend for \
+               %%makearray_dynamic_uninit"
+              (Printlambda.array_kind kind)
+          | Punboxedfloatarray Unboxed_float32 ->
+            Lconst (Const_base (Const_float32 "0.0"))
+          | Punboxedfloatarray Unboxed_float64 ->
+            Lconst (Const_base (Const_float "0.0"))
+          | Punboxedintarray Unboxed_int32 ->
+            Lconst (Const_base (Const_int32 0l))
+          | Punboxedintarray Unboxed_int64 ->
+            Lconst (Const_base (Const_int64 0L))
+          | Punboxedintarray Unboxed_nativeint ->
+            Lconst (Const_base (Const_nativeint 0n))
+          | Punboxedvectorarray _ -> raise Not_found
+          | Pgcignorableproductarray ignorables ->
+            let rec convert_ignorable
+                (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
+              match ign with
+              | Pint_ignorable -> Lconst (Const_base (Const_int 0))
+              | Punboxedfloat_ignorable Unboxed_float32 ->
+                Lconst (Const_base (Const_float32 "0.0"))
+              | Punboxedfloat_ignorable Unboxed_float64 ->
+                Lconst (Const_base (Const_float "0.0"))
+              | Punboxedint_ignorable Unboxed_int32 ->
+                Lconst (Const_base (Const_int32 0l))
+              | Punboxedint_ignorable Unboxed_int64 ->
+                Lconst (Const_base (Const_int64 0L))
+              | Punboxedint_ignorable Unboxed_nativeint ->
+                Lconst (Const_base (Const_nativeint 0n))
+              | Pproduct_ignorable ignorables ->
+                let fields = List.map convert_ignorable ignorables in
+                Lprim
+                  ( Pmakeblock (0, Immutable, None, Lambda.alloc_heap),
+                    fields,
+                    loc )
+            in
+            convert_ignorable (Pproduct_ignorable ignorables)
+        in
+        match args with
+        | [len] ->
+          comp_expr
+            (Lprim
+               ( Pmakearray_dynamic (kind, locality, With_initializer),
+                 [len; init],
+                 loc )
+              : Lambda.lambda)
+        | _ -> wrong_arity ~expected:1
       with Not_found -> simd_is_not_supported ())
     | Pduparray (kind, mutability) -> (
       match args with
@@ -727,8 +732,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         match locality with
         | Alloc_heap -> binary (Ccall "caml_make_vect")
         | Alloc_local -> binary (Ccall "caml_make_local_vect")))
-    | Parrayblit { src_mutability = _; dst_array_set_kind } ->
-      (match dst_array_set_kind with
+    | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
+      match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
       | Punboxedintarray_set _ | Pfloatarray_set | Punboxedfloatarray_set _
