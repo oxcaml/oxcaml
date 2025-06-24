@@ -5,7 +5,6 @@ module File_type = File_type
 module Ocaml_compiler_intf = Ocaml_compiler_intf
 module Path = Path
 module Std = Std
-module Build_system_intf = Build_system_intf
 module Allocations = Allocations
 module Allocations_annotator = Allocations_annotator
 module Allocations_highlighter = Allocations_highlighter
