@@ -2423,7 +2423,11 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
-let for_or_null_argument ~(why : History.value_creation_reason) =
+let for_or_null_argument ident =
+  let why =
+    History.Type_argument
+      { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
   let mod_bounds =
     Mod_bounds.create ~locality:Locality.Const.max
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
