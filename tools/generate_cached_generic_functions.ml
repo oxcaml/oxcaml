@@ -41,7 +41,8 @@ let make_cached_generic_functions unix ~ppf_dump ~id genfns =
   Emit.begin_assembly unix;
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   Profile.record_call "genfns" (fun () ->
-    List.iter compile_phrase (Generic_fns.compile ~cache:true ~shared:true genfns));
+    List.iter compile_phrase (
+      Generic_fns.compile ~cache:true ~shared:true genfns));
  Emit.end_assembly ()
 
 let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
