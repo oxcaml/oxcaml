@@ -175,6 +175,14 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
     in
     if not !changed then t1 else t
 
+  let frobnicate f t1 t2 =
+    merge
+      (fun key datum1_opt datum2_opt ->
+        match datum2_opt with
+        | None -> datum1_opt
+        | Some datum2 -> f key datum1_opt datum2)
+      t1 t2
+
   exception Found_common_element
 
   let inter_domain_is_non_empty t1 t2 =
