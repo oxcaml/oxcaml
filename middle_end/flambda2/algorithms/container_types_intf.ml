@@ -167,6 +167,8 @@ module type Map = sig
       assuming that [f x x = Some x] for all [x]s. *)
   val union_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
+  val frobnicate : (key -> 'a option -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
+
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
 
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
