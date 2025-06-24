@@ -456,11 +456,13 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       let fields = List.map (fun id -> IR.Var id) fields in
       apply_cps_cont_simple k acc env ccenv fields before_unarization)
   | Lmutvar id ->
-    (* CR mshinwell: note: mutable variables of non-singleton layouts are not
-       supported *)
-    let return_id, kind = Env.get_mutable_variable_with_kind env id in
-    apply_cps_cont k acc env ccenv return_id
-      (Flambda_arity.Component_for_creation.Singleton kind)
+    let new_ids_with_kinds, before_unarization =
+      Env.get_mutable_variable_with_kinds env id
+    in
+    let fields =
+      List.map (fun id -> IR.Var id) (List.map fst new_ids_with_kinds)
+    in
+    apply_cps_cont_simple k acc env ccenv fields before_unarization
   | Lconst const ->
     apply_cps_cont_simple k acc env ccenv [IR.Const const]
       (Singleton
@@ -497,24 +499,32 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     CC.close_let_rec acc ccenv ~function_declarations:[func] ~body
       ~current_region:
         (Env.current_region env |> Option.map Env.Region_stack_element.region)
-  | Lmutlet (value_kind, id, _duid, defining_expr, body) ->
+  | Lmutlet (layout, id, _duid, defining_expr, body) ->
     (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
     (* CR mshinwell: user-visibleness needs thinking about here *)
     let temp_id = Ident.create_local "let_mutable" in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
-      ~params:[temp_id, IR.Not_user_visible, value_kind]
+      ~params:[temp_id, IR.Not_user_visible, layout]
       ~body:(fun acc env ccenv after_defining_expr ->
         cps_tail acc env ccenv defining_expr after_defining_expr k_exn)
       ~handler:(fun acc env ccenv ->
-        let kind =
-          Flambda_kind.With_subkind.from_lambda_values_and_unboxed_numbers_only
-            value_kind
+        let before_unarization =
+          Flambda_arity.Component_for_creation.from_lambda layout
         in
-        let env, new_id = Env.register_mutable_variable env id kind in
+        let env, new_ids_with_kinds =
+          Env.register_mutable_variable env id ~before_unarization
+        in
         let body acc ccenv = cps acc env ccenv body k k_exn in
-        CC.close_let acc ccenv
-          [new_id, kind]
-          User_visible (Simple (Var temp_id)) ~body)
+        let temp_id_unarized : Ident.t list =
+          match Env.get_unboxed_product_fields env temp_id with
+          | None -> [temp_id]
+          | Some (_, temp_id_unarized) -> temp_id_unarized
+        in
+        List.fold_left2
+          (fun body new_id_with_kind temp_id acc ccenv ->
+            CC.close_let acc ccenv [new_id_with_kind] User_visible
+              (Simple (Var temp_id)) ~body)
+          body new_ids_with_kinds temp_id_unarized acc ccenv)
   | Llet ((Strict | Alias | StrictOpt), _, fun_id, duid, Lfunction func, body)
     ->
     (* This case is here to get function names right. *)
@@ -623,21 +633,22 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       Misc.fatal_errorf "Lassign on non-mutable variable %a" Ident.print
         being_assigned;
     cps_non_tail_simple acc env ccenv new_value
-      (fun acc env ccenv new_value _arity ->
-        let new_value = must_be_singleton_simple new_value in
-        let env, new_id = Env.update_mutable_variable env being_assigned in
+      (fun acc env ccenv new_values _arity ->
+        let env = Env.update_mutable_variable env being_assigned in
         let body acc ccenv =
           let body acc ccenv = cps acc env ccenv body k k_exn in
           CC.close_let acc ccenv
             [id, Flambda_kind.With_subkind.tagged_immediate]
             Not_user_visible (Simple (Const L.const_unit)) ~body
         in
-        let value_kind =
-          snd (Env.get_mutable_variable_with_kind env being_assigned)
+        let new_ids_with_kinds, _before_unarization =
+          Env.get_mutable_variable_with_kinds env being_assigned
         in
-        CC.close_let acc ccenv
-          [new_id, value_kind]
-          User_visible (Simple new_value) ~body)
+        List.fold_left2
+          (fun body new_id_with_kind new_value acc ccenv ->
+            CC.close_let acc ccenv [new_id_with_kind] User_visible
+              (Simple new_value) ~body)
+          body new_ids_with_kinds new_values acc ccenv)
       k_exn
   | Llet
       ((Strict | Alias | StrictOpt), _layout, id, _duid, defining_expr, Lvar id')
@@ -967,19 +978,20 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       Misc.fatal_errorf "Lassign on non-mutable variable %a" Ident.print
         being_assigned;
     cps_non_tail_simple acc env ccenv new_value
-      (fun acc env ccenv new_value _arity ->
-        let new_value = must_be_singleton_simple new_value in
-        let env, new_id = Env.update_mutable_variable env being_assigned in
+      (fun acc env ccenv new_values _arity ->
+        let env = Env.update_mutable_variable env being_assigned in
         let body acc ccenv =
           apply_cps_cont_simple k acc env ccenv [Const L.const_unit]
             (Singleton Flambda_kind.With_subkind.tagged_immediate)
         in
-        let _, value_kind =
-          Env.get_mutable_variable_with_kind env being_assigned
+        let new_ids_with_kinds, _before_unarization =
+          Env.get_mutable_variable_with_kinds env being_assigned
         in
-        CC.close_let acc ccenv
-          [new_id, value_kind]
-          User_visible (Simple new_value) ~body)
+        List.fold_left2
+          (fun body new_id_with_kind new_value acc ccenv ->
+            CC.close_let acc ccenv [new_id_with_kind] User_visible
+              (Simple new_value) ~body)
+          body new_ids_with_kinds new_values acc ccenv)
       k_exn
   | Levent (body, _event) -> cps acc env ccenv body k k_exn
   | Lifused _ ->
