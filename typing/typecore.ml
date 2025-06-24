@@ -9036,7 +9036,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
               type_pattern_list Value existential_context env spatl nvs
                 allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
-                       iter_pattern_variables_type generalize pvs)
+                iter_pattern_variables_type generalize pvs)
           in
           (* If recursive, first unify with an approximation of the
              expression *)
@@ -9177,7 +9177,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                - : 'a array -> int -> 'a = <fun>
              ]}
              so we do it anyway. *)
-              generalize exp.exp_type
+            generalize exp.exp_type
           | Some vars ->
               if maybe_expansive exp then
                 lower_contravariant env exp.exp_type;

@@ -446,7 +446,7 @@ end = struct
     let name = name
 
     let print env fmt t =
-      Format.fprintf fmt "%a" (print_var_env env.stamps env.env.type_var) t
+      Format.fprintf fmt "'%a" (print_var_env env.stamps env.env.type_var) t
   end
 
   module Type_constr = struct
@@ -625,17 +625,17 @@ module With_free_vars : sig
   val value_bindings :
     Loc.t -> Name.t list -> (Var.Value.t list -> 'a t) -> 'a t
 
-  (** [type_var_binding loc name t] is the value of [t]. [t] is expected to have
-      a single free type variable named [name]. [t] is represented as a function
+  (** [type_var_bindings loc names t] is the value of [t]. [t] is expected to have
+      a list of free type variables names are [names]. [t] is represented as a function
       from this type variable to the term itself. *)
-  val type_var_binding : Loc.t -> Name.t -> (Var.Type_var.t -> 'a t) -> 'a t
+  val type_var_bindings :
+    Loc.t -> Name.t list -> (Var.Type_var.t list -> 'a t) -> 'a t
 
-  (** [type_bindings loc names t] is the value of [t]. [t] is expected to have
-      free type constructor variables whose names are given by [names]. [t] is
-      represented as a function from these type constructor variables to the term
-      itself. *)
-  val type_bindings :
-    Loc.t -> Name.t list -> (Var.Type_constr.t list -> 'a t) -> 'a t
+  (** [type_bindings loc name t] is the value of [t]. [t] is expected to have
+      a single free type constructor variable named [name]. [t] is represented as
+      a function from these type constructor variables to the term itself. *)
+  val type_binding :
+    Loc.t -> Name.t -> (Var.Type_constr.t -> 'a t) -> 'a t
 
   (** [module_binding loc name t] is the value of [t]. [t] is expected to have
       a single free module variable named [name]. [t] is represented as a
@@ -698,18 +698,18 @@ end = struct
         let vars = Var.Map.remove_level level vars in
         { vars; v })
 
-  let type_bindings loc names f =
+  let type_var_bindings loc names f =
     Level.with_fresh loc (fun level ->
         let fresh_vars =
-          List.map (fun name -> Var.Type_constr.generate level name) names
+          List.map (fun name -> Var.Type_var.generate level name) names
         in
         let { vars; v } = f fresh_vars in
         let vars = Var.Map.remove_level level vars in
         { vars; v })
 
-  let type_var_binding loc name f =
+  let type_binding loc name f =
     Level.with_fresh loc (fun level ->
-        let fresh_var = Var.Type_var.generate level name in
+        let fresh_var = Var.Type_constr.generate level name in
         let { vars; v } = f fresh_var in
         let vars = Var.Map.remove_level level vars in
         { vars; v })
@@ -1151,7 +1151,7 @@ module Ast = struct
     | TypeClass of Name.t * core_type list
     | TypeAlias of core_type * Name.t
     | TypeVariant of row_field list * variant_form
-    | TypePoly of Name.t list * core_type
+    | TypePoly of Var.Type_var.t list * core_type
     | TypePackage of package_type
     | TypeQuote of core_type
     | TypeSplice of core_type
@@ -1285,7 +1285,7 @@ module Ast = struct
 
   and function_param =
     | Pparam_val of arg_label * expression option * pattern
-    | Pparam_newtype of Var.Type_var.t
+    | Pparam_newtype of Var.Type_constr.t
 
   and function_ =
     { params : function_param list;
@@ -1552,20 +1552,20 @@ module Ast = struct
         (print_core_type_with_parens env)
         ty (print_raw_ident_type env) ident
     | TypeConstr (ident, ty :: tys) ->
-      print_tuple_like "(" ")" "," (print_core_type env) fmt (ty :: tys);
+      print_tuple_like "," "(" ")" (print_core_type env) fmt (ty :: tys);
       pp fmt "@ %a" (print_raw_ident_type env) ident
     | TypeObject ([], closed_flag) ->
       pp fmt "< %a >" print_obj_closed closed_flag
     | TypeObject (f :: fs, closed_flag) ->
       pp fmt "<@ @[";
-      print_tuple_like "" "" "," (print_object_field env) fmt (f :: fs);
+      print_tuple_like "," "" "" (print_object_field env) fmt (f :: fs);
       print_obj_closed fmt closed_flag;
       pp fmt "@]@ >"
     | TypeClass (name, []) -> Name.print fmt name
     | TypeClass (name, [ty]) ->
       pp fmt "[%a]@ %a" (print_core_type env) ty Name.print name
     | TypeClass (name, ty :: tys) ->
-      print_tuple_like "[" "]" "," (print_core_type env) fmt (ty :: tys);
+      print_tuple_like "," "[" "]" (print_core_type env) fmt (ty :: tys);
       pp fmt "@ %a" Name.print name
     | TypeAlias (ty, tv) ->
       pp fmt "%a@ as@ %a" (print_core_type env) ty Name.print tv
@@ -1580,9 +1580,8 @@ module Ast = struct
       pp fmt " ]"
     | TypePoly ([], _) -> () (* fatal_error "Invalid poly-type" *)
     | TypePoly (tv :: tvs, ty) ->
-      let print_tv fmt name = pp fmt "'%s" name in
-      print_tuple_like "" "" " " print_tv fmt (tv :: tvs);
-      pp fmt ".@ %a" (print_core_type env) ty
+      print_tuple_like "" "" "." (Var.Type_var.print env) fmt (tv :: tvs);
+      pp fmt "@ %a" (print_core_type env) ty
     | TypePackage (ident, []) -> print_module_type env fmt ident
     | TypePackage (ident, (fragment, core_type) :: wcs) ->
       pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
@@ -1610,7 +1609,7 @@ module Ast = struct
     | Pparam_val (arg_lab, Some exp, pat) ->
       pp fmt "@ %a%a=(@[%a@])" print_arg_lab arg_lab (print_pat env) pat
         (print_exp env) exp
-    | Pparam_newtype ty -> pp fmt "@ (type@ %a)" (Var.Type_var.print env) ty
+    | Pparam_newtype ty -> pp fmt "@ (type@ %a)" (Var.Type_constr.print env) ty
 
   and print_record env fmt (fields, exp_opt) =
     pp fmt "@[<2>{@ ";
@@ -2183,9 +2182,9 @@ module Type = struct
     Ast.TypeVariant (rfs, form)
 
   let poly loc names f =
-    With_free_vars.type_bindings loc names (fun tvs ->
+    With_free_vars.type_var_bindings loc names (fun tvs ->
         let+ t = f tvs in
-        Ast.TypePoly (names, t))
+        Ast.TypePoly (tvs, t))
 
   let package m spec =
     let s =
@@ -2350,7 +2349,7 @@ module Function = struct
         mk (Ast.Pparam_val (lab, None, pat) :: params) constraint_ body)
 
   let newtype loc name f =
-    With_free_vars.type_var_binding loc name (fun typ ->
+    With_free_vars.type_binding loc name (fun typ ->
         let+ ({ params; constraint_; body } : Ast.function_) = f typ in
         mk (Ast.Pparam_newtype typ :: params) constraint_ body)
 end
@@ -2403,12 +2402,12 @@ module Code = struct
     let+ { exp; _ } = code in
     exp
 
-  let of_exp exp _loc =
+  let of_exp _loc exp =
     let+ exp = exp in
     { exp; _loc }
 
   let of_exp_with_type_vars _loc names body =
-    let+ exp = With_free_vars.type_bindings _loc names body in
+    let+ exp = With_free_vars.type_var_bindings _loc names body in
     { exp; _loc }
 
   module Closed = struct

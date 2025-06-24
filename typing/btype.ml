@@ -260,7 +260,7 @@ let fold_row f init row =
       (row_fields row)
   in
   match get_desc (row_more row) with
-  | Tvar _ | Tunivar _ | Tsubst _ | Tconstr _ | Tnil ->
+  | Tvar _ | Tunivar _ | Tsubst _ | Tconstr _ | Tquote _ | Tsplice _ | Tnil ->
     begin match
       Option.map (fun (_,l) -> List.fold_left f result l) (row_name row)
     with

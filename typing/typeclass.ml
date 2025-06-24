@@ -1889,11 +1889,11 @@ let final_decl env define_class
 
   List.iter Ctype.generalize clty.cty_params;
   Ctype.generalize_class_type clty.cty_type;
-  Option.iter  Ctype.generalize clty.cty_new;
+  Option.iter Ctype.generalize clty.cty_new;
   List.iter Ctype.generalize obj_abbr.type_params;
-  Option.iter  Ctype.generalize obj_abbr.type_manifest;
+  Option.iter Ctype.generalize obj_abbr.type_manifest;
   List.iter Ctype.generalize cl_abbr.type_params;
-  Option.iter  Ctype.generalize cl_abbr.type_manifest;
+  Option.iter Ctype.generalize cl_abbr.type_manifest;
 
   Ctype.nongen_vars_in_class_declaration clty
   |> Option.iter (fun vars ->

@@ -7,15 +7,13 @@ open Debuginfo.Scoped_location
 open Longident
 
 type fv_env = (Ident.t, lambda) Hashtbl.t (* maps identifiers to lambda *)
-
-(* maps names of poly type variables to lambda *)
-type ptv_env = (string, Ident.t * lambda) Hashtbl.t
+type pv_env = (string, Ident.t * lambda) Hashtbl.t (* maps identifiers to lambda *)
 
 type var_env =
   { env_vals : fv_env;
     env_tys : fv_env;
     env_mod : fv_env;
-    env_poly : ptv_env
+    env_poly : pv_env
   }
 
 let vars_env =
@@ -25,33 +23,39 @@ let vars_env =
     env_poly = Hashtbl.create 64
   }
 
+let refresh_env () =
+  Hashtbl.clear vars_env.env_vals;
+  Hashtbl.clear vars_env.env_tys;
+  Hashtbl.clear vars_env.env_mod;
+  Hashtbl.clear vars_env.env_poly
+
 let rec print_path = function
   | Path.Pident id -> Ident.name id
   | Path.Pdot (p, s) -> print_path p ^ "." ^ s
   | Path.Papply (p1, p2) -> print_path p1 ^ "(" ^ print_path p2 ^ ")"
   | Path.Pextra_ty (p, _) -> print_path p ^ "[extra]"
 
-let with_new_value name val_ = Hashtbl.add vars_env.env_vals name val_
+let with_value ident val_ = Hashtbl.add vars_env.env_vals ident val_
 
-let with_new_type name ty = Hashtbl.add vars_env.env_tys name ty
+let with_type_constr ident ty_ = Hashtbl.add vars_env.env_tys ident ty_
 
-let with_new_module name mod_ = Hashtbl.add vars_env.env_mod name mod_
+let with_module ident mod_ = Hashtbl.add vars_env.env_mod ident mod_
 
-let with_new_idents_values = List.iter (fun id -> with_new_value id (Lvar id))
+let with_new_idents_values = List.iter (fun id -> with_value id (Lvar id))
 
-let with_new_idents_types = List.iter (fun id -> with_new_type id (Lvar id))
+let with_new_idents_types_constr = List.iter (fun id -> with_type_constr id (Lvar id))
 
-let with_new_idents_modules = List.iter (fun id -> with_new_module id (Lvar id))
+let with_new_idents_modules = List.iter (fun id -> with_module id (Lvar id))
 
-let without_value name = Hashtbl.remove vars_env.env_vals name
+let without_value ident = Hashtbl.remove vars_env.env_vals ident
 
-let without_type name = Hashtbl.remove vars_env.env_tys name
+let without_type_constr ident = Hashtbl.remove vars_env.env_tys ident
 
-let without_module name = Hashtbl.remove vars_env.env_mod name
+let without_module ident = Hashtbl.remove vars_env.env_mod ident
 
 let without_idents_values = List.iter without_value
 
-let without_idents_types = List.iter without_type
+let without_idents_types_constr = List.iter without_type_constr
 
 let without_idents_modules = List.iter without_module
 
@@ -59,9 +63,9 @@ let with_poly_type name =
   let id = Ident.create_local name in
   Hashtbl.add vars_env.env_poly name (id, Lvar id)
 
-let without_poly_type name = Hashtbl.remove vars_env.env_poly name
-
 let with_new_idents_poly = List.iter with_poly_type
+
+let without_poly_type name = Hashtbl.remove vars_env.env_poly name
 
 let without_idents_poly = List.iter without_poly_type
 
@@ -579,7 +583,7 @@ module Code = struct
 
   let of_exp = combinator "Code" "of_exp" 2
 
-  let _of_exp_with_type_vars = combinator "Code" "of_exp_with_type_vars" 3
+  let of_exp_with_type_vars = combinator "Code" "of_exp_with_type_vars" 3
 end
 
 let use comb = Lazy.force comb
@@ -993,7 +997,7 @@ let with_new_param fp =
     | Tparam_optional_default (pat, _, _) -> pat
   in
   with_new_idents_pat pat_of_param;
-  List.iter (fun (id, _, _, _) -> with_new_idents_types [id]) fp.fp_newtypes
+  List.iter (fun (id, _, _, _) -> with_new_idents_types_constr [id]) fp.fp_newtypes
 
 let without_param fp =
   let pat_of_param =
@@ -1002,7 +1006,7 @@ let without_param fp =
     | Tparam_optional_default (pat, _, _) -> pat
   in
   without_idents_pat pat_of_param;
-  List.iter (fun (id, _, _, _) -> without_idents_types [id]) fp.fp_newtypes
+  List.iter (fun (id, _, _, _) -> without_idents_types_constr [id]) fp.fp_newtypes
 
 type case_binding =
   | Non_binding of lambda * lambda
@@ -1031,7 +1035,8 @@ let rec quote_computation_pattern p =
 and quote_pat_extra loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
-  | Tpat_constraint ty -> apply loc Pat.constraint_ [pat_lam; quote_core_type ty]
+  | Tpat_constraint ty ->
+    apply loc Pat.constraint_ [pat_lam; quote_core_type ty]
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
@@ -1128,15 +1133,19 @@ and quote_value_pattern p =
 and quote_core_type ty =
   let loc = ty.ctyp_loc in
   match ty.ctyp_desc with
-  | Ttyp_var (name, _) ->
-    let id =
-      Option.map
-        (fun n ->
-          let _, ty = Hashtbl.find vars_env.env_poly n in
-          ty)
-        name
+  | Ttyp_var (None, _) ->
+    apply loc Type.var [none]
+  | Ttyp_var (Some name, _) ->
+    let lam =
+      match Hashtbl.find_opt vars_env.env_poly name with
+      | Some (_, lam) -> lam
+      | None -> begin
+          with_poly_type name;
+          let (_, lam) = Hashtbl.find vars_env.env_poly name in
+          lam
+        end
     in
-    apply loc Type.var [option id]
+    apply loc Type.var [some lam]
   | Ttyp_arrow (arg_lab, ty1, ty2) ->
     let lab = quote_arg_label loc arg_lab
     and ty1 = quote_core_type ty1
@@ -1471,7 +1480,7 @@ and quote_expression_extra _ _ extra lambda =
 and update_env_with_extra extra =
   let extra, _, _ = extra in
   match extra with
-  | Texp_newtype (id, _, _, _) -> with_new_idents_types [id]
+  | Texp_newtype (id, _, _, _) -> with_new_idents_types_constr [id]
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> fatal_error "No support for modes yet"
@@ -1479,7 +1488,7 @@ and update_env_with_extra extra =
 and update_env_without_extra extra =
   let extra, _, _ = extra in
   match extra with
-  | Texp_newtype (id, _, _, _) -> without_idents_types [id]
+  | Texp_newtype (id, _, _, _) -> without_idents_types_constr [id]
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> fatal_error "No support for modes yet"
@@ -1788,5 +1797,15 @@ and quote_expression transl stage e =
   apply loc Exp.mk [desc; attributes]
 
 let transl_quote transl exp loc =
-  let expr = quote_expression transl 0 exp in
-  apply loc Code.of_exp [expr; quote_loc loc]
+  ignore (refresh_env);  (* add correct logic to refreshing identifiers *)
+  let exp_quoted = quote_expression transl 0 exp in
+  if Hashtbl.length vars_env.env_poly = 0 then
+    apply loc Code.of_exp [quote_loc loc; exp_quoted]
+  else
+    let free_type_vars = Hashtbl.to_seq vars_env.env_poly |> List.of_seq in
+    let type_names =
+      List.map (fun p -> apply loc Name.mk [string loc (fst p)]) free_type_vars
+    in
+    let type_idents = List.map (fun p -> fst (snd p)) free_type_vars in
+    let quote_fun = create_list_param_binding type_idents exp_quoted in
+    apply loc Code.of_exp_with_type_vars [quote_loc loc; mk_list type_names; quote_fun]

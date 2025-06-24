@@ -351,7 +351,7 @@ and Type : sig
 
   val variant : Variant_type.t -> t
 
-  val poly : Loc.t -> Name.t list -> (Var.Type_constr.t list -> t) -> t
+  val poly : Loc.t -> Name.t list -> (Var.Type_var.t list -> t) -> t
 
   val package : Module_type.t -> (Fragment.t * t) list -> t
 
@@ -483,7 +483,7 @@ and Function : sig
   val param_module :
     Label.t -> Loc.t -> Name.t -> (Var.Module.t -> Pat.t * t) -> t
 
-  val newtype : Loc.t -> Name.t -> (Var.Type_var.t -> t) -> t
+  val newtype : Loc.t -> Name.t -> (Var.Type_constr.t -> t) -> t
 end
 
 and Comprehension : sig
@@ -611,10 +611,10 @@ and Code : sig
 
   val to_exp : t -> Exp.t
 
-  val of_exp : Exp.t -> Loc.t -> t
+  val of_exp : Loc.t -> Exp.t -> t
 
   val of_exp_with_type_vars :
-    Loc.t -> Name.t list -> (Var.Type_constr.t list -> Exp.t) -> t
+    Loc.t -> Name.t list -> (Var.Type_var.t list -> Exp.t) -> t
 
   module Closed : sig
     type exp = t

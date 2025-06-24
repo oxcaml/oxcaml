@@ -218,6 +218,22 @@ let increase_global_level () =
 let restore_global_level gl =
   global_level := gl
 
+(**** Control variable stage in inference *)
+
+let rec update_variable_stage stage_offset ty name jkind =
+  if stage_offset = 0 then ()
+  else if stage_offset < 0 then begin
+    let v = newgenvar ?name jkind in
+    let ty' = newgenty (Tquote v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset + 1) v name jkind
+  end else begin
+    let v = newgenvar ?name jkind in
+    let ty' = newgenty (Tsplice v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset - 1) v name jkind
+  end
+
 (**** Control tracing of GADT instances *)
 
 let trace_gadt_instances = ref false
@@ -803,22 +819,25 @@ let duplicate_class_type ty =
    [expand_abbrev] (via [subst]) requires these expansions to be
    preserved. Does it worth duplicating this code ?
 *)
-let rec generalize ty =  (* FIXME: stage crossing *)
+let rec generalize stage_offset ty =
   let level = get_level ty in
   if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
-      Tconstr (_, _, abbrev) ->
-        iter_abbrev generalize !abbrev
-    | _ -> ()
+    | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
+    | Tquote ty' -> generalize (stage_offset + 1) ty'
+    | Tsplice ty' -> generalize (stage_offset - 1) ty'
+    | Tconstr (_, _, abbrev) ->
+        iter_abbrev (generalize stage_offset) !abbrev;
+        iter_type_expr (generalize stage_offset) ty
+    | _ -> iter_type_expr (generalize stage_offset) ty
     end;
-    iter_type_expr generalize ty
   end
 
 let generalize ty =
   simple_abbrevs := Mnil;
-  generalize ty
+  generalize 0 ty
 
 (* Generalize the structure and lower the variables *)
 
@@ -868,10 +887,6 @@ let rec generalize_spine ty =
       set_level ty generic_level;
       memo := Mnil;
       List.iter generalize_spine tyl
-  | Tquote tyl ->
-      generalize_spine tyl
-  | Tsplice tyl ->
-      generalize_spine tyl
   | _ -> ()
 
 let forward_try_expand_safe = (* Forward declaration *)
@@ -1301,7 +1316,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
                   Tsubst (ty, None) -> ty
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
-                | Tconstr _ | Tnil ->
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil ->
                     copy more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
@@ -6357,7 +6372,6 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Not_found ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
-    (* FIXME *)
     | (Tquote t1, Tquote t2) ->
          subtype_rec env trace t1 t2 cstrs
     | (Tsplice t1, Tsplice t2) ->
