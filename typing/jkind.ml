@@ -2423,6 +2423,20 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
+let for_or_null_argument ~(why : History.value_creation_reason) =
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation why)
+
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of *)
   let jkind = type_jkind_purely ty in
