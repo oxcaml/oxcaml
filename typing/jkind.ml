@@ -2430,7 +2430,8 @@ let for_or_null_argument ~(why : History.value_creation_reason) =
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
       ~visibility:Visibility.Const_op.max ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Maybe_separable
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
