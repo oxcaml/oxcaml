@@ -546,7 +546,7 @@ val for_float : Ident.t -> Types.jkind_l
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
 (** The jkind for [or_null] type arguments. *)
-val for_or_null_argument : why:History.value_creation_reason -> 'd Types.jkind
+val for_or_null_argument : Ident.t -> 'd Types.jkind
 
 (******************************)
 (* elimination and defaulting *)
