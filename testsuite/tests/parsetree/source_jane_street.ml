@@ -225,6 +225,13 @@ val f3 : packed2 -> unit = <fun>
 val f4 : packed2 -> unit = <fun>
 |}]
 
+(* This needs to be printed with a space after "float#" because of how
+   identifiers ending in "#" are parsed. *)
+let f () = fun () : float# -> #0.
+[%%expect{|
+val f : unit -> unit -> float# = <fun>
+|}]
+
 (******************)
 (* Comprehensions *)
 
