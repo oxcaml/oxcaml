@@ -311,11 +311,9 @@ let add_expose_attribute expr loc attributes =
           | Default_expose -> ()
           | Always_expose | Never_expose ->
             Location.prerr_warning loc
-              (Warnings.Duplicated_attribute "inline")
+              (Warnings.Duplicated_attribute "expose")
         end;
         let attr = { attr with expose } in
-        check_local_inline loc attr;
-        check_poll_inline loc attr;
         lfunction_with_attr ~attr funct
     end
   | _ -> expr
