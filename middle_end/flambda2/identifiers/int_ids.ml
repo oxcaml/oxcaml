@@ -831,7 +831,7 @@ module Code_id_or_symbol = struct
 
   let create_symbol symbol = symbol
 
-  let pattern_match t ~code_id ~symbol =
+  let[@inline always] pattern_match t ~code_id ~symbol =
     let flags = Table_by_int_id.Id.flags t in
     if flags = Code_id_data.flags
     then (code_id [@inlined hint]) t
@@ -900,7 +900,7 @@ module Code_id_or_name = struct
 
   let symbol symbol = symbol
 
-  let pattern_match t ~code_id ~var ~symbol =
+  let[@inline always] pattern_match t ~code_id ~var ~symbol =
     let flags = Table_by_int_id.Id.flags t in
     if flags = Code_id_data.flags
     then (code_id [@inlined hint]) t
