@@ -30,9 +30,6 @@ Working version
   and RISC-V.  This reduces minor GC work in the presence of deep call stacks.
   (Xavier Leroy, review by Miod Vallat, Gabriel Scherer and Olivier Nicole)
 
-- #14057: Don't update memprof too early at the end of a minor GC.
-  (Nick Barnes, review by Damien Doligez).
-
 ### Code generation and optimizations:
 
 ### Standard library:
@@ -65,18 +62,6 @@ Working version
 - #13781: Set scope of internal type nodes during abbreviation expansion
   rather than recursing during unification.
   (Jacques Garrigue, review by Gabriel Scherer)
-
-* #13830: fail rather than silently create abstract module types when avoiding
-  (i.e. hiding) signature items, as in:
-  ```ocaml
-    module N = struct
-      open (struct type t = A | B end)
-      module type T = sig type u = t * int end
-    end
-  ```
-  Before, it was succeeding with `module N : sig module type T end`, now it
-  fails. Similarly for anonymous functor calls (of the form `F(struct ... end))
-  (Clement Blaudeau, review by Gabriel Scherer)
 
 * #14066: catch invalid aliases introduced by signature constraints during
   merging rather than in subtyping:
@@ -181,10 +166,6 @@ Working version
   handling deep constraints.
   (Clement Blaudeau, review by Florian Angeletti and Samuel Vivien)
 
-* #13972: Renamed the `-no-alias-deps` flag internal representation to
-  `no_alias_deps` instead of `transparent_modules`.
-  (Clement Blaudeau, review by Gabriel Scherer)
-
 - #13980 Refactor `type-approx` and improve some errors' locations.
   (Leo White, Ulysse Gérard, review by Samuel Vivien and Florian Angeletti)
 
@@ -197,10 +178,6 @@ Working version
 - #13656: Use C99 stdint.h/inttypes.h fixed-width integer types and
   macros to define OCaml integers.
   (Antonin Décimo, review by Nick Barnes)
-
-- #14105: Fix a loop in Pprintast that could result in a hang when printing
-  constructor `(::)` in isolation.
-  (Ulysse Gérard, review by Nicolás Ojeda Bär and Florian Angeletti)
 
 ### Build system:
 
@@ -471,6 +448,9 @@ OCaml 5.4.0
   (Gabriel Scherer, review by Damien Doligez and Guillaume Munch-Maccagnoni,
    report by Emilio Jesús Gallego Arias and Olivier Nicole)
 
+- #14057: Don't update memprof too early at the end of a minor GC.
+  (Nick Barnes, review by Damien Doligez).
+
 ### Code generation and optimizations:
 
 - #13262, #14074: fix performance issue on Apple Silicon macOS by emitting
@@ -606,6 +586,20 @@ OCaml 5.4.0
 
 - #13732: Document that custom finalizers must not access the OCaml heap, etc.
   (Josh Berdine, review by Stephen Dolan and Guillaume Munch-Maccagnoni)
+
+### Type system
+
+* #13830: fail rather than silently create abstract module types when avoiding
+  (i.e. hiding) signature items, as in:
+  ```ocaml
+    module N = struct
+      open (struct type t = A | B end)
+      module type T = sig type u = t * int end
+    end
+  ```
+  Before, it was succeeding with `module N : sig module type T end`, now it
+  fails. Similarly for anonymous functor calls (of the form `F(struct ... end))
+  (Clement Blaudeau, review by Gabriel Scherer)
 
 ### Compiler user-interface and warnings:
 
@@ -756,6 +750,10 @@ OCaml 5.4.0
 - #13971: Keep generalized structure from patterns when typing `let`
   (Leo White, review by Samuel Vivien and Florian Angeletti)
 
+* #13972: Renamed the `-no-alias-deps` flag internal representation to
+  `no_alias_deps` instead of `transparent_modules`.
+  (Clement Blaudeau, review by Gabriel Scherer)
+
 ### Build system:
 
 * #13526, #13789, #13804: Simplify the build of cross compilers
@@ -895,6 +893,13 @@ OCaml 5.4.0
   (Ulysse Gérard, review by Florian Angeletti)
 
 - #14070: also point to label mismatches in error messages for labelled tuples
+  (Florian Angeletti, review by Gabriel Scherer)
+
+- #14105: Fix a loop in Pprintast that could result in a hang when printing
+  constructor `(::)` in isolation.
+  (Ulysse Gérard, review by Nicolás Ojeda Bär and Florian Angeletti)
+
+- #14108: toplevel, fix a typo in directive type mismatch
   (Florian Angeletti, review by Gabriel Scherer)
 
 OCaml 5.3.0 (8 January 2025)
