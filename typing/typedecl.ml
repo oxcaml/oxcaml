@@ -3030,7 +3030,7 @@ let transl_extension_constructor ~scope env type_path type_params
               | _ -> ())
             typext_params
         end;
-        begin match Ctype.check_constructor_crossing env cdescr.cstr_tag
+        begin match Ctype.check_constructor_crossing Rebinding env cdescr.cstr_tag
           ~res:cstr_res ~args held_locks with
         | Ok () -> ()
         | Error e -> raise (Error (lid.loc, Constructor_submode_failed e))
@@ -4732,7 +4732,9 @@ let report_error ppf = function
       fprintf ppf "@[This constructor is at mode %a, \
         but expected to be at mode %a.@]"
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right;
+      fprintf ppf "@[<hv>@[@{<hint>Hint@}: all argument types must \
+        mode-cross for rebinding to succeed.@]"
 
 let () =
   Location.register_error_of_exn

@@ -3051,13 +3051,6 @@ and type_pat_aux
         solve_Ppat_construct ~refine:false tps penv loc constr no_existentials
           existential_styp expected_ty
       in
-      begin match Ctype.check_constructor_crossing !!penv constr.cstr_tag
-        ~res:expected_ty ~args held_locks with
-      | Ok () -> ()
-      | Error e ->
-          raise (Error(lid.loc, !!penv,
-            Submode_failed(e, Other, None, None, None, None)))
-      end;
 
       let rec check_non_escaping p =
         match p.ppat_desc with
@@ -3076,11 +3069,18 @@ and type_pat_aux
         Option.iter (fun (_, sarg) -> check_non_escaping sarg) sarg
       end;
 
+      let constructor_mode =
+        Ctype.check_constructor_crossing Destruction !!penv constr.cstr_tag
+          ~res:expected_ty ~args held_locks
+      in
       let args =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
               Modality.Value.Const.apply arg.ca_modalities alloc_mode.mode
+             in
+             let alloc_mode =
+              Mode.Value.join [ alloc_mode; constructor_mode ]
              in
              let alloc_mode = simple_pat_mode alloc_mode in
              type_pat ~alloc_mode tps Value p arg.ca_type)
@@ -8706,13 +8706,6 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
         List.iter (fun {Types.ca_type=ty; _} -> generalize_structure ty) ty_args)
   in
   let ty_args, ty_res, texp = unify_as_construct ty_expected in
-  begin match Ctype.check_constructor_crossing env constr.cstr_tag
-    ~res:ty_res ~args:ty_args held_locks with
-  | Ok () -> ()
-  | Error e ->
-      raise (Error (lid.loc, env, Submode_failed(e, Other, None, None, None,
-        None)))
-  end;
   let ty_args0, ty_res =
     match instance_list (ty_res :: (List.map (fun ca -> ca.Types.ca_type) ty_args)) with
       t :: tl -> tl, t
@@ -8734,6 +8727,14 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       | _ ->
         raise (Error(loc, env, Inlined_record_expected))
       end
+  in
+  let constructor_mode =
+    Ctype.check_constructor_crossing Creation env constr.cstr_tag
+      ~res:ty_res ~args:ty_args held_locks
+  in
+  let expected_mode =
+    { expected_mode with mode =
+      Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
   in
   let (argument_mode, alloc_mode) =
     match constr.cstr_repr with
