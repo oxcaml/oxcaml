@@ -104,7 +104,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -127,7 +127,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -153,7 +153,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -185,7 +185,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -214,7 +214,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -237,7 +237,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -260,7 +260,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -283,7 +283,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -306,7 +306,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -329,7 +329,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -352,7 +352,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -375,7 +375,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -398,7 +398,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -421,7 +421,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -444,7 +444,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -467,7 +467,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -490,7 +490,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -513,7 +513,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -539,7 +539,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -571,7 +571,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -603,7 +603,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -635,7 +635,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -664,7 +664,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -687,7 +687,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -710,7 +710,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -733,7 +733,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -756,7 +756,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -779,7 +779,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -805,7 +805,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -834,7 +834,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -860,7 +860,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -892,7 +892,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -927,7 +927,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -956,7 +956,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -991,7 +991,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1032,7 +1032,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1067,7 +1067,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1096,7 +1096,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1125,7 +1125,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1154,7 +1154,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1183,7 +1183,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1212,7 +1212,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1241,7 +1241,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1270,7 +1270,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1299,7 +1299,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1328,7 +1328,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1357,7 +1357,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1386,7 +1386,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1415,7 +1415,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1444,7 +1444,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1479,7 +1479,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1520,7 +1520,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1561,7 +1561,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1602,7 +1602,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1637,7 +1637,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1666,7 +1666,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1695,7 +1695,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1724,7 +1724,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1753,7 +1753,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1782,7 +1782,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1817,7 +1817,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1852,7 +1852,7 @@
  (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1887,7 +1887,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1928,7 +1928,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -1969,7 +1969,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2010,7 +2010,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2051,7 +2051,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2092,7 +2092,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2133,7 +2133,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2174,7 +2174,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2215,7 +2215,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2256,7 +2256,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2297,7 +2297,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2338,7 +2338,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2379,7 +2379,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2420,7 +2420,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2461,7 +2461,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2502,7 +2502,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2543,7 +2543,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2584,7 +2584,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2625,7 +2625,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2666,7 +2666,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2707,7 +2707,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2748,7 +2748,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2789,7 +2789,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2830,7 +2830,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2871,7 +2871,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2912,7 +2912,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2953,7 +2953,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -2994,7 +2994,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -3035,7 +3035,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -3076,7 +3076,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -3117,7 +3117,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -3158,7 +3158,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -3199,7 +3199,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule
@@ -3240,7 +3240,7 @@
            (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_helpers simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs))
 
 (rule

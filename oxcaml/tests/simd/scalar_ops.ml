@@ -70,10 +70,9 @@ module Int = struct
   let rec popcnt i = if i = 0 then 0 else (i land 1) + popcnt (i lsr 1)
 
   let () =
-    Test_helpers.run_if_not_under_rosetta2 ~f:(fun () ->
-        check count_leading_zeros clz;
-        check count_leading_zeros2 clz;
-        check count_trailing_zeros ctz);
+    check count_leading_zeros clz;
+    check count_leading_zeros2 clz;
+    check count_trailing_zeros ctz;
     check count_set_bits popcnt;
     check count_set_bits2 popcnt
 end
@@ -139,11 +138,10 @@ module Int64 = struct
     else Int64.(logand i 1L |> to_int) + popcnt Int64.(shift_right_logical i 1)
 
   let () =
-    Test_helpers.run_if_not_under_rosetta2 ~f:(fun () ->
-        check count_leading_zeros clz;
-        check ~nonzero:true count_leading_zeros_nonzero_arg clz;
-        check count_trailing_zeros ctz;
-        check ~nonzero:true count_trailing_zeros_nonzero_arg ctz);
+    check count_leading_zeros clz;
+    check ~nonzero:true count_leading_zeros_nonzero_arg clz;
+    check count_trailing_zeros ctz;
+    check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
     check count_set_bits popcnt
 end
 
@@ -208,10 +206,9 @@ module Int32 = struct
     else Int32.(logand i 1l |> to_int) + popcnt Int32.(shift_right_logical i 1)
 
   let () =
-    Test_helpers.run_if_not_under_rosetta2 ~f:(fun () ->
-        check count_leading_zeros clz;
-        check ~nonzero:true count_leading_zeros_nonzero_arg clz;
-        check count_trailing_zeros ctz;
-        check ~nonzero:true count_trailing_zeros_nonzero_arg ctz);
+    check count_leading_zeros clz;
+    check ~nonzero:true count_leading_zeros_nonzero_arg clz;
+    check count_trailing_zeros ctz;
+    check ~nonzero:true count_trailing_zeros_nonzero_arg ctz;
     check count_set_bits popcnt
 end
