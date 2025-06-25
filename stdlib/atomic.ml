@@ -109,26 +109,26 @@ module Contended = struct
     = "%atomic_load"
 
   external set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a @ portable -> unit
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> unit
     @@ portable
     = "%atomic_set"
 
   external exchange
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a @ portable -> 'a
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a
     @@ portable
     = "%atomic_exchange"
 
   external compare_and_set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a -> 'a @ portable -> bool
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a -> bool
     @@ portable
     = "%atomic_cas"
 
   external compare_exchange
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a -> 'a @ portable -> 'a @ contended
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a -> 'a
     @@ portable
     = "%atomic_compare_exchange"
 end

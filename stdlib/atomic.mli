@@ -101,8 +101,8 @@ val incr : int t @ contended local -> unit
 (** [decr r] atomically decrements the value of [r] by [1]. *)
 val decr : int t @ contended local -> unit
 
-(** Submodule containing non-backwards-compatible functions which enforce thread
-    safety via modes. *)
+(** Operations that act over contended atomics. This imposes some extra mode
+    constraints for safety. *)
 module Contended : sig
   (** Like {!get}, but can be called on an atomic that came from another domain. *)
   external get
@@ -113,29 +113,29 @@ module Contended : sig
 
   (** Like {!set}, but can be called on an atomic that came from another domain. *)
   external set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a @ portable -> unit
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> unit
     = "%atomic_set"
 
   (** Like {!exchange}, but can be called on an atomic that came from another
       domain. *)
   external exchange
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a @ portable -> 'a
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a
     = "%atomic_exchange"
 
   (** Like {!compare_and_set}, but can be called on an atomic that came from
       another domain. *)
   external compare_and_set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a -> 'a @ portable -> bool
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a -> bool
     = "%atomic_cas"
 
   (** Like {!compare_exchange}, but can be called on an atomic that came from
       another domain. *)
   external compare_exchange
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a -> 'a @ portable -> 'a @ contended
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a -> 'a -> 'a
     = "%atomic_compare_exchange"
 end
 
