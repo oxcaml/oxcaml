@@ -764,6 +764,10 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
             Translattribute.add_inline_attribute module_body mb.mb_loc
                                                  mb.mb_attributes
           in
+          let module_body =
+            Translattribute.add_expose_attribute module_body mb.mb_loc
+                                                 mb.mb_attributes
+          in
           (* Translate remainder second *)
           let body, size =
             transl_structure ~scopes loc (cons_opt id fields)
