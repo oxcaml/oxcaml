@@ -312,6 +312,11 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
            and because it could be potentially confusing that there is a second
            source of information used to determine array type kinds (in addition
            to the type kind of the array parameter). See PR #4098.
+
+           Using its jkind to determine a non-value array kind would also only
+           be useful for explicit user-written primitives. In other cases where
+           we compute an array kind (array matching, array comprehension),
+           [elt_ty] is [None].
         *)
         raise (Error(loc,
           Opaque_array_non_value {
