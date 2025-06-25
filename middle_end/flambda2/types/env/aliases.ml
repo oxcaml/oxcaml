@@ -114,7 +114,7 @@ end = struct
     }
 
   let invariant { aliases; all } =
-    if Flambda_features.check_light_invariants ()
+    if Flambda_features.check_invariants ()
     then
       (* The elements in [aliases] have disjoint set of keys. *)
       let aliases_union : Map_to_canonical.t =
