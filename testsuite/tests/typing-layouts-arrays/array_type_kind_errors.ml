@@ -183,3 +183,30 @@ Error: This array operation cannot tell whether M.t is an array type,
          because it's the element type for an array operation with an opaque
          array type.
 |}]
+
+(* When part of the arrow type is behind an alias, it is disallowed by the
+   primitive arity check. *)
+type abstract_ufloat_array
+[%%expect{|
+type abstract_ufloat_array
+|}]
+
+type foo = int -> float#
+external array_get : abstract_ufloat_array -> foo = "%array_unsafe_get"
+[%%expect{|
+type foo = int -> float#
+Line 2, characters 0-71:
+2 | external array_get : abstract_ufloat_array -> foo = "%array_unsafe_get"
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Wrong arity for builtin primitive "%array_unsafe_get"
+|}]
+
+type foo = int -> float# -> unit
+external array_set : abstract_ufloat_array -> foo = "%array_unsafe_set"
+[%%expect{|
+type foo = int -> float# -> unit
+Line 2, characters 0-71:
+2 | external array_set : abstract_ufloat_array -> foo = "%array_unsafe_set"
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Wrong arity for builtin primitive "%array_unsafe_set"
+|}]
