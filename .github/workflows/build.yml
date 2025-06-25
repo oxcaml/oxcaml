@@ -60,12 +60,6 @@ jobs:
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
-          - name: flambda2_o3_heap
-            config: --enable-middle-end=flambda2 --disable-stack-allocation
-            os: ubuntu-latest
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
-
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: ubuntu-latest
