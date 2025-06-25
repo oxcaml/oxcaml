@@ -540,11 +540,11 @@ end = struct
     | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8 | Eorq_s8 | Negq_s8 | Cntq_u8
     | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _ | Shlq_n_u8 _ | Shrq_n_u8 _
     | Shrq_n_s8 _ | Getq_lane_s8 _ | Setq_lane_s8 _ | Dupq_lane_s8 _ | Extq_u8 _
-    | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16
-    | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64 | Movn_high_s32
-    | Movn_s32 | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16
-    | Mullq_high_s16 | Mullq_high_u16 | Movl_s16 | Movl_u16 | Movl_s8 | Movl_u8
-      ->
+    | Qmovn_high_s64 | Qmovn_s64 | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32
+    | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16
+    | Movn_high_s64 | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16
+    | Mullq_s16 | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 | Movl_s16
+    | Movl_u16 | Movl_s8 | Movl_u8 ->
       1
 
   let emit_rounding_mode (rm : Simd.Rounding_mode.t) : I.Rounding_mode.t =
@@ -676,8 +676,8 @@ end = struct
     | Qsubq_u16 | Qsubq_u8 -> ins I.UQSUB operands
     | Cntq_u16 | Cntq_u8 -> ins I.CNT operands
     | Extq_u8 n -> ins I.EXT (Array.append operands [| imm n |])
-    | Qmovn_high_s32 | Qmovn_high_s16 -> ins I.SQXTN2 operands
-    | Qmovn_s32 | Qmovn_s16 -> ins I.SQXTN operands
+    | Qmovn_high_s64 | Qmovn_high_s32 | Qmovn_high_s16 -> ins I.SQXTN2 operands
+    | Qmovn_s64 | Qmovn_s32 | Qmovn_s16 -> ins I.SQXTN operands
     | Qmovn_high_u32 | Qmovn_high_u16 -> ins I.UQXTN2 operands
     | Qmovn_u32 | Qmovn_u16 -> ins I.UQXTN operands
     | Movn_s64 | Movn_s32 | Movn_s16 -> ins I.XTN operands

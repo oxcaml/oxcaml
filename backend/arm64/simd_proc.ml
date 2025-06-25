@@ -128,11 +128,11 @@ let register_behavior (op : Simd.operation) =
     Rs32x2_to_Rs64x2
   | Movl_s16 | Movl_u16 -> Rs16x4_to_Rs32x4
   | Movl_s8 | Movl_u8 -> Rs8x8_to_Rs16x8
-  | Movn_s64 ->
+  | Movn_s64 | Qmovn_s64 ->
     (* Output should be in Vec128 register but only the bottom s32x2 is used by
        this instruction. *)
     Rs64x2_to_Rs32x2
-  | Movn_high_s64 -> Rs32x4_Rs64x2_to_First
+  | Movn_high_s64 | Qmovn_high_s64 -> Rs32x4_Rs64x2_to_First
   | Qmovn_u32 | Qmovn_s32 | Movn_s32 -> Rs32x4_to_Rs16x4
   | Qmovn_high_s32 | Qmovn_high_u32 | Movn_high_s32 -> Rs16x8_Rs32x4_to_First
   | Qmovn_u16 | Qmovn_s16 | Movn_s16 -> Rs16x8_to_Rs8x8
