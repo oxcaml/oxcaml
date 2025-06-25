@@ -601,8 +601,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   d = next_free_domain();
 
-  if (d == NULL)
-    goto domain_init_complete;
+  if (d == NULL) {
+    goto fail_domain;
+  }
 
   s = &d->interruptor;
   CAMLassert(!s->running);
@@ -623,7 +624,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     domain_state = (caml_domain_state*)
       caml_stat_calloc_noexc(1, sizeof(caml_domain_state));
     if (domain_state == NULL)
-      goto domain_init_complete;
+      goto fail_domain_state;
     d->state = domain_state;
   } else {
     domain_state = d->state;
@@ -658,7 +659,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   CAMLassert(domain_state->memprof == NULL);
   caml_memprof_new_domain(parent, domain_state);
   if (!domain_state->memprof) {
-    goto init_memprof_failure;
+    goto fail_memprof;
   }
 
   CAMLassert(!interruptor_has_pending(s));
@@ -678,40 +679,39 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->minor_tables = caml_alloc_minor_tables();
   if(domain_state->minor_tables == NULL) {
-    goto alloc_minor_tables_failure;
+    goto fail_minor_tables;
   }
 
   d->state->shared_heap = caml_init_shared_heap();
   if(d->state->shared_heap == NULL) {
-    goto init_shared_heap_failure;
+    goto fail_shared_heap;
   }
 
   if (caml_init_major_gc(domain_state) < 0) {
-    goto init_major_gc_failure;
+    goto fail_major_gc;
   }
 
   if(caml_reallocate_minor_heap(initial_minor_heap_wsize) < 0) {
-    goto reallocate_minor_heap_failure;
+    goto fail_minor_heap;
   }
 
   domain_state->in_minor_collection = 0;
 
   domain_state->dls_root = Val_unit;
+  /* This call may fail, but fatally so we don't need an error path */
   caml_register_generational_global_root(&domain_state->dls_root);
 
   domain_state->stack_cache = caml_alloc_stack_cache();
   if(domain_state->stack_cache == NULL) {
-    goto create_stack_cache_failure;
+    goto fail_stack_cache;
   }
 
   domain_state->extern_state = NULL;
-
   domain_state->intern_state = NULL;
 
-  domain_state->current_stack =
-      caml_alloc_main_stack(stack_wsize);
+  domain_state->current_stack = caml_alloc_main_stack(stack_wsize);
   if(domain_state->current_stack == NULL) {
-    goto alloc_main_stack_failure;
+    goto fail_main_stack;
   }
 
   /* No remaining failure cases: domain creation is going to succeed,
@@ -741,6 +741,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->backtrace_buffer = NULL;
   domain_state->backtrace_last_exn = Val_unit;
   domain_state->backtrace_active = 0;
+
+  /* This call may fail, but fatally so we don't need an error path */
   caml_register_generational_global_root(&domain_state->backtrace_last_exn);
 
   domain_state->local_sp = 0;
@@ -772,30 +774,34 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 #endif
 
   add_next_to_stw_domains();
-  goto domain_init_complete;
+  CAML_GC_MESSAGE(DOMAIN, "Creation complete.\n");
+  caml_plat_unlock(&all_domains_lock);
+  return;
 
-alloc_main_stack_failure:
-create_stack_cache_failure:
+fail_main_stack:
+  // caml_free_stack_cache()
+fail_stack_cache:
   caml_remove_generational_global_root(&domain_state->dls_root);
-reallocate_minor_heap_failure:
+  free_minor_heap();
+fail_minor_heap:
   caml_teardown_major_gc();
-init_major_gc_failure:
+fail_major_gc:
   caml_teardown_shared_heap(d->state->shared_heap);
-init_shared_heap_failure:
+fail_shared_heap:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
-alloc_minor_tables_failure:
+fail_minor_tables:
   caml_memprof_delete_domain(domain_state);
-init_memprof_failure:
+fail_memprof:
+  atomic_store_explicit(&s->interrupt_word, NULL, memory_order_release);
+  caml_stat_free(d->state);
+  d->state = NULL;
   domain_self = NULL;
-
-
-domain_init_complete:
-  if (domain_self) {
-    CAML_GC_MESSAGE(DOMAIN, "Creation complete.\n");
-  } else {
-    CAML_GC_MESSAGE(DOMAIN, "Creation failed.\n");
-  }
+  caml_state = NULL;
+fail_domain_state:
+  caml_plat_unlock(&d->domain_lock);
+fail_domain:
+  CAML_GC_MESSAGE(DOMAIN, "Creation failed.\n");
   caml_plat_unlock(&all_domains_lock);
 }
 
