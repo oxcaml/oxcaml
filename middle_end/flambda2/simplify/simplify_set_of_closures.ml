@@ -280,15 +280,19 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
 let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
+    ~(expose : Expose_attribute.t)
     ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
     ~lifted_consts_this_function ~params : _ Or_unknown_or_bottom.t =
   if is_opaque then Unknown else
     match return_cont_uses with
     | None -> Bottom
     | Some uses ->
-        if not (Flambda_features.function_result_types ~is_a_functor) then
-          Unknown
-        else
+        let function_result_types = Flambda_features.function_result_types ~is_a_functor in
+        match expose, function_result_types with
+        | Never_expose, _
+        | Default_expose, false -> Unknown
+        | Always_expose, _
+        | Default_expose, true ->
     let env_at_fork =
       (* We use [C.dacc_inside_functions] not [C.dacc_prior_to_sets] to ensure
          that the environment contains bindings for any symbols being defined by
@@ -423,10 +427,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   in
   let is_a_functor = Code.is_a_functor code in
   let is_opaque = Code.is_opaque code in
+  let expose = Code.expose code in
   let result_types =
     compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
       ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
-      ~lifted_consts_this_function ~params
+      ~lifted_consts_this_function ~params ~expose
   in
   let outer_dacc =
     (* This is the complicated part about slot offsets. We just traversed the
