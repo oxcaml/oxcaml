@@ -29,6 +29,9 @@ let is_inlined_attribute =
   ; "unrolled", return_if_flambda
   ]
 
+let is_expose_attribute =
+  [ "expose", Return ]
+
 let is_specialise_attribute =
   [ "specialise", return_if_flambda ]
 
@@ -125,6 +128,19 @@ let parse_inlined_attribute attr : inlined_attribute =
         ]
         payload
 
+let parse_expose_attribute attr : expose_attribute =
+  match attr with
+  | None -> Default_expose
+  | Some {Parsetree.attr_name = {txt;loc}; attr_payload = payload} ->
+      parse_id_payload txt loc
+        ~default:Default_expose
+        ~empty:Always_expose
+        [
+          "never", Never_expose;
+          "always", Always_expose;
+        ]
+        payload
+
 let parse_specialise_attribute attr =
   match attr with
   | None -> Default_specialise
@@ -190,6 +206,10 @@ let parse_opaque_attribute attr =
 let get_inline_attribute l =
   let attr = find_attribute is_inline_attribute l in
   parse_inline_attribute attr
+
+let get_expose_attribute l =
+  let attr = find_attribute is_expose_attribute l in
+  parse_expose_attribute attr
 
 let get_specialise_attribute l =
   let attr = find_attribute is_specialise_attribute l in

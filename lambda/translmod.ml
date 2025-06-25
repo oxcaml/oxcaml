@@ -580,6 +580,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
     ~return:Lambda.layout_module
     ~attr:{
       inline = inline_attribute;
+      expose = Default_expose; (* TODO XXX *)
       specialise = Default_specialise;
       local = Default_local;
       poll = Default_poll;

@@ -470,6 +470,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~first_complex_local_param:(Code.first_complex_local_param code)
       ~result_arity ~result_types ~result_mode:(Code.result_mode code)
       ~stub:(Code.stub code) ~inline:(Code.inline code)
+      ~expose:(Code.expose code)
       ~zero_alloc_attribute:(Code.zero_alloc_attribute code)
       ~poll_attribute:(Code.poll_attribute code) ~is_a_functor ~is_opaque
       ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments

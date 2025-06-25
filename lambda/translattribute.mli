@@ -23,6 +23,10 @@ val get_inline_attribute
    : Parsetree.attributes
   -> Lambda.inline_attribute
 
+val get_expose_attribute
+   : Parsetree.attributes
+  -> Lambda.expose_attribute
+
 val add_specialise_attribute
    : Lambda.lambda
   -> Location.t
