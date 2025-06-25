@@ -420,7 +420,7 @@ end
 
 let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
     ~index ~prev_updates =
-  let To_cmm_env.{ env; res; expr = { cmm; free_vars; effs } } =
+  let To_cmm_env.{ env; res; expr = { cmm = field_value; free_vars; effs } } =
     To_cmm_env.inline_variable env res var
   in
   let cmm =
@@ -446,7 +446,8 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
     match must_use_setfield with
     | Some imm_or_ptr ->
       assert (stride = Arch.size_addr);
-      Cmm_helpers.setfield index imm_or_ptr Root_initialization symbol cmm dbg
+      Cmm_helpers.setfield index imm_or_ptr Root_initialization symbol
+        field_value dbg
     | None ->
       let memory_chunk : Cmm.memory_chunk =
         match kind with
@@ -471,18 +472,33 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
         | Naked_vec512 -> Fivetwelve_unaligned
       in
       let addr = strided_field_address symbol ~stride ~index dbg in
-      store ~dbg memory_chunk Initialization ~addr ~new_value:cmm
+      store ~dbg memory_chunk Initialization ~addr ~new_value:field_value
   in
-  let update =
-    match prev_updates with
-    | None -> To_cmm_env.{ cmm; free_vars; effs }
-    | Some (prev : To_cmm_env.expr_with_info) ->
-      let cmm = sequence prev.cmm cmm in
-      let free_vars = Backend_var.Set.union prev.free_vars free_vars in
-      let effs = Ece.join prev.effs effs in
-      To_cmm_env.{ cmm; free_vars; effs }
+  (* We dont need the `return_unit` part of the assignment/initialization
+
+     CR gury: we could instead add this simplification in `Cmm_helpers.sequence`
+     to remove unnecessary unit returns in between expressions that are
+     sequenced. *)
+  let cmm =
+    match[@warning "-4"] cmm with
+    | Csequence (cmm, Cconst_int (1, _)) -> cmm
+    | _ -> cmm
   in
-  env, res, Some update
+  match[@warning "-4"] field_value with
+  | Cvar v ->
+    let env = To_cmm_env.add_symbol_init env v cmm in
+    env, res, prev_updates
+  | _ ->
+    let update =
+      match prev_updates with
+      | None -> To_cmm_env.{ cmm; free_vars; effs }
+      | Some (prev : To_cmm_env.expr_with_info) ->
+        let cmm = sequence prev.cmm cmm in
+        let free_vars = Backend_var.Set.union prev.free_vars free_vars in
+        let effs = Ece.join prev.effs effs in
+        To_cmm_env.{ cmm; free_vars; effs }
+    in
+    env, res, Some update
 
 let check_arity arity args =
   Flambda_arity.cardinal_unarized arity = List.length args
