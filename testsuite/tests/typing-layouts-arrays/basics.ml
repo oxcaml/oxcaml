@@ -15,35 +15,35 @@
 (*******************************************)
 (* Test 1: Support unboxed types in arrays *)
 
-type t_any_non_null : any_non_null
+type t_any mod separable : any mod separable
 
 type t1 = float# array
 type t2 = int32# array
 type t3 = int64# array
 type t4 = nativeint# array
-type t5 = t_any_non_null array
+type t5 = t_any mod separable array
 type t6 = float32# array
 
 type ('a : float64) t1' = 'a array
 type ('a : bits32) t2' = 'a array
 type ('a : bits64) t3' = 'a array
 type ('a : word) t4' = 'a array
-type ('a : any_non_null) t5' = 'a array
+type ('a : any mod separable) t5' = 'a array
 type ('a : float32) t6' = 'a array
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any mod separable : any mod separable
 type t1 = float# array
 type t2 = int32# array
 type t3 = int64# array
 type t4 = nativeint# array
-type t5 = t_any_non_null array
+type t5 = t_any mod separable array
 type t6 = float32# array
 type ('a : float64) t1' = 'a array
 type ('a : bits32) t2' = 'a array
 type ('a : bits64) t3' = 'a array
 type ('a : word) t4' = 'a array
-type ('a : any_non_null) t5' = 'a array
+type ('a : any mod separable) t5' = 'a array
 type ('a : float32) t6' = 'a array
 |}];;
 
@@ -130,11 +130,11 @@ external get : floatarray -> int -> float = "%floatarray_safe_get"
 val d : float# array -> float = <fun>
 |}];;
 
-external get : ('a : any_non_null). 'a array -> int -> float = "%floatarray_safe_get"
+external get : ('a : any mod separable). 'a array -> int -> float = "%floatarray_safe_get"
 let d (x : 'a array) = get x 0
 
 [%%expect{|
-external get : ('a : any_non_null). 'a array -> int -> float
+external get : ('a : any mod separable). 'a array -> int -> float
   = "%floatarray_safe_get"
 val d : 'a array -> float = <fun>
 |}];;
@@ -190,7 +190,7 @@ Error: Floatarray primitives can't be used on arrays containing
 (**************************)
 (* Test 5: [@layout_poly] *)
 
-external[@layout_poly] get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
+external[@layout_poly] get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_get"
 let f1 (x : float# array) = get x 0
 let f2 (x : int32# array) = get x 0
 let f3 (x : int64# array) = get x 0
@@ -198,8 +198,8 @@ let f4 (x : nativeint# array) = get x 0
 let f5 (x : float32# array) = get x 0
 
 [%%expect{|
-external get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
-  [@@layout_poly]
+external get : ('a : any mod separable). 'a array -> int -> 'a
+  = "%array_safe_get" [@@layout_poly]
 val f1 : float# array -> float# = <fun>
 val f2 : int32# array -> int32# = <fun>
 val f3 : int64# array -> int64# = <fun>
@@ -207,7 +207,7 @@ val f4 : nativeint# array -> nativeint# = <fun>
 val f5 : float32# array -> float32# = <fun>
 |}];;
 
-external[@layout_poly] set : ('a : any_non_null). 'a array -> int -> 'a -> unit = "%array_safe_set"
+external[@layout_poly] set : ('a : any mod separable). 'a array -> int -> 'a -> unit = "%array_safe_set"
 let f1 (x : float# array) v = set x 0 v
 let f2 (x : int32# array) v = set x 0 v
 let f3 (x : int64# array) v = set x 0 v
@@ -215,7 +215,7 @@ let f4 (x : nativeint# array) v = set x 0 v
 let f5 (x : float32# array) v = set x 0 v
 
 [%%expect{|
-external set : ('a : any_non_null). 'a array -> int -> 'a -> unit
+external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f1 : float# array -> float# -> unit = <fun>
 val f2 : int32# array -> int32# -> unit = <fun>
@@ -255,7 +255,7 @@ Error: This expression has type "int64#" but an expression was expected of type
 module M6_2 = struct
   (* sort var in exp *)
 
-  external[@layout_poly] get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
+  external[@layout_poly] get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_get"
 
   let arr = [||]
 
