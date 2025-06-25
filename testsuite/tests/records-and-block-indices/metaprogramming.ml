@@ -33,14 +33,12 @@ module Boxing = struct
 end
 
 module Layout = struct
-  type value_kind =
-    | Addr_non_float
-    | Immediate
-    | Float
-
   type t =
     | Product of t list
-    | Value of value_kind
+    | Value of
+        { ignorable : bool;
+          non_float : bool
+        }
     | Float64
     | Float32
     | Bits64
@@ -58,10 +56,9 @@ module Layout = struct
 
   let rec all_ignorable t =
     match t with
-    | Value Immediate | Float64 | Float32 | Bits64 | Bits32 | Vec128 | Word ->
-      true
+    | Value { ignorable; _ } -> ignorable
+    | Float64 | Float32 | Bits64 | Bits32 | Vec128 | Word -> true
     | Void -> true
-    | Value Addr_non_float | Value Float -> false
     | Product ts -> List.for_all ts ~f:all_ignorable
 
   let rec contains_vec128 t =
@@ -80,10 +77,8 @@ module Layout = struct
 
   let rec is_non_float t =
     match t with
-    | Value Float -> false
-    | Value (Immediate | Addr_non_float)
-    | Bits32 | Bits64 | Float64 | Float32 | Vec128 | Word | Void ->
-      true
+    | Value { non_float; _ } -> non_float
+    | Bits32 | Bits64 | Float64 | Float32 | Vec128 | Word | Void -> true
     | Product ts -> List.for_all ts ~f:is_non_float
 
   let rec all_void t =
@@ -237,6 +232,7 @@ end
 module Type_structure = struct
   type t =
     | Record of t list * Boxing.t
+    | Variant of t list list
     | Tuple of t list * Boxing.t
     | Option of t
     | Int
@@ -254,6 +250,8 @@ module Type_structure = struct
     | String
     | Int64x2_u
 
+  let rec scrape t = match t with Record ([t], Unboxed) -> scrape t | _ -> t
+
   let compare : t -> t -> int = Stdlib.compare
 
   let rec layout t : Layout.t =
@@ -264,9 +262,17 @@ module Type_structure = struct
     | Record (_, Boxed)
     | Tuple (_, Boxed)
     | Option _ | String | Int64 | Nativeint | Float32 | Int32 ->
-      Value Addr_non_float
-    | Int -> Value Immediate
-    | Float -> Value Float
+      Value { ignorable = false; non_float = true }
+    | Variant constructors ->
+      let constructor_is_immediate args =
+        List.for_all args ~f:(fun t -> Layout.all_void (layout t))
+      in
+      Value
+        { ignorable = List.for_all constructors ~f:constructor_is_immediate;
+          non_float = true
+        }
+    | Int -> Value { ignorable = true; non_float = true }
+    | Float -> Value { ignorable = false; non_float = false }
     | Int64_u -> Bits64
     | Int32_u -> Bits32
     | Float32_u -> Float32
@@ -278,12 +284,14 @@ module Type_structure = struct
   let is_flat_float_record t =
     match t with
     | Record (ts, Boxed) ->
-      List.for_all ts ~f:(fun t -> layout t = Float64 || layout t = Value Float)
+      List.for_all ts ~f:(fun t -> layout t = Float64 || scrape t = Float)
     | _ -> false
 
   let rec contains_vec128 t =
     match t with
     | Record (ts, _) | Tuple (ts, _) -> List.exists ts ~f:contains_vec128
+    | Variant constructors ->
+      List.exists constructors ~f:(fun ts -> List.exists ts ~f:contains_vec128)
     | Option t -> contains_vec128 t
     | String | Int64 | Nativeint | Float32 | Int32 | Int | Float | Int64_u
     | Float_u | Int32_u | Float32_u | Nativeint_u | Unit_u ->
@@ -313,6 +321,14 @@ module Type_structure = struct
     | Tuple (ts, boxing) ->
       sprintf "%s(%s)" (Boxing.to_string boxing)
         (List.map ts ~f:to_string |> String.concat ~sep:", ")
+    | Variant constructors ->
+      let constructor_to_string ts =
+        List.map ts ~f:to_string |> String.concat ~sep:" * "
+      in
+      "| "
+      ^ (List.map constructors ~f:constructor_to_string
+        |> String.concat ~sep:" | "
+        )
     | Option t -> sprintf "%s option" (to_string t)
     | String -> "string"
     | Int64 -> "int64"
@@ -364,6 +380,11 @@ let assemble_record_expr boxing name labels vals =
   assemble_record "=" boxing labels vals
 (* ^ " : " ^ name ^ ")" *)
 
+let assemble_constructor name vals =
+  match vals with
+  | [] -> name
+  | _ -> name ^ "(" ^ String.concat ~sep:", " vals ^ ")"
+
 let assemble_tuple ~sep (boxing : Boxing.t) xs =
   let hash = match boxing with Boxed -> "" | Unboxed -> "#" in
   sprintf "%s(%s)" hash (String.concat ~sep xs)
@@ -391,6 +412,10 @@ module Type = struct
           fields : (string * t) list;
           boxing : Boxing.t
         }
+    | Variant of
+        { name : string;
+          constructors : constructor list
+        }
     | Tuple of t list * Boxing.t
     | Option of t
     | Int
@@ -407,6 +432,11 @@ module Type = struct
     | Float32_u
     | String
     | Int64x2_u
+
+  and constructor =
+    { name : string;
+      args : t list
+    }
 
   let rec follow_path t (path : Path.t) =
     match path with
@@ -426,6 +456,11 @@ module Type = struct
     | Record { fields; boxing; _ } ->
       let ts = List.map fields ~f:(fun (_, t) -> structure t) in
       Record (ts, boxing)
+    | Variant { constructors; _ } ->
+      let constructors =
+        List.map constructors ~f:(fun c -> List.map ~f:structure c.args)
+      in
+      Variant constructors
     | Tuple (ts, boxing) ->
       let ts = List.map ts ~f:structure in
       Tuple (ts, boxing)
@@ -448,6 +483,7 @@ module Type = struct
   let rec code (t : t) =
     match t with
     | Record { name; _ } -> name
+    | Variant { name; _ } -> name
     | Tuple (tys, boxing) ->
       assemble_tuple ~sep:" * " boxing (List.map tys ~f:code)
     | Option t -> code t ^ " option"
@@ -467,11 +503,16 @@ module Type = struct
     | Int64x2_u -> "int64x2#"
 
   let rec num_subvals t : int =
-    match t with
-    | Record { fields; _ } ->
-      List.fold_left fields ~f:(fun acc (_, t) -> acc + num_subvals t) ~init:0
-    | Tuple (ts, _) ->
+    let sum_num_subvals ts =
       List.fold_left ts ~f:(fun acc t -> acc + num_subvals t) ~init:0
+    in
+    match t with
+    | Record { fields; _ } -> sum_num_subvals (List.map ~f:snd fields)
+    | Variant { constructors; _ } ->
+      List.fold_left ~init:0
+        ~f:(fun acc c -> max acc (sum_num_subvals c.args))
+        constructors
+    | Tuple (ts, _) -> sum_num_subvals ts
     | Option t -> num_subvals t
     | Unit_u -> 0
     | Int | Int64 | Int64_u | Int32 | Int32_u | Nativeint | Nativeint_u | Float
@@ -515,6 +556,18 @@ module Type = struct
       in
       let labels = List.map ~f:fst fields in
       assemble_record_expr boxing name labels xs
+    | Variant { name; constructors } ->
+      let num_constructors = List.length constructors in
+      let constructor =
+        List.nth constructors (i mod List.length constructors)
+      in
+      let _, xs =
+        List.fold_left_map constructor.args ~init:i ~f:(fun acc t ->
+            let x = value_code t acc in
+            acc + num_subvals t, x
+        )
+      in
+      assemble_constructor constructor.name xs
     | Tuple (tys, boxing) ->
       let _, xs =
         List.fold_left_map tys ~init:i ~f:(fun acc t ->
