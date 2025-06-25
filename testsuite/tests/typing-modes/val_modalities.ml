@@ -38,7 +38,7 @@ module M = struct
   let foo = {x = "hello"}
 end
 [%%expect{|
-module M : sig val foo : r end @@ portable
+module M : sig val foo : r end @@ stateless
 |}]
 
 module type S = sig
@@ -103,7 +103,7 @@ module (M @ uncontended) = struct
     let x @ contended = "hello"
 end
 [%%expect{|
-module M : sig val x : string @@ contended end @@ portable
+module M : sig val x : string @@ contended end @@ stateless
 |}]
 
 (* Testing the defaulting behaviour.
@@ -128,7 +128,7 @@ module Module_type_of_comonadic :
     module M : sig val x : 'a -> 'a end @@ portable
     module type S = sig val x : 'a -> 'a end
     module M' = M
-  end
+  end @@ stateless nonportable
 |}]
 
 (* zapping behavior can cause type error that shouldn't happen in upstream ocaml *)
@@ -154,7 +154,11 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end @ nonportable
+         sig
+           val y : int ref @@ unyielding many stateless
+           val z : 'a -> 'a @@ unyielding many
+           val x : 'a -> 'a @@ unyielding many
+         end @ nonportable
        is not included in
          sig
            val y : int ref @@ stateless
@@ -162,7 +166,7 @@ Error: Signature mismatch:
            val x : 'a -> 'a @@ stateless
          end @ nonportable
        Values do not match:
-         val x : 'a -> 'a @ nonportable
+         val x : 'a -> 'a @@ unyielding many @ nonportable
        is not included in
          val x : 'a -> 'a @@ stateless @ nonportable
        The first is "nonportable" but the second is "portable".
@@ -175,7 +179,11 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end @ nonportable
+         sig
+           val y : int ref @@ unyielding many
+           val z : 'a -> 'a @@ unyielding many
+           val x : 'a -> 'a @@ unyielding many
+         end @ nonportable
        is not included in
          sig
            val y : int ref
@@ -183,7 +191,7 @@ Error: Signature mismatch:
            val x : 'a -> 'a @@ stateless
          end @ nonportable
        Values do not match:
-         val x : 'a -> 'a @ nonportable
+         val x : 'a -> 'a @@ unyielding many @ nonportable
        is not included in
          val x : 'a -> 'a @@ stateless @ nonportable
        The first is "nonportable" but the second is "portable".
@@ -228,19 +236,10 @@ https://github.com/oxcaml/oxcaml/pull/3922#discussion_r2059000469
 module Module_type_nested :
   sig
     module M : sig val x : 'a -> 'a module N : sig val y : string ref end end
-      @@ portable
     module M' :
       sig val x : 'a -> 'a module N : sig val y : string ref end end @@
       contended
-  end
-|}, Principal{|
-module Module_type_nested :
-  sig
-    module M : sig val x : 'a -> 'a module N : sig val y : string ref end end
-    module M' :
-      sig val x : 'a -> 'a module N : sig val y : string ref end end @@
-      contended
-  end
+  end @@ stateless
 |}, Principal{|
 module Module_type_nested :
   sig
@@ -253,7 +252,7 @@ module Module_type_nested :
       sig
         val x : 'a -> 'a @@ stateless
         module N : sig val y : string ref end
-      end @@ contended
+      end @@ stateless contended
   end
 |}]
 
@@ -271,7 +270,8 @@ module Without_inclusion = struct
 end
 [%%expect{|
 module Without_inclusion :
-  sig module M : sig val x : 'a -> 'a @@ portable val y : 'a -> 'a end end
+  sig module M : sig val x : 'a -> 'a @@ portable val y : 'a -> 'a end end @@
+  stateless nonportable
 |}]
 
 module Without_inclusion = struct
@@ -297,7 +297,7 @@ end
 (* For this to type check, M has to be at [contended] *)
 [%%expect{|
 module Inclusion_fail :
-  sig module M : sig val x : string ref end @@ contended end @@ portable
+  sig module M : sig val x : string ref end @@ contended end @@ stateless
 |}]
 
 module Inclusion_fail = struct
@@ -314,26 +314,26 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ many portable unyielding contended end @ uncontended
+         sig val x : string ref @@ unyielding many stateless contended end @ uncontended
        is not included in
          sig val x : string ref end @ uncontended
        Values do not match:
-         val x : string ref @@ many portable unyielding contended @ uncontended
+         val x : string ref @@ unyielding many stateless contended @ uncontended
        is not included in
          val x : string ref @ uncontended
        The first is "contended" but the second is "uncontended".
 |}, Principal{|
-Lines 4-6, characters 23-5:
-4 | .......................struct
+Lines 4-6, characters 22-5:
+4 | ......................struct
 5 |       let x @ contended = ref "hello"
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ many unyielding contended end @ uncontended
+         sig val x : string ref @@ unyielding many contended end @ uncontended
        is not included in
          sig val x : string ref end @ uncontended
        Values do not match:
-         val x : string ref @@ many unyielding contended @ uncontended
+         val x : string ref @@ unyielding many contended @ uncontended
        is not included in
          val x : string ref @ uncontended
        The first is "contended" but the second is "uncontended".
@@ -365,7 +365,7 @@ end
 (* [M] is inferred to be [portable] in order to type check *)
 [%%expect{|
 module Inclusion_weakens_comonadic :
-  sig module M : sig val x : 'a -> 'a end end @@ portable
+  sig module M : sig val x : 'a -> 'a end end @@ stateless
 |}]
 
 module Inclusion_weakens_comonadic = struct
@@ -393,7 +393,7 @@ module Inclusion_match = struct
 end
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
-  portable
+  stateless
 |}]
 
 (* [foo] closes over [M.x] instead of [M]. This is better ergonomics. *)
@@ -408,7 +408,7 @@ end
 [%%expect{|
 module Close_over_value :
   sig module M : sig val x : 'a -> 'a end val foo : unit -> unit end @@
-  portable
+  stateless
 |}]
 
 (* CR mode-crossing: This is used for the below test in place of a mutable record. *)
@@ -420,7 +420,7 @@ end = struct
   let mk = ()
 end
 [%%expect {|
-module M : sig type t val mk : t @@ portable end @@ portable
+module M : sig type t val mk : t @@ portable end @@ stateless
 |}]
 
 module Close_over_value_monadic = struct
@@ -471,8 +471,8 @@ Lines 3-6, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val x : 'a -> 'a @@ many unyielding
-           external length : string -> int @@ many unyielding
+           val x : 'a -> 'a @@ unyielding many stateless nonportable
+           external length : string -> int @@ unyielding many
              = "%string_length"
          end @ nonportable
        is not included in
@@ -480,7 +480,7 @@ Error: Signature mismatch:
            external length : string -> int @@ portable = "%string_length"
          end @ nonportable
        Values do not match:
-         external length : string -> int @@ many unyielding
+         external length : string -> int @@ unyielding many
            = "%string_length" @ nonportable
        is not included in
          external length : string -> int @@ portable = "%string_length" @ nonportable
@@ -592,7 +592,7 @@ Lines 13-19, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           module Plain : sig val f : int -> int end @@ many unyielding
+           module Plain : sig val f : int -> int end @@ unyielding many
            module type S_plain =
              sig module M : sig val f : int -> int end end
          end @ nonportable
@@ -627,7 +627,7 @@ end = struct
   include (struct let foo x = x end : sig val foo : 'a -> 'a end)
 end
 [%%expect{|
-module M : sig val foo : 'a -> 'a @@ global many end @@ portable
+module M : sig val foo : 'a -> 'a @@ global many end @@ stateless
 |}]
 
 (* module declaration inclusion check looks at the mode of the enclosing
@@ -639,7 +639,7 @@ end = struct
 end
 [%%expect{|
 module M : sig module N : sig val foo : 'a -> 'a @@ global many end end @@
-  portable
+  stateless
 |}]
 
 (* inclusion check should cross modes, if we are comparing modes (instead of
@@ -650,7 +650,7 @@ end = struct
   let foo @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig val foo : int @@ portable end @@ portable
+module M : sig val foo : int @@ portable end @@ stateless
 |}]
 
 (* The RHS type (expected type) is used for mode crossing. The following still
@@ -663,7 +663,7 @@ end = struct
   let t @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig type t val t : t @@ portable end @@ portable
+module M : sig type t val t : t @@ portable end @@ stateless
 |}]
 
 (* LHS type is a subtype of RHS type, which means more type-level information.
@@ -676,7 +676,7 @@ end = struct
   let t @ nonportable contended = `Foo
 end
 [%%expect{|
-module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ portable
+module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
 |}]
 
 module M : sig
@@ -691,14 +691,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val t : [> `Foo ] @@ many unyielding end @ nonportable
+         sig val t : [> `Foo ] @@ unyielding many stateless nonportable end @ nonportable
        is not included in
          sig
            val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
              portable
          end @ nonportable
        Values do not match:
-         val t : [> `Foo ] @@ many unyielding @ nonportable
+         val t : [> `Foo ] @@ unyielding many stateless nonportable @ nonportable
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable @ nonportable
        The first is "nonportable" but the second is "portable".
@@ -722,7 +722,7 @@ end = struct
 end
 [%%expect{|
 module rec M : sig module N : sig val foo : 'a -> 'a @@ global many end end
-  @@ portable
+  @@ stateless
 |}]
 
 
@@ -732,7 +732,7 @@ module F (M : sig val f : 'a -> 'a @@ global many end) = struct
 end
 [%%expect{|
 module F : functor (M : sig val f : 'a -> 'a @@ global many end) -> sig end
-  @@ portable
+  @@ stateless
 |}]
 
 module G (M : sig val f : 'a -> 'a end) = F(M)
@@ -747,7 +747,7 @@ module G (M : sig val f : 'a -> 'a end) = struct
 end
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig val f : 'a -> 'a end
-  @@ portable
+  @@ stateless
 |}]
 
 (* functor declaration inclusion check  looks at the modes of parameter and
@@ -951,7 +951,7 @@ end
 [%%expect{|
 module M :
   sig module type F = sig val foo : 'a @@ global many end -> sig end end @@
-  portable
+  stateless
 |}]
 
 module M : sig
@@ -963,7 +963,7 @@ end = struct
 end
 [%%expect{|
 module M : sig module type F = sig end -> sig val foo : 'a end end @@
-  portable
+  stateless
 |}]
 
 module type T = sig @@ portable
@@ -1011,7 +1011,7 @@ module F (X : SL) : SR = X
 [%%expect{|
 module type SR = sig end
 module type SL = sig end
-module F : functor (X : SL) -> SR @@ portable
+module F : functor (X : SL) -> SR @@ stateless
 |}]
 
 
@@ -1024,8 +1024,8 @@ module M_portable = struct
     let f @ portable = fun () -> ()
     end
 [%%expect{|
-module M_nonportable : sig val f : unit -> unit end
-module M_portable : sig val f : unit -> unit end @@ portable
+module M_nonportable : sig val f : unit -> unit end @@ stateless nonportable
+module M_portable : sig val f : unit -> unit end @@ stateless
 |}]
 
 let (foo @ portable) () =
@@ -1314,7 +1314,7 @@ let (bar @ portable) () =
   k
 [%%expect{|
 module type F = sig end -> sig end
-module F : functor (X : sig end) -> sig end
+module F : functor (X : sig end) -> sig end @@ stateless nonportable
 Line 4, characters 18-19:
 4 |   let k = (module F : F) in
                       ^
@@ -1329,7 +1329,7 @@ let (bar @ portable) () =
   k
 [%%expect{|
 module type F = sig end -> sig end
-module F : functor (X : sig end) -> sig end @@ portable
+module F : functor (X : sig end) -> sig end @@ stateless
 val bar : unit -> (module F) = <fun>
 |}]
 
@@ -1383,8 +1383,8 @@ let (f @ portable) () =
   let _ : F(X).t = "hello" in
   ()
 [%%expect{|
-module F : functor (X : sig end) -> sig type t = string end @@ portable
-module X : sig end @@ portable
+module F : functor (X : sig end) -> sig type t = string end @@ stateless
+module X : sig end @@ stateless
 val f : unit -> unit = <fun>
 |}]
 
@@ -1400,8 +1400,8 @@ end @ nonportable = struct
   let f = M0.f
 end
 [%%expect{|
-module rec M0 : sig val f : 'a -> 'a end @@ portable
-and M1 : sig val f : 'a -> 'a @@ portable end
+module rec M0 : sig val f : 'a -> 'a end @@ stateless
+and M1 : sig val f : 'a -> 'a @@ portable end @@ stateless nonportable
 |}]
 
 
@@ -1422,11 +1422,11 @@ Lines 8-10, characters 20-3:
 10 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ many unyielding end @ nonportable
+         sig val f : 'a -> 'a @@ unyielding many stateless nonportable end @ nonportable
        is not included in
          sig val f : 'a -> 'a @@ portable end @ nonportable
        Values do not match:
-         val f : 'a -> 'a @@ many unyielding @ nonportable
+         val f : 'a -> 'a @@ unyielding many stateless nonportable @ nonportable
        is not included in
          val f : 'a -> 'a @@ portable @ nonportable
        The first is "nonportable" but the second is "portable".
@@ -1449,11 +1449,11 @@ Lines 3-5, characters 17-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ many unyielding end @ nonportable
+         sig val f : 'a -> 'a @@ unyielding many stateless nonportable end @ nonportable
        is not included in
          sig val f : 'a -> 'a end @ portable
        Values do not match:
-         val f : 'a -> 'a @@ many unyielding @ nonportable
+         val f : 'a -> 'a @@ unyielding many stateless nonportable @ nonportable
        is not included in
          val f : 'a -> 'a @ portable
        The first is "nonportable" but the second is "portable".
