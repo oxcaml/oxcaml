@@ -175,7 +175,7 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
     in
     if not !changed then t1 else t
 
-  let frobnicate f t1 t2 =
+  let update_many f t1 t2 =
     merge
       (fun key datum1_opt datum2_opt ->
         match datum2_opt with
