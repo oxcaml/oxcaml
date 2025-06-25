@@ -17,28 +17,63 @@ let interesting_type_trees : Type_structure.t Tree.t list =
      We balance these factors by combining e.g. a collection of trees with
      many/complex shapes but few types and a collection of trees with a few
      shapes but many types. And so on. *)
+  let patient =
+    (* Enable extra tests that take too long to compile (particularly on
+       native), and thus are run locally only *)
+    true
+  in
   let open Type_structure in
   List.concat_map
-    [[Int; Float]; [Int; Int32_u]; [Int; Int64x2_u]; [Float; Float_u]]
+    [ [Int; Float];
+      [Int; Int32_u];
+      [Int; Int64x2_u];
+      [Float; Float_u];
+      [Unit_u; String]
+    ]
     ~f:(fun leaves ->
       List.concat_map
-        (Tree.enumerate_shapes'
-           ~max_leaves_and_singleton_branches:3
-             (* Extra tree shapes make native tests too long to compile, so test
-                these locally only *)
-             (* @ [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
-              *     Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
-              *     Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
-              *     Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
-              *   ] *)
-        ) ~f:(fun shape -> Tree.enumerate ~shape ~leaves
-      )
+        (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
+        @
+        if patient
+        then
+          [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
+            Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
+            Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
+            Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
+          ]
+        else []
+        )
+        ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
     )
   @ List.concat_map
       (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:2)
       ~f:(fun shape ->
         Tree.enumerate ~shape
-          ~leaves:[Int; Int64; Int32_u; Float; Int64_u; Nativeint_u; Unit_u]
+          ~leaves:
+            ([ Int;
+               Int64;
+               Int32_u;
+               Float;
+               Int64_u;
+               Nativeint_u;
+               Unit_u;
+               Variant [[Unit_u]]
+             ]
+            @
+            if patient
+            then
+              [ Tuple ([Unit_u; Unit_u], Unboxed);
+                Tuple ([Unit_u; Int], Unboxed);
+                Tuple ([Unit_u; Int64_u], Unboxed);
+                Tuple ([Unit_u; String], Unboxed);
+                Variant
+                  [ [Unit_u];
+                    [Unit_u; Unit_u];
+                    [Tuple ([Unit_u; Unit_u], Unboxed)]
+                  ]
+              ]
+            else []
+            )
     )
   @ (* Some particular interesting trees *)
   [ Branch
@@ -326,12 +361,13 @@ let test_record_access ty ~local =
 
 let toplevel_unit_block f =
   assert (Int.equal !indent 0);
-  line "let () =";
+  line "let to_run () =";
   with_indent (fun () ->
       f ();
       line "()"
   );
   line ";;";
+  line "let () = to_run ();;";
   line ""
 
 type test =
@@ -384,12 +420,12 @@ let main test ~bytecode =
   begin
     match test with
     | Record_size ->
-      toplevel_unit_block (fun () ->
-          List.iter types ~f:(test_record_size ~bytecode)
+      List.iter types ~f:(fun ty ->
+          toplevel_unit_block (fun () -> test_record_size ~bytecode ty)
       )
     | Record_access { local } ->
-      toplevel_unit_block (fun () ->
-          List.iter types ~f:(test_record_access ~local)
+      List.iter types ~f:(fun ty ->
+          toplevel_unit_block (fun () -> test_record_access ~local ty)
       )
   end;
   line "for i = 1 to %d do" !test_id;
