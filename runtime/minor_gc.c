@@ -174,10 +174,10 @@ static value alloc_shared(caml_domain_state* d,
   return Val_hp(mem);
 }
 
-/* in progress updates are zeros except for the lowest color bit set to 1
-   that is a header with: wosize == 0 && color == 1 && tag == 0 */
-#define In_progress_update_val ((header_t)0x100)
-#define Is_update_in_progress(hd) ((hd) == In_progress_update_val)
+/* In-progress headers are zeros except for the lowest color bit set
+   to 1. */
+#define In_progress_hd (Make_header(0, 0, 0x100))
+#define Is_update_in_progress(hd) ((hd) == In_progress_hd)
 
 static header_t spin_on_header(value v) {
   SPIN_WAIT {
@@ -223,7 +223,7 @@ static int try_update_object_header(value v, volatile value *p, value result,
       result = Field(v, 0);
     } else {
       /* Here the header is neither zero nor an in-progress update */
-      header_t desired_hd = In_progress_update_val;
+      header_t desired_hd = In_progress_hd;
       if( atomic_compare_exchange_strong(Hp_atomic_val(v), &hd, desired_hd) ) {
         /* Success. Now we can write the forwarding pointer. */
         atomic_store_relaxed(Op_atomic_val(v), result);
