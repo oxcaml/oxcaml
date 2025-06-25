@@ -282,15 +282,13 @@ let simplify_function_body context ~outer_dacc function_slot_opt
 let compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
     ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
     ~lifted_consts_this_function ~params : _ Or_unknown_or_bottom.t =
-  match
-    ( is_opaque,
-      Flambda_features.function_result_types ~is_a_functor,
-      return_cont_uses )
-  with
-  | true, _, _ -> Unknown
-  | false, _, None -> Bottom
-  | false, false, Some _ -> Unknown
-  | false, true, Some uses ->
+  if is_opaque then Unknown else
+    match return_cont_uses with
+    | None -> Bottom
+    | Some uses ->
+        if not (Flambda_features.function_result_types ~is_a_functor) then
+          Unknown
+        else
     let env_at_fork =
       (* We use [C.dacc_inside_functions] not [C.dacc_prior_to_sets] to ensure
          that the environment contains bindings for any symbols being defined by
