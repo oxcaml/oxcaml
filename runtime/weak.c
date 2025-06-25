@@ -395,7 +395,8 @@ static value ephe_get_field_copy (value e, mlsize_t offset)
 
     /* Don't copy, but do darken, custom blocks #7279 */
     if (Tag_val(val) == Custom_tag) {
-      caml_darken (Caml_state, val, 0);
+      if (caml_marking_started())
+        caml_darken (Caml_state, val, 0);
       copy = val;
       goto some;
     }
