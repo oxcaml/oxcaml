@@ -1790,3 +1790,24 @@ end
 [%%expect{|
 module M : sig type 'a t : value mod portable with 'a end
 |}]
+
+module M : sig
+  type 'a t : value mod portable
+end = struct
+  type 'a t = { x : 'a @@ portable } [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable end
+|}]
+
+module M : sig
+  type 'a t : value mod portable contended with 'a @@ portable
+end = struct
+  type 'a t = { x : 'a @@ portable } [@@unboxed]
+end
+
+[%%expect{|
+module M :
+  sig type 'a t : value mod contended portable with 'a @@ portable end
+|}]

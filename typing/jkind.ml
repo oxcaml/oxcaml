@@ -2371,11 +2371,13 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
-let for_abbreviation ~type_jkind_purely ty =
+let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
-    let relevant_axes = Jkind_axis.Axis_set.all in
+    let relevant_axes =
+      relevant_axes_of_modality ~relevant_for_shallow:`Relevant ~modality
+    in
     With_bounds_types.singleton ty { relevant_axes }
   in
   fresh_jkind_poly
