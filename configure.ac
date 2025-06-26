@@ -921,14 +921,19 @@ AS_CASE([$ocaml_cc_vendor],
   [msvc-*],
     [AS_CASE([$ocaml_cc_vendor],
       [msvc-*-clang-*],
-        [cc_warnings="-W4 -Wno-unused-parameter -Wno-sign-compare -Wundef \
--Wno-cast-function-type-mismatch"
+        [cc_warnings='-W4 -Wno-unused-parameter -Wno-sign-compare -Wundef'
          warn_error_flag='-WX'],
       [cc_warnings='-W2'
        warn_error_flag='-WX -options:strict'])],
   [warn_error_flag='-Werror'
   cc_warnings="-Wall -Wint-conversion -Wstrict-prototypes \
 -Wold-style-definition -Wundef"])
+
+AS_CASE([$ocaml_cc_vendor],
+  [msvc-*-clang-*],
+    [AX_CHECK_COMPILE_FLAG([-Wno-cast-function-type-mismatch],
+      [cc_warnings="$cc_warnings -Wno-cast-function-type-mismatch"], [],
+      [$warn_error_flag])])
 
 # Use -Wold-style-declaration if supported
 AX_CHECK_COMPILE_FLAG([-Wold-style-declaration],
