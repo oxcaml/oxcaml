@@ -763,9 +763,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               (fun handler_env ((arg, _duid, layout), kinds) ->
                 (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
                 match kinds with
-                | [] -> handler_env, []
                 | [kind] -> handler_env, [arg, kind]
-                | _ :: _ ->
+                | [] | _ :: _ ->
                   let fields =
                     List.mapi
                       (fun n kind ->
