@@ -7198,7 +7198,12 @@ let print_global_state fmt global_state =
    can't be written in Jkind. It's possible that, after jkind.ml is broken up,
    this problem goes away, because the dependency from Env to Jkind is pretty
    minimal. *)
-let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
+let type_equal env ty1 ty2 =
+  let snap = Btype.snapshot () in
+  let result = is_equal env false [ty1] [ty2] in
+  Btype.backtrack snap;
+  result
+
 let () = type_equal' := type_equal
 
 let check_decl_jkind env decl jkind =
