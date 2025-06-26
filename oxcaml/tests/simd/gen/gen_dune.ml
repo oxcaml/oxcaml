@@ -171,7 +171,13 @@ let () =
       "test_callee_save_neon_regs", enabled_if_main;
       "probes", enabled_if_main_amd64_not_macos;
       "probes256", enabled_if_main_amd64_not_macos;
-      "utils256", enabled_if_main_amd64_not_macos ]
+      "utils256", enabled_if_main_amd64_not_macos;
+      "ops_float32x8", enabled_if_main_amd64_not_macos;
+      "ops_float64x4", enabled_if_main_amd64_not_macos;
+      "ops_int32x8", enabled_if_main_amd64_not_macos;
+      "ops_int64x4", enabled_if_main_amd64_not_macos;
+      "ops_int16x16", enabled_if_main_amd64_not_macos;
+      "ops_int8x32", enabled_if_main_amd64_not_macos ]
   in
   List.iter print_test tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;
