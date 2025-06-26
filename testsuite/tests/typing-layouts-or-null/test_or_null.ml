@@ -185,19 +185,30 @@ external unsafe_get : 'a or_null -> 'a = "%identity"
 external unsafe_get : 'a or_null -> 'a = "%identity"
 |}]
 
-let should_fail = [| Null; This 5 |]
+let should_work = [| Null; This 5 |]
 
 [%%expect{|
-Line 1, characters 21-25:
-1 | let should_fail = [| Null; This 5 |]
-                         ^^^^
-Error: This expression has type "'a t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
-       The kind of 'a t is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of 'a t must be a subkind of value
-         because it's the type of an array element,
-         chosen to have kind value.
+val should_work : int t array = [|Null; This 5|]
+|}]
+
+let should_fail = [| This 5.; Null |]
+
+[%%expect{|
+Line 1, characters 26-28:
+1 | let should_fail = [| This 5.; Null |]
+                              ^^
+Error: This expression has type "float" but an expression was expected of type
+         "('a : value mod non_float)"
+       The kind of float is value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value mod non_float
+         because it's the type of an array element.
+|}]
+
+type should_work = string or_null array
+
+[%%expect{|
+type should_work = string or_null array
 |}]
 
 type should_fail = float or_null array
@@ -207,10 +218,12 @@ Line 1, characters 19-32:
 1 | type should_fail = float or_null array
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of float or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of float or_null must be a subkind of any_non_null
+         "('a : any mod separable)"
+       The kind of float or_null is
+         value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float or_null must be a subkind of
+         any mod non_null non_float
          because it's the type argument to the array type.
 |}]
 
@@ -228,19 +241,31 @@ type null_list = float or_null list
 
 (* Immutable arrays should work the same as mutable: *)
 
-let should_fail = [: Null; This 5 :]
+let should_work = [: Null; This 'a' :]
 
 [%%expect{|
-Line 1, characters 21-25:
-1 | let should_fail = [: Null; This 5 :]
-                         ^^^^
-Error: This expression has type "'a t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
-       The kind of 'a t is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of 'a t must be a subkind of value
-         because it's the type of an array element,
-         chosen to have kind value.
+val should_work : char t iarray = [:Null; This 'a':]
+|}]
+
+
+let should_fail = [: Null; This 5. :]
+
+[%%expect{|
+Line 1, characters 32-34:
+1 | let should_fail = [: Null; This 5. :]
+                                    ^^
+Error: This expression has type "float" but an expression was expected of type
+         "('a : value mod non_float)"
+       The kind of float is value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value mod non_float
+         because it's the type of an array element.
+|}]
+
+type should_work = exn or_null array
+
+[%%expect{|
+type should_work = exn or_null array
 |}]
 
 type should_fail = float or_null array
@@ -250,10 +275,12 @@ Line 1, characters 19-32:
 1 | type should_fail = float or_null array
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of float or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of float or_null must be a subkind of any_non_null
+         "('a : any mod separable)"
+       The kind of float or_null is
+         value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float or_null must be a subkind of
+         any mod non_null non_float
          because it's the type argument to the array type.
 |}]
 
@@ -289,8 +316,8 @@ Error: Variables bound in a class must have layout value.
 |}]
 
 (* just checking printing *)
-type t_any_non_null : any_non_null
+type t_any_separable : any mod separable
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any_separable : any mod separable
 |}]
