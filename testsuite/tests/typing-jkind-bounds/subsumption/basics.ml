@@ -270,9 +270,17 @@ type t = [ `bar | `foo ]
 
 type t
 type u : immutable_data with t = [`foo of t]
+(* CR layouts v2.8: This should be accepted *)
 [%%expect {|
 type t
-type u = [ `foo of t ]
+Line 2, characters 0-44:
+2 | type u : immutable_data with t = [`foo of t]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `foo of t ]" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `foo of t ]" must be a subkind of immutable_data
+         with t
+         because of the definition of u at line 2, characters 0-44.
 |}]
 
 type (_, _) eq = Eq : ('a, 'a) eq
