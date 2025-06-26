@@ -188,6 +188,21 @@ Error: This constructor is at mode "nonportable", but expected to be at mode "po
        Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
+let (bar @ portable) () =
+    let module M = struct
+        exception Uncontended'' = Uncontended
+    end in
+    raise (M.Uncontended'' ())
+[%%expect{|
+val bar : unit -> 'a = <fun>
+|}, Principal{|
+Line 3, characters 34-45:
+3 |         exception Uncontended'' = Uncontended
+                                      ^^^^^^^^^^^
+Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+       Hint: all argument types must mode-cross for rebinding to succeed.
+|}]
+
 
 (* other extensible types are not affected *)
 type t = ..
@@ -207,4 +222,28 @@ Line 8, characters 12-13:
 8 |     ignore (x : _ @ portable)
                 ^
 Error: The value "x" is nonportable, so cannot be used inside a function that is portable.
+|}]
+
+module type S = sig
+    exception Exn of string ref
+end
+[%%expect{|
+module type S = sig exception Exn of string ref end
+|}]
+
+(* CR modes: test that portable modules, when implemented,
+   handle constructor locks correctly. *)
+
+let make_s () : (module S) @ portable =
+    let module M = struct
+        exception Exn of string ref
+    end
+    in
+    (module M : S)
+
+[%%expect{|
+Line 6, characters 4-18:
+6 |     (module M : S)
+        ^^^^^^^^^^^^^^
+Error: This value is "nonportable" but expected to be "portable".
 |}]
