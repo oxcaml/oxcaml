@@ -355,9 +355,9 @@ module Group = struct
          ~exn_continuation:(Continuation.create ()) Bound_parameters.empty
          ~body:(Expr.create_invalid Code_not_rebuilt)
          ~free_names_of_body:Unknown
-         ~my_closure:(Variable.create "my_closure")
+         ~my_closure:(Variable.create "my_closure" Flambda_kind.value)
          ~my_region:None ~my_ghost_region:None
-         ~my_depth:(Variable.create "my_depth"))
+         ~my_depth:(Variable.create "my_depth" Flambda_kind.rec_info))
 
   let pieces_of_code_including_those_not_rebuilt t =
     ListLabels.filter_map t.consts ~f:(fun const ->

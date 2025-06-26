@@ -293,7 +293,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
-    let var = Variable.create "switch_block" in
+    let var = Variable.create "switch_block" K.value in
     Symbol.create
       (Compilation_unit.get_current_exn ())
       (Linkage_name.of_string (Variable.unique_name var))
@@ -327,12 +327,12 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     Binary (Array_load (Values, Values, Immutable), block, tagged_scrutinee)
   in
   let load_from_block = Named.create_prim load_from_block_prim dbg in
-  let arg_var = Variable.create "arg" in
+  let arg_var = Variable.create "arg" K.value in
   let arg = Simple.var arg_var in
   let final_arg_var, final_arg =
     match must_untag_lookup_table_result with
     | Must_untag ->
-      let final_arg_var = Variable.create "final_arg" in
+      let final_arg_var = Variable.create "final_arg" K.naked_immediate in
       final_arg_var, Simple.var final_arg_var
     | Leave_as_tagged_immediate -> arg_var, arg
   in
@@ -510,7 +510,7 @@ let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             let uacc =
               UA.notify_removed ~operation:Removed_operations.branch uacc
             in
-            let not_scrutinee = Variable.create "not_scrutinee" in
+            let not_scrutinee = Variable.create "not_scrutinee" K.value in
             let not_scrutinee' = Simple.var not_scrutinee in
             let tagging_prim : P.t = Unary (Tag_immediate, scrutinee) in
             match
@@ -697,7 +697,7 @@ let simplify_switch0 dacc switch ~down_to_up =
 
 let simplify_switch ~simplify_let_with_bound_pattern ~simplify_function_body
     dacc switch ~down_to_up =
-  let tagged_scrutinee = Variable.create "tagged_scrutinee" in
+  let tagged_scrutinee = Variable.create "tagged_scrutinee" K.value in
   let tagging_prim =
     Named.create_prim
       (Unary (Tag_immediate, Switch.scrutinee switch))

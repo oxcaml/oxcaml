@@ -89,7 +89,11 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
       in
       let kinded_params =
         List.map
-          (fun k -> Bound_parameter.create (Variable.create "wrapper_return") k)
+          (fun k ->
+            Bound_parameter.create
+              (Variable.create "wrapper_return"
+                 (Flambda_kind.With_subkind.kind k))
+              k)
           (Flambda_arity.unarized_components result_arity)
       in
       let trap_action =
@@ -104,7 +108,7 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
         ~handler_params:(Bound_parameters.create kinded_params)
         ~handler ~body ~is_exn_handler:false ~is_cold:false
   in
-  let param = Variable.create "exn" in
+  let param = Variable.create "exn" Flambda_kind.value in
   let wrapper_handler_params =
     [Bound_parameter.create param Flambda_kind.With_subkind.any_value]
     |> Bound_parameters.create

@@ -375,7 +375,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     List.mapi
       (fun i kind_with_subkind ->
         BP.create
-          (Variable.create ("result" ^ string_of_int i))
+          (Variable.create
+             ("result" ^ string_of_int i)
+             (KS.kind kind_with_subkind))
           kind_with_subkind)
       (Flambda_arity.unarized_components result_arity)
     |> Bound_parameters.create

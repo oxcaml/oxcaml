@@ -727,7 +727,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       ~mode:(C.alloc_mode_for_allocations_to_cmm closure_alloc_mode)
       dbg ~tag l memory_chunks
   in
-  let soc_var = Variable.create "*set_of_closures*" in
+  let soc_var = Variable.create "*set_of_closures*" Flambda_kind.value in
   let defining_expr = Env.simple csoc free_vars in
   let env, res =
     Env.bind_variable_to_primitive env res soc_var ~inline:Env.Do_not_inline
