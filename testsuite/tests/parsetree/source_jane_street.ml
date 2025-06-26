@@ -945,7 +945,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
