@@ -33,6 +33,7 @@
   basic256_u
   ops
   ops_u
+  ops256
   arrays
   arrays_u
   scalar_ops
@@ -47,6 +48,7 @@
   basic256_u
   ops
   ops_u
+  ops256
   arrays
   arrays_u
   scalar_ops
@@ -57,7 +59,7 @@
  (libraries simd_test_helpers stdlib_stable stdlib_upstream_compatible)
  (foreign_archives stubs)
  (ocamlopt_flags
-  (:standard -extension simd_beta)))
+  (:standard -extension simd_alpha -favx2)))
 
 (rule
  (enabled_if
@@ -69,6 +71,7 @@
   basic256_u.out
   ops.out
   ops_u.out
+  ops256.out
   arrays.out
   arrays_u.out
   scalar_ops.out
@@ -82,6 +85,7 @@
   basic256.exe
   basic256_u.exe
   ops.exe
+  ops256.exe
   arrays.exe
   arrays_u.exe
   scalar_ops.exe
@@ -109,6 +113,9 @@
    (with-outputs-to
     ops_u.out
     (run ./ops_u.exe))
+   (with-outputs-to
+    ops256.out
+    (run ./ops256.exe))
    (with-outputs-to
     arrays.out
     (run ./arrays.exe))
@@ -145,6 +152,7 @@
    (diff empty.expected basic256_u.out)
    (diff empty.expected ops.out)
    (diff empty.expected ops_u.out)
+   (diff empty.expected ops256.out)
    (diff empty.expected arrays.out)
    (diff empty.expected arrays_u.out)
    (diff empty.expected scalar_ops.out)
@@ -337,7 +345,7 @@
   (<> %{system} macosx))
  (modules probes probes256)
  (ocamlopt_flags
-  (:standard -extension simd_beta))
+  (:standard -extension simd_alpha -favx2))
  (foreign_archives stubs))
 
 (rule

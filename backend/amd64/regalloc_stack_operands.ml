@@ -208,7 +208,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
             | SSE Div_f32 ),
             _ ))) ->
     May_still_have_spilled_registers
-  | Op (Reinterpret_cast (Float_of_float32 | Float32_of_float | V128_of_v128))
+  | Op (Reinterpret_cast (Float_of_float32 | Float32_of_float | V128_of_v128 | V256_of_v256 | V512_of_v512))
   | Op (Static_cast (V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2))
   | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4))
   | Op (Static_cast (V256_of_scalar Float64x4 | Scalar_of_v256 Float64x4))

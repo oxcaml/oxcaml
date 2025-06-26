@@ -313,6 +313,12 @@ let transl_vec_builtin name args dbg _typ_res =
   | "caml_vec128_cast" ->
     let op = Creinterpret_cast V128_of_v128 in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec256_cast" ->
+    let op = Creinterpret_cast V256_of_v256 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_cast" ->
+    let op = Creinterpret_cast V512_of_v512 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   (* Scalar casts. These leave the top bits of the vector unspecified. *)
   | "caml_float64x2_low_of_float" ->
     let op = Cstatic_cast (V128_of_scalar Float64x2) in

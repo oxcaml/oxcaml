@@ -214,6 +214,8 @@ let to_string msg =
 
 let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | V128_of_v128 -> "vec128 as vec128"
+  | V256_of_v256 -> "vec256 as vec256"
+  | V512_of_v512 -> "vec512 as vec512"
   | Value_of_int -> "int as value"
   | Int_of_value -> "value as int"
   | Float32_of_float -> "float as float32"

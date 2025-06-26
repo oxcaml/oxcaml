@@ -324,6 +324,8 @@ type reinterpret_cast =
   | Float32_of_int32
   | Int32_of_float32
   | V128_of_v128
+  | V256_of_v256
+  | V512_of_v512
 
 type static_cast =
   | Float_of_int of float_width
@@ -818,9 +820,11 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | Float32_of_int32, Float32_of_int32 -> true
   | Int32_of_float32, Int32_of_float32 -> true
   | V128_of_v128, V128_of_v128 -> true
+  | V256_of_v256, V256_of_v256 -> true
+  | V512_of_v512, V512_of_v512 -> true
   | ( ( Int_of_value | Value_of_int | Float_of_float32 | Float32_of_float
       | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | V128_of_v128 ),
+      | V128_of_v128 | V256_of_v256 | V512_of_v512 ),
       _ ) ->
     false
 

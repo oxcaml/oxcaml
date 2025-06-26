@@ -1381,6 +1381,9 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Float_of_float32 | Float32_of_float ->
     if distinct then I.movss (arg i 0) (res i 0)
   | V128_of_v128 -> if distinct then I.movapd (arg i 0) (res i 0)
+  | V256_of_v256 -> 
+    if distinct then I.simd Simd_instrs.vmovapd_Y_Ym256 [| arg i 0; res i 0 |]
+  | V512_of_v512 -> Misc.fatal_error "V512_of_v512 not yet implemented"
   | Float_of_int64 | Int64_of_float -> I.movq (arg i 0) (res i 0)
   | Float32_of_int32 -> I.movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> I.movd (arg i 0) (res32 i 0)

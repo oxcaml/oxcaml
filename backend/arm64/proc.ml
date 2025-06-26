@@ -448,7 +448,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cpackf32
   | Creinterpret_cast (Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128)
+                       V128_of_v128 | V256_of_v256 | V512_of_v512)
   | Cstatic_cast (Float_of_float32 | Float32_of_float |
                   Int_of_float Float32 | Float_of_int Float32 |
                   V128_of_scalar _ | Scalar_of_v128 _)

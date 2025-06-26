@@ -1048,7 +1048,7 @@ module BR = Branch_relaxation.Make (struct
           ( Float32_of_float | Float_of_float32 | Float32_of_int32
           | Int32_of_float32 )) ->
       1
-    | Lop (Reinterpret_cast V128_of_v128) -> 1
+    | Lop (Reinterpret_cast (V128_of_v128 | V256_of_v256 | V512_of_v512)) -> 1
     | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
     | Lop
         (Static_cast
@@ -1347,6 +1347,8 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       DSL.check_reg Vec128 src;
       DSL.check_reg Vec128 dst;
       DSL.ins I.FMOV [| DSL.emit_reg dst; DSL.emit_reg src |])
+  | V256_of_v256 -> Misc.fatal_error "arm64: got 256 bit vector"
+  | V512_of_v512 -> Misc.fatal_error "arm64: got 512 bit vector"
   | Int_of_value | Value_of_int -> move src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
