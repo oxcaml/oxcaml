@@ -1790,3 +1790,59 @@ end
 [%%expect{|
 module M : sig type 'a t : value mod portable with 'a end
 |}]
+
+module M : sig
+  type 'a t : value mod portable
+end = struct
+  type 'a t = { x : 'a @@ portable } [@@unboxed]
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = { x : 'a @@ portable } [@@unboxed]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = { x : 'a @@ portable; } [@@unboxed] end
+       is not included in
+         sig type 'a t : value mod portable end
+       Type declarations do not match:
+         type 'a t = { x : 'a @@ portable; } [@@unboxed]
+       is not included in
+         type 'a t : value mod portable
+       The kind of the first is immediate with 'a
+         because it is the expansion of a type abbreviation.
+       But the kind of the first must be a subkind of value mod portable
+         because of the definition of t at line 2, characters 2-32.
+|}]
+
+module M : sig
+  type 'a t : value mod portable contended with 'a @@ portable
+end = struct
+  type 'a t = { x : 'a @@ portable } [@@unboxed]
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = { x : 'a @@ portable } [@@unboxed]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = { x : 'a @@ portable; } [@@unboxed] end
+       is not included in
+         sig type 'a t : value mod contended portable with 'a @@ portable end
+       Type declarations do not match:
+         type 'a t = { x : 'a @@ portable; } [@@unboxed]
+       is not included in
+         type 'a t : value mod contended portable with 'a @@ portable
+       The kind of the first is immediate with 'a
+         because it is the expansion of a type abbreviation.
+       But the kind of the first must be a subkind of
+         value mod contended portable with 'a @@ portable
+         because of the definition of t at line 2, characters 2-62.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
+|}]
