@@ -28,7 +28,7 @@ let () =
     Unix.read rd (Bytes.make 10_000 '?') 0 10_000 |> ignore;
     close_out ch
   in
-  Sys.signal Sys.sigalrm (Signal_handle alarm_handler) |> ignore;
+  Sys.Safe.signal Sys.sigalrm (Signal_handle alarm_handler) |> ignore;
   Unix.alarm 1 |> ignore;
   flush ch;
   print_endline "ok"
