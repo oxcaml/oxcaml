@@ -519,9 +519,9 @@ module Name = struct
   let[@inline always] pattern_match t ~var ~symbol =
     let flags = Id.flags t in
     if flags = var_flags
-    then var t
+    then (var [@inlined hint]) t
     else if flags = symbol_flags
-    then symbol t
+    then (symbol [@inlined hint]) t
     else assert false
 
   module T0 = struct
@@ -801,12 +801,12 @@ module Code_id_or_symbol = struct
 
   let create_symbol symbol = symbol
 
-  let pattern_match t ~code_id ~symbol =
+  let[@inline always] pattern_match t ~code_id ~symbol =
     let flags = Table_by_int_id.Id.flags t in
     if flags = Code_id_data.flags
-    then code_id t
+    then (code_id [@inlined hint]) t
     else if flags = Symbol_data.flags
-    then symbol t
+    then (symbol [@inlined hint]) t
     else
       Misc.fatal_errorf "Code_id_or_symbol 0x%x with wrong flags 0x%x" t flags
 
@@ -870,14 +870,14 @@ module Code_id_or_name = struct
 
   let symbol symbol = symbol
 
-  let pattern_match t ~code_id ~var ~symbol =
+  let[@inline always] pattern_match t ~code_id ~var ~symbol =
     let flags = Table_by_int_id.Id.flags t in
     if flags = Code_id_data.flags
-    then code_id t
+    then (code_id [@inlined hint]) t
     else if flags = Symbol_data.flags
-    then symbol t
+    then (symbol [@inlined hint]) t
     else if flags = Variable_data.flags
-    then var t
+    then (var [@inlined hint]) t
     else
       Misc.fatal_errorf "Code_id_or_symbol 0x%x with wrong flags 0x%x" t flags
 
