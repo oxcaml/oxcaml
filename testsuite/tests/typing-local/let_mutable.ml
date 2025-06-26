@@ -595,8 +595,5 @@ let foo_21 =
   bar <- #(789, 101);
   42
 [%%expect{|
-Line 2, characters 20-31:
-2 |   let mutable bar = #(123, 456) in
-                        ^^^^^^^^^^^
-Error: Mutable lets are not yet supported with unboxed products.
+val foo_21 : int = 42
 |}]

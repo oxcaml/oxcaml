@@ -42,9 +42,12 @@ val ident_stamp_upon_starting : t -> int
 val is_mutable : t -> Ident.t -> bool
 
 val register_mutable_variable :
-  t -> Ident.t -> Flambda_kind.With_subkind.t -> t * Ident.t
+  t ->
+  Ident.t ->
+  before_unarization:[`Complex] Flambda_arity.Component_for_creation.t ->
+  t * (Ident.t * Flambda_kind.With_subkind.full_kind) list
 
-val update_mutable_variable : t -> Ident.t -> t * Ident.t
+val update_mutable_variable : t -> Ident.t -> t
 
 val register_unboxed_product :
   t ->
@@ -97,8 +100,11 @@ val extra_args_for_continuation : t -> Continuation.t -> Ident.t list
 val extra_args_for_continuation_with_kinds :
   t -> Continuation.t -> (Ident.t * Flambda_kind.With_subkind.t) list
 
-val get_mutable_variable_with_kind :
-  t -> Ident.t -> Ident.t * Flambda_kind.With_subkind.t
+val get_mutable_variable_with_kinds :
+  t ->
+  Ident.t ->
+  (Ident.t * Flambda_kind.With_subkind.t) list
+  * [`Complex] Flambda_arity.Component_for_creation.t
 
 (** About local allocation regions:
 
