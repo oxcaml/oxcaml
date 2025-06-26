@@ -117,7 +117,7 @@ let pr_item =
 let execute_phrase print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
-      let oldenv = Env.add_local_env_lock !toplevel_env in
+      let oldenv = !toplevel_env in
       let oldsig = !toplevel_sig in
       Typecore.reset_delayed_checks ();
       let (str, sg, sn, shape, newenv) =

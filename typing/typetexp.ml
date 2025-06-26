@@ -147,7 +147,7 @@ module TyVarEnv : sig
 
   val is_in_scope : string -> bool
 
-  val add : string -> type_expr -> jkind_lr -> unit
+  val add : string -> type_expr -> jkind_lr -> int -> unit
   (* add a global type variable to the environment, with the given jkind.
      Precondition: the [type_expr] must be a [Tvar] with the given jkind. *)
 
@@ -208,7 +208,7 @@ module TyVarEnv : sig
        are in scope. *)
 
   val lookup_local :
-    row_context:type_expr option ref list -> string -> int -> type_expr * int
+    row_context:type_expr option ref list -> string -> type_expr * int
     (* look up a local type variable; throws Not_found if it isn't in scope *)
 
   val lookup_global_jkind : string -> jkind_lr
@@ -216,7 +216,7 @@ module TyVarEnv : sig
        assigned. Throws [Not_found] if the variable isn't in scope. See
        Note [Global type variables]. *)
 
-  val remember_used : string -> type_expr -> Location.t -> unit
+  val remember_used : string -> type_expr -> Location.t -> int -> unit
     (* remember that a given name is bound to a given type *)
 
   val globalize_used_variables : policy -> Env.t -> unit -> unit
@@ -240,13 +240,13 @@ end = struct
   (* These are the "global" type variables: they were in scope before
      we started processing the current type. See Note [Global type variables].
   *)
-  let type_variables = ref (TyVarMap.empty : (type_expr * jkind_lr) TyVarMap.t)
+  let type_variables = ref (TyVarMap.empty : (type_expr * jkind_lr * int) TyVarMap.t)
 
   (* These are variables that have been used in the currently-being-checked
      type, possibly including the variables in [type_variables].
   *)
   let used_variables =
-    ref (TyVarMap.empty : (type_expr * Location.t) TyVarMap.t)
+    ref (TyVarMap.empty : (type_expr * Location.t * int) TyVarMap.t)
 
   (* These are variables that will become univars when we're done with the
      current type. Used to force free variables in method types to become
@@ -261,9 +261,9 @@ end = struct
   let is_in_scope name =
     TyVarMap.mem name !type_variables
 
-  let add name v jkind =
+  let add name v jkind stage =
     assert (not_generic v);
-    type_variables := TyVarMap.add name (v, jkind) !type_variables
+    type_variables := TyVarMap.add name (v, jkind, stage) !type_variables
 
   let narrow () =
     (increase_global_level (), !type_variables)
@@ -280,10 +280,11 @@ end = struct
 
   (* throws Not_found if the variable is not in scope *)
   let lookup_global name =
-    fst (TyVarMap.find name !type_variables)
+    let (type_expr, _, stage) = TyVarMap.find name !type_variables in
+    (type_expr, stage)
 
   let lookup_global_jkind name =
-    snd (TyVarMap.find name !type_variables)
+    snd3 (TyVarMap.find name !type_variables)
 
   let get_in_scope_names () =
     let add_name name _ l =
@@ -431,20 +432,21 @@ end = struct
     p.associated <- List.fold_left add row_context p.associated
 
   (* throws Not_found if the variable is not in scope *)
-  let lookup_local ~row_context name stage =
+  let lookup_local ~row_context name =
     try
       let p, s = find_poly_univars name !univars in
       associate row_context p;
       p.univar, s
     with Not_found ->
-      instance (fst (TyVarMap.find name !used_variables)), stage
+      let (univar, _, s) = TyVarMap.find name !used_variables in
+      univar, s
       (* This call to instance might be redundant; all variables
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
 
-  let remember_used name v loc =
+  let remember_used name v loc stage =
     assert (not_generic v);
-    used_variables := TyVarMap.add name (v, loc) !used_variables
+    used_variables := TyVarMap.add name (v, loc, stage) !used_variables
 
 
   type flavor = Unification | Universal
@@ -506,13 +508,18 @@ end = struct
   let globalize_used_variables { flavor; extensibility } env =
     let r = ref [] in
     TyVarMap.iter
-      (fun name (ty, loc) ->
+      (fun name (ty, loc, s) ->
         if flavor = Unification || is_in_scope name then
           let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
           let snap = Btype.snapshot () in
           if try unify env v ty; true with _ -> Btype.backtrack snap; false
           then try
-            r := (loc, v, lookup_global name) :: !r
+            let (type_expr, stage) = lookup_global name in
+            if stage <> s then
+              raise
+                (Error (loc, env, (Invalid_variable_stage
+                   {name; intro_stage = stage; usage_loc = loc; usage_stage = s})));
+            r := (loc, v, type_expr, stage) :: !r
           with Not_found ->
             if extensibility = Fixed && Btype.is_Tvar ty then
               raise(Error(loc, env,
@@ -520,13 +527,14 @@ end = struct
                                                  get_in_scope_names ())));
             let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
             let v2 = new_global_var jkind in
-            r := (loc, v, v2) :: !r;
-            add name v2 jkind)
+            let stage = Env.stage env in
+            r := (loc, v, v2, stage) :: !r;
+            add name v2 jkind stage)
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
       List.iter
-        (function (loc, t1, t2) ->
+        (function (loc, t1, t2, _) ->
           try unify env t1 t2 with Unify err ->
             raise (Error(loc, env, Type_mismatch err)))
         !r
@@ -579,7 +587,7 @@ let transl_type_param_var env loc attrs name_opt
       name
   in
   let ty = new_global_var ~name jkind in
-  Option.iter (fun name -> TyVarEnv.add name ty jkind) name_opt;
+  Option.iter (fun name -> TyVarEnv.add name ty jkind (Env.stage env)) name_opt;
   { ctyp_desc = tvar; ctyp_type = ty; ctyp_env = env;
     ctyp_loc = loc; ctyp_attributes = attrs }
 
@@ -1059,10 +1067,12 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
   | Ptyp_quote t ->
-      let cty = transl_type (Env.add_quotation_lock env) ~policy ~row_context mode t in
+      let new_env = Env.add_quotation_lock env in
+      let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
-      let cty = transl_type (Env.add_splice_lock env) ~policy ~row_context mode t in
+      let new_env = Env.add_splice_lock env in
+      let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
@@ -1073,7 +1083,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
     raise (Error (loc, env, Invalid_variable_name print_name));
   let of_annot = jkind_of_annotation (Type_variable print_name) attrs in
   let ty, stage = try
-      TyVarEnv.lookup_local ~row_context name (Env.stage env)
+      TyVarEnv.lookup_local ~row_context name
     with Not_found ->
       let jkind =
         (* See Note [Global type variables] *)
@@ -1081,7 +1091,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
         with Not_found -> TyVarEnv.new_jkind ~is_named:true policy
       in
       let ty = TyVarEnv.new_var ~name jkind policy in
-      TyVarEnv.remember_used name ty loc;
+      TyVarEnv.remember_used name ty loc (Env.stage env);
       ty, Env.stage env
   in
   if Env.stage env <> stage then
@@ -1129,7 +1139,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
   let cty, jkind_annot = match name_opt with
     | Some { txt = alias; loc = alias_loc } ->
       begin try
-        let t, _ = TyVarEnv.lookup_local ~row_context alias (Env.stage env) in
+        let t, _ = TyVarEnv.lookup_local ~row_context alias in
         let cty =
           transl_type env ~policy ~aliased:true ~row_context mode styp
         in
@@ -1165,7 +1175,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
             in
             let t = newvar jkind in
             (* Use the whole location, which is used by [Type_mismatch]. *)
-            TyVarEnv.remember_used alias t styp_loc;
+            TyVarEnv.remember_used alias t styp_loc (Env.stage env);
             let ty = transl_type env ~policy ~row_context mode styp in
             begin try unify_var env t ty.ctyp_type with Unify err ->
               let err = Errortrace.swap_unification_error err in

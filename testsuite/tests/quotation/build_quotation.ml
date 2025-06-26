@@ -92,6 +92,23 @@
 - : <[ [> `A of int ] ]> expr = <[ `A 42 ]>
 |}];;
 
+let _ = <[ `B 123 ]>;;
+[%%expect {|
+- : <[ [> `B of int ] ]> expr = <[ `B 123 ]>
+|}];;
+
+let x0 = <[ `C 543 ]>;;
+[%%expect {|
+Line 1:
+Error: Values do not match:
+         val x0 : <[ [> `C of int ] ]> expr
+       is not included in
+         val x0 : <[ [> `C of int ] ]> expr
+       The type "<[ [> `C of int ] ]> expr" is not compatible with the type
+         "<[ [> `C of int ] ]> expr"
+       Type "[> `C of int ]" is not compatible with type "[> `C of int ]"
+|}];;
+
 <[ if true then `A 10 else `B ("foo", 42) ]>;;
 [%%expect {|
 - : <[ [> `A of int | `B of string * int ] ]> expr =

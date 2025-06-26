@@ -23,7 +23,7 @@ let vars_env =
     env_poly = Hashtbl.create 64
   }
 
-let refresh_env () =
+let _refresh_env () =
   Hashtbl.clear vars_env.env_vals;
   Hashtbl.clear vars_env.env_tys;
   Hashtbl.clear vars_env.env_mod;
@@ -764,10 +764,10 @@ let module_type_for_path loc = function
   | _ -> raise Exit
 
 let type_for_path loc = function
-  | Path.Pident id -> (
+  | Path.Pident id -> begin
     match Hashtbl.find_opt vars_env.env_tys id with
     | Some t -> apply loc Identifier.Type.var [t; quote_loc loc]
-    | None -> (
+    | None -> begin
       match Ident.name id with
       | "int" -> use Identifier.Type.int
       | "char" -> use Identifier.Type.char
@@ -800,7 +800,9 @@ let type_for_path loc = function
       | "int64x2" -> use Identifier.Type.int64x2
       | "float32x4" -> use Identifier.Type.float32x4
       | "float62x2" -> use Identifier.Type.float64x2
-      | _ -> raise Exit))
+      | _ -> raise Exit
+    end
+  end
   | Path.Pdot (p, s) ->
     apply loc Identifier.Type.dot [module_for_path loc p; string loc s]
   | _ -> raise Exit
@@ -1036,7 +1038,7 @@ and quote_pat_extra loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint ty ->
-    apply loc Pat.constraint_ [pat_lam; quote_core_type ty]
+    apply loc Pat.constraint_ [pat_lam; quote_core_type ~in_constraint:true ty]
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
@@ -1130,7 +1132,7 @@ and quote_value_pattern p =
     (fun extra p -> quote_pat_extra loc p extra)
     p.pat_extra pat_quoted
 
-and quote_core_type ty =
+and quote_core_type ~in_constraint ty =
   let loc = ty.ctyp_loc in
   match ty.ctyp_desc with
   | Ttyp_var (None, _) ->
@@ -1148,30 +1150,33 @@ and quote_core_type ty =
     apply loc Type.var [some lam]
   | Ttyp_arrow (arg_lab, ty1, ty2) ->
     let lab = quote_arg_label loc arg_lab
-    and ty1 = quote_core_type ty1
-    and ty2 = quote_core_type ty2 in
+    and ty1 = quote_core_type ~in_constraint ty1
+    and ty2 = quote_core_type ~in_constraint ty2 in
     apply loc Type.arrow [lab; ty1; ty2]
   | Ttyp_tuple ts ->
     let tups =
       List.map
-        (fun (s_opt, ty) -> pair (quote_nonopt loc s_opt, quote_core_type ty))
+        (fun (s_opt, ty) ->
+           pair (quote_nonopt loc s_opt, quote_core_type ~in_constraint ty))
         ts
     in
     apply loc Type.tuple [mk_list tups]
   | Ttyp_unboxed_tuple ts ->
     let tups =
       List.map
-        (fun (s_opt, ty) -> pair (quote_nonopt loc s_opt, quote_core_type ty))
+        (fun (s_opt, ty) ->
+           pair (quote_nonopt loc s_opt, quote_core_type ~in_constraint ty))
         ts
     in
     apply loc Type.unboxed_tuple [mk_list tups]
   | Ttyp_constr (path, _, tys) ->
-    let ident = type_for_path loc path and tys = List.map quote_core_type tys in
+    let ident = type_for_path loc path
+    and tys = List.map (quote_core_type ~in_constraint:true) tys in
     apply loc Type.constr [ident; mk_list tys]
   | Ttyp_object (_, _) -> fatal_error "Still not implemented."
   | Ttyp_class (_, _, _) -> fatal_error "Still not implemented."
   | Ttyp_alias (ty, alias_opt, _) ->
-    let ty = quote_core_type ty
+    let ty = quote_core_type ~in_constraint ty
     and alias_opt =
       match alias_opt with
       | None -> None
@@ -1185,13 +1190,15 @@ and quote_core_type ty =
         (fun rf ->
           match rf.rf_desc with
           | Tinherit ty ->
-            apply rf.rf_loc Variant_type.Row_field.inherit_ [quote_core_type ty]
+            apply rf.rf_loc Variant_type.Row_field.inherit_ [quote_core_type ~in_constraint ty]
           | Ttag (tag, b, tys) ->
             let variant =
               apply tag.loc Variant.of_string [string tag.loc tag.txt]
             in
             apply rf.rf_loc Variant_type.Row_field.tag
-              [variant; quote_bool b; mk_list (List.map quote_core_type tys)])
+              [variant;
+               quote_bool b;
+               mk_list (List.map (quote_core_type ~in_constraint) tys)])
         row_fields
     and variant_form =
       match closed_flag, labels with
@@ -1213,7 +1220,7 @@ and quote_core_type ty =
     let body =
       create_list_param_binding
         (List.map ident_for_poly_name names)
-        (quote_core_type ty)
+        (quote_core_type ~in_constraint ty)
     in
     without_idents_poly names;
     apply loc Type.poly [quote_loc loc; mk_list names_lam; body]
@@ -1225,12 +1232,14 @@ and quote_core_type ty =
         (fun (lid, ty) ->
           pair
             ( quote_fragment_of_lid Asttypes.(lid.loc) lid.txt,
-              quote_core_type ty ))
+              quote_core_type ~in_constraint ty ))
         pack_fields
     in
     apply loc Type.package [mod_type; mk_list with_types]
-  | Ttyp_quote ty -> apply loc Type.quote [quote_core_type ty]
-  | Ttyp_splice ty -> apply loc Type.splice [quote_core_type ty]
+  | Ttyp_quote ty -> apply loc Type.quote [quote_core_type ~in_constraint ty]
+  | Ttyp_splice ty ->
+    if in_constraint then apply loc Type.var [none]
+    else apply loc Type.splice [quote_core_type ~in_constraint ty]
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> fatal_error "Still not implemented."
 
@@ -1465,12 +1474,14 @@ and quote_expression_extra _ _ extra lambda =
   | Texp_newtype _ -> lambda
   (* Texp_newtype only relevant for functions, handled elsewhere *)
   | Texp_constraint ty ->
-    let constr_ = apply loc Type_constraint.constraint_ [quote_core_type ty] in
+    let constr_ =
+      apply loc Type_constraint.constraint_ [quote_core_type ~in_constraint:true ty] in
     apply loc Exp_desc.constraint_ [mk_exp_noattr loc lambda; constr_]
   | Texp_coerce (ty_opt, ty) ->
     let coerce =
       apply loc Type_constraint.coercion
-        [option (Option.map quote_core_type ty_opt); quote_core_type ty]
+        [option (Option.map (quote_core_type ~in_constraint:true) ty_opt);
+         quote_core_type ~in_constraint:true ty]
     in
     apply loc Exp_desc.constraint_ [mk_exp_noattr loc lambda; coerce]
   | Texp_stack -> apply loc Exp_desc.stack [mk_exp_noattr loc lambda]
@@ -1797,7 +1808,6 @@ and quote_expression transl stage e =
   apply loc Exp.mk [desc; attributes]
 
 let transl_quote transl exp loc =
-  ignore (refresh_env);  (* add correct logic to refreshing identifiers *)
   let exp_quoted = quote_expression transl 0 exp in
   if Hashtbl.length vars_env.env_poly = 0 then
     apply loc Code.of_exp [quote_loc loc; exp_quoted]

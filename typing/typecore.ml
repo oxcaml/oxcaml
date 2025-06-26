@@ -6900,8 +6900,6 @@ and type_expect_
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = new_env }
-  | Pexp_quoted_type_expr ty ->
-      raise (Error (ty.ptyp_loc, env, Unsupported_quotation_construct))
   | Pexp_splice exp ->
       if Env.without_open_quotations env then
         raise (Error (exp.pexp_loc, env, Toplevel_splice));

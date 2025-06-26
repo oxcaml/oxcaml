@@ -3024,33 +3024,6 @@ let lookup_global_name_module_no_locks
           may_lookup_error errors loc env (Error_from_persistent_env err)
     end
 
-let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
-  let path, locks, data =
-    match find_name_module ~mark:use s env.modules with
-    | res -> res
-    | exception Not_found ->
-        may_lookup_error errors loc env (Unbound_module (Lident s))
-  in
-  match data with
-  | Mod_local (mda, alias_locks) -> begin
-      use_module ~use ~loc path mda;
-      let locks = alias_locks @ locks in
-      match load with
-      | Load -> path, locks, (mda : a)
-      | Don't_load -> path, locks, (() : a)
-    end
-  | Mod_unbound reason ->
-      report_module_unbound ~errors ~loc env reason
-  | Mod_persistent -> begin
-      (* This is only used when processing [Longident.t]s, which never have
-         instance arguments *)
-      let name = Global_module.Name.create_no_args s in
-      let path, a =
-        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
-      in
-      path, locks, a
-    end
-
 let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
   begin match
   Mode.Regionality.submode
@@ -3205,10 +3178,46 @@ let lookup_ident_type ~errors ~use ~loc s env =
       | Some n ->
           may_lookup_error errors loc env
             (Incompatible_stage (Lident s, loc, env.stage,
-                                 tda.tda_declaration.type_loc, env.stage - n))
+                                 tda.tda_declaration.type_loc,
+                                 env.stage - n))
     end
   | exception Not_found | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
+
+let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
+  let path, locks, data =
+    match find_name_module ~mark:use s env.modules with
+    | path, locks, data -> begin
+        match quotation_locks_offset locks with
+        | None | Some 0 -> path, locks, data
+        | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 Location.none, env.stage - n))
+    end
+    | exception Not_found ->
+        may_lookup_error errors loc env (Unbound_module (Lident s))
+  in
+  match data with
+  | Mod_local (mda, alias_locks) -> begin
+      use_module ~use ~loc path mda;
+      let locks = alias_locks @ locks in
+      match load with
+      | Load -> path, locks, (mda : a)
+      | Don't_load -> path, locks, (() : a)
+    end
+  | Mod_unbound reason ->
+      report_module_unbound ~errors ~loc env reason
+  | Mod_persistent -> begin
+      (* This is only used when processing [Longident.t]s, which never have
+         instance arguments *)
+      let name = Global_module.Name.create_no_args s in
+      let path, a =
+        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
+      in
+      path, locks, a
+    end
+
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
   match IdTbl.find_name wrap_identity ~mark:use s env.modtypes with

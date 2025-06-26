@@ -290,9 +290,6 @@ let unclosed opening_name opening_loc closing_name closing_loc =
 let unspliceable loc =
   raise(Syntaxerr.Error(Syntaxerr.Unspliceable (make_loc loc)))
 
-let unsupported loc =
-  raise(Syntaxerr.Error(Syntaxerr.Unsupported (make_loc loc)))
-
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
    [Generic_array] module provides (1) a type representing the possible results,
@@ -1004,7 +1001,6 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
 %token LESSLBRACKET           "<["
-%token LESSLBRACKETCOLON      "<[:"
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -1143,7 +1139,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT DOLLAR LESSLBRACKET LESSLBRACKETCOLON
+          NEW PREFIXOP STRING TRUE UIDENT DOLLAR LESSLBRACKET
           LBRACKETPERCENT QUOTED_STRING_EXPR STACK HASHLBRACE HASHLPAREN
 
 
@@ -3156,8 +3152,6 @@ comprehension_clause:
       { Pexp_splice $2 }
   | LESSLBRACKET seq_expr RBRACKETGREATER
       { Pexp_quotation $2 }
-  | LESSLBRACKETCOLON core_type RBRACKETGREATER
-      { unsupported $sloc }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH

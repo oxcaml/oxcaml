@@ -461,9 +461,6 @@ and expression i ppf x =
   | Pexp_quotation e ->
     line i ppf "Pexp_quotation\n";
     expression i ppf e
-  | Pexp_quoted_type_expr t ->
-    line i ppf "Pexp_quoted_type_expr\n";
-    core_type i ppf t
   | Pexp_splice e ->
       line i ppf "Pexp_splice\n";
       expression i ppf e

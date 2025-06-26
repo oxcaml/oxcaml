@@ -166,6 +166,7 @@ type error =
   | Submode_failed of Mode.Value.error
   | Modal_module_not_supported
   | Quotation_structure
+  | Quotation_signature
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

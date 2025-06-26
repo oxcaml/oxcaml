@@ -106,6 +106,7 @@ type error =
   | Submode_failed of Mode.Value.error
   | Modal_module_not_supported
   | Quotation_structure
+  | Quotation_signature
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -251,7 +252,7 @@ let initial_env ~loc ~initially_opened_module
         (open_module env m, units)
   in
   let env = List.fold_left add_units env units in
-  List.fold_left open_module env open_implicit_modules
+  Env.add_local_env_lock (List.fold_left open_module env open_implicit_modules)
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, newenv) =
@@ -1649,6 +1650,8 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_alias (path, lid)) (Mty_alias path) env loc
         smty.pmty_attributes
   | Pmty_signature ssg ->
+      if Env.has_open_quotations env then
+        raise(Error(loc, env, Quotation_signature));
       let sg = transl_signature env ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
@@ -4417,6 +4420,11 @@ let report_error ~loc _env = function
         "Module definitions using %a@ blocks are not allowed \
          inside quotations."
         Style.inline_code "struct..end"
+  | Quotation_signature ->
+      Location.errorf ~loc
+        "Module type definitions using %a@ are not allowed \
+         inside quotations."
+        Style.inline_code "sig..end"
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env_error env
