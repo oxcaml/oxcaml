@@ -7221,11 +7221,13 @@ let check_decl_jkind env decl jkind =
                    Record_unboxed, None), _
     | Type_record_unboxed_product ([{ ld_type = inner_ty;
                                       ld_modalities = modality }], _, None), _
-    | Type_variant ([{ cd_args = (Cstr_tuple [{ ca_type = inner_ty;
-                                                ca_modalities = modality }] |
-                                  Cstr_record [{ ld_type = inner_ty;
-                                                 ld_modalities = modality }]) }],
-                    Variant_unboxed, None), _ ->
+    | Type_variant (
+        [{ cd_args =
+             (Cstr_tuple [{ ca_type = inner_ty;
+                            ca_modalities = modality }] |
+              Cstr_record [{ ld_type = inner_ty;
+                             ld_modalities = modality }]) }],
+        Variant_unboxed, None), _ ->
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
