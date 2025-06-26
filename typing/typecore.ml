@@ -317,7 +317,7 @@ let type_open :
 
 let type_open_decl :
   (?used_slot:bool ref -> Env.t -> Parsetree.open_declaration
-   -> open_declaration * Types.signature * Env.t)
+   -> open_declaration * Env.t)
     ref =
   ref (fun ?used_slot:_ _ -> assert false)
 
@@ -6692,7 +6692,7 @@ and type_expect_
         exp_env = env }
   | Pexp_open (od, e) ->
       let tv = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-      let (od, _, newenv) = !type_open_decl env od in
+      let (od, newenv) = !type_open_decl env od in
       let exp = type_expect newenv expected_mode e ty_expected_explained in
       (* Force the return type to be well-formed in the original
          environment. *)

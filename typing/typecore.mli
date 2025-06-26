@@ -349,7 +349,7 @@ val type_open:
 (* Forward declaration, to be filled in by Typemod.type_open_decl *)
 val type_open_decl:
   (?used_slot:bool ref -> Env.t -> Parsetree.open_declaration ->
-   Typedtree.open_declaration * Types.signature * Env.t)
+   Typedtree.open_declaration * Env.t)
     ref
 (* Forward declaration, to be filled in by Typeclass.class_structure *)
 val type_object:

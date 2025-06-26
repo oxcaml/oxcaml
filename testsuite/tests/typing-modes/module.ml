@@ -298,6 +298,37 @@ Error: This application of the functor "F" is ill-typed.
           This escapes its region.
 |}]
 
+(* [include] should rebase modalities relative to the current structure *)
+module Test_incl = struct
+    module M = struct
+        let foo x = x
+    end
+    module type S = module type of M
+    (* [M] is portable, so inside [S] there is no [portable] modality on [foo] *)
+    module N = struct
+        let x  : int ref = ref 42
+        let f () = x := 24
+        (* [N] cannot be [portable] due to [f] *)
+
+        include M
+    end
+
+    let () = portable_use N.foo
+end
+[%%expect{|
+module Test_incl :
+  sig
+    module M : sig val foo : 'a -> 'a end @@ stateless
+    module type S = sig val foo : 'a -> 'a end
+    module N :
+      sig
+        val x : int ref @@ stateless
+        val f : unit -> unit
+        val foo : 'a -> 'a @@ stateless
+      end
+  end
+|}]
+
 let use_unique : 'a @ unique -> unit = fun _ -> ()
 
 (* Functors are [many], and can't close over unique values*)

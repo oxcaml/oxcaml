@@ -2655,6 +2655,24 @@ let maybe_infer_modalities ~loc ~env ~md_mode ~mode =
     Mode.Modality.Value.id
   end
 
+(** Given a signature [sg] to be included in a structure. The signature contains
+  modalities relative to [mode], this function returns a signature with
+  modalities relative to [md_mode].  *)
+let rebase_modalities ~loc ~env ~md_mode ~mode sg =
+  List.map (function
+    | Sig_value (id, vd, vis) ->
+        let mode = Mode.Modality.Value.apply vd.val_modalities mode in
+        let val_modalities = maybe_infer_modalities ~loc ~env ~md_mode ~mode in
+        let vd = {vd with val_modalities} in
+        Sig_value (id, vd, vis)
+    | Sig_module (id, pres, md, rec_, vis) ->
+        let mode = Mode.Modality.Value.apply md.md_modalities mode in
+        let md_modalities = maybe_infer_modalities ~loc ~env ~md_mode ~mode in
+        let md = {md with md_modalities} in
+        Sig_module (id, pres, md, rec_, vis)
+    | item -> item
+    ) sg
+
 let rec type_module ?alias sttn funct_body anchor env smod =
   let md, shape =
     type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor env smod
@@ -3059,7 +3077,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
       open_loc = loc;
       open_attributes = od.popen_attributes
     } in
-    open_descr, [], newenv
+    open_descr, Mode.Value.(max |> disallow_right), [], newenv
   | _ ->
     let md, mod_shape = type_module true funct_body None env od.popen_expr in
     let mode = mode_without_locks_exn md.mod_mode in
@@ -3095,7 +3113,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
       open_loc = loc;
       open_attributes = od.popen_attributes
     } in
-    open_descr, sg, newenv
+    open_descr, mode, sg, newenv
 
 and type_structure ?(toplevel = None) funct_body anchor env sstr =
   let names = Signature_names.create () in
@@ -3126,6 +3144,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
         modl_shape sg ~mode env
     in
+    let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
       { incl_mod = modl;
@@ -3477,9 +3496,10 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         Tstr_modtype mtd, [Sig_modtype (id, decl, Exported)], map, newenv
     | Pstr_open sod ->
         let toplevel = Option.is_some toplevel in
-        let (od, sg, newenv) =
+        let (od, mode, sg, newenv) =
           type_open_decl ~toplevel funct_body names env sod
         in
+        let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
         Tstr_open od, sg, shape_map, newenv
     | Pstr_class cl ->
         Value.Comonadic.(submode_exn legacy md_mode.comonadic);
@@ -3784,8 +3804,11 @@ let type_package env m p fl =
 (* Fill in the forward declarations *)
 
 let type_open_decl ?used_slot env od =
-  type_open_decl ?used_slot ?toplevel:None false (Signature_names.create ()) env
-    od
+  let od, _, _, env =
+    type_open_decl ?used_slot ?toplevel:None false (Signature_names.create ()) env
+      od
+  in
+  od, env
 
 let type_open_descr ?used_slot env od =
   type_open_descr ?used_slot ?toplevel:None env od
