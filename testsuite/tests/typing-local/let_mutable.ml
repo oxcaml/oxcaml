@@ -111,7 +111,7 @@ Error: Mutable variable cannot be used inside closure.
 (* Test 3.3: Locally defined functors *)
 module type S_3_3 = sig module F () : sig val x : int end end
 
-let m_3_3 =
+let [@warning "-26"] m_3_3 =
   let mutable y = 42 in
   (module (struct module F () = struct let x = y end end) : S_3_3)
 
@@ -329,7 +329,7 @@ val foo5_4 : int -> int = <fun>
 
 (* Test 6: Regionality *)
 (* 6.1: regional <- regional assignment is allowed *)
-let allowed_6_1 =
+let [@warning "-26"] allowed_6_1 =
   let mutable x = [] in
   let y = stack_ (1 :: []) in
   for i = 0 to 1 do
@@ -467,7 +467,7 @@ let allowed_13_4 =
 val allowed_13_4 : unit = ()
 |}]
 
-let allowed_13_5 =
+let [@warning "-26"] allowed_13_5 =
   let mutable f @ portable = fun _ -> () in
   (f <- fun z -> x_13_3 := z)
 [%%expect{|
@@ -568,36 +568,6 @@ Error: This expression has type "int" but an expression was expected of type
   Hint: Did you mean "3."?
 |}]
 
-(* Tests 19 and 20: some mode crossing *)
-let f_19 () =
-  let mutable x : int = 42 in
-  x <- (local_ 24);
-  x
-[%%expect{|
-val f_19 : unit -> int = <fun>
-|}]
-
-let foo_20 y =
-  let mutable x = y in
-  (x <- stack_ (10 :: x));
-  x
-[%%expect{|
-Line 4, characters 2-3:
-4 |   x
-      ^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
-|}]
-
-(* Test 21: Unboxed products not supported yet *)
-let foo_21 =
-  let mutable bar = #(123, 456) in
-  bar <- #(789, 101);
-  42
-[%%expect{|
-val foo_21 : int = 42
-|}]
-
 (* Test 18.1: unmutated mutable variable warning *)
 let x_18_1 =
   let mutable x = 3 in x + 1
@@ -622,4 +592,34 @@ Line 2, characters 14-15:
 Warning 26 [unused-var]: unused variable x.
 
 val x_18_2 : int = 4
+|}]
+
+(* Tests 19 and 20: some mode crossing *)
+let f_19 () =
+  let mutable x : int = 42 in
+  x <- (local_ 24);
+  x
+[%%expect{|
+val f_19 : unit -> int = <fun>
+|}]
+
+let foo_20 y =
+  let mutable x = y in
+  (x <- stack_ (10 :: x));
+  x
+[%%expect{|
+Line 4, characters 2-3:
+4 |   x
+      ^
+Error: This value escapes its region.
+  Hint: Cannot return a local value without an "exclave_" annotation.
+|}]
+
+(* Test 21: Unboxed products not supported yet *)
+let [@warning "-26"] foo_21 =
+  let mutable bar = #(123, 456) in
+  bar <- #(789, 101);
+  42
+[%%expect{|
+val foo_21 : int = 42
 |}]
