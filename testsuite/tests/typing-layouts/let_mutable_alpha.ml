@@ -20,12 +20,12 @@ let () =
   v <- u;
   print_endline "Hello, world!"
 
-type t = #{ x: int; v: void; y: int }
+type t = #{ x: int; v: void; y: int32# }
 
 let () =
-  let mutable r = #{ x = 10; v = unbox_unit (); y = 20 } in
-  r <- #{ x = 50; v = unbox_unit (); y = 60 };
+  let mutable r = #{ x = 10; v = unbox_unit (); y = #20l } in
+  r <- #{ x = 50; v = unbox_unit (); y = #60l };
   print_int r.#x;
   print_string " ";
-  print_int r.#y;
+  print_int (Stdlib_upstream_compatible.Int32_u.to_int r.#y);
   print_endline ""
