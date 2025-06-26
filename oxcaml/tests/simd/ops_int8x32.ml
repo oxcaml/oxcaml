@@ -7,12 +7,12 @@ let eq lv hv l h =
   then Printf.printf "high: actual = 0x%016Lx <> 0x%016Lx = expected\n" hv h;
   if l <> lv || h <> hv then assert false
 
-    let eqi lv hv l h =
-      if l <> lv
-      then Printf.printf "low:  expected = %016x <> %016x = actual\n" lv l;
-      if h <> hv
-      then Printf.printf "high: expected = %016x <> %016x = actual\n" hv h;
-      if l <> lv || h <> hv then assert false
+let eqi lv hv l h =
+  if l <> lv
+  then Printf.printf "low:  expected = %016x <> %016x = actual\n" lv l;
+  if h <> hv
+  then Printf.printf "high: expected = %016x <> %016x = actual\n" hv h;
+  if l <> lv || h <> hv then assert false
 
 type t = int8x32
 

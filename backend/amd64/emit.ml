@@ -387,21 +387,16 @@ let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
-let argX i n : X86_ast.arg =
-  match reg i.arg.(n) with
-  | Regf (YMM r | ZMM r) -> Regf (XMM r)
-  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-    | Regf (XMM _)
-    | Mem _ | Mem64_RIP _ ) as arg ->
-    arg
-
-let resX i n : X86_ast.arg =
-  match reg i.res.(n) with
+let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
   | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
     | Regf (XMM _)
     | Mem _ | Mem64_RIP _ ) as res ->
     res
+
+let argX i n = narrow_to_xmm (reg i.arg.(n))
+
+let resX i n = narrow_to_xmm (reg i.res.(n))
 
 (* Output an addressing mode *)
 
@@ -1453,8 +1448,10 @@ let emit_static_cast (cast : Cmm.static_cast) i =
        remove zx once we have unboxed int8 *)
     I.movd (argX i 0) (res32 i 0);
     I.movzx (res8 i 0) (res i 0)
-  | V128_of_scalar Int16x8 | V128_of_scalar Int8x16
-  | V256_of_scalar Int16x16 | V256_of_scalar Int8x32 ->
+  | V128_of_scalar Int16x8
+  | V128_of_scalar Int8x16
+  | V256_of_scalar Int16x16
+  | V256_of_scalar Int8x32 ->
     (* [movw] and [movb] cannot operate on vector registers. Moving 32 bits is
        OK because the argument is an untagged positive int and these operations
        leave the top bits of the vector unspecified. CR mslater: (SIMD) don't

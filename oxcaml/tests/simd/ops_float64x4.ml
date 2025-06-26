@@ -12,7 +12,8 @@ external low_to : t -> float
   = "caml_vec256_unreachable" "caml_float64x4_low_to_float"
   [@@noalloc] [@@unboxed] [@@builtin]
 
-(* Helper functions for testing - using the infrastructure from utils256_cast.ml *)
+(* Helper functions for testing - using the infrastructure from
+   utils256_cast.ml *)
 external float64x4_low_int64 : t -> int64 = "" "vec256_fourth_int64"
   [@@noalloc] [@@unboxed]
 
@@ -25,4 +26,3 @@ let () =
   let f1 = low_to v1 in
   let f2 = low_to v2 in
   eqf f1 f2 1. 2.
-

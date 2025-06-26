@@ -24,4 +24,3 @@ let () =
   let f1 = low_to v1 in
   let f2 = low_to v2 in
   eqf32 f1 f2 1.s 2.s
-

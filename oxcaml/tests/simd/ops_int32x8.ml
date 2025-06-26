@@ -2,7 +2,7 @@ open Utils
 
 type t = int32x8
 
-(* Creation / Destruction  *)
+(* Creation / Destruction *)
 
 external low_of : int32 -> t
   = "caml_vec256_unreachable" "caml_int32x8_low_of_int32"
