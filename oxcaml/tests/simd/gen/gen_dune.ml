@@ -170,7 +170,8 @@ let () =
       "callback256", enabled_if_main_amd64_not_macos;
       "test_callee_save_neon_regs", enabled_if_main;
       "probes", enabled_if_main_amd64_not_macos;
-      "probes256", enabled_if_main_amd64_not_macos ]
+      "probes256", enabled_if_main_amd64_not_macos;
+      "utils256", enabled_if_main_amd64_not_macos ]
   in
   List.iter print_test tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;

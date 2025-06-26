@@ -8,6 +8,11 @@
 #ifdef ARCH_AVX
 #include <immintrin.h>
 
+#define BUILTIN(name) void name() { assert(0); }
+
+BUILTIN(caml_vec256_unreachable);
+BUILTIN(caml_vec256_cast);
+
 int64_t vec256_first_int64(__m256i v)
 {
     return _mm256_extract_epi64(v, 3);
