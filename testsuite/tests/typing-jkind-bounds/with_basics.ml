@@ -1239,4 +1239,23 @@ let f _ : _ =
   let _ : _ T0.value ref = ref (failwith "") in
   ()
 
-[%%expect]
+[%%expect{|
+module T0 :
+  sig
+    type 'codegen record = { spec : unit inner_record; }
+    and 'codegen variant = { spec : unit inner_variant; }
+    and 'codegen inner_record = { fields : unit field; }
+    and 'codegen inner_variant = { cases : unit field; }
+    and 'codegen optional = { contains : unit value; }
+    and 'codegen indexable = { element : unit value; }
+    and 'codegen foo = { element : unit value; }
+    and 'codegen bar = { element : unit value; }
+    and 'codegen derived = { spec : unit value; }
+    and 'codegen field = { inner : unit leaf; }
+    and 'codegen leaf = unit value
+    and 'codegen value =
+        unit record * unit variant * unit optional * unit indexable *
+        unit derived * unit foo * unit bar
+  end
+val f : 'a -> unit = <fun>
+|}]

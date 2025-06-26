@@ -497,17 +497,7 @@ type 'a mutable_list = Nil | Cons of int ref * 'a mutable_list
 
 type t1
 type 'a t2 : immutable_data with 'a with t1 = Leaf of 'a | Node of 'a * t1 t2
-(* CR layouts v2.8: this should be accepted *)
 [%%expect {|
 type t1
-Line 2, characters 0-77:
-2 | type 'a t2 : immutable_data with 'a with t1 = Leaf of 'a | Node of 'a * t1 t2
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data with 'a with t1 with t1 t2
-         because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immutable_data with 'a
-         with t1
-         because of the annotation on the declaration of the type t2.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type 'a t2 = Leaf of 'a | Node of 'a * t1 t2
 |}]
