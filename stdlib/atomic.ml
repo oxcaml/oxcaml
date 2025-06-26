@@ -103,8 +103,8 @@ let decr r = sub r 1
 
 module Contended = struct
   external get
-    : ('a : value_or_null).
-    'a t @ contended local -> 'a @ contended
+    : ('a : value_or_null mod contended portable).
+    'a t @ contended local -> 'a
     @@ portable
     = "%atomic_load"
 
