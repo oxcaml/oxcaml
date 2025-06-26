@@ -1358,8 +1358,12 @@ and cont_handlers env handler1 handler2 =
 let flambda_units u1 u2 =
   let ret_cont = Continuation.create ~sort:Toplevel_return () in
   let exn_cont = Continuation.create () in
-  let toplevel_my_region = Variable.create "toplevel_my_region" in
-  let toplevel_my_ghost_region = Variable.create "toplevel_my_ghost_region" in
+  let toplevel_my_region =
+    Variable.create "toplevel_my_region" Flambda_kind.region
+  in
+  let toplevel_my_ghost_region =
+    Variable.create "toplevel_my_ghost_region" Flambda_kind.region
+  in
   let mk_renaming u =
     let renaming = Renaming.empty in
     let renaming =

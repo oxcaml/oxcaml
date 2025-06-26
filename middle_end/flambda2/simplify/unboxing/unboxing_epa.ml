@@ -62,18 +62,18 @@ let unbox_arg (unboxer : Unboxers.unboxer) ~typing_env_at_use arg_being_unboxed
     | Known_result simple ->
       EPA.Extra_arg.Already_in_scope simple, Available simple
     | Need_meet ->
-      let var = Variable.create unboxer.var_name in
+      let var = Variable.create unboxer.var_name unboxer.var_kind in
       let prim = unboxer.unboxing_prim arg_at_use in
       let extra_arg = EPA.Extra_arg.New_let_binding (var, prim) in
       extra_arg, Generated var)
   | Generated var ->
     let arg_at_use = Simple.var var in
-    let var = Variable.create unboxer.var_name in
+    let var = Variable.create unboxer.var_name unboxer.var_kind in
     let prim = unboxer.unboxing_prim arg_at_use in
     let extra_arg = EPA.Extra_arg.New_let_binding (var, prim) in
     extra_arg, Generated var
   | Added_by_wrapper_at_rewrite_use { nth_arg } ->
-    let var = Variable.create "unboxed_field" in
+    let var = Variable.create "unboxed_field" unboxer.var_kind in
     ( EPA.Extra_arg.New_let_binding_with_named_args
         ( var,
           fun args ->

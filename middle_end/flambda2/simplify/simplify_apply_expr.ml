@@ -123,7 +123,7 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   (* Create the list of variables and projections *)
   let vars_and_fields =
     List.init tuple_size (fun field ->
-        ( Variable.create "tuple_field",
+        ( Variable.create "tuple_field" K.value,
           Flambda_debug_uid.none,
           (* This internally created variable does not get a
              [Flambda_debug_uid.t]. *)
@@ -427,7 +427,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       args
       (Flambda_arity.unarize param_arity)
   in
-  let wrapper_var = Variable.create "partial_app" in
+  let wrapper_var = Variable.create "partial_app" K.value in
   let wrapper_var_duid = Flambda_debug_uid.none in
   let compilation_unit = Compilation_unit.get_current_exn () in
   let wrapper_function_slot =
@@ -484,7 +484,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let remaining_params =
           List.map
             (fun kind ->
-              let param = Variable.create "param" in
+              let param = Variable.create "param" (KS.kind kind) in
               let param_duid = Flambda_debug_uid.none in
               Bound_parameter.create param kind param_duid)
             (Flambda_arity.unarize remaining_param_arity)
@@ -534,7 +534,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               if Coercion.is_id coercion
               then Symbol symbol
               else
-                let var = Variable.create "symbol" in
+                let var = Variable.create "symbol" K.value in
                 if not (K.equal (K.With_subkind.kind kind) K.value)
                 then
                   Misc.fatal_errorf
@@ -561,18 +561,18 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let contains_no_escaping_local_allocs =
           match result_mode with Alloc_heap -> true | Alloc_local -> false
         in
-        let my_closure = Variable.create "my_closure" in
+        let my_closure = Variable.create "my_closure" K.value in
         let my_region =
           if contains_no_escaping_local_allocs
           then None
-          else Some (Variable.create "my_region")
+          else Some (Variable.create "my_region" K.region)
         in
         let my_ghost_region =
           if contains_no_escaping_local_allocs
           then None
-          else Some (Variable.create "my_ghost_region")
+          else Some (Variable.create "my_ghost_region" K.region)
         in
-        let my_depth = Variable.create "my_depth" in
+        let my_depth = Variable.create "my_depth" K.rec_info in
         let exn_continuation =
           Apply.exn_continuation apply |> Exn_continuation.without_extra_args
         in

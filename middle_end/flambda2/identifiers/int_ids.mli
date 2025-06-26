@@ -109,13 +109,15 @@ module Variable : sig
 
   module Lmap : Lmap.S with type key := t
 
-  val create : ?user_visible:unit -> string -> t
+  val create : ?user_visible:unit -> string -> Flambda_kind.t -> t
 
   val compilation_unit : t -> Compilation_unit.t
 
   val name : t -> string
 
   val name_stamp : t -> int
+
+  val kind : t -> Flambda_kind.t
 
   val user_visible : t -> bool
 

@@ -679,7 +679,12 @@ and split_in_env env res var binding =
     let env, res =
       List.fold_left
         (fun (env, res) new_binding ->
-          let flambda_var = Variable.create "to_cmm_tmp" in
+          let flambda_var =
+            (* CR vlaviron/gbury: The kind is wrong, but it should never be
+               actually used. We could enforce this by using a dedicated invalid
+               kind, but for now we just use Value arbitrarily. *)
+            Variable.create "to_cmm_tmp" Flambda_kind.value
+          in
           add_binding_to_env env res flambda_var new_binding)
         (env, res) new_bindings
     in

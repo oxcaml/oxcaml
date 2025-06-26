@@ -188,6 +188,8 @@ module Simples_in_joined_envs : sig
 
   val raw_name : t -> string
 
+  val kind : t -> Flambda_kind.t
+
   val add : Index.t -> Simple_in_one_joined_env.t -> t -> t
 
   val of_list : (Index.t * Simple.t) list -> t
@@ -267,6 +269,11 @@ end = struct
       with Not_found -> None
     in
     match shared_name with Some raw_name -> raw_name | None -> "join_var"
+
+  let kind (t : t) =
+    match Index.Map.choose_opt (t :> Simple.t Index.Map.t) with
+    | Some (_, s) -> Simple.kind s
+    | None -> Misc.fatal_error "Simple_in_joined_envs.kind: No binding"
 
   let of_list list =
     List.fold_left
@@ -576,7 +583,8 @@ end = struct
        record it so that it can be found by [find] if we encounter the same set
        of values later. *)
     let raw_name = Simples_in_joined_envs.raw_name simples in
-    let var = Variable.create raw_name in
+    let kind = Simples_in_joined_envs.kind simples in
+    let var = Variable.create raw_name kind in
     let var_as_name = Name_in_target_env.create (Name.var var) in
     let joined_simples =
       Simples_in_joined_envs.Map.add simples var_as_name t.joined_simples

@@ -57,9 +57,9 @@ let let_prim ~dbg v v_duid prim (free_names, body) =
 (* ******************************** *)
 
 let simplify_comparison_of_tagged_immediates ~dbg dacc ~cmp_prim cont a b =
-  let v_comp = Variable.create "comp" in
+  let v_comp = Variable.create "comp" K.naked_immediate in
   let v_comp_duid = Flambda_debug_uid.none in
-  let tagged = Variable.create "tagged" in
+  let tagged = Variable.create "tagged" K.value in
   let tagged_duid = Flambda_debug_uid.none in
   let _free_names, res =
     let_prim ~dbg v_comp v_comp_duid (P.Binary (cmp_prim, a, b))
@@ -70,13 +70,17 @@ let simplify_comparison_of_tagged_immediates ~dbg dacc ~cmp_prim cont a b =
   Specialised (dacc, res, RO.specialized_poly_compare)
 
 let simplify_comparison_of_boxed_numbers ~dbg dacc ~kind ~cmp_prim cont a b =
-  let a_naked = Variable.create "unboxed" in
+  let a_naked =
+    Variable.create "unboxed" (K.Boxable_number.unboxed_kind kind)
+  in
   let a_naked_duid = Flambda_debug_uid.none in
-  let b_naked = Variable.create "unboxed" in
+  let b_naked =
+    Variable.create "unboxed" (K.Boxable_number.unboxed_kind kind)
+  in
   let b_naked_duid = Flambda_debug_uid.none in
-  let v_comp = Variable.create "comp" in
+  let v_comp = Variable.create "comp" K.naked_immediate in
   let v_comp_duid = Flambda_debug_uid.none in
-  let tagged = Variable.create "tagged" in
+  let tagged = Variable.create "tagged" K.value in
   let tagged_duid = Flambda_debug_uid.none in
   let _free_names, res =
     (* XXX try to remove @@ *)

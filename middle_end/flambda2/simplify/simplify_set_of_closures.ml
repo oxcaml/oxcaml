@@ -388,7 +388,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   let return_cont_params =
     List.mapi
       (fun i kind_with_subkind ->
-        let result_var = Variable.create ("result" ^ string_of_int i) in
+        let result_var =
+          Variable.create
+            ("result" ^ string_of_int i)
+            (KS.kind kind_with_subkind)
+        in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
       (Flambda_arity.unarized_components result_arity)

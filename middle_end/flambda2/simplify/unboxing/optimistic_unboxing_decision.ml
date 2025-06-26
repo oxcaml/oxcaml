@@ -33,10 +33,11 @@ let unbox_closures = true
 let make_optimistic_const_ctor () : U.const_ctors_decision =
   let is_int =
     Extra_param_and_args.create ~name:"is_int" ~debug_uid:Flambda_debug_uid.none
+      K.naked_immediate
   in
   let unboxed_const_ctor =
     Extra_param_and_args.create ~name:"unboxed_const_ctor"
-      ~debug_uid:Flambda_debug_uid.none
+      ~debug_uid:Flambda_debug_uid.none K.naked_immediate
   in
   let ctor = U.Unbox (Number (Naked_immediate, unboxed_const_ctor)) in
   At_least_one { is_int; ctor }
@@ -48,6 +49,7 @@ let make_optimistic_number_decision tenv param_type
     let naked_number =
       Extra_param_and_args.create ~name:decider.param_name
         ~debug_uid:Flambda_debug_uid.none
+        (K.naked_number decider.kind)
     in
     Some (Unbox (Number (decider.kind, naked_number)))
   | Unknown -> None
@@ -107,7 +109,7 @@ let rec make_optimistic_decision ~depth ~recursive tenv ~param_type : U.decision
             when unbox_variants && not recursive -> (
             let tag =
               Extra_param_and_args.create ~name:"tag"
-                ~debug_uid:Flambda_debug_uid.none
+                ~debug_uid:Flambda_debug_uid.none K.naked_immediate
             in
             let const_ctors : U.const_ctors_decision =
               match const_ctors with
@@ -163,7 +165,8 @@ and make_optimistic_fields ~add_tag_to_name ~depth ~recursive tenv param_type
   let field_vars =
     List.init (Targetint_31_63.to_int size) (fun i ->
         Extra_param_and_args.create ~name:(field_name i)
-          ~debug_uid:Flambda_debug_uid.none)
+          ~debug_uid:Flambda_debug_uid.none
+          (K.Block_shape.element_kind shape i))
   in
   let type_of_var index (epa : Extra_param_and_args.t) =
     T.alias_type_of
@@ -211,6 +214,7 @@ and make_optimistic_vars_within_closure ~depth ~recursive tenv closures_entry =
         Extra_param_and_args.create
           ~name:(Value_slot.to_string value_slot)
           ~debug_uid:Flambda_debug_uid.none
+          (Value_slot.kind value_slot)
       in
       let decision =
         make_optimistic_decision ~depth:(depth + 1) ~recursive tenv
