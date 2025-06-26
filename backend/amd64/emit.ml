@@ -1420,6 +1420,19 @@ let emit_static_cast (cast : Cmm.static_cast) i =
        leave the top bits of the vector unspecified. CR mslater: (SIMD) don't
        load 32 bits once we have unboxed int16/int8 *)
     I.movd (arg32 i 0) (res i 0)
+  (* 256-bit vector operations *)
+  | V256_of_scalar _ | Scalar_of_v256 _ ->
+    (* CR mslater: (SIMD) 256-bit vector static cast operations require
+       AVX2 support with proper YMM register handling. The current SSE
+       instructions (movsd, movss, movq, movd) only work with XMM registers.
+       Proper implementation requires vextractf128/vextracti128 for extraction
+       and vbroadcastsd/vbroadcastss for broadcasting. *)
+    assert false
+  (* 512-bit vector operations - not implemented *)
+  | V512_of_scalar _ | Scalar_of_v512 _ ->
+    (* CR mslater: (SIMD) 512-bit vector static cast operations require
+       AVX-512 support and are not yet implemented *)
+    assert false
 
 let assert_loc (loc : Simd.loc) arg =
   (match Reg.is_reg arg with

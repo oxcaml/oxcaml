@@ -302,6 +302,10 @@ type static_cast =
   | Float32_of_float
   | V128_of_scalar of vec128_type
   | Scalar_of_v128 of vec128_type
+  | V256_of_scalar of vec256_type
+  | Scalar_of_v256 of vec256_type
+  | V512_of_scalar of vec512_type
+  | Scalar_of_v512 of vec512_type
 
 module Alloc_mode : sig
   type t =

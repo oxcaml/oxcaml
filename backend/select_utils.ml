@@ -219,6 +219,16 @@ let oper_result_type = function
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
     typ_int
+  | Cstatic_cast (V256_of_scalar _) -> typ_vec256
+  | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
+  | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
+  | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
+    typ_int
+  | Cstatic_cast (V512_of_scalar _) -> typ_vec512
+  | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
+  | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
+  | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
+    typ_int
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
