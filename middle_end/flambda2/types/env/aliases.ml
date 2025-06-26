@@ -114,26 +114,28 @@ end = struct
     }
 
   let invariant { aliases; all } =
-    (* The elements in [aliases] have disjoint set of keys. *)
-    let aliases_union : Map_to_canonical.t =
-      Name_mode.Map.fold
-        (fun _name_mode map acc ->
-          Name.Map.union
-            (fun elt _coercion1 _coercion2 ->
-              Misc.fatal_errorf
-                "[Aliases_of_canonical_element.invariant]: element %a appears \
-                 in several modes"
-                Name.print elt)
-            map acc)
-        aliases Name.Map.empty
-    in
-    (* [all] is the union of all elements in [aliases] *)
-    if Name.Map.equal Coercion.equal all aliases_union
-    then ()
-    else
-      Misc.fatal_errorf
-        "[Aliases_of_canonical_element.invariant]: [aliases] and [all] are not \
-         consistent"
+    if Flambda_features.check_invariants ()
+    then
+      (* The elements in [aliases] have disjoint set of keys. *)
+      let aliases_union : Map_to_canonical.t =
+        Name_mode.Map.fold
+          (fun _name_mode map acc ->
+            Name.Map.union
+              (fun elt _coercion1 _coercion2 ->
+                Misc.fatal_errorf
+                  "[Aliases_of_canonical_element.invariant]: element %a \
+                   appears in several modes"
+                  Name.print elt)
+              map acc)
+          aliases Name.Map.empty
+      in
+      (* [all] is the union of all elements in [aliases] *)
+      if Name.Map.equal Coercion.equal all aliases_union
+      then ()
+      else
+        Misc.fatal_errorf
+          "[Aliases_of_canonical_element.invariant]: [aliases] and [all] are \
+           not consistent"
 
   let [@ocamlformat "disable"] print ppf { aliases; all = _; } =
     Name_mode.Map.print (Name.Map.print Coercion.print) ppf aliases
