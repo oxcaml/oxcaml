@@ -32,10 +32,10 @@ Error: Layout void is more experimental than allowed by the enabled layouts exte
        You must enable -extension layouts_alpha to use this feature.
 |}]
 
-type t_any mod separable : any mod separable;;
+type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any mod separable : any mod separable
+type t_any_mod_separable : any mod separable
 |}]
 
 type t_value_or_null : value_or_null;;
