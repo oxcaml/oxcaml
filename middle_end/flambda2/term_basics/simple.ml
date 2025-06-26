@@ -62,7 +62,7 @@ let is_imported_or_constant t =
     ~const:(fun _ -> true)
     ~name:(fun name ~coercion:_ -> Name.is_imported name)
 
-let pattern_match' t ~var ~symbol ~const =
+let[@inline always] pattern_match' t ~var ~symbol ~const =
   pattern_match t ~const ~name:(fun name ->
       Name.pattern_match name ~var ~symbol)
 

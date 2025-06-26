@@ -133,11 +133,11 @@ module Simple_in_one_joined_env : sig
 end = struct
   include Thing_in_env (Simple) ()
 
-  let pattern_match (t : t) ~name:on_name ~const =
+  let[@inline always] pattern_match (t : t) ~name:on_name ~const =
     Simple.pattern_match
       (t :> Simple.t)
       ~name:(fun name ~coercion ->
-        on_name (Name_in_one_joined_env.create name) ~coercion)
+        (on_name [@inlined hint]) (Name_in_one_joined_env.create name) ~coercion)
       ~const
 end
 
