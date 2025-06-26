@@ -132,7 +132,7 @@ external float64x4_fourth_int64 : float64x4 -> int64
 
 module Vector_casts = struct
   (* Test casts between 256-bit vector types *)
-  
+
   external int64x4_of_int32x8 : int32x8 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
     [@@noalloc] [@@unboxed] [@@builtin]

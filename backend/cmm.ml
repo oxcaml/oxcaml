@@ -800,7 +800,8 @@ let equal_vec512_type v1 v2 =
   | Int64x8, Int64x8 -> true
   | Float32x16, Float32x16 -> true
   | Float64x8, Float64x8 -> true
-  | (Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float32x16 | Float64x8), _ -> false
+  | (Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float32x16 | Float64x8), _ ->
+    false
 
 let equal_float_width left right =
   match left, right with
@@ -841,8 +842,8 @@ let equal_static_cast (left : static_cast) (right : static_cast) =
   | Scalar_of_v512 v1, Scalar_of_v512 v2 -> equal_vec512_type v1 v2
   | V512_of_scalar v1, V512_of_scalar v2 -> equal_vec512_type v1 v2
   | ( ( Float32_of_float | Float_of_float32 | Float_of_int _ | Int_of_float _
-      | Scalar_of_v128 _ | V128_of_scalar _ | Scalar_of_v256 _ | V256_of_scalar _
-      | Scalar_of_v512 _ | V512_of_scalar _ ),
+      | Scalar_of_v128 _ | V128_of_scalar _ | Scalar_of_v256 _
+      | V256_of_scalar _ | Scalar_of_v512 _ | V512_of_scalar _ ),
       _ ) ->
     false
 

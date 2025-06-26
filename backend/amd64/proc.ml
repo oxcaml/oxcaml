@@ -186,6 +186,13 @@ let calling_conventions
   let float = ref first_float in
   let ofs = ref first_stack in
   let stack_vec256, stack_vec512 = ref false, ref false in
+  (* A negative offset indicates a domainstate slot, which will
+     generate unaligned moves. *)
+  let align ofs size =
+    if ofs <= -size then ofs
+    else if ofs <= 0 then 0
+    else Misc.align ofs size
+  in
   for i = 0 to Array.length arg - 1 do
     match (arg.(i) : machtype_component) with
     | Val | Int | Addr as ty ->
@@ -210,7 +217,7 @@ let calling_conventions
         loc.(i) <- phys_reg Vec128 !float;
         incr float
       end else begin
-        ofs := Misc.align !ofs size_vec128;
+        ofs := align !ofs size_vec128;
         loc.(i) <- stack_slot (make_stack !ofs) Vec128;
         ofs := !ofs + size_vec128
       end
@@ -221,7 +228,7 @@ let calling_conventions
         incr float
       end else begin
         stack_vec256 := true;
-        ofs := Misc.align !ofs size_vec256;
+        ofs := align !ofs size_vec256;
         loc.(i) <- stack_slot (make_stack !ofs) Vec256;
         ofs := !ofs + size_vec256
       end
@@ -232,7 +239,7 @@ let calling_conventions
         incr float
       end else begin
         stack_vec512 := true;
-        ofs := Misc.align !ofs size_vec512;
+        ofs := align !ofs size_vec512;
         loc.(i) <- stack_slot (make_stack !ofs) Vec512;
         ofs := !ofs + size_vec512
       end
@@ -702,6 +709,12 @@ let precolored_regs () =
 
 let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
+  | Creinterpret_cast V256_of_v256
+  | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
+    Arch.Extension.allow_vec256 ()
+  | Creinterpret_cast V512_of_v512
+  | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
+    Arch.Extension.allow_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -713,11 +726,19 @@ let operation_supported = function
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _
-  | Creinterpret_cast _ | Cstatic_cast _
   | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
   | Cpoll
-    -> true
+  | Creinterpret_cast (Int_of_value | Value_of_int |
+                       Int64_of_float | Float_of_int64 |
+                       Float32_of_float | Float_of_float32 |
+                       Float32_of_int32 | Int32_of_float32 |
+                       V128_of_v128)
+  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+                  Int_of_float Float32 | Float_of_int Float32 |
+                  Float_of_int Float64 | Int_of_float Float64 |
+                  V128_of_scalar _ | Scalar_of_v128 _) ->
+    true
 
 let trap_size_in_bytes = 16

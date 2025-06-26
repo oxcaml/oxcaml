@@ -387,6 +387,22 @@ let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
+let argX i n : X86_ast.arg =
+  match reg i.arg.(n) with
+  | Regf (YMM r | ZMM r) -> Regf (XMM r)
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regf (XMM _)
+    | Mem _ | Mem64_RIP _ ) as arg ->
+    arg
+
+let resX i n : X86_ast.arg =
+  match reg i.res.(n) with
+  | Regf (YMM r | ZMM r) -> Regf (XMM r)
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regf (XMM _)
+    | Mem _ | Mem64_RIP _ ) as res ->
+    res
+
 (* Output an addressing mode *)
 
 let addressing addr typ i n =
@@ -929,8 +945,12 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Float, Reg _, Float, Reg _
   | Float32, Reg _, Float32, Reg _
   | (Vec128 | Valx2), (Reg _ | Stack _), (Vec128 | Valx2), (Reg _ | Stack _) ->
-    (* Vec128 stack slots are always aligned. *)
-    if distinct then I.movapd (reg src) (reg dst)
+    if distinct
+    then
+      (* Vec128 stack slots are aligned, domainstate slots are not. *)
+      if Reg.is_domainstate src || Reg.is_domainstate dst
+      then I.movupd (reg src) (reg dst)
+      else I.movapd (reg src) (reg dst)
   | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
@@ -1375,15 +1395,23 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     I.xchg src dst
 
 let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
+  let open Amd64_simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then I.movss (arg i 0) (res i 0)
   | V128_of_v128 -> if distinct then I.movapd (arg i 0) (res i 0)
-  | V256_of_v256 -> 
-    if distinct then I.simd Simd_instrs.vmovapd_Y_Ym256 [| arg i 0; res i 0 |]
-  | V512_of_v512 -> Misc.fatal_error "V512_of_v512 not yet implemented"
+  | V256_of_v256 ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if Reg.is_stack i.arg.(0)
+      then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
+      else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
+  | V512_of_v512 ->
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
   | Float_of_int64 | Int64_of_float -> I.movq (arg i 0) (res i 0)
   | Float32_of_int32 -> I.movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> I.movd (arg i 0) (res32 i 0)
@@ -1397,45 +1425,46 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | Int_of_float Float32 -> I.cvttss2si (arg i 0) (res i 0)
   | Float_of_float32 -> I.cvtss2sd (arg i 0) (res i 0)
   | Float32_of_float -> I.cvtsd2ss (arg i 0) (res i 0)
-  | V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2 ->
-    if distinct then I.movsd (arg i 0) (res i 0)
-  | Scalar_of_v128 Int64x2 | V128_of_scalar Int64x2 ->
-    I.movq (arg i 0) (res i 0)
-  | Scalar_of_v128 Int32x4 -> I.movd (arg i 0) (res32 i 0)
-  | V128_of_scalar Int32x4 -> I.movd (arg32 i 0) (res i 0)
-  | V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4 ->
-    if distinct then I.movss (arg i 0) (res i 0)
-  | Scalar_of_v128 Int16x8 ->
+  | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
+    if distinct then I.movsd (argX i 0) (res i 0)
+  | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
+    if distinct then I.movsd (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int64x2 | Scalar_of_v256 Int64x4 ->
+    I.movq (argX i 0) (res i 0)
+  | V128_of_scalar Int64x2 | V256_of_scalar Int64x4 ->
+    I.movq (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int32x4 | Scalar_of_v256 Int32x8 ->
+    I.movd (argX i 0) (res32 i 0)
+  | V128_of_scalar Int32x4 | V256_of_scalar Int32x8 ->
+    I.movd (arg32 i 0) (resX i 0)
+  | Scalar_of_v128 Float32x4 | Scalar_of_v256 Float32x8 ->
+    if distinct then I.movss (argX i 0) (res i 0)
+  | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
+    if distinct then I.movss (arg i 0) (resX i 0)
+  | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
     (* [movw] and [movzx] cannot operate on vector registers. We must zero
        extend as the result is an untagged positive int. CR mslater: (SIMD)
        remove zx once we have unboxed int16 *)
-    I.movd (arg i 0) (res32 i 0);
+    I.movd (argX i 0) (res32 i 0);
     I.movzx (res16 i 0) (res i 0)
-  | Scalar_of_v128 Int8x16 ->
+  | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
     (* [movb] and [movzx] cannot operate on vector registers. We must zero
        extend as the result is an untagged positive int. CR mslater: (SIMD)
        remove zx once we have unboxed int8 *)
-    I.movd (arg i 0) (res32 i 0);
+    I.movd (argX i 0) (res32 i 0);
     I.movzx (res8 i 0) (res i 0)
-  | V128_of_scalar Int16x8 | V128_of_scalar Int8x16 ->
+  | V128_of_scalar Int16x8
+  | V128_of_scalar Int8x16
+  | V256_of_scalar Int16x16
+  | V256_of_scalar Int8x32 ->
     (* [movw] and [movb] cannot operate on vector registers. Moving 32 bits is
        OK because the argument is an untagged positive int and these operations
        leave the top bits of the vector unspecified. CR mslater: (SIMD) don't
        load 32 bits once we have unboxed int16/int8 *)
-    I.movd (arg32 i 0) (res i 0)
-  (* 256-bit vector operations *)
-  | V256_of_scalar _ | Scalar_of_v256 _ ->
-    (* CR mslater: (SIMD) 256-bit vector static cast operations require
-       AVX2 support with proper YMM register handling. The current SSE
-       instructions (movsd, movss, movq, movd) only work with XMM registers.
-       Proper implementation requires vextractf128/vextracti128 for extraction
-       and vbroadcastsd/vbroadcastss for broadcasting. *)
-    assert false
-  (* 512-bit vector operations - not implemented *)
+    I.movd (arg32 i 0) (resX i 0)
   | V512_of_scalar _ | Scalar_of_v512 _ ->
-    (* CR mslater: (SIMD) 512-bit vector static cast operations require
-       AVX-512 support and are not yet implemented *)
-    assert false
+    (* CR-soon mslater: avx512 *)
+    Misc.fatal_error "avx512 instructions not yet implemented"
 
 let assert_loc (loc : Simd.loc) arg =
   (match Reg.is_reg arg with

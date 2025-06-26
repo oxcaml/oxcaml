@@ -512,6 +512,12 @@ immutable field can't be modified[^write-on-initialization]. Hence `price` can't
 produce a data race no matter what is happening in parallel. The situation
 changes if we make `price` mutable:
 
+[^write-on-initialization]: If we think of the field as a location in memory,
+    then of course there is one point at which the field _is_ modified, namely
+    when the record is created. Fortunately, the memory model guarantees that
+    this _initialising write_ never races against a read of the same field, so
+    OCaml code never has to worry about data races on immutable fields.
+
 ```diff
    type t =
 -    { price : float

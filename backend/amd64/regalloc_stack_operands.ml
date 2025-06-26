@@ -208,7 +208,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
             | SSE Div_f32 ),
             _ ))) ->
     May_still_have_spilled_registers
-  | Op (Reinterpret_cast (Float_of_float32 | Float32_of_float | V128_of_v128 | V256_of_v256 | V512_of_v512))
+  | Op
+      (Reinterpret_cast
+        ( Float_of_float32 | Float32_of_float | V128_of_v128 | V256_of_v256
+        | V512_of_v512 ))
   | Op (Static_cast (V128_of_scalar Float64x2 | Scalar_of_v128 Float64x2))
   | Op (Static_cast (V128_of_scalar Float32x4 | Scalar_of_v128 Float32x4))
   | Op (Static_cast (V256_of_scalar Float64x4 | Scalar_of_v256 Float64x4))
@@ -219,7 +222,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Reinterpret_cast (Float_of_int64 | Float32_of_int32))
   | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
   | Op (Static_cast (V256_of_scalar (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
-  | Op (Static_cast (V512_of_scalar (Int64x8 | Int32x16 | Int16x32 | Int8x64))) ->
+  | Op (Static_cast (V512_of_scalar (Int64x8 | Int32x16 | Int16x32 | Int8x64)))
+    ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Reinterpret_cast (Int64_of_float | Int32_of_float32))
   | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4)))

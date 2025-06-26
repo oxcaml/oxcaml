@@ -274,7 +274,8 @@ let destroyed_at_c_noalloc_call =
 
 (* CSE needs to know that all versions of neon are destroyed. *)
 let destroy_neon_reg n =
-  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n); phys_reg Vec128 (100 + n); |]
+  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n);
+     phys_reg Vec128 (100 + n); |]
 
 let destroy_neon_reg7 = destroy_neon_reg 7
 
@@ -329,7 +330,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Move | Spill | Reload
         | Floatop _
         | Csel _
-        | Reinterpret_cast _ | Const_int _
+        | Const_int _
         | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _
         | Stackoffset _
@@ -337,6 +338,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque
         | Begin_region | End_region | Dls_get)
   | Poptrap _ | Prologue
+  | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
+                          Float32_of_float | Float_of_int64 | Int64_of_float |
+                          Float32_of_int32 | Int32_of_float32 | V128_of_v128))
     -> [||]
   | Stack_check _ -> assert false (* not supported *)
   | Op (Const_vec256 _ | Const_vec512 _)
@@ -348,6 +352,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
           ((Twofiftysix_aligned|Twofiftysix_unaligned|
             Fivetwelve_aligned|Fivetwelve_unaligned),
             _, _))
+  | Op (Reinterpret_cast (V256_of_v256 | V512_of_v512))
+  | Op (Static_cast (V256_of_scalar _ | Scalar_of_v256 _ |
+                     V512_of_scalar _ | Scalar_of_v512 _))
     -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
@@ -441,17 +448,15 @@ let assemble_file infile outfile =
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
 let operation_supported : Cmm.operation -> bool = function
-  | Cprefetch _ | Catomic _ -> false
+  | Cprefetch _ | Catomic _
+  | Creinterpret_cast (V256_of_v256 | V512_of_v512)
+  | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _ |
+                  V512_of_scalar _ | Scalar_of_v512 _) ->
+    false
   | Cpopcnt
   | Cnegf Float32 | Cabsf Float32 | Caddf Float32
   | Csubf Float32 | Cmulf Float32 | Cdivf Float32
   | Cpackf32
-  | Creinterpret_cast (Float32_of_float | Float_of_float32 |
-                       Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128 | V256_of_v256 | V512_of_v512)
-  | Cstatic_cast (Float_of_float32 | Float32_of_float |
-                  Int_of_float Float32 | Float_of_int Float32 |
-                  V128_of_scalar _ | Scalar_of_v128 _)
   | Cclz _ | Cctz _ | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -459,9 +464,6 @@ let operation_supported : Cmm.operation -> bool = function
   | Ccmpi _ | Caddv | Cadda | Ccmpa _
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
-  | Creinterpret_cast (Int_of_value | Value_of_int |
-                       Int64_of_float | Float_of_int64)
-  | Cstatic_cast (Float_of_int Float64 | Int_of_float Float64)
   | Ccmpf _
   | Ccsel _
   | Craise _
@@ -469,6 +471,15 @@ let operation_supported : Cmm.operation -> bool = function
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Cpoll
-    -> true
+  | Creinterpret_cast (Int_of_value | Value_of_int |
+                       Int64_of_float | Float_of_int64 |
+                       Float32_of_float | Float_of_float32 |
+                       Float32_of_int32 | Int32_of_float32 |
+                       V128_of_v128)
+  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+                  Int_of_float Float32 | Float_of_int Float32 |
+                  Float_of_int Float64 | Int_of_float Float64 |
+                  V128_of_scalar _ | Scalar_of_v128 _) ->
+    true
 
 let trap_size_in_bytes = 16

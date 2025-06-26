@@ -360,136 +360,86 @@ let transl_vec_builtin name args dbg _typ_res =
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let op = Cstatic_cast (Scalar_of_v128 Int8x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  (* 256-bit scalar casts - require AVX2 *)
   | "caml_float64x4_low_of_float" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (V256_of_scalar Float64x4) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V256_of_scalar Float64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float64x4_low_to_float" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (Scalar_of_v256 Float64x4) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v256 Float64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float32x8_low_of_float32" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (V256_of_scalar Float32x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V256_of_scalar Float32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float32x8_low_to_float32" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (Scalar_of_v256 Float32x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v256 Float32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int64x4_low_of_int64" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (V256_of_scalar Int64x4) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V256_of_scalar Int64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int64x4_low_to_int64" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (Scalar_of_v256 Int64x4) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v256 Int64x4) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int32x8_low_of_int32" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (V256_of_scalar Int32x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V256_of_scalar Int32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int32x8_low_to_int32" ->
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (Scalar_of_v256 Int32x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v256 Int32x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int16x16_low_of_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (V256_of_scalar Int16x16) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V256_of_scalar Int16x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int16x16_low_to_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (Scalar_of_v256 Int16x16) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v256 Int16x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int8x32_low_of_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (V256_of_scalar Int8x32) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V256_of_scalar Int8x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int8x32_low_to_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-    if Extension.allow_vec256 () then
-      let op = Cstatic_cast (Scalar_of_v256 Int8x32) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
-  (* 512-bit scalar casts - require AVX-512 *)
+    let op = Cstatic_cast (Scalar_of_v256 Int8x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float64x8_low_of_float" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (V512_of_scalar Float64x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V512_of_scalar Float64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float64x8_low_to_float" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (Scalar_of_v512 Float64x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v512 Float64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float32x16_low_of_float32" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (V512_of_scalar Float32x16) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V512_of_scalar Float32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float32x16_low_to_float32" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (Scalar_of_v512 Float32x16) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v512 Float32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int64x8_low_of_int64" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (V512_of_scalar Int64x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V512_of_scalar Int64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int64x8_low_to_int64" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (Scalar_of_v512 Int64x8) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v512 Int64x8) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int32x16_low_of_int32" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (V512_of_scalar Int32x16) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V512_of_scalar Int32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int32x16_low_to_int32" ->
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (Scalar_of_v512 Int32x16) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v512 Int32x16) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int16x32_low_of_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (V512_of_scalar Int16x32) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V512_of_scalar Int16x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int16x32_low_to_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (Scalar_of_v512 Int16x32) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v512 Int16x32) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int8x64_low_of_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (V512_of_scalar Int8x64) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (V512_of_scalar Int8x64) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int8x64_low_to_int" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-    if Extension.allow_vec512 () then
-      let op = Cstatic_cast (Scalar_of_v512 Int8x64) in
-      if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-    else None
+    let op = Cstatic_cast (Scalar_of_v512 Int8x64) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   (* Constants *)
   | "caml_float32x4_const1" ->
     let f = const_float32_args 1 args name |> List.hd in

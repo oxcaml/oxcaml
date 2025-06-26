@@ -542,6 +542,29 @@ val for_float : Ident.t -> Types.jkind_l
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
+(** The jkind for an abbreviation declaration. This implements the design
+    in rule FIND_ABBREV in kind-inference.md, where we consider a definition
+
+    {[
+      type ... = rhs
+    ]}
+
+    to have the kind [<<layout of rhs>> mod everything with rhs]. This is
+    important to allow code like this to type-check:
+
+    {[
+      module M : sig
+        type 'a t : value mod portable with 'a
+      end = struct
+        type 'a t = 'a
+      end
+    ]}
+*)
+val for_abbreviation :
+  type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
+  Types.type_expr ->
+  Types.jkind_l
+
 (******************************)
 (* elimination and defaulting *)
 

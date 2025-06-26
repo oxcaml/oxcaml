@@ -330,7 +330,11 @@ let decrease_continuation_specialization_budget t cost =
 
 let prepare_for_speculative_inlining dacc =
   let dacc =
-    map_denv ~f:DE.set_do_not_rebuild_terms_and_disable_inlining dacc
+    map_denv
+      ~f:(fun denv ->
+        DE.set_do_not_rebuild_terms_and_disable_inlining denv
+          Speculative_inlining)
+      dacc
   in
   with_are_lifting_conts dacc Are_lifting_conts.no_lifting
 

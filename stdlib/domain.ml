@@ -167,7 +167,12 @@ module Runtime_5 = struct
       = "caml_recommended_domain_count" [@@noalloc]
   end
 
-  let cpu_relax () = Raw.cpu_relax ()
+  (* When poll insertion is disabled, [cpu_relax] also needs to act as a polling
+     point to allow systhread preemption. *)
+  (* CR-soon mslater: make cpu_relax a primitive *)
+  let cpu_relax () =
+    Raw.cpu_relax ();
+    Sys.poll_actions ()
 
   type id = Raw.t
 

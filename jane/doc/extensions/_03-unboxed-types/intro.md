@@ -204,7 +204,7 @@ elements than there are available registers).
 Currently, types that have unboxed product layouts are *unboxed tuples* and
 *unboxed records*.
 
-Unboxed tuples are written `#(...)`, and may have labels just like normal tuples.
+*Unboxed tuples* are written `#(...)`, and may have labels just like normal tuples.
 So, for example, you can write:
 ```ocaml
 module Flipper : sig
@@ -214,7 +214,7 @@ end = struct
 end
 ```
 
-Unboxed records are defined, constructed, and matched on like normal records, but with
+*Unboxed records* are defined, constructed, and matched on like normal records, but with
 a leading hash. Fields are projected with `.#`. For example:
 ```ocaml
 type t = #{ f : float# ; s : string }
@@ -225,12 +225,20 @@ let get_s t = t.#s
 The field names of unboxed records occupy a different namespace from the
 field names of "normal" (including `[@@unboxed]`) records.
 
-Unboxed tuples and records may be nested within other unboxed tuples and records.
-There are no limitations on the layouts of the elements of unboxed tuples, but the fields
-of unboxed records must be representable.
+*Implicit unboxed records* are unboxed record types automatically provided by
+boxed record declarations. For example, the type `t#` comes "for free" from the definition of `t`:
+```ocaml
+type t = { i : int ; s : string }
+let box : t# -> t = fun #{ i ; s } -> { i ; s }
+type u : immediate & value = t# = #{ i : int ; s : string }
+```
+
+Records who store boxed floats flatly (all-float and float-and-float# records)
+and `[@@unboxed]` records do not get unboxed versions.
 
 *Limitations and future plans*:
-* Unboxed products may not currently placed in blocks.
+* Unboxed products may only be stored in blocks via records (i.e. they are not
+  supported in tuples, polymorphic variants, etc.).
   We plan to lift this restriction in the near future.
 * Unboxed record fields may not be mutable.
   We plan to allow mutating unboxed records within boxed records

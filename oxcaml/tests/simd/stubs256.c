@@ -3,8 +3,10 @@
 #include <caml/alloc.h>
 #include <caml/simd.h>
 #include <caml/callback.h>
-#include <immintrin.h>
 #include <assert.h>
+
+#ifdef ARCH_AVX
+#include <immintrin.h>
 
 int64_t vec256_first_int64(__m256i v)
 {
@@ -119,8 +121,4 @@ double vector_and_then_stack_floats(
 {
     return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7;
 }
-
-#define BUILTIN(name) void name() { assert(0); }
-
-BUILTIN(caml_vec256_unreachable);
-BUILTIN(caml_vec512_unreachable);
+#endif // ARCH_AVX

@@ -753,10 +753,19 @@ let rewrite_exn_continuation = Apply_cont_rewrite.rewrite_exn_continuation
 let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
     rewrite_fixed_arity_continuation0_result =
   let uenv = UA.uenv uacc in
-  let cont =
+  let specialize_if_needed cont =
+    try Continuation_callsite_map.find cont use_id (UA.specialization_map uacc)
+    with Not_found -> cont
+  in
+  let cont, cont_or_apply_cont =
     match cont_or_apply_cont with
-    | Continuation cont -> cont
-    | Apply_cont apply_cont -> Apply_cont.continuation apply_cont
+    | Continuation cont ->
+      let cont = specialize_if_needed cont in
+      cont, Continuation cont
+    | Apply_cont apply_cont ->
+      let cont = specialize_if_needed (Apply_cont.continuation apply_cont) in
+      let apply_cont = Apply_cont.with_continuation apply_cont cont in
+      cont, Apply_cont apply_cont
   in
   let[@local] shortcut_this_continuation_if_possible () :
       rewrite_fixed_arity_continuation0_result =
@@ -767,13 +776,6 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
       This_continuation (apply_continuation_aliases uenv cont)
     | Apply_cont apply_cont ->
       Apply_cont (apply_continuation_shortcuts uenv apply_cont)
-  in
-  let cont =
-    match
-      Continuation_callsite_map.find cont use_id (UA.specialization_map uacc)
-    with
-    | exception Not_found -> cont
-    | specialized -> specialized
   in
   match UE.find_apply_cont_rewrite uenv cont with
   | None -> shortcut_this_continuation_if_possible ()
