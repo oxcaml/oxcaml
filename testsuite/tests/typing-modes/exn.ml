@@ -93,6 +93,28 @@ Error: This constructor is at mode "nonportable", but expected to be at mode "po
        Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
+(* Rebinding with crossing types succeeds. *)
+
+exception Crossing of int list
+[%%expect{|
+exception Crossing of int list
+|}]
+
+let (cross @ portable) () =
+    let module M = struct
+        exception Crossing' = Crossing
+    end in
+    raise (M.Crossing' [3; 4; 5])
+[%%expect{|
+val cross : unit -> 'a = <fun>
+|}, Principal{|
+Line 3, characters 30-38:
+3 |         exception Crossing' = Crossing
+                                  ^^^^^^^^
+Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+       Hint: all argument types must mode-cross for rebinding to succeed.
+|}]
+
 
 exception SemiPortable of string * (unit -> unit)
 
@@ -104,8 +126,6 @@ exception SemiPortable of string * (unit -> unit)
 val foo : unit -> unit = <fun>
 |}]
 
-(* [exn] also crosses contention. To make it safe, exception constructors
-are uncontended iff all its arguments are uncontended. *)
 exception Uncontended of unit
 exception Uncontended' of int ref @@ contended
 exception Contended of int ref
