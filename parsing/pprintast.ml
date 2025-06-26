@@ -2298,7 +2298,8 @@ and function_constraint ctxt f x =
   match[@ocaml.warning "+9"] x with
   | { ret_type_constraint = Some (Pconstraint ty); ret_mode_annotations; _ } ->
 
-    pp f "@;:@;%a@;" (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
+    pp f "@;:@;%a@;"
+      (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
   | { ret_type_constraint = Some (Pcoerce (ty1, ty2)); _ } ->
     pp f "@;%a:>@;%a"
       (option ~first:":@;" (core_type ctxt)) ty1
