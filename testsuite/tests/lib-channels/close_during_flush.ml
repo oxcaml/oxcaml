@@ -2,6 +2,7 @@
  not-windows;
  include unix;
  hasunix;
+ runtime5;
  native;
 *)
 
