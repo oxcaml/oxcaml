@@ -396,24 +396,25 @@ module type S = sig
       type 'a axis := (monadic, 'a) Axis.t
 
       include
-        Common_product
-          with type Const.t = monadic
-           and type 'a axis := 'a axis
+        Common_product with type Const.t = monadic and type 'a axis := 'a axis
 
       module Const_op : Lattice with type t = Const.t
 
       val proj : 'a axis -> ('r * 'l) t -> ('a, 'l * 'r) mode
+
       val min_with : 'a axis -> ('a, 'l * 'r) mode -> ('r * disallowed) t
     end
 
     module Comonadic : sig
       type 'a axis := (Areality.Const.t comonadic_with, 'a) Axis.t
 
-      include Common_product
-        with type Const.t = Areality.Const.t comonadic_with
-         and type 'a axis := 'a axis
+      include
+        Common_product
+          with type Const.t = Areality.Const.t comonadic_with
+           and type 'a axis := 'a axis
 
       val proj : 'a axis -> ('l * 'r) t -> ('a, 'l * 'r) mode
+
       val max_with : 'a axis -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
     end
 
