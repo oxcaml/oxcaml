@@ -21,7 +21,7 @@ make                       # Full build
 ## Test Commands
 ```bash
 make test-one TEST=test-dir/path.ml      # Run a single test
-make test-one DIR=test-dir               # Run a test in a directory
+make test-one DIR=test-dir               # Run all tests in a directory
 make promote-one TEST=test-dir/path.ml   # Update expected test outputs
 ```
 
