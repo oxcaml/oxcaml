@@ -113,19 +113,12 @@ module F (M : sig type t end) = struct
   module type T = S with type t = t
 end
 [%%expect {|
-Line 6, characters 18-35:
+Line 6, characters 25-35:
 6 |   module type T = S with type t = t
-                      ^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = t
-       is not included in
-         type t : value mod global with M.t
-       The kind of the first is value
+                             ^^^^^^^^^^
+Error: The kind of type "t" is value
          because of the definition of t at line 5, characters 2-8.
-       But the kind of the first must be a subkind of value mod global
-         with M.t
+       But the kind of type "t" must be a subkind of value mod global with M.t
          because of the definition of t at line 3, characters 4-38.
 |}]
 

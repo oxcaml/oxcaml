@@ -80,18 +80,12 @@ Error: The type constraints are not consistent.
 module type S1f'' = S1f with type s = t_float64;;
 
 [%%expect{|
-Line 1, characters 20-47:
+Line 1, characters 29-47:
 1 | module type S1f'' = S1f with type s = t_float64;;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "s"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type s = t_float64
-       is not included in
-         type s
-       The layout of the first is float64
+                                 ^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of value
+       But the layout of type "t_float64" must be a sublayout of value
          because of the definition of s at line 3, characters 2-8.
 |}]
 
@@ -438,18 +432,12 @@ end
 module type S3_2' = S3_2 with type t := string;;
 [%%expect{|
 module type S3_2 = sig type t : immediate end
-Line 5, characters 20-46:
+Line 5, characters 30-46:
 5 | module type S3_2' = S3_2 with type t := string;;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = string
-       is not included in
-         type t : immediate
-       The kind of the first is immutable_data
+                                  ^^^^^^^^^^^^^^^^
+Error: The kind of type "string" is immutable_data
          because it is the primitive type string.
-       But the kind of the first must be a subkind of immediate
+       But the kind of type "string" must be a subkind of immediate
          because of the definition of t at line 2, characters 2-20.
 |}]
 

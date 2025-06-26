@@ -357,8 +357,6 @@ module History = struct
         }
     (* [position] is 1-indexed *)
     | Generalized of Ident.t option * Location.t
-    (* See commentary on [Jkind.for_abbreviation] *)
-    | Abbreviation
 
   type interact_reason =
     | Gadt_equation of Path.t

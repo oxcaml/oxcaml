@@ -142,18 +142,13 @@ module type T = S with type ('a, 'b) t = ('a, 'b) t
 [%%expect {|
 type ('a, 'b) t : immutable_data with 'a with 'b
 module type S = sig type ('a, 'b) t : immutable_data with 'a end
-Line 7, characters 16-51:
+Line 7, characters 23-51:
 7 | module type T = S with type ('a, 'b) t = ('a, 'b) t
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type ('a, 'b) t = ('a, 'b) t
-       is not included in
-         type ('a, 'b) t : immutable_data with 'a
-       The kind of the first is immutable_data with 'a with 'b
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "('a, 'b) t" is immutable_data with 'a with 'b
          because of the definition of t at line 1, characters 0-48.
-       But the kind of the first must be a subkind of immutable_data with 'a
+       But the kind of type "('a, 'b) t" must be a subkind of immutable_data
+         with 'a
          because of the definition of t at line 4, characters 2-42.
 |}]
 

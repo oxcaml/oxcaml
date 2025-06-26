@@ -655,7 +655,7 @@ tconstr_jkind₁ = π [[ 'aᵢ : χ₁ᵢ ]]ₙ. κ₁₀
 TODO: More type_binding rules
 
 
-Γ ⊢includemod Γ₂ ≤ Γ₁  (* check whether Γ₁ covers Γ₂ *)
+Γ ⊢includemod Γ₂ ≤ Γ₁  (* check whether Γ₁, covers Γ₂ *)
 ============================
 
 -------------------- IM_EMPTY
