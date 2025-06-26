@@ -1466,122 +1466,154 @@ module Const = struct
         name = "immediate64"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let float64 =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float64"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float64 mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float32"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float32 mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let word =
       { jkind =
-          mk_jkind (Base Word) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         name = "word"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_nativeint =
       { jkind =
-          mk_jkind (Base Word) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "word mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let bits32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         name = "bits32"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "bits32 mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let bits64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64 mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let vec128 =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let vec256 =
       { jkind =
-          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         name = "vec256"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let vec512 =
       { jkind =
-          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
             ~separability:Non_float;
         name = "vec512"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128 mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_256bit_vectors =
       { jkind =
-          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "vec256 mod everything"
       }
 
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_512bit_vectors =
       { jkind =
-          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "vec512 mod everything"
       }
