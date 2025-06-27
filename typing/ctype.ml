@@ -806,22 +806,6 @@ let forward_try_expand_safe = (* Forward declaration *)
    [generic_level]).
 *)
 
-let rec normalize_package_path env p =
-  let t =
-    try (Env.find_modtype p env).mtd_type
-    with Not_found -> None
-  in
-  match t with
-  | Some (Mty_ident p) -> normalize_package_path env p
-  | Some (Mty_signature _ | Mty_functor _ | Mty_alias _) | None ->
-      match p with
-        Path.Pdot (p1, s) ->
-          (* For module aliases *)
-          let p1' = Env.normalize_module_path None env p1 in
-          if Path.same p1 p1' then p else
-          normalize_package_path env (Path.Pdot (p1', s))
-      | _ -> p
-
 let rec check_scope_escape mark env level ty =
   let orig_level = get_level ty in
   if try_mark_node mark ty then begin
@@ -836,7 +820,7 @@ let rec check_scope_escape mark env level ty =
             raise_escape_exn (Constructor p)
         end
     | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
-        let p' = normalize_package_path env p in
+        let p' = Env.normalize_modtype_path env p in
         if Path.same p p' then raise_escape_exn (Module_type p);
         check_scope_escape mark env level
           (newty2 ~level:orig_level
@@ -911,7 +895,7 @@ let rec update_level env level expand ty =
           iter_type_expr (update_level env level expand) ty
         end
     | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
-        let p' = normalize_package_path env p in
+        let p' = Env.normalize_modtype_path env p in
         if Path.same p p' then raise_escape_exn (Module_type p);
         set_type_desc ty (Tpackage {pack with pack_path = p'});
         update_level env level expand ty
@@ -2636,7 +2620,8 @@ let add_gadt_equation uenv source destination =
 
 let eq_package_path env p1 p2 =
   Path.same p1 p2 ||
-  Path.same (normalize_package_path env p1) (normalize_package_path env p2)
+  Path.same (Env.normalize_modtype_path env p1)
+            (Env.normalize_modtype_path env p2)
 
 let nondep_type' = ref (fun _ _ _ -> assert false)
 let package_subtype = ref (fun _ _ _ -> assert false)
@@ -5506,7 +5491,7 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
             with Cannot_expand -> raise exn
           end
       | Tpackage pack when Path.exists_free ids pack.pack_path ->
-          let p' = normalize_package_path env pack.pack_path in
+          let p' = Env.normalize_modtype_path env pack.pack_path in
           begin match Path.find_free_opt ids p' with
           | Some id -> raise (Nondep_cannot_erase id)
           | None ->
