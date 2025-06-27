@@ -194,6 +194,7 @@ module Violation : sig
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
   val of_ :
+    type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
     jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
     ?missing_cmi:Path.t ->
     violation ->
@@ -616,6 +617,7 @@ val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
 (** Gets the mode crossing for types of this jkind. *)
 val get_mode_crossing :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   'd Types.jkind ->
   Mode.Crossing.t
@@ -623,6 +625,7 @@ val get_mode_crossing :
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   'd Types.jkind ->
   Jkind_axis.Externality.t
@@ -634,6 +637,7 @@ val set_externality_upper_bound :
 
 (** Gets the nullability from a jkind. *)
 val get_nullability :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   'd Types.jkind ->
   Jkind_axis.Nullability.t
@@ -689,6 +693,7 @@ type normalize_mode =
 
 val normalize :
   mode:normalize_mode ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   Types.jkind_l ->
   Types.jkind_l
@@ -814,6 +819,7 @@ val sub_jkind_l :
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. *)
 val round_up :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind
