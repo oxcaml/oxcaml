@@ -2615,8 +2615,7 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
-let maybe_infer_modalities ~loc ~env ~md_mode ~mode =
-  if Language_extension.(is_at_least Mode Stable) then begin
+let infer_modalities ~loc ~env ~md_mode ~mode =
     (* Values are packed into a structure at modes weaker than they actually
       are. This is to allow our legacy zapping behavior. For example:
 
@@ -2647,13 +2646,6 @@ let maybe_infer_modalities ~loc ~env ~md_mode ~mode =
             (Error (Comonadic ax, e))))
     end;
     Mode.Modality.Value.infer ~md_mode ~mode
-  end else begin
-    begin match Mode.Value.submode mode md_mode with
-      | Ok () -> ()
-      | Error e -> raise (Error (loc, env, Value_weaker_than_module e))
-    end;
-    Mode.Modality.Value.id
-  end
 
 (** Given a signature [sg] to be included in a structure. The signature contains
   modalities relative to [mode], this function returns a signature with
@@ -2662,12 +2654,12 @@ let rebase_modalities ~loc ~env ~md_mode ~mode sg =
   List.map (function
     | Sig_value (id, vd, vis) ->
         let mode = Mode.Modality.Value.apply vd.val_modalities mode in
-        let val_modalities = maybe_infer_modalities ~loc ~env ~md_mode ~mode in
+        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
         let mode = Mode.Modality.Value.apply md.md_modalities mode in
-        let md_modalities = maybe_infer_modalities ~loc ~env ~md_mode ~mode in
+        let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let md = {md with md_modalities} in
         Sig_module (id, pres, md, rec_, vis)
     | item -> item
@@ -3245,7 +3237,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
               let vd, mode =  Env.find_value_no_locks_exn id newenv in
               let vd = Subst.Lazy.force_value_description vd in
               let modalities =
-                maybe_infer_modalities ~loc:first_loc ~env ~md_mode ~mode
+                infer_modalities ~loc:first_loc ~env ~md_mode ~mode
               in
               let vd =
                 { vd with
@@ -3274,7 +3266,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
           |> Alloc.of_const
           |> alloc_as_value
         in
-        let modalities = maybe_infer_modalities ~loc ~env ~md_mode ~mode in
+        let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let (desc, newenv) =
           Typedecl.transl_value_decl env ~modalities loc sdesc
         in
@@ -3354,9 +3346,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         in
         let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
         let mode = mode_without_locks_exn modl.mod_mode in
-        let md_modalities =
-          maybe_infer_modalities ~loc:pmb_loc ~env ~md_mode ~mode
-        in
+        let md_modalities = infer_modalities ~loc:pmb_loc ~env ~md_mode ~mode in
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
             md_modalities;
@@ -3475,7 +3465,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         map_rec (fun rs (id, mb, uid, _shape) ->
             let mode = mode_without_locks_exn mb.mb_expr.mod_mode in
             let md_modalities =
-              maybe_infer_modalities ~loc:mb.mb_loc ~env ~md_mode ~mode
+              infer_modalities ~loc:mb.mb_loc ~env ~md_mode ~mode
             in
             Sig_module(id, Mp_present, {
                 md_type=mb.mb_expr.mod_type;
@@ -3685,7 +3675,7 @@ let type_module_type_of env smod =
   (fst tmty.mod_mode).comonadic |> Mode.Value.Comonadic.zap_to_floor |> ignore;
   let mty =
     remove_modality_and_zero_alloc_variables_mty env
-      ~zap_modality:Mode.Modality.Value.zap_to_floor mty
+      ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Stable) mty
   in
   tmty, mty
 
@@ -3943,7 +3933,8 @@ let type_implementation target modulename initial_env ast =
           (* Printing [.mli] from [.ml], we zap to identity modality for legacy
              compatibility. *)
           remove_modality_and_zero_alloc_variables_sg finalenv
-            ~zap_modality:Mode.Modality.Value.zap_to_id simple_sg
+            ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Alpha)
+            simple_sg
         in
         Typecore.force_delayed_checks ();
         Typecore.optimise_allocations ();
@@ -4048,7 +4039,8 @@ let type_implementation target modulename initial_env ast =
             (* Generating [cmi] without [mli]. This [cmi] will only be on the
                LHS of inclusion check, so we zap to floor (strongest). *)
             remove_modality_and_zero_alloc_variables_sg finalenv
-              ~zap_modality:Mode.Modality.Value.zap_to_floor simple_sg
+              ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Stable)
+              simple_sg
           in
           normalize_signature simple_sg;
           let argument_interface =

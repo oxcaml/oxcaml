@@ -5051,6 +5051,11 @@ let mode_crossing_functor =
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.top
 
+let zap_modalities_to_floor_if_at_least level =
+  if Language_extension.(is_at_least Mode level)
+    then Mode.Modality.Value.zap_to_floor
+    else Mode.Modality.Value.zap_to_id
+
 let crossing_of_jkind env jkind =
   let jkind_of_type = type_jkind_purely_if_principal env in
   Jkind.get_mode_crossing ~jkind_of_type jkind

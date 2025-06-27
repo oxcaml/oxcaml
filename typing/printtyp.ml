@@ -2222,11 +2222,6 @@ let extension_only_constructor id ppf ext =
       ocstr_return_type = ret;
     }
 
-let get_zap_modalities () =
-  if Language_extension.(is_at_least Mode Alpha)
-    then Mode.Modality.Value.zap_to_floor
-    else Mode.Modality.Value.zap_to_id
-
 (* Print a value declaration *)
 
 let tree_of_value_description id decl =
@@ -2236,7 +2231,9 @@ let tree_of_value_description id decl =
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   let snap = Btype.snapshot () in
-  let moda = get_zap_modalities () decl.val_modalities in
+  let moda =
+    Ctype.zap_modalities_to_floor_if_at_least Alpha decl.val_modalities
+  in
   let qtvs = extract_qtvs [decl.val_type] in
   let apparent_arity =
     let rec count n typ =
@@ -2739,7 +2736,7 @@ and tree_of_modtype_declaration ?abbrev id decl =
 
 and tree_of_module ?abbrev id md rs =
   let snap = Btype.snapshot () in
-  let moda = get_zap_modalities () md.md_modalities in
+  let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
   let r =
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities_new Immutable moda,
