@@ -94,6 +94,24 @@ Error: This value is "aliased" but expected to be "unique".
 |}]
 
 (***********************************************************************)
+type 'a t : value mod contended portable =
+  | Shared : ('b : value mod contended portable). 'b  -> 'b t
+  | Unshared : (unit -> 'c) @@ portable               -> 'c t
+;;
+(* CR layouts v2.8: This should be accepted *)
+[%%expect{|
+Lines 1-3, characters 0-61:
+1 | type 'a t : value mod contended portable =
+2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
+3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
+Error: The kind of type "t" is value mod portable immutable non_float with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of
+         value mod contended portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(***********************************************************************)
 (* This test is about trying to avoid inconsistent contexts.
    See
    https://github.com/oxcaml/oxcaml/pull/3284#discussion_r1920019049
