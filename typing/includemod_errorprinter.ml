@@ -273,7 +273,7 @@ let print_out_mode
 : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> a -> _
 = fun ax mode ->
   let (module L) = Mode.Value.Const.lattice_of_axis ax in
-  Format.dprintf " @@ %a" L.print mode
+  Format.dprintf " (* in a structure at %a *)" L.print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with
