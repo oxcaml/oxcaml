@@ -6230,7 +6230,7 @@ and type_expect_
         match mut with
         | Mutable -> Mutable {
           modal_upper_bound = Alloc.Comonadic.Const.legacy;
-          (* CR aspsmith: Revisit once we support atomic record fields *)
+          (* CR aspsmith: Revisit once we support atomic arrays *)
           atomic = Nonatomic;
         }
         | Immutable ->
