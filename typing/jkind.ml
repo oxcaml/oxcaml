@@ -1993,7 +1993,7 @@ module Const = struct
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base Void, _ -> Alpha
+      | Base Void, _ -> Stable
     in
     scan_layout jkind.layout
 
@@ -2377,7 +2377,7 @@ let has_mutable_label lbls =
 
 let all_void_labels lbls =
   List.for_all
-    (fun (lbl : Types.label_declaration) -> Sort.Const.(equal void lbl.ld_sort))
+    (fun (lbl : Types.label_declaration) -> Sort.Const.(all_void lbl.ld_sort))
     lbls
 
 let add_labels_as_with_bounds lbls jkind =
@@ -2560,7 +2560,7 @@ let for_boxed_variant ~decl_params ~type_apply ~free_vars cstrs =
          (fun cstr ->
          match cstr.cd_args with
          | Cstr_tuple args ->
-           List.for_all (fun arg -> Sort.Const.(equal void arg.ca_sort)) args
+           List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
          | Cstr_record lbls -> all_void_labels lbls)
        cstrs
   then Builtin.immediate ~why:Enumeration

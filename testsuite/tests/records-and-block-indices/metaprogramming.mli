@@ -39,20 +39,19 @@ module Boxing : sig
 end
 
 module Layout : sig
-  type value_kind =
-    | Addr_non_float
-    | Immediate
-    | Float
-
   type t =
     | Product of t list
-    | Value of value_kind
+    | Value of
+        { ignorable : bool;
+          non_float : bool
+        }
     | Float64
     | Float32
     | Bits64
     | Bits32
     | Vec128
     | Word
+    | Void
 
   val all_scannable : t -> bool
 
@@ -68,6 +67,7 @@ module Type_structure : sig
 
   type t =
     | Record of t list * Boxing.t
+    | Variant of t list list
     | Tuple of t list * Boxing.t
     | Option of t
     | Int
@@ -77,6 +77,7 @@ module Type_structure : sig
     | Int32_u
     | Nativeint
     | Nativeint_u
+    | Unit_u
     | Float
     | Float_u
     | Float32
@@ -120,6 +121,10 @@ module Type : sig
           fields : (string * t) list;
           boxing : Boxing.t
         }
+    | Variant of
+        { name : string;
+          constructors : constructor list
+        }
     | Tuple of t list * Boxing.t
     | Option of t
     | Int
@@ -129,12 +134,18 @@ module Type : sig
     | Int32_u
     | Nativeint
     | Nativeint_u
+    | Unit_u
     | Float
     | Float_u
     | Float32
     | Float32_u
     | String
     | Int64x2_u
+
+  and constructor =
+    { name : string;
+      args : t list
+    }
 
   val follow_path : t -> Path.t -> t
 
