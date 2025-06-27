@@ -3,6 +3,18 @@
    expect;
 *)
 
+(* Atomic fields must be mutable. *)
+module Error1 = struct
+  type t = { x : int [@atomic] }
+end
+[%%expect{|
+Line 2, characters 13-30:
+2 |   type t = { x : int [@atomic] }
+                 ^^^^^^^^^^^^^^^^^
+Error: The label "x" must be mutable to be declared atomic.
+|}];;
+
+
 (* Check module interface checking: it is not allowed to remove or add
    atomic attributes. *)
 
@@ -66,7 +78,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/303" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Ok/304" (makeblock 0))
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -78,7 +90,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/311"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/312"
   (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
     (makeblock 0 test)))
 module Inline_record :
@@ -99,7 +111,7 @@ module Extension_with_inline_record = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/319"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/320"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
