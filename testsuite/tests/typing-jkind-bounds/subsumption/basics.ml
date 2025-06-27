@@ -188,8 +188,8 @@ Error: Signature mismatch:
          type 'a t : mutable_data with 'a @@ unyielding many
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
-       But the kind of the first must be a subkind of mutable_data
-         with 'a @@ unyielding many
+       But the kind of the first must be a subkind of
+           mutable_data with 'a @@ unyielding many
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:

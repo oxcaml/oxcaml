@@ -107,7 +107,7 @@ Lines 1-3, characters 0-61:
 Error: The kind of type "t" is value mod portable immutable non_float with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
-         value mod contended portable
+           value mod contended portable
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -277,11 +277,11 @@ type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
 2 | type existential_abstract : immediate =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is immutable_data
-         with (type : value mod portable) abstract
+Error: The kind of type "existential_abstract" is
+           immutable_data with (type : value mod portable) abstract
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
-         immediate
+           immediate
          because of the annotation on the declaration of the type existential_abstract.
 |}]
 
@@ -336,11 +336,11 @@ Error: Signature mismatch:
          type t = P : ('a : immediate). 'a abstract -> t
        is not included in
          type t : immutable_data with (type : value) abstract
-       The kind of the first is immutable_data
-         with (type : immediate) abstract
+       The kind of the first is
+           immutable_data with (type : immediate) abstract
          because of the definition of t at line 4, characters 2-49.
-       But the kind of the first must be a subkind of immutable_data
-         with (type : value) abstract
+       But the kind of the first must be a subkind of
+           immutable_data with (type : value) abstract
          because of the definition of t at line 2, characters 2-54.
 |}]
 
@@ -475,7 +475,7 @@ Line 1, characters 0-59:
 Error: The kind of type "(int ref, int ref) box2" is mutable_data
          because of the definition of box2 at line 1, characters 0-45.
        But the kind of type "(int ref, int ref) box2" must be a subkind of
-         immediate
+           immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
 
@@ -545,8 +545,8 @@ type show_me_the_kind : immediate = exist_row1
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row1
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row1" is immutable_data
-         with [< `A | `B of int ref ]
+Error: The kind of type "exist_row1" is
+           immutable_data with [< `A | `B of int ref ]
          because of the definition of exist_row1 at line 1, characters 0-67.
        But the kind of type "exist_row1" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
@@ -579,8 +579,8 @@ type show_me_the_kind : immediate = exist_row2
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row2" is immutable_data
-         with [> `A | `B of int ref ]
+Error: The kind of type "exist_row2" is
+           immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row2 at line 1, characters 0-67.
        But the kind of type "exist_row2" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
@@ -613,11 +613,11 @@ type 'a show_me_the_kind : immediate = 'a option exist_row3
 Line 1, characters 0-59:
 1 | type 'a show_me_the_kind : immediate = 'a option exist_row3
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a option exist_row3" is immutable_data
-         with [> `A | `B of int ref ]
+Error: The kind of type "'a option exist_row3" is
+           immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row3 at line 1, characters 0-80.
        But the kind of type "'a option exist_row3" must be a subkind of
-         immediate
+           immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
 

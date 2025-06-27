@@ -124,8 +124,8 @@ Error: In this "with" constraint, the new definition of "t"
          type t : value mod global with M.t
        The kind of the first is value
          because of the definition of t at line 5, characters 2-8.
-       But the kind of the first must be a subkind of value mod global
-         with M.t
+       But the kind of the first must be a subkind of
+           value mod global with M.t
          because of the definition of t at line 3, characters 4-38.
 |}]
 
@@ -308,8 +308,8 @@ Error: Signature mismatch:
            constraint 'a = [< `a of int -> int | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-55.
-       But the kind of the first must be a subkind of value mod portable
-         with [< `a of int -> int | `b ] u
+       But the kind of the first must be a subkind of
+           value mod portable with [< `a of int -> int | `b ] u
          because of the definition of t at line 3, characters 2-42.
 |}]
 
