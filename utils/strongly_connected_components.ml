@@ -156,16 +156,12 @@ module type S = sig
 
   type directed_graph = Id.Set.t Id.Map.t
 
-  type numbered_graph
-
   type component =
     | Has_loop of Id.t list
     | No_loop of Id.t
 
-  val stable_number : (Id.t * Id.Set.t) list -> numbered_graph
-
-  val numbered_connected_components_sorted_from_roots_to_leaf
-     : numbered_graph
+  val stable_connected_components_sorted_from_roots_to_leaf
+    : (Id.t * Id.Set.t) list
     -> component array
 
   val connected_components_sorted_from_roots_to_leaf
@@ -177,8 +173,6 @@ end
 
 module Make (Id : Id) = struct
   type directed_graph = Id.Set.t Id.Map.t
-
-  type numbered_graph = Id.t array * int list array
 
   type component =
     | Has_loop of Id.t list
@@ -197,7 +191,7 @@ module Make (Id : Id) = struct
           set)
       dependencies
 
-  let number_bindings ?(stable = false) (bindings : (Id.t * Id.Set.t) list) =
+  let number ?(stable = false) (bindings : (Id.t * Id.Set.t) list) =
     let size = List.length bindings in
     let a = Array.of_list bindings in
     let forth = Array.map fst a in
@@ -228,12 +222,6 @@ module Make (Id : Id) = struct
     in
     forth, integer_graph
 
-  let stable_number graph =
-    number_bindings ~stable:true graph
-
-  let number graph =
-    number_bindings (Id.Map.bindings graph)
-
   let rec int_list_mem x xs =
     match xs with
     | [] -> false
@@ -257,11 +245,14 @@ module Make (Id : Id) = struct
             component_edges.(component))
       sorted_connected_components
 
-  let numbered_connected_components_sorted_from_roots_to_leaf graph =
-    Array.map fst (numbered_component_graph graph)
+  let stable_component_graph graph =
+    numbered_component_graph (number ~stable:true graph)
+
+  let stable_connected_components_sorted_from_roots_to_leaf graph =
+    Array.map fst (stable_component_graph graph)
 
   let component_graph graph =
-    numbered_component_graph (number graph)
+    numbered_component_graph (number ~stable:false (Id.Map.bindings graph))
 
   let connected_components_sorted_from_roots_to_leaf graph =
     Array.map fst (component_graph graph)

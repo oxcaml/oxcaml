@@ -213,14 +213,10 @@ let sort0 t =
        can just filter out external dependencies from the graph. *)
     remove_values_not_in_domain lifted_constants_dep_graph
   in
-  let lifted_constants_dep_numbered_graph =
-    SCC_lifted_constants.stable_number
-      (CIS.Lmap.bindings lifted_constants_dep_graph)
-  in
   let innermost_first =
-    lifted_constants_dep_numbered_graph
+    CIS.Lmap.bindings lifted_constants_dep_graph
     |> SCC_lifted_constants
-       .numbered_connected_components_sorted_from_roots_to_leaf
+       .stable_connected_components_sorted_from_roots_to_leaf
     |> ArrayLabels.map ~f:(fun (group : SCC_lifted_constants.component) ->
            let code_id_or_symbols =
              match group with

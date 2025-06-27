@@ -73,16 +73,12 @@ module type S = sig
       from [a] to every element of [set].  It is assumed that no edge
       points to a vertex not represented in the map. *)
 
-  type numbered_graph
-
   type component =
     | Has_loop of Id.t list
     | No_loop of Id.t
 
-  val stable_number : (Id.t * Id.Set.t) list -> numbered_graph
-
-  val numbered_connected_components_sorted_from_roots_to_leaf
-     : numbered_graph
+  val stable_connected_components_sorted_from_roots_to_leaf
+    : (Id.t * Id.Set.t) list
     -> component array
 
   val connected_components_sorted_from_roots_to_leaf
