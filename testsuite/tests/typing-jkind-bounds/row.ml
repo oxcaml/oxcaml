@@ -25,8 +25,8 @@ Line 1, characters 0-49:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `A of 'a ]" is value mod non_float
          because it's a polymorphic variant type.
-       But the kind of type "[ `A of 'a ]" must be a subkind of immutable_data
-         with 'a
+       But the kind of type "[ `A of 'a ]" must be a subkind of
+           immutable_data with 'a
          because of the definition of t at line 1, characters 0-49.
 |}]
 
@@ -39,7 +39,7 @@ Line 1, characters 0-51:
 Error: The kind of type "[ `B of 'a ref ]" is value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `B of 'a ref ]" must be a subkind of
-         mutable_data with 'a
+           mutable_data with 'a
          because of the definition of u at line 1, characters 0-51.
 |}]
 
@@ -50,7 +50,7 @@ Line 1, characters 0-89:
 1 | type 'a v : value mod contended with 'a = [ `C of 'a | `D of 'a -> 'a | `E of 'a option ]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `C of 'a | `D of 'a -> 'a | `E of 'a option ]" is
-         value mod non_float
+           value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `C of 'a | `D of 'a -> 'a | `E of 'a option ]" must be a subkind of
          value mod contended with 'a
@@ -141,8 +141,8 @@ Error: In this "with" constraint, the new definition of "abstract"
          type 'a abstract : immutable_data with 'a polyvar
        The kind of the first is immutable_data with 'a
          because of the definition of simple at line 1, characters 0-39.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a polyvar
+       But the kind of the first must be a subkind of
+           immutable_data with 'a polyvar
          because of the definition of abstract at line 3, characters 2-51.
 |}]
 
@@ -168,8 +168,8 @@ Error: In this "with" constraint, the new definition of "abstract"
          type 'a abstract : immutable_data with 'a test
        The kind of the first is immutable_data with 'a
          because of the definition of simple at line 1, characters 0-39.
-       But the kind of the first must be a subkind of immutable_data
-         with 'a test
+       But the kind of the first must be a subkind of
+           immutable_data with 'a test
          because of the definition of abstract at line 4, characters 2-48.
 |}]
 
@@ -219,7 +219,7 @@ Line 1, characters 0-66:
 Error: The kind of type "[< `X | `Y of 'a ]" is value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[< `X | `Y of 'a ]" must be a subkind of
-         immutable_data with 'a
+           immutable_data with 'a
          because of the definition of t at line 1, characters 0-66.
 |}]
 type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
@@ -230,7 +230,7 @@ Line 1, characters 0-66:
 Error: The kind of type "[> `X | `Y of 'a ]" is value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[> `X | `Y of 'a ]" must be a subkind of
-         immutable_data with 'a
+           immutable_data with 'a
          because of the definition of u at line 1, characters 0-66.
 |}]
 
@@ -257,7 +257,7 @@ Line 2, characters 2-83:
 2 |   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" is
-         value mod non_float
+           value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" must be a subkind of
          immutable_data with 'a
@@ -279,7 +279,7 @@ Error: This alias is bound to type "[> `Foo of int ]"
        The kind of [> `Foo of int ] is value mod non_float
          because it's a polymorphic variant type.
        But the kind of [> `Foo of int ] must be a subkind of
-         value mod portable
+           value mod portable
          because of the annotation on the universal variable 'a.
 |}]
 
@@ -294,7 +294,7 @@ Error: This alias is bound to type "[< `Foo of int ]"
        The kind of [< `Foo of int ] is value mod non_float
          because it's a polymorphic variant type.
        But the kind of [< `Foo of int ] must be a subkind of
-         value mod portable
+           value mod portable
          because of the annotation on the universal variable 'a.
 |}]
 
@@ -306,7 +306,7 @@ Line 1, characters 0-63:
 1 | type trec1 : immutable_data = [ `A of string | `B of 'a ] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `A of string | `B of 'a ] as 'a" is
-         value mod non_float
+           value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `A of string | `B of 'a ] as 'a" must be a subkind of
          immutable_data
@@ -322,7 +322,7 @@ Line 1, characters 0-58:
 Error: The kind of type "[ `A | `B of 'a list ] as 'a" is value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `A | `B of 'a list ] as 'a" must be a subkind of
-         immutable_data
+           immutable_data
          because of the definition of trec2 at line 1, characters 0-58.
 |}]
 
@@ -333,7 +333,7 @@ Line 1, characters 0-71:
 1 | type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
-         value mod non_float
+           value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
          immutable_data
@@ -347,7 +347,7 @@ Line 1, characters 0-79:
 1 | type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
-         value mod non_float
+           value mod non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
          value mod immutable
@@ -369,7 +369,7 @@ Error: The kind of type "[ `X of
                                 [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
                                 as 'b
                             | `Y of 'b ] as 'a" must be a subkind of
-         immutable_data
+           immutable_data
          because of the definition of trec_rec_fails at lines 1-2, characters 0-80.
 |}]
 
@@ -388,7 +388,7 @@ Error: The kind of type "[ `X of
                                 [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
                                 as 'b
                             | `Y of 'b ] as 'a" must be a subkind of
-         value mod immutable
+           value mod immutable
          because of the definition of trec_rec_succeeds at lines 1-2, characters 0-80.
 |}]
 
@@ -403,8 +403,8 @@ Line 2, characters 0-47:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate
-         with [< `A of string | `B of int ] t1
+       But the kind of type "t2" must be a subkind of
+           immediate with [< `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
@@ -415,8 +415,8 @@ Line 1, characters 0-57:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t3" is immutable_data
          because it's a boxed variant type.
-       But the kind of type "t3" must be a subkind of immediate
-         with [ `A of string ] t1
+       But the kind of type "t3" must be a subkind of
+           immediate with [ `A of string ] t1
          because of the annotation on the declaration of the type t3.
 |}]
 
@@ -429,8 +429,8 @@ Line 2, characters 0-47:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate
-         with [> `A of string | `B of int ] t1
+       But the kind of type "t2" must be a subkind of
+           immediate with [> `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
@@ -441,8 +441,8 @@ Line 1, characters 0-75:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t3" is immutable_data
          because it's a boxed variant type.
-       But the kind of type "t3" must be a subkind of immediate
-         with [ `A of string | `B of int | `C ] t1
+       But the kind of type "t3" must be a subkind of
+           immediate with [ `A of string | `B of int | `C ] t1
          because of the annotation on the declaration of the type t3.
 |}]
 
