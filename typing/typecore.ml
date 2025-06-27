@@ -288,7 +288,8 @@ type error =
   | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
-  | Impossible_function_jkind of type_expr * jkind_lr
+  | Impossible_function_jkind of
+      { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
 
@@ -4001,6 +4002,12 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
     let ls, tvar = list_labels env ty_fun in
     tvar || List.mem l ls
   in
+  let get_arg_loc = function
+    | (_, Arg ( Known_arg { sarg; _ }
+              | Unknown_arg { sarg; _ })) -> Some sarg.pexp_loc
+    | (_, Arg (Eliminated_optional_arg _))
+    | (_, Omitted _) -> None
+  in
   let rec loop ty_fun mode_fun rev_args sargs =
     match sargs with
     | [] -> ty_fun, mode_fun, List.rev rev_args
@@ -4028,8 +4035,17 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                   (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
               with
               | Unify _ ->
-                raise(Error(funct.exp_loc, env,
-                            Impossible_function_jkind (ty_fun, jkind)))
+                (* need to calculate a location containing the function
+                   and any arguments already processed *)
+                let locs =
+                  funct.exp_loc :: sarg.pexp_loc ::
+                  List.filter_map get_arg_loc rev_args
+                in
+                let loc = Location.merge ~ghost:false locs in
+                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
+                raise(Error(loc, env,
+                            Impossible_function_jkind
+                              { some_args_ok; ty_fun; jkind }))
               end;
               (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
         | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
@@ -4063,13 +4079,7 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                      provide a good location in the [Eliminated_optional_arg]
                      case - maybe fix one day if it is noticeable. *)
                   rev_args
-                  |> List.find_map
-                       (function
-                         | (_, Arg ( Known_arg { sarg; _ }
-                                   | Unknown_arg { sarg; _ })) ->
-                           Some sarg.pexp_loc
-                         | (_, Arg (Eliminated_optional_arg _))
-                         | (_, Omitted _) -> None)
+                  |> List.find_map get_arg_loc
                   |> Option.value ~default:funct.exp_loc
                 in
                 raise(Error(funct.exp_loc, env, Apply_non_function {
@@ -11288,14 +11298,22 @@ let report_error ~loc env =
       print_unsupported_stack_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
-  | Impossible_function_jkind (ty, jkind) ->
+  | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
+      let hint ppf =
+        if some_args_ok
+        then Format.fprintf ppf
+              "@ Hint: Perhaps you have over-applied the function or used an \
+               incorrect label."
+      in
       Location.errorf ~loc
-        "@[@[This expression is used as a function, but its type@ %a@]@ \
-         has kind %a, which cannot be the kind of a function.@ \
-         (Functions always have kind %a.)@]"
-        (Style.as_inline_code Printtyp.type_expr) ty
+        "@[@[This function application uses an expression with type@ %a@]@ \
+         as a function, but that type has kind %a, which cannot@ \
+         be the kind of a function.@ \
+         (Functions always have kind %a.)%t@]"
+        (Style.as_inline_code Printtyp.type_expr) ty_fun
         (Style.as_inline_code Jkind.format) jkind
         (Style.as_inline_code Jkind.format) Jkind.for_arrow
+        hint
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
         "Overwriting is only supported on tuples, constructors and boxed records."
