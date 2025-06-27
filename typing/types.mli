@@ -41,7 +41,7 @@ type mutability =
       }
 
 (** Returns [true] is the [mutable_flag] is mutable or atomic. Should be called
-    if not interested in the payload of [Mutable] or [Atomic]. *)
+    if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
 
 (** Type expressions for the core language.
