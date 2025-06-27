@@ -256,7 +256,7 @@ list-parallel: lib tools
 	     echo "This target requires GNU parallel.";\
 	     exit 1)
 	@cat $(FILE) \
-	 | parallel --gnu --no-notice --keep-order --memsuspend 1G \
+	 | parallel --gnu --no-notice --keep-order --verbose --halt soon,fail=1 \
 	   "$(MAKE) $(NO_PRINT) exec-one DIR={} 2>&1" \
 	 | tee $(TESTLOG)
 	@$(MAKE) report
