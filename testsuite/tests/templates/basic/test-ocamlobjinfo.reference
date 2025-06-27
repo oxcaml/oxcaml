@@ -1,0 +1,21 @@
+File test.cms
+Cms unit name: Test
+Source file: test.ml
+Implementation shape:
+        {<Test>
+          "M"[module] ->
+            Alias(<Test.0>
+                  CU Main[List_element:Int_list_element][Semigroup:String_semigroup]);
+          "greeting"[value] -> <Test.2>;
+          "ints"[value] -> <Test.1>;
+          "ints_line"[value] -> <Test.4>;
+          "s"[value] -> <Test.6>;
+          }
+Indexed shapes:
+Uid dependencies:
+Uid of decls:
+        Test.0: M (File "test.ml", line 1091, characters 7-8)
+        Test.1: ints (File "test.ml", line 1095, characters 4-8)
+        Test.2: greeting (File "test.ml", line 1101, characters 4-12)
+        Test.4: ints_line (File "test.ml", line 1108, characters 4-13)
+        Test.6: s (File "test.ml", line 1112, characters 4-5)

@@ -52,6 +52,7 @@
    string_monoid.ml string_monoid.mli \
    string_semigroup.ml string_semigroup.mli \
    test.reference \
+   test-ocamlobjinfo.reference \
    test_direct_access.ml test_direct_access.reference \
    widget.ml widget.mli \
  ";
@@ -174,7 +175,7 @@
        compiler_reference = "bad_ref_indirect.reference";
        check-ocamlc.byte-output;
      }{
-       flags = "-parameter Monoid";
+       flags = "-parameter Monoid -bin-annot-cms";
        module = "ref_indirect.ml";
        ocamlc.byte;
 
@@ -501,10 +502,11 @@
                compiler_reference = "main.reference";
                check-ocamlc.byte-output;
              }{
+               flags += " -bin-annot-cms";
                module = "main.ml";
                ocamlc.byte;
                {
-                 program = "main.cmo main.cmi";
+                 program = "-shape -index -decls -uid-deps main.cmo main.cmi main.cms";
                  output = "main-ocamlobjinfo.output";
                  ocamlobjinfo;
 
@@ -517,7 +519,7 @@
                  all_modules = "main.cmo int_list_element.cmo string_semigroup.cmo";
                  ocamlc.byte;
 
-                 flags = "-w -misplaced-attribute";
+                 flags = "-w -misplaced-attribute -bin-annot-cms";
                  module = "test.ml";
                  ocamlc.byte;
 
@@ -555,6 +557,13 @@
                  run;
 
                  reference = "test.reference";
+                 check-program-output;
+
+                 program = "-shape -index -decls -uid-deps test.cms";
+                 output = "test-ocamlobjinfo.output";
+                 ocamlobjinfo;
+
+                 reference = "test-ocamlobjinfo.reference";
                  check-program-output;
                }
              }
