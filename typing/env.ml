@@ -637,7 +637,7 @@ type t = {
   unboxed_labels: unboxed_label_description TycompTbl.t;
   types: (lock, type_data, type_data) IdTbl.t;
   modules: (lock, module_entry, module_data) IdTbl.t;
-  modtypes: (empty, modtype_data, modtype_data) IdTbl.t;
+  modtypes: (lock, modtype_data, modtype_data) IdTbl.t;
   classes: (lock, class_data, class_data) IdTbl.t;
   cltypes: (empty, cltype_data, cltype_data) IdTbl.t;
   functor_args: unit Ident.tbl;
@@ -1392,7 +1392,6 @@ and find_cstr path name env =
   | Type_record _ | Type_record_unboxed_product _ | Type_abstract _
   | Type_open ->
       raise Not_found
-
 
 
 let find_modtype_lazy path env =
@@ -2590,6 +2589,7 @@ let add_lock lock env =
     values = IdTbl.add_lock lock env.values;
     types = IdTbl.add_lock lock env.types;
     modules = IdTbl.add_lock lock env.modules;
+    modtypes = IdTbl.add_lock lock env.modtypes;
     classes = IdTbl.add_lock lock env.classes;
   }
 
@@ -3220,11 +3220,20 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
 
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
-  match IdTbl.find_name wrap_identity ~mark:use s env.modtypes with
-  | (path, data) ->
-      use_modtype ~use ~loc path data.mtda_declaration;
-      (path, data.mtda_declaration)
-  | exception Not_found ->
+  match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.modtypes with
+  | Ok (path, locks, data) -> begin
+      match quotation_locks_offset locks with
+      | None | Some 0 -> begin
+          use_modtype ~use ~loc path data.mtda_declaration;
+          (path, locks, data.mtda_declaration)
+        end
+      | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 data.mtda_declaration.mtd_loc,
+                                 env.stage -n))
+    end
+  | Error _ ->
       may_lookup_error errors loc env (Unbound_modtype (Lident s))
 
 let lookup_ident_class ~errors ~use ~loc s env =
@@ -3428,12 +3437,12 @@ let lookup_dot_type ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
-  let (p, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
+  let (p, locks, comps) = lookup_structure_components ~errors ~use ~loc l env in
   match NameMap.find s comps.comp_modtypes with
   | mta ->
       let path = Pdot(p, s) in
       use_modtype ~use ~loc path mta.mtda_declaration;
-      (path, mta.mtda_declaration)
+      (path, locks, mta.mtda_declaration)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_modtype (Ldot(l, s)))
 
@@ -3517,7 +3526,7 @@ let add_components slot root env0 comps locks =
     add_v (fun x -> `Type x) comps.comp_types env0.types
   in
   let modtypes =
-    add (fun x -> `Module_type x) comps.comp_modtypes env0.modtypes
+    add_v (fun x -> `Module_type x) comps.comp_modtypes env0.modtypes
   in
   let classes =
     add_v (fun x -> `Class x) comps.comp_classes env0.classes
@@ -3734,7 +3743,7 @@ let lookup_modtype_lazy ~errors ~use ~loc lid env =
   | Lapply _ -> assert false
 
 let lookup_modtype ~errors ~use ~loc lid env =
-  let (path, mt) = lookup_modtype_lazy ~errors ~use ~loc lid env in
+  let (path, _, mt) = lookup_modtype_lazy ~errors ~use ~loc lid env in
   path, Subst.Lazy.force_modtype_decl mt
 
 let lookup_class ~errors ~use ~loc lid env =
@@ -3900,7 +3909,7 @@ let lookup_modtype ?(use=true) ~loc lid env =
   lookup_modtype ~errors:true ~use ~loc lid env
 
 let lookup_modtype_path ?(use=true) ~loc lid env =
-  fst (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
+  fst3 (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
 
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in

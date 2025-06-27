@@ -635,41 +635,23 @@ module type S =
   sig type t type t2 val a : t val b : t -> int -> t val c : t -> int end
 |}];;
 
+module Mod = struct
+  type t = int
+  let mk x = x
+end;;
+[%%expect {|
+module Mod : sig type t = int val mk : 'a -> 'a end
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
-- : <[ (module S) -> $ ('a) -> int ]> expr = <[ fun (module _ : S) x -> 42 ]>
-|}];;
-
-<[ fun (module M : S) x -> M.c (M.b M.a x) ]>;;
-[%%expect {|
-- : <[ (module S) -> int -> int ]> expr =
-<[ fun (module M : S) x -> M.c (M.b M.a x) ]>
-|}];;
-
-<[ fun (module M : S with type t = string) x -> M.c (M.b M.a x) ]>;;
-[%%expect {|
-- : <[ (module S with type t = string) -> int -> int ]> expr =
-<[ fun (module M : S with type t = string) x -> M.c (M.b M.a x) ]>
-|}];;
-
-<[ fun (module M : S with type t = string and type t2 = int) x -> M.c (M.b M.a x) ]>;;
-[%%expect {|
-- : <[ (module S with type t = string and type t2 = int) -> int -> int ]>
-    expr
-=
-<[
-  fun (module M : S with type t = string and type t2 = int) x ->
-    M.c (M.b M.a x)
-]>
-|}];;
-
-<[ let module M (N : S) = struct type t = N.t let x = N.a end in () ]>;;
-[%%expect {|
-Line 1, characters 26-61:
-1 | <[ let module M (N : S) = struct type t = N.t let x = N.a end in () ]>;;
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Module definitions using "struct..end"
-       blocks are not allowed inside quotations.
+Line 1, characters 19-20:
+1 | <[ fun (module _ : S) x -> 42 ]>;;
+                       ^
+Error: Identifier "S" is used at Line 1, characters 19-20
+       in a context with one layer of quotation (<[ ... ]>);
+       it is introduced at Lines 1-7, characters 0-3
+       in a context with no quotations or splices.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
@@ -679,6 +661,17 @@ Line 1, characters 18-52:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Module definitions using "struct..end"
        blocks are not allowed inside quotations.
+|}];;
+
+<[ Mod.mk 42 ]>;;
+[%%expect {|
+Line 1, characters 3-9:
+1 | <[ Mod.mk 42 ]>;;
+       ^^^^^^
+Error: Identifier "Mod" is used at Line 1, characters 3-9
+       in a context with one layer of quotation (<[ ... ]>);
+       it is introduced at File "_none_", line 1
+       in a context with no quotations or splices.
 |}];;
 
 let x = 42 in <[ x ]>;;
