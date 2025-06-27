@@ -747,7 +747,6 @@ module G (M : sig val f : 'a -> 'a end) = struct
 end
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig val f : 'a -> 'a end
-  @@ stateless
 |}]
 
 (* functor declaration inclusion check  looks at the modes of parameter and
