@@ -3671,7 +3671,8 @@ let type_module_type_of env smod =
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
   (* Must zap module to floor first, otherwise the modality zapping will mutate
-  the module to ceil. *)
+  the module to ceil, which might be too high if the module is a .ml file and
+  expected to be legacy. *)
   (fst tmty.mod_mode).comonadic |> Mode.Value.Comonadic.zap_to_floor |> ignore;
   let mty =
     remove_modality_and_zero_alloc_variables_mty env
