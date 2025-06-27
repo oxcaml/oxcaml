@@ -3929,6 +3929,12 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
     let ls, tvar = list_labels env ty_fun in
     tvar || List.mem l ls
   in
+  let get_arg_loc = function
+    | (_, Arg ( Known_arg { sarg; _ }
+              | Unknown_arg { sarg; _ })) -> Some sarg.pexp_loc
+    | (_, Arg (Eliminated_optional_arg _))
+    | (_, Omitted _) -> None
+  in
   let rec loop ty_fun mode_fun rev_args sargs =
     match sargs with
     | [] -> ty_fun, mode_fun, List.rev rev_args
@@ -3958,13 +3964,10 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
               | Unify _ ->
                 (* need to calculate a location containing the function
                    and any arguments already processed *)
-                let get_loc (_, arg) = match arg with
-                  | Arg (Known_arg { sarg }
-                         | Unknown_arg { sarg }) -> Some sarg.pexp_loc
-                  | Arg (Eliminated_optional_arg _) -> None
-                  | Omitted _ -> None
+                let locs =
+                  funct.exp_loc :: sarg.pexp_loc ::
+                  List.filter_map get_arg_loc rev_args
                 in
-                let locs = funct.exp_loc :: List.filter_map get_loc rev_args in
                 let loc = Location.merge ~ghost:false locs in
                 let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
                 raise(Error(loc, env,
@@ -4003,13 +4006,7 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                      provide a good location in the [Eliminated_optional_arg]
                      case - maybe fix one day if it is noticeable. *)
                   rev_args
-                  |> List.find_map
-                       (function
-                         | (_, Arg ( Known_arg { sarg; _ }
-                                   | Unknown_arg { sarg; _ })) ->
-                           Some sarg.pexp_loc
-                         | (_, Arg (Eliminated_optional_arg _))
-                         | (_, Omitted _) -> None)
+                  |> List.find_map get_arg_loc
                   |> Option.value ~default:funct.exp_loc
                 in
                 raise(Error(funct.exp_loc, env, Apply_non_function {
@@ -11174,8 +11171,9 @@ let report_error ~loc env =
                incorrect label."
       in
       Location.errorf ~loc
-        "@[@[This expression is used as a function, but its type@ %a@]@ \
-         has kind %a, which cannot be the kind of a function.@ \
+        "@[@[This function application uses an expression with type@ %a@]@ \
+         as a function, but that type has kind %a, which cannot@ \
+         be the kind of a function.@ \
          (Functions always have kind %a.)%t@]"
         (Style.as_inline_code Printtyp.type_expr) ty_fun
         (Style.as_inline_code Jkind.format) jkind

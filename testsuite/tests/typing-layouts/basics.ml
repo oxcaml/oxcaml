@@ -2871,22 +2871,24 @@ Error: This expression has type "float#" but an expression was expected of type
 let f (x : ('a : bits64)) = x ()
 
 [%%expect{|
-Line 1, characters 28-29:
+Line 1, characters 28-32:
 1 | let f (x : ('a : bits64)) = x ()
-                                ^
-Error: This expression is used as a function, but its type "'a"
-       has kind "bits64", which cannot be the kind of a function.
+                                ^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "bits64", which cannot
+       be the kind of a function.
        (Functions always have kind "value mod aliased immutable non_float".)
 |}]
 
 let f (x : ('a : value mod portable)) = x ()
 
 [%%expect{|
-Line 1, characters 40-41:
+Line 1, characters 40-44:
 1 | let f (x : ('a : value mod portable)) = x ()
-                                            ^
-Error: This expression is used as a function, but its type "'a"
-       has kind "value mod portable", which cannot be the kind of a function.
+                                            ^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "value mod portable", which cannot
+       be the kind of a function.
        (Functions always have kind "value mod aliased immutable non_float".)
 |}]
 
@@ -2916,11 +2918,12 @@ let g t = M.f t ~key:0
 [%%expect{|
 type ('v : immediate) t
 module M : sig val f : ('v : immediate). 'v t -> int -> 'v end
-Line 9, characters 10-15:
+Line 9, characters 10-22:
 9 | let g t = M.f t ~key:0
-              ^^^^^
-Error: This expression is used as a function, but its type "'a"
-       has kind "immediate", which cannot be the kind of a function.
+              ^^^^^^^^^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "immediate", which cannot
+       be the kind of a function.
        (Functions always have kind "value mod aliased immutable non_float".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
@@ -2931,8 +2934,9 @@ let h t = M.f ~key:0 t
 Line 1, characters 10-22:
 1 | let h t = M.f ~key:0 t
               ^^^^^^^^^^^^
-Error: This expression is used as a function, but its type "'a"
-       has kind "immediate", which cannot be the kind of a function.
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "immediate", which cannot
+       be the kind of a function.
        (Functions always have kind "value mod aliased immutable non_float".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
