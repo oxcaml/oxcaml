@@ -559,7 +559,7 @@
                  reference = "test.reference";
                  check-program-output;
 
-                 program = "-shape -index -decls -uid-deps test.cms";
+                 program = "-shape -index -decls -uid-deps test.cmo test.cmi test.cms";
                  output = "test-ocamlobjinfo.output";
                  ocamlobjinfo;
 
