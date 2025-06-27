@@ -501,13 +501,6 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          in
          let arg = Ast_helper.Typ.force_poly arg in
          let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
-         let is_atomic = Builtin_attributes.has_atomic attrs in
-         begin match is_atomic, mut with
-         | true, Mutable _
-         | false, _  -> ()
-         | true, Immutable ->
-           raise (Error (loc, Atomic_field_must_be_mutable name.txt));
-         end;
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
