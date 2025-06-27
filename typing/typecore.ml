@@ -6990,7 +6990,8 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
     ~sub:(
       let semicolon =
         if returns_unit then
-          [msg ~loc:tail_loc "@{<hint>Hint@}: Did you forget a ';'?"]
+          [msg ~loc:tail_loc "@{<hint>Hint@}: Did you forget a %a?"
+             Style.inline_code ";"]
         else []
       in
       semicolon @
