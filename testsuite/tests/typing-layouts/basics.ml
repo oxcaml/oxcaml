@@ -2924,3 +2924,15 @@ Error: This expression is used as a function, but its type "'a"
        (Functions always have kind "value mod aliased immutable non_float".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
+
+let h t = M.f ~key:0 t
+
+[%%expect{|
+Line 1, characters 10-22:
+1 | let h t = M.f ~key:0 t
+              ^^^^^^^^^^^^
+Error: This expression is used as a function, but its type "'a"
+       has kind "immediate", which cannot be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
+       Hint: Perhaps you have over-applied the function or used an incorrect label.
+|}]
