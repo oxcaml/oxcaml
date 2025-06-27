@@ -776,3 +776,9 @@ val cross_left_alloc :
   Types.type_expr ->
   Mode.Alloc.l ->
   Mode.Alloc.l
+
+(** Zap a modality to floor if maturity allows, zap to id otherwise. *)
+val zap_modalities_to_floor_if_at_least :
+  Language_extension.maturity ->
+  Mode.Modality.Value.t ->
+  Mode.Modality.Value.Const.t

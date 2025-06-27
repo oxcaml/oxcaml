@@ -975,17 +975,17 @@ exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
-val x : x:int * y:int = (~x:1, ~y:2)
-val x : x:int * y:int = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
    (~x: 1, ~s: "a", ~y: 2, "ignore me")
 
 [%%expect{|
-val x0 : int = 1
-val s : string = "a"
-val y : int = 2
+val x0 : int @@ stateless = 1
+val s : string @@ stateless = "a"
+val y : int @@ stateless = 2
 |}]
 
 module M : sig
@@ -1021,9 +1021,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
-val x : int = 1
+val x : int @@ stateless = 1
 val y : int = 2
-val x : int = 1
+val x : int @@ stateless = 1
 val y : int = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
