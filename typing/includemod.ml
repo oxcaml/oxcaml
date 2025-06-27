@@ -466,7 +466,7 @@ let pair_components subst sig1_comps sig2 =
           | Sig_module _ ->
               Subst.add_module id2 (Path.Pident id1) subst
           | Sig_modtype _ ->
-              Subst.add_modtype id2 (Mty_ident (Path.Pident id1)) subst
+              Subst.add_modtype id2 (Path.Pident id1) subst
           | Sig_value _ | Sig_typext _
           | Sig_class _ | Sig_class_type _ ->
               subst
