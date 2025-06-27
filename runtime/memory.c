@@ -322,6 +322,7 @@ CAMLprim value caml_atomic_load_field (value obj, value vfield)
     return atomic_load(&Op_atomic_val(obj)[field]);
   }
 }
+
 CAMLprim value caml_atomic_load (value ref)
 {
   return caml_atomic_load_field(ref, Val_long(0));
@@ -358,7 +359,7 @@ CAMLprim value caml_atomic_compare_exchange_field (
     value* p = &Op_val(obj)[field];
     if (*p == oldv) {
       *p = newv;
-      write_barrier(obj, 0, oldv, newv);
+      write_barrier(obj, Long_val(vfield), oldv, newv);
       return oldv;
     } else {
       return *p;
@@ -368,7 +369,7 @@ CAMLprim value caml_atomic_compare_exchange_field (
     int cas_ret = atomic_compare_exchange_strong(p, &oldv, newv);
     atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
     if (cas_ret) {
-      write_barrier(obj, 0, oldv, newv);
+      write_barrier(obj, Long_val(vfield), oldv, newv);
     }
     return oldv;
   }

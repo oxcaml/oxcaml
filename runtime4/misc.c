@@ -263,7 +263,7 @@ CAMLprim value caml_atomic_compare_exchange_field(value ref, value vfield, value
 {
   value* p = Op_val(ref);
   if (*p == oldv) {
-    caml_modify_local(ref, 0, newv);
+    caml_modify_local(ref, Long_val(vfield), newv);
     return oldv;
   } else {
     return *p;
@@ -276,7 +276,7 @@ CAMLprim value caml_atomic_compare_exchange(value ref, value oldv, value newv) {
 
 CAMLprim value caml_atomic_cas_field(value ref, value vfield, value oldv, value newv)
 {
-  if (caml_atomic_compare_exchange(ref, oldv, newv) == oldv) {
+  if (caml_atomic_compare_exchange_field(ref, vfield, oldv, newv) == oldv) {
     return Val_true;
   } else {
     return Val_false;
