@@ -21,15 +21,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = { mutable x : int; } end
        is not included in
-         sig type t = { mutable x : int; } end
+         sig type t = { mutable x : int [@atomic]; } end
        Type declarations do not match:
          type t = { mutable x : int; }
        is not included in
-         type t = { mutable x : int; }
+         type t = { mutable x : int [@atomic]; }
        Fields do not match:
          "mutable x : int;"
        is not the same as:
-         "mutable x : int;"
+         "mutable x : int [@atomic];"
        The second is atomic and the first is not.
 |}];;
 
@@ -46,15 +46,15 @@ Lines 1-3, characters 17-3:
 3 | end......
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = { mutable x : int; } end
+         sig type t = { mutable x : int [@atomic]; } end
        is not included in
          sig type t = { mutable x : int; } end
        Type declarations do not match:
-         type t = { mutable x : int; }
+         type t = { mutable x : int [@atomic]; }
        is not included in
          type t = { mutable x : int; }
        Fields do not match:
-         "mutable x : int;"
+         "mutable x : int [@atomic];"
        is not the same as:
          "mutable x : int;"
        The first is atomic and the second is not.
@@ -67,7 +67,7 @@ end : sig
 end)
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Ok/303" (makeblock 0))
-module Ok : sig type t = { mutable x : int; } end
+module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
 (* Inline records are supported, including in extensions. *)
@@ -82,7 +82,7 @@ end
   (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
     (makeblock 0 test)))
 module Inline_record :
-  sig type t = A of { mutable x : int; } val test : t -> int end
+  sig type t = A of { mutable x : int [@atomic]; } val test : t -> int end
 |}];;
 
 module Extension_with_inline_record = struct
@@ -112,5 +112,9 @@ end
          (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
     (makeblock 0 A test)))
 module Extension_with_inline_record :
-  sig type t = .. type t += A of { mutable x : int; } val test : t -> int end
+  sig
+    type t = ..
+    type t += A of { mutable x : int [@atomic]; }
+    val test : t -> int
+  end
 |}]

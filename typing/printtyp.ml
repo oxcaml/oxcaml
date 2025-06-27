@@ -1838,13 +1838,18 @@ let param_jkind ty =
 let tree_of_label l =
   let mut =
     match l.ld_mutable with
-    | Mutable { modal_upper_bound; _ } ->
+    | Mutable { modal_upper_bound; atomic } ->
+        let atomic =
+          match atomic with
+          | Atomic -> Atomic
+          | Nonatomic -> Nonatomic
+        in
         let mut =
           let open Alloc.Comonadic.Const in
           if Misc.Le_result.equal ~le modal_upper_bound legacy then
-            Om_mutable None
+            Om_mutable (None, atomic)
           else
-            Om_mutable (Some "<non-legacy>")
+            Om_mutable (Some "<non-legacy>", atomic)
         in
         mut
     | Immutable -> Om_immutable
