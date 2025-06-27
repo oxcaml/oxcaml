@@ -82,11 +82,11 @@ let code odd_2 deleted and code even_1 deleted in
 let code parity_is_0 deleted in
 let code k_3 deleted in
 let code rec loopify(never) size(26) newer_version_of(odd_2)
-      even_1_1 (n : imm tagged)
+      odd_2_1 (n : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1 =
-  let k = %project_value_slot even.k my_closure in
-  let even = %project_function_slot (even -> odd) my_closure in
+  let k = %project_value_slot odd.k my_closure in
+  let even = %project_function_slot (odd -> even) my_closure in
   let prim = %phys_eq (n, 0) in
   switch prim
     | 0 -> k2
@@ -95,14 +95,14 @@ let code rec loopify(never) size(26) newer_version_of(odd_2)
       apply inlined(hint) k (0) -> k * k1
     where k2 =
       let Psubint = n - 1 in
-      apply direct(odd_2_1)
+      apply direct(even_1_1)
         even ~ depth my_depth -> succ my_depth (Psubint) -> k * k1
 and code rec loopify(never) size(26) newer_version_of(even_1)
-      odd_2_1 (n : imm tagged)
+      even_1_1 (n : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1 =
-  let k = %project_value_slot odd.k my_closure in
-  let odd = %project_function_slot (odd -> even) my_closure in
+  let k = %project_value_slot even.k my_closure in
+  let odd = %project_function_slot (even -> odd) my_closure in
   let prim = %phys_eq (n, 0) in
   switch prim
     | 0 -> k2
@@ -111,7 +111,7 @@ and code rec loopify(never) size(26) newer_version_of(even_1)
       apply inlined(hint) k (1) -> k * k1
     where k2 =
       let Psubint = n - 1 in
-      apply direct(even_1_1)
+      apply direct(odd_2_1)
         odd ~ depth my_depth -> succ my_depth (Psubint) -> k * k1
 in
 let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
@@ -130,24 +130,24 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
       let prim = %phys_eq (n, 0) in
       (switch prim
          | 0 -> k2_1
-         | 1 -> k4
-         where k4 =
+         | 1 -> k3
+         where k3 =
            apply inlined(hint) inlining_state(depth(10)) k (0) -> k * k1
          where k2_1 =
            let Psubint = n - 1 in
            let prim_1 = %phys_eq (Psubint, 0) in
            (switch prim_1
               | 0 -> k2_1
-              | 1 -> k4
-              where k4 =
+              | 1 -> k3
+              where k3 =
                 apply inlined(hint) inlining_state(depth(20)) k (1) -> k * k1
               where k2_1 =
                 let Psubint_1 = Psubint - 1 in
                 let prim_2 = %phys_eq (Psubint_1, 0) in
                 (switch prim_2
                    | 0 -> k2_1
-                   | 1 -> k4
-                   where k4 =
+                   | 1 -> k3
+                   where k3 =
                      apply inlined(hint) inlining_state(depth(30))
                        k (0) -> k * k1
                    where k2_1 =
@@ -155,13 +155,13 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
                      let prim_3 = %phys_eq (Psubint_2, 0) in
                      (switch prim_3
                         | 0 -> k2_1
-                        | 1 -> k4
-                        where k4 =
+                        | 1 -> k3
+                        where k3 =
                           apply inlined(hint) inlining_state(depth(40))
                             k (1) -> k * k1
                         where k2_1 =
                           let Psubint_3 = Psubint_2 - 1 in
-                          apply direct(odd_2_1_1) inlining_state(depth(40))
+                          apply direct(odd_2_1) inlining_state(depth(40))
                             odd ~ depth 0 -> unroll 0 4 (Psubint_3) -> k * k1))))
     where k2 =
       let prim = %phys_eq (n, 0) in
@@ -189,7 +189,7 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
                        k (1) -> k * k1
                    where k2 =
                      let Psubint_2 = Psubint_1 - 1 in
-                     apply direct(odd_2_1_1) inlining_state(depth(30))
+                     apply direct(odd_2_1) inlining_state(depth(30))
                        odd ~ depth 0 -> unroll 0 3 (Psubint_2) -> k * k1)))
 in
 let $camlUnroll4__parity_is_4 = closure parity_is_0_1 @parity_is in
@@ -202,10 +202,10 @@ apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
   $camlUnroll4__k_5 (0) -> k1 * error
   where k1 (one_is_even : imm tagged) =
     ((let $camlUnroll4__even_8 =
-        closure even_1_1_1 @even_1
+        closure even_1_2 @even
       and $camlUnroll4__odd_9 =
-        closure odd_2_2 @odd_1
-      and code rec loopify(never) size(18) newer_version_of(even_1_1)
+        closure odd_2_2 @odd
+      and code rec loopify(never) size(18) newer_version_of(odd_2_1)
             odd_2_2 (n : imm tagged)
               my_closure my_region my_ghost_region my_depth
               -> k * k1_1 =
@@ -215,12 +215,12 @@ apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
           | 1 -> k (0)
           where k2 =
             let Psubint = n - 1 in
-            apply direct(even_1_1_1) inlining_state(depth(1))
+            apply direct(even_1_2) inlining_state(depth(1))
               $camlUnroll4__even_8 ~ depth my_depth -> succ my_depth
                 (Psubint)
                 -> k * k1_1
-      and code rec loopify(never) size(18) newer_version_of(odd_2_1)
-            even_1_1_1 (n : imm tagged)
+      and code rec loopify(never) size(18) newer_version_of(even_1_1)
+            even_1_2 (n : imm tagged)
               my_closure my_region my_ghost_region my_depth
               -> k * k1_1 =
         let prim = %phys_eq (n, 0) in
@@ -233,7 +233,7 @@ apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
               $camlUnroll4__odd_9 ~ depth my_depth -> succ my_depth
                 (Psubint)
                 -> k * k1_1
-        with { k_1 = $camlUnroll4__k_5 }
+        with { k = $camlUnroll4__k_5 }
       in
       apply direct(odd_2_2) inlining_state(depth(41))
         $camlUnroll4__odd_9 ~ depth 0 -> unroll 0 4 (0) -> k1 * error)
