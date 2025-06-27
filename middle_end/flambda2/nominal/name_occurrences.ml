@@ -951,8 +951,7 @@ let with_only_variables { names; _ } =
   let names = For_names.filter names ~f:Name.is_var in
   { empty with names }
 
-let with_only_names { names; _ } =
-  { empty with names }
+let with_only_names { names; _ } = { empty with names }
 
 let with_only_names_and_code_ids_promoting_newer_version_of
     { names; code_ids; newer_version_of_code_ids; _ } =
