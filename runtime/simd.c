@@ -26,6 +26,10 @@
 // SIMD is only supported on 64-bit targets
 #define Max_unboxed_vec128_array_wosize    (Max_custom_array_wosize / 2)
 
+CAMLprim value caml_simd_bytecode_not_supported(void) {
+  caml_fatal_error("SIMD is not supported in bytecode mode.");
+}
+
 #if defined(ARCH_SSE2) || defined(__ARM_NEON)
 
 CAMLexport value caml_copy_vec128(simd_float32x4_t v) {
@@ -48,6 +52,7 @@ CAMLexport value caml_copy_vec128d(simd_float64x2_t v) {
 
 /* Defined in array.c */
 
+// Defined in array.c
 CAMLextern int caml_unboxed_array_no_polymorphic_compare(value v1, value v2);
 CAMLextern intnat caml_unboxed_array_no_polymorphic_hash(value v);
 CAMLextern void caml_unboxed_array_serialize(value v, uintnat* bsize_32, uintnat* bsize_64);
