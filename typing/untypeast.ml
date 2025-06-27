@@ -273,6 +273,7 @@ let constructor_declaration sub cd =
 let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
+  (* ignore [atomic], as it's already in the attributes *)
   | Mutable { modal_upper_bound = m; atomic = _ } ->
       let open Mode.Alloc.Comonadic.Const in
       if Misc.Le_result.equal ~le m legacy then
