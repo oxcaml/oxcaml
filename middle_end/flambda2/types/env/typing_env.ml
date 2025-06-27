@@ -713,7 +713,7 @@ let invariant_for_new_equation (t : t) name ty =
         (Name.Set.union (name_domain t) (t.get_imported_names ()))
         Name_mode.in_types
     in
-    let free_names = Name_occurrences.without_code_ids (TG.free_names ty) in
+    let free_names = Name_occurrences.with_only_names (TG.free_names ty) in
     if not (Name_occurrences.subset_domain free_names defined_names)
     then
       let unbound_names =
