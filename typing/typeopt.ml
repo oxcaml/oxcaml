@@ -965,8 +965,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_int Unboxed_int32
   | Base Bits64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_int Unboxed_int64
-  | Base Float32 when Language_extension.(is_at_least Layouts Stable) &&
-                      Language_extension.(is_enabled Small_numbers) ->
+  | Base Float32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float32
   | Base Vec128 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
