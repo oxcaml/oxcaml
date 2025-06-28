@@ -21,6 +21,8 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+
 external runtime5 : unit -> bool @@ portable = "%runtime5"
 
 exception Encapsulated of string
@@ -134,7 +136,6 @@ module Runtime_4 = struct
   let get_id _ = not_implemented ()
 
   let self () = 0
-  let cpu_relax = Sys.poll_actions
   let is_main_domain () = true
   let recommended_domain_count () = 1
 end
@@ -162,18 +163,9 @@ module Runtime_5 = struct
       = "caml_domain_spawn"
     external self : unit -> t @@ portable
       = "caml_ml_domain_id" [@@noalloc]
-    external cpu_relax : unit -> unit @@ portable
-      = "caml_ml_domain_cpu_relax"
     external get_recommended_domain_count: unit -> int @@ portable
       = "caml_recommended_domain_count" [@@noalloc]
   end
-
-  (* When poll insertion is disabled, [cpu_relax] also needs to act as a polling
-     point to allow systhread preemption. *)
-  (* CR-soon mslater: make cpu_relax a primitive *)
-  let cpu_relax () =
-    Raw.cpu_relax ();
-    Sys.poll_actions ()
 
   type id = Raw.t
 
@@ -484,7 +476,6 @@ module type S = sig
   type id = private int
   val get_id : 'a t -> id @@ portable
   val self : unit -> id @@ portable
-  val cpu_relax : unit -> unit @@ portable
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable

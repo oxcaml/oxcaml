@@ -30,7 +30,7 @@ let unboxed_float = function
 
 let unboxed_vector = function
   | Unboxed_vec128 -> "unboxed_vec128"
-  | Unboxed_vec256 -> "unboxed_vec256" 
+  | Unboxed_vec256 -> "unboxed_vec256"
   | Unboxed_vec512 -> "unboxed_vec512"
 
 let boxed_integer = function
@@ -909,6 +909,7 @@ let primitive ppf = function
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ppoll -> fprintf ppf "poll"
+  | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
   | Pobj_magic _ -> fprintf ppf "obj_magic"
@@ -1108,6 +1109,7 @@ let name_of_primitive = function
   | Patomic_land -> "Patomic_land"
   | Patomic_lor -> "Patomic_lor"
   | Patomic_lxor -> "Patomic_lxor"
+  | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Prunstack -> "Prunstack"
   | Presume -> "Presume"

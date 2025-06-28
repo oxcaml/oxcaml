@@ -411,6 +411,7 @@ module Instruction_name = struct
     | ADRP
     | STP
     | RET
+    | YIELD
     (* neon *)
     | MOV
     | MOVI
@@ -549,6 +550,7 @@ module Instruction_name = struct
     | ADRP -> "adrp"
     | STP -> "stp"
     | RET -> "ret"
+    | YIELD -> "yield"
     (* neon *)
     | MOV -> "mov"
     | MOVI -> "movi"
