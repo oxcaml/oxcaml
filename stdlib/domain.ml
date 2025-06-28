@@ -132,10 +132,11 @@ module Runtime_4 = struct
   let spawn' _ = not_implemented ()
   let join _ = not_implemented ()
   let get_id _ = not_implemented ()
-  let self () = not_implemented ()
-  let cpu_relax () = not_implemented ()
-  let is_main_domain () = not_implemented ()
-  let recommended_domain_count () = not_implemented ()
+
+  let self () = 0
+  let cpu_relax = Sys.poll_actions
+  let is_main_domain () = true
+  let recommended_domain_count () = 1
 end
 
 module Runtime_5 = struct
