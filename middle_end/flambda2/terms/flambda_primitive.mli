@@ -342,6 +342,9 @@ type nullary_primitive =
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and
           GC slices, so should not be moved or optimised away. *)
+  | Cpu_relax
+      (** Arch-specific pause. If poll insertion is disabled, also acts
+          as a polling point. *)
 
 (** Untagged binary integer arithmetic operations.
 

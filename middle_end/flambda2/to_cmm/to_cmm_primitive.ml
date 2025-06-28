@@ -964,6 +964,7 @@ let nullary_primitive _env res dbg prim =
        correctly adjust the inlined debuginfo in the env."
   | Dls_get -> None, res, C.dls_get ~dbg
   | Poll -> None, res, C.poll ~dbg
+  | Cpu_relax -> None, res, C.cpu_relax ~dbg
 
 let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->

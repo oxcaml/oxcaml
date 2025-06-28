@@ -369,6 +369,8 @@ type primitive =
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
   | Ppoll
+  (* Arch-specific pause. Without poll insertion, also acts as a [Ppoll]. *)
+  | Pcpu_relax
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
