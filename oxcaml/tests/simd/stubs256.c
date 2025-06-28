@@ -25,6 +25,20 @@ BUILTIN(caml_int16x16_low_to_int);
 BUILTIN(caml_int8x32_low_of_int);
 BUILTIN(caml_int8x32_low_to_int);
 
+// 256-bit vector constants
+BUILTIN(caml_float32x8_const1);
+BUILTIN(caml_float32x8_const8);
+BUILTIN(caml_float64x4_const1);
+BUILTIN(caml_float64x4_const4);
+BUILTIN(caml_int64x4_const1);
+BUILTIN(caml_int64x4_const4);
+BUILTIN(caml_int32x8_const1);
+BUILTIN(caml_int32x8_const8);
+BUILTIN(caml_int16x16_const1);
+BUILTIN(caml_int16x16_const16);
+BUILTIN(caml_int8x32_const1);
+BUILTIN(caml_int8x32_const32);
+
 int64_t vec256_first_int64(__m256i v)
 {
     return _mm256_extract_epi64(v, 3);
