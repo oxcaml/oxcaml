@@ -2072,8 +2072,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbox_float (_, m) | Pbox_int (_, m) | Pbox_vector (_, m) -> Some m
   | Prunstack | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
-  | Ppoll -> Some alloc_heap
-  | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
+  | Ppoll | Pcpu_relax -> Some alloc_heap
   | Patomic_load _
   | Patomic_set _
   | Patomic_exchange _
