@@ -746,6 +746,7 @@ let expression_supported = function
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
   | Cexit _ -> true
-  | Cconst_vec256 _ | Cconst_vec512 _ -> false
+  | Cconst_vec256 _ -> Arch.Extension.allow_vec256 ()
+  | Cconst_vec512 _ -> Arch.Extension.allow_vec512 ()
 
 let trap_size_in_bytes = 16

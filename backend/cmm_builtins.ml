@@ -232,6 +232,7 @@ let bigstring_atomic_sub size (arg1, arg2, arg3) dbg =
 
 let rec const_args_gen ~extract ~type_name n args name =
   match n, args with
+  | -1, _ -> bad_immediate "Too many arguments for %s" name
   | 0, [] -> []
   | _, [] ->
     bad_immediate "Missing %d constant %s argument(s) for %s" n type_name name
@@ -443,54 +444,49 @@ let transl_vec_builtin name args dbg _typ_res =
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let op = Cstatic_cast (Scalar_of_v512 Int8x64) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  (* Constants *)
+  (* 128-bit constants *)
   | "caml_float32x4_const1" ->
     let f = const_float32_args 1 args name |> List.hd in
     let i = int64_of_float32 f in
     let i = pack_int32s i i in
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_float32x4_const4" ->
-    let i0, i1, i2, i3 =
-      match const_float32_args 4 args name |> List.map int64_of_float32 with
-      | [i0; i1; i2; i3] -> i0, i1, i2, i3
-      | _ -> assert false
+    let vals =
+      const_float32_args 4 args name
+      |> Array.of_list |> Array.map int64_of_float32
     in
-    let word0 = pack_int32s i0 i1 in
-    let word1 = pack_int32s i2 i3 in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_float64x2_const1" ->
     let f = const_float_args 1 args name |> List.hd in
     let i = Int64.bits_of_float f in
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_float64x2_const2" ->
-    let word0, word1 =
-      match const_float_args 2 args name |> List.map Int64.bits_of_float with
-      | [f0; f1] -> f0, f1
-      | _ -> assert false
+    let vals =
+      const_float_args 2 args name
+      |> Array.of_list
+      |> Array.map Int64.bits_of_float
     in
+    let word0, word1 = vals.(0), vals.(1) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int64x2_const1" ->
     let i = const_int64_args 1 args name |> List.hd in
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int64x2_const2" ->
-    let word0, word1 =
-      match const_int64_args 2 args name with
-      | [i0; i1] -> i0, i1
-      | _ -> assert false
-    in
+    let vals = const_int64_args 2 args name |> Array.of_list in
+    let word0, word1 = vals.(0), vals.(1) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int32x4_const1" ->
     let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
     let i = pack_int32s i i in
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int32x4_const4" ->
-    let i0, i1, i2, i3 =
-      match const_int_args 4 args name |> List.map int64_of_int32 with
-      | [i0; i1; i2; i3] -> i0, i1, i2, i3
-      | _ -> assert false
+    let vals =
+      const_int_args 4 args name |> Array.of_list |> Array.map int64_of_int32
     in
-    let word0 = pack_int32s i0 i1 in
-    let word1 = pack_int32s i2 i3 in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int16x8_const1" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
@@ -499,13 +495,11 @@ let transl_vec_builtin name args dbg _typ_res =
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int16x8_const8" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-    let i0, i1, i2, i3, i4, i5, i6, i7 =
-      match const_int_args 8 args name |> List.map int64_of_int16 with
-      | [i0; i1; i2; i3; i4; i5; i6; i7] -> i0, i1, i2, i3, i4, i5, i6, i7
-      | _ -> assert false
+    let vals =
+      const_int_args 8 args name |> Array.of_list |> Array.map int64_of_int16
     in
-    let word0 = pack_int16s i0 i1 i2 i3 in
-    let word1 = pack_int16s i4 i5 i6 i7 in
+    let word0 = pack_int16s vals.(0) vals.(1) vals.(2) vals.(3) in
+    let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int8x16_const1" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
@@ -514,16 +508,328 @@ let transl_vec_builtin name args dbg _typ_res =
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int8x16_const16" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-    let i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15 =
-      match const_int_args 16 args name |> List.map int64_of_int8 with
-      | [i0; i1; i2; i3; i4; i5; i6; i7; i8; i9; i10; i11; i12; i13; i14; i15]
-        ->
-        i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15
-      | _ -> assert false
+    let vals =
+      const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int8
     in
-    let word0 = pack_int8s i0 i1 i2 i3 i4 i5 i6 i7 in
-    let word1 = pack_int8s i8 i9 i10 i11 i12 i13 i14 i15 in
+    let word0 =
+      pack_int8s vals.(0) vals.(1) vals.(2) vals.(3) vals.(4) vals.(5) vals.(6)
+        vals.(7)
+    in
+    let word1 =
+      pack_int8s vals.(8) vals.(9) vals.(10) vals.(11) vals.(12) vals.(13)
+        vals.(14) vals.(15)
+    in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
+  (* 256-bit constants *)
+  | "caml_float32x8_const1" ->
+    let f = const_float32_args 1 args name |> List.hd in
+    let i = int64_of_float32 f in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_float32x8_const8" ->
+    let vals =
+      const_float32_args 8 args name
+      |> Array.of_list |> Array.map int64_of_float32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_float64x4_const1" ->
+    let f = const_float_args 1 args name |> List.hd in
+    let i = Int64.bits_of_float f in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_float64x4_const4" ->
+    let vals =
+      const_float_args 4 args name
+      |> Array.of_list
+      |> Array.map Int64.bits_of_float
+    in
+    let word0, word1, word2, word3 = vals.(0), vals.(1), vals.(2), vals.(3) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int64x4_const1" ->
+    let i = const_int64_args 1 args name |> List.hd in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int64x4_const4" ->
+    let vals = const_int64_args 4 args name |> Array.of_list in
+    let word0, word1, word2, word3 = vals.(0), vals.(1), vals.(2), vals.(3) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int32x8_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int32x8_const8" ->
+    let vals =
+      const_int_args 8 args name |> Array.of_list |> Array.map int64_of_int32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int16x16_const1" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
+    let i = pack_int16s i i i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int16x16_const16" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+    let vals =
+      const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int16
+    in
+    let word0 = pack_int16s vals.(0) vals.(1) vals.(2) vals.(3) in
+    let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
+    let word2 = pack_int16s vals.(8) vals.(9) vals.(10) vals.(11) in
+    let word3 = pack_int16s vals.(12) vals.(13) vals.(14) vals.(15) in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  | "caml_int8x32_const1" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
+    let i = pack_int8s i i i i i i i i in
+    if_expr_supported
+      (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
+  | "caml_int8x32_const32" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+    let vals =
+      const_int_args 32 args name |> Array.of_list |> Array.map int64_of_int8
+    in
+    let word0 =
+      pack_int8s vals.(0) vals.(1) vals.(2) vals.(3) vals.(4) vals.(5) vals.(6)
+        vals.(7)
+    in
+    let word1 =
+      pack_int8s vals.(8) vals.(9) vals.(10) vals.(11) vals.(12) vals.(13)
+        vals.(14) vals.(15)
+    in
+    let word2 =
+      pack_int8s vals.(16) vals.(17) vals.(18) vals.(19) vals.(20) vals.(21)
+        vals.(22) vals.(23)
+    in
+    let word3 =
+      pack_int8s vals.(24) vals.(25) vals.(26) vals.(27) vals.(28) vals.(29)
+        vals.(30) vals.(31)
+    in
+    if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
+  (* 512-bit constants *)
+  | "caml_float32x16_const1" ->
+    let f = const_float32_args 1 args name |> List.hd in
+    let i = int64_of_float32 f in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_float32x16_const16" ->
+    let vals =
+      const_float32_args 16 args name
+      |> Array.of_list |> Array.map int64_of_float32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    let word4 = pack_int32s vals.(8) vals.(9) in
+    let word5 = pack_int32s vals.(10) vals.(11) in
+    let word6 = pack_int32s vals.(12) vals.(13) in
+    let word7 = pack_int32s vals.(14) vals.(15) in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_float64x8_const1" ->
+    let f = const_float_args 1 args name |> List.hd in
+    let i = Int64.bits_of_float f in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_float64x8_const8" ->
+    let vals =
+      const_float_args 8 args name
+      |> Array.of_list
+      |> Array.map Int64.bits_of_float
+    in
+    let word0, word1, word2, word3, word4, word5, word6, word7 =
+      ( vals.(0),
+        vals.(1),
+        vals.(2),
+        vals.(3),
+        vals.(4),
+        vals.(5),
+        vals.(6),
+        vals.(7) )
+    in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int64x8_const1" ->
+    let i = const_int64_args 1 args name |> List.hd in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int64x8_const8" ->
+    let vals = const_int64_args 8 args name |> Array.of_list in
+    let word0, word1, word2, word3, word4, word5, word6, word7 =
+      ( vals.(0),
+        vals.(1),
+        vals.(2),
+        vals.(3),
+        vals.(4),
+        vals.(5),
+        vals.(6),
+        vals.(7) )
+    in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int32x16_const1" ->
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
+    let i = pack_int32s i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int32x16_const16" ->
+    let vals =
+      const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int32
+    in
+    let word0 = pack_int32s vals.(0) vals.(1) in
+    let word1 = pack_int32s vals.(2) vals.(3) in
+    let word2 = pack_int32s vals.(4) vals.(5) in
+    let word3 = pack_int32s vals.(6) vals.(7) in
+    let word4 = pack_int32s vals.(8) vals.(9) in
+    let word5 = pack_int32s vals.(10) vals.(11) in
+    let word6 = pack_int32s vals.(12) vals.(13) in
+    let word7 = pack_int32s vals.(14) vals.(15) in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int16x32_const1" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
+    let i = pack_int16s i i i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int16x32_const32" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+    let vals =
+      const_int_args 32 args name |> Array.of_list |> Array.map int64_of_int16
+    in
+    let word0 = pack_int16s vals.(0) vals.(1) vals.(2) vals.(3) in
+    let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
+    let word2 = pack_int16s vals.(8) vals.(9) vals.(10) vals.(11) in
+    let word3 = pack_int16s vals.(12) vals.(13) vals.(14) vals.(15) in
+    let word4 = pack_int16s vals.(16) vals.(17) vals.(18) vals.(19) in
+    let word5 = pack_int16s vals.(20) vals.(21) vals.(22) vals.(23) in
+    let word6 = pack_int16s vals.(24) vals.(25) vals.(26) vals.(27) in
+    let word7 = pack_int16s vals.(28) vals.(29) vals.(30) vals.(31) in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
+  | "caml_int8x64_const1" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+    let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
+    let i = pack_int8s i i i i i i i i in
+    if_expr_supported
+      (Cconst_vec512
+         ( { word0 = i;
+             word1 = i;
+             word2 = i;
+             word3 = i;
+             word4 = i;
+             word5 = i;
+             word6 = i;
+             word7 = i
+           },
+           dbg ))
+  | "caml_int8x64_const64" ->
+    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+    let vals =
+      const_int_args 64 args name |> Array.of_list |> Array.map int64_of_int8
+    in
+    let word0 =
+      pack_int8s vals.(0) vals.(1) vals.(2) vals.(3) vals.(4) vals.(5) vals.(6)
+        vals.(7)
+    in
+    let word1 =
+      pack_int8s vals.(8) vals.(9) vals.(10) vals.(11) vals.(12) vals.(13)
+        vals.(14) vals.(15)
+    in
+    let word2 =
+      pack_int8s vals.(16) vals.(17) vals.(18) vals.(19) vals.(20) vals.(21)
+        vals.(22) vals.(23)
+    in
+    let word3 =
+      pack_int8s vals.(24) vals.(25) vals.(26) vals.(27) vals.(28) vals.(29)
+        vals.(30) vals.(31)
+    in
+    let word4 =
+      pack_int8s vals.(32) vals.(33) vals.(34) vals.(35) vals.(36) vals.(37)
+        vals.(38) vals.(39)
+    in
+    let word5 =
+      pack_int8s vals.(40) vals.(41) vals.(42) vals.(43) vals.(44) vals.(45)
+        vals.(46) vals.(47)
+    in
+    let word6 =
+      pack_int8s vals.(48) vals.(49) vals.(50) vals.(51) vals.(52) vals.(53)
+        vals.(54) vals.(55)
+    in
+    let word7 =
+      pack_int8s vals.(56) vals.(57) vals.(58) vals.(59) vals.(60) vals.(61)
+        vals.(62) vals.(63)
+    in
+    if_expr_supported
+      (Cconst_vec512
+         ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
   | _ -> None
 
 (** [transl_builtin prim args dbg] returns None if the built-in [prim] is not
