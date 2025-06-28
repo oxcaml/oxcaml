@@ -207,6 +207,8 @@ let oper_result_type = function
   | Ccsel ty -> ty
   | Creinterpret_cast Value_of_int -> typ_val
   | Creinterpret_cast V128_of_v128 -> typ_vec128
+  | Creinterpret_cast V256_of_v256 -> typ_vec256
+  | Creinterpret_cast V512_of_v512 -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
@@ -218,6 +220,16 @@ let oper_result_type = function
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
+    typ_int
+  | Cstatic_cast (V256_of_scalar _) -> typ_vec256
+  | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
+  | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
+  | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
+    typ_int
+  | Cstatic_cast (V512_of_scalar _) -> typ_vec512
+  | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
+  | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
+  | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
     typ_int
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void

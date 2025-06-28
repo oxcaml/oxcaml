@@ -118,5 +118,9 @@ val assemble_file : string -> string -> int
     to primitive operations. *)
 val operation_supported : Cmm.operation -> bool
 
+(** [expression_supported exp] returns true when [exp] is a
+    cmm expression supported by this architecture. *)
+val expression_supported : Cmm.expression -> bool
+
 (** The number of bytes each trap occupies on the stack. *)
 val trap_size_in_bytes : int
