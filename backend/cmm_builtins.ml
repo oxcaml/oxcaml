@@ -58,6 +58,9 @@ let if_operation_supported_bi bi op ~f =
   then None
   else if_operation_supported op ~f
 
+let if_expr_supported expr =
+  match Proc.expression_supported expr with true -> Some expr | false -> None
+
 let int_of_value arg dbg = Cop (Creinterpret_cast Int_of_value, [arg], dbg)
 
 let value_of_int arg dbg = Cop (Creinterpret_cast Value_of_int, [arg], dbg)
@@ -445,7 +448,7 @@ let transl_vec_builtin name args dbg _typ_res =
     let f = const_float32_args 1 args name |> List.hd in
     let i = int64_of_float32 f in
     let i = pack_int32s i i in
-    Some (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_float32x4_const4" ->
     let i0, i1, i2, i3 =
       match const_float32_args 4 args name |> List.map int64_of_float32 with
@@ -454,32 +457,32 @@ let transl_vec_builtin name args dbg _typ_res =
     in
     let word0 = pack_int32s i0 i1 in
     let word1 = pack_int32s i2 i3 in
-    Some (Cconst_vec128 ({ word0; word1 }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_float64x2_const1" ->
     let f = const_float_args 1 args name |> List.hd in
     let i = Int64.bits_of_float f in
-    Some (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_float64x2_const2" ->
     let word0, word1 =
       match const_float_args 2 args name |> List.map Int64.bits_of_float with
       | [f0; f1] -> f0, f1
       | _ -> assert false
     in
-    Some (Cconst_vec128 ({ word0; word1 }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int64x2_const1" ->
     let i = const_int64_args 1 args name |> List.hd in
-    Some (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int64x2_const2" ->
     let word0, word1 =
       match const_int64_args 2 args name with
       | [i0; i1] -> i0, i1
       | _ -> assert false
     in
-    Some (Cconst_vec128 ({ word0; word1 }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int32x4_const1" ->
     let i = const_int_args 1 args name |> List.hd |> int64_of_int32 in
     let i = pack_int32s i i in
-    Some (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int32x4_const4" ->
     let i0, i1, i2, i3 =
       match const_int_args 4 args name |> List.map int64_of_int32 with
@@ -488,12 +491,12 @@ let transl_vec_builtin name args dbg _typ_res =
     in
     let word0 = pack_int32s i0 i1 in
     let word1 = pack_int32s i2 i3 in
-    Some (Cconst_vec128 ({ word0; word1 }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int16x8_const1" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
     let i = pack_int16s i i i i in
-    Some (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int16x8_const8" ->
     (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let i0, i1, i2, i3, i4, i5, i6, i7 =
@@ -503,12 +506,12 @@ let transl_vec_builtin name args dbg _typ_res =
     in
     let word0 = pack_int16s i0 i1 i2 i3 in
     let word1 = pack_int16s i4 i5 i6 i7 in
-    Some (Cconst_vec128 ({ word0; word1 }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int8x16_const1" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
     let i = pack_int8s i i i i i i i i in
-    Some (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int8x16_const16" ->
     (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15 =
@@ -520,7 +523,7 @@ let transl_vec_builtin name args dbg _typ_res =
     in
     let word0 = pack_int8s i0 i1 i2 i3 i4 i5 i6 i7 in
     let word1 = pack_int8s i8 i9 i10 i11 i12 i13 i14 i15 in
-    Some (Cconst_vec128 ({ word0; word1 }, dbg))
+    if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | _ -> None
 
 (** [transl_builtin prim args dbg] returns None if the built-in [prim] is not

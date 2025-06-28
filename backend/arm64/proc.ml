@@ -482,4 +482,10 @@ let operation_supported : Cmm.operation -> bool = function
                   V128_of_scalar _ | Scalar_of_v128 _) ->
     true
 
+let expression_supported : Cmm.expression -> bool = function
+  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+  | Cexit _ | Cconst_vec256 _ | Cconst_vec512 _ -> true
+
 let trap_size_in_bytes = 16
