@@ -1,27 +1,7 @@
 open Stdlib
+open Utils
 
 [@@@ocaml.warning "-unused-module"]
-
-let eq lv hv l h =
-  if l <> lv then Printf.printf "%016Lx <> %016Lx\n" lv l;
-  if h <> hv then Printf.printf "%016Lx <> %016Lx\n" hv h
-
-let eql lv hv l h =
-  if l <> lv then Printf.printf "%016lx <> %016lx\n" lv l;
-  if h <> hv then Printf.printf "%016lx <> %016lx\n" hv h
-
-let eqi lv hv l h =
-  if l <> lv then Printf.printf "%016x <> %016x\n" lv l;
-  if h <> hv then Printf.printf "%016x <> %016x\n" hv h
-
-let eqf32 lv hv l h =
-  let f32 = Stdlib_stable.Float32.to_float in
-  if l <> lv then Printf.printf "%f <> %f\n" (f32 l) (f32 lv);
-  if h <> hv then Printf.printf "%f <> %f\n" (f32 h) (f32 hv)
-
-let eqf lv hv l h =
-  if l <> lv then Printf.printf "%f <> %f\n" l lv;
-  if h <> hv then Printf.printf "%f <> %f\n" h hv
 
 external int64x2_low_int64 : int64x2 -> int64 = "" "vec128_low_int64"
   [@@noalloc] [@@unboxed]
