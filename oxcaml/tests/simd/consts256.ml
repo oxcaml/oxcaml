@@ -84,8 +84,16 @@ module Float32x8 = struct
   external const1 : float32 -> t = "" "caml_float32x8_const1"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external const8 : float32 -> float32 -> float32 -> float32 -> float32 -> float32 -> float32 -> float32 -> t
-    = "" "caml_float32x8_const8"
+  external const8 :
+    float32 ->
+    float32 ->
+    float32 ->
+    float32 ->
+    float32 ->
+    float32 ->
+    float32 ->
+    float32 ->
+    t = "" "caml_float32x8_const8"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
@@ -99,8 +107,10 @@ module Float32x8 = struct
     let w1_2 = float32x8_word1_int64 v2 in
     let w2_2 = float32x8_word2_int64 v2 in
     let w3_2 = float32x8_word3_int64 v2 in
-    eq4 w0_1 w1_1 w2_1 w3_1 0x3f8000003f800000L 0x3f8000003f800000L 0x3f8000003f800000L 0x3f8000003f800000L;
-    eq4 w0_2 w1_2 w2_2 w3_2 0x4000000040000000L 0x4000000040000000L 0x4000000040000000L 0x4000000040000000L;
+    eq4 w0_1 w1_1 w2_1 w3_1 0x3f8000003f800000L 0x3f8000003f800000L
+      0x3f8000003f800000L 0x3f8000003f800000L;
+    eq4 w0_2 w1_2 w2_2 w3_2 0x4000000040000000L 0x4000000040000000L
+      0x4000000040000000L 0x4000000040000000L;
     let f0 = low_to v1 in
     let f1 = low_to v2 in
     eqf32 f0 f1 1.s 2.s
@@ -116,8 +126,10 @@ module Float32x8 = struct
     let w1_2 = float32x8_word1_int64 v2 in
     let w2_2 = float32x8_word2_int64 v2 in
     let w3_2 = float32x8_word3_int64 v2 in
-    eq4 w0_1 w1_1 w2_1 w3_1 0x400000003f800000L 0x4080000040400000L 0x40c0000040a00000L 0x4100000040e00000L;
-    eq4 w0_2 w1_2 w2_2 w3_2 0x4120000041100000L 0x4140000041300000L 0x4160000041500000L 0x4180000041700000L;
+    eq4 w0_1 w1_1 w2_1 w3_1 0x400000003f800000L 0x4080000040400000L
+      0x40c0000040a00000L 0x4100000040e00000L;
+    eq4 w0_2 w1_2 w2_2 w3_2 0x4120000041100000L 0x4140000041300000L
+      0x4160000041500000L 0x4180000041700000L;
     let f0 = low_to v1 in
     let f1 = low_to v2 in
     eqf32 f0 f1 1.s 9.s
@@ -132,7 +144,8 @@ module Float64x4 = struct
   external const1 : float -> t = "" "caml_float64x4_const1"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external const4 : float -> float -> float -> float -> t = "" "caml_float64x4_const4"
+  external const4 : float -> float -> float -> float -> t
+    = "" "caml_float64x4_const4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   let () =
@@ -146,8 +159,10 @@ module Float64x4 = struct
     let w1_2 = float64x4_word1_int64 v2 in
     let w2_2 = float64x4_word2_int64 v2 in
     let w3_2 = float64x4_word3_int64 v2 in
-    eq4 w0_1 w1_1 w2_1 w3_1 0x3ff0000000000000L 0x3ff0000000000000L 0x3ff0000000000000L 0x3ff0000000000000L;
-    eq4 w0_2 w1_2 w2_2 w3_2 0x4000000000000000L 0x4000000000000000L 0x4000000000000000L 0x4000000000000000L;
+    eq4 w0_1 w1_1 w2_1 w3_1 0x3ff0000000000000L 0x3ff0000000000000L
+      0x3ff0000000000000L 0x3ff0000000000000L;
+    eq4 w0_2 w1_2 w2_2 w3_2 0x4000000000000000L 0x4000000000000000L
+      0x4000000000000000L 0x4000000000000000L;
     let f0 = low_to v1 in
     let f1 = low_to v2 in
     eqf f0 f1 1. 2.
@@ -163,8 +178,10 @@ module Float64x4 = struct
     let w1_2 = float64x4_word1_int64 v2 in
     let w2_2 = float64x4_word2_int64 v2 in
     let w3_2 = float64x4_word3_int64 v2 in
-    eq4 w0_1 w1_1 w2_1 w3_1 0x3ff0000000000000L 0x4000000000000000L 0x4008000000000000L 0x4010000000000000L;
-    eq4 w0_2 w1_2 w2_2 w3_2 0x4014000000000000L 0x4018000000000000L 0x401c000000000000L 0x4020000000000000L;
+    eq4 w0_1 w1_1 w2_1 w3_1 0x3ff0000000000000L 0x4000000000000000L
+      0x4008000000000000L 0x4010000000000000L;
+    eq4 w0_2 w1_2 w2_2 w3_2 0x4014000000000000L 0x4018000000000000L
+      0x401c000000000000L 0x4020000000000000L;
     let f0 = low_to v1 in
     let f1 = low_to v2 in
     eqf f0 f1 1. 5.
@@ -179,7 +196,8 @@ module Int64x4 = struct
   external const1 : int64 -> t = "" "caml_int64x4_const1"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external const4 : int64 -> int64 -> int64 -> int64 -> t = "" "caml_int64x4_const4"
+  external const4 : int64 -> int64 -> int64 -> int64 -> t
+    = "" "caml_int64x4_const4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   let[@inline always] check1 i =
@@ -228,7 +246,8 @@ module Int32x8 = struct
   external const1 : int32 -> t = "" "caml_int32x8_const1"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external const8 : int32 -> int32 -> int32 -> int32 -> int32 -> int32 -> int32 -> int32 -> t
+  external const8 :
+    int32 -> int32 -> int32 -> int32 -> int32 -> int32 -> int32 -> int32 -> t
     = "" "caml_int32x8_const8"
     [@@noalloc] [@@unboxed] [@@builtin]
 
@@ -272,8 +291,10 @@ module Int32x8 = struct
     check8 0l 1l 2l 3l 4l 5l 6l 7l;
     check8 8l 9l 10l 11l 12l 13l 14l 15l;
     check8 (-1l) (-2l) (-3l) (-4l) (-5l) (-6l) (-7l) (-8l);
-    check8 Int32.min_int Int32.max_int Int32.min_int Int32.max_int Int32.min_int Int32.max_int Int32.min_int Int32.max_int;
-    check8 Int32.max_int Int32.min_int Int32.max_int Int32.min_int Int32.max_int Int32.min_int Int32.max_int Int32.min_int
+    check8 Int32.min_int Int32.max_int Int32.min_int Int32.max_int Int32.min_int
+      Int32.max_int Int32.min_int Int32.max_int;
+    check8 Int32.max_int Int32.min_int Int32.max_int Int32.min_int Int32.max_int
+      Int32.min_int Int32.max_int Int32.min_int
 end
 
 module Int16x16 = struct
@@ -283,7 +304,8 @@ module Int16x16 = struct
     = "" "caml_int16x16_low_to_int"
     [@@noalloc] [@@builtin]
 
-  external const1 : (int[@untagged]) -> (t[@unboxed]) = "" "caml_int16x16_const1"
+  external const1 : (int[@untagged]) -> (t[@unboxed])
+    = "" "caml_int16x16_const1"
     [@@noalloc] [@@builtin]
 
   external const16 :
@@ -364,9 +386,12 @@ module Int16x16 = struct
   let () =
     check16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15;
     check16 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31;
-    check16 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff;
-    check16 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000;
-    check16 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0
+    check16 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff
+      0xffff 0xffff 0xffff 0xffff 0xffff 0xffff 0xffff;
+    check16 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000
+      0x8000 0x8000 0x8000 0x8000 0x8000 0x8000 0x8000;
+    check16 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0 0xffff 0
+      0xffff 0
 end
 
 module Int8x32 = struct
@@ -437,7 +462,8 @@ module Int8x32 = struct
     check1 0xff;
     check1 0x80
 
-  let[@inline always] check32 a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd ee ff =
+  let[@inline always] check32 a b c d e f g h i j k l m n o p q r s t u v w x y
+      z aa bb cc dd ee ff =
     let l32 =
       Int64.(
         logor
@@ -490,7 +516,10 @@ module Int8x32 = struct
           (logor (shift_left (i8 dd) 8) (i8 cc)))
     in
     let w3 = Int64.(logor (shift_left h32 32) l32) in
-    let v = const32 a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd ee ff in
+    let v =
+      const32 a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd ee
+        ff
+    in
     let _w0 = int8x32_word0_int64 v in
     let _w1 = int8x32_word1_int64 v in
     let _w2 = int8x32_word2_int64 v in
@@ -500,9 +529,16 @@ module Int8x32 = struct
     eqi _a 0 a 0
 
   let () =
-    check32 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31;
-    check32 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63;
-    check32 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff;
-    check32 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80;
-    check32 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0
+    check32 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
+      26 27 28 29 30 31;
+    check32 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54
+      55 56 57 58 59 60 61 62 63;
+    check32 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff
+      0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff
+      0xff 0xff 0xff 0xff;
+    check32 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80
+      0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80
+      0x80 0x80 0x80 0x80;
+    check32 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff
+      0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0 0xff 0
 end
