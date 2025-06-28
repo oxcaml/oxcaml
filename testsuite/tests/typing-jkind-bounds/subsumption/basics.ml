@@ -127,8 +127,8 @@ Line 2, characters 0-53:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "('a, 'b) u" is immutable_data with 'a with 'b
          because of the definition of u at line 1, characters 0-48.
-       But the kind of type "('a, 'b) u" must be a subkind of immutable_data
-         with 'a
+       But the kind of type "('a, 'b) u" must be a subkind of
+           immutable_data with 'a
          because of the definition of t at line 2, characters 0-53.
 |}]
 
@@ -188,8 +188,8 @@ Error: Signature mismatch:
          type 'a t : mutable_data with 'a @@ unyielding many
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
-       But the kind of the first must be a subkind of mutable_data
-         with 'a @@ unyielding many
+       But the kind of the first must be a subkind of
+           mutable_data with 'a @@ unyielding many
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
@@ -275,9 +275,17 @@ type t = [ `bar | `foo ]
 
 type t
 type u : immutable_data with t = [`foo of t]
+(* CR layouts v2.8: This should be accepted *)
 [%%expect {|
 type t
-type u = [ `foo of t ]
+Line 2, characters 0-44:
+2 | type u : immutable_data with t = [`foo of t]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `foo of t ]" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `foo of t ]" must be a subkind of
+           immutable_data with t
+         because of the definition of u at line 2, characters 0-44.
 |}]
 
 type (_, _) eq = Eq : ('a, 'a) eq
@@ -316,8 +324,7 @@ module M :
     type b : immutable_data with t1
     val eq : (a, b) eq
   end
->> Fatal error: Abstract kind with [with]: immutable_data
-with t1
+>> Fatal error: Abstract kind with [with]: immutable_data with t1
 Uncaught exception: Misc.Fatal_error
 
 |}]

@@ -562,6 +562,7 @@ val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 *)
 val for_abbreviation :
   type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
+  modality:Mode.Modality.Value.Const.t ->
   Types.type_expr ->
   Types.jkind_l
 

@@ -345,7 +345,7 @@ module Layout = struct
       | Any -> fprintf ppf "any"
       | Sort s -> Sort.format ppf s
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf " & " in
+        let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
@@ -2031,7 +2031,7 @@ module Desc = struct
         | Some c -> Const.format ppf c
         | None -> assert false (* handled above *))
     in
-    format_desc ~nested:false ppf t
+    format_desc ppf ~nested:false t
 end
 
 module Jkind_desc = struct
@@ -2423,11 +2423,13 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
-let for_abbreviation ~type_jkind_purely ty =
+let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
-    let relevant_axes = Jkind_axis.Axis_set.all in
+    let relevant_axes =
+      relevant_axes_of_modality ~relevant_for_shallow:`Relevant ~modality
+    in
     With_bounds_types.singleton ty { relevant_axes }
   in
   fresh_jkind_poly
@@ -3055,6 +3057,8 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
+    | Mutable_var_assignment ->
+      fprintf ppf "it's the type of a mutable variable used in an assignment"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3483,15 +3487,18 @@ module Violation = struct
       | Sort (Base _) | Any -> false
     in
     let format_layout_or_kind ppf jkind =
+      let indent =
+        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
+      in
       match mismatch_type with
-      | Mode -> Format.fprintf ppf "@,%a" format jkind
-      | Layout -> Layout.format ppf jkind.jkind.layout
+      | Mode -> fprintf ppf "%t%a" indent format jkind
+      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
       then dprintf "%s representable" verb
       else
-        dprintf "%s a sub%s of %a" verb layout_or_kind format_layout_or_kind k2
+        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_layout_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmi_option =
       match t with
@@ -3509,7 +3516,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
             subjkind_format "is not" k2,
             None )
         | Some p ->
@@ -3522,8 +3529,8 @@ module Violation = struct
         assert (Option.is_none missing_cmi);
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
-          dprintf "does not overlap with %a" format_layout_or_kind k2,
+          dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+          dprintf "does not overlap with@ %a" format_layout_or_kind k2,
           None )
     in
     if display_histories
@@ -3531,15 +3538,15 @@ module Violation = struct
       let connective =
         match t.violation, has_sort_var (get k2).layout with
         | Not_a_subjkind _, false ->
-          dprintf "be a sub%s of %a" layout_or_kind format_layout_or_kind k2
+          dprintf "be a sub%s of@ %a" layout_or_kind format_layout_or_kind k2
         | No_intersection _, false ->
-          dprintf "overlap with %a" format_layout_or_kind k2
+          dprintf "overlap with@ %a" format_layout_or_kind k2
         | _, true -> dprintf "be representable"
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
-             (dprintf "@[<hov 2>The %s of %a is %a@]" layout_or_kind pp_former
+             (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
                 former format_layout_or_kind k1)
            ~layout_or_kind)
         k1
@@ -3859,6 +3866,7 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
+    | Mutable_var_assignment -> fprintf ppf "Mutable_var_assignment"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

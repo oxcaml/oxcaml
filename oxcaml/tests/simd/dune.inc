@@ -209,6 +209,52 @@
    (diff empty.expected basic256_u.out)))
 
 (executable
+ (name let_mutable)
+ (modules let_mutable)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   let_mutable.out
+   (run ./let_mutable.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected let_mutable.out)))
+
+(executable
+ (name let_mutable_u)
+ (modules let_mutable_u)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   let_mutable_u.out
+   (run ./let_mutable_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected let_mutable_u.out)))
+
+(executable
  (name ops_float32x4)
  (modules ops_float32x4)
  (enabled_if (= %{context_name} "main"))
@@ -1278,6 +1324,64 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected basic256_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy let_mutable.ml let_mutable_nodynlink.ml)))
+
+(executable
+ (name let_mutable_nodynlink)
+ (modules let_mutable_nodynlink)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   let_mutable_nodynlink.out
+   (run ./let_mutable_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected let_mutable_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy let_mutable_u.ml let_mutable_u_nodynlink.ml)))
+
+(executable
+ (name let_mutable_u_nodynlink)
+ (modules let_mutable_u_nodynlink)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   let_mutable_u_nodynlink.out
+   (run ./let_mutable_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected let_mutable_u_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -2625,6 +2729,88 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected basic256_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy let_mutable.ml let_mutable_internal_assembler.ml)))
+
+(executable
+ (name let_mutable_internal_assembler)
+ (modules let_mutable_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   let_mutable_internal_assembler.out
+   (run ./let_mutable_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected let_mutable_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy let_mutable_u.ml let_mutable_u_internal_assembler.ml)))
+
+(executable
+ (name let_mutable_u_internal_assembler)
+ (modules let_mutable_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   let_mutable_u_internal_assembler.out
+   (run ./let_mutable_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected let_mutable_u_internal_assembler.out)))
 
 (rule
  (alias runtest)

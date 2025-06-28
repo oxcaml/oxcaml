@@ -143,6 +143,8 @@ let () =
       "basic_u", enabled_if_main;
       "basic256", enabled_if_main_amd64_not_macos;
       "basic256_u", enabled_if_main_amd64_not_macos;
+      "let_mutable", enabled_if_main;
+      "let_mutable_u", enabled_if_main;
       "ops_float32x4", enabled_if_main;
       "ops_float32x4_u", enabled_if_main;
       "ops_float64x2", enabled_if_main;

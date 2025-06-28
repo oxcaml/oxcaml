@@ -148,6 +148,8 @@ val without_code_ids : t -> t
 
 val with_only_variables : t -> t
 
+val with_only_names : t -> t
+
 (** The value returned by this function only records occurrences in two fields:
 
     - names, as per the input

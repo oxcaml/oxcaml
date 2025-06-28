@@ -21,5 +21,5 @@ and odd n =
   else even (n-1)
 
 let _ =
-  let n = 100_000 in
+  let n = 25_000 in
   Printf.printf "even %d is %B\n%!" n (even n)

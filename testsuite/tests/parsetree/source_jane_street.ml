@@ -225,6 +225,13 @@ val f3 : packed2 -> unit = <fun>
 val f4 : packed2 -> unit = <fun>
 |}]
 
+(* This needs to be printed with a space after "float#" because of how
+   identifiers ending in "#" are parsed. *)
+let f () = fun () : float# -> #0.
+[%%expect{|
+val f : unit -> unit -> float# = <fun>
+|}]
+
 (******************)
 (* Comprehensions *)
 
@@ -1480,4 +1487,18 @@ let f g here = g ~(here : [%call_pos])
 
 [%%expect{|
 val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
+|}]
+
+(***************)
+(* let mutable *)
+
+let triangle_10 = let mutable x = 0 in
+  for i = 1 to 10 do
+    x <- x + i
+  done;
+  (x : int)
+;;
+
+[%%expect{|
+val triangle_10 : int = 55
 |}]
