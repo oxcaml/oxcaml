@@ -2325,6 +2325,7 @@ let rec estimate_type_jkind ~expand_component env ty =
      Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
+    let type_equal = !type_equal' env in
     let jkind_of_type = !type_jkind_purely_if_principal' env in
     estimate_type_jkind ~expand_component env ty |>
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
@@ -2334,7 +2335,7 @@ let rec estimate_type_jkind ~expand_component env ty =
        variables bound in this [Tpoly]. *)
     (* CR layouts v2.8: Consider doing better -- but only once we can write
        down a test case that cares. *)
-    Jkind.round_up ~jkind_of_type |>
+    Jkind.round_up ~type_equal ~jkind_of_type |>
     Jkind.disallow_right
   | Tof_kind jkind -> Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
@@ -2345,10 +2346,11 @@ and close_open_jkind ~expand_component ~is_open env jkind =
     (* CR layouts v2.8: Do better, by tracking the actual free variables and
        rounding only those variables up. *)
   then
+    let type_equal = !type_equal' env in
     let jkind_of_type ty =
       Some (estimate_type_jkind ~expand_component env ty)
     in
-    Jkind.round_up ~jkind_of_type jkind |> Jkind.disallow_right
+    Jkind.round_up ~type_equal ~jkind_of_type jkind |> Jkind.disallow_right
   else jkind
 
 let estimate_type_jkind_unwrapped
@@ -2426,7 +2428,7 @@ let constrain_type_jkind ~fixed env ty jkind =
     if Jkind.is_obviously_max jkind then Ok () else
     if fuel < 0 then
       Error (
-        Jkind.Violation.of_ ~jkind_of_type (
+        Jkind.Violation.of_ ~type_equal ~jkind_of_type (
           Not_a_subjkind (ty's_jkind, jkind, [Constrain_ran_out_of_fuel])))
     else
     match get_desc ty with
@@ -2480,7 +2482,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              arbitrary amounts of expansion and looking through [@@unboxed]
              types. So we don't, settling for the slightly worse error
              message. *)
-          Error (Jkind.Violation.of_ ~jkind_of_type
+          Error (Jkind.Violation.of_ ~type_equal ~jkind_of_type
             (Not_a_subjkind (ty's_jkind, jkind, Nonempty_list.to_list sub_failure_reasons)))
        | Has_intersection sub_failure_reasons ->
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
@@ -2498,7 +2500,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                in
                if List.for_all Result.is_ok results
                then Ok ()
-               else Error (Jkind.Violation.of_ ~jkind_of_type
+               else Error (Jkind.Violation.of_ ~type_equal ~jkind_of_type
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              in
              begin match Jkind.decompose_product ty's_jkind,
@@ -2517,7 +2519,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.
                *)
-               Error (Jkind.Violation.of_ ~jkind_of_type
+               Error (Jkind.Violation.of_ ~type_equal ~jkind_of_type
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
           in
@@ -2530,13 +2532,13 @@ let constrain_type_jkind ~fixed env ty jkind =
                  (estimate_type_jkind env ty) jkind
              else
                begin match unbox_once env ty with
-               | Missing path -> Error (Jkind.Violation.of_
+               | Missing path -> Error (Jkind.Violation.of_ ~type_equal
                                           ~jkind_of_type ~missing_cmi:path
                                           (Not_a_subjkind (ty's_jkind, jkind,
                                                            sub_failure_reasons)))
                | Final_result ->
                  Error
-                   (Jkind.Violation.of_ ~jkind_of_type
+                   (Jkind.Violation.of_ ~type_equal ~jkind_of_type
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
                | Stepped { ty; is_open = is_open2; modality } ->
                  let is_open = is_open || is_open2 in
@@ -2554,7 +2556,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
           | _ ->
-            Error (Jkind.Violation.of_ ~jkind_of_type
+            Error (Jkind.Violation.of_ ~type_equal ~jkind_of_type
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
   in
   loop ~fuel:100 ~expanded:false ty ~is_open:false
@@ -2634,8 +2636,8 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
     let type_equal = !type_equal' env in
     let jkind1 = type_jkind env ty1 in
     let jkind_of_type = type_jkind_purely_if_principal env in
-    let jkind1 = Jkind.round_up ~jkind_of_type jkind1 in
-    let jkind2 = Jkind.round_up ~jkind_of_type jkind2 in
+    let jkind1 = Jkind.round_up ~type_equal ~jkind_of_type jkind1 in
+    let jkind2 = Jkind.round_up ~type_equal ~jkind_of_type jkind2 in
     (* This is strange, in that we're rounding up and then computing an
        intersection. So we might find an intersection where there isn't really
        one. See the comment above this function arguing why this is OK here. *)
@@ -2660,8 +2662,11 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       (* Just check externality and layout, because that's what actually matters
          for upstream code. We check both for a known value and something that
          might turn out later to be value. This is the conservative choice. *)
+      let type_equal = !type_equal' env in
       let jkind_of_type = type_jkind_purely_if_principal env in
-      let ext = Jkind.get_externality_upper_bound ~jkind_of_type jkind in
+      let ext =
+        Jkind.get_externality_upper_bound ~type_equal ~jkind_of_type jkind
+      in
       Jkind_axis.Externality.le ext External64 &&
       match Jkind.get_layout jkind with
       | Some (Base Value) | None -> true
@@ -5011,8 +5016,9 @@ let relevant_pairs pairs v =
   | Bivariant -> pairs.bivariant_pairs
 
 let crossing_of_jkind env jkind =
+  let type_equal = !type_equal' env in
   let jkind_of_type = type_jkind_purely_if_principal env in
-  Jkind.get_mode_crossing ~jkind_of_type jkind
+  Jkind.get_mode_crossing ~type_equal ~jkind_of_type jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -6992,8 +6998,9 @@ let rec nondep_type_decl env mid is_covariant decl =
       try Jkind.map_type_expr (nondep_type_rec env mid) decl.type_jkind
       (* CR layouts v2.8: This should be done with a proper nondep_jkind. *)
       with Nondep_cannot_erase _ when is_covariant ->
+        let type_equal = !type_equal' env in
         let jkind_of_type = type_jkind_purely_if_principal env in
-        Jkind.round_up ~jkind_of_type decl.type_jkind |>
+        Jkind.round_up ~type_equal ~jkind_of_type decl.type_jkind |>
         Jkind.disallow_right
     in
     clear_hash ();
@@ -7189,7 +7196,12 @@ let print_global_state fmt global_state =
    can't be written in Jkind. It's possible that, after jkind.ml is broken up,
    this problem goes away, because the dependency from Env to Jkind is pretty
    minimal. *)
-let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
+let type_equal env ty1 ty2 =
+  let snap = Btype.snapshot () in
+  let result = is_equal env false [ty1] [ty2] in
+  Btype.backtrack snap;
+  result
+
 let () = type_equal' := type_equal
 
 let check_decl_jkind env decl jkind =
