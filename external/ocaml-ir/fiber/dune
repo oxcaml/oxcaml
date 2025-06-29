@@ -1,0 +1,6 @@
+(library 
+  (name ocaml_ir_fiber)
+  (foreign_stubs (language c) (names stubs))
+  (libraries unix))
+
+

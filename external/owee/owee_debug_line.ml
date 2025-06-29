@@ -13,6 +13,8 @@ type header = {
   opcode_base                : u8;
   standard_opcode_lengths    : string;
   filenames                  : string array;
+  directories                : string array;
+  comp_dir                   : string option;
 }
 
 type pointers_to_other_sections = {
@@ -20,27 +22,88 @@ type pointers_to_other_sections = {
   debug_str      : t option;
 }
 
-let read_filename_version_lt_5 t =
+let get_directory_gte_5 directories dir =
+  (* Prior to DWARF Version 5, the current directory was not represented in the
+     directories field and a directory index of 0 implicitly referred to that directory
+     as found in the DW_AT_comp_dir attribute of the compilation unit debugging
+     information entry. In DWARF Version 5, the current directory is explicitly
+     present in the directories field. *)
+  if dir <= Array.length directories then
+    Some directories.(dir)
+  else
+    None
+
+let get_directory_lt_5 directories dir =
+  (* In DWARF4, "The line number program assigns numbers to each of the file
+     entries in order, beginning with 1. The current directory of the compilation
+     is understood to be the zeroth entry and is not explicitly represented."
+     (cf DWARF4, section 6.2.4 page 114)
+  *)
+  if dir <= 0 then
+    None
+  else if dir <= Array.length directories then
+    Some directories.(dir - 1)
+  else
+    None
+
+
+let construct_full_filename ~comp_dir  ~dir fname =
+  let fname =
+    match dir with
+    | Some dir -> Filename.concat dir fname
+    | None -> fname
+  in
+  match comp_dir with
+  | None -> fname
+  | Some comp_dir ->
+    if Filename.is_relative fname then
+      Filename.concat comp_dir fname
+    else
+      fname
+
+let read_filename_version_lt_5 ~comp_dir ~directories t =
   match Read.zero_string t () with
   | None -> invalid_format "Unterminated filename"
   | Some s ->
     match s with
     | "" -> ""
     | fname ->
-      let _dir  = Read.uleb128 t in
+      let dir  = Read.uleb128 t in
       let _time = Read.uleb128 t in
       let _len  = Read.uleb128 t in
-      fname
+      construct_full_filename ~comp_dir ~dir:(get_directory_lt_5 directories dir) fname
 
-let rec skip_directories_version_lt_5 t =
-  match Read.zero_string t () with
-  | None -> invalid_format "Unterminated directory list"
-  | Some s ->
-    match s with
-    | "" -> ()
-    | _dir ->
-      (*print_endline _dir;*)
-      skip_directories_version_lt_5 t
+let read_directories_version_lt_5 t =
+  let rec loop acc =
+    match Read.zero_string t () with
+    | None -> invalid_format "Unterminated directory list"
+    | Some s ->
+      match s with
+      | "" -> acc
+      | dir ->
+        loop (dir :: acc)
+  in
+  loop [] |> List.rev |> Array.of_list
+
+(* CR-someday gyorsh: it's a bit unfortunate that this code is partially repeated from
+   owee_debug_info, I wonder if there is a nice way to put it in one place:
+   read_form : Owee_form.t -> Owee_buf.cursor -> <sometype?> option
+*)
+let read_dir_entry_version_gte_5
+    cursor
+    ~is_64bit
+    ~address_size
+  = function
+  | `data1 ->
+    Some (Read.u8 cursor)
+  | `data2 ->
+    Some (Read.u16 cursor)
+  | `udata ->
+    Some (Read.uleb128 cursor)
+  | unknown_form ->
+    Owee_form.skip unknown_form cursor ~is_64bit ~address_size;
+    None
+
 
 let rec read_filename_version_gte_5
     t
@@ -83,33 +146,72 @@ let unwrap_address_size_v5_only = function
   | None ->
     failwith "Expected address size in v5"
 
-let skip_directories_version_gte_5 t ~is_64bit ~address_size =
+type descriptor = {
+  content_type : Owee_content_type.t;
+  form : Owee_form.t
+}
+
+let read_descriptor t =
+  let content_type = Owee_content_type.of_int_exn (Read.uleb128 t) in
+  let form = Owee_form.read t in
+  { content_type; form }
+
+let read_directories_version_gte_5
+      t
+      ~pointers_to_other_sections
+      ~is_64bit
+      ~address_size
+  =
   let format_count = Read.u8 t in
   let descriptors =
-    Array.init format_count (fun _ ->
-      let content_type_code : u128 = Read.uleb128 t in
-      let form = Owee_form.read t in
-      (content_type_code, form))
+    Array.init format_count (fun _ -> read_descriptor t)
   in
   let directory_entry_count = Read.uleb128 t in
+  let filenames = ref [] in
   for _ = 1 to directory_entry_count do
     Array.iter
-    (fun (_, form) -> Owee_form.skip form t ~is_64bit ~address_size)
-    descriptors
-  done
+      (fun { content_type; form } ->
+         match content_type with
+         | Path -> begin
+           match
+             read_filename_version_gte_5
+               t
+               ~pointers_to_other_sections
+               ~is_64bit
+               ~address_size
+               form
+           with
+           | None -> ()
+           | Some filename ->
+             filenames := filename :: !filenames
+         end
+         | _ ->
+           Owee_form.skip form t ~is_64bit ~address_size
+      )
+      descriptors
+  done;
+  !filenames |> List.rev |> Array.of_list
 
-let skip_directories t ~is_64bit ~version ~address_size =
+let read_directories t ~pointers_to_other_sections ~is_64bit ~version ~address_size =
   if version < 5 then
-    skip_directories_version_lt_5 t
+    read_directories_version_lt_5 t
   else begin
     let address_size = unwrap_address_size_v5_only address_size in
-    skip_directories_version_gte_5 t ~is_64bit ~address_size
+    match pointers_to_other_sections with
+    | None ->
+      invalid_format "Owee needs pointers_to_other_sections for Dwarf5"
+    | Some pointers_to_other_sections ->
+      read_directories_version_gte_5
+        t
+        ~pointers_to_other_sections
+        ~is_64bit
+        ~address_size
   end
 
-let read_filenames_version_lt_5 t =
+let read_filenames_version_lt_5 ~comp_dir ~directories t =
   let rec loop acc =
-    match read_filename_version_lt_5 t with
-    | "" -> acc 
+    match read_filename_version_lt_5 ~comp_dir ~directories t with
+    | "" -> acc
     | fname ->
       (*Printf.eprintf "%S\n%!" fname;*)
       loop (fname :: acc)
@@ -118,66 +220,84 @@ let read_filenames_version_lt_5 t =
 
 let read_filenames_version_gte_5
     t
+    ~directories
     ~pointers_to_other_sections
     ~is_64bit
     ~address_size
   =
   let format_count = Read.u8 t in
   let descriptors =
-    Array.init format_count (fun _ ->
-      let content_type_code : u128 = Read.uleb128 t in
-      let form = Owee_form.read t in
-      (content_type_code, form))
+    Array.init format_count (fun _ -> read_descriptor t)
   in
-  let directory_entry_count = Read.uleb128 t in
+  let filenames_entry_count = Read.uleb128 t in
   let filenames = ref [] in
-  for _ = 1 to directory_entry_count do
+  for _ = 1 to filenames_entry_count do
+    let filename = ref None in
+    let dir_entry = ref None in
     Array.iter
-      (fun (content_type_code, form) ->
-        if content_type_code = 0x01 (* DW_LNCT_path *) then begin
-          match
-            read_filename_version_gte_5
-              t
-              ~pointers_to_other_sections
-              ~is_64bit
-              ~address_size
-              form
-          with
-          | None -> ()
-          | Some filename ->
-            (*Printf.eprintf "%S\n%!" filename;*)
-            filenames := filename :: !filenames
-        end else
-          Owee_form.skip form t ~is_64bit ~address_size
+      (fun { content_type; form } ->
+         match content_type with
+         | Path ->
+           filename :=
+             read_filename_version_gte_5
+               t
+               ~pointers_to_other_sections
+               ~is_64bit
+               ~address_size
+               form
+         | Directory_index ->
+           dir_entry :=
+             read_dir_entry_version_gte_5
+               t
+               ~is_64bit
+               ~address_size
+               form
+         | _ ->
+           Owee_form.skip form t ~is_64bit ~address_size
       )
-      descriptors
+      descriptors;
+    let dir = Option.bind !dir_entry (get_directory_gte_5 directories) in
+    (* In DWARF5 the directory at index 0 is the comp dir
+       (cf. DWARF5 chapter 6.2.4 page 157 line 6) *)
+    let comp_dir = get_directory_gte_5 directories 0 in
+    match !filename with
+    | Some f -> filenames := construct_full_filename ~comp_dir ~dir f :: !filenames
+    | None -> ()
   done;
   !filenames |> List.rev |> Array.of_list
 
 (* Returns the list in the other direction. *)
 let read_filenames
+  ~comp_dir
     t
+    ~directories
     ~pointers_to_other_sections
     ~version
     ~is_64bit
     ~address_size
   =
   if version < 5 then
-    read_filenames_version_lt_5 t
+    read_filenames_version_lt_5 ~comp_dir ~directories t
   else begin
     let address_size = unwrap_address_size_v5_only address_size in
-    read_filenames_version_gte_5
-      t
-      ~pointers_to_other_sections 
-      ~is_64bit
-      ~address_size
+    match pointers_to_other_sections with
+    | None ->
+      invalid_format "Owee needs pointers_to_other_sections for Dwarf5"
+    | Some pointers_to_other_sections ->
+      read_filenames_version_gte_5
+        t
+        ~directories
+        ~pointers_to_other_sections
+        ~is_64bit
+        ~address_size
   end
 
 let read_prologue_length t ~is_64bit =
   if is_64bit then Int64.to_int (Read.u64 t) else Read.u32 t
 
-let read_header t ~pointers_to_other_sections =
+let read_header ~get_comp_dir t ~pointers_to_other_sections =
   ensure t 24 ".debug_line header truncated";
+  let comp_dir = Option.bind get_comp_dir (fun f -> f t.position) in
   let total_length = Read.u32 t in
   let is_64bit     = total_length = 0xFFFF_FFFF in
   let total_length =
@@ -212,10 +332,19 @@ let read_header t ~pointers_to_other_sections =
   assert_format (opcode_base > 0)
     "invalid opcode_base";
   let standard_opcode_lengths = Read.fixed_string prologue (opcode_base - 1) in
-  skip_directories prologue ~is_64bit ~version ~address_size;
+  let directories =
+    read_directories
+      prologue
+      ~pointers_to_other_sections
+      ~is_64bit
+      ~version
+      ~address_size
+  in
   let filenames =
     read_filenames
       prologue
+      ~comp_dir
+      ~directories
       ~pointers_to_other_sections
       ~is_64bit
       ~version
@@ -225,14 +354,14 @@ let read_header t ~pointers_to_other_sections =
     { is_64bit; total_length; version;
       address_size; prologue_length; minimum_instruction_length;
       default_is_stmt; line_base; line_range; opcode_base;
-      standard_opcode_lengths; filenames }
+      standard_opcode_lengths; filenames; directories; comp_dir }
   in
   (header, chunk)
 
-let read_chunk t ~pointers_to_other_sections =
+let read_chunk ?get_comp_dir t ~pointers_to_other_sections =
   if at_end t
   then None
-  else Some (read_header t ~pointers_to_other_sections)
+  else Some (read_header ~get_comp_dir t ~pointers_to_other_sections)
 
 type state = {
   mutable address        : int;
@@ -366,7 +495,10 @@ let step header section state f acc =
       | 3 (* DW_LNE_define_file *) ->
         (* DW_LNE_define_file was deprecated in DWARF 5. *)
         assert (header.version < 5);
-        state.filename <- read_filename_version_lt_5 section;
+        state.filename <- read_filename_version_lt_5
+                            ~comp_dir:header.comp_dir
+                            ~directories:header.directories
+                            section;
         acc
       | 4 (* DW_LNE_set_discriminator *) ->
         state.discriminator <- Read.uleb128 section;
