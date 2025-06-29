@@ -1,0 +1,36 @@
+(data global "camlCmm__gc_roots": int 0)
+(data
+ int 3840
+ global "camlCmm":
+ addr G:"camlCmm__standard_atomic_get_5"
+ addr G:"camlCmm__get_6"
+ addr G:"camlCmm__set_7")
+(data
+ int 4087
+ global "camlCmm__set_7":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlCmm__set_3_7_code")
+(data
+ int 3063
+ global "camlCmm__get_6":
+ addr G:"camlCmm__get_2_6_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlCmm__standard_atomic_get_5":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlCmm__standard_atomic_get_1_5_code")
+(function camlCmm__standard_atomic_get_1_5_code (r: val v: val)
+ (extcall "caml_atomic_exchange_field" r 1 v ->val) 1)
+
+(function camlCmm__get_2_6_code (r: val) (load_mut_atomic val (+a r 8)))
+
+(function camlCmm__set_3_7_code (r: val v: val)
+ (extcall "caml_atomic_exchange_field" r 3 v ->val) 1)
+
+(function no_cse reduce_code_size linscan camlCmm__entry ()
+ (catch (exit 1 G:"camlCmm") with(1 *ret*: val) 1))
+
+(data)

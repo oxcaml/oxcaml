@@ -91,7 +91,9 @@ module Inline_record = struct
 end
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Inline_record/313"
-  (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
+  (let
+    (test =
+       (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
     (makeblock 0 test)))
 module Inline_record :
   sig type t = A of { mutable x : int [@atomic]; } val test : t -> int end
@@ -118,7 +120,7 @@ end
          (caml_fresh_oo_id 0))
      test =
        (function {nlocal = 0} param : int
-         (if (== (field_imm 0 param) A) (field_int 1 param) 0))
+         (if (== (field_imm 0 param) A) (atomic_load_field_imm param 1) 0))
      *match* =[value<int>]
        (if (== (apply test (makemutable 0 (?,value<int>) A 42)) 42) 0
          (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
@@ -156,7 +158,7 @@ represented as a flat float array.
      mk_t =
        (function {nlocal = 0} x[value<float>] y[value<float>]
          (makemutable 0 (value<float>,value<float>) x y))
-     get = (function {nlocal = 0} v : float (field_mut 1 v)))
+     get = (function {nlocal = 0} v : float (atomic_load_field_ptr v 1)))
     (makeblock 0 mk_flat mk_t get)))
 
 module Float_records :
