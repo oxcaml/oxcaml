@@ -18,7 +18,7 @@ module Atomic = struct
   end
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic/286"
+(apply (field_imm 1 (global Toploop!)) "Atomic/287"
   (let (Loc = (makeblock 0)) (makeblock 0 Loc)))
 module Atomic :
   sig
@@ -56,7 +56,7 @@ module Basic = struct
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Basic/326"
+(apply (field_imm 1 (global Toploop!)) "Basic/327"
   (let
     (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
      get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
@@ -192,7 +192,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/361" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Ok/362" (makeblock 0))
 module Ok : sig type t = { mutable(<non-legacy>) x : int [@atomic]; } end
 |}];;
 
@@ -206,7 +206,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/369"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/370"
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
@@ -231,7 +231,7 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/377"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/378"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -262,7 +262,7 @@ module Float_records = struct
 end
 (* CR aspsmith: this is wrong? *)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Float_records/394"
+(apply (field_imm 1 (global Toploop!)) "Float_records/395"
   (let
     (mk_t =
        (function {nlocal = 0} x[float] y[float] (makefloatblock Mutable x y))
