@@ -308,7 +308,7 @@ type tpat_array_identifier = mutability * Jkind.sort
 
 let mkTpat_array
     ?id:(mut, arg_sort =
-        ( Mutable { mode = Value.Comonadic.Legacy; atomic = Nonatomic },
+        ( Mutable { mode = Value.Comonadic.legacy; atomic = Nonatomic },
           Jkind.Sort.value )) l =
   Tpat_array (mut, arg_sort, l)
 
