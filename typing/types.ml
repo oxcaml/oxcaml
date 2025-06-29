@@ -25,13 +25,20 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { modal_upper_bound : Mode.Alloc.Comonadic.Const.t
+      { mode : Mode.Value.Comonadic.lr
       ; atomic : atomic
       }
 
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
+
+(** Takes [m0] which is the parameter of [let mutable], returns the
+    mode of new values in future writes. *)
+let mutable_mode m0 : _ Mode.Value.t =
+  { comonadic = m0
+  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  }
 
 (* Type expressions for the core language *)
 
@@ -481,6 +488,8 @@ module Vars = Misc.Stdlib.String.Map
 
 type value_kind =
     Val_reg                             (* Regular value *)
+  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+                                        (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
   | Val_self of
@@ -1079,8 +1088,7 @@ type 'a gen_label_description =
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Value.Const.t;(* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_num: int;                       (* Position in type *)
+    lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;                     (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1133,8 +1141,6 @@ let item_visibility = function
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
-
-let lbl_pos_void = -1
 
 let rec bound_value_identifiers = function
     [] -> []

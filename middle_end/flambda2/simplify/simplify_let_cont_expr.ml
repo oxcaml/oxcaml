@@ -1446,9 +1446,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
     (* CR-someday ncourant: this makes the order in which continuations are
        processed dependant on things like the name of the compilation unit
        (because it affects the order on [Continuation.t], and thus the element
-       returned by [min_elt_opt]). However, recursive continuations are
-       specified using a [Continuation.Map.t], whose order already depends on
-       the name of the compilation unit. *)
+       returned by [min_elt_opt]). *)
     match Continuation.Set.min_elt_opt reachable_handlers_to_simplify with
     | None ->
       (* all remaining_handlers are unreachable *)

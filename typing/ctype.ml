@@ -2322,7 +2322,9 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     Jkind.for_boxed_row row
+     if tvariant_not_immediate row
+     then Jkind.for_non_float ~why:Polymorphic_variant
+     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let jkind_of_type = !type_jkind_purely_if_principal' env in
@@ -7197,8 +7199,39 @@ let check_decl_jkind env decl jkind =
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
      and so we leave this optimization for later. *)
   let type_equal = type_equal env in
-  let jkind_of_type ty = Some (type_jkind_purely env ty) in
-  match Jkind.sub_jkind_l ~type_equal ~jkind_of_type decl.type_jkind jkind with
+  let type_jkind_purely = type_jkind_purely env in
+  let jkind_of_type ty = Some (type_jkind_purely ty) in
+  (* CR layouts v2.8: When we have [layout_of], this logic should move to the
+     place where [type_jkind] is set. But for now, it has to be here, because we
+     want this in module inclusion but not other places (because substitutions
+     won't improve the layout) *)
+  (* CR layouts v2.8: This improvement ignores types with both [@@unboxed]
+     and [@@unsafe_allow_any_mode_crossing], because the stdlib didn't build
+     otherwise. But we really shouldn't allow mixing those two features, and
+     so instead of trying to get to the bottom of it, I'm just punting. *)
+  let decl_jkind = match decl.type_kind, decl.type_manifest with
+    | Type_abstract _, Some inner_ty ->
+      Jkind.for_abbreviation ~type_jkind_purely
+        ~modality:Mode.Modality.Value.Const.id inner_ty
+    (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
+       (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
+       they should be fine here. This will all get fixed up later with the
+       above CRs. *)
+    | Type_record ([{ ld_type = inner_ty; ld_modalities = modality }],
+                   Record_unboxed, None), _
+    | Type_record_unboxed_product ([{ ld_type = inner_ty;
+                                      ld_modalities = modality }], _, None), _
+    | Type_variant (
+        [{ cd_args =
+             (Cstr_tuple [{ ca_type = inner_ty;
+                            ca_modalities = modality }] |
+              Cstr_record [{ ld_type = inner_ty;
+                             ld_modalities = modality }]) }],
+        Variant_unboxed, None), _ ->
+      Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
+    | _ -> decl.type_jkind
+  in
+  match Jkind.sub_jkind_l ~type_equal ~jkind_of_type decl_jkind jkind with
   | Ok () -> Ok ()
   | Error _ as err ->
     match decl.type_manifest with
@@ -7229,38 +7262,3 @@ let constrain_decl_jkind env decl jkind =
         match decl.type_manifest with
         | None -> err
         | Some ty -> constrain_type_jkind env ty jkind
-
-let check_constructor_crossing env tag ~res args held_locks =
-  match tag with
-  | Ordinary _ | Null -> ()
-  | Extension _ ->
-      match get_desc (expand_head env res) with
-      | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
-          (* CR zqian: handle other extensible variant types as well *)
-          let mode_crossings =
-            List.map (
-              fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
-              crossing_of_ty env ~modalities:ca_modalities ca_type
-            ) args
-          in
-          let mode_crossing =
-            List.fold_left Mode.Crossing.join Mode.Crossing.bot mode_crossings
-          in
-          (* We only check portability and contention, since [exn] doesn't
-               cross other axes anyway. *)
-          let monadic =
-            Mode.Value.max_with (Monadic Contention) Mode.Contention.min
-            |> Mode.Crossing.apply_right mode_crossing
-          in
-          let comonadic =
-            Mode.Value.min_with (Comonadic Portability) Mode.Portability.max
-            |> Mode.Crossing.apply_left mode_crossing
-          in
-          let mode = {
-            monadic = monadic.monadic;
-            comonadic = comonadic.comonadic;
-          }
-          |> Mode.Value.close_over
-          in
-          ignore (Env.walk_locks ~env ~item:Constructor mode None held_locks)
-      | _ -> ()

@@ -1,6 +1,6 @@
 # OxCaml
 
-A performance-focussed version of OCaml.
+A performance-focused version of OCaml.
 This is also the home of the Flambda 2 optimiser and the Cfg backend.
 
 OxCaml is currently based on OCaml 5.2.0 (plus some patches from later

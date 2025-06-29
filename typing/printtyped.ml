@@ -91,10 +91,10 @@ let fmt_mutable_flag f x =
 let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
-  | Mutable { modal_upper_bound; atomic = Nonatomic } ->
-    fprintf f "Mutable(%a)" Mode.Alloc.Comonadic.Const.print modal_upper_bound
-  | Mutable { modal_upper_bound; atomic = Atomic } ->
-    fprintf f "Atomic(%a)" Mode.Alloc.Comonadic.Const.print modal_upper_bound
+  | Mutable { mode; atomic = Nonatomic } ->
+    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) mode
+  | Mutable { mode; atomic = Atomic } ->
+    fprintf f "Atomic(%a)" (Mode.Value.Comonadic.print ()) mode
 
 let fmt_virtual_flag f x =
   match x with
@@ -494,11 +494,16 @@ and expression i ppf x =
   match x.exp_desc with
   | Texp_ident (li,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
+  | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
   | Texp_let (rf, l, e) ->
       line i ppf "Texp_let %a\n" fmt_rec_flag rf;
       list i (value_binding rf) ppf l;
       expression i ppf e;
+  | Texp_letmutable (vb, e) ->
+      line i ppf "Texp_letmutable\n";
+      value_binding Nonrecursive i ppf vb;
+      expression i ppf e
   | Texp_function { params; body; alloc_mode = am } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
@@ -617,6 +622,9 @@ and expression i ppf x =
   | Texp_new (li, _, _, _) -> line i ppf "Texp_new %a\n" fmt_path li;
   | Texp_setinstvar (_, s, _, e) ->
       line i ppf "Texp_setinstvar %a\n" fmt_path s;
+      expression i ppf e;
+  | Texp_setmutvar (lid, _, e) ->
+      line i ppf "Texp_setmutvar %a\n" fmt_ident lid.txt;
       expression i ppf e;
   | Texp_override (_, l) ->
       line i ppf "Texp_override\n";

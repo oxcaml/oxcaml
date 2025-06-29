@@ -400,7 +400,8 @@
  (files
   Makefile.build_config
   Makefile.config_if_required
-  Makefile.config)
+  Makefile.config
+  VERSION)
  (section lib)
  (package ocaml))
 

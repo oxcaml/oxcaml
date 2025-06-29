@@ -22,9 +22,7 @@ external low_to : float32x4 -> float32
   = "caml_vec128_unreachable" "caml_float32x4_low_to_float32"
   [@@noalloc] [@@unboxed] [@@builtin]
 
-external add : float32x4 -> float32x4 -> float32x4
-  = "caml_vec128_unreachable" "caml_sse_float32x4_add"
-  [@@noalloc] [@@unboxed] [@@builtin]
+let add = Builtins.Float32x4.add
 
 let callback0 () =
   let x0 = low_of 0.0s in

@@ -75,7 +75,7 @@ difference lists allow for efficient concatenation; they can also be viewed
 as based on passing around accumulators, which allows us to make our
 functions tail-recursive, at the cost of building our lists up backwards.
 An additional choice we make is to build all these intermediate data
-structures on the stack (i.e., make them `local_`); again, this is for
+structures on the stack (i.e., make them `local`); again, this is for
 efficiency, as it means we don't need to get the structure of these
 difference lists involved with the garbage collector. Since we can
 currently only generate global lists with list comprehensions, we need a
@@ -87,9 +87,9 @@ internal module `CamlinternalComprehension`):
     | Nil
     | Snoc of { init : 'a rev_list; global_ last : 'a }
 
-  type 'a rev_dlist = local_ 'a rev_list -> local_ 'a rev_list
+  type 'a rev_dlist = 'a rev_list @ local -> 'a rev_list @ local
 ```
-We then work exclusively in terms of `local_ 'a rev_dlist` values, reversing
+We then work exclusively in terms of `'a rev_dlist @ local` values, reversing
 them into a global `list` only at the very end.
 
 [^fn:snoc]: I.e., the reverse of cons (`::`).
@@ -99,8 +99,8 @@ tail-recursive higher-order function analogous to `concat_map`, whose type
 is of the following form:
 ```ocaml
   ...iterator arguments... ->
-  local_ ('elt -> local_ 'res rev_dlist) ->
-  local_ 'res rev_dlist
+  ('elt -> 'res rev_dlist @ local) @ local ->
+  'res rev_dlist @ local
 ```
 Here, the `...iterator arguments...` define the sequence of values to be
 iterated over (the `seq` of a `for pat in seq` iterator, or the `start` and
@@ -131,7 +131,7 @@ CamlinternalComprehension.rev_list_to_list (
   let stop  = 3 in
   CamlinternalComprehension.rev_dlist_concat_iterate_up
     start stop
-    (fun x acc_x -> local_
+    (fun x acc_x : _ @ local ->
       (* when x <> 2 *)
       if x <> 2
       then
@@ -139,7 +139,7 @@ CamlinternalComprehension.rev_list_to_list (
         let iter_list = [10*x; 100*x] in
         CamlinternalComprehension.rev_dlist_concat_map
           iter_list
-          (fun y acc_y -> local_
+          (fun y acc_y : _ @ local ->
             (* The body: x+y *)
             Snoc { init = acc_y; last = x*y })
           acc_x

@@ -280,7 +280,7 @@ for details).
 ```ocaml
 let test_add4 par = add4 par 1 10 100 1000
 
-let run_one_test ~(f : Parallel.t -> 'a) : 'a =
+let run_one_test ~(f : Parallel.t @ local -> 'a) : 'a =
   let module Scheduler = Parallel_scheduler_work_stealing in
   let scheduler = Scheduler.create () in
   let monitor = Parallel.Monitor.create_root () in
@@ -511,6 +511,12 @@ for two accesses to produce a data race, one of them must be a write—and an
 immutable field can't be modified[^write-on-initialization]. Hence `price` can't
 produce a data race no matter what is happening in parallel. The situation
 changes if we make `price` mutable:
+
+[^write-on-initialization]: If we think of the field as a location in memory,
+    then of course there is one point at which the field _is_ modified, namely
+    when the record is created. Fortunately, the memory model guarantees that
+    this _initialising write_ never races against a read of the same field, so
+    OCaml code never has to worry about data races on immutable fields.
 
 ```diff
    type t =

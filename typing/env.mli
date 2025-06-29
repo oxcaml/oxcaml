@@ -190,22 +190,20 @@ type locality_context =
 
 type closure_context =
   | Function of locality_context option
+  | Functor
   | Lazy
 
 type escaping_context =
   | Letop
   | Probe
   | Class
-  | Module
 
 type shared_context =
   | For_loop
   | While_loop
   | Letop
-  | Closure
   | Comprehension
   | Class
-  | Module
   | Probe
 
 type locks
@@ -224,7 +222,6 @@ type lock_item =
   | Value
   | Module
   | Class
-  | Constructor
 
 type structure_components_reason =
   | Project
@@ -239,8 +236,8 @@ type lookup_error =
   | Unbound_class of Longident.t
   | Unbound_modtype of Longident.t
   | Unbound_cltype of Longident.t
-  | Unbound_instance_variable of string
-  | Not_an_instance_variable of string
+  | Unbound_settable_variable of string
+  | Not_a_settable_variable of string
   | Masked_instance_variable of Longident.t
   | Masked_self_variable of Longident.t
   | Masked_ancestor_variable of Longident.t
@@ -258,6 +255,9 @@ type lookup_error =
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
+  | Mutable_value_used_in_closure of
+      [`Escape of escaping_context | `Shared of shared_context | `Closure]
+
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
 
@@ -318,14 +318,14 @@ val lookup_module_instance_path:
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  constructor_description * locks
+  constructor_description
 val lookup_all_constructors:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  (((constructor_description * locks) * (unit -> unit)) list,
+  ((constructor_description * (unit -> unit)) list,
    Location.t * t * lookup_error) result
 val lookup_all_constructors_from_type:
   ?use:bool -> loc:Location.t -> constructor_usage -> Path.t -> t ->
-  ((constructor_description * locks) * (unit -> unit)) list
+  (constructor_description * (unit -> unit)) list
 
 val lookup_label:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Longident.t -> t ->
@@ -338,9 +338,12 @@ val lookup_all_labels_from_type:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Path.t -> t ->
   ('rcd gen_label_description * (unit -> unit)) list
 
-val lookup_instance_variable:
-  ?use:bool -> loc:Location.t -> string -> t ->
-  Path.t * Asttypes.mutable_flag * string * type_expr
+type settable_variable =
+  | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
+
+val lookup_settable_variable:
+  ?use:bool -> loc:Location.t -> string -> t -> settable_variable
 
 val find_value_by_name:
   Longident.t -> t -> Path.t * value_description

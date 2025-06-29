@@ -94,6 +94,24 @@ Error: This value is "aliased" but expected to be "unique".
 |}]
 
 (***********************************************************************)
+type 'a t : value mod contended portable =
+  | Shared : ('b : value mod contended portable). 'b  -> 'b t
+  | Unshared : (unit -> 'c) @@ portable               -> 'c t
+;;
+(* CR layouts v2.8: This should be accepted *)
+[%%expect{|
+Lines 1-3, characters 0-61:
+1 | type 'a t : value mod contended portable =
+2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
+3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
+Error: The kind of type "t" is value mod portable immutable non_float with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of
+           value mod contended portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(***********************************************************************)
 (* This test is about trying to avoid inconsistent contexts.
    See
    https://github.com/oxcaml/oxcaml/pull/3284#discussion_r1920019049
@@ -142,8 +160,7 @@ module F :
     end
 module Arg1 : sig type t1 = int -> int type t2 = string end
 module M1 : sig type t3 = F(Arg1).t3 type t4 = F(Arg1).t4 end
->> Fatal error: Abstract kind with [with]: value mod portable
-with Arg1.t2
+>> Fatal error: Abstract kind with [with]: value mod portable with Arg1.t2
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -260,11 +277,11 @@ type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
 2 | type existential_abstract : immediate =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is immutable_data
-         with (type : value mod portable) abstract
+Error: The kind of type "existential_abstract" is
+           immutable_data with (type : value mod portable) abstract
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
-         immediate
+           immediate
          because of the annotation on the declaration of the type existential_abstract.
 |}]
 
@@ -319,11 +336,11 @@ Error: Signature mismatch:
          type t = P : ('a : immediate). 'a abstract -> t
        is not included in
          type t : immutable_data with (type : value) abstract
-       The kind of the first is immutable_data
-         with (type : immediate) abstract
+       The kind of the first is
+           immutable_data with (type : immediate) abstract
          because of the definition of t at line 4, characters 2-49.
-       But the kind of the first must be a subkind of immutable_data
-         with (type : value) abstract
+       But the kind of the first must be a subkind of
+           immutable_data with (type : value) abstract
          because of the definition of t at line 2, characters 2-54.
 |}]
 
@@ -458,7 +475,7 @@ Line 1, characters 0-59:
 Error: The kind of type "(int ref, int ref) box2" is mutable_data
          because of the definition of box2 at line 1, characters 0-45.
        But the kind of type "(int ref, int ref) box2" must be a subkind of
-         immediate
+           immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
 
@@ -528,8 +545,8 @@ type show_me_the_kind : immediate = exist_row1
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row1
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row1" is immutable_data
-         with [< `A | `B of int ref ]
+Error: The kind of type "exist_row1" is
+           immutable_data with [< `A | `B of int ref ]
          because of the definition of exist_row1 at line 1, characters 0-67.
        But the kind of type "exist_row1" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
@@ -562,8 +579,8 @@ type show_me_the_kind : immediate = exist_row2
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row2" is immutable_data
-         with [> `A | `B of int ref ]
+Error: The kind of type "exist_row2" is
+           immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row2 at line 1, characters 0-67.
        But the kind of type "exist_row2" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
@@ -596,11 +613,11 @@ type 'a show_me_the_kind : immediate = 'a option exist_row3
 Line 1, characters 0-59:
 1 | type 'a show_me_the_kind : immediate = 'a option exist_row3
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a option exist_row3" is immutable_data
-         with [> `A | `B of int ref ]
+Error: The kind of type "'a option exist_row3" is
+           immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row3 at line 1, characters 0-80.
        But the kind of type "'a option exist_row3" must be a subkind of
-         immediate
+           immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
 

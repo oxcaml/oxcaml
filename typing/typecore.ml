@@ -142,6 +142,10 @@ let print_unsupported_stack_allocation ppf = function
   | List_comprehension -> Format.fprintf ppf "list comprehensions"
   | Array_comprehension -> Format.fprintf ppf "array comprehensions"
 
+type mutable_restriction =
+  | In_group
+  | In_rec
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg
@@ -223,6 +227,7 @@ type error =
   | Cannot_infer_signature
   | Not_a_packed_module of type_expr
   | Unexpected_existential of existential_restriction * string
+  | Unexpected_mutable of mutable_restriction
   | Invalid_interval
   | Invalid_for_loop_index
   | Invalid_comprehension_for_range_iterator_index
@@ -244,6 +249,7 @@ type error =
   | Float32_literal of string
   | Illegal_letrec_pat
   | Illegal_letrec_expr
+  | Illegal_mutable_pat
   | Illegal_class_expr
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
@@ -276,12 +282,14 @@ type error =
   | Function_type_not_rep of type_expr * Jkind.Violation.t
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
+  | Mutable_var_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
-  | Impossible_function_jkind of type_expr * jkind_lr
+  | Impossible_function_jkind of
+      { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
 
@@ -1003,25 +1011,31 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
   | Ok () -> ()
   | Error e -> error (Right_le_left, e))
 
-(** Given the parameter [m0] on mutable, return the mode of future writes. *)
-let mutable_mode m0 =
-  let m0 =
-    Alloc.Const.merge
-      {comonadic = m0;
-       monadic = Alloc.Monadic.Const.min}
-  in
-  m0 |> Const.alloc_as_value |> Value.of_const
-
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
     would be allowed. This applies to mutable arrays similarly. *)
-let check_construct_mutability ~loc ~env mutability ty ?modalities block_mode =
+let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
-  | Mutable { modal_upper_bound = m0; _ } ->
-      let m0 = mutable_mode m0 in
-      let m0 = cross_left env ty ?modalities m0 in
+  | Mutable { mode = m0; _ } ->
+      let m0 = m0 |> mutable_mode |> Value.disallow_right in
+      let m0 = match ty with
+      | Some ty -> cross_left env ty ?modalities m0
+      | None -> m0
+      in
       submode ~loc ~env m0 block_mode
+
+(** Take [m0] which is the parameter to mutable, and the mode of the RHS (the
+    content expression), returns the strongest mode the mutable variable can be.
+*)
+let mutvar_mode ~loc ~env m0 exp_mode =
+  let m = Value.newvar () in
+  let mode = mode_default m in
+  let modalities = Typemode.let_mutable_modalities m0 in
+  submode ~loc ~env exp_mode (mode_modality modalities mode);
+  check_construct_mutability ~loc ~env
+    (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
+  m |> Value.disallow_right
 
 (** The [expected_mode] of the record when projecting a mutable field. *)
 let mode_project_mutable =
@@ -1163,6 +1177,7 @@ type pattern_variable =
     pv_id: Ident.t;
     pv_uid: Uid.t;
     pv_mode: Value.l;
+    pv_kind : value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
     pv_as_var: bool;
@@ -1259,13 +1274,19 @@ let maybe_add_pattern_variables_ghost loc_let env pv =
 let iter_pattern_variables_type f : pattern_variable list -> unit =
   List.iter (fun {pv_type; _} -> f pv_type)
 
+let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
+  List.iter (fun {pv_type; pv_kind; _ } ->
+    match pv_kind with
+    | Val_mut _ -> f_mut pv_type
+    | _ -> f_immut pv_type) pvs
+
 let add_pattern_variables ?check ?check_as env pv =
   List.fold_right
-    (fun {pv_id; pv_mode; pv_type; pv_loc; pv_as_var; pv_attributes; pv_uid}
-      env ->
+    (fun {pv_id; pv_mode; pv_kind; pv_type; pv_loc; pv_as_var;
+          pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = Val_reg; Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.Value.id;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -1313,7 +1334,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-    ty attrs =
+    ~kind ty attrs =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
   then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
@@ -1346,7 +1367,8 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
   let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
   tps.tps_pattern_variables <-
     {pv_id = id;
-     pv_mode = Value.disallow_right mode;
+     pv_mode = mode;
+     pv_kind = kind;
      pv_type = ty;
      pv_loc = loc;
      pv_as_var = is_as_variable;
@@ -1437,15 +1459,15 @@ and build_as_type_aux (env : Env.t) p ~mode =
 
         RAE: why? It looks fine as-is. *)
     let ty = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-    let ppl = List.map (fun (_, l, p) -> l.lbl_num, p) lpl in
+    let ppl = List.map (fun (_, l, p) -> l.lbl_pos, p) lpl in
     let do_label lbl =
       let _, ty_arg, ty_res = instance_label ~fixed:false lbl in
       unify_pat env {p with pat_type = ty} ty_res;
       let refinable =
-        lbl.lbl_mut = Immutable && List.mem_assoc lbl.lbl_num ppl &&
+        lbl.lbl_mut = Immutable && List.mem_assoc lbl.lbl_pos ppl &&
         match get_desc lbl.lbl_arg with Tpoly _ -> false | _ -> true in
       if refinable then begin
-        let arg = List.assoc lbl.lbl_num ppl in
+        let arg = List.assoc lbl.lbl_pos ppl in
         unify_pat env
           {arg with pat_type = build_as_type env arg} ty_arg
       end else begin
@@ -1723,19 +1745,21 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
     unify_pat_types_return_equated_pairs ~refine loc penv ty_res expected_ty
   in
 
-  let ty_args, equated_types, existential_ctyp =
+  let ty_args_ty, ty_args_gf, equated_types, existential_ctyp =
     with_local_level_iter ~post: generalize_structure begin fun () ->
       let expected_ty = instance expected_ty in
-      let ty_args, ty_args_ty, ty_res, equated_types, existential_ctyp =
+      let ty_args_ty, ty_args_gf, ty_res, equated_types, existential_ctyp =
         match existential_styp with
           None ->
             let ty_args, ty_res, _ =
               instance_constructor (Make_existentials_abstract penv) constr
             in
-            let ty_args_ty =
-              List.map (fun ca -> ca.Types.ca_type) ty_args
+            let ty_args_ty, ty_args_gf =
+              List.split
+                (List.map (fun ca ->
+                  ca.Types.ca_type, ca.Types.ca_modalities) ty_args)
             in
-            ty_args, ty_args_ty, ty_res, unify_res ty_res expected_ty, None
+            ty_args_ty, ty_args_gf, ty_res, unify_res ty_res expected_ty, None
         | Some (name_list, sty) ->
             let existential_treatment =
               if name_list = [] then
@@ -1749,20 +1773,20 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
               instance_constructor existential_treatment constr
             in
             let equated_types = unify_res ty_res expected_ty in
-            let ty_args_ty = List.map (fun ca -> ca.Types.ca_type) ty_args in
+            let ty_args_ty, ty_args_gf =
+              List.split
+                (List.map (fun ca ->
+                  ca.Types.ca_type, ca.Types.ca_modalities) ty_args)
+            in
             let ty_args_ty, existential_ctyp =
               solve_constructor_annotation tps penv name_list sty ty_args_ty
                 ty_ex
             in
-            let ty_args =
-              List.map2 (fun arg ca_type -> {arg with Types.ca_type}) ty_args
-                ty_args_ty
-            in
-            ty_args, ty_args_ty, ty_res, equated_types, existential_ctyp
+            ty_args_ty, ty_args_gf, ty_res, equated_types, existential_ctyp
       in
       if constr.cstr_existentials <> [] then
         lower_variables_only !!penv penv.Pattern_env.equations_scope ty_res;
-      ((ty_args, equated_types, existential_ctyp),
+      ((ty_args_ty, ty_args_gf, equated_types, existential_ctyp),
        expected_ty :: ty_res :: ty_args_ty)
     end
   in
@@ -1788,7 +1812,7 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
         equated_types
     with Warn_only_once -> ()
   end;
-  (ty_args, existential_ctyp)
+  (ty_args_ty, ty_args_gf, existential_ctyp)
 
 let solve_Ppat_record_field ~refine loc penv label label_lid record_ty
       record_form =
@@ -1938,7 +1962,7 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
     any (Ident.create_local "_for", Uid.mk ~current_unit:(Env.get_unit_name ()))
   | Ppat_var name ->
       var ~name
-          ~pv_mode:Value.min
+          ~pv_mode:Value.(min |> disallow_right)
           ~pv_type:(instance Predef.type_int)
           ~pv_loc:loc
           ~pv_as_var:false
@@ -1966,7 +1990,9 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_id = Ident.create_local txt in
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
-              { pv_id; pv_uid; pv_mode=Value.disallow_right pv_mode; pv_type; pv_loc; pv_as_var; pv_attributes }
+              { pv_id; pv_uid; pv_mode;
+                pv_kind=Val_reg; pv_type; pv_loc; pv_as_var;
+                pv_attributes }
             in
             (pv_id, pv_uid), add_pattern_variables ~check ~check_as:check env [pv])
 
@@ -1983,6 +2009,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
+            ~kind:Val_reg
             tps
             pv_loc
             name
@@ -1990,6 +2017,26 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
             pv_type
             pv_attributes)
 
+let check_let_mutable (mf : mutable_flag) env ?restriction vbs =
+  match vbs, mf with
+  | vb :: vbs, Mutable -> begin
+      let loc = vb.pvb_pat.ppat_loc in
+      (* If the [let] is [mutable], check:
+         - Let_mutable is enabled
+         - There is only one value binding
+         - The value binding pattern consists only of a variable, possibly
+           with a type/mode constraint
+         - Mutables are not restricted here according to [restriction] *)
+      Language_extension.assert_enabled ~loc Let_mutable ();
+      match restriction, vb.pvb_pat.ppat_desc, vbs with
+      | _, _, _ :: _ -> raise (Error (loc, env, Unexpected_mutable In_group))
+      | Some r, _, _ -> raise (Error (loc, env, Unexpected_mutable r))
+      | None, Ppat_var _, [] -> ()
+      | None, (Ppat_constraint ({ppat_desc=Ppat_var _}, _, _)), [] -> ()
+      | None, _, [] -> raise (Error (loc, env, Illegal_mutable_pat))
+    end
+  | _ -> ()
+;;
 
 (* Type paths *)
 
@@ -2419,7 +2466,7 @@ let disambiguate_sort_lid_a_list
       (Warnings.Name_out_of_scope (!w_scope_ty, warning)));
   (* Invariant: records are sorted in the typed tree *)
   List.sort
-    (fun (_,lbl1,_) (_,lbl2,_) -> compare lbl1.lbl_num lbl2.lbl_num)
+    (fun (_,lbl1,_) (_,lbl2,_) -> compare lbl1.lbl_pos lbl2.lbl_pos)
     lbl_a_list
 
 let map_fold_cont f xs k =
@@ -2436,9 +2483,9 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
       let all = label1.lbl_all in
       let defined = Array.make (Array.length all) false in
       let check_defined (_, label, _) =
-        if defined.(label.lbl_num)
+        if defined.(label.lbl_pos)
         then raise(Error(loc, Env.empty, Label_multiply_defined label.lbl_name))
-        else defined.(label.lbl_num) <- true in
+        else defined.(label.lbl_pos) <- true in
       List.iter check_defined lbl_pat_list;
       if closed = Closed
       && Warnings.is_active
@@ -2459,11 +2506,11 @@ let check_recordpat_labels loc lbl_pat_list closed record_form =
 (* Constructors *)
 
 module Constructor = NameChoice (struct
-  type t = constructor_description * Env.locks
+  type t = constructor_description
   type usage = Env.constructor_usage
   let kind = Datatype_kind.Variant
-  let get_name (cstr, _) = cstr.cstr_name
-  let get_type (cstr, _) = cstr.cstr_res
+  let get_name cstr = cstr.cstr_name
+  let get_type cstr = cstr.cstr_res
   let lookup_all_from_type loc usage path env =
     match Env.lookup_all_constructors_from_type ~loc usage path env with
     | _ :: _ as x -> x
@@ -2477,9 +2524,7 @@ module Constructor = NameChoice (struct
             let filter lbl =
               compare_type_path env
                 path (get_constr_type_path @@ get_type lbl) in
-            let add_valid x acc =
-              let x = (x, Env.locks_empty) in
-              if filter x then (x, ignore)::acc else acc in
+            let add_valid x acc = if filter x then (x,ignore)::acc else acc in
             Env.fold_constructors add_valid None env []
         | _ -> []
   let in_env _ = true
@@ -2621,22 +2666,25 @@ let components_have_label (labeled_components : (string option * 'a) list) =
 let rec type_pat
   : type k . type_pat_state -> k pattern_category ->
       no_existentials: existential_restriction option ->
-      alloc_mode:expected_pat_mode ->
+      alloc_mode:expected_pat_mode -> mutable_flag:_ ->
       penv: Pattern_env.t -> Parsetree.pattern -> type_expr ->
       k general_pattern
-  = fun tps category ~no_existentials ~alloc_mode ~penv sp expected_ty ->
+  = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv sp
+      expected_ty ->
   Builtin_attributes.warning_scope sp.ppat_attributes
     (fun () ->
        type_pat_aux tps category ~no_existentials
-         ~alloc_mode ~penv sp expected_ty
+         ~alloc_mode ~mutable_flag ~penv sp expected_ty
     )
 
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
-         alloc_mode:expected_pat_mode -> penv:_ -> _ -> _ -> k general_pattern
-  = fun tps category ~no_existentials ~alloc_mode ~penv sp expected_ty ->
+         alloc_mode:expected_pat_mode -> mutable_flag:mutable_flag -> penv:_ ->
+         _ -> _ -> k general_pattern
+  = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv sp
+        expected_ty ->
   let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) =
-    type_pat tps category ~no_existentials ~alloc_mode ~penv
+    type_pat tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
   in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =
@@ -2825,8 +2873,31 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
+      let mode, kind =
+        match mutable_flag with
+        | Immutable -> alloc_mode, Val_reg
+        | Mutable ->
+            let m0 = Value.Comonadic.newvar () in
+            let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
+            (* Sort information is used when translating a [Texp_mutvar] into an
+               [Lassign]. We calculate [sort] here so we can store and reuse it.
+               However, since we already make sure pattern variables are
+               representable, we are already calculating [sort] elsewhere, but
+               that place is too far removed to easily pass it here. *)
+            let sort =
+              match
+                Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
+                  ~fixed:false !!penv ty
+              with
+              | Ok sort -> sort
+              | Error err -> raise(Error(loc, !!penv,
+                                          Mutable_var_not_rep(ty, err)))
+            in
+            let kind = Val_mut (m0, sort) in
+            mode, kind
+      in
       let id, uid =
-        enter_variable tps loc name alloc_mode ty sp.ppat_attributes
+        enter_variable tps loc name mode ~kind ty sp.ppat_attributes
       in
       rvp {
         pat_desc = Tpat_var (id, name, uid, alloc_mode);
@@ -2853,7 +2924,7 @@ and type_pat_aux
              [Ppat_unpack] is a case identified by [may_contain_modules]. See
              the comment on [may_contain_modules]. *)
           let id, uid = enter_variable tps loc v alloc_mode.mode
-                          t ~is_module:true sp.ppat_attributes in
+                          t ~is_module:true ~kind:Val_reg sp.ppat_attributes in
           rvp {
             pat_desc = Tpat_var (id, v, uid, alloc_mode.mode);
             pat_loc = sp.ppat_loc;
@@ -2868,8 +2939,8 @@ and type_pat_aux
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
-        enter_variable ~is_as_variable:true tps name.loc name mode ty_var
-          sp.ppat_attributes
+        enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
+          ty_var sp.ppat_attributes
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, mode, ty_var);
             pat_loc = loc; pat_extra=[];
@@ -2917,7 +2988,7 @@ and type_pat_aux
             let error = Wrong_expected_kind(srt, Pattern, expected_ty) in
             raise (Error (loc, !!penv, error))
       in
-      let constr, locks =
+      let constr =
         let candidates =
           Env.lookup_all_constructors Env.Pattern ~loc:lid.loc lid.txt !!penv in
         wrap_disambiguate "This variant pattern is expected to have"
@@ -2925,7 +2996,6 @@ and type_pat_aux
           (Constructor.disambiguate Env.Pattern lid !!penv expected_type)
           candidates
       in
-      let held_locks = (locks, lid.txt, lid.loc) in
       begin match no_existentials, constr.cstr_existentials with
       | None, _ | _, [] -> ()
       | Some r, (_ :: _) ->
@@ -2975,12 +3045,10 @@ and type_pat_aux
         raise(Error(loc, !!penv, Constructor_arity_mismatch(lid.txt,
                                      constr.cstr_arity, List.length sargs)));
 
-      let (args, existential_ctyp) =
+      let (ty_args_ty, ty_args_gf, existential_ctyp) =
         solve_Ppat_construct ~refine:false tps penv loc constr no_existentials
           existential_styp expected_ty
       in
-      Ctype.check_constructor_crossing !!penv constr.cstr_tag ~res:expected_ty
-        args held_locks;
 
       let rec check_non_escaping p =
         match p.ppat_desc with
@@ -3001,13 +3069,11 @@ and type_pat_aux
 
       let args =
         List.map2
-          (fun p (arg : Types.constructor_argument) ->
-             let alloc_mode =
-              Modality.Value.Const.apply arg.ca_modalities alloc_mode.mode
-             in
+          (fun p (ty, gf) ->
+             let alloc_mode = Modality.Value.Const.apply gf alloc_mode.mode in
              let alloc_mode = simple_pat_mode alloc_mode in
-             type_pat ~alloc_mode tps Value p arg.ca_type)
-          sargs args
+             type_pat ~alloc_mode tps Value p ty)
+          sargs (List.combine ty_args_ty ty_args_gf)
       in
       rvp { pat_desc=Tpat_construct(lid, constr, args, existential_ctyp);
             pat_loc = loc; pat_extra=[];
@@ -3042,7 +3108,7 @@ and type_pat_aux
       let mut =
         match mut with
         | Mutable  -> Mutable {
-          modal_upper_bound = Alloc.Comonadic.Const.legacy;
+          mode = Value.Comonadic.legacy;
           (* CR aspsmith: Revisit once we support atomic arrays *)
           atomic = Nonatomic
         }
@@ -3163,14 +3229,17 @@ and type_pat_aux
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
-let type_pat tps category ?no_existentials penv =
-  type_pat tps category ~no_existentials ~penv
+let type_pat tps category ?no_existentials ~mutable_flag penv =
+  type_pat tps category ~no_existentials ~mutable_flag ~penv
 
 let type_pattern category ~lev ~alloc_mode env spat expected_ty allow_modules =
   let tps = create_type_pat_state allow_modules in
   let new_penv = Pattern_env.make env
       ~equations_scope:lev ~allow_recursive_equations:false in
-  let pat = type_pat tps category ~alloc_mode new_penv spat expected_ty in
+  let pat =
+      type_pat tps category ~alloc_mode ~mutable_flag:Immutable new_penv spat
+        expected_ty
+  in
   let { tps_pattern_variables = pvs;
         tps_module_variables = mvs;
         tps_pattern_force = forces;
@@ -3178,7 +3247,7 @@ let type_pattern category ~lev ~alloc_mode env spat expected_ty allow_modules =
   (pat, !!new_penv, forces, pvs, mvs)
 
 let type_pattern_list
-    category no_existentials env spatl expected_tys allow_modules
+    category no_existentials env mutable_flag spatl expected_tys allow_modules
   =
   let tps = create_type_pat_state allow_modules in
   let equations_scope = get_current_level () in
@@ -3189,7 +3258,8 @@ let type_pattern_list
       (fun () ->
          exp_mode,
          type_pat tps category
-           ~no_existentials ~alloc_mode:pat_mode new_penv pat ty
+           ~no_existentials ~alloc_mode:pat_mode ~mutable_flag
+           new_penv pat ty
       )
   in
   let patl = List.map2 type_pat spatl expected_tys in
@@ -3210,7 +3280,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           ~equations_scope ~allow_recursive_equations:false in
       let pat =
         type_pat tps Value ~no_existentials:In_class_args ~alloc_mode
-          new_penv spat nv in
+          ~mutable_flag:Immutable new_penv spat nv in
       if has_variants pat then begin
         Parmatch.pressure_variants val_env [pat];
         finalize_variants pat;
@@ -3273,7 +3343,7 @@ let type_self_pattern env spat =
       ~equations_scope ~allow_recursive_equations:false in
   let pat =
     type_pat tps Value ~no_existentials:In_self_pattern ~alloc_mode
-      new_penv spat nv in
+      ~mutable_flag:Immutable new_penv spat nv in
   List.iter (fun f -> f()) tps.tps_pattern_force;
   pat, tps.tps_pattern_variables
 
@@ -3566,12 +3636,12 @@ let rec check_counter_example_pat
   | Tpat_construct(cstr_lid, constr, targs, _) ->
       if constr.cstr_generalized && must_backtrack_on_gadt then
         raise Need_backtrack;
-      let (ty_args, existential_ctyp) =
+      let (ty_args, _, existential_ctyp) =
         solve_Ppat_construct ~refine type_pat_state penv loc constr None None
           expected_ty
       in
       map_fold_cont
-        (fun (p,t) -> check_rec p t.Types.ca_type)
+        (fun (p,t) -> check_rec p t)
         (List.combine targs ty_args)
         (fun args ->
           mkp k (Tpat_construct(cstr_lid, constr, args, existential_ctyp)))
@@ -3937,6 +4007,12 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
     let ls, tvar = list_labels env ty_fun in
     tvar || List.mem l ls
   in
+  let get_arg_loc = function
+    | (_, Arg ( Known_arg { sarg; _ }
+              | Unknown_arg { sarg; _ })) -> Some sarg.pexp_loc
+    | (_, Arg (Eliminated_optional_arg _))
+    | (_, Omitted _) -> None
+  in
   let rec loop ty_fun mode_fun rev_args sargs =
     match sargs with
     | [] -> ty_fun, mode_fun, List.rev rev_args
@@ -3964,8 +4040,17 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                   (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
               with
               | Unify _ ->
-                raise(Error(funct.exp_loc, env,
-                            Impossible_function_jkind (ty_fun, jkind)))
+                (* need to calculate a location containing the function
+                   and any arguments already processed *)
+                let locs =
+                  funct.exp_loc :: sarg.pexp_loc ::
+                  List.filter_map get_arg_loc rev_args
+                in
+                let loc = Location.merge ~ghost:false locs in
+                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
+                raise(Error(loc, env,
+                            Impossible_function_jkind
+                              { some_args_ok; ty_fun; jkind }))
               end;
               (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
         | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
@@ -3999,13 +4084,7 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                      provide a good location in the [Eliminated_optional_arg]
                      case - maybe fix one day if it is noticeable. *)
                   rev_args
-                  |> List.find_map
-                       (function
-                         | (_, Arg ( Known_arg { sarg; _ }
-                                   | Unknown_arg { sarg; _ })) ->
-                           Some sarg.pexp_loc
-                         | (_, Arg (Eliminated_optional_arg _))
-                         | (_, Omitted _) -> None)
+                  |> List.find_map get_arg_loc
                   |> Option.value ~default:funct.exp_loc
                 in
                 raise(Error(funct.exp_loc, env, Apply_non_function {
@@ -4200,6 +4279,8 @@ let rec is_nonexpansive exp =
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
+  | Texp_letmutable(pat_exp, body) ->
+      is_nonexpansive pat_exp.vb_expr && is_nonexpansive body
   | Texp_apply(e, (_,Omitted _)::el, _, _, _) ->
       is_nonexpansive e && List.for_all is_nonexpansive_arg (List.map snd el)
   | Texp_match(e, _, cases, _) ->
@@ -4294,7 +4375,9 @@ let rec is_nonexpansive exp =
   | Texp_for _
   | Texp_send _
   | Texp_instvar _
+  | Texp_mutvar _
   | Texp_setinstvar _
+  | Texp_setmutvar _
   | Texp_override _
   | Texp_letexception _
   | Texp_letop _
@@ -4529,7 +4612,7 @@ let type_approx_fun_one_param
 let rec type_approx env sexp ty_expected =
   let loc = sexp.pexp_loc in
   match sexp.pexp_desc with
-    Pexp_let (_, _, e) -> type_approx env e ty_expected
+    Pexp_let (_, _, _, e) -> type_approx env e ty_expected
   | Pexp_function (params, c, body) ->
       type_approx_function env params c body ty_expected ~loc
   | Pexp_match (_, {pc_rhs=e}::_) -> type_approx env e ty_expected
@@ -4748,6 +4831,7 @@ let check_partial_application ~statement exp =
             | Texp_field _ | Texp_setfield _ | Texp_array _
             | Texp_list_comprehension _ | Texp_array_comprehension _
             | Texp_while _ | Texp_for _ | Texp_instvar _
+            | Texp_mutvar _ | Texp_setmutvar _
             | Texp_setinstvar _ | Texp_override _ | Texp_assert _
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
@@ -4760,7 +4844,8 @@ let check_partial_application ~statement exp =
                 check e; List.iter (fun {c_rhs; _} -> check c_rhs) cases
             | Texp_ifthenelse (_, e1, Some e2) ->
                 check e1; check e2
-            | Texp_let (_, _, e) | Texp_sequence (_, _, e) | Texp_open (_, e)
+            | Texp_let (_, _, e) | Texp_letmutable(_, e)
+            | Texp_sequence (_, _, e) | Texp_open (_, e)
             | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
             | Texp_exclave e ->
                 check e
@@ -5553,7 +5638,7 @@ and type_expect_
           None, expected_mode
       in
       let type_label_exp overwrite ((_, label, _) as x) =
-        check_construct_mutability ~loc ~env label.lbl_mut label.lbl_arg
+        check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
           ~modalities:label.lbl_modalities record_mode;
         let argument_mode = mode_modality label.lbl_modalities record_mode in
         type_label_exp ~overwrite true env argument_mode loc ty_record x record_form
@@ -5573,7 +5658,7 @@ and type_expect_
       (* note: check_duplicates would better be implemented in
          disambiguate_sort_lid_a_list directly *)
       let rec check_duplicates = function
-        | (_, lbl1, _) :: (_, lbl2, _) :: _ when lbl1.lbl_num = lbl2.lbl_num ->
+        | (_, lbl1, _) :: (_, lbl2, _) :: _ when lbl1.lbl_pos = lbl2.lbl_pos ->
           raise(Error(loc, env, Label_multiply_defined lbl1.lbl_name))
         | _ :: rem ->
             check_duplicates rem
@@ -5584,7 +5669,7 @@ and type_expect_
         let (_lid, lbl, _lbl_exp) = List.hd lbl_exp_list in
         let matching_label lbl =
           List.find
-            (fun (_, lbl',_) -> lbl'.lbl_num = lbl.lbl_num)
+            (fun (_, lbl',_) -> lbl'.lbl_pos = lbl.lbl_pos)
             lbl_exp_list
         in
         let unify_kept record_loc extended_expr_loc ty_exp mode lbl =
@@ -5602,7 +5687,7 @@ and type_expect_
               check_project_mutability ~loc:extended_expr_loc ~env lbl.lbl_mut mode;
               let mode = Modality.Value.Const.apply lbl.lbl_modalities mode in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
-                lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
+                ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
               let argument_mode =
                 mode_modality lbl.lbl_modalities record_mode
               in
@@ -5621,7 +5706,7 @@ and type_expect_
                       Overridden (lid, lbl_exp)
                   | exception Not_found ->
                       let present_indices =
-                        List.map (fun (_, lbl, _) -> lbl.lbl_num) lbl_exp_list
+                        List.map (fun (_, lbl, _) -> lbl.lbl_pos) lbl_exp_list
                       in
                       let label_names =
                         extract_label_names record_form env ty_expected in
@@ -5716,6 +5801,19 @@ and type_expect_
                          match lid.txt with
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
+        | Val_mut (m0, _) -> begin
+            match path with
+            | Path.Pident id ->
+              let modalities = Typemode.let_mutable_modalities m0 in
+              let mode =
+                Modality.Value.Const.apply modalities actual_mode.mode
+              in
+              submode ~loc ~env mode expected_mode;
+              Texp_mutvar {loc = lid.loc; txt = id}
+            | _ ->
+              fatal_error "Typecore.type_expect_: \
+                bad mutable variable identifier"
+          end
         | Val_self (_, _, _, cl_num) ->
             let (path, _) =
               Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
@@ -5773,7 +5871,7 @@ and type_expect_
         exp_type = type_constant cst;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  | Pexp_let(Nonrecursive,
+  | Pexp_let(Immutable, Nonrecursive,
              [{pvb_pat=spat; pvb_attributes=[]; _ } as vb], sbody)
     when turn_let_into_match spat ->
       (* TODO: allow non-empty attributes? *)
@@ -5782,8 +5880,13 @@ and type_expect_
         {sexp with
          pexp_desc = Pexp_match (sval, [Ast_helper.Exp.case spat sbody])}
         ty_expected_explained
-  | Pexp_let(rec_flag, spat_sexp_list, sbody) ->
-      let existential_context =
+  | Pexp_let(mutable_flag, rec_flag, spat_sexp_list, sbody) ->
+      let restriction = match rec_flag with
+        | Recursive -> Some In_rec
+        | Nonrecursive -> None
+      in
+      check_let_mutable mutable_flag env ?restriction spat_sexp_list;
+      let existential_context : existential_restriction =
         if rec_flag = Recursive then In_rec
         else if List.compare_length_with spat_sexp_list 1 > 0 then In_group
         else With_attributes in
@@ -5806,8 +5909,8 @@ and type_expect_
             else Modules_rejected
           in
           let (pat_exp_list, new_env) =
-            type_let existential_context env rec_flag spat_sexp_list
-              allow_modules
+            type_let existential_context env mutable_flag rec_flag
+              spat_sexp_list allow_modules
           in
           let body =
             type_expect
@@ -5850,8 +5953,17 @@ and type_expect_
           (* The "body" component of the scope escape check. *)
           unify_exp new_env body (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
       in
+      let exp =
+        match mutable_flag, pat_exp_list with
+        | Immutable, _ -> Texp_let(rec_flag, pat_exp_list, body)
+        | Mutable, [vb] -> Texp_letmutable(vb, body)
+        | Mutable, _ ->
+          (* Unreachable: should be prevented by [check_let_mutable] *)
+          fatal_error "Typecore.type_expect_: \
+            [let mutable] should have exactly one value binding"
+      in
       re {
-        exp_desc = Texp_let(rec_flag, pat_exp_list, body);
+        exp_desc = exp;
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
@@ -6135,7 +6247,7 @@ and type_expect_
           match label.lbl_repres with
           | Record_float -> true
           | Record_mixed mixed -> begin
-              match mixed.(label.lbl_num) with
+              match mixed.(label.lbl_pos) with
               | Float_boxed -> true
               | Float64 | Float32 | Value | Bits32 | Bits64
               | Vec128 | Vec256 | Vec512 | Word
@@ -6205,7 +6317,7 @@ and type_expect_
       in
       let (label_loc, label, newval) =
         match label.lbl_mut with
-        | Mutable { modal_upper_bound = m0; atomic } ->
+        | Mutable { mode = m0; atomic } ->
           ignore atomic;  (* CR aspsmith: TODO *)
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
@@ -6229,7 +6341,7 @@ and type_expect_
       let mutability =
         match mut with
         | Mutable -> Mutable {
-          modal_upper_bound = Alloc.Comonadic.Const.legacy;
+          mode = Value.Comonadic.legacy;
           (* CR aspsmith: Revisit once we support atomic arrays *)
           atomic = Nonatomic;
         }
@@ -6442,28 +6554,33 @@ and type_expect_
               exp_attributes = sexp.pexp_attributes;
               exp_env = env }
         end
-  | Pexp_setinstvar (lab, snewval) -> begin
-      let (path, mut, cl_num, ty) =
-        Env.lookup_instance_variable ~loc lab.txt env
+  | Pexp_setvar (lab, snewval) ->
+      let desc =
+        match Env.lookup_settable_variable ~loc lab.txt env with
+        | Instance_variable (path, Mutable, cl_num,ty) ->
+            let newval =
+              type_expect env mode_legacy snewval (mk_expected (instance ty))
+            in
+            let (path_self, _) =
+              Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
+            in
+            Texp_setinstvar(path_self, path, lab, newval)
+        | Instance_variable (_,Immutable,_,_) ->
+            raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
+        | Mutable_variable (id, mode, ty, sort) ->
+            let newval =
+              type_expect env (mode_default mode)
+                snewval (mk_expected (instance ty))
+            in
+            let lid = {txt = id; loc} in
+            Texp_setmutvar(lid, sort, newval)
       in
-      match mut with
-      | Mutable ->
-          let newval =
-            type_expect env mode_legacy snewval
-              (mk_expected (instance ty))
-          in
-          let (path_self, _) =
-            Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
-          in
-          rue {
-            exp_desc = Texp_setinstvar(path_self, path, lab, newval);
-            exp_loc = loc; exp_extra = [];
-            exp_type = instance Predef.type_unit;
-            exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
-      | _ ->
-          raise(Error(loc, env, Instance_variable_not_mutable lab.txt))
-    end
+      rue {
+        exp_desc = desc;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance Predef.type_unit;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
   | Pexp_override lst ->
       submode ~loc ~env Value.legacy expected_mode;
       let _ =
@@ -6816,11 +6933,9 @@ and type_expect_
                    Pstr_eval ({ pexp_desc = Pexp_construct (lid, None); _ }, _)
                } ] ->
           let path =
-            let cd, held_locks =
+            let cd =
               Env.lookup_constructor Env.Positive ~loc:lid.loc lid.txt env
             in
-            (* no argument and thus crossing portability *)
-            ignore held_locks;
             match cd.cstr_tag with
             | Extension path -> path
             | _ -> raise (Error (lid.loc, env, Not_an_extension_constructor))
@@ -8532,12 +8647,11 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   let constrs =
     Env.lookup_all_constructors ~loc:lid.loc Env.Positive lid.txt env
   in
-  let constr, locks =
+  let constr =
     wrap_disambiguate "This variant expression is expected to have"
       ty_expected_explained
       (Constructor.disambiguate Env.Positive lid env expected_type) constrs
   in
-  let held_locks = (locks, lid.txt, lid.loc) in
   let sargs =
     match sarg with
     | None -> []
@@ -8587,8 +8701,6 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
         List.iter (fun {Types.ca_type=ty; _} -> generalize_structure ty) ty_args)
   in
   let ty_args, ty_res, texp = unify_as_construct ty_expected in
-  Ctype.check_constructor_crossing env constr.cstr_tag ~res:ty_res ty_args
-    held_locks;
   let ty_args0, ty_res =
     match instance_list (ty_res :: (List.map (fun ca -> ca.Types.ca_type) ty_args)) with
       t :: tl -> tl, t
@@ -9135,7 +9247,7 @@ and type_function_cases_expect
 (* Typing of let bindings *)
 
 and type_let ?check ?check_strict ?(force_toplevel = false)
-    existential_context env rec_flag spat_sexp_list allow_modules =
+    existential_context env mutable_flag rec_flag spat_sexp_list allow_modules =
   let rec sexp_is_fun sexp =
     match sexp.pexp_desc with
     | Pexp_function _ -> true
@@ -9176,8 +9288,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           in
           let (pat_list, _new_env, _force, pvs, _mvs as res) =
             with_local_level_if is_recursive (fun () ->
-              type_pattern_list Value existential_context env spatl nvs
-                allow_modules
+              type_pattern_list Value existential_context env mutable_flag spatl
+                nvs allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
                        iter_pattern_variables_type generalize pvs)
           in
@@ -9300,7 +9412,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (fun (_, pat, _) (exp, _) ->
           if maybe_expansive exp then lower_contravariant env pat.pat_type)
         mode_pat_typ_list exp_list;
-      iter_pattern_variables_type generalize pvs;
+      iter_pattern_variables_type_mut
+        ~f_immut:generalize
+        ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
+        pvs;
       (* update pattern variable jkind reasons *)
       List.iter
         (fun pv ->
@@ -9573,7 +9688,7 @@ and type_generic_array
   let to_unify = type_ ty in
   with_explanation explanation (fun () ->
     unify_exp_types loc env to_unify (generic_instance ty_expected));
-  check_construct_mutability ~loc ~env mutability ty array_mode;
+  check_construct_mutability ~loc ~env mutability ~ty array_mode;
   let argument_mode = expect_mode_cross env ty argument_mode in
   let argl =
     List.map
@@ -9826,7 +9941,7 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         let container_type, mut = match amut with
         | Mutable   ->
           Predef.type_array, Mutable {
-            modal_upper_bound = Alloc.Comonadic.Const.legacy;
+            mode = Value.Comonadic.legacy;
             (* CR aspsmith: Revisit once we support atomic arrays *)
             atomic = Nonatomic
           }
@@ -9992,6 +10107,7 @@ and type_comprehension_iterator
           Value
           ~no_existentials:In_self_pattern
           ~alloc_mode:(simple_pat_mode Value.legacy)
+          ~mutable_flag:Immutable
           penv
           pattern
           item_ty
@@ -10096,21 +10212,22 @@ let maybe_check_uniqueness_value_bindings vbl =
 
 (* Typing of toplevel bindings *)
 
-let type_binding env rec_flag ?force_toplevel spat_sexp_list =
+let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
       ~check:(fun s -> Warnings.Unused_value_declaration s)
       ~check_strict:(fun s -> Warnings.Unused_value_declaration s)
       ?force_toplevel
       At_toplevel
-      env rec_flag spat_sexp_list Modules_rejected
+      env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
   maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
-let type_let existential_ctx env rec_flag spat_sexp_list =
+let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
   let (pat_exp_list, new_env) =
-    type_let existential_ctx env rec_flag spat_sexp_list Modules_rejected
+    type_let existential_ctx env mutable_flag rec_flag spat_sexp_list
+      Modules_rejected
   in
   maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
@@ -10843,6 +10960,16 @@ let report_error ~loc env =
       Location.errorf ~loc
         "%t,@ but the constructor %a introduces existential types."
         reason_str Style.inline_code name
+  | Unexpected_mutable reason ->
+      let reason_str =
+        match reason with
+        | In_rec ->
+          "to be recursive"
+        | In_group ->
+          "as part of a `let .. and ..' group"
+      in
+      Location.errorf ~loc "@[Mutable let bindings are not allowed %s "
+        reason_str
   | Invalid_interval ->
       Location.errorf ~loc
         "@[Only character intervals are supported in patterns.@]"
@@ -10926,6 +11053,10 @@ let report_error ~loc env =
       Location.errorf ~loc
         "Only variables are allowed as left-hand side of %a"
         Style.inline_code "let rec"
+  | Illegal_mutable_pat ->
+      Location.errorf ~loc
+        "Only variables are allowed as the left-hand side of %a"
+        Style.inline_code "let mutable"
   | Illegal_letrec_expr ->
       Location.errorf ~loc
         "This kind of expression is not allowed as right-hand side of %a"
@@ -11156,6 +11287,11 @@ let report_error ~loc env =
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+  | Mutable_var_not_rep (ty, violation) ->
+      Location.errorf ~loc
+        "@[Mutable variables must be representable.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
@@ -11177,14 +11313,22 @@ let report_error ~loc env =
       print_unsupported_stack_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
-  | Impossible_function_jkind (ty, jkind) ->
+  | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
+      let hint ppf =
+        if some_args_ok
+        then Format.fprintf ppf
+              "@ Hint: Perhaps you have over-applied the function or used an \
+               incorrect label."
+      in
       Location.errorf ~loc
-        "@[@[This expression is used as a function, but its type@ %a@]@ \
-         has kind %a, which cannot be the kind of a function.@ \
-         (Functions always have kind %a.)@]"
-        (Style.as_inline_code Printtyp.type_expr) ty
+        "@[@[This function application uses an expression with type@ %a@]@ \
+         as a function, but that type has kind %a, which cannot@ \
+         be the kind of a function.@ \
+         (Functions always have kind %a.)%t@]"
+        (Style.as_inline_code Printtyp.type_expr) ty_fun
         (Style.as_inline_code Jkind.format) jkind
         (Style.as_inline_code Jkind.format) Jkind.for_arrow
+        hint
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
         "Overwriting is only supported on tuples, constructors and boxed records."

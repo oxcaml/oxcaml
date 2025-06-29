@@ -567,7 +567,7 @@ Line 1, characters 13-26:
 Error: This type "float or_null" should be an instance of type
          "('a : any mod separable)"
        The kind of float or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of float or_null must be a subkind of any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -643,7 +643,7 @@ Line 1, characters 22-36:
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of string or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -670,7 +670,7 @@ Line 1, characters 13-26:
 Error: This type "float or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of float or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of float or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -697,7 +697,7 @@ Line 1, characters 22-36:
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of string or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.

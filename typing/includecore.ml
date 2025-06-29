@@ -695,17 +695,15 @@ module Record_diffing = struct
           | Immutable, Immutable -> None
           | Mutable _, Immutable -> Some (Mutability First)
           | Immutable, Mutable _ -> Some (Mutability Second)
-          | Mutable { modal_upper_bound = m1; atomic = atomic1 },
-            Mutable { modal_upper_bound = m2; atomic = atomic2 } ->
+          | Mutable { mode = m1; atomic = atomic1 },
+            Mutable { mode = m2; atomic = atomic2 } ->
             begin match atomic1, atomic2 with
             | Atomic, Nonatomic -> Some (Atomicity First)
             | Nonatomic, Atomic -> Some (Atomicity Second)
             | Atomic, Atomic | Nonatomic, Nonatomic ->
-                let open Mode.Alloc.Comonadic.Const in
-                (if not (Misc.Le_result.equal ~le m1 legacy) then
-                   Misc.fatal_errorf "Unexpected mutable(%a)" print m1);
-                (if not (Misc.Le_result.equal ~le m2 legacy) then
-                   Misc.fatal_errorf "Unexpected mutable(%a)" print m2);
+                let open Mode.Value.Comonadic in
+                equate_exn m1 legacy;
+                equate_exn m2 legacy;
                 None
             end
         in

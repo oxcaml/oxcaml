@@ -184,48 +184,38 @@ module TycompTbl =
         and constructors).  We keep a representation of each nested
         "open" and the set of local bindings between each of them. *)
 
-    type ('lock, 'a) t = {
+    type 'a t = {
       current: 'a Ident.tbl;
       (** Local bindings since the last open. *)
 
-      layer: ('lock, 'a) layer;
-      (** Symbolic representation of the last (innermost) layer *)
+      opened: 'a opened option;
+      (** Symbolic representation of the last (innermost) open, if any. *)
     }
 
-    and ('lock, 'a) layer =
-      | Open of {
-        components: ('a list) NameMap.t;
-        (** Components from the opened module. We keep a list of
-            bindings for each name, as in comp_labels and
-            comp_constrs. *)
+    and 'a opened = {
+      components: ('a list) NameMap.t;
+      (** Components from the opened module. We keep a list of
+          bindings for each name, as in comp_labels and
+          comp_constrs. *)
 
-        root: Path.t;
-        (** Only used to check removal of open *)
+      root: Path.t;
+      (** Only used to check removal of open *)
 
-        using: (string -> ('a * 'a) option -> unit) option;
-        (** A callback to be applied when a component is used from this
-            "open".  This is used to detect unused "opens".  The
-            arguments are used to detect shadowing. *)
+      using: (string -> ('a * 'a) option -> unit) option;
+      (** A callback to be applied when a component is used from this
+          "open".  This is used to detect unused "opens".  The
+          arguments are used to detect shadowing. *)
 
-        next: ('lock, 'a) t;
-        (** The table before opening the module. *)
+      next: 'a t;
+      (** The table before opening the module. *)
+    }
 
-        locks: 'lock list;
-        (** List of locks from the definition of [root] to this [Open], in that
-            order *)
-      }
-      | Lock of {
-          lock : 'lock;
-          next : ('lock, 'a) t;
-      }
-      | Nothing
-
-    let empty = { current = Ident.empty; layer = Nothing }
+    let empty = { current = Ident.empty; opened = None }
 
     let add id x tbl =
       {tbl with current = Ident.add id x tbl.current}
 
-    let add_open slot wrap root components locks next =
+    let add_open slot wrap root components next =
       let using =
         match slot with
         | None -> None
@@ -233,12 +223,12 @@ module TycompTbl =
       in
       {
         current = Ident.empty;
-        layer = Open {using; components; root; locks; next};
+        opened = Some {using; components; root; next};
       }
 
     let remove_last_open rt tbl =
-      match tbl.layer with
-      | Open {root; next; _} when Path.same rt root ->
+      match tbl.opened with
+      | Some {root; next; _} when Path.same rt root ->
           { next with current =
             Ident.fold_all Ident.add tbl.current next.current }
       | _ ->
@@ -247,10 +237,9 @@ module TycompTbl =
     let rec find_same id tbl =
       try Ident.find_same id tbl.current
       with Not_found as exn ->
-        begin match tbl.layer with
-        | Open {next; _} -> find_same id next
-        | Lock {next; _} -> find_same id next
-        | Nothing -> raise exn
+        begin match tbl.opened with
+        | Some {next; _} -> find_same id next
+        | None -> raise exn
         end
 
     let nothing = fun () -> ()
@@ -267,10 +256,9 @@ module TycompTbl =
     let rec find_all ~mark name tbl =
       List.map (fun (_id, desc) -> desc, nothing)
         (Ident.find_all name tbl.current) @
-      match tbl.layer with
-      | Nothing -> []
-      | Lock {next; _} -> find_all ~mark name next
-      | Open {using; next; components; root = _} ->
+      match tbl.opened with
+      | None -> []
+      | Some {using; next; components; root = _} ->
           let rest = find_all ~mark name next in
           let using = if mark then using else None in
           match NameMap.find name components with
@@ -281,50 +269,23 @@ module TycompTbl =
                 opened
               @ rest
 
-    let add_lock lock next =
-      { current = Ident.empty; layer = Lock {lock; next} }
-
-    let rec find_all_and_locks ~mark name tbl acc =
-      List.map (fun (_id, desc) -> (desc, (acc, nothing)))
-        (Ident.find_all name tbl.current) @
-      match tbl.layer with
-      | Nothing -> []
-      | Lock {lock;next} ->
-          find_all_and_locks ~mark name next (lock :: acc)
-      | Open {using; next; components; locks; root = _} ->
-          let rest = find_all_and_locks ~mark name next acc in
-          let using = if mark then using else None in
-          match NameMap.find name components with
-          | exception Not_found -> rest
-          | opened ->
-              List.map
-                (fun desc -> desc,
-                  (locks @ acc, mk_callback rest name desc using))
-                opened
-              @ rest
-
-    let find_all_and_locks ~mark name tbl =
-      find_all_and_locks ~mark name tbl []
-
     let rec fold_name f tbl acc =
       let acc = Ident.fold_name (fun _id d -> f d) tbl.current acc in
-      match tbl.layer with
-      | Open {using = _; next; components; root = _} ->
+      match tbl.opened with
+      | Some {using = _; next; components; root = _} ->
           acc
           |> NameMap.fold
             (fun _name -> List.fold_right f)
             components
           |> fold_name f next
-      | Lock {next; _} -> fold_name f next acc
-      | Nothing ->
+      | None ->
           acc
 
     let rec local_keys tbl acc =
       let acc = Ident.fold_all (fun k _ accu -> k::accu) tbl.current acc in
-      match tbl.layer with
-      | Open o -> local_keys o.next acc
-      | Lock {next; _} -> local_keys next acc
-      | Nothing -> acc
+      match tbl.opened with
+      | Some o -> local_keys o.next acc
+      | None -> acc
 
     let diff_keys is_local tbl1 tbl2 =
       let keys2 = local_keys tbl2 [] in
@@ -349,22 +310,20 @@ type locality_context =
 
 type closure_context =
   | Function of locality_context option
+  | Functor
   | Lazy
 
 type escaping_context =
   | Letop
   | Probe
   | Class
-  | Module
 
 type shared_context =
   | For_loop
   | While_loop
   | Letop
-  | Closure
   | Comprehension
   | Class
-  | Module
   | Probe
 
 type lock =
@@ -387,7 +346,6 @@ type lock_item =
   | Value
   | Module
   | Class
-  | Constructor
 
 module IdTbl =
   struct
@@ -668,9 +626,9 @@ let in_signature_flag = 0x01
 
 type t = {
   values: (lock, value_entry, value_data) IdTbl.t;
-  constrs: (lock, constructor_data) TycompTbl.t;
-  labels: (empty, label_data) TycompTbl.t;
-  unboxed_labels: (empty, unboxed_label_description) TycompTbl.t;
+  constrs: constructor_data TycompTbl.t;
+  labels: label_data TycompTbl.t;
+  unboxed_labels: unboxed_label_description TycompTbl.t;
   types: (empty, type_data, type_data) IdTbl.t;
   modules: (lock, module_entry, module_data) IdTbl.t;
   modtypes: (empty, modtype_data, modtype_data) IdTbl.t;
@@ -825,8 +783,8 @@ type lookup_error =
   | Unbound_class of Longident.t
   | Unbound_modtype of Longident.t
   | Unbound_cltype of Longident.t
-  | Unbound_instance_variable of string
-  | Not_an_instance_variable of string
+  | Unbound_settable_variable of string
+  | Not_a_settable_variable of string
   | Masked_instance_variable of Longident.t
   | Masked_self_variable of Longident.t
   | Masked_ancestor_variable of Longident.t
@@ -845,6 +803,8 @@ type lookup_error =
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
+  | Mutable_value_used_in_closure of
+      [`Escape of escaping_context | `Shared of shared_context | `Closure]
 
 type error =
   | Missing_module of Location.t * Path.t * Path.t
@@ -870,7 +830,7 @@ let mode_default mode = {
 }
 
 let env_labels (type rep) (record_form : rep record_form) env
-    : (empty, rep gen_label_description) TycompTbl.t  =
+    : rep gen_label_description TycompTbl.t  =
   match record_form with
   | Legacy -> env.labels
   | Unboxed_product -> env.unboxed_labels
@@ -2779,7 +2739,6 @@ let add_lock lock env =
     values = IdTbl.add_lock lock env.values;
     modules = IdTbl.add_lock lock env.modules;
     classes = IdTbl.add_lock lock env.classes;
-    constrs = TycompTbl.add_lock lock env.constrs;
   }
 
 let add_escape_lock escaping_context env =
@@ -3343,9 +3302,58 @@ let walk_locks ~errors ~loc ~env ~item ~lid mode ty locks =
           vmode
     ) vmode locks
 
+(** Takes [m0] which is the parameter of [let mutable x] at declaration site,
+  and [locks] which is the locks between the declaration and the usage (either
+  reading or writing) of [x], and:
+- Raises error if the usage is forbidden by the locks
+- Returns the expected mode of the new value at the usage site (if the usage is
+  a write).
+*)
+let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
+  let mode =
+    m0
+    |> mutable_mode |> Mode.Value.disallow_left
+  in
+  List.fold_left
+    (fun (mode : Mode.Value.r) lock ->
+      match lock with
+      | Region_lock ->
+          (* CR zqian: once we have finer regionality, remove this branch *)
+          (* First map [regional] to [global], then cap [local] to [regional] *)
+          let mode = mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value in
+          Mode.Value.meet
+            [mode;
+             Mode.Value.max_with (Comonadic Areality)
+                                 (Mode.Regionality.regional)]
+      | Exclave_lock ->
+          (* If [m0] is [global], then inside the exclave we require new values
+          to be [global]. If [m0] is [regional], then we require the new values
+          to be [local]. If [m0] is [local], that would trigger type error
+          elsewhere, so what we return here doesn't matter. *)
+          mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
+      | Escape_lock (Letop | Probe | Class as ctx) ->
+          may_lookup_error errors loc env
+            (Mutable_value_used_in_closure (`Escape ctx))
+      | Share_lock (Letop | Probe | Class as ctx) ->
+          may_lookup_error errors loc env
+            (Mutable_value_used_in_closure (`Shared ctx))
+      | Share_lock (For_loop | While_loop | Comprehension) ->
+          mode
+      | Closure_lock _ ->
+          may_lookup_error errors loc env
+            (Mutable_value_used_in_closure `Closure)
+      | Unboxed_lock -> mode
+    ) mode locks
+
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) ->
+      begin match vda with
+      | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
+          m0
+          |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
+          |> ignore
+      | _ -> () end;
       use_value ~use ~loc path vda;
       path, locks, vda
   | Ok (_, _, Val_unbound reason) ->
@@ -3409,16 +3417,16 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
     end
 
 let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
-  match TycompTbl.find_all_and_locks ~mark:use s env.constrs with
+  match TycompTbl.find_all ~mark:use s env.constrs with
   | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
   | cstrs ->
       List.map
-        (fun (cda, (locks, use_fn)) ->
+        (fun (cda, use_fn) ->
            let use_fn () =
              use_constructor ~use ~loc usage env cda;
              use_fn ()
            in
-           ((cda.cda_description, locks), use_fn))
+           (cda.cda_description, use_fn))
         cstrs
 
 let rec lookup_module_components ~errors ~use ~loc lid env =
@@ -3612,9 +3620,7 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
       lookup_all_ident_constructors
         ~errors ~use ~loc usage s (Lazy.force initial)
   | _ ->
-      let (_, locks, comps) =
-        lookup_structure_components ~errors ~use ~loc l env
-      in
+      let (_, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
       match NameMap.find s comps.comp_constrs with
       | [] | exception Not_found ->
           may_lookup_error errors loc env (Unbound_constructor (Ldot(l, s)))
@@ -3622,17 +3628,14 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
           List.map
             (fun cda ->
                let use_fun () = use_constructor ~use ~loc usage env cda in
-               ((cda.cda_description, locks), use_fun))
+               (cda.cda_description, use_fun))
             cstrs
 
 (* Open a signature path *)
 
 let add_components slot root env0 comps locks =
   let add_l w comps env0 =
-    TycompTbl.add_open slot w root comps ([] : empty list) env0
-  in
-  let add_c w comps env0 =
-    TycompTbl.add_open slot w root comps locks env0
+    TycompTbl.add_open slot w root comps env0
   in
   let add_v w comps env0 =
     IdTbl.add_open slot w root comps locks env0
@@ -3641,7 +3644,7 @@ let add_components slot root env0 comps locks =
     IdTbl.add_open slot w root comps ([] : empty list) env0
   in
   let constrs =
-    add_c (fun x -> `Constructor x) comps.comp_constrs env0.constrs
+    add_l (fun x -> `Constructor x) comps.comp_constrs env0.constrs
   in
   let labels =
     add_l (fun x -> `Label x) comps.comp_labels env0.labels
@@ -3955,7 +3958,7 @@ let lookup_all_constructors ~errors ~use ~loc usage lid env =
 let lookup_constructor ~errors ~use ~loc usage lid env =
   match lookup_all_constructors ~errors ~use ~loc usage lid env with
   | [] -> assert false
-  | ((desc, locks), use) :: _ -> use (); desc, locks
+  | (desc, use) :: _ -> use (); desc
 
 let lookup_all_constructors_from_type ~use ~loc usage ty_path env =
   match find_type_descrs ty_path env with
@@ -3968,7 +3971,7 @@ let lookup_all_constructors_from_type ~use ~loc usage ty_path env =
            let use_fun () =
              use_constructor_desc ~use ~loc usage env cstr
            in
-           ((cstr, locks_empty), use_fun))
+           (cstr, use_fun))
         cstrs
 
 (* Lookup functions that do not mark the item as used or
@@ -4005,7 +4008,6 @@ let find_cltype_by_name lid env =
 let find_constructor_by_name lid env =
   let loc = Location.(in_file !input_name) in
   lookup_constructor ~errors:false ~use:false ~loc Positive lid env
-  |> fst
 
 let find_label_by_name record_form lid env =
   let loc = Location.(in_file !input_name) in
@@ -4086,27 +4088,45 @@ let lookup_all_labels_from_type ?(use=true) ~record_form ~loc usage ty_path env
   =
   lookup_all_labels_from_type ~use ~record_form ~loc usage ty_path env
 
-let lookup_instance_variable ?(use=true) ~loc name env =
+type settable_variable =
+  | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
+
+let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
-  | Ok (path, _, Val_bound vda) -> begin
+  | Ok (path, locks, Val_bound vda) -> begin
       let desc = vda.vda_description in
-      match desc.val_kind with
-      | Val_ivar(mut, cl_num) ->
+      match desc.val_kind, path with
+      | Val_ivar(mut, cl_num), _ ->
           use_value ~use ~loc path vda;
-          path, mut, cl_num, Subst.Lazy.force_type_expr desc.val_type
-      | _ ->
-          lookup_error loc env (Not_an_instance_variable name)
+          Instance_variable
+            (path, mut, cl_num, Subst.Lazy.force_type_expr desc.val_type)
+      | Val_mut (m0, sort), Pident id ->
+          let val_type = Subst.Lazy.force_type_expr desc.val_type in
+          let mode =
+            m0
+            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
+            |> Mode.Modality.Value.Const.apply
+                (Typemode.let_mutable_modalities m0)
+          in
+          use_value ~use ~loc path vda;
+          Mutable_variable (id, mode, val_type, sort)
+      | Val_mut _, _ -> assert false
+      (* Unreachable because only [type_pat] creates mutable variables
+         and it checks that they are simple identifiers. *)
+      | ((Val_reg | Val_prim _ | Val_self _ | Val_anc _), _) ->
+          lookup_error loc env (Not_a_settable_variable name)
     end
   | Ok (_, _, Val_unbound Val_unbound_instance_variable) ->
       lookup_error loc env (Masked_instance_variable (Lident name))
   | Ok (_, _, Val_unbound Val_unbound_self) ->
-      lookup_error loc env (Not_an_instance_variable name)
+      lookup_error loc env (Not_a_settable_variable name)
   | Ok (_, _, Val_unbound Val_unbound_ancestor) ->
-      lookup_error loc env (Not_an_instance_variable name)
+      lookup_error loc env (Not_a_settable_variable name)
   | Ok (_, _, Val_unbound Val_unbound_ghost_recursive _) ->
-      lookup_error loc env (Unbound_instance_variable name)
+      lookup_error loc env (Unbound_settable_variable name)
   | Error _ ->
-      lookup_error loc env (Unbound_instance_variable name)
+      lookup_error loc env (Unbound_settable_variable name)
 
 (* Checking if a name is bound *)
 
@@ -4403,11 +4423,11 @@ let extract_modtypes path env =
   fold_modtypes (fun name _ _ acc -> name :: acc) path env []
 let extract_cltypes path env =
   fold_cltypes (fun name _ _ acc -> name :: acc) path env []
-let extract_instance_variables env =
+let extract_settable_variables env =
   fold_values
     (fun name _ descr _ acc ->
        match descr.val_kind with
-       | Val_ivar _ -> name :: acc
+       | Val_ivar _ | Val_mut _ -> name :: acc
        | _ -> acc) None env []
 
 let string_of_escaping_context : escaping_context -> string =
@@ -4415,17 +4435,14 @@ let string_of_escaping_context : escaping_context -> string =
   | Letop -> "a letop"
   | Probe -> "a probe"
   | Class -> "a class"
-  | Module -> "a module"
 
 let string_of_shared_context : shared_context -> string =
   function
   | For_loop -> "a for loop"
   | While_loop -> "a while loop"
   | Letop -> "a letop"
-  | Closure -> "a closure that is not once"
   | Comprehension -> "a comprehension"
   | Class -> "a class"
-  | Module -> "a module"
   | Probe -> "a probe"
 
 let sharedness_hint ppf : shared_context -> _ = function
@@ -4449,15 +4466,6 @@ let sharedness_hint ppf : shared_context -> _ = function
     Format.fprintf ppf
         "@[Hint: This identifier cannot be used uniquely,@ \
           because it is defined in a class.@]"
-  | Closure ->
-    Format.fprintf ppf
-        "@[Hint: This identifier was defined outside of the current closure.@ \
-          Either this closure has to be once, or the identifier can be used only@ \
-          as aliased.@]"
-  | Module ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it is defined in a module.@]"
   | Probe ->
     Format.fprintf ppf
         "@[Hint: This identifier cannot be used uniquely,@ \
@@ -4473,9 +4481,6 @@ let print_lock_item ppf (item, lid) =
         (Style.as_inline_code !print_longident) lid
   | Value -> fprintf ppf "The value %a is"
       (Style.as_inline_code !print_longident) lid
-  | Constructor ->
-      fprintf ppf "The constructor %a is"
-        (Style.as_inline_code !print_longident) lid
 
 module Style = Misc.Style
 
@@ -4580,13 +4585,14 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf "Unbound class type %a"
         (Style.as_inline_code !print_longident) lid;
       spellcheck ppf extract_cltypes env lid
-  | Unbound_instance_variable s ->
-      fprintf ppf "Unbound instance variable %a" Style.inline_code s;
-      spellcheck_name ppf extract_instance_variables env s;
-  | Not_an_instance_variable s ->
-      fprintf ppf "The value %a is not an instance variable"
+  | Unbound_settable_variable s ->
+      fprintf ppf "Unbound instance variable or mutable variable %a"
         Style.inline_code s;
-      spellcheck_name ppf extract_instance_variables env s;
+      spellcheck_name ppf extract_settable_variables env s
+  | Not_a_settable_variable s ->
+      fprintf ppf "The value %a is not an instance variable or mutable variable"
+        Style.inline_code s;
+      spellcheck_name ppf extract_settable_variables env s
   | Masked_instance_variable lid ->
       fprintf ppf
         "The instance variable %a@ \
@@ -4670,6 +4676,13 @@ let report_lookup_error _loc env ppf = function
               | _ -> fun _ppf -> ()
             in
             "function that " ^ e1, hint
+        | Functor ->
+            let s =
+              match error with
+              | Error (Areality, _) -> "functor"
+              | _ -> "functor that " ^ e1
+            in
+            s, fun _ppf -> ()
         | Lazy ->
             let s =
               match error with
@@ -4711,6 +4724,15 @@ let report_lookup_error _loc env ppf = function
       end
   | Error_from_persistent_env err ->
       Persistent_env.report_error ppf err
+  | Mutable_value_used_in_closure ctx ->
+      let ctx =
+        match ctx with
+        | `Escape ctx -> string_of_escaping_context ctx
+        | `Shared ctx -> string_of_shared_context ctx
+        | `Closure -> "closure"
+      in
+      fprintf ppf
+        "@[Mutable variable cannot be used inside %s.@]" ctx
 
 let report_error ppf = function
   | Missing_module(_, path1, path2) ->
