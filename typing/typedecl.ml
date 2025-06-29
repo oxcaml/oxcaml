@@ -141,6 +141,7 @@ type error =
   | Unsafe_mode_crossing_on_invalid_type_kind
   | Illegal_baggage of jkind_l
   | No_unboxed_version of Path.t
+  | Atomic_field_must_be_mutable of string
 
 open Typedtree
 
@@ -481,12 +482,18 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
+         let is_atomic = Builtin_attributes.has_atomic attrs in
          let mut : mutability =
-          match mut with
-          | Immutable -> Immutable
-          | Mutable ->
+          match mut, is_atomic with
+          | Immutable, false -> Immutable
+          | Immutable, true ->
+            raise (Error (loc, Atomic_field_must_be_mutable name.txt))
+          | Mutable, is_atomic ->
               match record_form with
-              | Legacy -> Mutable Mode.Value.Comonadic.legacy
+              | Legacy -> Mutable {
+                mode = Mode.Value.Comonadic.legacy;
+                atomic = if is_atomic then Atomic else Nonatomic
+              }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
          let modalities =
@@ -4725,6 +4732,10 @@ let report_error ppf = function
   | No_unboxed_version p ->
       fprintf ppf "@[The type %a@ has no unboxed version.@]"
         (Style.as_inline_code Printtyp.path) p
+  | Atomic_field_must_be_mutable name ->
+      fprintf ppf
+        "@[The label %a must be mutable to be declared atomic.@]"
+        Style.inline_code name
 
 let () =
   Location.register_error_of_exn
