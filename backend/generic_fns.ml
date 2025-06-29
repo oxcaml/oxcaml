@@ -350,8 +350,12 @@ let default_generic_fns : Cmx_format.generic_fns =
   }
 
 (* These apply funs are always present in the main program because the run-time
-   system needs them (cf. runtime/<arch>.S) . *)
-let compile ~shared tbl =
+   system needs them (cf. runtime/<arch>.S) .
+
+   CR gbury: maybe we could use the Tbl/Cache mechanism to track whether we need
+   to include the `fail_if_called_indirectly` function ? That would remove the
+   need for the `cache` argument. *)
+let compile ~cache ~shared tbl =
   if not shared
   then ignore (Tbl.add ~imports:Partition.Set.empty tbl default_generic_fns);
   let ({ curry_fun; apply_fun; send_fun } : Cmx_format.generic_fns) =
@@ -360,7 +364,7 @@ let compile ~shared tbl =
   List.concat_map H.curry_function curry_fun
   @ List.map H.send_function send_fun
   @ List.map H.apply_function apply_fun
-  @ H.fail_if_called_indirectly_function ()
+  @ if cache then [] else H.fail_if_called_indirectly_function ()
 
 let imported_units p =
   Partition.Set.to_seq p |> Seq.map Partition.to_cu |> List.of_seq

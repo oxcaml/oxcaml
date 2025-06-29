@@ -486,7 +486,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           | Immutable -> Immutable
           | Mutable ->
               match record_form with
-              | Legacy -> Mutable Mode.Alloc.Comonadic.Const.legacy
+              | Legacy -> Mutable Mode.Value.Comonadic.legacy
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
          let modalities =
@@ -2998,10 +2998,7 @@ let transl_extension_constructor ~scope env type_path type_params
         let usage : Env.constructor_usage =
           if priv = Public then Env.Exported else Env.Exported_private
         in
-        let cdescr, locks =
-          Env.lookup_constructor ~loc:lid.loc usage lid.txt env
-        in
-        let held_locks = (locks, lid.txt, lid.loc) in
+        let cdescr = Env.lookup_constructor ~loc:lid.loc usage lid.txt env in
         let (args, cstr_res, _ex) =
           Ctype.instance_constructor Keep_existentials_flexible cdescr
         in
@@ -3035,8 +3032,6 @@ let transl_extension_constructor ~scope env type_path type_params
               | _ -> ())
             typext_params
         end;
-        Ctype.check_constructor_crossing env cdescr.cstr_tag ~res:cstr_res args
-          held_locks;
         (* Ensure that constructor's type matches the type being extended *)
         let cstr_type_path = Btype.cstr_type_path cdescr in
         let cstr_type_params = (Env.find_type cstr_type_path env).type_params in

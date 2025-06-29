@@ -231,3 +231,34 @@ Line 3, characters 19-20:
                        ^
 Error: "M" is a module, and modules are always nonportable, so cannot be used inside a function that is portable.
 |}]
+
+let use_unique : 'a @ unique -> unit = fun _ -> ()
+
+(* Functors are [many], and can't close over unique values*)
+
+let foo (x @ unique) =
+  let module Foo (_ : sig end) = struct
+    let () = use_unique x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+val use_unique : 'a @ unique -> unit = <fun>
+Line 7, characters 24-25:
+7 |     let () = use_unique x
+                            ^
+Error: This value is "aliased" but expected to be "unique".
+|}]
+
+let foo (x @ unique) =
+  let module Foo () = struct
+    let () = use_unique x
+  end in
+  let module _ = Foo() in
+  ()
+[%%expect{|
+Line 3, characters 24-25:
+3 |     let () = use_unique x
+                            ^
+Error: This value is "aliased" but expected to be "unique".
+|}]

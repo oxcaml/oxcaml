@@ -59,9 +59,21 @@ let add_use t use =
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
 let union t1 t2 =
-  assert (Continuation.equal t1.continuation t2.continuation);
-  (* Kinds will always match at join points *)
-  assert (Flambda_arity.equal_ignoring_subkinds t1.arity t2.arity);
+  if not (Continuation.equal t1.continuation t2.continuation)
+  then
+    Misc.fatal_errorf
+      "Cannot union continuation uses for different continuations %a and %a.@ \
+       Continuation uses t1:@ %a@ and@ t2:@ %a"
+      Continuation.print t1.continuation Continuation.print t2.continuation
+      print t1 print t2;
+  if Flambda_features.kind_checks ()
+     && not (Flambda_arity.equal_ignoring_subkinds t1.arity t2.arity)
+  then
+    Misc.fatal_errorf
+      "Arity of continuation uses (%a) doesn't match arity of continuation \
+       uses (%a).  Continuation uses t1:@ %a@ and@ t2:@ %a"
+      Flambda_arity.print t1.arity Flambda_arity.print t2.arity print t1 print
+      t2;
   { continuation = t1.continuation; arity = t1.arity; uses = t1.uses @ t2.uses }
 
 let number_of_uses t = List.length t.uses

@@ -27,7 +27,8 @@
 type t =
   | Missing_code
   | Definition_says_not_to_inline
-  | Environment_says_never_inline
+  | In_a_stub
+  | Doing_speculative_inlining
   | Argument_types_not_useful
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded
@@ -54,8 +55,9 @@ let [@ocamlformat "disable"] print ppf t =
   | Missing_code -> Format.fprintf ppf "Missing_code"
   | Definition_says_not_to_inline ->
     Format.fprintf ppf "Definition_says_not_to_inline"
-  | Environment_says_never_inline ->
-    Format.fprintf ppf "Environment_says_never_inline"
+  | In_a_stub -> Format.fprintf ppf "In_a_stub"
+  | Doing_speculative_inlining ->
+    Format.fprintf ppf "Doing_speculative_inlining"
   | Argument_types_not_useful ->
     Format.fprintf ppf "Argument_types_not_useful"
   | Unrolling_depth_exceeded ->
@@ -114,9 +116,10 @@ type can_inline =
 
 let can_inline (t : t) : can_inline =
   match t with
-  | Missing_code | Environment_says_never_inline | Max_inlining_depth_exceeded
-  | Recursion_depth_exceeded | Speculatively_not_inline _
-  | Definition_says_not_to_inline | Argument_types_not_useful ->
+  | Missing_code | In_a_stub | Doing_speculative_inlining
+  | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+  | Speculatively_not_inline _ | Definition_says_not_to_inline
+  | Argument_types_not_useful ->
     (* If there's an [@inlined] attribute on this, something's gone wrong *)
     Do_not_inline { erase_attribute_if_ignored = false }
   | Never_inlined_attribute ->
@@ -145,6 +148,7 @@ let can_inline (t : t) : can_inline =
   | Replay_history_says_must_inline ->
     Inline { unroll_to = None; was_inline_always = false }
 
+(* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
 let report_reason fmt t =
   match (t : t) with
   | Missing_code ->
@@ -154,8 +158,12 @@ let report_reason fmt t =
     Format.fprintf fmt
       "this@ function@ was@ deemed@ at@ the@ point@ of@ its@ definition@ to@ \
        never@ be@ inlinable"
-  | Environment_says_never_inline ->
-    Format.fprintf fmt "the@ environment@ says@ never@ to@ inline"
+  | In_a_stub ->
+    Format.fprintf fmt
+      "this@ function@ is@ being@ called@ inside@ of@ a@ stub;@ inlining@ is@ \
+       not@ performed@ inside@ stubs@ (until@ they@ are@ inlined)"
+  | Doing_speculative_inlining ->
+    Format.fprintf fmt "because@ speculative@ inlining@ is@ in@ progress"
   | Argument_types_not_useful ->
     Format.fprintf fmt
       "there@ was@ no@ useful@ information@ about@ the@ arguments"

@@ -627,6 +627,21 @@ let simple_exprs env simple1 simple2 : Simple.t Comparison.t =
           then Equivalent
           else Different { approximant = simple1 }))
 
+let simples_with_debuginfo env simple_with_dbg1 simple_with_dbg2 :
+    Simple.With_debuginfo.t Comparison.t =
+  let simple1 = Simple.With_debuginfo.simple simple_with_dbg1 in
+  let simple2 = Simple.With_debuginfo.simple simple_with_dbg2 in
+  let dbg1 = Simple.With_debuginfo.dbg simple_with_dbg1 in
+  let dbg2 = Simple.With_debuginfo.dbg simple_with_dbg2 in
+  Comparison.map
+    ~f:(fun (simple, dbg) -> Simple.With_debuginfo.create simple dbg)
+    (pairs ~f1:simple_exprs
+       ~f2:
+         (Comparator.of_predicate (fun dbg1 dbg2 ->
+              Debuginfo.compare dbg1 dbg2 = 0))
+       ~subst2:(fun _ dbg -> dbg)
+       env (simple1, dbg1) (simple2, dbg2))
+
 let print_list f ppf l =
   let pp_sep ppf () = Format.fprintf ppf ";@;<1 2>" in
   Format.fprintf ppf "@[<hv>[@ %a@ ]@]" (Format.pp_print_list ~pp_sep f) l
@@ -919,7 +934,7 @@ let bound_static env bound_static1 bound_static2 : Bound_static.t Comparison.t =
 
 let fields env (field1 : Simple.With_debuginfo.t)
     (field2 : Simple.With_debuginfo.t) : Simple.With_debuginfo.t Comparison.t =
-  Comparator.of_predicate Simple.With_debuginfo.equal env field1 field2
+  simples_with_debuginfo env field1 field2
 
 let blocks env block1 block2 =
   triples

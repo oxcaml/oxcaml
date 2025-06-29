@@ -269,7 +269,7 @@ let mk_flambda2_result_types_all_functions f =
 ;;
 
 let mk_no_flambda2_result_types f =
-  "-flambda2-result-types", Arg.Unit f,
+  "-no-flambda2-result-types", Arg.Unit f,
   Printf.sprintf " Do not infer result types for functions (or\n\
       \     functors)%s (Flambda 2 only)"
     (format_default (

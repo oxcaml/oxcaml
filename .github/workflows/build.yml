@@ -60,25 +60,6 @@ jobs:
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
-          - name: flambda2_o3_heap
-            config: --enable-middle-end=flambda2 --disable-stack-allocation
-            os: ubuntu-latest
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
-
-          - name: flambda2_o3_advanced_meet_frame_pointers_runtime5_polling
-            config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-runtime5 --enable-poll-insertion --enable-flambda-invariants
-            os: ubuntu-latest
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1,flambda2-expert-cont-lifting-budget=200,flambda2-join-algorithm=n-way'
-
-          - name: flambda2_o3_advanced_meet_frame_pointers_runtime5_debug
-            config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-runtime5
-            os: ubuntu-latest
-            build_ocamlparam: ''
-            use_runtime: d
-            ocamlparam: '_,O3=1,flambda2-expert-cont-lifting-budget=200,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1,flambda2-join-algorithm=n-way'
-
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: ubuntu-latest
@@ -90,60 +71,36 @@ jobs:
             config: --enable-middle-end=flambda2 --disable-warn-error
             os: macos-latest
 
-          - name: flambda2_macos_arm64_runtime5_irc
+          - name: flambda2_macos_arm64_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
             os: macos-latest
-            build_ocamlparam: '_,w=-46,regalloc=irc'
-            ocamlparam: '_,w=-46,regalloc=irc'
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
 
-          - name: flambda2_macos_arm64_debug_runtime5_irc
+          - name: flambda2_macos_arm64_debug_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
             os: macos-latest
-            build_ocamlparam: '_,w=-46,regalloc=irc'
-            ocamlparam: '_,w=-46,regalloc=irc'
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
+            run_regalloc_tool: true
 
-          - name: flambda2_macos_arm64_runtime5_ls
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: macos-latest
-            build_ocamlparam: '_,w=-46,regalloc=ls'
-            ocamlparam: '_,w=-46,regalloc=ls'
-
-          - name: flambda2_macos_arm64_gi
-            config: --enable-middle-end=flambda2 --disable-warn-error
-            os: macos-latest
-            build_ocamlparam: '_,w=-46,regalloc=gi'
-            ocamlparam: '_,w=-46,regalloc=gi'
-
-          - name: flambda2_macos_arm64_gi_debug_runtime
-            config: --enable-middle-end=flambda2 --disable-warn-error
-            os: macos-latest
-            build_ocamlparam: '_,w=-46,regalloc=gi'
-            ocamlparam: '_,w=-46,regalloc=gi'
-            use_runtime: d
-            ocamlrunparam: "v=0,V=1"
-
-          - name: flambda2_ubuntu_arm64_runtime5_irc
+          - name: flambda2_ubuntu_arm64_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
             os: ubuntu-24.04-arm
-            build_ocamlparam: '_,w=-46,regalloc=irc'
-            ocamlparam: '_,w=-46,regalloc=irc'
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
 
-          - name: flambda2_ubuntu_arm64_debug_runtime5_ls
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: ubuntu-24.04-arm
-            build_ocamlparam: '_,w=-46,regalloc=ls'
-            ocamlparam: '_,w=-46,regalloc=ls'
-            use_runtime: d
-            ocamlrunparam: "v=0,V=1"
-
-          - name: irc
+          - name: regalloc
             config: --enable-middle-end=flambda2
             os: ubuntu-latest
-            build_ocamlparam: '_,w=-46,regalloc=irc'
-            ocamlparam: '_,w=-46,regalloc=irc'
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             check_arch: true
+            run_regalloc_tool: true
 
           - name: irc_polling
             config: --enable-middle-end=flambda2 --enable-poll-insertion
@@ -157,20 +114,6 @@ jobs:
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
-            check_arch: true
-
-          - name: ls
-            config: --enable-middle-end=flambda2
-            os: ubuntu-latest
-            build_ocamlparam: '_,w=-46,regalloc=ls'
-            ocamlparam: '_,w=-46,regalloc=ls'
-            check_arch: true
-
-          - name: gi
-            config: --enable-middle-end=flambda2
-            os: ubuntu-latest
-            build_ocamlparam: '_,w=-46,regalloc=gi'
-            ocamlparam: '_,w=-46,regalloc=gi'
             check_arch: true
 
           - name: cfg-invariants
@@ -189,6 +132,11 @@ jobs:
 
           - name: address_sanitizer
             config: --enable-middle-end=flambda2 --enable-address-sanitizer
+            os: ubuntu-latest
+            cc: clang
+
+          - name: address_sanitizer_runtime5
+            config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-runtime5
             os: ubuntu-latest
             cc: clang
 
@@ -241,7 +189,6 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       working-directory: ocaml-414
       run: |
-        patch -p1 < $GITHUB_WORKSPACE/oxcaml/arm64-issue-debug-upstream.patch
         ./configure --prefix=$GITHUB_WORKSPACE/ocaml-414/_install
         make -j $J world.opt
         make install
@@ -346,6 +293,15 @@ jobs:
       if: matrix.check_arch == true
       run: |
         PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make check_all_arches
+
+    - name: Run register allocation on artifacts
+      working-directory: oxcaml
+      if: matrix.run_regalloc_tool == true
+      run: |
+        for allocator in irc ls gi; do \
+          find _build -name \*.cmir-cfg-regalloc -exec ./_build/default/tools/regalloc/regalloc.exe \
+            -validate -regalloc $allocator {} \; ; \
+        done
 
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}

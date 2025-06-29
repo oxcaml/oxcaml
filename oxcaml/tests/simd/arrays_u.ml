@@ -18,6 +18,8 @@ type nonrec int64x2 = int64x2#
 type nonrec float32x4 = float32x4#
 type nonrec float64x2 = float64x2#
 
+module Builtins = Builtins_u
+
 external int8x16_of_int64s : int64 -> int64 -> int8x16 = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
 external int8x16_low_int64 : int8x16 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
 external int8x16_high_int64 : int8x16 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
