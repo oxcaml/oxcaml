@@ -1017,7 +1017,7 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
 let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
-  | Mutable m0 ->
+  | Mutable { mode = m0; _ } ->
       let m0 = m0 |> mutable_mode |> Value.disallow_right in
       let m0 = match ty with
       | Some ty -> cross_left env ty ?modalities m0
@@ -1033,7 +1033,8 @@ let mutvar_mode ~loc ~env m0 exp_mode =
   let mode = mode_default m in
   let modalities = Typemode.let_mutable_modalities m0 in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
-  check_construct_mutability ~loc ~env (Mutable m0) ~modalities mode;
+  check_construct_mutability ~loc ~env
+    (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
   m |> Value.disallow_right
 
 (** The [expected_mode] of the record when projecting a mutable field. *)
@@ -1048,6 +1049,17 @@ let mode_project_mutable =
     contention_context = Some Read_mutable;
     visibility_context = Some Read_mutable }
 
+(** The [expected_mode] of the record when projecting an atomic field. *)
+let mode_project_atomic =
+  let mode =
+    { Value.Const.max with
+      visibility = Visibility.Const.Read }
+    |> Value.of_const
+  in
+  { (mode_default mode) with
+    visibility_context = Some Read_mutable }
+
+
 (** The [expected_mode] of the record when mutating a mutable field. *)
 let mode_mutate_mutable =
   let mode =
@@ -1060,6 +1072,14 @@ let mode_mutate_mutable =
     contention_context = Some Write_mutable;
     visibility_context = Some Write_mutable }
 
+(** The [expected_mode] of the record when mutating an atomic field. *)
+let mode_mutate_atomic =
+  let mode =
+    { Value.Const.max with visibility = Read_write; }
+    |> Value.of_const
+  in
+  { (mode_default mode) with visibility_context = Some Write_mutable }
+
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
   let mode =
@@ -1071,8 +1091,12 @@ let mode_force_lazy =
     contention_context = Some Force_lazy }
 
 let check_project_mutability ~loc ~env mutability mode =
-  if Types.is_mutable mutability then
+  match mutability with
+  | Immutable -> ()
+  | Mutable { atomic = Nonatomic; _ } ->
     submode ~loc ~env mode mode_project_mutable
+  | Mutable { atomic = Atomic; _ } ->
+    submode ~loc ~env mode mode_project_atomic
 
 (* Typing of patterns *)
 
@@ -3106,7 +3130,11 @@ and type_pat_aux
   | Ppat_array (mut, spl) ->
       let mut =
         match mut with
-        | Mutable -> Mutable Value.Comonadic.legacy
+        | Mutable  -> Mutable {
+          mode = Value.Comonadic.legacy;
+          (* CR aspsmith: Revisit once we support atomic arrays *)
+          atomic = Nonatomic
+        }
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -6312,8 +6340,13 @@ and type_expect_
       in
       let (label_loc, label, newval) =
         match label.lbl_mut with
-        | Mutable m0 ->
-          submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
+        | Mutable { mode = m0; atomic } ->
+          let expected_mode =
+            match atomic with
+            | Nonatomic -> mode_mutate_mutable
+            | Atomic -> mode_mutate_atomic;
+          in
+          submode ~loc:record.exp_loc ~env rmode expected_mode;
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
@@ -6334,7 +6367,11 @@ and type_expect_
   | Pexp_array(mut, sargl) ->
       let mutability =
         match mut with
-        | Mutable -> Mutable Value.Comonadic.legacy
+        | Mutable -> Mutable {
+          mode = Value.Comonadic.legacy;
+          (* CR aspsmith: Revisit once we support atomic arrays *)
+          atomic = Nonatomic;
+        }
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -9929,10 +9966,15 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.list_argument_jkind
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
-          | Mutable   -> Predef.type_array, Mutable Value.Comonadic.legacy
-          | Immutable ->
-              Language_extension.assert_enabled ~loc Immutable_arrays ();
-              Predef.type_iarray, Immutable
+        | Mutable   ->
+          Predef.type_array, Mutable {
+            mode = Value.Comonadic.legacy;
+            (* CR aspsmith: Revisit once we support atomic arrays *)
+            atomic = Nonatomic
+          }
+        | Immutable ->
+          Language_extension.assert_enabled ~loc Immutable_arrays ();
+          Predef.type_iarray, Immutable
         in
         (Array_comprehension mut : comprehension_type),
         container_type,
