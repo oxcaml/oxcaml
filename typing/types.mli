@@ -47,6 +47,9 @@ val is_mutable : mutability -> bool
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
 val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
+(** Is the given [mutable_flag] atomically mutable? *)
+val atomic : mutability -> atomic
+
 (** Type expressions for the core language.
 
     The [type_desc] variant defines all the possible type expressions one can
