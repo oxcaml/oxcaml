@@ -246,6 +246,7 @@ type error =
   | Extension_not_enabled : _ Language_extension.t -> error
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
+  | Atomic_in_pattern of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -2686,6 +2687,17 @@ let as_comp_pattern
 let components_have_label (labeled_components : (string option * 'a) list) =
   List.exists (function Some _, _ -> true | _ -> false) labeled_components
 
+let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
+  (* Pattern-matching under atomic record fields is not allowed. We
+     still allow wildcard patterns, so that it is valid to list all
+     record fields exhaustively. *)
+  let wildcard pat = match pat.pat_desc with
+    | Tpat_any -> true
+    | _ -> false
+  in
+  if Types.atomic label.lbl_mut = Atomic && not (wildcard pat) then
+    raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -2859,6 +2871,7 @@ and type_pat_aux
       let make_record_pat
             (lbl_pat_list : (_ * rep gen_label_description * _) list) =
         check_recordpat_labels loc lbl_pat_list closed record_form;
+        List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
           | Legacy -> Tpat_record (lbl_pat_list, closed)
           | Unboxed_product ->
@@ -11108,6 +11121,13 @@ let report_error ~loc env =
         Style.inline_code "[%atomic.loc]"
   | Label_not_atomic lid ->
       Location.errorf ~loc "The record field %a is not atomic"
+        (Style.as_inline_code longident) lid
+  | Atomic_in_pattern lid ->
+      Location.errorf ~loc
+        "Atomic fields (here %a) are forbidden in patterns,@ \
+         as it is difficult to reason about when the atomic read@ \
+         will happen during pattern matching:@ the field may be read@ \
+         zero, one or several times depending on the patterns around it."
         (Style.as_inline_code longident) lid
   | Literal_overflow ty ->
       Location.errorf ~loc
