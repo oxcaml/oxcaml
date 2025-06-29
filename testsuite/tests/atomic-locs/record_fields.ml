@@ -78,7 +78,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/304" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Ok/305" (makeblock 0))
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -90,7 +90,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/312"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/313"
   (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
     (makeblock 0 test)))
 module Inline_record :
@@ -111,7 +111,7 @@ module Extension_with_inline_record = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/320"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/321"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
