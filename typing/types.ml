@@ -40,6 +40,10 @@ let mutable_mode m0 : _ Mode.Value.t =
   ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
   }
 
+let atomic = function
+  | Mutable { atomic; mode = _ } -> atomic
+  | Immutable -> Nonatomic
+
 (* Type expressions for the core language *)
 
 module Jkind_mod_bounds = struct
