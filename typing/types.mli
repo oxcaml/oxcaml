@@ -26,14 +26,22 @@ open Allowance
 (** Asttypes exposes basic definitions shared both by Parsetree and Types. *)
 open Asttypes
 
+(** Whether or not a mutable field is atomic *)
+type atomic =
+  | Nonatomic
+  | Atomic
+
 (** Describes a mutable field/element. *)
 type mutability =
   | Immutable
-  | Mutable of Mode.Value.Comonadic.lr
-  (** Mode of new field value in mutation. *)
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+        (** Mode of new field value in mutation. *)
+      ; atomic : atomic
+      }
 
-(** Returns [true] is the [mutable_flag] is mutable. Should be called if not
-    interested in the payload of [Mutable]. *)
+(** Returns [true] is the [mutable_flag] is mutable or atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
 
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
