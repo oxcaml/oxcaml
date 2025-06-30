@@ -110,12 +110,12 @@ let standard_int_or_float_of_peek_or_poke (layout : L.peek_or_poke) :
   | Ppp_unboxed_int64 -> Naked_int64
   | Ppp_unboxed_nativeint -> Naked_nativeint
 
-let string_accessor_width_of_boxed_vector ~aligned = function
+let vec_accessor_width ~aligned = function
   | L.Boxed_vec128 -> P.One_twenty_eight { aligned }
   | L.Boxed_vec256 -> P.Two_fifty_six { aligned }
   | L.Boxed_vec512 -> P.Five_twelve { aligned }
 
-let vec_kind_of_boxed_vector = function
+let vec_kind = function
   | L.Boxed_vec128 -> Vector_types.Kind.Vec128
   | L.Boxed_vec256 -> Vector_types.Kind.Vec256
   | L.Boxed_vec512 -> Vector_types.Kind.Vec512
@@ -743,7 +743,8 @@ let actual_max_length_for_string_like_access_as_nativeint ~size_int
   in
   match access_size with
   | Eight -> length (* micro-optimization *)
-  | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+  | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _
+  | Two_fifty_six _ | Five_twelve _ ->
     let offset = length_offset_of_size access_size in
     let reduced_length =
       H.Prim
@@ -854,7 +855,9 @@ let string_like_load ~dbg ~unsafe
       | Five_twelve _, Some mode ->
         if boxed then box_vec512 mode ~current_region else Fun.id
       | (Eight | Sixteen), Some _
-      | (Thirty_two | Single | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _), None ->
+      | ( ( Thirty_two | Single | Sixty_four | One_twenty_eight _
+          | Two_fifty_six _ | Five_twelve _ ),
+          None ) ->
         Misc.fatal_error "Inconsistent alloc_mode for string or bytes load"
     in
     wrap (Binary (String_or_bigstring_load (kind, access_size), string, index))
@@ -1044,7 +1047,7 @@ let check_array_vector_access ~dbg ~size_int ~array array_kind ~index ~vec_kind
 
 let array_like_load_vec ~dbg ~size_int ~unsafe ~mode ~boxed ~current_region
     ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index =
-  let index = convert_index_to_untagged_int ~index ~index_kind in
+  let index = convert_index_to_tagged_int ~index ~index_kind in
   let load_kind, box =
     match vec_kind with
     | Vec128 -> P.Array_load_kind.Naked_vec128s, box_vec128
@@ -1064,8 +1067,9 @@ let array_like_load_vec ~dbg ~size_int ~unsafe ~mode ~boxed ~current_region
       primitive
 
 let array_like_set_vec ~dbg ~size_int ~unsafe ~boxed
-    ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index new_value =
-  let index = convert_index_to_untagged_int ~index ~index_kind in
+    ~(vec_kind : Vector_types.Kind.t) array_kind array ~index_kind index
+    new_value =
+  let index = convert_index_to_tagged_int ~index ~index_kind in
   let set_kind, unbox =
     match vec_kind with
     | Vec128 -> P.Array_set_kind.Naked_vec128s, unbox_vec128
@@ -2000,13 +2004,15 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
   | Pbytes_load_64 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
     [ string_like_load ~unsafe ~dbg ~size_int ~access_size:Sixty_four Bytes
         ~boxed (Some mode) bytes ~index_kind index ~current_region ]
-  | Pstring_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
+  | Pstring_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
+    ->
     [ string_like_load ~unsafe ~dbg ~size_int
-        ~access_size:(string_accessor_width_of_boxed_vector ~aligned:false size)
+        ~access_size:(vec_accessor_width ~aligned:false size)
         String ~boxed (Some mode) str ~index_kind index ~current_region ]
-  | Pbytes_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
+  | Pbytes_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
+    ->
     [ string_like_load ~unsafe ~dbg ~size_int
-        ~access_size:(string_accessor_width_of_boxed_vector ~aligned:false size)
+        ~access_size:(vec_accessor_width ~aligned:false size)
         Bytes ~boxed (Some mode) str ~index_kind index ~current_region ]
   | Pbytes_set_16 { unsafe; index_kind }, [[bytes]; [index]; [new_value]] ->
     [ bytes_like_set ~unsafe ~dbg ~size_int ~access_size:Sixteen Bytes
@@ -2023,10 +2029,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     ->
     [ bytes_like_set ~unsafe ~dbg ~size_int ~access_size:Sixty_four Bytes ~boxed
         bytes ~index_kind index new_value ]
-  | Pbytes_set_vec { size; unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
-    ->
+  | ( Pbytes_set_vec { size; unsafe; index_kind; boxed },
+      [[bytes]; [index]; [new_value]] ) ->
     [ bytes_like_set ~unsafe ~dbg ~size_int
-        ~access_size:(string_accessor_width_of_boxed_vector ~aligned:false size)
+        ~access_size:(vec_accessor_width ~aligned:false size)
         Bytes ~boxed bytes ~index_kind index new_value ]
   | Pisint { variant_only }, [[arg]] ->
     [tag_int (Unary (Is_int { variant_only }, arg))]
@@ -2491,7 +2497,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
   | ( Pbigstring_load_vec { size; unsafe; aligned; index_kind; mode; boxed },
       [[big_str]; [index]] ) ->
     [ string_like_load ~unsafe ~dbg ~size_int
-        ~access_size:(string_accessor_width_of_boxed_vector ~aligned size)
+        ~access_size:(vec_accessor_width ~aligned size)
         Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
     ]
   | Pbigstring_set_16 { unsafe; index_kind }, [[bigstring]; [index]; [new_value]]
@@ -2513,60 +2519,69 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
   | ( Pbigstring_set_vec { size; unsafe; aligned; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
     [ bytes_like_set ~unsafe ~dbg ~size_int
-        ~access_size:(string_accessor_width_of_boxed_vector ~aligned size)
+        ~access_size:(vec_accessor_width ~aligned size)
         Bigstring ~boxed bigstring ~index_kind index new_value ]
-  | Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]] ->
+  | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_load_vec";
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Naked_floats array ~index_kind index ]
-  | Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]]
-  | Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]] ->
+        ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
+  | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] )
+  | ( Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Naked_floats array ~index_kind index ]
-  | Punboxed_float32_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]]
-    ->
+        ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
+  | ( Punboxed_float32_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Naked_float32s array ~index_kind index ]
-  | Pint_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]] ->
+        ~vec_kind:(vec_kind size) Naked_float32s array ~index_kind index ]
+  | ( Pint_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     if Targetint.size <> 64
     then Misc.fatal_error "[Pint_array_load_vec]: immediates must be 64 bits.";
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Immediates array ~index_kind index ]
-  | Punboxed_int64_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]] ->
+        ~vec_kind:(vec_kind size) Immediates array ~index_kind index ]
+  | ( Punboxed_int64_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Naked_int64s array ~index_kind index ]
-  | Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]]
-    ->
+        ~vec_kind:(vec_kind size) Naked_int64s array ~index_kind index ]
+  | ( Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     if Targetint.size <> 64
     then
       Misc.fatal_error
         "[Punboxed_nativeint_array_load_vec]: nativeint must be 64 bits.";
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Naked_nativeints array ~index_kind index ]
-  | Punboxed_int32_array_load_vec { size; unsafe; index_kind; mode; boxed }, [[array]; [index]] ->
+        ~vec_kind:(vec_kind size) Naked_nativeints array ~index_kind index ]
+  | ( Punboxed_int32_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~size_int ~current_region ~unsafe ~mode ~boxed
-        ~vec_kind:(vec_kind_of_boxed_vector size) Naked_int32s array ~index_kind index ]
-  | Pfloat_array_set_vec { size; unsafe; index_kind; boxed }, [[array]; [index]; [new_value]] ->
+        ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index ]
+  | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_set_vec";
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Naked_floats array ~index_kind index new_value ]
-  | Pfloatarray_set_vec { size; unsafe; index_kind; boxed }, [[array]; [index]; [new_value]]
+  | ( Pfloatarray_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] )
   | ( Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Naked_floats array ~index_kind index new_value ]
   | ( Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Naked_float32s array ~index_kind index new_value ]
-  | Pint_array_set_vec { size; unsafe; index_kind; boxed }, [[array]; [index]; [new_value]] ->
+  | ( Pint_array_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] ) ->
     if Targetint.size <> 64
     then Misc.fatal_error "[Pint_array_set_vec]: immediates must be 64 bits.";
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Immediates array ~index_kind index new_value ]
   | ( Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Naked_int64s array ~index_kind index new_value ]
   | ( Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
@@ -2574,11 +2589,11 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     then
       Misc.fatal_error
         "[Punboxed_nativeint_array_set_vec]: nativeint must be 64 bits.";
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Naked_nativeints array ~index_kind index new_value ]
   | ( Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
-    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind_of_boxed_vector size)
+    [ array_like_set_vec ~dbg ~size_int ~unsafe ~boxed ~vec_kind:(vec_kind size)
         Naked_int32s array ~index_kind index new_value ]
   | Pcompare_ints, [[i1]; [i2]] ->
     [ tag_int
