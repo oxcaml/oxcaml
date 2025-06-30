@@ -1432,6 +1432,13 @@ module Const = struct
         name = "void"
       }
 
+    let void_mod_everything =
+      { jkind =
+          mk_jkind (Base Void) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "void mod everything"
+      }
+
     let immediate =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
@@ -1652,6 +1659,7 @@ module Const = struct
         sync_data;
         mutable_data;
         void;
+        void_mod_everything;
         immediate;
         immediate_or_null;
         immediate64;
@@ -2556,9 +2564,7 @@ let for_boxed_variant ~decl_params ~type_apply ~free_vars cstrs =
   let open Types in
   let base =
     if List.for_all
-         (* CR layouts v12: This code assumes that all voids mode-cross. I
-             think that's probably not what we want. *)
-           (fun cstr ->
+         (fun cstr ->
            match cstr.cd_args with
            | Cstr_tuple args ->
              List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args

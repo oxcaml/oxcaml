@@ -1909,7 +1909,11 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
     (* Constructors whose arguments are all void, e.g.
        [A of #(void * void) * void], are immediate. Accesses to their arguments
        must create a void (represented in lambda as an empty unboxed product)
-       or product of voids rather than access a block. *)
+       or product of voids rather than access a block.
+
+       This is necessary for bytecode, where [Pmixedfield]s that access void are
+       not erased but translated into field access(es) (as unboxed products are
+       boxed in bytecode). *)
     let rec lambda_void_of_el el =
       match el with
       | Product shape ->

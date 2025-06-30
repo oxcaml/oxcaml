@@ -345,7 +345,7 @@ type t7_3 : immediate = t7_2
 [%%expect{|
 type t7 = A | B | C | D of t7_void
 and t7_2 = { x : t7; } [@@unboxed]
-and t7_void : void mod global aliased many stateless immutable external_
+and t7_void : void mod everything
 type t7_3 = t7_2
 |}]
 
