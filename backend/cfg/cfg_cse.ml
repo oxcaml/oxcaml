@@ -357,9 +357,13 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          the argument reg. *)
       let n1 = set_move n i.arg.(0) i.res.(0) in
       n1
-    | Op (Opaque | Pause) ->
-      (* Assume arbitrary side effects from Opaque / Pause *)
+    | Op Opaque ->
+      (* Assume arbitrary side effects from Opaque *)
       empty_numbering
+    | Op Pause ->
+      (* We don't want to reorder loads across Pause, since it's used to spin on
+         memory locations. *)
+      kill_loads n
     | Op (Alloc _) | Op Poll ->
       (* For allocations, we must avoid extending the live range of a
          pseudoregister across the allocation if this pseudoreg is a derived
