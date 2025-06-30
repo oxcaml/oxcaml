@@ -43,8 +43,8 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
     ListLabels.map2 params args ~f:(fun param arg ->
         let let_bound =
           let param_var, param_uid = BP.var_and_uid param in
-            Bound_var.create param_var param_uid Name_mode.normal
-            |> Bound_pattern.singleton
+          Bound_var.create param_var param_uid Name_mode.normal
+          |> Bound_pattern.singleton
         in
         let named = Named.create_simple arg in
         { Expr_builder.let_bound;

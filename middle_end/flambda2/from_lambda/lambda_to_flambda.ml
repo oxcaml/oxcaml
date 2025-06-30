@@ -137,14 +137,14 @@ let compile_staticfail acc env ccenv ~(continuation : Continuation.t) ~args :
       fun acc ccenv ->
         CC.close_let acc ccenv
           [ ( Ident.create_local "unit",
-              Flambda_uid.internal_not_actually_unique (* CR sspies: fix *),
+              Flambda_debug_uid.none,
               Flambda_kind.With_subkind.tagged_immediate ) ]
           Not_user_visible
           (End_region { is_try_region = false; region; ghost = false })
           ~body:(fun acc ccenv ->
             CC.close_let acc ccenv
               [ ( Ident.create_local "unit",
-                  Flambda_uid.internal_not_actually_unique,
+                  Flambda_debug_uid.none,
                   Flambda_kind.With_subkind.tagged_immediate ) ]
               Not_user_visible
               (End_region
@@ -204,7 +204,7 @@ let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
         in
         match arity_component with
         | Singleton kind ->
-          let duid = Flambda_uid.uid duid in
+          let duid = Flambda_debug_uid.of_lambda_debug_uid duid in
           let param = id, duid, visible, kind in
           handler_env, param :: params_rev
         | Unboxed_product _ ->
@@ -216,7 +216,9 @@ let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
                   Ident.create_local
                     (Printf.sprintf "%s_unboxed%d" (Ident.unique_name id) n)
                 in
-                let field_uid = Flambda_uid.proj duid ~field:n in
+                let field_uid =
+                  Flambda_debug_uid.of_lambda_debug_uid_proj duid ~field:n
+                in
                 field, field_uid, kind)
               (Flambda_arity.unarize arity)
           in
@@ -280,14 +282,14 @@ let restore_continuation_context acc env ccenv cont ~close_current_region_early
       in
       CC.close_let acc ccenv
         [ ( Ident.create_local "unit",
-            Flambda_uid.internal_not_actually_unique (* CR sspies: fix *),
+            Flambda_debug_uid.none,
             Flambda_kind.With_subkind.tagged_immediate ) ]
         Not_user_visible
         (End_region { is_try_region = false; region; ghost = false })
         ~body:(fun acc ccenv ->
           CC.close_let acc ccenv
             [ ( Ident.create_local "unit",
-                Flambda_uid.internal_not_actually_unique (* CR sspies: fix*),
+                Flambda_debug_uid.none,
                 Flambda_kind.With_subkind.tagged_immediate ) ]
             Not_user_visible
             (End_region
@@ -373,7 +375,11 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
         List.map2
           (fun return_value_component kind ->
             ( return_value_component,
-              Flambda_uid.internal_not_actually_unique,
+              Flambda_debug_uid.none,
+              (* CR sspies: There are some debug uids for the extra arguments
+                 that we could propagate here. But it seems these are never user
+                 visible, so there is currently no point in propagate the debug
+                 uids. (They are probably [.none] anyways, I guess.) *)
               IR.Not_user_visible,
               kind ))
           return_value_components return_kinds
@@ -435,10 +441,10 @@ let maybe_insert_let_cont result_var_name layout k acc env ccenv body =
         ~body
     else
       let result_var = Ident.create_local result_var_name in
-      let duid = Shape.Uid.internal_not_actually_unique in
+      let result_var_duid = Lambda.debug_uid_none in
       let_cont_nonrecursive_with_extra_params acc env ccenv
         ~is_exn_handler:false
-        ~params:[result_var, duid, IR.Not_user_visible, layout]
+        ~params:[result_var, result_var_duid, IR.Not_user_visible, layout]
         ~handler:(fun acc env ccenv ->
           k acc env ccenv (get_unarized_vars result_var env) arity_component)
         ~body
@@ -448,9 +454,11 @@ let name_if_not_var acc ccenv name simple kind body =
   | IR.Var id -> body id acc ccenv
   | IR.Const _ ->
     let id = Ident.create_local name in
-    let duid = Flambda_uid.internal_not_actually_unique in
+    let id_duid = Flambda_debug_uid.none in
+    (* CR sspies: I think the [name] is always a constant string (so these are
+       not user visible variables). As such, using [.none] should be fine. *)
     CC.close_let acc ccenv
-      [id, duid, kind]
+      [id, id_duid, kind]
       Not_user_visible (IR.Simple simple) ~body:(body id)
 
 let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
@@ -476,9 +484,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let new_ids_with_kinds, before_unarization =
       Env.get_mutable_variable_with_kinds env id
     in
-    let fields =
-      List.map (fun (id, _, _) -> IR.Var id) new_ids_with_kinds
-    in
+    let fields = List.map (fun (id, _, _) -> IR.Var id) new_ids_with_kinds in
     apply_cps_cont_simple k acc env ccenv fields before_unarization
   | Lconst const ->
     apply_cps_cont_simple k acc env ccenv [IR.Const const]
@@ -505,9 +511,11 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
   | Lfunction func ->
     let id = Ident.create_local (name_for_function func) in
+    let id_duid = Flambda_debug_uid.none in
+    (* CR sspies: Is there a better [Flambda_debug_uid.t] available here? *)
     let dbg = Debuginfo.from_location func.loc in
     let func =
-      cps_function env ~fid:id ~fuid:Flambda_uid.internal_not_actually_unique
+      cps_function env ~fid:id ~fuid:id_duid
         ~recursive:(Non_recursive : Recursive.t)
         func
     in
@@ -518,12 +526,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     CC.close_let_rec acc ccenv ~function_declarations:[func] ~body
       ~current_region:
         (Env.current_region env |> Option.map Env.Region_stack_element.region)
-  | Lmutlet (layout, id, duid, defining_expr, body) ->
+  | Lmutlet (layout, id, _duid, defining_expr, body) ->
+    (* CR sspies: Mutable lets currently do not propagate debugging uids
+       correctly. *)
     (* CR mshinwell: user-visibleness needs thinking about here *)
     let temp_id = Ident.create_local "let_mutable" in
+    let temp_id_duid = Lambda.debug_uid_none in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
-      ~params:[temp_id, duid, IR.Not_user_visible, layout]
-      (* CR sspies: Probably not where we want the duid to end up. *)
+      ~params:[temp_id, temp_id_duid, IR.Not_user_visible, layout]
       ~body:(fun acc env ccenv after_defining_expr ->
         cps_tail acc env ccenv defining_expr after_defining_expr k_exn)
       ~handler:(fun acc env ccenv ->
@@ -538,7 +548,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           match Env.get_unboxed_product_fields env temp_id with
           | None -> [temp_id]
           | Some (_, temp_id_unarized) -> List.map fst temp_id_unarized
-          (* CR sspies: Probably not what we want to do here. *)
+          (* CR sspies: Probably we do not want to discard the debugging uid
+             here. *)
         in
         List.fold_left2
           (fun body new_id_with_kind temp_id acc ccenv ->
@@ -570,7 +581,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         layout
     in
     CC.close_let acc ccenv
-      [id, Flambda_uid.uid duid, kind]
+      [id, Flambda_debug_uid.of_lambda_debug_uid duid, kind]
       (is_user_visible env id) (Simple (Const const)) ~body
   | Llet
       ( ((Strict | Alias | StrictOpt) as let_kind),
@@ -584,7 +595,6 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     in
     match result with
     | Primitive (prim, args, loc) ->
-      (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
       (* This case avoids extraneous continuations. *)
       let exn_continuation : IR.exn_continuation option =
         if L.primitive_can_raise prim
@@ -605,7 +615,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               ->
               ( env,
                 [ ( id,
-                    Flambda_uid.uid duid,
+                    Flambda_debug_uid.of_lambda_debug_uid duid,
                     Flambda_kind.With_subkind
                     .from_lambda_values_and_unboxed_numbers_only layout ) ] )
             | Punboxed_product layouts ->
@@ -617,7 +627,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               let arity = Flambda_arity.create [arity_component] in
               let fields =
                 Flambda_arity.fresh_idents_unarized ~id arity
-                |> Flambda_uid.add_proj_debugging_uids_to_fields ~duid
+                |> Flambda_debug_uid.add_proj_debugging_uids_to_fields ~duid
               in
               let env =
                 Env.register_unboxed_product_with_kinds env ~unboxed_product:id
@@ -660,7 +670,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           let body acc ccenv = cps acc env ccenv body k k_exn in
           CC.close_let acc ccenv
             [ ( id,
-                Flambda_uid.uid duid,
+                Flambda_debug_uid.of_lambda_debug_uid duid,
                 Flambda_kind.With_subkind.tagged_immediate ) ]
             Not_user_visible (Simple (Const L.const_unit)) ~body
         in
@@ -676,12 +686,13 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
   | Llet
       ((Strict | Alias | StrictOpt), _layout, id, _duid, defining_expr, Lvar id')
     when Ident.same id id' ->
-    (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
+    (* CR sspies: Is there any use for the debugging uid in this case? *)
     (* Simplif already simplifies such bindings, but we can generate new ones
        when translating primitives (see the Lprim case below). *)
     (* This case must not be moved above the case for let-bound primitives. *)
     cps acc env ccenv defining_expr k k_exn
-  | Llet ((Strict | Alias | StrictOpt), layout, id, duid, defining_expr, body) ->
+  | Llet ((Strict | Alias | StrictOpt), layout, id, duid, defining_expr, body)
+    ->
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
       ~params:[id, duid, is_user_visible env id, layout]
       ~body:(fun acc env ccenv after_defining_expr ->
@@ -794,7 +805,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             List.fold_left_map
               (fun handler_env ((arg, duid, layout), kinds) ->
                 match kinds with
-                | [kind] -> handler_env, [arg, Flambda_uid.uid duid, kind]
+                | [kind] ->
+                  ( handler_env,
+                    [arg, Flambda_debug_uid.of_lambda_debug_uid duid, kind] )
                 | [] | _ :: _ ->
                   let fields =
                     List.mapi
@@ -804,7 +817,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                             (Printf.sprintf "%s_unboxed%d"
                                (Ident.unique_name arg) n)
                         in
-                        let duid = Flambda_uid.proj duid ~field:n in
+                        let duid =
+                          Flambda_debug_uid.of_lambda_debug_uid_proj duid
+                            ~field:n
+                        in
                         ident, duid, kind)
                       kinds
                   in
@@ -876,12 +892,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               k_exn)
           k_exn)
       k_exn
-  | Ltrywith (body, id, _duid, handler, kind) ->
-    (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
+  | Ltrywith (body, id, duid, handler, kind) ->
     let dbg = Debuginfo.none (* CR mshinwell: fix [Lambda] *) in
     let body_result = Ident.create_local "body_result" in
+    let body_result_lambda_duid = L.debug_uid_none in
     let region = Ident.create_local "try_region" in
+    let region_duid = Flambda_debug_uid.none in
     let ghost_region = Ident.create_local "try_ghost_region" in
+    let ghost_region_duid = Flambda_debug_uid.none in
     (* As for all other constructs, the OCaml type checker and the Lambda
        generation pass ensures that there will be an enclosing region around the
        whole [Ltrywith] (possibly not immediately enclosing, but maybe further
@@ -902,16 +920,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let handler k acc env ccenv =
       CC.close_let acc ccenv
         [ ( Ident.create_local "unit",
-            Flambda_uid.internal_not_actually_unique,
+            Flambda_debug_uid.none,
             Flambda_kind.With_subkind.tagged_immediate ) ]
-        (* CR sspies: can we do better? *)
         Not_user_visible
         (End_region { is_try_region = true; region; ghost = false })
         ~body:(fun acc ccenv ->
           CC.close_let acc ccenv
             [ ( Ident.create_local "unit",
-                Flambda_uid.internal_not_actually_unique,
-                (* CR sspies: can we do better? *)
+                Flambda_debug_uid.none,
                 Flambda_kind.With_subkind.tagged_immediate ) ]
             Not_user_visible
             (End_region
@@ -921,9 +937,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let region_stack_elt = Env.current_region env in
     let begin_try_region body =
       CC.close_let acc ccenv
-        [ ( region,
-            Flambda_uid.internal_not_actually_unique,
-            Flambda_kind.With_subkind.region ) ]
+        [region, region_duid, Flambda_kind.With_subkind.region]
         Not_user_visible
         (Begin_region
            { is_try_region = true;
@@ -933,9 +947,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
            })
         ~body:(fun acc ccenv ->
           CC.close_let acc ccenv
-            [ ( ghost_region,
-                Flambda_uid.internal_not_actually_unique,
-                Flambda_kind.With_subkind.region ) ]
+            [ghost_region, ghost_region_duid, Flambda_kind.With_subkind.region]
             Not_user_visible
             (Begin_region
                { is_try_region = true;
@@ -951,19 +963,13 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           (fun acc env ccenv k ->
             let_cont_nonrecursive_with_extra_params acc env ccenv
               ~is_exn_handler:true
-              ~params:
-                [ ( id,
-                    (* CR mshinwell: there should be a Uid here, needs adding to
-                       Ltrywith *)
-                    Shape.Uid.internal_not_actually_unique,
-                    is_user_visible env id,
-                    Lambda.layout_block ) ]
+              ~params:[id, duid, is_user_visible env id, Lambda.layout_block]
               ~body:(fun acc env ccenv handler_continuation ->
                 let_cont_nonrecursive_with_extra_params acc env ccenv
                   ~is_exn_handler:false
                   ~params:
                     [ ( body_result,
-                        Shape.Uid.internal_not_actually_unique,
+                        body_result_lambda_duid,
                         Not_user_visible,
                         kind ) ]
                   ~body:(fun acc env ccenv poptrap_continuation ->
@@ -1053,14 +1059,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let ghost_region = Env.Region_stack_element.ghost_region current_region in
     CC.close_let acc ccenv
       [ ( Ident.create_local "unit",
-          Flambda_uid.internal_not_actually_unique,
+          Flambda_debug_uid.none,
           Flambda_kind.With_subkind.tagged_immediate ) ]
       Not_user_visible
       (End_region { is_try_region = false; region; ghost = false })
       ~body:(fun acc ccenv ->
         CC.close_let acc ccenv
           [ ( Ident.create_local "unit",
-              Flambda_uid.internal_not_actually_unique (* CR sspies: fix *),
+              Flambda_debug_uid.none,
               Flambda_kind.With_subkind.tagged_immediate ) ]
           Not_user_visible
           (End_region
@@ -1073,16 +1079,16 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        above). Since we're not in tail position, we also need to have a new
        continuation for the code after the body. *)
     let region = Ident.create_local "region" in
+    let region_duid = Flambda_debug_uid.none in
     let ghost_region = Ident.create_local "ghost_region" in
+    let ghost_region_duid = Flambda_debug_uid.none in
     let parent_stack_elt = Env.current_region env in
     let region_stack_elt =
       Env.Region_stack_element.create ~region ~ghost_region
     in
     let dbg = Debuginfo.none in
     CC.close_let acc ccenv
-      [ ( region,
-          Flambda_uid.internal_not_actually_unique,
-          Flambda_kind.With_subkind.region ) ]
+      [region, region_duid, Flambda_kind.With_subkind.region]
       Not_user_visible
       (Begin_region
          { is_try_region = false;
@@ -1092,9 +1098,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
          })
       ~body:(fun acc ccenv ->
         CC.close_let acc ccenv
-          [ ( ghost_region,
-              Flambda_uid.internal_not_actually_unique (* CR sspies: fix *),
-              Flambda_kind.With_subkind.region ) ]
+          [ghost_region, ghost_region_duid, Flambda_kind.With_subkind.region]
           Not_user_visible
           (Begin_region
              { is_try_region = false;
@@ -1144,7 +1148,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                   ~handler:(fun acc env ccenv ->
                     CC.close_let acc ccenv
                       [ ( Ident.create_local "unit",
-                          Flambda_uid.internal_not_actually_unique,
+                          Flambda_debug_uid.none,
                           Flambda_kind.With_subkind.tagged_immediate ) ]
                       Not_user_visible
                       (End_region
@@ -1152,7 +1156,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                       ~body:(fun acc ccenv ->
                         CC.close_let acc ccenv
                           [ ( Ident.create_local "unit",
-                              Flambda_uid.internal_not_actually_unique,
+                              Flambda_debug_uid.none,
                               Flambda_kind.With_subkind.tagged_immediate ) ]
                           Not_user_visible
                           (End_region
@@ -1298,8 +1302,8 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
             ~params ~body:fbody ~return ~attr ~loc ~ret_mode ~mode
         with
         | [{ id; debug_uid = duid; def = lfun }] -> [id, duid, lfun]
-        | [{ id = id1; debug_uid = duid1; def = lfun1 };
-           { id = id2; debug_uid = duid2; def = lfun2 }] ->
+        | [ { id = id1; debug_uid = duid1; def = lfun1 };
+            { id = id2; debug_uid = duid2; def = lfun2 } ] ->
           [id1, duid1, lfun1; id2, duid2, lfun2]
         | [] | _ :: _ :: _ :: _ ->
           Misc.fatal_errorf
@@ -1342,7 +1346,7 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
   let bindings_with_wrappers = List.flatten bindings_with_wrappers in
   List.map
     (fun (fun_id, fun_uid, def) ->
-      let fuid = Flambda_uid.uid fun_uid in
+      let fuid = Flambda_debug_uid.of_lambda_debug_uid fun_uid in
       cps_function env ~fid:fun_id ~fuid ~recursive:(recursive fun_id)
         ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
         def)
@@ -1512,17 +1516,19 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let unboxed_products = ref Ident.Map.empty in
   let params =
     List.concat_map
-      (fun (({ name; debug_uid = var_uid; layout; mode; attributes } : L.lparam), kinds) :
+      (fun (({ name; debug_uid; layout; mode; attributes } : L.lparam), kinds) :
            Function_decl.param list ->
         match kinds with
         | [kind] ->
-          let var_uid = Flambda_uid.uid var_uid in
-          [{ name; var_uid; kind; mode; attributes }]
+          let debug_uid = Flambda_debug_uid.of_lambda_debug_uid debug_uid in
+          [{ name; debug_uid; kind; mode; attributes }]
         | [] | _ :: _ ->
           let fields =
             List.mapi
               (fun n kind ->
-                let duid = Flambda_uid.proj var_uid ~field:n in
+                let duid =
+                  Flambda_debug_uid.of_lambda_debug_uid_proj debug_uid ~field:n
+                in
                 let ident =
                   Ident.create_local
                     (Printf.sprintf "%s_unboxed%d" (Ident.unique_name name) n)
@@ -1536,8 +1542,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           unboxed_products
             := Ident.Map.add name (before_unarization, fields) !unboxed_products;
           List.map
-            (fun (name, var_uid, kind) : Function_decl.param ->
-              { name; var_uid; kind; mode; attributes })
+            (fun (name, debug_uid, kind) : Function_decl.param ->
+              { name; debug_uid; kind; mode; attributes })
             fields)
       (List.combine params unarized_per_param)
   in
@@ -1687,13 +1693,14 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           CC.close_switch acc ccenv ~condition_dbg scrutinee const_switch
         in
         let scrutinee_tag = Ident.create_local "scrutinee_tag" in
+        let scrutinee_tag_duid = Flambda_debug_uid.none in
         let block_switch acc ccenv =
           let body acc ccenv =
             CC.close_switch acc ccenv ~condition_dbg scrutinee_tag block_switch
           in
           CC.close_let acc ccenv
             [ ( scrutinee_tag,
-                Flambda_uid.internal_not_actually_unique,
+                scrutinee_tag_duid,
                 Flambda_kind.With_subkind.tagged_immediate ) ]
             Not_user_visible (Get_tag scrutinee) ~body
         in
@@ -1713,6 +1720,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
             }
           in
           let is_scrutinee_int = Ident.create_local "is_scrutinee_int" in
+          let is_scrutinee_int_duid = Flambda_debug_uid.none in
           let isint_switch acc ccenv =
             let body acc ccenv =
               CC.close_switch acc ccenv ~condition_dbg is_scrutinee_int
@@ -1727,7 +1735,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
             in
             CC.close_let acc ccenv
               [ ( is_scrutinee_int,
-                  Flambda_uid.internal_not_actually_unique,
+                  is_scrutinee_int_duid,
                   Flambda_kind.With_subkind.tagged_immediate ) ]
               Not_user_visible
               (Prim
