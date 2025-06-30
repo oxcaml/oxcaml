@@ -4977,8 +4977,8 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
 let poll ~dbg = return_unit dbg (Cop (Cpoll, [], dbg))
 
 let cpu_relax ~dbg =
-  let relax = return_unit dbg (Cop (Crelax, [], dbg)) in
-  if Config.poll_insertion then relax else sequence relax (poll ~dbg)
+  let pause = return_unit dbg (Cop (Cpause, [], dbg)) in
+  if Config.poll_insertion then pause else sequence pause (poll ~dbg)
 
 module Scalar_type = struct
   module Float_width = struct

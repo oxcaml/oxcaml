@@ -164,7 +164,7 @@ type t =
       }
   | Dls_get
   | Poll
-  | Relax
+  | Pause
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;

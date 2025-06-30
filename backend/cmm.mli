@@ -423,7 +423,7 @@ type operation =
     (* the [machtype array] refers to the whole tuple *)
   | Cdls_get
   | Cpoll
-  | Crelax
+  | Cpause
 
 type is_global =
   | Global
