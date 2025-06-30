@@ -338,14 +338,14 @@ Error: This expression has type "float" but an expression was expected of type
 (* See Note [Default layouts in transl_declaration] in Typedecl. *)
 type t7 = A | B | C | D of t7_void
 and t7_2 = { x : t7 } [@@unboxed]
-and t7_void : void
+and t7_void : void mod everything
 
 type t7_3 : immediate = t7_2
 
 [%%expect{|
 type t7 = A | B | C | D of t7_void
 and t7_2 = { x : t7; } [@@unboxed]
-and t7_void : void
+and t7_void : void mod global aliased many stateless immutable external_
 type t7_3 = t7_2
 |}]
 
