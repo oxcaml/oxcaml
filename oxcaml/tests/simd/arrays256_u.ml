@@ -628,7 +628,37 @@ open struct
   end)
 end
 
-module Float_arrays = struct
+module Float_arrays (Primitives : sig
+
+  val float_array_get_float64x4 : float array -> int -> float64x4
+  val float_array_get_float64x4_unsafe : float array -> int -> float64x4
+
+  val float_iarray_get_float64x4 : float iarray -> int -> float64x4
+  val float_iarray_get_float64x4_unsafe : float iarray -> int -> float64x4
+
+  val float_array_set_float64x4 : float array -> int -> float64x4 -> unit
+  val float_array_set_float64x4_unsafe : float array -> int -> float64x4 -> unit
+
+  val floatarray_get_float64x4 : floatarray -> int -> float64x4
+  val floatarray_get_float64x4_unsafe : floatarray -> int -> float64x4
+
+  val floatarray_set_float64x4 : floatarray -> int -> float64x4 -> unit
+  val floatarray_set_float64x4_unsafe : floatarray -> int -> float64x4 -> unit
+
+  val unboxed_float_array_get_float64x4 : float# array -> int -> float64x4
+  val unboxed_float_array_get_float64x4_unsafe : float# array -> int -> float64x4
+
+  val unboxed_float_array_set_float64x4 : float# array -> int -> float64x4 -> unit
+  val unboxed_float_array_set_float64x4_unsafe : float# array -> int -> float64x4 -> unit
+
+  val unboxed_float32_array_get_float32x8 : float32# array -> int -> float32x8
+  val unboxed_float32_array_get_float32x8_unsafe : float32# array -> int -> float32x8
+
+  val unboxed_float32_array_set_float32x8 : float32# array -> int -> float32x8 -> unit
+  val unboxed_float32_array_set_float32x8_unsafe : float32# array -> int -> float32x8 -> unit
+
+end) = struct
+  open Primitives
 
   external low_of64 : float -> float64x4 = "caml_vec256_unreachable" "caml_float64x4_low_of_float"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -647,33 +677,6 @@ module Float_arrays = struct
       Int64.logor (Int64.logand x_bits 0xFFFFFFFFL) (Int64.shift_left y_bits 32)
     in
     float32x8_of_int64s (pack_pair g h) (pack_pair e f) (pack_pair c d) (pack_pair a b)
-
-  external float_array_get_float64x4 : float array -> int -> float64x4 = "%caml_float_array_get256#"
-  external float_array_get_float64x4_unsafe : float array -> int -> float64x4 = "%caml_float_array_get256u#"
-
-  external float_iarray_get_float64x4 : float iarray -> int -> float64x4 = "%caml_float_array_get256#"
-  external float_iarray_get_float64x4_unsafe : float iarray -> int -> float64x4 = "%caml_float_array_get256u#"
-
-  external float_array_set_float64x4 : float array -> int -> float64x4 -> unit = "%caml_float_array_set256#"
-  external float_array_set_float64x4_unsafe : float array -> int -> float64x4 -> unit = "%caml_float_array_set256u#"
-
-  external floatarray_get_float64x4 : floatarray -> int -> float64x4 = "%caml_floatarray_get256#"
-  external floatarray_get_float64x4_unsafe : floatarray -> int -> float64x4 = "%caml_floatarray_get256u#"
-
-  external floatarray_set_float64x4 : floatarray -> int -> float64x4 -> unit = "%caml_floatarray_set256#"
-  external floatarray_set_float64x4_unsafe : floatarray -> int -> float64x4 -> unit = "%caml_floatarray_set256u#"
-
-  external unboxed_float_array_get_float64x4 : float# array -> int -> float64x4 = "%caml_unboxed_float_array_get256#"
-  external unboxed_float_array_get_float64x4_unsafe : float# array -> int -> float64x4 = "%caml_unboxed_float_array_get256u#"
-
-  external unboxed_float_array_set_float64x4 : float# array -> int -> float64x4 -> unit = "%caml_unboxed_float_array_set256#"
-  external unboxed_float_array_set_float64x4_unsafe : float# array -> int -> float64x4 -> unit = "%caml_unboxed_float_array_set256u#"
-
-  external unboxed_float32_array_get_float32x8 : float32# array -> int -> float32x8 = "%caml_unboxed_float32_array_get256#"
-  external unboxed_float32_array_get_float32x8_unsafe : float32# array -> int -> float32x8 = "%caml_unboxed_float32_array_get256u#"
-
-  external unboxed_float32_array_set_float32x8 : float32# array -> int -> float32x8 -> unit = "%caml_unboxed_float32_array_set256#"
-  external unboxed_float32_array_set_float32x8_unsafe : float32# array -> int -> float32x8 -> unit = "%caml_unboxed_float32_array_set256u#"
 
   let float_array () = [| 0.0; 1.0; 2.0; 3.0; 4.0 |]
   let float_iarray () = [: 0.0; 1.0; 2.0; 3.0; 4.0 :]
@@ -922,34 +925,215 @@ module Float_arrays = struct
   ;;
 end
 
-module Int_arrays = struct
+module _ = Float_arrays(struct
 
-  external int_array_get_int64x4 : int array -> int -> int64x4 = "%caml_int_array_get256#"
-  external int_array_get_int64x4_unsafe : int array -> int -> int64x4 = "%caml_int_array_get256u#"
+  external float_array_get_float64x4 : float array -> int -> float64x4 = "%caml_float_array_get256#"
+  external float_array_get_float64x4_unsafe : float array -> int -> float64x4 = "%caml_float_array_get256u#"
 
-  external int_iarray_get_int64x4 : int iarray -> int -> int64x4 = "%caml_int_array_get256#"
-  external int_iarray_get_int64x4_unsafe : int iarray -> int -> int64x4 = "%caml_int_array_get256u#"
+  external float_iarray_get_float64x4 : float iarray -> int -> float64x4 = "%caml_float_array_get256#"
+  external float_iarray_get_float64x4_unsafe : float iarray -> int -> float64x4 = "%caml_float_array_get256u#"
 
-  external int_array_set_int64x4 : int array -> int -> int64x4 -> unit = "%caml_int_array_set256#"
-  external int_array_set_int64x4_unsafe : int array -> int -> int64x4 -> unit = "%caml_int_array_set256u#"
+  external float_array_set_float64x4 : float array -> int -> float64x4 -> unit = "%caml_float_array_set256#"
+  external float_array_set_float64x4_unsafe : float array -> int -> float64x4 -> unit = "%caml_float_array_set256u#"
 
-  external unboxed_int64_array_get_int64x4 : int64# array -> int -> int64x4 = "%caml_unboxed_int64_array_get256#"
-  external unboxed_int64_array_get_int64x4_unsafe : int64# array -> int -> int64x4 = "%caml_unboxed_int64_array_get256u#"
+  external floatarray_get_float64x4 : floatarray -> int -> float64x4 = "%caml_floatarray_get256#"
+  external floatarray_get_float64x4_unsafe : floatarray -> int -> float64x4 = "%caml_floatarray_get256u#"
 
-  external unboxed_int64_array_set_int64x4 : int64# array -> int -> int64x4 -> unit = "%caml_unboxed_int64_array_set256#"
-  external unboxed_int64_array_set_int64x4_unsafe : int64# array -> int -> int64x4 -> unit = "%caml_unboxed_int64_array_set256u#"
+  external floatarray_set_float64x4 : floatarray -> int -> float64x4 -> unit = "%caml_floatarray_set256#"
+  external floatarray_set_float64x4_unsafe : floatarray -> int -> float64x4 -> unit = "%caml_floatarray_set256u#"
 
-  external unboxed_nativeint_array_get_int64x4 : nativeint# array -> int -> int64x4 = "%caml_unboxed_nativeint_array_get256#"
-  external unboxed_nativeint_array_get_int64x4_unsafe : nativeint# array -> int -> int64x4 = "%caml_unboxed_nativeint_array_get256u#"
+  external unboxed_float_array_get_float64x4 : float# array -> int -> float64x4 = "%caml_unboxed_float_array_get256#"
+  external unboxed_float_array_get_float64x4_unsafe : float# array -> int -> float64x4 = "%caml_unboxed_float_array_get256u#"
 
-  external unboxed_nativeint_array_set_int64x4 : nativeint# array -> int -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256#"
-  external unboxed_nativeint_array_set_int64x4_unsafe : nativeint# array -> int -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256u#"
+  external unboxed_float_array_set_float64x4 : float# array -> int -> float64x4 -> unit = "%caml_unboxed_float_array_set256#"
+  external unboxed_float_array_set_float64x4_unsafe : float# array -> int -> float64x4 -> unit = "%caml_unboxed_float_array_set256u#"
 
-  external unboxed_int32_array_get_int32x8 : int32# array -> int -> int32x8 = "%caml_unboxed_int32_array_get256#"
-  external unboxed_int32_array_get_int32x8_unsafe : int32# array -> int -> int32x8 = "%caml_unboxed_int32_array_get256u#"
+  external unboxed_float32_array_get_float32x8 : float32# array -> int -> float32x8 = "%caml_unboxed_float32_array_get256#"
+  external unboxed_float32_array_get_float32x8_unsafe : float32# array -> int -> float32x8 = "%caml_unboxed_float32_array_get256u#"
 
-  external unboxed_int32_array_set_int32x8 : int32# array -> int -> int32x8 -> unit = "%caml_unboxed_int32_array_set256#"
-  external unboxed_int32_array_set_int32x8_unsafe : int32# array -> int -> int32x8 -> unit = "%caml_unboxed_int32_array_set256u#"
+  external unboxed_float32_array_set_float32x8 : float32# array -> int -> float32x8 -> unit = "%caml_unboxed_float32_array_set256#"
+  external unboxed_float32_array_set_float32x8_unsafe : float32# array -> int -> float32x8 -> unit = "%caml_unboxed_float32_array_set256u#"
+
+end)
+
+module _ = Float_arrays(struct
+
+  external float_array_get_float64x4 : float array -> int32# -> float64x4 = "%caml_float_array_get256#_indexed_by_int32#"
+  let float_array_get_float64x4 arr i = float_array_get_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external float_array_get_float64x4_unsafe : float array -> int32# -> float64x4 = "%caml_float_array_get256u#_indexed_by_int32#"
+  let float_array_get_float64x4_unsafe arr i = float_array_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external float_iarray_get_float64x4 : float iarray -> int32# -> float64x4 = "%caml_float_array_get256#_indexed_by_int32#"
+  let float_iarray_get_float64x4 arr i = float_iarray_get_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external float_iarray_get_float64x4_unsafe : float iarray -> int32# -> float64x4 = "%caml_float_array_get256u#_indexed_by_int32#"
+  let float_iarray_get_float64x4_unsafe arr i = float_iarray_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external float_array_set_float64x4 : float array -> int32# -> float64x4 -> unit = "%caml_float_array_set256#_indexed_by_int32#"
+  let float_array_set_float64x4 arr i v = float_array_set_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external float_array_set_float64x4_unsafe : float array -> int32# -> float64x4 -> unit = "%caml_float_array_set256u#_indexed_by_int32#"
+  let float_array_set_float64x4_unsafe arr i v = float_array_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external floatarray_get_float64x4 : floatarray -> int32# -> float64x4 = "%caml_floatarray_get256#_indexed_by_int32#"
+  let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external floatarray_get_float64x4_unsafe : floatarray -> int32# -> float64x4 = "%caml_floatarray_get256u#_indexed_by_int32#"
+  let floatarray_get_float64x4_unsafe arr i = floatarray_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external floatarray_set_float64x4 : floatarray -> int32# -> float64x4 -> unit = "%caml_floatarray_set256#_indexed_by_int32#"
+  let floatarray_set_float64x4 arr i v = floatarray_set_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external floatarray_set_float64x4_unsafe : floatarray -> int32# -> float64x4 -> unit = "%caml_floatarray_set256u#_indexed_by_int32#"
+  let floatarray_set_float64x4_unsafe arr i v = floatarray_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_float_array_get_float64x4 : float# array -> int32# -> float64x4 = "%caml_unboxed_float_array_get256#_indexed_by_int32#"
+  let unboxed_float_array_get_float64x4 arr i = unboxed_float_array_get_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_float_array_get_float64x4_unsafe : float# array -> int32# -> float64x4 = "%caml_unboxed_float_array_get256u#_indexed_by_int32#"
+  let unboxed_float_array_get_float64x4_unsafe arr i = unboxed_float_array_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_float_array_set_float64x4 : float# array -> int32# -> float64x4 -> unit = "%caml_unboxed_float_array_set256#_indexed_by_int32#"
+  let unboxed_float_array_set_float64x4 arr i v = unboxed_float_array_set_float64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_float_array_set_float64x4_unsafe : float# array -> int32# -> float64x4 -> unit = "%caml_unboxed_float_array_set256u#_indexed_by_int32#"
+  let unboxed_float_array_set_float64x4_unsafe arr i v = unboxed_float_array_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x8 : float32# array -> int32# -> float32x8 = "%caml_unboxed_float32_array_get256#_indexed_by_int32#"
+  let unboxed_float32_array_get_float32x8 arr i = unboxed_float32_array_get_float32x8 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_float32_array_get_float32x8_unsafe : float32# array -> int32# -> float32x8 = "%caml_unboxed_float32_array_get256u#_indexed_by_int32#"
+  let unboxed_float32_array_get_float32x8_unsafe arr i = unboxed_float32_array_get_float32x8_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_float32_array_set_float32x8 : float32# array -> int32# -> float32x8 -> unit = "%caml_unboxed_float32_array_set256#_indexed_by_int32#"
+  let unboxed_float32_array_set_float32x8 arr i v = unboxed_float32_array_set_float32x8 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_float32_array_set_float32x8_unsafe : float32# array -> int32# -> float32x8 -> unit = "%caml_unboxed_float32_array_set256u#_indexed_by_int32#"
+  let unboxed_float32_array_set_float32x8_unsafe arr i v = unboxed_float32_array_set_float32x8_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+end)
+
+module _ = Float_arrays(struct
+
+  external float_array_get_float64x4 : float array -> int64# -> float64x4 = "%caml_float_array_get256#_indexed_by_int64#"
+  let float_array_get_float64x4 arr i = float_array_get_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external float_array_get_float64x4_unsafe : float array -> int64# -> float64x4 = "%caml_float_array_get256u#_indexed_by_int64#"
+  let float_array_get_float64x4_unsafe arr i = float_array_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external float_iarray_get_float64x4 : float iarray -> int64# -> float64x4 = "%caml_float_array_get256#_indexed_by_int64#"
+  let float_iarray_get_float64x4 arr i = float_iarray_get_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external float_iarray_get_float64x4_unsafe : float iarray -> int64# -> float64x4 = "%caml_float_array_get256u#_indexed_by_int64#"
+  let float_iarray_get_float64x4_unsafe arr i = float_iarray_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external float_array_set_float64x4 : float array -> int64# -> float64x4 -> unit = "%caml_float_array_set256#_indexed_by_int64#"
+  let float_array_set_float64x4 arr i v = float_array_set_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external float_array_set_float64x4_unsafe : float array -> int64# -> float64x4 -> unit = "%caml_float_array_set256u#_indexed_by_int64#"
+  let float_array_set_float64x4_unsafe arr i v = float_array_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external floatarray_get_float64x4 : floatarray -> int64# -> float64x4 = "%caml_floatarray_get256#_indexed_by_int64#"
+  let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external floatarray_get_float64x4_unsafe : floatarray -> int64# -> float64x4 = "%caml_floatarray_get256u#_indexed_by_int64#"
+  let floatarray_get_float64x4_unsafe arr i = floatarray_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external floatarray_set_float64x4 : floatarray -> int64# -> float64x4 -> unit = "%caml_floatarray_set256#_indexed_by_int64#"
+  let floatarray_set_float64x4 arr i v = floatarray_set_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external floatarray_set_float64x4_unsafe : floatarray -> int64# -> float64x4 -> unit = "%caml_floatarray_set256u#_indexed_by_int64#"
+  let floatarray_set_float64x4_unsafe arr i v = floatarray_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_float_array_get_float64x4 : float# array -> int64# -> float64x4 = "%caml_unboxed_float_array_get256#_indexed_by_int64#"
+  let unboxed_float_array_get_float64x4 arr i = unboxed_float_array_get_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_float_array_get_float64x4_unsafe : float# array -> int64# -> float64x4 = "%caml_unboxed_float_array_get256u#_indexed_by_int64#"
+  let unboxed_float_array_get_float64x4_unsafe arr i = unboxed_float_array_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_float_array_set_float64x4 : float# array -> int64# -> float64x4 -> unit = "%caml_unboxed_float_array_set256#_indexed_by_int64#"
+  let unboxed_float_array_set_float64x4 arr i v = unboxed_float_array_set_float64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_float_array_set_float64x4_unsafe : float# array -> int64# -> float64x4 -> unit = "%caml_unboxed_float_array_set256u#_indexed_by_int64#"
+  let unboxed_float_array_set_float64x4_unsafe arr i v = unboxed_float_array_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x8 : float32# array -> int64# -> float32x8 = "%caml_unboxed_float32_array_get256#_indexed_by_int64#"
+  let unboxed_float32_array_get_float32x8 arr i = unboxed_float32_array_get_float32x8 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_float32_array_get_float32x8_unsafe : float32# array -> int64# -> float32x8 = "%caml_unboxed_float32_array_get256u#_indexed_by_int64#"
+  let unboxed_float32_array_get_float32x8_unsafe arr i = unboxed_float32_array_get_float32x8_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_float32_array_set_float32x8 : float32# array -> int64# -> float32x8 -> unit = "%caml_unboxed_float32_array_set256#_indexed_by_int64#"
+  let unboxed_float32_array_set_float32x8 arr i v = unboxed_float32_array_set_float32x8 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_float32_array_set_float32x8_unsafe : float32# array -> int64# -> float32x8 -> unit = "%caml_unboxed_float32_array_set256u#_indexed_by_int64#"
+  let unboxed_float32_array_set_float32x8_unsafe arr i v = unboxed_float32_array_set_float32x8_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+end)
+
+module _ = Float_arrays(struct
+
+  external float_array_get_float64x4 : float array -> nativeint# -> float64x4 = "%caml_float_array_get256#_indexed_by_nativeint#"
+  let float_array_get_float64x4 arr i = float_array_get_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external float_array_get_float64x4_unsafe : float array -> nativeint# -> float64x4 = "%caml_float_array_get256u#_indexed_by_nativeint#"
+  let float_array_get_float64x4_unsafe arr i = float_array_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external float_iarray_get_float64x4 : float iarray -> nativeint# -> float64x4 = "%caml_float_array_get256#_indexed_by_nativeint#"
+  let float_iarray_get_float64x4 arr i = float_iarray_get_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external float_iarray_get_float64x4_unsafe : float iarray -> nativeint# -> float64x4 = "%caml_float_array_get256u#_indexed_by_nativeint#"
+  let float_iarray_get_float64x4_unsafe arr i = float_iarray_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external float_array_set_float64x4 : float array -> nativeint# -> float64x4 -> unit = "%caml_float_array_set256#_indexed_by_nativeint#"
+  let float_array_set_float64x4 arr i v = float_array_set_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external float_array_set_float64x4_unsafe : float array -> nativeint# -> float64x4 -> unit = "%caml_float_array_set256u#_indexed_by_nativeint#"
+  let float_array_set_float64x4_unsafe arr i v = float_array_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external floatarray_get_float64x4 : floatarray -> nativeint# -> float64x4 = "%caml_floatarray_get256#_indexed_by_nativeint#"
+  let floatarray_get_float64x4 arr i = floatarray_get_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external floatarray_get_float64x4_unsafe : floatarray -> nativeint# -> float64x4 = "%caml_floatarray_get256u#_indexed_by_nativeint#"
+  let floatarray_get_float64x4_unsafe arr i = floatarray_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external floatarray_set_float64x4 : floatarray -> nativeint# -> float64x4 -> unit = "%caml_floatarray_set256#_indexed_by_nativeint#"
+  let floatarray_set_float64x4 arr i v = floatarray_set_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external floatarray_set_float64x4_unsafe : floatarray -> nativeint# -> float64x4 -> unit = "%caml_floatarray_set256u#_indexed_by_nativeint#"
+  let floatarray_set_float64x4_unsafe arr i v = floatarray_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_float_array_get_float64x4 : float# array -> nativeint# -> float64x4 = "%caml_unboxed_float_array_get256#_indexed_by_nativeint#"
+  let unboxed_float_array_get_float64x4 arr i = unboxed_float_array_get_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_float_array_get_float64x4_unsafe : float# array -> nativeint# -> float64x4 = "%caml_unboxed_float_array_get256u#_indexed_by_nativeint#"
+  let unboxed_float_array_get_float64x4_unsafe arr i = unboxed_float_array_get_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_float_array_set_float64x4 : float# array -> nativeint# -> float64x4 -> unit = "%caml_unboxed_float_array_set256#_indexed_by_nativeint#"
+  let unboxed_float_array_set_float64x4 arr i v = unboxed_float_array_set_float64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_float_array_set_float64x4_unsafe : float# array -> nativeint# -> float64x4 -> unit = "%caml_unboxed_float_array_set256u#_indexed_by_nativeint#"
+  let unboxed_float_array_set_float64x4_unsafe arr i v = unboxed_float_array_set_float64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x8 : float32# array -> nativeint# -> float32x8 = "%caml_unboxed_float32_array_get256#_indexed_by_nativeint#"
+  let unboxed_float32_array_get_float32x8 arr i = unboxed_float32_array_get_float32x8 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_float32_array_get_float32x8_unsafe : float32# array -> nativeint# -> float32x8 = "%caml_unboxed_float32_array_get256u#_indexed_by_nativeint#"
+  let unboxed_float32_array_get_float32x8_unsafe arr i = unboxed_float32_array_get_float32x8_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_float32_array_set_float32x8 : float32# array -> nativeint# -> float32x8 -> unit = "%caml_unboxed_float32_array_set256#_indexed_by_nativeint#"
+  let unboxed_float32_array_set_float32x8 arr i v = unboxed_float32_array_set_float32x8 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_float32_array_set_float32x8_unsafe : float32# array -> nativeint# -> float32x8 -> unit = "%caml_unboxed_float32_array_set256u#_indexed_by_nativeint#"
+  let unboxed_float32_array_set_float32x8_unsafe arr i v = unboxed_float32_array_set_float32x8_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+end)
+
+module Int_arrays (Primitives : sig
+
+  val int_array_get_int64x4 : int array -> int -> int64x4
+  val int_array_get_int64x4_unsafe : int array -> int -> int64x4
+
+  val int_iarray_get_int64x4 : int iarray -> int -> int64x4
+  val int_iarray_get_int64x4_unsafe : int iarray -> int -> int64x4
+
+  val int_array_set_int64x4 : int array -> int -> int64x4 -> unit
+  val int_array_set_int64x4_unsafe : int array -> int -> int64x4 -> unit
+
+  val unboxed_int64_array_get_int64x4 : int64# array -> int -> int64x4
+  val unboxed_int64_array_get_int64x4_unsafe : int64# array -> int -> int64x4
+
+  val unboxed_int64_array_set_int64x4 : int64# array -> int -> int64x4 -> unit
+  val unboxed_int64_array_set_int64x4_unsafe : int64# array -> int -> int64x4 -> unit
+
+  val unboxed_nativeint_array_get_int64x4 : nativeint# array -> int -> int64x4
+  val unboxed_nativeint_array_get_int64x4_unsafe : nativeint# array -> int -> int64x4
+
+  val unboxed_nativeint_array_set_int64x4 : nativeint# array -> int -> int64x4 -> unit
+  val unboxed_nativeint_array_set_int64x4_unsafe : nativeint# array -> int -> int64x4 -> unit
+
+  val unboxed_int32_array_get_int32x8 : int32# array -> int -> int32x8
+  val unboxed_int32_array_get_int32x8_unsafe : int32# array -> int -> int32x8
+
+  val unboxed_int32_array_set_int32x8 : int32# array -> int -> int32x8 -> unit
+  val unboxed_int32_array_set_int32x8_unsafe : int32# array -> int -> int32x8 -> unit
+
+end) = struct
+  open Primitives
 
   let i64x4 x y z w = int64x4_of_int64s w z y x
 
@@ -1235,3 +1419,181 @@ module Int_arrays = struct
     fail [|#0l|] (-1)
   ;;
 end
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x4 : int array -> int -> int64x4 = "%caml_int_array_get256#"
+  external int_array_get_int64x4_unsafe : int array -> int -> int64x4 = "%caml_int_array_get256u#"
+
+  external int_iarray_get_int64x4 : int iarray -> int -> int64x4 = "%caml_int_array_get256#"
+  external int_iarray_get_int64x4_unsafe : int iarray -> int -> int64x4 = "%caml_int_array_get256u#"
+
+  external int_array_set_int64x4 : int array -> int -> int64x4 -> unit = "%caml_int_array_set256#"
+  external int_array_set_int64x4_unsafe : int array -> int -> int64x4 -> unit = "%caml_int_array_set256u#"
+
+  external unboxed_int64_array_get_int64x4 : int64# array -> int -> int64x4 = "%caml_unboxed_int64_array_get256#"
+  external unboxed_int64_array_get_int64x4_unsafe : int64# array -> int -> int64x4 = "%caml_unboxed_int64_array_get256u#"
+
+  external unboxed_int64_array_set_int64x4 : int64# array -> int -> int64x4 -> unit = "%caml_unboxed_int64_array_set256#"
+  external unboxed_int64_array_set_int64x4_unsafe : int64# array -> int -> int64x4 -> unit = "%caml_unboxed_int64_array_set256u#"
+
+  external unboxed_nativeint_array_get_int64x4 : nativeint# array -> int -> int64x4 = "%caml_unboxed_nativeint_array_get256#"
+  external unboxed_nativeint_array_get_int64x4_unsafe : nativeint# array -> int -> int64x4 = "%caml_unboxed_nativeint_array_get256u#"
+
+  external unboxed_nativeint_array_set_int64x4 : nativeint# array -> int -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256#"
+  external unboxed_nativeint_array_set_int64x4_unsafe : nativeint# array -> int -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256u#"
+
+  external unboxed_int32_array_get_int32x8 : int32# array -> int -> int32x8 = "%caml_unboxed_int32_array_get256#"
+  external unboxed_int32_array_get_int32x8_unsafe : int32# array -> int -> int32x8 = "%caml_unboxed_int32_array_get256u#"
+
+  external unboxed_int32_array_set_int32x8 : int32# array -> int -> int32x8 -> unit = "%caml_unboxed_int32_array_set256#"
+  external unboxed_int32_array_set_int32x8_unsafe : int32# array -> int -> int32x8 -> unit = "%caml_unboxed_int32_array_set256u#"
+
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x4 : int array -> int32# -> int64x4 = "%caml_int_array_get256#_indexed_by_int32#"
+  let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external int_array_get_int64x4_unsafe : int array -> int32# -> int64x4 = "%caml_int_array_get256u#_indexed_by_int32#"
+  let int_array_get_int64x4_unsafe arr i = int_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external int_iarray_get_int64x4 : int iarray -> int32# -> int64x4 = "%caml_int_array_get256#_indexed_by_int32#"
+  let int_iarray_get_int64x4 arr i = int_iarray_get_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external int_iarray_get_int64x4_unsafe : int iarray -> int32# -> int64x4 = "%caml_int_array_get256u#_indexed_by_int32#"
+  let int_iarray_get_int64x4_unsafe arr i = int_iarray_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external int_array_set_int64x4 : int array -> int32# -> int64x4 -> unit = "%caml_int_array_set256#_indexed_by_int32#"
+  let int_array_set_int64x4 arr i v = int_array_set_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external int_array_set_int64x4_unsafe : int array -> int32# -> int64x4 -> unit = "%caml_int_array_set256u#_indexed_by_int32#"
+  let int_array_set_int64x4_unsafe arr i v = int_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x4 : int64# array -> int32# -> int64x4 = "%caml_unboxed_int64_array_get256#_indexed_by_int32#"
+  let unboxed_int64_array_get_int64x4 arr i = unboxed_int64_array_get_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_int64_array_get_int64x4_unsafe : int64# array -> int32# -> int64x4 = "%caml_unboxed_int64_array_get256u#_indexed_by_int32#"
+  let unboxed_int64_array_get_int64x4_unsafe arr i = unboxed_int64_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_int64_array_set_int64x4 : int64# array -> int32# -> int64x4 -> unit = "%caml_unboxed_int64_array_set256#_indexed_by_int32#"
+  let unboxed_int64_array_set_int64x4 arr i v = unboxed_int64_array_set_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_int64_array_set_int64x4_unsafe : int64# array -> int32# -> int64x4 -> unit = "%caml_unboxed_int64_array_set256u#_indexed_by_int32#"
+  let unboxed_int64_array_set_int64x4_unsafe arr i v = unboxed_int64_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x4 : nativeint# array -> int32# -> int64x4 = "%caml_unboxed_nativeint_array_get256#_indexed_by_int32#"
+  let unboxed_nativeint_array_get_int64x4 arr i = unboxed_nativeint_array_get_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_nativeint_array_get_int64x4_unsafe : nativeint# array -> int32# -> int64x4 = "%caml_unboxed_nativeint_array_get256u#_indexed_by_int32#"
+  let unboxed_nativeint_array_get_int64x4_unsafe arr i = unboxed_nativeint_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x4 : nativeint# array -> int32# -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256#_indexed_by_int32#"
+  let unboxed_nativeint_array_set_int64x4 arr i v = unboxed_nativeint_array_set_int64x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x4_unsafe : nativeint# array -> int32# -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256u#_indexed_by_int32#"
+  let unboxed_nativeint_array_set_int64x4_unsafe arr i v = unboxed_nativeint_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x8 : int32# array -> int32# -> int32x8 = "%caml_unboxed_int32_array_get256#_indexed_by_int32#"
+  let unboxed_int32_array_get_int32x8 arr i = unboxed_int32_array_get_int32x8 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_int32_array_get_int32x8_unsafe : int32# array -> int32# -> int32x8 = "%caml_unboxed_int32_array_get256u#_indexed_by_int32#"
+  let unboxed_int32_array_get_int32x8_unsafe arr i = unboxed_int32_array_get_int32x8_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_int32_array_set_int32x8 : int32# array -> int32# -> int32x8 -> unit = "%caml_unboxed_int32_array_set256#_indexed_by_int32#"
+  let unboxed_int32_array_set_int32x8 arr i v = unboxed_int32_array_set_int32x8 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_int32_array_set_int32x8_unsafe : int32# array -> int32# -> int32x8 -> unit = "%caml_unboxed_int32_array_set256u#_indexed_by_int32#"
+  let unboxed_int32_array_set_int32x8_unsafe arr i v = unboxed_int32_array_set_int32x8_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x4 : int array -> int64# -> int64x4 = "%caml_int_array_get256#_indexed_by_int64#"
+  let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external int_array_get_int64x4_unsafe : int array -> int64# -> int64x4 = "%caml_int_array_get256u#_indexed_by_int64#"
+  let int_array_get_int64x4_unsafe arr i = int_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external int_iarray_get_int64x4 : int iarray -> int64# -> int64x4 = "%caml_int_array_get256#_indexed_by_int64#"
+  let int_iarray_get_int64x4 arr i = int_iarray_get_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external int_iarray_get_int64x4_unsafe : int iarray -> int64# -> int64x4 = "%caml_int_array_get256u#_indexed_by_int64#"
+  let int_iarray_get_int64x4_unsafe arr i = int_iarray_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external int_array_set_int64x4 : int array -> int64# -> int64x4 -> unit = "%caml_int_array_set256#_indexed_by_int64#"
+  let int_array_set_int64x4 arr i v = int_array_set_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external int_array_set_int64x4_unsafe : int array -> int64# -> int64x4 -> unit = "%caml_int_array_set256u#_indexed_by_int64#"
+  let int_array_set_int64x4_unsafe arr i v = int_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x4 : int64# array -> int64# -> int64x4 = "%caml_unboxed_int64_array_get256#_indexed_by_int64#"
+  let unboxed_int64_array_get_int64x4 arr i = unboxed_int64_array_get_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_int64_array_get_int64x4_unsafe : int64# array -> int64# -> int64x4 = "%caml_unboxed_int64_array_get256u#_indexed_by_int64#"
+  let unboxed_int64_array_get_int64x4_unsafe arr i = unboxed_int64_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_int64_array_set_int64x4 : int64# array -> int64# -> int64x4 -> unit = "%caml_unboxed_int64_array_set256#_indexed_by_int64#"
+  let unboxed_int64_array_set_int64x4 arr i v = unboxed_int64_array_set_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_int64_array_set_int64x4_unsafe : int64# array -> int64# -> int64x4 -> unit = "%caml_unboxed_int64_array_set256u#_indexed_by_int64#"
+  let unboxed_int64_array_set_int64x4_unsafe arr i v = unboxed_int64_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x4 : nativeint# array -> int64# -> int64x4 = "%caml_unboxed_nativeint_array_get256#_indexed_by_int64#"
+  let unboxed_nativeint_array_get_int64x4 arr i = unboxed_nativeint_array_get_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_nativeint_array_get_int64x4_unsafe : nativeint# array -> int64# -> int64x4 = "%caml_unboxed_nativeint_array_get256u#_indexed_by_int64#"
+  let unboxed_nativeint_array_get_int64x4_unsafe arr i = unboxed_nativeint_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x4 : nativeint# array -> int64# -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256#_indexed_by_int64#"
+  let unboxed_nativeint_array_set_int64x4 arr i v = unboxed_nativeint_array_set_int64x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x4_unsafe : nativeint# array -> int64# -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256u#_indexed_by_int64#"
+  let unboxed_nativeint_array_set_int64x4_unsafe arr i v = unboxed_nativeint_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x8 : int32# array -> int64# -> int32x8 = "%caml_unboxed_int32_array_get256#_indexed_by_int64#"
+  let unboxed_int32_array_get_int32x8 arr i = unboxed_int32_array_get_int32x8 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_int32_array_get_int32x8_unsafe : int32# array -> int64# -> int32x8 = "%caml_unboxed_int32_array_get256u#_indexed_by_int64#"
+  let unboxed_int32_array_get_int32x8_unsafe arr i = unboxed_int32_array_get_int32x8_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_int32_array_set_int32x8 : int32# array -> int64# -> int32x8 -> unit = "%caml_unboxed_int32_array_set256#_indexed_by_int64#"
+  let unboxed_int32_array_set_int32x8 arr i v = unboxed_int32_array_set_int32x8 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_int32_array_set_int32x8_unsafe : int32# array -> int64# -> int32x8 -> unit = "%caml_unboxed_int32_array_set256u#_indexed_by_int64#"
+  let unboxed_int32_array_set_int32x8_unsafe arr i v = unboxed_int32_array_set_int32x8_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x4 : int array -> nativeint# -> int64x4 = "%caml_int_array_get256#_indexed_by_nativeint#"
+  let int_array_get_int64x4 arr i = int_array_get_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external int_array_get_int64x4_unsafe : int array -> nativeint# -> int64x4 = "%caml_int_array_get256u#_indexed_by_nativeint#"
+  let int_array_get_int64x4_unsafe arr i = int_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external int_iarray_get_int64x4 : int iarray -> nativeint# -> int64x4 = "%caml_int_array_get256#_indexed_by_nativeint#"
+  let int_iarray_get_int64x4 arr i = int_iarray_get_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external int_iarray_get_int64x4_unsafe : int iarray -> nativeint# -> int64x4 = "%caml_int_array_get256u#_indexed_by_nativeint#"
+  let int_iarray_get_int64x4_unsafe arr i = int_iarray_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external int_array_set_int64x4 : int array -> nativeint# -> int64x4 -> unit = "%caml_int_array_set256#_indexed_by_nativeint#"
+  let int_array_set_int64x4 arr i v = int_array_set_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external int_array_set_int64x4_unsafe : int array -> nativeint# -> int64x4 -> unit = "%caml_int_array_set256u#_indexed_by_nativeint#"
+  let int_array_set_int64x4_unsafe arr i v = int_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x4 : int64# array -> nativeint# -> int64x4 = "%caml_unboxed_int64_array_get256#_indexed_by_nativeint#"
+  let unboxed_int64_array_get_int64x4 arr i = unboxed_int64_array_get_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_int64_array_get_int64x4_unsafe : int64# array -> nativeint# -> int64x4 = "%caml_unboxed_int64_array_get256u#_indexed_by_nativeint#"
+  let unboxed_int64_array_get_int64x4_unsafe arr i = unboxed_int64_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_int64_array_set_int64x4 : int64# array -> nativeint# -> int64x4 -> unit = "%caml_unboxed_int64_array_set256#_indexed_by_nativeint#"
+  let unboxed_int64_array_set_int64x4 arr i v = unboxed_int64_array_set_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_int64_array_set_int64x4_unsafe : int64# array -> nativeint# -> int64x4 -> unit = "%caml_unboxed_int64_array_set256u#_indexed_by_nativeint#"
+  let unboxed_int64_array_set_int64x4_unsafe arr i v = unboxed_int64_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x4 : nativeint# array -> nativeint# -> int64x4 = "%caml_unboxed_nativeint_array_get256#_indexed_by_nativeint#"
+  let unboxed_nativeint_array_get_int64x4 arr i = unboxed_nativeint_array_get_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_nativeint_array_get_int64x4_unsafe : nativeint# array -> nativeint# -> int64x4 = "%caml_unboxed_nativeint_array_get256u#_indexed_by_nativeint#"
+  let unboxed_nativeint_array_get_int64x4_unsafe arr i = unboxed_nativeint_array_get_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x4 : nativeint# array -> nativeint# -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256#_indexed_by_nativeint#"
+  let unboxed_nativeint_array_set_int64x4 arr i v = unboxed_nativeint_array_set_int64x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x4_unsafe : nativeint# array -> nativeint# -> int64x4 -> unit = "%caml_unboxed_nativeint_array_set256u#_indexed_by_nativeint#"
+  let unboxed_nativeint_array_set_int64x4_unsafe arr i v = unboxed_nativeint_array_set_int64x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x8 : int32# array -> nativeint# -> int32x8 = "%caml_unboxed_int32_array_get256#_indexed_by_nativeint#"
+  let unboxed_int32_array_get_int32x8 arr i = unboxed_int32_array_get_int32x8 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_int32_array_get_int32x8_unsafe : int32# array -> nativeint# -> int32x8 = "%caml_unboxed_int32_array_get256u#_indexed_by_nativeint#"
+  let unboxed_int32_array_get_int32x8_unsafe arr i = unboxed_int32_array_get_int32x8_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_int32_array_set_int32x8 : int32# array -> nativeint# -> int32x8 -> unit = "%caml_unboxed_int32_array_set256#_indexed_by_nativeint#"
+  let unboxed_int32_array_set_int32x8 arr i v = unboxed_int32_array_set_int32x8 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_int32_array_set_int32x8_unsafe : int32# array -> nativeint# -> int32x8 -> unit = "%caml_unboxed_int32_array_set256u#_indexed_by_nativeint#"
+  let unboxed_int32_array_set_int32x8_unsafe arr i v = unboxed_int32_array_set_int32x8_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+end)

@@ -240,11 +240,13 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = false; unsafe; index_kind; mode; boxed } );
+            { size = Boxed_vec128; aligned = false; unsafe;
+              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = true; unsafe; index_kind; mode; boxed } );
+            { size = Boxed_vec128; aligned = true; unsafe;
+              index_kind; mode; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -260,38 +262,48 @@ let indexing_primitives =
           Pbigstring_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = false; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec128; aligned = false;
+                               unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = true; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec128; aligned = true;
+                               unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = false; unsafe; index_kind; mode; boxed } );
+            { size = Boxed_vec256; aligned = false; unsafe;
+              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = true; unsafe; index_kind; mode; boxed } );
+            { size = Boxed_vec256; aligned = true; unsafe;
+              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = false; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec256; aligned = false;
+                               unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = true; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec256; aligned = true;
+                               unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = false; unsafe; index_kind; mode; boxed } );
+            { size = Boxed_vec512; aligned = false; unsafe;
+              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = true; unsafe; index_kind; mode; boxed } );
+            { size = Boxed_vec512; aligned = true; unsafe;
+              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = false; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec512; aligned = false;
+                               unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = true; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec512; aligned = true;
+                               unsafe; index_kind; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -307,7 +319,8 @@ let indexing_primitives =
           Pbytes_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pbytes_load_vec {size = Boxed_vec128; unsafe; index_kind; mode; boxed } );
+          Pbytes_load_vec { size = Boxed_vec128; unsafe;
+                            index_kind; mode; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_set16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -323,19 +336,21 @@ let indexing_primitives =
           Pbytes_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbytes_set_vec {size = Boxed_vec128; unsafe; index_kind; boxed } );
+          Pbytes_set_vec { size = Boxed_vec128; unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pbytes_load_vec {size = Boxed_vec256; unsafe; index_kind; mode; boxed } );
+          Pbytes_load_vec { size = Boxed_vec256; unsafe;
+                            index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_setu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbytes_set_vec {size = Boxed_vec256; unsafe; index_kind; boxed } );
+          Pbytes_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pbytes_load_vec {size = Boxed_vec512; unsafe; index_kind; mode; boxed } );
+          Pbytes_load_vec { size = Boxed_vec512; unsafe;
+                            index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbytes_set_vec {size = Boxed_vec512; unsafe; index_kind; boxed } );
+          Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_string_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -351,13 +366,16 @@ let indexing_primitives =
           Pstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pstring_load_vec {size = Boxed_vec128; unsafe; index_kind; mode; boxed } );
+          Pstring_load_vec { size = Boxed_vec128; unsafe;
+                             index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pstring_load_vec {size = Boxed_vec256; unsafe; index_kind; mode; boxed } );
+          Pstring_load_vec { size = Boxed_vec256; unsafe;
+                             index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pstring_load_vec {size = Boxed_vec512; unsafe; index_kind; mode; boxed } );
+          Pstring_load_vec { size = Boxed_vec512; unsafe;
+                             index_kind; mode; boxed } );
       (* We encourage respecting the immutability of [string]s and so do not add
          new [string] setters. However, we keep existing setting primitives for
          upstream compatibility. *)
@@ -1926,10 +1944,11 @@ let lambda_primitive_needs_event_after = function
   | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _ | Pasrbint _
   | Pbintcomp _ | Punboxed_int_comp _ | Pcompare_bints _
   | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_16 _
-  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
-  | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
-  | Pbytes_load_vec _ | Pbytes_set_16 _ | Pbytes_set_32 _  | Pbytes_set_f32 _
-  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_16 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+  | Pstring_load_vec _ | Pbytes_load_16 _ | Pbytes_load_32 _
+  | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_16 _
+  | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+  | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
   | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
