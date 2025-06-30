@@ -172,6 +172,7 @@ let () =
       "callback256", enabled_if_main_amd64_not_macos;
       "test_callee_save_neon_regs", enabled_if_main;
       "probes", enabled_if_main_amd64_not_macos;
+      "arrays256", enabled_if_main_amd64_not_macos;
       "consts256", enabled_if_main_amd64_not_macos;
       "consts256_u", enabled_if_main_amd64_not_macos;
       "probes256", enabled_if_main_amd64_not_macos;
