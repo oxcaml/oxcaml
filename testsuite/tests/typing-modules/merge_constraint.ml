@@ -627,10 +627,5 @@ module type S2 = S with type ('a, _) t = 'a t2
 [%%expect{|
 module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
 type 'a t2 constraint 'a = 'l * 'r
-Line 7, characters 17-46:
-7 | module type S2 = S with type ('a, _) t = 'a t2
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Destructive substitutions are not supported for constrained
-       types (other than when replacing a type constructor with
-       a type constructor with the same arguments).
+module type S2 = sig type ('a, _) t = 'a t2 constraint 'a = 'b * 'c end
 |}]
