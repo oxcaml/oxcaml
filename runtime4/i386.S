@@ -410,7 +410,7 @@ FUNCTION(caml_callback2_asm)
         movl    28(%esp), %edi   /* arguments array */
         movl    0(%edi), %eax    /* arg1: first argument */
         movl    4(%edi), %ebx    /* arg2: second argument */
-        movl    $ G(caml_apply2), %esi   /* code pointer */
+        movl    $ G(caml_apply2L), %esi   /* code pointer */
         jmp     LBL(106)
         CFI_ENDPROC
 ENDFUNCTION(caml_callback2_asm)
@@ -428,7 +428,7 @@ FUNCTION(caml_callback3_asm)
         movl    0(%edi), %eax    /* arg1: first argument */
         movl    4(%edi), %ebx    /* arg2: second argument */
         movl    8(%edi), %ecx    /* arg3: third argument */
-        movl    $ G(caml_apply3), %esi   /* code pointer */
+        movl    $ G(caml_apply3L), %esi   /* code pointer */
         jmp     LBL(106)
         CFI_ENDPROC
 ENDFUNCTION(caml_callback3_asm)
