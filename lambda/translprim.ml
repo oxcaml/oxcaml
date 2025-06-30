@@ -485,9 +485,12 @@ let array_vec_primitives =
    let* unsafe, unsafe_sigil = [ (false, ""); (true, "u") ] in
    let* boxed, boxed_sigil = [ (true, ""); (false, "#") ] in
    [
-     (Printf.sprintf "%%caml_%s_get%s%s%s%s" array_type size_str unsafe_sigil boxed_sigil index_kind_sigil,
-      fun ~mode -> Primitive (load_prim ~size ~unsafe ~index_kind ~mode ~boxed, 2));
-     (Printf.sprintf "%%caml_%s_set%s%s%s%s" array_type size_str unsafe_sigil boxed_sigil index_kind_sigil,
+     (Printf.sprintf "%%caml_%s_get%s%s%s%s" array_type size_str unsafe_sigil
+        boxed_sigil index_kind_sigil,
+      fun ~mode ->
+        Primitive (load_prim ~size ~unsafe ~index_kind ~mode ~boxed, 2));
+     (Printf.sprintf "%%caml_%s_set%s%s%s%s" array_type size_str unsafe_sigil
+        boxed_sigil index_kind_sigil,
       fun ~mode:_ -> Primitive (set_prim ~size ~unsafe ~index_kind ~boxed, 3))
    ])
   |> List.to_seq
