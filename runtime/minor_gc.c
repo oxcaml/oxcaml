@@ -196,11 +196,6 @@ Caml_inline header_t get_header_val(value v) {
   return 0;
 }
 
-header_t caml_get_header_val(value v) {
-  return get_header_val(v);
-}
-
-
 static int try_update_object_header(value v, volatile value *p, value result,
                                     mlsize_t infix_offset) {
   int success = 0;
@@ -868,7 +863,7 @@ static void custom_finalize_minor (caml_domain_state * domain)
        elt < domain->minor_tables->custom.ptr; elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
-      if (get_header_val(*v) != 0) { /* value not copied to major heap */
+      if (Hd_val(*v) != 0) { /* value not copied to major heap */
         void (*final_fun)(value) = Custom_ops_val(*v)->finalize;
         if (final_fun != NULL) final_fun(*v);
       }
@@ -884,7 +879,7 @@ static void dependent_accounting_minor (caml_domain_state *domain)
     value *v = &elt->block;
     CAMLassert (Is_block (*v));
     if (Is_young(*v)) {
-      if (get_header_val(*v) == 0) { /* value copied to major heap */
+      if (Hd_val(*v) == 0) { /* value copied to major heap */
         /* inlined version of [caml_alloc_dependent_memory] */
         domain->allocated_dependent_bytes += elt->mem;
         domain->stat_promoted_dependent_bytes += elt->mem;
