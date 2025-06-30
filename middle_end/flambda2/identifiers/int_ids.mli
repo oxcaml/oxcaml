@@ -101,6 +101,8 @@ module Variable : sig
 
   include Container_types.S with type t := t
 
+  module Lmap : Lmap.S with type key := t
+
   val create : ?user_visible:unit -> string -> t
 
   val compilation_unit : t -> Compilation_unit.t
