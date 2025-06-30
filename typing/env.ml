@@ -137,7 +137,8 @@ type value_unbound_reason =
   | Val_unbound_ghost_recursive of Location.t
 
 type module_unbound_reason =
-  | Mod_unbound_illegal_recursion
+  | Mod_unbound_illegal_recursion of
+      { container : string option; unbound : string }
 
 type summary =
     Env_empty
@@ -793,7 +794,14 @@ type lookup_error =
   | Functor_used_as_structure of Longident.t * structure_components_reason
   | Abstract_used_as_structure of Longident.t * Path.t * structure_components_reason
   | Generative_used_as_applicative of Longident.t
-  | Illegal_reference_to_recursive_module
+  | Illegal_reference_to_recursive_module of
+      { container: string option; unbound : string }
+  | Illegal_reference_to_recursive_class_type of
+      { container : string option;
+        unbound : string;
+        unbound_class_type : Longident.t;
+        container_class_type : string;
+      }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
@@ -3054,9 +3062,10 @@ let may_lookup_error report_errors loc env err =
 
 let report_module_unbound ~errors ~loc env reason =
   match reason with
-  | Mod_unbound_illegal_recursion ->
+  | Mod_unbound_illegal_recursion { container; unbound } ->
       (* see #5965 *)
-    may_lookup_error errors loc env Illegal_reference_to_recursive_module
+      may_lookup_error errors loc env
+        (Illegal_reference_to_recursive_module { container; unbound })
 
 let report_value_unbound ~errors ~loc env reason lid =
   match reason with
@@ -4608,8 +4617,46 @@ let report_lookup_error _loc env ppf = function
         "The ancestor variable %a@ \
          cannot be accessed from the definition of an instance variable"
        (Style.as_inline_code !print_longident) lid
-  | Illegal_reference_to_recursive_module ->
-     fprintf ppf "Illegal recursive module reference"
+  | Illegal_reference_to_recursive_module { container; unbound } ->
+      let container = Option.value ~default:"_" container in
+      let self_or_definition, self_or_unbound =
+        if String.equal container unbound
+        then dprintf "its own definition", dprintf "itself"
+        else
+          dprintf "the definition of the module %a" Style.inline_code container,
+          dprintf "the module type of %a" Style.inline_code unbound
+      in
+      fprintf ppf
+        "@[<hov>This module type is recursive.@ \
+         This use of the recursive module %a@ \
+         within %t@ \
+         makes the module type of %a depend on@ %t.@ \
+         Such recursive definitions of module types are not allowed.@]"
+        Style.inline_code unbound
+        self_or_definition
+        Style.inline_code container
+        self_or_unbound
+  | Illegal_reference_to_recursive_class_type
+      { container; unbound; unbound_class_type; container_class_type } ->
+      let container = Option.value ~default:"_" container in
+      let self_or_unbound =
+        if String.equal container unbound
+        then dprintf "itself"
+        else dprintf "the module type of %a" Style.inline_code unbound
+      in
+      fprintf ppf
+        "@[<hov>This class type is recursive.@ This use of the class type %a@ \
+         from the recursive module %a@ within the definition of@ \
+         the class type %a@ in the recursive module %a@ \
+         makes the module type of %a@ depend on %t.@ \
+         Such recursive definitions of@ class types within recursive modules@ \
+         are not allowed.@]"
+        (Style.as_inline_code !print_longident) unbound_class_type
+        Style.inline_code unbound
+        Style.inline_code container_class_type
+        Style.inline_code container
+        Style.inline_code container
+        self_or_unbound
   | Structure_used_as_functor lid ->
       fprintf ppf "@[The module %a is a structure, it cannot be applied@]"
       (Style.as_inline_code !print_longident) lid
