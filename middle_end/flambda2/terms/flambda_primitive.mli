@@ -703,6 +703,18 @@ val equal_ternary_primitive : ternary_primitive -> ternary_primitive -> bool
 
 val equal_variadic_primitive : variadic_primitive -> variadic_primitive -> bool
 
+val compare : t -> t -> int
+
+val compare_nullary_primitive : nullary_primitive -> nullary_primitive -> int
+
+val compare_unary_primitive : unary_primitive -> unary_primitive -> int
+
+val compare_binary_primitive : binary_primitive -> binary_primitive -> int
+
+val compare_ternary_primitive : ternary_primitive -> ternary_primitive -> int
+
+val compare_variadic_primitive : variadic_primitive -> variadic_primitive -> int
+
 val is_begin_or_end_region : t -> bool
 
 val is_begin_region : t -> bool
