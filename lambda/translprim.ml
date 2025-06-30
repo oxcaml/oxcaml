@@ -430,12 +430,14 @@ let array_vec_primitives =
          Pfloatarray_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_float_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+         Punboxed_float_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_float32_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_float32_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+         Punboxed_float32_array_load_vec { size; unsafe; index_kind;
+                                           mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("int_array",
@@ -445,17 +447,20 @@ let array_vec_primitives =
          Pint_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int64_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_int64_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+         Punboxed_int64_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int32_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_int32_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+         Punboxed_int32_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_nativeint_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+         Punboxed_nativeint_array_load_vec { size; unsafe; index_kind;
+                                             mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed }));
     ]
