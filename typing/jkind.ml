@@ -2508,48 +2508,61 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
 
 let for_boxed_variant cstrs =
   let open Types in
-  if List.for_all
-       (* CR layouts v12: This code assumes that all voids mode-cross. I
-          think that's probably not what we want. *)
-         (fun cstr ->
-         match cstr.cd_args with
-         | Cstr_tuple args ->
-           List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
-         | Cstr_record lbls -> all_void_labels lbls)
-       cstrs
-  then Builtin.immediate ~why:Enumeration
-  else
-    let is_mutable =
-      List.exists
+  let has_gadt_constructor =
+    List.exists
+      (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
+      cstrs
+  in
+  if has_gadt_constructor
+  then
+    let no_args =
+      List.for_all
         (fun cstr ->
           match cstr.cd_args with
-          | Cstr_tuple _ -> false
-          | Cstr_record lbls -> has_mutable_label lbls)
+          | Cstr_tuple [] | Cstr_record [] -> true
+          | Cstr_tuple _ | Cstr_record _ -> false)
         cstrs
     in
-    let has_gadt_constructor =
-      List.exists
-        (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
-        cstrs
+    if no_args
+    then Builtin.immediate ~why:Enumeration
+    else for_non_float ~why:Boxed_variant
+  else
+    let base =
+      let all_args_void =
+        List.for_all
+          (fun cstr ->
+            match cstr.cd_args with
+            | Cstr_tuple args ->
+              List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
+            | Cstr_record lbls -> all_void_labels lbls)
+          cstrs
+      in
+      if all_args_void
+      then Builtin.immediate ~why:Enumeration
+      else
+        let is_mutable =
+          List.exists
+            (fun cstr ->
+              match cstr.cd_args with
+              | Cstr_tuple _ -> false
+              | Cstr_record lbls -> has_mutable_label lbls)
+            cstrs
+        in
+        if is_mutable
+        then Builtin.mutable_data ~why:Boxed_variant
+        else Builtin.immutable_data ~why:Boxed_variant
     in
-    if has_gadt_constructor
-    then for_non_float ~why:Boxed_variant
-    else
-      let base =
-        (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-          ~why:Boxed_variant
-        |> mark_best
-      in
-      let add_cstr_args cstr jkind =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_right
-            (fun arg ->
-              add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
-            args jkind
-        | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
-      in
-      List.fold_right add_cstr_args cstrs base
+    let base = mark_best base in
+    let add_cstr_args cstr jkind =
+      match cstr.cd_args with
+      | Cstr_tuple args ->
+        List.fold_right
+          (fun arg ->
+            add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
+          args jkind
+      | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
+    in
+    List.fold_right add_cstr_args cstrs base
 
 let for_boxed_tuple elts =
   List.fold_right

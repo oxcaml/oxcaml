@@ -2,13 +2,15 @@
  expect;
 *)
 
-type unit_u : void
+type unit_u : void mod everything
+[%%expect{|
+type unit_u : void mod global aliased many stateless immutable external_
+|}]
 
 (* Variants whose constructor arguments are all void are immediates *)
 
 type v : immediate = A of unit_u
 [%%expect{|
-type unit_u : void
 type v = A of unit_u
 |}]
 
@@ -26,6 +28,34 @@ Error: The kind of type "bad" is immutable_data with unit_u
          because it's a boxed variant type.
        But the kind of type "bad" must be a subkind of immediate
          because of the annotation on the declaration of the type bad.
+|}]
+
+(* With-bounds for all-void variants *)
+
+type key : void
+type key_holder1 : immediate with key = A of key
+type ('a : void) r = #{ a : 'a }
+type key_holder2 : immediate with key = A of #(unit_u * key r)
+[%%expect{|
+type key : void
+type key_holder1 = A of key
+type ('a : void) r = #{ a : 'a; }
+type key_holder2 = A of #(unit_u * key r)
+|}]
+
+type bad : immediate = A of key
+[%%expect{|
+Line 1, characters 0-31:
+1 | type bad : immediate = A of key
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bad" is immediate with key
+         because it's an enumeration variant type (all constructors are constant).
+       But the kind of type "bad" must be a subkind of immediate
+         because of the annotation on the declaration of the type bad.
+|}]
+type key_holder2 : immediate with key = A of #(unit_u * key r)
+[%%expect{|
+type key_holder2 = A of #(unit_u * key r)
 |}]
 
 (* All-void records are not allowed *)
