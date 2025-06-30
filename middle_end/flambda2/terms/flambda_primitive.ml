@@ -2258,49 +2258,52 @@ let classify_for_printing t =
   | Ternary (prim, _, _, _) -> ternary_classify_for_printing prim
   | Variadic (prim, _) -> variadic_classify_for_printing prim
 
+let compare_primitive_application ~compare_simple t1 t2 =
+  if t1 == t2
+  then 0
+  else
+    let numbering t =
+      match t with
+      | Nullary _ -> 0
+      | Unary _ -> 1
+      | Binary _ -> 2
+      | Ternary _ -> 3
+      | Variadic _ -> 4
+    in
+    match t1, t2 with
+    | Nullary p, Nullary p' -> compare_nullary_primitive p p'
+    | Unary (p, s1), Unary (p', s1') ->
+      let c = compare_unary_primitive p p' in
+      if c <> 0 then c else compare_simple s1 s1'
+    | Binary (p, s1, s2), Binary (p', s1', s2') ->
+      let c = compare_binary_primitive p p' in
+      if c <> 0
+      then c
+      else
+        let c = compare_simple s1 s1' in
+        if c <> 0 then c else compare_simple s2 s2'
+    | Ternary (p, s1, s2, s3), Ternary (p', s1', s2', s3') ->
+      let c = compare_ternary_primitive p p' in
+      if c <> 0
+      then c
+      else
+        let c = compare_simple s1 s1' in
+        if c <> 0
+        then c
+        else
+          let c = compare_simple s2 s2' in
+          if c <> 0 then c else compare_simple s3 s3'
+    | Variadic (p, s), Variadic (p', s') ->
+      let c = compare_variadic_primitive p p' in
+      if c <> 0 then c else List.compare compare_simple s s'
+    | (Nullary _ | Unary _ | Binary _ | Ternary _ | Variadic _), _ ->
+      Stdlib.compare (numbering t1) (numbering t2)
+
 include Container_types.Make (struct
   type nonrec t = t
 
   let compare t1 t2 =
-    if t1 == t2
-    then 0
-    else
-      let numbering t =
-        match t with
-        | Nullary _ -> 0
-        | Unary _ -> 1
-        | Binary _ -> 2
-        | Ternary _ -> 3
-        | Variadic _ -> 4
-      in
-      match t1, t2 with
-      | Nullary p, Nullary p' -> compare_nullary_primitive p p'
-      | Unary (p, s1), Unary (p', s1') ->
-        let c = compare_unary_primitive p p' in
-        if c <> 0 then c else Simple.compare s1 s1'
-      | Binary (p, s1, s2), Binary (p', s1', s2') ->
-        let c = compare_binary_primitive p p' in
-        if c <> 0
-        then c
-        else
-          let c = Simple.compare s1 s1' in
-          if c <> 0 then c else Simple.compare s2 s2'
-      | Ternary (p, s1, s2, s3), Ternary (p', s1', s2', s3') ->
-        let c = compare_ternary_primitive p p' in
-        if c <> 0
-        then c
-        else
-          let c = Simple.compare s1 s1' in
-          if c <> 0
-          then c
-          else
-            let c = Simple.compare s2 s2' in
-            if c <> 0 then c else Simple.compare s3 s3'
-      | Variadic (p, s), Variadic (p', s') ->
-        let c = compare_variadic_primitive p p' in
-        if c <> 0 then c else Simple.List.compare s s'
-      | (Nullary _ | Unary _ | Binary _ | Ternary _ | Variadic _), _ ->
-        Stdlib.compare (numbering t1) (numbering t2)
+    compare_primitive_application ~compare_simple:Simple.compare t1 t2
 
   let equal t1 t2 = compare t1 t2 = 0
 

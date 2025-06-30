@@ -326,39 +326,6 @@ module Join_result = struct
     }
 end
 
-let stable_compare_primitives tenv (prim1 : P.t) (prim2 : P.t) =
-  match prim1, prim2 with
-  | Nullary prim1, Nullary prim2 -> P.compare_nullary_primitive prim1 prim2
-  | Nullary _, (Unary _ | Binary _ | Ternary _ | Variadic _) -> -1
-  | (Unary _ | Binary _ | Ternary _ | Variadic _), Nullary _ -> 1
-  | Unary (prim1, x1), Unary (prim2, x2) ->
-    let c = P.compare_unary_primitive prim1 prim2 in
-    if c <> 0 then c else TE.stable_compare_simples tenv x1 x2
-  | Unary _, (Binary _ | Ternary _ | Variadic _) -> -1
-  | (Binary _ | Ternary _ | Variadic _), Unary _ -> 1
-  | Binary (prim1, x1, y1), Binary (prim2, x2, y2) ->
-    let c = P.compare_binary_primitive prim1 prim2 in
-    if c <> 0
-    then c
-    else List.compare ~cmp:(TE.stable_compare_simples tenv) [x1; y1] [x2; y2]
-  | Binary _, (Ternary _ | Variadic _) -> -1
-  | (Ternary _ | Variadic _), Binary _ -> 1
-  | Ternary (prim1, x1, y1, z1), Ternary (prim2, x2, y2, z2) ->
-    let c = P.compare_ternary_primitive prim1 prim2 in
-    if c <> 0
-    then c
-    else
-      List.compare
-        ~cmp:(TE.stable_compare_simples tenv)
-        [x1; y1; z1] [x2; y2; z2]
-  | Ternary _, Variadic _ -> -1
-  | Variadic _, Ternary _ -> 1
-  | Variadic (prim1, xs1), Variadic (prim2, xs2) ->
-    let c = P.compare_variadic_primitive prim1 prim2 in
-    if c <> 0
-    then c
-    else List.compare ~cmp:(TE.stable_compare_simples tenv) xs1 xs2
-
 let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
     ~scope_at_fork =
   let params = Bound_parameters.to_list params in
@@ -390,7 +357,9 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
     in
     let sorted_extra_bindings =
       List.sort extra_bindings ~cmp:(fun (prim1, _) (prim2, _) ->
-          stable_compare_primitives typing_env_with_extra_params
+          P.compare_primitive_application
+            ~compare_simple:
+              (TE.stable_compare_simples typing_env_with_extra_params)
             (EP.to_primitive prim1) (EP.to_primitive prim2))
     in
     let extra_params', typing_env_with_extra_params' =
