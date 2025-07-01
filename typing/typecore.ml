@@ -3071,8 +3071,8 @@ and type_pat_aux
       end;
 
       let constructor_mode =
-        match Ctype.check_constructor_crossing Destruction !!penv constr.cstr_tag
-          ~res:expected_ty ~args held_locks with
+        match Ctype.check_constructor_crossing Destruction !!penv
+          constr.cstr_tag ~res:expected_ty ~args held_locks with
         | Ok mode -> mode
         | Error e -> raise (Error (lid.loc, !!penv,
           Submode_failed (e, Constructor lid.txt, None, None, None, None)))
