@@ -18,9 +18,27 @@ module R = To_cmm_result
 module P = Flambda_primitive
 module Ece = Effects_and_coeffects
 
-type free_vars = Backend_var.Set.t
+(* Delayed symbol inits *)
+module Symbol_inits = struct
 
-type symbol_inits = Cmm.expression list Backend_var.Map.t
+  type t = Cmm.expression list Backend_var.Map.t
+
+  let empty : t = Backend_var.Map.empty
+
+  let is_empty t =
+    Backend_var.Map.is_empty t ||
+    Backend_var.Map.for_all (fun _ l -> Misc.Stdlib.List.is_empty l) t
+
+  let merge t t' =
+    Backend_var.Map.union_merge List.append t t'
+
+  let print ppf t =
+    let pp = Format.pp_print_list Printcmm.expression in
+    Backend_var.Map.print pp ppf t
+
+end
+
+type free_vars = Backend_var.Set.t
 
 type expr_with_info =
   { cmm : Cmm.expression;
@@ -73,17 +91,6 @@ type 'env trans_prim =
     variadic :
       ('env, P.variadic_primitive, Cmm.expression list -> prim_res) prim_helper
   }
-
-(* Delayed symbol inits *)
-let empty_symbol_inits : symbol_inits = Backend_var.Map.empty
-
-let check_is_empty_symbol_inits symbol_inits =
-  if not (Backend_var.Map.is_empty symbol_inits) then
-    assert false
-
-let merge_symbol_inits inits inits' =
-  Backend_var.Map.union_merge List.append inits inits'
-
 (* Delayed let-bindings (see the .mli) *)
 
 (* the binding kinds *)
@@ -169,7 +176,7 @@ type t =
     (* Maps for `Must_inline_once` variable that end up aliased. *)
     stages : stage list;
     (* Stages of let-bindings, most recent at the head. *)
-    symbol_inits : symbol_inits
+    symbol_inits : Symbol_inits.t
         (* Symbol initialization expressions, indexed by the variable used as
            value for the symbol field initialization. *)
   }
@@ -954,7 +961,7 @@ let flush_bindings order_map flushed_symbol_inits =
   fun e free_vars symbol_inits ->
   (* Merge the symbol inits from the env that was flushed, and those
      from the body (i.e. [e]) that we want to wrap *)
-  let symbol_inits = merge_symbol_inits flushed_symbol_inits symbol_inits in
+  let symbol_inits = Symbol_inits.merge flushed_symbol_inits symbol_inits in
   M.fold
     (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
        match b.bound_expr with

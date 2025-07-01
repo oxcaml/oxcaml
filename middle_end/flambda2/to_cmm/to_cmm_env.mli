@@ -22,13 +22,18 @@ type t
 type free_vars = Backend_var.Set.t
 
 (** Delayed symbol initializations *)
-type symbol_inits
+module Symbol_inits : sig
+  type t
 
-val empty_symbol_inits : symbol_inits
+  val empty : t
 
-val merge_symbol_inits : symbol_inits -> symbol_inits -> symbol_inits
+  val merge : t -> t -> t
 
-val check_is_empty_symbol_inits : symbol_inits -> unit
+  val is_empty : t -> bool
+
+  val print : Format.formatter -> t -> unit
+
+end
 
 (** A cmm expression along with extra information *)
 type expr_with_info =
@@ -290,13 +295,13 @@ val flush_delayed_lets :
   mode:flush_mode ->
   t ->
   To_cmm_result.t ->
-  (Cmm.expression -> free_vars -> symbol_inits -> Cmm.expression * free_vars * symbol_inits)
+  (Cmm.expression -> free_vars -> Symbol_inits.t -> Cmm.expression * free_vars * Symbol_inits.t)
   * t
   * To_cmm_result.t
 
 val place_symbol_inits :
   params:((Backend_var.With_provenance.t * _) list) ->
-  Cmm.expression -> free_vars -> symbol_inits -> Cmm.expression * free_vars * symbol_inits
+  Cmm.expression -> free_vars -> Symbol_inits.t -> Cmm.expression * free_vars * Symbol_inits.t
 
 (** Fetch the extra info for a Flambda variable (if any), specified as a
     [Simple]. *)

@@ -28,7 +28,7 @@ type translate_expr =
   To_cmm_env.t ->
   To_cmm_result.t ->
   Expr.t ->
-  Cmm.expression * To_cmm_env.free_vars * To_cmm_env.symbol_inits * To_cmm_result.t
+  Cmm.expression * To_cmm_env.free_vars * To_cmm_env.Symbol_inits.t * To_cmm_result.t
 
 (* Filling of closure blocks *)
 
@@ -488,7 +488,9 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let env, fun_params = C.function_bound_parameters env params in
   let fun_body, fun_body_free_vars, fun_body_symbol_inits, res = translate_expr env res body in
   (* Symbol definitions should have been lifted at top-level *)
-  To_cmm_env.check_is_empty_symbol_inits fun_body_symbol_inits;
+  if not (To_cmm_env.Symbol_inits.is_empty fun_body_symbol_inits) then
+    Misc.fatal_errorf "Found leftover symbol initializations statements in a function body: %a"
+      To_cmm_env.Symbol_inits.print fun_body_symbol_inits;
   let fun_free_vars =
     C.remove_vars_with_machtype
       (C.remove_var_opt_with_provenance
