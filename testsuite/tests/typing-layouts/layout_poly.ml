@@ -714,34 +714,35 @@ Error: "[@layout_poly]" on this external declaration has no
 (*********************************************)
 (* Tuple array prims no longer gated to beta *)
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array =
   "%makearray_dynamic"
 [%%expect{|
-external makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array
+external makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit :
-  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit =
+  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit =
   "%arrayblit"
 [%%expect{|
 external arrayblit :
-  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit
+  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit
   = "%arrayblit" [@@layout_poly]
 |}]
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a array =
   "%makearray_dynamic_uninit"
 [%%expect{|
-external makearray_dynamic : ('a : any_non_null). int -> 'a array
+external makearray_dynamic : ('a : any mod separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit_src_immut :
-  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit =
+  ('a : any mod separable). 'a iarray -> int -> 'a array -> int -> int -> unit =
   "%arrayblit_src_immut"
 [%%expect{|
 external arrayblit_src_immut :
-  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit
+  ('a : any mod separable).
+    'a iarray -> int -> 'a array -> int -> int -> unit
   = "%arrayblit_src_immut" [@@layout_poly]
 |}]
