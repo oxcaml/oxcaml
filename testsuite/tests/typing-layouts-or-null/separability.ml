@@ -189,12 +189,12 @@ Error: This type "t_any" should be an instance of type "('a : any mod non_float)
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
-(* [any_non_null] is separable *)
-type t_ann : any_non_null
+(* [any_separable] is separable *)
+type t_ann : any mod separable
 type succeeds = t_ann accepts_maybesep
 type succeeds = t_ann accepts_sep
 [%%expect{|
-type t_ann : any_non_null
+type t_ann : any mod separable
 type succeeds = t_ann accepts_maybesep
 type succeeds = t_ann accepts_sep
 |}]
@@ -206,8 +206,8 @@ Line 1, characters 13-18:
 1 | type fails = t_ann accepts_nonfloat
                  ^^^^^
 Error: This type "t_ann" should be an instance of type "('a : any mod non_float)"
-       The kind of t_ann is any_non_null
-         because of the definition of t_ann at line 1, characters 0-25.
+       The kind of t_ann is any mod separable
+         because of the definition of t_ann at line 1, characters 0-30.
        But the kind of t_ann must be a subkind of any mod non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
@@ -507,7 +507,7 @@ Error: This type "t_val or_null" should be an instance of type
        The kind of t_val or_null is value
          because of the definition of t_val at line 1, characters 0-18.
        But the kind of t_val or_null must be a subkind of
-         any_non_null mod non_float
+         any mod non_null non_float
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -564,7 +564,7 @@ Error: This type "float or_null" should be an instance of type
          value mod many unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float or_null must be a subkind of
-         any_non_null mod non_float
+         any mod non_null non_float
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -579,10 +579,10 @@ Line 1, characters 13-27:
 1 | type fails = t_maybesep_val array
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybesep_val" should be an instance of type
-         "('a : any_non_null)"
+         "('a : any mod separable)"
        The kind of t_maybesep_val is value_or_null mod non_null
          because of the definition of t_maybesep_val at line 1, characters 0-48.
-       But the kind of t_maybesep_val must be a subkind of any_non_null
+       But the kind of t_maybesep_val must be a subkind of any mod separable
          because it's the type argument to the array type.
 |}]
 
@@ -592,35 +592,18 @@ type ('a : value mod separable) succeeds = 'a array
 type 'a succeeds = 'a array
 |}]
 
-(* CR layouts v3.4: Arrays should accept [value_or_null mod separable] elements.
-   This is currently inferred as accepting [non_null] values. *)
+(* Arrays accept [value_or_null mod separable] elements. *)
 
 type should_succeed = int or_null array
 
 [%%expect{|
-Line 1, characters 22-33:
-1 | type should_succeed = int or_null array
-                          ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of int or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of int or_null must be a subkind of any_non_null
-         because it's the type argument to the array type.
+type should_succeed = int or_null array
 |}]
 
 type should_succeed = string or_null array
 
 [%%expect{|
-Line 1, characters 22-36:
-1 | type should_succeed = string or_null array
-                          ^^^^^^^^^^^^^^
-Error: This type "string or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of string or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of string or_null must be a subkind of any_non_null
-         because it's the type argument to the array type.
+type should_succeed = string or_null array
 |}]
 
 (* Arrays should not accept [float or_null]s: *)
@@ -632,41 +615,27 @@ Line 1, characters 13-26:
 1 | type fails = float or_null array
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of float or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of float or_null must be a subkind of any_non_null
+         "('a : any mod separable)"
+       The kind of float or_null is
+         value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float or_null must be a subkind of
+         any mod non_null non_float
          because it's the type argument to the array type.
 |}]
 
-(* CR layouts v3.4: arrays should accepts non-float [or_null] values. *)
+(* Arrays accept non-float [or_null] values. *)
 
 type should_succeed = string or_null array
 
 [%%expect{|
-Line 1, characters 22-36:
-1 | type should_succeed = string or_null array
-                          ^^^^^^^^^^^^^^
-Error: This type "string or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of string or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of string or_null must be a subkind of any_non_null
-         because it's the type argument to the array type.
+type should_succeed = string or_null array
 |}]
 
 type should_succeed = int or_null array
 
 [%%expect{|
-Line 1, characters 22-33:
-1 | type should_succeed = int or_null array
-                          ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type
-         "('a : any_non_null)"
-       The kind of int or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
-       But the kind of int or_null must be a subkind of any_non_null
-         because it's the type argument to the array type.
+type should_succeed = int or_null array
 |}]
 
 (* With-kinds and separability. *)
@@ -857,7 +826,7 @@ Error: This type "float Or_null_reexport.t" = "float or_null"
          value mod many unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float Or_null_reexport.t must be a subkind of
-         any_non_null mod non_float
+         any mod non_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -873,7 +842,7 @@ Error: This type "float Or_null_reexport.t" = "float or_null"
          value mod many unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float Or_null_reexport.t must be a subkind of
-         any_non_null mod non_float
+         any mod non_null non_float
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -905,6 +874,6 @@ Error: This type "float unbx or_null" should be an instance of type
          value mod many unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float unbx or_null must be a subkind of
-         any_non_null mod non_float
+         any mod non_null non_float
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
