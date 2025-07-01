@@ -20,22 +20,19 @@ module Ece = Effects_and_coeffects
 
 (* Delayed symbol inits *)
 module Symbol_inits = struct
-
   type t = Cmm.expression list Backend_var.Map.t
 
   let empty : t = Backend_var.Map.empty
 
   let is_empty t =
-    Backend_var.Map.is_empty t ||
-    Backend_var.Map.for_all (fun _ l -> Misc.Stdlib.List.is_empty l) t
+    Backend_var.Map.is_empty t
+    || Backend_var.Map.for_all (fun _ l -> Misc.Stdlib.List.is_empty l) t
 
-  let merge t t' =
-    Backend_var.Map.union_merge List.append t t'
+  let merge t t' = Backend_var.Map.union_merge List.append t t'
 
   let print ppf t =
     let pp = Format.pp_print_list Printcmm.expression in
     Backend_var.Map.print pp ppf t
-
 end
 
 type free_vars = Backend_var.Set.t
@@ -941,56 +938,57 @@ let pop_symbol_inits symbol_inits v =
   | l -> l, Backend_var.Map.remove v symbol_inits
 
 (* Wrapper function to introduce delayed let-bindings. *)
-let place_symbol_inits ~params = fun e free_vars symbol_inits ->
-  List.fold_left (fun (acc, free_vars, symbol_inits) (v, _) ->
+let place_symbol_inits ~params e free_vars symbol_inits =
+  List.fold_left
+    (fun (acc, free_vars, symbol_inits) (v, _) ->
       let v = Backend_var.With_provenance.var v in
       let inits, symbol_inits = pop_symbol_inits symbol_inits v in
       match inits with
       | [] -> acc, free_vars, symbol_inits
       | _ :: _ ->
-          let acc =
+        let acc =
+          List.fold_left
+            (fun acc init -> Cmm_helpers.sequence init acc)
+            acc inits
+        in
+        let free_vars = Backend_var.Set.add v free_vars in
+        acc, free_vars, symbol_inits)
+    (e, free_vars, symbol_inits)
+    params
+
+let flush_bindings order_map flushed_symbol_inits e free_vars symbol_inits =
+  (* Merge the symbol inits from the env that was flushed, and those from the
+     body (i.e. [e]) that we want to wrap *)
+  let symbol_inits = Symbol_inits.merge flushed_symbol_inits symbol_inits in
+  M.fold
+    (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
+      match b.bound_expr with
+      | Splittable_prim _ ->
+        Misc.fatal_errorf
+          "Complex bindings should have been split prior to being flushed."
+      | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
+        let v = Backend_var.With_provenance.var b.cmm_var in
+        let inits, symbol_inits = pop_symbol_inits symbol_inits v in
+        if can_be_removed b.effs
+           && Misc.Stdlib.List.is_empty inits
+           && not (Backend_var.Set.mem v acc_free_vars)
+        then acc, acc_free_vars, symbol_inits
+        else
+          let body =
             List.fold_left
               (fun acc init -> Cmm_helpers.sequence init acc)
               acc inits
           in
-          let free_vars = Backend_var.Set.add v free_vars in
-          acc, free_vars, symbol_inits
-    ) (e, free_vars, symbol_inits) params
-
-let flush_bindings order_map flushed_symbol_inits =
-  fun e free_vars symbol_inits ->
-  (* Merge the symbol inits from the env that was flushed, and those
-     from the body (i.e. [e]) that we want to wrap *)
-  let symbol_inits = Symbol_inits.merge flushed_symbol_inits symbol_inits in
-  M.fold
-    (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
-       match b.bound_expr with
-       | Splittable_prim _ ->
-           Misc.fatal_errorf
-             "Complex bindings should have been split prior to being flushed."
-       | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
-           let v = Backend_var.With_provenance.var b.cmm_var in
-           let inits, symbol_inits = pop_symbol_inits symbol_inits v in
-           if can_be_removed b.effs
-           && Misc.Stdlib.List.is_empty inits
-           && not (Backend_var.Set.mem v acc_free_vars)
-           then acc, acc_free_vars, symbol_inits
-           else
-             let body =
-               List.fold_left
-                 (fun acc init -> Cmm_helpers.sequence init acc)
-                 acc inits
-             in
-             let expr =
-               Cmm_helpers.letin b.cmm_var ~defining_expr:cmm_expr ~body
-             in
-             let free_vars =
-               Backend_var.Set.union free_vars
-                 (Backend_var.Set.remove v acc_free_vars)
-             in
-             expr, free_vars, symbol_inits)
-      order_map
-      (e, free_vars, symbol_inits)
+          let expr =
+            Cmm_helpers.letin b.cmm_var ~defining_expr:cmm_expr ~body
+          in
+          let free_vars =
+            Backend_var.Set.union free_vars
+              (Backend_var.Set.remove v acc_free_vars)
+          in
+          expr, free_vars, symbol_inits)
+    order_map
+    (e, free_vars, symbol_inits)
 
 let flush_delayed_lets ~mode env res =
   (* CR-someday mshinwell: work out a criterion for allowing substitutions into
@@ -1078,5 +1076,6 @@ let flush_delayed_lets ~mode env res =
       stages = [];
       bindings = bindings_to_keep;
       symbol_inits = Backend_var.Map.empty
-    } in
-  ( flush, env, !res )
+    }
+  in
+  flush, env, !res

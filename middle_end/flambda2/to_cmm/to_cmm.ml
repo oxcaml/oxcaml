@@ -100,8 +100,10 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
   in
-  if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits) then
-    Misc.fatal_errorf "Did not find where to place the following symbol initializations: %a"
+  if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits)
+  then
+    Misc.fatal_errorf
+      "Did not find where to place the following symbol initializations: %a"
       To_cmm_env.Symbol_inits.print body_symbol_inits;
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var

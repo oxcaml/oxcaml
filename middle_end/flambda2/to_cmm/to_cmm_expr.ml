@@ -535,7 +535,9 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
     let free_vars = Backend_var.Set.union exn_free_vars extra_free_vars in
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
     let cmm = C.raise_prim raise_kind exn ~extra_args:extra dbg in
-    let cmm, free_vars, symbol_inits = wrap cmm free_vars Env.Symbol_inits.empty in
+    let cmm, free_vars, symbol_inits =
+      wrap cmm free_vars Env.Symbol_inits.empty
+    in
     cmm, free_vars, symbol_inits, res
   | [] ->
     Misc.fatal_errorf "Exception continuation %a has no arguments:@ \n%a"
@@ -558,7 +560,9 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     let args = C.remove_skipped_args args types in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-    let cmm, free_vars, symbol_inits = wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty in
+    let cmm, free_vars, symbol_inits =
+      wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty
+    in
     cmm, free_vars, symbol_inits, res
   else
     Misc.fatal_errorf "Types (%a) do not match arguments of@ %a"
@@ -579,12 +583,16 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
     match Apply_cont.trap_action apply with
     | None ->
-      let cmm, free_vars, symbol_inits = wrap return_value free_vars Env.Symbol_inits.empty in
+      let cmm, free_vars, symbol_inits =
+        wrap return_value free_vars Env.Symbol_inits.empty
+      in
       cmm, free_vars, symbol_inits, res
     | Some (Pop { exn_handler; _ }) ->
       let cont = Env.get_cmm_continuation env exn_handler in
       let cmm, free_vars, symbol_inits =
-        wrap (C.trap_return return_value [Cmm.Pop cont]) free_vars Env.Symbol_inits.empty
+        wrap
+          (C.trap_return return_value [Cmm.Pop cont])
+          free_vars Env.Symbol_inits.empty
       in
       cmm, free_vars, symbol_inits, res
     | Some (Push _) ->
@@ -602,12 +610,15 @@ let invalid env res ~message =
     Env.flush_delayed_lets ~mode:Branching_point env res
   in
   let cmm_invalid, res = C.invalid res ~message in
-  let cmm, free_vars, symbol_inits = wrap cmm_invalid Backend_var.Set.empty Env.Symbol_inits.empty in
+  let cmm, free_vars, symbol_inits =
+    wrap cmm_invalid Backend_var.Set.empty Env.Symbol_inits.empty
+  in
   cmm, free_vars, symbol_inits, res
 
 (* The main set of translation functions for expressions *)
 
-let rec expr env res e : Cmm.expression * Backend_var.Set.t * Env.Symbol_inits.t * To_cmm_result.t =
+let rec expr env res e :
+    Cmm.expression * Backend_var.Set.t * Env.Symbol_inits.t * To_cmm_result.t =
   match Expr.descr e with
   | Let e' -> let_expr env res e'
   | Let_cont e' -> let_cont env res e'
@@ -719,7 +730,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       in
       let body, body_free_vars, symbol_inits, res = expr env res body in
       let free_vars = Backend_var.Set.union free_vars body_free_vars in
-      let cmm, free_vars, symbol_inits = wrap (C.sequence cmm body) free_vars symbol_inits in
+      let cmm, free_vars, symbol_inits =
+        wrap (C.sequence cmm body) free_vars symbol_inits
+      in
       cmm, free_vars, symbol_inits, res)
   | Singleton _, Rec_info _ -> expr env res body
   | Singleton _, (Set_of_closures _ | Static_consts _)
@@ -802,7 +815,9 @@ and let_cont_not_inlined env res k handler body =
          Env.add_inlined_debuginfo to it *)
       let dbg = Debuginfo.none in
       let body, free_vars_of_body, body_symbol_inits, res = expr env res body in
-      let symbol_inits = Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits in
+      let symbol_inits =
+        Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits
+      in
       let free_vars =
         Backend_var.Set.union free_vars_of_body
           (C.remove_vars_with_machtype free_vars_of_handler vars)
@@ -890,9 +905,10 @@ and let_cont_rec env res invariant_params conts body =
         let vars, _arity, handler, free_vars_of_handler, symbol_inits, res =
           continuation_handler env res handler
         in
-        (* It should be an flambda2 invariant that symbols are bound at top-level,
-           and the handler of a loop is clearly not top-level *)
-        if not (Env.Symbol_inits.is_empty symbol_inits) then
+        (* It should be an flambda2 invariant that symbols are bound at
+           top-level, and the handler of a loop is clearly not top-level *)
+        if not (Env.Symbol_inits.is_empty symbol_inits)
+        then
           Format.eprintf "Found leftover symbol inits in the body of a loop: %a"
             Env.Symbol_inits.print symbol_inits;
         ( Continuation.Map.add k
@@ -922,7 +938,7 @@ and let_cont_rec env res invariant_params conts body =
       conts_to_handlers ([], free_vars_of_body)
   in
   let cmm = C.create_ccatch ~rec_flag:true ~body ~handlers in
-  let cmm, free_vars, symbol_inits  = wrap cmm free_vars symbol_inits in
+  let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
   cmm, free_vars, symbol_inits, res
 
 and continuation_handler env res handler =
@@ -930,9 +946,12 @@ and continuation_handler env res handler =
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
       let env, vars = C.continuation_bound_parameters env params in
-      let expr, free_vars_of_handler, symbol_inits, res = expr env res handler in
+      let expr, free_vars_of_handler, symbol_inits, res =
+        expr env res handler
+      in
       let expr, free_vars_of_handler, symbol_inits =
-        Env.place_symbol_inits ~params:vars expr free_vars_of_handler symbol_inits
+        Env.place_symbol_inits ~params:vars expr free_vars_of_handler
+          symbol_inits
       in
       vars, arity, expr, free_vars_of_handler, symbol_inits, res)
 
@@ -962,7 +981,9 @@ and apply_expr env res apply =
   | Never_returns ->
     (* Case 1 *)
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-    let cmm, free_vars, symbol_inits = wrap call free_vars Env.Symbol_inits.empty in
+    let cmm, free_vars, symbol_inits =
+      wrap call free_vars Env.Symbol_inits.empty
+    in
     cmm, free_vars, symbol_inits, res
   | Return k -> (
     match Env.get_continuation env k with
@@ -976,7 +997,9 @@ and apply_expr env res apply =
         let wrap, _, res =
           Env.flush_delayed_lets ~mode:Branching_point env res
         in
-        let cmm, free_vars, symbol_inits = wrap call free_vars Env.Symbol_inits.empty in
+        let cmm, free_vars, symbol_inits =
+          wrap call free_vars Env.Symbol_inits.empty
+        in
         cmm, free_vars, symbol_inits, res
       else
         Misc.fatal_errorf
@@ -986,7 +1009,9 @@ and apply_expr env res apply =
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
       let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-      let cmm, free_vars, symbol_inits = wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty in
+      let cmm, free_vars, symbol_inits =
+        wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
+      in
       cmm, free_vars, symbol_inits, res
     | Inline
         { handler_params;
@@ -1029,9 +1054,12 @@ and apply_expr env res apply =
         let env =
           Env.set_inlined_debuginfo env handler_body_inlined_debuginfo
         in
-        let expr, free_vars_of_handler, handler_symbol_inits, res = expr env res body in
+        let expr, free_vars_of_handler, handler_symbol_inits, res =
+          expr env res body
+        in
         let expr, free_vars_of_handler, symbol_inits =
-          Env.place_symbol_inits ~params:params_with_machtype expr free_vars_of_handler handler_symbol_inits
+          Env.place_symbol_inits ~params:params_with_machtype expr
+            free_vars_of_handler handler_symbol_inits
         in
         (* we know the handler can't be cold, or it wouldn't have been
            inlined. *)
@@ -1165,7 +1193,9 @@ and switch env res switch =
   in
   let make_arm ~must_tag_discriminant env res (d, action) =
     let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
-    let cmm_action, action_free_vars, action_symbol_inits, res = apply_cont env res action in
+    let cmm_action, action_free_vars, action_symbol_inits, res =
+      apply_cont env res action
+    in
     ( ( d,
         cmm_action,
         action_free_vars,
@@ -1185,18 +1215,22 @@ and switch env res switch =
        before creating an if-then-else, introducing an indirection that might
        prevent some optimizations performed by Selectgen/Emit when the condition
        is inlined in the if-then-else. Instead we use [C.ite]. *)
-    | (0, else_, else_free_vars, else_inits, else_dbg), (_, then_, then_free_vars, then_inits, then_dbg)
-    | (_, then_, then_free_vars, then_inits, then_dbg), (0, else_, else_free_vars, else_inits, else_dbg)
-      ->
+    | ( (0, else_, else_free_vars, else_inits, else_dbg),
+        (_, then_, then_free_vars, then_inits, then_dbg) )
+    | ( (_, then_, then_free_vars, then_inits, then_dbg),
+        (0, else_, else_free_vars, else_inits, else_dbg) ) ->
       let free_vars =
         Backend_var.Set.union scrutinee_free_vars
           (Backend_var.Set.union else_free_vars then_free_vars)
       in
-      (* CR gbury: technically, these symbol inits should be empty since neither of the branches
-         should be at top-level, but it should not hurt to do this. *)
+      (* CR gbury: technically, these symbol inits should be empty since neither
+         of the branches should be at top-level, but it should not hurt to do
+         this. *)
       let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
       let cmm, free_vars, symbol_inits =
-        wrap (C.ite ~dbg scrutinee ~then_dbg ~then_ ~else_dbg ~else_) free_vars symbol_inits
+        wrap
+          (C.ite ~dbg scrutinee ~then_dbg ~then_ ~else_dbg ~else_)
+          free_vars symbol_inits
       in
       cmm, free_vars, symbol_inits, res
     (* Similar case to the previous but none of the arms match 0, so we have to
@@ -1213,9 +1247,12 @@ and switch env res switch =
           (C.eq ~dbg (C.int ~dbg x) scrutinee)
           ~then_dbg:if_x_dbg ~then_:if_x ~else_dbg:if_not_dbg ~else_:if_not
       in
-      (* CR gbury: technically, these symbol inits should be empty since neither of the branches
-         should be at top-level, but it should not hurt to do this. *)
-      let symbol_inits = Env.Symbol_inits.merge if_x_symbol_inits if_not_symbol_inits in
+      (* CR gbury: technically, these symbol inits should be empty since neither
+         of the branches should be at top-level, but it should not hurt to do
+         this. *)
+      let symbol_inits =
+        Env.Symbol_inits.merge if_x_symbol_inits if_not_symbol_inits
+      in
       let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
       cmm, free_vars, symbol_inits, res)
   (* General case *)
@@ -1230,12 +1267,16 @@ and switch env res switch =
     let _, res, free_vars, symbol_inits =
       Targetint_31_63.Map.fold
         (fun discriminant action (i, res, free_vars, symbol_inits) ->
-          let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res =
+          let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res
+              =
             make_arm ~must_tag_discriminant env res (discriminant, action)
           in
-          (* CR gbury: technically, these symbol inits should be empty since neither of the branches
-             should be at top-level, but it should not hurt to do this. *)
-          let symbol_inits = Env.Symbol_inits.merge symbol_inits action_symbol_inits in
+          (* CR gbury: technically, these symbol inits should be empty since
+             neither of the branches should be at top-level, but it should not
+             hurt to do this. *)
+          let symbol_inits =
+            Env.Symbol_inits.merge symbol_inits action_symbol_inits
+          in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
           cases.(i) <- cmm_action;
           index.(d) <- i;
