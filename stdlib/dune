@@ -51,7 +51,6 @@
 
 (copy_files ../Makefile.config)
 
-; CR sspies: Add [.cms] files
 
 (install
  (files

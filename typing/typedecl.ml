@@ -455,59 +455,6 @@ let set_private_row env loc p decl =
   in
   set_type_desc rv (Tconstr (p, decl.type_params, ref Mnil))
 
-
-module Shape_reduce = Shape_reduce.Make(struct
-    let fuel = 10
-
-    let read_unit_shape ~unit_name =
-      let filename = String.uncapitalize_ascii unit_name in
-      match Load_path.find_normalized (filename ^ ".cms") with
-      | exception Not_found -> None
-      | fn ->
-        (* CR tnowak: exception? *)
-        let cms_infos = Cms_format.read fn in
-        cms_infos.cms_impl_shape
-
-  end)
-
-let debug = false
-
-let uid_of_path ~env path =
-  if debug then Format.eprintf "uid_of_path path=%a\n" Path.print path;
-  let compilation_unit = Type_shape.compilation_unit_from_path path in
-  match compilation_unit with
-  | None ->
-    if debug then Format.eprintf "I'm in this root\n";
-    (match (Env.find_type path env) with
-      | exception Not_found -> if debug then Format.eprintf "None0\n"; None
-      | type_ -> let uid = type_.type_uid in
-        if debug then Format.eprintf "uid = %a\n" Uid.print uid;
-        Some uid
-    )
-  | Some compilation_unit ->
-    let filename = String.uncapitalize_ascii compilation_unit in
-    match Load_path.find_normalized (filename ^ ".cms") with
-    | exception Not_found -> if debug then Format.eprintf "None1\n"; None
-    | fn ->
-      (* CR tnowak: exception? *)
-      let cms_infos = Cms_format.read fn in
-      match cms_infos.cms_impl_shape with
-      | None -> if debug then Format.eprintf "None2\n"; None
-      | Some shape ->
-        let shape =
-          (* CR tnowak: that might be wrong? *)
-          Shape.of_path
-            ~find_shape:(fun _sig_comp_kind ident ->
-              assert (Ident.name ident = compilation_unit); shape)
-            ~namespace:Type path
-        in
-        let shape = Shape_reduce.reduce env shape in
-        match shape.uid with
-        | None -> if debug then Format.eprintf "None3\n"; None
-        | Some uid -> if debug then Format.eprintf "got it uid=%a\n" Uid.print uid; Some uid
-
-
-
 (* Makes sure a type is representable. When called with a type variable, will
    lower [any] to a sort variable if [allow_unboxed = true], and to [value]
    if [allow_unboxed = false]. *)
@@ -3013,10 +2960,12 @@ let transl_type_decl env rec_flag sdecl_list =
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env decls shapes env in
-  (* Save the declarations in [Type_shape] for debug info. *)
-    List.iter (fun (id, decl) ->
-      Type_shape.add_to_type_decls (Pident id) decl (uid_of_path ~env:final_env)
-    ) decls;
+  (* Save the shapes of the declarations in [Type_shape] for debug info. *)
+  List.iter (fun (id, decl) ->
+    Type_shape.add_to_type_decls
+      (Pident id) decl
+      (Env.find_uid_of_path final_env)
+  ) decls;
   (* Keep original declaration *)
   let final_decls =
     List.map2

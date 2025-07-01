@@ -1,3 +1,5 @@
+[@@@ocaml.warning "+a-40-42"]
+
 module Uid = Shape.Uid
 
 module Type_shape = struct
@@ -59,29 +61,38 @@ module Type_shape = struct
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
      in the lookup and we, additionally, carry a maximal depth for the recursion.
      We allow a deeper bound than [value_kind]. *)
+  (* CR sspies: Consider additionally adding a max size for the set of visited types.
+     Also consider reverting to the original value kind depth limit (although 2
+     seems low). *)
   let rec of_type_expr_go ~visited ~depth (expr : Types.type_expr) uid_of_path =
     let[@inline] cannot_proceed () =
       Numbers.Int.Set.mem (Types.get_id expr) visited || depth >= 10
     in
-    if cannot_proceed () then Ts_other else
-    let visited = Numbers.Int.Set.add (Types.get_id expr) visited in
-    let depth = depth + 1 in
-    let desc = Types.get_desc expr in
-    let map_expr_list (exprs : Types.type_expr list) =
-      List.map (fun expr -> of_type_expr_go ~depth ~visited expr uid_of_path) exprs
-    in
-    match desc with
-    | Tconstr (path, constrs, _abbrev_memo) -> (
-      match Predef.of_string (Path.name path) with
-      | Some predef -> Ts_predef (predef, map_expr_list constrs)
-      | None -> (
-        match uid_of_path path with
-        | Some uid -> Ts_constr ((uid, path), map_expr_list constrs)
-        | None -> Ts_other))
-    | Ttuple exprs -> Ts_tuple (map_expr_list (List.map snd exprs))
-    | Tvar { name; _ } -> Ts_var name
-    | Tpoly (type_expr, []) -> of_type_expr_go ~depth ~visited type_expr uid_of_path
-    | _ -> Ts_other
+    if cannot_proceed ()
+    then Ts_other
+    else
+      let visited = Numbers.Int.Set.add (Types.get_id expr) visited in
+      let depth = depth + 1 in
+      let desc = Types.get_desc expr in
+      let map_expr_list (exprs : Types.type_expr list) =
+        List.map
+          (fun expr -> of_type_expr_go ~depth ~visited expr uid_of_path)
+          exprs
+      in
+      match[@warning "-4"] desc with
+      (* CR sspies: Extend this match to handle more type constructor cases. *)
+      | Tconstr (path, constrs, _abbrev_memo) -> (
+        match Predef.of_string (Path.name path) with
+        | Some predef -> Ts_predef (predef, map_expr_list constrs)
+        | None -> (
+          match uid_of_path path with
+          | Some uid -> Ts_constr ((uid, path), map_expr_list constrs)
+          | None -> Ts_other))
+      | Ttuple exprs -> Ts_tuple (map_expr_list (List.map snd exprs))
+      | Tvar { name; _ } -> Ts_var name
+      | Tpoly (type_expr, []) ->
+        of_type_expr_go ~depth ~visited type_expr uid_of_path
+      | _ -> Ts_other
 
   let of_type_expr (expr : Types.type_expr) uid_of_path =
     of_type_expr_go ~visited:Numbers.Int.Set.empty ~depth:(-1) expr uid_of_path
@@ -118,8 +129,7 @@ module Type_shape = struct
   let rec replace_tvar t ~(pairs : (t * t) list) =
     match
       List.filter_map
-        (fun (from, to_) ->
-          if t = from then Some to_ else None)
+        (fun (from, to_) -> if t = from then Some to_ else None)
         pairs
     with
     | new_type :: _ -> new_type
@@ -149,14 +159,21 @@ module Type_shape = struct
 end
 
 module Type_decl_shape = struct
+  type 'a complex_constructor =
+    { name : string;
+      args : 'a complex_constructor_arguments list
+    }
+
+  and 'a complex_constructor_arguments =
+    { field_name : string option;
+      field_value : 'a
+    }
+
   type tds =
     | Tds_variant of
         { simple_constructors : string list;
-          complex_constructors :
-            (string * (string option * Type_shape.t) list) list
+          complex_constructors : Type_shape.t complex_constructor list
         }
-    (* CR sspies: This split loses the order of constructors.
-       Could that be a problem? *)
     | Tds_record of (string * Type_shape.t) list
     | Tds_alias of Type_shape.t
     | Tds_other
@@ -167,19 +184,31 @@ module Type_decl_shape = struct
       type_params : Type_shape.t list
     }
 
+  let complex_constructor_map f { name; args } =
+    let args =
+      List.map
+        (fun { field_name; field_value } ->
+          { field_name; field_value = f field_value })
+        args
+    in
+    { name; args }
+
   let get_variant_constructors (cstr_args : Types.constructor_declaration)
       uid_of_path =
     match cstr_args.cd_args with
     | Cstr_tuple list ->
       List.map
-        (fun ({ ca_type = type_expr; _}: Types.constructor_argument) ->
-          None, Type_shape.of_type_expr type_expr uid_of_path)
+        (fun ({ ca_type = type_expr; _ } : Types.constructor_argument) ->
+          { field_name = None;
+            field_value = Type_shape.of_type_expr type_expr uid_of_path
+          })
         list
     | Cstr_record list ->
       List.map
         (fun (lbl : Types.label_declaration) ->
-          ( Some (Ident.name lbl.ld_id),
-            Type_shape.of_type_expr lbl.ld_type uid_of_path ))
+          { field_name = Some (Ident.name lbl.ld_id);
+            field_value = Type_shape.of_type_expr lbl.ld_type uid_of_path
+          })
         list
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
@@ -206,7 +235,8 @@ module Type_decl_shape = struct
                 match is_empty_constructor_list cstr with
                 | true -> Left name
                 | false ->
-                  Right (name, get_variant_constructors cstr uid_of_path))
+                  Right
+                    { name; args = get_variant_constructors cstr uid_of_path })
               cstr_list
           in
           Tds_variant { simple_constructors; complex_constructors }
@@ -233,8 +263,7 @@ module Type_decl_shape = struct
         | Type_open -> Tds_other
         | Type_record_unboxed_product _ ->
           (* CR sspies: Unboxed products are currently not supported.*)
-          Tds_other
-        )
+          Tds_other)
     in
     let type_params =
       List.map
@@ -243,17 +272,18 @@ module Type_decl_shape = struct
     in
     { path; definition; type_params }
 
-  let print_one_constructor ppf (name, type_shape) =
-    match name with
+  let print_one_entry print_value ppf { field_name; field_value } =
+    match field_name with
     | Some name ->
-      Format.fprintf ppf "%a=%a" Format.pp_print_string name Type_shape.print
-        type_shape
-    | None -> Format.fprintf ppf "%a" Type_shape.print type_shape
+      Format.fprintf ppf "%a=%a" Format.pp_print_string name print_value
+        field_value
+    | None -> Format.fprintf ppf "%a" print_value field_value
 
-  let print_complex_constructor ppf (name, constructors) =
+  let print_complex_constructor print_value ppf { name; args } =
     Format.fprintf ppf "(%a: %a)" Format.pp_print_string name
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_one_constructor)
-      constructors
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space
+         (print_one_entry print_value))
+      args
 
   let print_field ppf (name, shape) =
     Format.fprintf ppf "(%a: %a)" Format.pp_print_string name Type_shape.print
@@ -267,7 +297,7 @@ module Type_decl_shape = struct
            Format.pp_print_string)
         simple_constructors
         (Format.pp_print_list ~pp_sep:Format.pp_print_space
-           print_complex_constructor)
+           (print_complex_constructor Type_shape.print))
         complex_constructors
     | Tds_record field_list ->
       Format.fprintf ppf "Tds_record fields=%a"
@@ -309,7 +339,9 @@ module Type_decl_shape = struct
               Tds_variant
                 { simple_constructors;
                   complex_constructors =
-                    map_snd (map_snd replace_tvar) complex_constructors
+                    List.map
+                      (complex_constructor_map replace_tvar)
+                      complex_constructors
                 }
             | Tds_record field_list ->
               Tds_record (map_snd replace_tvar field_list)
@@ -323,9 +355,17 @@ module Type_decl_shape = struct
       { type_params = []; path = t.path; definition = Tds_other }
 end
 
+
+
+type binder_shape = {
+  type_shape : Type_shape.t;
+  type_sort: Jkind_types.Sort.Const.t;
+}
+
+
 let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 16
 
-let (all_type_shapes : Type_shape.t Uid.Tbl.t) = Uid.Tbl.create 16
+let (all_type_shapes : binder_shape Uid.Tbl.t) = Uid.Tbl.create 16
 
 let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   let type_decl_shape =
@@ -333,9 +373,9 @@ let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   in
   Uid.Tbl.add all_type_decls type_decl.type_uid type_decl_shape
 
-let add_to_type_shapes var_uid type_expr uid_of_path =
+let add_to_type_shapes var_uid type_expr sort uid_of_path =
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
-  Uid.Tbl.add all_type_shapes var_uid type_shape
+  Uid.Tbl.add all_type_shapes var_uid { type_shape; type_sort = sort }
 
 let tuple_to_string (strings : string list) =
   match strings with
@@ -349,128 +389,35 @@ let shapes_to_string (strings : string list) =
   | hd :: [] -> hd ^ " "
   | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ") "
 
-(* CR sspies: The original code of [compilation_unit_from_path], namely
-   [split_type_path_at_compilation_unit], split the path here into compilation
-   unit and the path. However, this code created fresh identifiers (leading to
-   unexpected changes in variable names) and always discarded the path. Hence,
-   this new version only extracts the compilation unit. *)
-let rec compilation_unit_from_path (path : Path.t) =
-  match path with
-  | Pident _ | Papply _ -> None
-  | Pdot (Pident i, _) ->
-    if Ident.is_global i
-    then Some (Ident.name i)
-    else None
-  | Pdot (path, _) ->
-    let comp_unit = compilation_unit_from_path path in
-    comp_unit
-  | Pextra_ty (path, _) ->
-    let comp_unit = compilation_unit_from_path path in
-    comp_unit
+let find_in_type_decls (type_uid : Uid.t) =
+  Uid.Tbl.find_opt all_type_decls type_uid
 
-let debug = false
-
-(* CR sspies: This seems to not perform caching. I think [load_decls_from_cms]
-   always goes to the file and loads it the original code. *)
-let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
-    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
-  if debug
-  then Format.eprintf "trying to find type_uid = %a\n" Uid.print type_uid;
-  if debug then Format.eprintf "splitting %a\n" Path.print type_path;
-  let compilation_unit_type_decls =
-    match compilation_unit_from_path type_path with
-    | Some compilation_unit -> (
-      if debug
-      then
-        Format.eprintf "got compilation unit %a\n" Format.pp_print_string
-          compilation_unit;
-      (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
-      let filename = compilation_unit |> String.uncapitalize_ascii in
-      match Load_path.find_normalized (filename ^ ".cms") with
-      | exception Not_found ->
-        if debug
-        then
-          Format.eprintf "not found filename %a" Format.pp_print_string filename;
-        None
-      | fn ->
-        let type_decls = load_decls_from_cms fn in
-        Some type_decls)
-    | None ->
-      if debug then Format.eprintf "same unit\n";
-      Some all_type_decls
-  in
-  Option.bind compilation_unit_type_decls (fun tbl ->
-      Uid.Tbl.find_opt tbl type_uid)
-
-(* CR sspies: This seems to not perform caching. I think [load_decls_from_cms]
-  always goes to the file and loads it the original code. *)
-let rec type_name (type_shape : Type_shape.t)
-    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
+let rec type_name (type_shape : Type_shape.t) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
-    shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+    shapes_to_string (List.map type_name shapes)
     ^ Type_shape.Predef.to_string predef
   | Ts_other ->
-    if debug then Format.eprintf "unknown0\n";
     "unknown"
   | Ts_tuple shapes ->
-    tuple_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+    tuple_to_string (List.map type_name shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
-  | Ts_constr ((type_uid, type_path), shapes) -> (
-    match find_in_type_decls type_uid type_path ~load_decls_from_cms with
+  | Ts_constr ((type_uid, _type_path), shapes) -> (
+    match[@warning "-4"]
+      find_in_type_decls type_uid
+    with
     | None ->
-      if debug then Format.eprintf "unknown2\n";
       "unknown"
     | Some { definition = Tds_other; _ } ->
-      if debug then Format.eprintf "unknown1\n";
       "unknown"
     | Some type_decl_shape ->
+      (* We have found type instantiation shapes [shapes] and a typing
+         declaration shape [type_decl_shape]. *)
       let type_decl_shape =
         Type_decl_shape.replace_tvar type_decl_shape shapes
       in
       let args =
-        shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+        shapes_to_string (List.map type_name shapes)
       in
       let name = Path.name type_decl_shape.path in
       args ^ name)
-
-let rec attach_head (path : Path.t) (new_head : Ident.t) =
-  match path with
-  | Pident ident -> Path.Pdot (Pident new_head, Ident.name ident)
-  | Pdot (l, r) -> Path.Pdot (attach_head l new_head, r)
-  | Papply (l, r) -> Path.Papply (attach_head l new_head, attach_head r new_head)
-  | Pextra_ty (l, extra) -> Path.Pextra_ty (attach_head l new_head, extra)
-
-let attach_compilation_unit_to_path (path : Path.t)
-    (compilation_unit : Compilation_unit.t) =
-  match compilation_unit_from_path path with
-  | None ->
-    attach_head path
-      (Compilation_unit.to_global_ident_for_bytecode compilation_unit)
-  | Some _ -> path
-
-let map_snd f list = List.map (fun (a, b) -> a, f b) list
-
-let attach_compilation_unit_to_paths (type_decl : Type_decl_shape.t)
-    ~(compilation_unit : Compilation_unit.t) =
-  let attach_to_shape = function
-    | Type_shape.Ts_constr ((uid, path), ts) ->
-      Type_shape.Ts_constr
-        ((uid, attach_compilation_unit_to_path path compilation_unit), ts)
-    | _ as x -> x
-  in
-  { Type_decl_shape.path =
-      attach_compilation_unit_to_path type_decl.path compilation_unit;
-    type_params = List.map attach_to_shape type_decl.type_params;
-    definition =
-      (match type_decl.definition with
-      | Tds_variant { simple_constructors; complex_constructors } ->
-        Tds_variant
-          { simple_constructors;
-            complex_constructors =
-              map_snd (map_snd attach_to_shape) complex_constructors
-          }
-      | Tds_record list -> Tds_record (map_snd attach_to_shape list)
-      | Tds_alias shape -> Tds_alias (attach_to_shape shape)
-      | Tds_other -> Tds_other)
-  }

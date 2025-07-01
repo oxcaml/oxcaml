@@ -1589,7 +1589,7 @@ and transl_tupled_function
             (transl_tupled_cases ~scopes return_sort pats_expr_list) partial
         in
         let region = region || not (may_allocate_in_region body) in
-        add_type_shapes_of_cases cases;
+        add_type_shapes_of_cases arg_sort cases;
         (* CR sspies: Unsure whether we need to add this here. *)
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
@@ -1617,13 +1617,13 @@ and transl_tupled_function
 
 (** [add_type_shapes_of_cases] iterates through a given list of cases and associates
     for each case, the debugging UID of the variable with the type expression of
-    the variable. *)
-and add_type_shapes_of_cases cases =
+    the variable and its sort. *)
+and add_type_shapes_of_cases sort cases =
   let add_case (case : Typedtree.value Typedtree.case) =
-    let var_list = Typedtree.pat_bound_idents_full Jkind.Sort.Const.value case.c_lhs in
-    List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
-      Type_shape.add_to_type_shapes var_uid type_expr
-        (Typedecl.uid_of_path ~env:case.c_lhs.pat_env))
+    let var_list = Typedtree.pat_bound_idents_full sort case.c_lhs in
+    List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+      Type_shape.add_to_type_shapes var_uid type_expr var_sort
+        (Env.find_uid_of_path case.c_lhs.pat_env))
       var_list
   in
   List.iter add_case cases
@@ -1634,10 +1634,11 @@ and add_type_shapes_of_cases cases =
 and add_type_shapes_of_params params =
     let add_param (param : Typedtree.function_param) =
       let pattern = match param.fp_kind with Tparam_pat p -> p | Tparam_optional_default (p, _, _) -> p in
-      let var_list = Typedtree.pat_bound_idents_full Jkind.Sort.Const.value pattern in
-      List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
-        Type_shape.add_to_type_shapes var_uid type_expr
-          (Typedecl.uid_of_path ~env:pattern.pat_env))
+      let sort = Jkind.Sort.default_for_transl_and_get param.fp_sort in
+      let var_list = Typedtree.pat_bound_idents_full sort pattern in
+      List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+        Type_shape.add_to_type_shapes var_uid type_expr var_sort
+          (Env.find_uid_of_path pattern.pat_env))
         var_list
     in
     List.iter add_param params
@@ -1647,10 +1648,11 @@ and add_type_shapes_of_params params =
   expression of the variable. *)
 and add_type_shapes_of_patterns patterns =
   let add_case (value_binding : Typedtree.value_binding) =
-    let var_list = Typedtree.pat_bound_idents_full Jkind.Sort.Const.value value_binding.vb_pat in
-    List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
-      Type_shape.add_to_type_shapes var_uid type_expr
-        (Typedecl.uid_of_path ~env:value_binding.vb_expr.exp_env))
+    let sort = Jkind.Sort.default_for_transl_and_get value_binding.vb_sort in
+    let var_list = Typedtree.pat_bound_idents_full sort value_binding.vb_pat in
+    List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+      Type_shape.add_to_type_shapes var_uid type_expr var_sort
+        (Env.find_uid_of_path value_binding.vb_expr.exp_env))
       var_list
   in
   List.iter add_case patterns
@@ -1688,7 +1690,7 @@ and transl_curried_function ~scopes loc repr params body
               layout_of_sort fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
-        add_type_shapes_of_cases fc_cases;
+        add_type_shapes_of_cases fc_arg_sort fc_cases;
         let attributes =
           match fc_cases with
           | [ { c_lhs }] -> Translattribute.transl_param_attributes c_lhs
