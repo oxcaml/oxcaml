@@ -712,6 +712,11 @@ module Merge = struct
         (* Actually remove the identifiers *)
         let sub = Subst.change_locs Subst.identity loc in
         let sub = List.fold_left replace sub paths in
+        (* Since destructive with is implemented via substitution, we need to
+          expand any type abbreviations (like strengthening) where the expanded
+          form might contain the thing we need to substitute. See corresponding
+          test in strengthening.ml.  *)
+        let sg = Mtype.expand_to env sg paths in
         unsafe_signature_subst env loc sg sub
       else sg
     in
