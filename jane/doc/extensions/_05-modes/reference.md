@@ -55,8 +55,11 @@ The exception type `exn` crosses portability and contention.
 For backwards compatibility with OCaml, we don't require exception constructor argument
 types to cross portability and contention themselves. Instead, we treat each instance
 of an exception constructor as belonging to the capsule it originally was defined in.
-When the constructor is used outside of that capsule (i.e. in a `portable` function),
-its arguments are required to be `portable` and are marked as `contended`:
+
+When the constructor is instantiated outside the original capsule
+(i.e. in a `portable` function), its arguments are required to cross contention
+and be portable. Likewise, when pattern-matched on outside the original capsule,
+its arguments must cross portability and are marked as contended.
 
 ```ocaml
 exception Foo of (unit -> unit)
@@ -64,11 +67,11 @@ exception Bar of int ref
 
 
 let (foo @ portable) f =
-  raise (Foo f) (* Here, [f] is required to be portable: *)
+  raise (Foo f) (* Here, [f] is required to be portable and must cross contention. *)
 
 let (bar @ portable) g =
   try g () with
-  | Bar x -> ... (* And here [x] is marked as contended. *)
+  | Bar x -> ... (* And here [x] is marked as contended and must cross portaibility. *)
 ```
 
 Rebinding exception constructors "resets" its originating capsule.

@@ -5,8 +5,8 @@
 (* [exn] currently crosses portability and contention.
 
    To make it safe, exception constructors under a portable lock:
-   - Require their fields to be portable during creation
-   - Mark their fields as contended during pattern-matching
+   - Require their fields cross contention and be at portable during creation
+   - Require their fields cross portability and mark as contended during pattern-matching
 
    This can be modeled as each exception constructor being contained in
    the original capsule it was defined in. Creating/destroying instances
@@ -33,7 +33,12 @@ let (foo @ portable) () =
     | Nonportable g -> g ()
     | _ -> ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+Line 3, characters 6-17:
+3 |     | Nonportable g -> g ()
+          ^^^^^^^^^^^
+Error: This value is "nonportable" but expected to be "portable".
+  Hint: All arguments of the constructor "Nonportable"
+  must cross this axis to use it in this position.
 |}]
 
 let (foo @ portable) () =
@@ -115,7 +120,7 @@ Error: This constructor is at mode "nonportable", but expected to be at mode "po
        Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
-
+(* CR modes: accepting this requires [coportable]. *)
 exception SemiPortable of string * (unit -> unit)
 
 let (foo @ portable) () =
@@ -123,7 +128,12 @@ let (foo @ portable) () =
     SemiPortable (s, _) -> print_endline s
 [%%expect{|
 exception SemiPortable of string * (unit -> unit)
-val foo : unit -> unit = <fun>
+Line 5, characters 4-16:
+5 |     SemiPortable (s, _) -> print_endline s
+        ^^^^^^^^^^^^
+Error: This value is "nonportable" but expected to be "portable".
+  Hint: All arguments of the constructor "SemiPortable"
+  must cross this axis to use it in this position.
 |}]
 
 exception Uncontended of unit
@@ -185,7 +195,12 @@ val foo : unit -> 'a = <fun>
 let (foo @ portable) () =
     raise (Contended (ref 42))
 [%%expect{|
-val foo : unit -> 'a = <fun>
+Line 2, characters 11-20:
+2 |     raise (Contended (ref 42))
+               ^^^^^^^^^
+Error: This value is "contended" but expected to be "uncontended".
+  Hint: All arguments of the constructor "Contended"
+  must cross this axis to use it in this position.
 |}]
 
 (* rebinding counts as usage *)
