@@ -20,6 +20,8 @@ module Ece = Effects_and_coeffects
 
 type free_vars = Backend_var.Set.t
 
+type symbol_inits = Cmm.expression list Backend_var.Map.t
+
 type expr_with_info =
   { cmm : Cmm.expression;
     effs : Effects_and_coeffects.t;
@@ -71,6 +73,16 @@ type 'env trans_prim =
     variadic :
       ('env, P.variadic_primitive, Cmm.expression list -> prim_res) prim_helper
   }
+
+(* Delayed symbol inits *)
+let empty_symbol_inits : symbol_inits = Backend_var.Map.empty
+
+let check_is_empty_symbol_inits symbol_inits =
+  if not (Backend_var.Map.is_empty symbol_inits) then
+    assert false
+
+let merge_symbol_inits inits inits' =
+  Backend_var.Map.union_merge List.append inits inits'
 
 (* Delayed let-bindings (see the .mli) *)
 
@@ -157,7 +169,7 @@ type t =
     (* Maps for `Must_inline_once` variable that end up aliased. *)
     stages : stage list;
     (* Stages of let-bindings, most recent at the head. *)
-    symbol_inits : Cmm.expression list Backend_var.Map.t
+    symbol_inits : symbol_inits
         (* Symbol initialization expressions, indexed by the variable used as
            value for the symbol field initialization. *)
   }
@@ -916,52 +928,64 @@ let can_be_removed effs =
   | Arbitrary_effects, _, _ -> false
   | (Only_generative_effects _ | No_effects), _, _ -> true
 
+let pop_symbol_inits symbol_inits v =
+  match Backend_var.Map.find v symbol_inits with
+  | exception Not_found -> [], symbol_inits
+  | l -> l, Backend_var.Map.remove v symbol_inits
+
+(* Wrapper function to introduce delayed let-bindings. *)
+let place_symbol_inits ~params = fun e free_vars symbol_inits ->
+  List.fold_left (fun (acc, free_vars, symbol_inits) (v, _) ->
+      let v = Backend_var.With_provenance.var v in
+      let inits, symbol_inits = pop_symbol_inits symbol_inits v in
+      match inits with
+      | [] -> acc, free_vars, symbol_inits
+      | _ :: _ ->
+          let acc =
+            List.fold_left
+              (fun acc init -> Cmm_helpers.sequence init acc)
+              acc inits
+          in
+          let free_vars = Backend_var.Set.add v free_vars in
+          acc, free_vars, symbol_inits
+    ) (e, free_vars, symbol_inits) params
+
+let flush_bindings order_map flushed_symbol_inits =
+  fun e free_vars symbol_inits ->
+  (* Merge the symbol inits from the env that was flushed, and those
+     from the body (i.e. [e]) that we want to wrap *)
+  let symbol_inits = merge_symbol_inits flushed_symbol_inits symbol_inits in
+  M.fold
+    (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
+       match b.bound_expr with
+       | Splittable_prim _ ->
+           Misc.fatal_errorf
+             "Complex bindings should have been split prior to being flushed."
+       | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
+           let v = Backend_var.With_provenance.var b.cmm_var in
+           let inits, symbol_inits = pop_symbol_inits symbol_inits v in
+           if can_be_removed b.effs
+           && Misc.Stdlib.List.is_empty inits
+           && not (Backend_var.Set.mem v acc_free_vars)
+           then acc, acc_free_vars, symbol_inits
+           else
+             let body =
+               List.fold_left
+                 (fun acc init -> Cmm_helpers.sequence init acc)
+                 acc inits
+             in
+             let expr =
+               Cmm_helpers.letin b.cmm_var ~defining_expr:cmm_expr ~body
+             in
+             let free_vars =
+               Backend_var.Set.union free_vars
+                 (Backend_var.Set.remove v acc_free_vars)
+             in
+             expr, free_vars, symbol_inits)
+      order_map
+      (e, free_vars, symbol_inits)
+
 let flush_delayed_lets ~mode env res =
-  (* Generate a wrapper function to introduce the delayed let-bindings. *)
-  let wrap_flush order_map e free_vars =
-    let expr, free_vars, symbol_inits =
-      M.fold
-        (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
-          match b.bound_expr with
-          | Splittable_prim _ ->
-            Misc.fatal_errorf
-              "Complex bindings should have been split prior to being flushed."
-          | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
-            let v = Backend_var.With_provenance.var b.cmm_var in
-            let inits, symbol_inits =
-              match Backend_var.Map.find v symbol_inits with
-              | exception Not_found -> [], symbol_inits
-              | l -> l, Backend_var.Map.remove v symbol_inits
-            in
-            if can_be_removed b.effs
-               && Misc.Stdlib.List.is_empty inits
-               && not (Backend_var.Set.mem v acc_free_vars)
-            then acc, acc_free_vars, symbol_inits
-            else
-              let body =
-                List.fold_left
-                  (fun acc init -> Cmm_helpers.sequence init acc)
-                  acc inits
-              in
-              let expr =
-                Cmm_helpers.letin b.cmm_var ~defining_expr:cmm_expr ~body
-              in
-              let free_vars =
-                Backend_var.Set.union free_vars
-                  (Backend_var.Set.remove v acc_free_vars)
-              in
-              expr, free_vars, symbol_inits)
-        order_map
-        (e, free_vars, env.symbol_inits)
-    in
-    Backend_var.Map.fold
-      (fun v inits (acc, acc_free_vars) ->
-        ( List.fold_left
-            (fun acc init -> Cmm_helpers.sequence init acc)
-            acc inits,
-          Backend_var.Set.add v acc_free_vars ))
-      symbol_inits (expr, free_vars)
-  in
   (* CR-someday mshinwell: work out a criterion for allowing substitutions into
      loops. CR gbury: this is now done by creating a binding with the inline
      status `Must_inline_and_duplicate`, so the caller of `to_cmm_env` has to
@@ -1041,11 +1065,11 @@ let flush_delayed_lets ~mode env res =
             None))
       env.bindings
   in
-  let flush e = wrap_flush !bindings_to_flush e in
-  ( flush,
+  let flush = flush_bindings !bindings_to_flush env.symbol_inits in
+  let env =
     { env with
       stages = [];
       bindings = bindings_to_keep;
       symbol_inits = Backend_var.Map.empty
-    },
-    !res )
+    } in
+  ( flush, env, !res )
