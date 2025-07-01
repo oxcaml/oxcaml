@@ -1553,13 +1553,13 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
     then (
       DSL.check_reg Float src;
       DSL.check_reg Float32 dst;
-      DSL.ins I.MOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
+      DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
   | Float_of_float32 ->
     if distinct
     then (
       DSL.check_reg Float32 src;
       DSL.check_reg Float dst;
-      DSL.ins I.MOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
+      DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
   | V128_of_v128 ->
     if distinct
     then (
