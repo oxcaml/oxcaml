@@ -45,18 +45,15 @@ module Type_decl_shape : sig
   type tds =
     | Tds_variant of
         { simple_constructors : string list;
-              (** The string is the name of the constructor. The runtime representation of
-                the constructor at index [i] in this list is [2 * i + 1]. See
-                [dwarf_type.ml] for more details. *)
+              (** The string is the name of the constructor. The runtime
+                  representation of the constructor at index [i] in this list is
+                  [2 * i + 1]. See [dwarf_type.ml] for more details. *)
           complex_constructors : Type_shape.t complex_constructor list
-              (** All constructors in this category are represented as blocks. The index [i]
-                in the list indicates the tag at runtime. The length of the constructor
-                argument list [args] determines the size of the block. *)
+              (** All constructors in this category are represented as blocks.
+                  The index [i] in the list indicates the tag at runtime. The
+                  length of the constructor argument list [args] determines the
+                  size of the block. *)
         }
-        (** Note that this variant representation split up variants into immediates
-          (simple constructors) and blocks (complex constructors). Thus, even though the
-          order is disturbed by separating them into two lists, the runtime shape is still
-          uniquely determined, because the two representations are disjoint. *)
     | Tds_record of (string * Type_shape.t) list
     | Tds_alias of Type_shape.t
     | Tds_other
@@ -72,11 +69,12 @@ module Type_decl_shape : sig
   val replace_tvar : t -> Type_shape.t list -> t
 end
 
-
-type binder_shape = {
-  type_shape : Type_shape.t;
-  type_sort: Jkind_types.Sort.Const.t;
-}
+(* CR sspies: For now, we bundle the shape together with its layout. In
+   subsequent PRs, the layouts will be integrated into the shape type. *)
+type binder_shape =
+  { type_shape : Type_shape.t;
+    type_sort : Jkind_types.Sort.Const.t
+  }
 
 val all_type_decls : Type_decl_shape.t Uid.Tbl.t
 
@@ -93,10 +91,6 @@ val add_to_type_shapes :
   (Path.t -> Uid.t option) ->
   unit
 
-val find_in_type_decls :
-  Uid.t ->
-  Type_decl_shape.t option
+val find_in_type_decls : Uid.t -> Type_decl_shape.t option
 
-val type_name :
-  Type_shape.t ->
-  string
+val type_name : Type_shape.t -> string

@@ -1590,34 +1590,31 @@ and transl_tupled_function
         in
         let region = region || not (may_allocate_in_region body) in
         add_type_shapes_of_cases arg_sort cases;
-        (* CR sspies: Unsure whether we need to add this here. *)
+        (* CR sspies: Unsure whether this is the right place to grab the type
+           expressions. *)
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
 
-(* CR sspies: I think for the three functions below to work correctly, we must maintain
-   the following invariant:
+(* For the functions [add_type_shape_of_cases], [add_type_shapes_of_params], and
+   [add_type_shapes_of_patterns] to be correct, we must ensure that at the type
+   tree level, a [debug_uid] is never associated with more than one type
+   expression, because the type expressions determine the debug information we
+   emit for the bound variable associated with the debug uid.
 
-      At the typed_tree level, each debug uid is associated with at most one variable.
-
-   The reason is that here, we associate debug UIDs with type expressions from the
-   variable declaration. For this to make sense, there should only be one type expression
-   for a UID. For example, for:
+   For example, for:
 
       let f (x: int list) = x
 
-   The functions below will associate the UID of [x] with [int list] as the type
-   expression. We will the separately associate the debugging UID of [x] with the type
-   declaration of [list], such that in the backend we have both the type expression
-   (here [int list]) and the type declaration (here [type 'a list = ...]) available for
-   the variable [x].
+   the functions below will associate the UID of [x] with [int list] as the type
+   expression.
 *)
 
-(** [add_type_shapes_of_cases] iterates through a given list of cases and associates
-    for each case, the debugging UID of the variable with the type expression of
-    the variable and its sort. *)
+(** [add_type_shapes_of_cases] iterates through a given list of cases and
+    associates for each case, the debugging UID of the variable with the type
+    expression of the variable and its sort. *)
 and add_type_shapes_of_cases sort cases =
   let add_case (case : Typedtree.value Typedtree.case) =
     let var_list = Typedtree.pat_bound_idents_full sort case.c_lhs in
@@ -1628,12 +1625,15 @@ and add_type_shapes_of_cases sort cases =
   in
   List.iter add_case cases
 
-(** [add_type_shapes_of_params] iterates through the variables in a function parameter
-    and, for each variable, associates the debugging UID of the variable with the type
-    expression of the variable. *)
+(** [add_type_shapes_of_params] iterates through the variables in a function
+    parameter and, for each variable, associates the debugging UID of the
+    variable with the type expression of the variable. *)
 and add_type_shapes_of_params params =
     let add_param (param : Typedtree.function_param) =
-      let pattern = match param.fp_kind with Tparam_pat p -> p | Tparam_optional_default (p, _, _) -> p in
+      let pattern = match param.fp_kind with
+                    | Tparam_pat p -> p
+                    | Tparam_optional_default (p, _, _) -> p
+      in
       let sort = Jkind.Sort.default_for_transl_and_get param.fp_sort in
       let var_list = Typedtree.pat_bound_idents_full sort pattern in
       List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
@@ -1643,9 +1643,9 @@ and add_type_shapes_of_params params =
     in
     List.iter add_param params
 
-(** [add_type_shapes_of_patterns] iterates through the variables in a value binding
-  and, for each variable, associates the debugging UID of the variable with the type
-  expression of the variable. *)
+(** [add_type_shapes_of_patterns] iterates through the variables in a value
+    binding and, for each variable, associates the debugging UID of the variable
+    with the type expression of the variable. *)
 and add_type_shapes_of_patterns patterns =
   let add_case (value_binding : Typedtree.value_binding) =
     let sort = Jkind.Sort.default_for_transl_and_get value_binding.vb_sort in

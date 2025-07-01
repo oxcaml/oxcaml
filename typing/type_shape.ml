@@ -1,5 +1,3 @@
-[@@@ocaml.warning "+a-40-42"]
-
 module Uid = Shape.Uid
 
 module Type_shape = struct
@@ -80,7 +78,8 @@ module Type_shape = struct
           exprs
       in
       match[@warning "-4"] desc with
-      (* CR sspies: Extend this match to handle more type constructor cases. *)
+      (* CR sspies: Extend this match to handle more type constructor cases in
+         subsequent PRs. *)
       | Tconstr (path, constrs, _abbrev_memo) -> (
         match Predef.of_string (Path.name path) with
         | Some predef -> Ts_predef (predef, map_expr_list constrs)
@@ -123,9 +122,9 @@ module Type_shape = struct
         name
     | Ts_other -> Format.fprintf ppf "Ts_other"
 
-  (* CR sspies: This function looks very different from a regular substitution.
-     It seems to replace an entire type description, and it uses polymorphic
-     equality to determine which one. *)
+  (* CR sspies: This is a hacky "solution" to do type variable substitution in
+     type expression shapes. In subsequent PRs, this code should be changed to
+     use the shape mechanism instead. *)
   let rec replace_tvar t ~(pairs : (t * t) list) =
     match
       List.filter_map
@@ -313,18 +312,10 @@ module Type_decl_shape = struct
 
   let map_snd f list = List.map (fun (fst, snd) -> fst, f snd) list
 
-  (* CR sspies: This function is probably meant to instantiate the polymorphic
-     variables in the type declarations. There must be functionality in the
-     type checker for this. *)
+  (* CR sspies: This is a hacky "solution" to do type variable substitution in
+     type declaration shapes. In subsequent PRs, this code should be changed to
+     use the shape mechanism instead. *)
   let replace_tvar (t : t) (shapes : Type_shape.t list) =
-    let debug = false in
-    if debug
-    then
-      Format.eprintf "replacing tvar %a; %a; %a\n%!" print t
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
-        shapes
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
-        t.type_params;
     match List.length t.type_params == List.length shapes with
     | true ->
       let replace_tvar =
@@ -350,18 +341,13 @@ module Type_decl_shape = struct
         }
       in
       ret
-    | false ->
-      (* CR tnowak: investigate *)
-      { type_params = []; path = t.path; definition = Tds_other }
+    | false -> { type_params = []; path = t.path; definition = Tds_other }
 end
 
-
-
-type binder_shape = {
-  type_shape : Type_shape.t;
-  type_sort: Jkind_types.Sort.Const.t;
-}
-
+type binder_shape =
+  { type_shape : Type_shape.t;
+    type_sort : Jkind_types.Sort.Const.t
+  }
 
 let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 16
 
@@ -397,27 +383,19 @@ let rec type_name (type_shape : Type_shape.t) =
   | Ts_predef (predef, shapes) ->
     shapes_to_string (List.map type_name shapes)
     ^ Type_shape.Predef.to_string predef
-  | Ts_other ->
-    "unknown"
-  | Ts_tuple shapes ->
-    tuple_to_string (List.map type_name shapes)
+  | Ts_other -> "unknown"
+  | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
   | Ts_constr ((type_uid, _type_path), shapes) -> (
-    match[@warning "-4"]
-      find_in_type_decls type_uid
-    with
-    | None ->
-      "unknown"
-    | Some { definition = Tds_other; _ } ->
-      "unknown"
+    match[@warning "-4"] find_in_type_decls type_uid with
+    | None -> "unknown"
+    | Some { definition = Tds_other; _ } -> "unknown"
     | Some type_decl_shape ->
       (* We have found type instantiation shapes [shapes] and a typing
          declaration shape [type_decl_shape]. *)
       let type_decl_shape =
         Type_decl_shape.replace_tvar type_decl_shape shapes
       in
-      let args =
-        shapes_to_string (List.map type_name shapes)
-      in
+      let args = shapes_to_string (List.map type_name shapes) in
       let name = Path.name type_decl_shape.path in
       args ^ name)
