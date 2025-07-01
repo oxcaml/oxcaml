@@ -229,11 +229,12 @@ module Runtime_5 = struct
 
     let key_counter = Atomic.make 0
 
-    type key_initializer : immutable_data =
+    type key_initializer : value mod contended portable =
         KI: 'a key * ('a -> (Access.t -> 'a) @ portable) @@ portable -> key_initializer
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
-    type key_initializer_list : immutable_data = key_initializer list
+    type key_initializer_list : value mod contended portable =
+      key_initializer list
 
     let parent_keys = Atomic.make ([] : key_initializer_list)
 
@@ -333,7 +334,7 @@ module Runtime_5 = struct
     let get_initial_keys access : key_value list =
       List.map
         (fun (KI (k, split)) -> KV (k, (split (get access k))))
-        (Atomic.Contended.get parent_keys)
+        (Atomic.Contended.get parent_keys : key_initializer_list)
 
     let set_initial_keys access (l: key_value list) =
       List.iter (fun (KV (k, v)) -> set access k (v access)) l
