@@ -2168,7 +2168,12 @@ CAMLprim value caml_ml_domain_cpu_relax(value t)
 {
   struct interruptor* self = &domain_self->interruptor;
   handle_incoming_otherwise_relax (self);
+
+#ifndef POLL_INSERTION
+  return caml_process_pending_actions_with_root(t);
+#else
   return Val_unit;
+#endif
 }
 
 CAMLprim value caml_domain_dls_set(value t)

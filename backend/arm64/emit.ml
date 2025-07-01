@@ -1062,9 +1062,9 @@ let num_call_gc_points instr =
           | Ishiftarith (_, _)
           | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
-        ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Stackoffset _ | Load _
+        ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
+        | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _
         | Intop_imm (_, _)
@@ -1131,7 +1131,7 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
       | Lcondbranch3 _ -> Some Bcc
       | Lop
-          ( Specific _ | Move | Spill | Reload | Opaque | Begin_region
+          ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
           | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
           | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
           | Store (_, _, _)
@@ -1226,6 +1226,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> 5
     | Lop (Specific (Ifar_alloc _)) when !fastcode_flag -> 6
     | Lop Poll -> 3
+    | Lop Pause -> 1
     | Lop (Specific Ifar_poll) -> 4
     | Lop (Alloc { mode = Heap; bytes = num_bytes; _ })
     | Lop (Specific (Ifar_alloc { bytes = num_bytes; _ })) -> (
@@ -1913,6 +1914,7 @@ let emit_instr i =
          DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
       |]
   | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
+  | Lop Pause -> DSL.ins I.YIELD [||]
   | Lop (Specific Ifar_poll) ->
     assembly_code_for_poll i ~far:true ~return_label:None
   | Lop (Intop_imm (Iadd, n)) -> emit_addimm i.res.(0) i.arg.(0) n

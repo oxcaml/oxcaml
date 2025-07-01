@@ -1827,6 +1827,7 @@ let emit_instr ~first ~fallthrough i =
          }
          :: !call_gc_sites;
     D.define_label lbl_after_poll
+  | Lop Pause -> I.pause ()
   | Lop (Intop (Icomp cmp)) ->
     I.cmp (arg i 1) (arg i 0);
     I.set (cond cmp) al;
