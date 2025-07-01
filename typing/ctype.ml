@@ -7266,11 +7266,11 @@ let constrain_decl_jkind env decl jkind =
 type 'res constructor_crossing_kind =
   | Creation : Mode.Value.r constructor_crossing_kind
   | Destruction : Mode.Value.l constructor_crossing_kind
-  | Rebinding : (unit, Mode.Value.error) result constructor_crossing_kind
+  | Rebinding : unit constructor_crossing_kind
 
 let check_exn_constructor_crossing (type res)
    (kind : res constructor_crossing_kind)
-   env ~args held_locks : res =
+   env ~args held_locks : (res, Mode.Value.error) result =
   let vmode =
     Env.walk_locks ~env ~item:Constructor
       (Mode.Value.(disallow_right min)) None held_locks
@@ -7294,29 +7294,35 @@ let check_exn_constructor_crossing (type res)
     { comonadic;
       monadic = Mode.Value.Monadic.(disallow_left max)}
   in
-  match kind with
-  | Creation -> max_bound
-  | Destruction -> min_bound
-  | Rebinding ->
-    (* Rebinding is only safe if constructor arguments mode-cross. *)
-    let mode_crossing =
-      List.map (
-        fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
+  let mode_crossing =
+    List.map (
+      fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
         crossing_of_ty env ~modalities:ca_modalities ca_type
-      ) args
-      |> List.fold_left Mode.Crossing.join Mode.Crossing.bot
-    in
-    let res1 =
-      Mode.Value.submode
-        Mode.Value.(disallow_right max)
-        (Mode.Crossing.apply_right mode_crossing max_bound)
-    in
-    let res2 () =
+    ) args
+    |> List.fold_left Mode.Crossing.join Mode.Crossing.bot
+  in
+  let check_comonadic_crossing () =
+    Mode.Value.submode
+      Mode.Value.(disallow_right max)
+      (Mode.Crossing.apply_right mode_crossing max_bound)
+  in
+  let check_monadic_crossing () =
       Mode.Value.submode
         (Mode.Crossing.apply_left mode_crossing min_bound)
         Mode.Value.(disallow_left min)
-    in
-    Result.bind res1 res2
+  in
+  match kind with
+  | Creation ->
+    (* Creating a constructor under a lock is safe if the arguments
+       submode on the comonadic axis and cross the monadic axis. *)
+    Result.map (fun () -> max_bound) (check_monadic_crossing ())
+  | Destruction ->
+    (* Destroying a constructor under a lock is safe if the arguments
+       submode on the monadic axis and cross the comonadic axis. *)
+    Result.map (fun () -> min_bound) (check_comonadic_crossing ())
+  | Rebinding ->
+    (* Rebinding is only safe if constructor arguments mode-cross both way. *)
+    Result.bind (check_comonadic_crossing ()) check_monadic_crossing
 
 let check_constructor_crossing (type res)
    (kind : res constructor_crossing_kind)
@@ -7325,13 +7331,13 @@ let check_constructor_crossing (type res)
     match kind with
     | Creation -> Mode.Value.(disallow_left max)
     | Destruction -> Mode.Value.(disallow_right min)
-    | Rebinding -> Ok ()
+    | Rebinding -> ()
   in
   match tag with
-  | Ordinary _ | Null -> no_check
+  | Ordinary _ | Null -> Ok no_check
   | Extension _ ->
       match get_desc (expand_head env res) with
       | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
           (* Currently, only [exn] is treated specially. *)
           check_exn_constructor_crossing kind env ~args held_locks
-      | _ -> no_check
+      | _ -> Ok no_check

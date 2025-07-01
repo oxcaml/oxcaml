@@ -117,6 +117,7 @@ type existential_restriction =
 
 type submode_reason =
   | Application of type_expr
+  | Constructor of Longident.t
   | Other
 
 type contention_context =
@@ -3070,8 +3071,11 @@ and type_pat_aux
       end;
 
       let constructor_mode =
-        Ctype.check_constructor_crossing Destruction !!penv constr.cstr_tag
-          ~res:expected_ty ~args held_locks
+        match Ctype.check_constructor_crossing Destruction !!penv constr.cstr_tag
+          ~res:expected_ty ~args held_locks with
+        | Ok mode -> mode
+        | Error e -> raise (Error (lid.loc, !!penv,
+          Submode_failed (e, Constructor lid.txt, None, None, None, None)))
       in
       let args =
         List.map2
@@ -8729,8 +8733,11 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       end
   in
   let constructor_mode =
-    Ctype.check_constructor_crossing Creation env constr.cstr_tag
-      ~res:ty_res ~args:ty_args held_locks
+    match Ctype.check_constructor_crossing Creation env constr.cstr_tag
+      ~res:ty_res ~args:ty_args held_locks with
+    | Ok mode -> mode
+    | Error e -> raise (Error (lid.loc, env,
+        Submode_failed (e, Constructor lid.txt, None, None, None, None)))
   in
   let expected_mode =
     { expected_mode with mode =
@@ -10492,7 +10499,7 @@ let escaping_hint (failure_reason : Value.error) submode_reason
           n args qualifier ]
     | None -> []
     end
-  | Other -> []
+  | Constructor _ | Other -> []
   end
 
 
@@ -11179,6 +11186,15 @@ let report_error ~loc env =
         | Error (Comonadic Portability, _ ) -> []
         | Error (Comonadic Yielding, _) -> []
         | Error (Comonadic Statefulness, _) -> []
+      in
+      let sub =
+        match submode_reason with
+        | Constructor name ->
+          assert (List.length sub = 0);
+          [ Location.msg "@[Hint: All arguments of the constructor %a@\n\
+            must cross this axis to use it in this position.@]"
+            (Style.as_inline_code longident) name ]
+        | Application _ | Other -> sub
       in
       Location.errorf ~loc ~sub "@[%t@]" begin
         match fail_reason with
