@@ -873,22 +873,25 @@ module Merge = struct
     let path, paths, tdecl, sg = merge ~patch ~destructive env sg loc lid in
     (* Post processing *)
     let replace =
-      match type_decl_is_alias sdecl with
-      | Some lid ->
-          (* if the type is an alias of [lid], replace by the definition *)
-          let replacement, _ =
-            try Env.find_type_by_name lid.txt env
-            with Not_found -> assert false
-          in
-          fun s path -> Subst.Unsafe.add_type_path path replacement s
-      | None ->
-          (* if the type is not an alias, try to inline it *)
-          let body = Option.get tdecl.typ_type.type_manifest in
-          let params = tdecl.typ_type.type_params in
-          if params_are_constrained params then
-            raise(Error(loc, env, With_cannot_remove_constrained_type));
-          fun s path ->
-            Subst.Unsafe.add_type_function path ~params ~body s
+      if destructive then
+        match type_decl_is_alias sdecl with
+        | Some lid ->
+            (* if the type is an alias of [lid], replace by the definition *)
+            let replacement, _ =
+              try Env.find_type_by_name lid.txt env
+              with Not_found -> assert false
+            in
+            fun s path -> Subst.Unsafe.add_type_path path replacement s
+        | None ->
+            (* if the type is not an alias, try to inline it *)
+            let body = Option.get tdecl.typ_type.type_manifest in
+            let params = tdecl.typ_type.type_params in
+            if params_are_constrained params then
+              raise(Error(loc, env, With_cannot_remove_constrained_type));
+            fun s path ->
+              Subst.Unsafe.add_type_function path ~params ~body s
+      else
+        fun s _ -> s
     in
     let sg = post_process ~destructive loc lid env paths sg replace in
     (tdecl, (path, lid, sg))
