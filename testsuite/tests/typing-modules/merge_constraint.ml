@@ -438,7 +438,7 @@ module type Non_destructive_with_type_with_constraint =
   sig
     module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
     type 'a t2 constraint 'a = 'l * 'r
-    module type S2 = sig type ('a, _) t = 'a t2 constraint 'a = 'b * 'c end
+    module type S2 = sig type ('a, 'b) t = 'a t2 constraint 'a = 'l * 'r end
   end
 |}]
 
@@ -455,7 +455,7 @@ module type Non_destructive_with_type_alias_with_constraint =
     module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
     type ('a, 'b) t2 constraint 'a = 'l * 'r
     module type S2 =
-      sig type ('a, 'b) t = ('a, 'b) t2 constraint 'a = 'c * 'd end
+      sig type ('a, 'b) t = ('a, 'b) t2 constraint 'a = 'l * 'r end
   end
 |}]
 
@@ -471,7 +471,7 @@ Line 6, characters 32-34:
 6 |   module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
                                     ^^
 Error: The type constraints are not consistent.
-       Type "'a * 'b * 'c" is not compatible with type "'d * 'e"
+       Type "'a * 'b * 'c" is not compatible with type "'l * 'r"
 |}]
 
 module type Destructive_with_type_with_constraint = sig
@@ -518,5 +518,5 @@ Line 6, characters 32-34:
 6 |   module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
                                     ^^
 Error: The type constraints are not consistent.
-       Type "'a * 'b * 'c" is not compatible with type "'d * 'e"
+       Type "'a * 'b * 'c" is not compatible with type "'l * 'r"
 |}]
