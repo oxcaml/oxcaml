@@ -239,6 +239,7 @@ module Runtime_5 = struct
 
     type key_initializer : value mod contended portable =
         KI: 'a key * ('a -> (Access.t -> 'a) @ portable) @@ portable -> key_initializer
+    [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
     type key_initializer_list : value mod contended portable =
       key_initializer list
@@ -336,6 +337,7 @@ module Runtime_5 = struct
 
     type key_value : value mod portable contended =
         KV : 'a key * (Access.t -> 'a) @@ portable -> key_value
+    [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
     let get_initial_keys access : key_value list =
       List.map
