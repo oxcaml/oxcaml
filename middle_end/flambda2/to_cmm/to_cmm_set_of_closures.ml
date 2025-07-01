@@ -451,9 +451,6 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     then params
     else
       let my_closure_duid = Flambda_debug_uid.none in
-      (* CR sspies: Not sure whethere these closures can ever be user visible.
-         Popagating a [Lambda_debug_uid.t] here is nontrivial, so I picked
-         [Flambda_debug_uid.none] for now. *)
       let my_closure_param =
         Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
           my_closure_duid
