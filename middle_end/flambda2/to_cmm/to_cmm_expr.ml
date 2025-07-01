@@ -808,7 +808,7 @@ and let_cont_not_inlined env res k handler body =
     if is_exn_handler
     then
       let_cont_exn_handler env res k body vars handler free_vars_of_handler
-        ~catch_id arity
+        handler_symbol_inits ~catch_id arity
     else
       (* CR mshinwell: fix debuginfo *)
       (* CR gbury: once we get proper debuginfo here, remember to apply
@@ -837,7 +837,7 @@ and let_cont_not_inlined env res k handler body =
 (* Exception continuations are translated using delayed Ctrywith blocks. The
    exception handler parts of these blocks are identified by the [catch_id]s. *)
 and let_cont_exn_handler env res k body vars handler free_vars_of_handler
-    ~catch_id arity =
+    handler_symbol_inits ~catch_id arity =
   let exn_var, extra_params =
     match vars with
     | (v, _) :: rest -> v, rest
@@ -856,7 +856,12 @@ and let_cont_exn_handler env res k body vars handler free_vars_of_handler
       extra_params
   in
   let env_body = Env.add_exn_handler env k arity in
-  let body, free_vars_of_body, symbol_inits, res = expr env_body res body in
+  let body, free_vars_of_body, body_symbol_inits, res =
+    expr env_body res body
+  in
+  let symbol_inits =
+    Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits
+  in
   let free_vars =
     Backend_var.Set.union free_vars_of_body
       (C.remove_vars_with_machtype free_vars_of_handler vars)
