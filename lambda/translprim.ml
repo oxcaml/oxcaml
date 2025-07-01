@@ -917,6 +917,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_land" -> Primitive (Patomic_land, 2)
     | "%atomic_lor" -> Primitive (Patomic_lor, 2)
     | "%atomic_lxor" -> Primitive (Patomic_lxor, 2)
+    | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
     | "%runstack" ->
       if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
     | "%reperform" ->
@@ -1982,10 +1983,10 @@ let lambda_primitive_needs_event_after = function
   | Patomic_exchange _ | Patomic_compare_exchange _
   | Patomic_compare_set _ | Patomic_fetch_add | Patomic_add | Patomic_sub
   | Patomic_land | Patomic_lor | Patomic_lxor | Patomic_load _ | Patomic_set _
-  | Pintofbint _ | Pctconst _ | Pbswap16 | Pint_as_pointer _ | Popaque _
-  | Pdls_get
-  | Pobj_magic _ | Punbox_float _ | Punbox_int _ | Punbox_vector _
-  | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
+  | Pcpu_relax | Pintofbint _ | Pctconst _ | Pbswap16 | Pint_as_pointer _
+  | Popaque _ | Pdls_get | Pobj_magic _ | Punbox_float _ | Punbox_int _
+  | Punbox_vector _ | Preinterpret_unboxed_int64_as_tagged_int63
+  | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_float (_, _) | Pbox_int _ | Pbox_vector (_, _)
   | Punbox_unit
