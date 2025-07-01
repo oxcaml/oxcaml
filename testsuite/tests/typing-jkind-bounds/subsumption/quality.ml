@@ -55,8 +55,8 @@ Error: Signature mismatch:
          type t : value mod portable with a
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod portable
-         with a
+       But the kind of the first must be a subkind of
+           value mod portable with a
          because of the definition of t at line 3, characters 2-36.
 |}]
 
@@ -124,8 +124,8 @@ Error: In this "with" constraint, the new definition of "t"
          type t : value mod global with M.t
        The kind of the first is value
          because of the definition of t at line 5, characters 2-8.
-       But the kind of the first must be a subkind of value mod global
-         with M.t
+       But the kind of the first must be a subkind of
+           value mod global with M.t
          because of the definition of t at line 3, characters 4-38.
 |}]
 
@@ -163,7 +163,7 @@ Error: Signature mismatch:
        The kind of the first is value mod portable
          because of the definition of t at line 13, characters 2-29.
        But the kind of the first must be a subkind of
-         value mod contended portable with M.t
+           value mod contended portable with M.t
          because of the definition of t at line 11, characters 2-48.
 |}]
 
@@ -203,7 +203,7 @@ Error: Signature mismatch:
        The kind of the first is value mod portable
          because of the definition of t at line 15, characters 2-29.
        But the kind of the first must be a subkind of
-         value mod contended portable with M.u
+           value mod contended portable with M.u
          because of the definition of t at line 13, characters 2-48.
 |}]
 
@@ -225,14 +225,17 @@ Error: Signature mismatch:
        Modules do not match:
          sig type a = [ `a of string | `b ] type t end
        is not included in
-         sig type a = [ `a of string | `b ] type t : value mod unyielding end
+         sig
+           type a = [ `a of string | `b ]
+           type t : value mod global with a
+         end
        Type declarations do not match:
          type t
        is not included in
-         type t : value mod unyielding
+         type t : value mod global with a
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod unyielding
+       But the kind of the first must be a subkind of value mod global with a
          because of the definition of t at line 3, characters 2-34.
 |}]
 
@@ -268,8 +271,8 @@ Error: Signature mismatch:
            constraint 'a = [< `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of value mod global
-         with [< `a of string | `b ] u
+       But the kind of the first must be a subkind of
+           value mod global with [< `a of string | `b ] u
          because of the definition of t at line 3, characters 2-40.
 |}]
 
@@ -305,8 +308,8 @@ Error: Signature mismatch:
            constraint 'a = [< `a of int -> int | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-55.
-       But the kind of the first must be a subkind of value mod portable
-         with [< `a of int -> int | `b ] u
+       But the kind of the first must be a subkind of
+           value mod portable with [< `a of int -> int | `b ] u
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -342,8 +345,8 @@ Error: Signature mismatch:
            constraint 'a = [> `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of value mod portable
-         with [> `a of string | `b ] u
+       But the kind of the first must be a subkind of
+           value mod portable with [> `a of string | `b ] u
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -384,7 +387,7 @@ end = struct
 end
 [%%expect {|
 type gadt = Foo : int -> gadt
-module M : sig type t : value mod portable end
+module M : sig type t end
 |}]
 
 type gadt = Foo : int -> gadt
@@ -393,25 +396,10 @@ module M : sig
 end = struct
   type t
 end
+(* CR layouts v2.8: This should not be accepted *)
 [%%expect {|
 type gadt = Foo : int -> gadt
-Lines 4-6, characters 6-3:
-4 | ......struct
-5 |   type t
-6 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t : value mod unyielding end
-       Type declarations do not match:
-         type t
-       is not included in
-         type t : value mod unyielding
-       The kind of the first is value
-         because of the definition of t at line 5, characters 2-8.
-       But the kind of the first must be a subkind of value mod unyielding
-         because of the definition of t at line 3, characters 2-37.
+module M : sig type t end
 |}]
 
 type gadt = Foo : int -> gadt [@@unboxed]
@@ -513,8 +501,8 @@ Error: Signature mismatch:
          type t : value mod contended with a
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod contended
-         with a
+       But the kind of the first must be a subkind of
+           value mod contended with a
          because of the definition of t at line 3, characters 2-37.
 |}]
 
@@ -547,8 +535,8 @@ Error: Signature mismatch:
          type t : value mod portable with s
        The kind of the first is value
          because of the definition of t at line 8, characters 2-8.
-       But the kind of the first must be a subkind of value mod portable
-         with s
+       But the kind of the first must be a subkind of
+           value mod portable with s
          because of the definition of t at line 6, characters 2-36.
 |}]
 

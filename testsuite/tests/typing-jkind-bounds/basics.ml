@@ -228,7 +228,7 @@ Line 2, characters 0-71:
 2 | type b : value mod local unique many contended nonportable internal = a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "a" is
-         value mod global aliased contended portable external_
+           value mod global aliased contended portable external_
          because of the definition of a at line 1, characters 0-67.
        But the kind of type "a" must be a subkind of value mod many contended
          because of the definition of b at line 2, characters 0-71.
@@ -798,7 +798,7 @@ Line 1, characters 0-65:
 Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of
-         any mod global many contended portable
+           any mod global many contended portable
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -1183,7 +1183,7 @@ Error: The kind of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have kind value.
        But the kind of type "t" must be a subkind of
-         immutable_data mod global aliased yielding
+           immutable_data mod global aliased yielding
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this should be accepted *)
@@ -1789,4 +1789,25 @@ end
 
 [%%expect{|
 module M : sig type 'a t : value mod portable with 'a end
+|}]
+
+module M : sig
+  type 'a t : value mod portable
+end = struct
+  type 'a t = { x : 'a @@ portable } [@@unboxed]
+end
+
+[%%expect{|
+module M : sig type 'a t : value mod portable end
+|}]
+
+module M : sig
+  type 'a t : value mod portable contended with 'a @@ portable
+end = struct
+  type 'a t = { x : 'a @@ portable } [@@unboxed]
+end
+
+[%%expect{|
+module M :
+  sig type 'a t : value mod contended portable with 'a @@ portable end
 |}]

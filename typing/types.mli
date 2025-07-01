@@ -29,12 +29,15 @@ open Asttypes
 (** Describes a mutable field/element. *)
 type mutability =
   | Immutable
-  | Mutable of Mode.Alloc.Comonadic.Const.t
-  (** The upper bound of the new field value upon mutation. *)
+  | Mutable of Mode.Value.Comonadic.lr
+  (** Mode of new field value in mutation. *)
 
 (** Returns [true] is the [mutable_flag] is mutable. Should be called if not
     interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
+
+(** Given the parameter [m0] on mutable, return the mode of future writes. *)
+val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Type expressions for the core language.
 
@@ -649,6 +652,8 @@ module Vars  : Map.S with type key = string
 
 type value_kind =
     Val_reg                             (* Regular value *)
+  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+                                        (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
   | Val_self of class_signature * self_meths * Ident.t Vars.t * string
@@ -1143,8 +1148,7 @@ type 'a gen_label_description =
     lbl_modalities: Mode.Modality.Value.Const.t;
                                         (* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_num: int;                       (* Position in the type *)
+    lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;  (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1173,14 +1177,6 @@ type record_form_packed =
   | P : _ record_form -> record_form_packed
 
 val record_form_to_string : _ record_form -> string
-
-(** The special value we assign to lbl_pos for label descriptions corresponding
-    to void types, because they can't sensibly be projected.
-
-    CR layouts v5: This should be removed once we have unarization, as it
-    will be up to a later stage of the compiler to erase void.
-*)
-val lbl_pos_void : int
 
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that

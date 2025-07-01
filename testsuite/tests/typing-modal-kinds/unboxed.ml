@@ -236,11 +236,11 @@ Lines 1-2, characters 0-43:
 1 | type 'a t : value & value mod portable =
 2 |   #{ x : 'a contended; y : 'a @@ portable }
 Error: The kind of type "t" is
-         immediate with 'a @@ portable with 'a contended & immediate
-         with 'a @@ portable with 'a contended
+           immediate with 'a @@ portable with 'a contended
+           & immediate with 'a @@ portable with 'a contended
          because it is an unboxed record.
        But the kind of type "t" must be a subkind of
-         value mod portable & value mod portable
+           value mod portable & value mod portable
          because of the annotation on the declaration of the type t.
 
        The first mode-crosses less than the second along:
@@ -255,10 +255,10 @@ Lines 1-2, characters 0-40:
 1 | type 'a t : value & value mod portable =
 2 |   #{ x : 'a contended; y : 'a portable }
 Error: The kind of type "t" is
-         immediate with 'a contended with 'a portable & immediate
-         with 'a contended with 'a portable
+           immediate with 'a contended with 'a portable
+           & immediate with 'a contended with 'a portable
          because it is an unboxed record.
        But the kind of type "t" must be a subkind of
-         value mod portable & value mod portable
+           value mod portable & value mod portable
          because of the annotation on the declaration of the type t.
 |}]

@@ -71,7 +71,9 @@ end
 type t =
   { current_unit : Compilation_unit.t;
     current_values_of_mutables_in_scope :
-      (Ident.t * Flambda_kind.With_subkind.t) Ident.Map.t;
+      ((Ident.t * Flambda_kind.With_subkind.full_kind) list
+      * [`Complex] Flambda_arity.Component_for_creation.t)
+      Ident.Map.t;
     mutables_needed_by_continuations : Ident.Set.t Continuation.Map.t;
     unboxed_product_components_in_scope :
       ([`Complex] Flambda_arity.Component_for_creation.t * Ident.t list)
@@ -117,27 +119,36 @@ let ident_stamp_upon_starting t = t.ident_stamp_upon_starting
 
 let is_mutable t id = Ident.Map.mem id t.current_values_of_mutables_in_scope
 
-let register_mutable_variable t id kind =
+let register_mutable_variable t id ~before_unarization =
   if Ident.Map.mem id t.current_values_of_mutables_in_scope
   then Misc.fatal_errorf "Redefinition of mutable variable %a" Ident.print id;
-  let new_id = Ident.rename id in
+  let fields =
+    Flambda_arity.fresh_idents_unarized ~id
+      (Flambda_arity.create [before_unarization])
+  in
   let current_values_of_mutables_in_scope =
-    Ident.Map.add id (new_id, kind) t.current_values_of_mutables_in_scope
+    Ident.Map.add id
+      (fields, before_unarization)
+      t.current_values_of_mutables_in_scope
   in
   let t = { t with current_values_of_mutables_in_scope } in
-  t, new_id
+  t, fields
 
 let update_mutable_variable t id =
   match Ident.Map.find id t.current_values_of_mutables_in_scope with
   | exception Not_found ->
     Misc.fatal_errorf "Mutable variable %a not in environment" Ident.print id
-  | _old_id, kind ->
-    let new_id = Ident.rename id in
-    let current_values_of_mutables_in_scope =
-      Ident.Map.add id (new_id, kind) t.current_values_of_mutables_in_scope
+  | _old_ids_and_kinds, before_unarization ->
+    let fields =
+      Flambda_arity.fresh_idents_unarized ~id
+        (Flambda_arity.create [before_unarization])
     in
-    let t = { t with current_values_of_mutables_in_scope } in
-    t, new_id
+    let current_values_of_mutables_in_scope =
+      Ident.Map.add id
+        (fields, before_unarization)
+        t.current_values_of_mutables_in_scope
+    in
+    { t with current_values_of_mutables_in_scope }
 
 let mutables_in_scope t = Ident.Map.keys t.current_values_of_mutables_in_scope
 
@@ -189,7 +200,12 @@ let add_continuation t cont ~push_to_try_stack ~pop_region
   in
   let current_values_of_mutables_in_scope =
     Ident.Map.mapi
-      (fun mut_var (_outer_value, kind) -> Ident.rename mut_var, kind)
+      (fun mut_var (_outer_values_with_kinds, before_unarization) ->
+        let fields =
+          Flambda_arity.fresh_idents_unarized ~id:mut_var
+            (Flambda_arity.create [before_unarization])
+        in
+        fields, before_unarization)
       t.current_values_of_mutables_in_scope
   in
   let handler_env =
@@ -209,6 +225,7 @@ let add_continuation t cont ~push_to_try_stack ~pop_region
   in
   let extra_params =
     Ident.Map.data handler_env.current_values_of_mutables_in_scope
+    |> List.map fst |> List.concat
   in
   { body_env; handler_env; extra_params }
 
@@ -264,22 +281,24 @@ let extra_args_for_continuation_with_kinds t cont =
     Misc.fatal_errorf "Unbound continuation %a" Continuation.print cont
   | mutables ->
     let mutables = Ident.Set.elements mutables in
-    List.map
+    List.concat_map
       (fun mut ->
         match Ident.Map.find mut t.current_values_of_mutables_in_scope with
         | exception Not_found ->
           Misc.fatal_errorf "No current value for %a" Ident.print mut
-        | current_value, kind -> current_value, kind)
+        | current_values_with_kinds, _before_unarization ->
+          current_values_with_kinds)
       mutables
 
 let extra_args_for_continuation t cont =
   List.map fst (extra_args_for_continuation_with_kinds t cont)
 
-let get_mutable_variable_with_kind t id =
+let get_mutable_variable_with_kinds t id =
   match Ident.Map.find id t.current_values_of_mutables_in_scope with
   | exception Not_found ->
     Misc.fatal_errorf "Mutable variable %a not bound in env" Ident.print id
-  | id, kind -> id, kind
+  | ids_with_kinds_and_arity_before_unarization ->
+    ids_with_kinds_and_arity_before_unarization
 
 let get_unboxed_product_fields t id =
   match Ident.Map.find id t.unboxed_product_components_in_scope with

@@ -214,6 +214,8 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
+    | Mutable_var_assignment
+    | Old_style_unboxed_type
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -224,7 +226,6 @@ module History = struct
     | Wildcard
     | Unification_var
     | Array_element
-    | Old_style_unboxed_type
 
   open Allowance
 

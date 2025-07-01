@@ -2322,7 +2322,9 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     Jkind.for_boxed_row row
+     if tvariant_not_immediate row
+     then Jkind.for_non_float ~why:Polymorphic_variant
+     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let jkind_of_type = !type_jkind_purely_if_principal' env in
@@ -7208,17 +7210,25 @@ let check_decl_jkind env decl jkind =
      otherwise. But we really shouldn't allow mixing those two features, and
      so instead of trying to get to the bottom of it, I'm just punting. *)
   let decl_jkind = match decl.type_kind, decl.type_manifest with
-    | Type_abstract _, Some inner_ty
+    | Type_abstract _, Some inner_ty ->
+      Jkind.for_abbreviation ~type_jkind_purely
+        ~modality:Mode.Modality.Value.Const.id inner_ty
     (* These next cases are more properly rule TK_UNBOXED from kind-inference.md
        (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
        they should be fine here. This will all get fixed up later with the
        above CRs. *)
-    | Type_record ([{ ld_type = inner_ty }], Record_unboxed, None), _
-    | Type_record_unboxed_product ([{ ld_type = inner_ty }], _, None), _
-    | Type_variant ([{ cd_args = (Cstr_tuple [{ ca_type = inner_ty }] |
-                                  Cstr_record [{ ld_type = inner_ty }]) }],
-                    Variant_unboxed, None), _ ->
-      Jkind.for_abbreviation ~type_jkind_purely inner_ty
+    | Type_record ([{ ld_type = inner_ty; ld_modalities = modality }],
+                   Record_unboxed, None), _
+    | Type_record_unboxed_product ([{ ld_type = inner_ty;
+                                      ld_modalities = modality }], _, None), _
+    | Type_variant (
+        [{ cd_args =
+             (Cstr_tuple [{ ca_type = inner_ty;
+                            ca_modalities = modality }] |
+              Cstr_record [{ ld_type = inner_ty;
+                             ld_modalities = modality }]) }],
+        Variant_unboxed, None), _ ->
+      Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
   match Jkind.sub_jkind_l ~type_equal ~jkind_of_type decl_jkind jkind with
