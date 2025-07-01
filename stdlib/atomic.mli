@@ -106,15 +106,15 @@ val decr : int t @ contended local -> unit
 module Contended : sig
   (** Like {!get}, but can be called on an atomic that came from another domain. *)
   external get
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a
+    : ('a : value_or_null mod portable).
+    'a t @ contended local -> 'a @ contended
     @@ portable
     = "%atomic_load"
 
   (** Like {!set}, but can be called on an atomic that came from another domain. *)
   external set
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> unit
+    : ('a : value_or_null mod contended).
+    'a t @ contended local -> 'a @ portable -> unit
     = "%atomic_set"
 
   (** Like {!exchange}, but can be called on an atomic that came from another
