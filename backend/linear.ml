@@ -78,8 +78,7 @@ and call_operation =
 let has_fallthrough = function
   | Lreturn | Lbranch _ | Lswitch _ | Lraise _
   | Lcall_op Ltailcall_ind
-  | Lcall_op (Ltailcall_imm _) ->
-    false
+  | Lcall_op (Ltailcall_imm _)
   | Lcall_op (Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _)
   | Lprologue | Lend | Lreloadretaddr | Lentertrap | Lpoptrap _ | Lop _
   | Llabel _
