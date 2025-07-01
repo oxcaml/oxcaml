@@ -485,9 +485,6 @@ module Fold_prims = struct
                 in
                 let var = Variable.create (Printf.sprintf "%s_%i" name i) in
                 let var_duid = Flambda_debug_uid.none in
-                (* CR sspies: While this is an internally generated variable,
-                   would it make sense to try to propagate a
-                   [Flambda_debug_uid.t] here? *)
                 Bound_parameter.create var kind var_duid)
               fields_kinds
           in
