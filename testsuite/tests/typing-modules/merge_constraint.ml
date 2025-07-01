@@ -618,14 +618,100 @@ Error: In this "with" constraint, replacing "X0" by "F(X)" would
        introduce an invalid alias at "X1"
 |}]
 
-(* #14117 *)
-module type S = sig
-  type ('a, 'b) t constraint 'a = 'l * 'r
+(*** [with type] with type constraints ***)
+
+(* This first test is a regression test for #14117. *)
+module type Non_destructive_with_type_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type 'a t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, _) t = 'a t2
 end
-type 'a t2 constraint 'a = 'l * 'r
-module type S2 = S with type ('a, _) t = 'a t2
 [%%expect{|
-module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
-type 'a t2 constraint 'a = 'l * 'r
-module type S2 = sig type ('a, _) t = 'a t2 constraint 'a = 'b * 'c end
+module type Non_destructive_with_type_with_constraint =
+  sig
+    module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
+    type 'a t2 constraint 'a = 'l * 'r
+    module type S2 = sig type ('a, _) t = 'a t2 constraint 'a = 'b * 'c end
+  end
+|}]
+
+module type Non_destructive_with_type_alias_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+end
+[%%expect{|
+module type Non_destructive_with_type_alias_with_constraint =
+  sig
+    module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
+    type ('a, 'b) t2 constraint 'a = 'l * 'r
+    module type S2 =
+      sig type ('a, 'b) t = ('a, 'b) t2 constraint 'a = 'c * 'd end
+  end
+|}]
+
+module type Non_destructive_with_type_alias_with_inconsistent_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r * 's
+  module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+end
+[%%expect{|
+Line 6, characters 32-34:
+6 |   module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+                                    ^^
+Error: The type constraints are not consistent.
+       Type "'a * 'b * 'c" is not compatible with type "'d * 'e"
+|}]
+
+module type Destructive_with_type_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type 'a t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, _) t := 'a t2
+end
+[%%expect{|
+Line 6, characters 19-49:
+6 |   module type S2 = S with type ('a, _) t := 'a t2
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Destructive substitutions are not supported for constrained
+       types (other than when replacing a type constructor with
+       a type constructor with the same arguments).
+|}]
+
+module type Destructive_with_type_alias_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+end
+[%%expect{|
+module type Destructive_with_type_alias_with_constraint =
+  sig
+    module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
+    type ('a, 'b) t2 constraint 'a = 'l * 'r
+    module type S2 = sig end
+  end
+|}]
+
+module type Destructive_with_type_alias_with_inconsistent_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r * 's
+  module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+end
+[%%expect{|
+Line 6, characters 32-34:
+6 |   module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+                                    ^^
+Error: The type constraints are not consistent.
+       Type "'a * 'b * 'c" is not compatible with type "'d * 'e"
 |}]
