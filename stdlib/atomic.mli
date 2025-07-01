@@ -127,8 +127,8 @@ module Contended : sig
   (** Like {!compare_and_set}, but can be called on an atomic that came from
       another domain. *)
   external compare_and_set
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> 'a -> bool
+    : ('a : value_or_null mod contended).
+    'a t @ contended local -> 'a -> 'a @ portable -> bool
     = "%atomic_cas"
 
   (** Like {!compare_exchange}, but can be called on an atomic that came from

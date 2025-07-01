@@ -121,8 +121,8 @@ module Contended = struct
     = "%atomic_exchange"
 
   external compare_and_set
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> 'a -> bool
+    : ('a : value_or_null mod contended).
+    'a t @ contended local -> 'a -> 'a @ portable -> bool
     @@ portable
     = "%atomic_cas"
 
