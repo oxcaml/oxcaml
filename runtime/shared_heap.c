@@ -1185,9 +1185,9 @@ static void compact_fix(bool global_roots)
 
 /* How many pools are there on this list? */
 
-size_t compact_count_pools(pool* pool)
+uintnat compact_count_pools(pool* pool)
 {
-  size_t count = 0;
+  uintnat count = 0;
   while (pool) {
     count++;
     pool = pool->next;
@@ -1249,7 +1249,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
       continue;
     }
 
-    size_t num_pools = compact_count_pools(cur_pool);
+    uintnat num_pools = compact_count_pools(cur_pool);
     struct compact_pool_stat {
       uintnat free_blocks;
       uintnat live_blocks;
@@ -1480,7 +1480,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
     if (caml_compact_unmap) {
       pool* cur_pool;
       pool* next_pool;
-      size_t unmapped = 0;
+      uintnat unmapped = 0;
 
       caml_plat_lock_blocking(&pool_freelist.lock);
       cur_pool = pool_freelist.free;
@@ -1505,7 +1505,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
 
 /* Add all the pools on a list to an array of pool pointers */
 
-size_t compact_add_pools_to_array(pool *list, pool **array, size_t idx)
+uintnat compact_add_pools_to_array(pool *list, pool **array, uintnat idx)
 {
   while (list) {
     array[idx++] = list;
@@ -1545,11 +1545,11 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
 {
   for (int sz_class = 1; sz_class < NUM_SIZECLASSES; sz_class++) {
     mlsize_t wh = wsize_sizeclass[sz_class];
-    size_t avail_pools =
+    uintnat avail_pools =
       compact_count_pools(heap->unswept_avail_pools[sz_class]);
-    size_t full_pools =
+    uintnat full_pools =
       compact_count_pools(heap->unswept_full_pools[sz_class]);
-    size_t total_pools = avail_pools + full_pools;
+    uintnat total_pools = avail_pools + full_pools;
 
     if (!total_pools) /* No pools of this size class */
       continue;
@@ -1607,7 +1607,7 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
       return;
     }
 
-    size_t pool_idx = 0;
+    uintnat pool_idx = 0;
     pool_idx = compact_add_pools_to_array(heap->unswept_full_pools[sz_class],
                                           pool_array, pool_idx);
     pool_idx = compact_add_pools_to_array(heap->unswept_avail_pools[sz_class],
@@ -1617,10 +1617,10 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
     qsort(pool_array, total_pools, sizeof(pool*), compact_compare_pools);
 
     /* Number of to-pools required */
-    int to_pool_count = (total_live_blocks + pool_blocks - 1) / pool_blocks;
+    uintnat to_pool_count = (total_live_blocks + pool_blocks - 1) / pool_blocks;
 
     /* mark to-pools as not-evacuating, and the others as evacuating */
-    for (size_t i = 0 ; i < total_pools; i++) {
+    for (uintnat i = 0 ; i < total_pools; i++) {
       pool_array[i]->evacuate = (i >= to_pool_count);
     }
 
@@ -1648,7 +1648,7 @@ int compact_phase_two_mark(int participating_count,
   }
 
   /* Now count all pools in the system */
-  size_t pools_count = 0;
+  uintnat pools_count = 0;
 
   /* First, used pools */
   for( int i = 0; i < participating_count; i++ ) {
@@ -1663,16 +1663,16 @@ int compact_phase_two_mark(int participating_count,
         compact_count_pools(heap->unswept_avail_pools[sz]);
     }
   }
-  size_t live_pools = pools_count;
+  uintnat live_pools = pools_count;
 
   /* Now, free pools */
-  size_t free_pools = compact_count_pools(pool_freelist.free);
+  uintnat free_pools = compact_count_pools(pool_freelist.free);
   pools_count += free_pools;
 
   /* Now make an array of all pool pointers */
   pool **pool_array =
     (pool**)caml_stat_alloc_noexc(sizeof(pool*) * pools_count);
-  int pool_idx = 0;
+  uintnat pool_idx = 0;
 
   if (!pool_array) {
     CAML_GC_MESSAGE(COMPACT,
@@ -1702,7 +1702,7 @@ int compact_phase_two_mark(int participating_count,
   CAMLassert(live_pools <= pools_count);
 
   /* mark the first live_pools as live, the rest as evacuating. */
-  for(int i = 0; i < pools_count; i++) {
+  for (uintnat i = 0; i < pools_count; i++) {
     pool_array[i]->evacuate = (i >= live_pools);
   }
 
@@ -1710,7 +1710,7 @@ int compact_phase_two_mark(int participating_count,
      array (so we allocate the largest chunks first). So we cons up
      the list working backwards from the end bof the array. */
   pool* new_free = NULL;
-  for (int i = pools_count - 1; i >= 0; i--) {
+  for (ptrdiff_t i = pools_count - 1; i >= 0; i--) {
     pool* p = pool_array[i];
     if (!p->owner) {
       p->next = new_free;
@@ -1724,8 +1724,8 @@ int compact_phase_two_mark(int participating_count,
 
   #ifdef DEBUG
   /* Check that chunk sizes are increasing in the free list */
-  int current_chunk_size_debug = INT_MAX;
-  int free_pools_debug = 0;
+  uintnat current_chunk_size_debug = SIZE_MAX;
+  uintnat free_pools_debug = 0;
   for (pool* p = pool_freelist.free; p; p = p->next) {
     CAMLassert(p->chunk_size <= current_chunk_size_debug);
     current_chunk_size_debug = p->chunk_size;
@@ -1750,7 +1750,7 @@ void compact_release_freelist(void)
   CAML_EV_BEGIN(EV_COMPACT_RELEASE);
   caml_plat_lock_blocking(&pool_freelist.lock);
 
-  size_t free_pools_count = compact_count_pools(pool_freelist.free);
+  uintnat free_pools_count = compact_count_pools(pool_freelist.free);
 
   if (!free_pools_count) {
     /* No free pools */
@@ -1766,16 +1766,16 @@ void compact_release_freelist(void)
       ("Unable to allocate array to release free pools after compaction");
   }
 
-  size_t i = compact_add_pools_to_array(pool_freelist.free,
-                                        free_pools, 0);
+  uintnat i = compact_add_pools_to_array(pool_freelist.free,
+                                         free_pools, 0);
   CAMLassert(i == free_pools_count);
 
   qsort(free_pools, free_pools_count, sizeof(pool*), compact_compare_pools);
 
   #ifdef DEBUG
   /* sanity check the free_pools list */
-  int current_chunk_size_debug = INT_MAX;
-  int current_chunk_debug = 0;
+  uintnat current_chunk_size_debug = SIZE_MAX;
+  uintnat current_chunk_debug = 0;
 
   for( i = 0; i < free_pools_count; i++ ) {
     CAMLassert(free_pools[i]->chunk_size <= current_chunk_size_debug);
@@ -1800,8 +1800,8 @@ void compact_release_freelist(void)
    * other pool, we put on a reconstituted free list.*/
   pool* new_free_list = NULL;
   i = free_pools_count;
-  size_t unmapped = 0;
-  size_t remaining = 0;
+  uintnat unmapped = 0;
+  uintnat remaining = 0;
   do {
     --i;
     pool *cur_pool = free_pools[i];
@@ -1817,7 +1817,7 @@ void compact_release_freelist(void)
 
     /* If all the pools of this chunk are in the array, which will
        be the first? */
-    size_t first = i - cur_pool->chunk_size + 1;
+    uintnat first = i - cur_pool->chunk_size + 1;
     /* The array is sorted by decreasing chunk size, decreasing chunk
      * number, and increasing address order. Also, every pool with the
      * same chunk number has the same chunk size. So if `first` and
