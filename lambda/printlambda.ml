@@ -747,7 +747,7 @@ let primitive ppf = function
      fprintf ppf "string.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pstring_load_128 {unsafe; index_kind; mode; boxed} ->
+  | Pstring_load_vec {unsafe; index_kind; mode; boxed} ->
      fprintf ppf "string.%sunaligned_get128%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
@@ -766,7 +766,7 @@ let primitive ppf = function
      fprintf ppf "bytes.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbytes_load_128 {unsafe; index_kind; mode; boxed} ->
+  | Pbytes_load_vec {unsafe; index_kind; mode; boxed} ->
      fprintf ppf "bytes.%sunaligned_get128%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
@@ -785,7 +785,7 @@ let primitive ppf = function
      fprintf ppf "bytes.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbytes_set_128 { unsafe; boxed; index_kind } ->
+  | Pbytes_set_vec { unsafe; boxed; index_kind } ->
      fprintf ppf "bytes.%sunaligned_get128%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if boxed then "" else "#") array_index_kind index_kind
@@ -804,7 +804,7 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbigstring_load_128 { unsafe; aligned; mode; boxed; index_kind } ->
+  | Pbigstring_load_vec { unsafe; aligned; mode; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sget128%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
@@ -824,57 +824,57 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbigstring_set_128 { unsafe; aligned; boxed; index_kind } ->
+  | Pbigstring_set_vec { unsafe; aligned; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sget128%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (if boxed then "" else "#") array_index_kind index_kind
-  | Pfloatarray_load_128 {unsafe; mode; boxed} ->
+  | Pfloatarray_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "floatarray.%sget128%s%s"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Pfloat_array_load_128 {unsafe; mode; boxed} ->
+  | Pfloat_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "float_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Pint_array_load_128 {unsafe; mode; boxed} ->
+  | Pint_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "int_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_float_array_load_128 {unsafe; mode; boxed} ->
+  | Punboxed_float_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_float32_array_load_128 {unsafe; mode; boxed} ->
+  | Punboxed_float32_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float32_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_int32_array_load_128 {unsafe; mode; boxed} ->
+  | Punboxed_int32_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int32_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_int64_array_load_128 {unsafe; mode; boxed} ->
+  | Punboxed_int64_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int64_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_nativeint_array_load_128 {unsafe; mode; boxed} ->
+  | Punboxed_nativeint_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_nativeint_array.%sget128%s%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
-  | Pfloatarray_set_128 {unsafe; boxed} ->
+  | Pfloatarray_set_vec {unsafe; boxed} ->
      fprintf ppf "floatarray.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Pfloat_array_set_128 {unsafe; boxed} ->
+  | Pfloat_array_set_vec {unsafe; boxed} ->
      fprintf ppf "float_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Pint_array_set_128 {unsafe; boxed} ->
+  | Pint_array_set_vec {unsafe; boxed} ->
      fprintf ppf "int_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_float_array_set_128 {unsafe; boxed} ->
+  | Punboxed_float_array_set_vec {unsafe; boxed} ->
      fprintf ppf "unboxed_float_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_float32_array_set_128 {unsafe; boxed} ->
+  | Punboxed_float32_array_set_vec {unsafe; boxed} ->
      fprintf ppf "unboxed_float32_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_int32_array_set_128 {unsafe; boxed} ->
+  | Punboxed_int32_array_set_vec {unsafe; boxed} ->
      fprintf ppf "unboxed_int32_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_int64_array_set_128 {unsafe; boxed} ->
+  | Punboxed_int64_array_set_vec {unsafe; boxed} ->
      fprintf ppf "unboxed_int64_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_nativeint_array_set_128 {unsafe; boxed} ->
+  | Punboxed_nativeint_array_set_vec {unsafe; boxed} ->
      fprintf ppf "unboxed_nativeint_array.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
   | Pbswap16 -> fprintf ppf "bswap16"
@@ -1043,43 +1043,43 @@ let name_of_primitive = function
   | Pstring_load_32 _ -> "Pstring_load_32"
   | Pstring_load_f32 _ -> "Pstring_load_f32"
   | Pstring_load_64 _ -> "Pstring_load_64"
-  | Pstring_load_128 _ -> "Pstring_load_128"
+  | Pstring_load_vec _ -> "Pstring_load_vec"
   | Pbytes_load_16 _ -> "Pbytes_load_16"
   | Pbytes_load_32 _ -> "Pbytes_load_32"
   | Pbytes_load_f32 _ -> "Pbytes_load_f32"
   | Pbytes_load_64 _ -> "Pbytes_load_64"
-  | Pbytes_load_128 _ -> "Pbytes_load_128"
+  | Pbytes_load_vec _ -> "Pbytes_load_vec"
   | Pbytes_set_16 _ -> "Pbytes_set_16"
   | Pbytes_set_32 _ -> "Pbytes_set_32"
   | Pbytes_set_f32 _ -> "Pbytes_set_f32"
   | Pbytes_set_64 _ -> "Pbytes_set_64"
-  | Pbytes_set_128 _ -> "Pbytes_set_128"
+  | Pbytes_set_vec _ -> "Pbytes_set_vec"
   | Pbigstring_load_16 _ -> "Pbigstring_load_16"
   | Pbigstring_load_32 _ -> "Pbigstring_load_32"
   | Pbigstring_load_f32 _ -> "Pbigstring_load_f32"
   | Pbigstring_load_64 _ -> "Pbigstring_load_64"
-  | Pbigstring_load_128 _ -> "Pbigstring_load_128"
+  | Pbigstring_load_vec _ -> "Pbigstring_load_vec"
   | Pbigstring_set_16 _ -> "Pbigstring_set_16"
   | Pbigstring_set_32 _ -> "Pbigstring_set_32"
   | Pbigstring_set_f32 _ -> "Pbigstring_set_f32"
   | Pbigstring_set_64 _ -> "Pbigstring_set_64"
-  | Pbigstring_set_128 _ -> "Pbigstring_set_128"
-  | Pfloatarray_load_128 _ -> "Pfloatarray_load_128"
-  | Pfloat_array_load_128 _ -> "Pfloat_array_load_128"
-  | Pint_array_load_128 _ -> "Pint_array_load_128"
-  | Punboxed_float_array_load_128 _ -> "Punboxed_float_array_load_128"
-  | Punboxed_float32_array_load_128 _ -> "Punboxed_float32_array_load_128"
-  | Punboxed_int32_array_load_128 _ -> "Punboxed_int32_array_load_128"
-  | Punboxed_int64_array_load_128 _ -> "Punboxed_int64_array_load_128"
-  | Punboxed_nativeint_array_load_128 _ -> "Punboxed_nativeint_array_load_128"
-  | Pfloatarray_set_128 _ -> "Pfloatarray_set_128"
-  | Pfloat_array_set_128 _ -> "Pfloat_array_set_128"
-  | Pint_array_set_128 _ -> "Pint_array_set_128"
-  | Punboxed_float_array_set_128 _ -> "Punboxed_float_array_set_128"
-  | Punboxed_float32_array_set_128 _ -> "Punboxed_float32_array_set_128"
-  | Punboxed_int32_array_set_128 _ -> "Punboxed_int32_array_set_128"
-  | Punboxed_int64_array_set_128 _ -> "Punboxed_int64_array_set_128"
-  | Punboxed_nativeint_array_set_128 _ -> "Punboxed_nativeint_array_set_128"
+  | Pbigstring_set_vec _ -> "Pbigstring_set_vec"
+  | Pfloatarray_load_vec _ -> "Pfloatarray_load_vec"
+  | Pfloat_array_load_vec _ -> "Pfloat_array_load_vec"
+  | Pint_array_load_vec _ -> "Pint_array_load_vec"
+  | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
+  | Punboxed_float32_array_load_vec _ -> "Punboxed_float32_array_load_vec"
+  | Punboxed_int32_array_load_vec _ -> "Punboxed_int32_array_load_vec"
+  | Punboxed_int64_array_load_vec _ -> "Punboxed_int64_array_load_vec"
+  | Punboxed_nativeint_array_load_vec _ -> "Punboxed_nativeint_array_load_vec"
+  | Pfloatarray_set_vec _ -> "Pfloatarray_set_vec"
+  | Pfloat_array_set_vec _ -> "Pfloat_array_set_vec"
+  | Pint_array_set_vec _ -> "Pint_array_set_vec"
+  | Punboxed_float_array_set_vec _ -> "Punboxed_float_array_set_vec"
+  | Punboxed_float32_array_set_vec _ -> "Punboxed_float32_array_set_vec"
+  | Punboxed_int32_array_set_vec _ -> "Punboxed_int32_array_set_vec"
+  | Punboxed_int64_array_set_vec _ -> "Punboxed_int64_array_set_vec"
+  | Punboxed_nativeint_array_set_vec _ -> "Punboxed_nativeint_array_set_vec"
   | Pbswap16 -> "Pbswap16"
   | Pbbswap _ -> "Pbbswap"
   | Pint_as_pointer _ -> "Pint_as_pointer"

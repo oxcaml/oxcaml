@@ -239,12 +239,12 @@ let indexing_primitives =
           Pbigstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pbigstring_load_128
-            { aligned = false; unsafe; index_kind; mode; boxed } );
+          Pbigstring_load_vec
+            { size = Boxed_vec128; aligned = false; unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pbigstring_load_128
-            { aligned = true; unsafe; index_kind; mode; boxed } );
+          Pbigstring_load_vec
+            { size = Boxed_vec128; aligned = true; unsafe; index_kind; mode; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -260,10 +260,38 @@ let indexing_primitives =
           Pbigstring_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_128 { aligned = false; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec128; aligned = false; unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_128 { aligned = true; unsafe; index_kind; boxed } );
+          Pbigstring_set_vec { size = Boxed_vec128; aligned = true; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_vec
+            { size = Boxed_vec256; aligned = false; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_vec
+            { size = Boxed_vec256; aligned = true; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_vec { size = Boxed_vec256; aligned = false; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_seta256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_vec { size = Boxed_vec256; aligned = true; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_vec
+            { size = Boxed_vec512; aligned = false; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_vec
+            { size = Boxed_vec512; aligned = true; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_vec { size = Boxed_vec512; aligned = false; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_seta512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_vec { size = Boxed_vec512; aligned = true; unsafe; index_kind; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -279,7 +307,7 @@ let indexing_primitives =
           Pbytes_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pbytes_load_128 { unsafe; index_kind; mode; boxed } );
+          Pbytes_load_vec {size = Boxed_vec128; unsafe; index_kind; mode; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_set16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -295,7 +323,19 @@ let indexing_primitives =
           Pbytes_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbytes_set_128 { unsafe; index_kind; boxed } );
+          Pbytes_set_vec {size = Boxed_vec128; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_vec {size = Boxed_vec256; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_vec {size = Boxed_vec256; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_vec {size = Boxed_vec512; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_vec {size = Boxed_vec512; unsafe; index_kind; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_string_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
@@ -311,7 +351,13 @@ let indexing_primitives =
           Pstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
-          Pstring_load_128 { unsafe; index_kind; mode; boxed } );
+          Pstring_load_vec {size = Boxed_vec128; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_vec {size = Boxed_vec256; unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_vec {size = Boxed_vec512; unsafe; index_kind; mode; boxed } );
       (* We encourage respecting the immutability of [string]s and so do not add
          new [string] setters. However, we keep existing setting primitives for
          upstream compatibility. *)
@@ -355,54 +401,51 @@ let array_vec_primitives =
   let array_types_and_primitives =
     [
       ("float_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Pfloat_array_load_128 { unsafe; index_kind; mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Pfloat_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Pfloat_array_set_vec { size; unsafe; index_kind; boxed }));
       ("floatarray",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Pfloatarray_load_128 { unsafe; index_kind; mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Pfloatarray_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Pfloatarray_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_float_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_float_array_load_128 { unsafe; index_kind;
-                                         mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Punboxed_float_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_float32_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_float32_array_load_128 { unsafe; index_kind;
-                                           mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Punboxed_float32_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_float32_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("int_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Pint_array_load_128 { unsafe; index_kind; mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Pint_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Pint_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Pint_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int64_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_int64_array_load_128 { unsafe; index_kind;
-                                         mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Punboxed_int64_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_int64_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int32_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_int32_array_load_128 { unsafe; index_kind;
-                                         mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Punboxed_int32_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_int32_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_nativeint_array",
-       (fun ~unsafe ~index_kind ~mode ~boxed ->
-         Punboxed_nativeint_array_load_128 { unsafe; index_kind;
-                                             mode; boxed }),
-       (fun ~unsafe ~index_kind ~boxed ->
-         Punboxed_nativeint_array_set_128 { unsafe; index_kind; boxed }));
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_nativeint_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed }));
     ]
   in
   let vec_sizes = [
     ("128", Boxed_vec128);
+    ("256", Boxed_vec256);
+    ("512", Boxed_vec512);
   ] in
   let index_kinds =
     [
@@ -414,18 +457,15 @@ let array_vec_primitives =
   in
   (let ( let* ) x f = List.concat_map f x in
    let* array_type, load_prim, set_prim = array_types_and_primitives in
-   let* size_str, _size = vec_sizes in
+   let* size_str, size = vec_sizes in
    let* index_kind, index_kind_sigil = index_kinds in
    let* unsafe, unsafe_sigil = [ (false, ""); (true, "u") ] in
    let* boxed, boxed_sigil = [ (true, ""); (false, "#") ] in
    [
-     (Printf.sprintf "%%caml_%s_get%s%s%s%s" array_type size_str unsafe_sigil
-        boxed_sigil index_kind_sigil,
-      fun ~mode ->
-        Primitive (load_prim ~unsafe ~index_kind ~mode ~boxed, 2));
-     (Printf.sprintf "%%caml_%s_set%s%s%s%s" array_type size_str unsafe_sigil
-        boxed_sigil index_kind_sigil,
-      fun ~mode:_ -> Primitive (set_prim ~unsafe ~index_kind ~boxed, 3))
+     (Printf.sprintf "%%caml_%s_get%s%s%s%s" array_type size_str unsafe_sigil boxed_sigil index_kind_sigil,
+      fun ~mode -> Primitive (load_prim ~size ~unsafe ~index_kind ~mode ~boxed, 2));
+     (Printf.sprintf "%%caml_%s_set%s%s%s%s" array_type size_str unsafe_sigil boxed_sigil index_kind_sigil,
+      fun ~mode:_ -> Primitive (set_prim ~size ~unsafe ~index_kind ~boxed, 3))
    ])
   |> List.to_seq
   |> fun seq -> String.Map.add_seq seq String.Map.empty
@@ -1886,21 +1926,21 @@ let lambda_primitive_needs_event_after = function
   | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _ | Pasrbint _
   | Pbintcomp _ | Punboxed_int_comp _ | Pcompare_bints _
   | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_16 _
-  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_128 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _ | Pstring_load_vec _
   | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
-  | Pbytes_load_128 _ | Pbytes_set_16 _ | Pbytes_set_32 _  | Pbytes_set_f32 _
-  | Pbytes_set_64 _ | Pbytes_set_128 _ | Pbigstring_load_16 _
+  | Pbytes_load_vec _ | Pbytes_set_16 _ | Pbytes_set_32 _  | Pbytes_set_f32 _
+  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-  | Pbigstring_load_128 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
-  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_128 _
-  | Pfloatarray_load_128 _ | Pfloat_array_load_128 _ | Pint_array_load_128 _
-  | Punboxed_float_array_load_128 _| Punboxed_float32_array_load_128 _
-  | Punboxed_int32_array_load_128 _ | Punboxed_int64_array_load_128 _
-  | Punboxed_nativeint_array_load_128 _
-  | Pfloatarray_set_128 _ | Pfloat_array_set_128 _ | Pint_array_set_128 _
-  | Punboxed_float_array_set_128 _| Punboxed_float32_array_set_128 _
-  | Punboxed_int32_array_set_128 _ | Punboxed_int64_array_set_128 _
-  | Punboxed_nativeint_array_set_128 _
+  | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
+  | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+  | Punboxed_nativeint_array_load_vec _
+  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
+  | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+  | Punboxed_nativeint_array_set_vec _
   | Prunstack | Pperform | Preperform | Presume
   | Pbbswap _ | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
