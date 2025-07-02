@@ -1087,6 +1087,11 @@ let layout_letrec = layout_any_value
 let layout_probe_arg = nullable_value Pgenval
 let layout_unboxed_product layouts = Punboxed_product layouts
 
+let unboxed_vector_of_boxed_vector = function
+  | Boxed_vec128 -> Unboxed_vec128
+  | Boxed_vec256 -> Unboxed_vec256
+  | Boxed_vec512 -> Unboxed_vec512
+
 (* CR ncourant: use [Ptop] or remove this as soon as possible. *)
 let layout_top = layout_any_value
 let layout_bottom = Pbottom
@@ -2457,9 +2462,6 @@ let primitive_result_layout (p : primitive) =
   | Pstring_load_64 { boxed = true; _ } | Pbytes_load_64 { boxed = true; _ }
   | Pbigstring_load_64 { boxed = true; _ } ->
       layout_boxed_int Boxed_int64
-  | Pstring_load_vec { boxed = true; _ } | Pbytes_load_vec { boxed = true; _ }
-  | Pbigstring_load_vec { boxed = true; _ } ->
-      layout_boxed_vector Boxed_vec128
   | Pbigstring_load_32 { boxed = false; _ }
   | Pstring_load_32 { boxed = false; _ }
   | Pbytes_load_32 { boxed = false; _ } -> layout_unboxed_int Unboxed_int32
@@ -2469,27 +2471,30 @@ let primitive_result_layout (p : primitive) =
   | Pbigstring_load_64 { boxed = false; _ }
   | Pstring_load_64 { boxed = false; _ }
   | Pbytes_load_64 { boxed = false; _ } -> layout_unboxed_int Unboxed_int64
-  | Pstring_load_vec { boxed = false; _ } | Pbytes_load_vec { boxed = false; _ }
-  | Pbigstring_load_vec { boxed = false; _ } ->
-      layout_unboxed_vector Unboxed_vec128
-  | Pfloatarray_load_vec { boxed = true; _ }
-  | Pfloat_array_load_vec { boxed = true; _ }
-  | Punboxed_float_array_load_vec { boxed = true; _ }
-  | Punboxed_float32_array_load_vec { boxed = true; _ }
-  | Pint_array_load_vec { boxed = true; _ }
-  | Punboxed_int64_array_load_vec { boxed = true; _ }
-  | Punboxed_nativeint_array_load_vec { boxed = true; _ }
-  | Punboxed_int32_array_load_vec { boxed = true; _ } ->
-      layout_boxed_vector Boxed_vec128
-  | Pfloatarray_load_vec { boxed = false; _ }
-  | Pfloat_array_load_vec { boxed = false; _ }
-  | Punboxed_float_array_load_vec { boxed = false; _ }
-  | Punboxed_float32_array_load_vec { boxed = false; _ }
-  | Pint_array_load_vec { boxed = false; _ }
-  | Punboxed_int64_array_load_vec { boxed = false; _ }
-  | Punboxed_nativeint_array_load_vec { boxed = false; _ }
-  | Punboxed_int32_array_load_vec { boxed = false; _ } ->
-      layout_unboxed_vector Unboxed_vec128
+  | Pstring_load_vec { size; boxed = false; _ }
+  | Pbytes_load_vec { size; boxed = false; _ }
+  | Pbigstring_load_vec { size; boxed = false; _ }
+  | Pfloatarray_load_vec { size; boxed = false; _ }
+  | Pfloat_array_load_vec { size; boxed = false; _ }
+  | Punboxed_float_array_load_vec { size; boxed = false; _ }
+  | Punboxed_float32_array_load_vec { size; boxed = false; _ }
+  | Pint_array_load_vec { size; boxed = false; _ }
+  | Punboxed_int64_array_load_vec { size; boxed = false; _ }
+  | Punboxed_nativeint_array_load_vec { size; boxed = false; _ }
+  | Punboxed_int32_array_load_vec { size; boxed = false; _ } ->
+      layout_unboxed_vector (unboxed_vector_of_boxed_vector size)
+  | Pstring_load_vec { size; boxed = true; _ }
+  | Pbytes_load_vec { size; boxed = true; _ }
+  | Pbigstring_load_vec { size; boxed = true; _ }
+  | Pfloatarray_load_vec { size; boxed = true; _ }
+  | Pfloat_array_load_vec { size; boxed = true; _ }
+  | Punboxed_float_array_load_vec { size; boxed = true; _ }
+  | Punboxed_float32_array_load_vec { size; boxed = true; _ }
+  | Pint_array_load_vec { size; boxed = true; _ }
+  | Punboxed_int64_array_load_vec { size; boxed = true; _ }
+  | Punboxed_nativeint_array_load_vec { size; boxed = true; _ }
+  | Punboxed_int32_array_load_vec { size; boxed = true; _ } ->
+      layout_boxed_vector size
   | Pbigarrayref (_, _, kind, _) ->
       begin match kind with
       | Pbigarray_unknown -> layout_any_value

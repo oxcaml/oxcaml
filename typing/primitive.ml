@@ -594,6 +594,10 @@ let prim_has_valid_reprs ~loc prim =
       let vector_sizes = [
         ("128", "", C.value);
         ("128", "#", C.vec128);
+        ("256", "", C.value);
+        ("256", "#", C.vec256);
+        ("512", "", C.value);
+        ("512", "#", C.vec512);
       ] in
       let array_types = [
         "float_array";
