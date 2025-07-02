@@ -1478,7 +1478,7 @@ module Extra_params = struct
            (Arg.Bad
               (Printf.sprintf "Unexpected value %s for %s" v name)))
     | "poll-insertion" -> set' Oxcaml_flags.disable_poll_insertion
-    | "symbol-visibility-protected" -> set' Oxcaml_flags.disable_poll_insertion
+    | "symbol-visibility-protected" -> set' Oxcaml_flags.symbol_visibility_protected
     | "long-frames" -> set' Oxcaml_flags.allow_long_frames
     | "debug-long-frames-threshold" ->
       begin match Compenv.check_int ppf name v with
