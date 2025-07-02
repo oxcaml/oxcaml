@@ -21,7 +21,6 @@ module DS = Dwarf_state
 
 let cache = Type_shape.Type_shape.Tbl.create 16
 
-
 let wrap_die_under_a_pointer ~proto_die ~reference ~parent_proto_die =
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
     ~tag:Dwarf_tag.Reference_type
@@ -440,9 +439,9 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
   | Uid var_uid -> (
     match Shape.Uid.Tbl.find_opt Type_shape.all_type_shapes var_uid with
     | None -> fallback_die
-    | Some { type_shape; type_sort = _} ->
-      (* CR sspies: For now, we ignore the sort here. This has to be fixed
-         in future versions. *)
+    | Some { type_shape; type_sort = _ } ->
+      (* CR sspies: For now, we ignore the sort here. This has to be fixed in
+         future versions. *)
       type_shape_to_die type_shape ~parent_proto_die ~fallback_die)
   | Proj (_uid, _field) ->
     (* CR mshinwell: support unboxed product projections in the shape eval
