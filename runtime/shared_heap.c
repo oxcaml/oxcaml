@@ -1251,8 +1251,8 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
 
     size_t num_pools = compact_count_pools(cur_pool);
     struct compact_pool_stat {
-      int free_blocks;
-      int live_blocks;
+      uintnat free_blocks;
+      uintnat live_blocks;
     } *pool_stats = caml_stat_alloc_noexc(
       sizeof(struct compact_pool_stat) * num_pools);
 
@@ -1280,9 +1280,9 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
        pass.
     */
     int k = 0;
-    int total_live_blocks = 0;
+    uintnat total_live_blocks = 0;
 #ifdef DEBUG
-    int total_free_blocks = 0;
+    uintnat total_free_blocks = 0;
 #endif
     while (cur_pool) {
       header_t* p = POOL_FIRST_BLOCK(cur_pool, sz_class);
@@ -1327,9 +1327,9 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
        want to walk through the pools and check whether we have enough free
        blocks in the pools behind us to accommodate all the remaining live
        blocks. */
-    int free_blocks = 0;
+    uintnat free_blocks = 0;
     int j = 0;
-    int remaining_live_blocks = total_live_blocks;
+    intnat remaining_live_blocks = total_live_blocks;
 
     cur_pool = heap->unswept_avail_pools[sz_class];
     /* [last_pool_p] will be a pointer to the next field of the last
@@ -1556,8 +1556,8 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
 
     /* Count all live blocks of this size class. First those in full pools
        (this will include some GARBAGE blocks, which is harmless). */
-    int pool_blocks = POOL_BLOCKS(sz_class);
-    int total_live_blocks = full_pools * pool_blocks;
+    uintnat pool_blocks = POOL_BLOCKS(sz_class);
+    uintnat total_live_blocks = full_pools * pool_blocks;
 
     /* Now live blocks in partially-full pools.
 
