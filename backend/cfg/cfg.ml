@@ -508,7 +508,7 @@ let is_noop_move instr =
       | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
       | Opaque | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
       | Specific _ | Name_for_debugger _ | Begin_region | End_region | Dls_get
-      | Poll | Alloc _ )
+      | Poll | Alloc _ | Pause )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
     false
 
@@ -577,10 +577,10 @@ let is_poll (instr : basic instruction) =
   | Op Poll -> true
   | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc _ | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _
+      ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
+      | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)
@@ -596,9 +596,9 @@ let is_alloc (instr : basic instruction) =
   | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _
+      | Dls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)
@@ -614,7 +614,7 @@ let is_end_region (b : basic) =
   | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
-      | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+      | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
       | Load _
       | Store (_, _, _)
@@ -701,7 +701,7 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Poll | Alloc _ )
+        | Dls_get | Poll | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
