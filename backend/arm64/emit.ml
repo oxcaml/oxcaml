@@ -1752,7 +1752,8 @@ let emit_instr i =
           [| DSL.emit_reg reg_tmp1;
              DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
           |];
-        DSL.ins I.MOV [| DSL.sp; DSL.emit_reg reg_tmp1 |]);
+        DSL.ins I.MOV [| DSL.sp; DSL.emit_reg reg_tmp1 |])
+      else D.cfi_remember_state ();
       DSL.ins I.BL [| DSL.emit_symbol (S.create func) |];
       if Config.runtime5 then DSL.ins I.MOV [| DSL.sp; DSL.reg_x_29 |];
       D.cfi_restore_state ())
