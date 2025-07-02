@@ -40,7 +40,8 @@ module Provenance = struct
 
   let print_debug_uid ppf duid =
     if !Clflags.dump_debug_uids then
-      Format.fprintf ppf "%@{%a}" Flambda2_identifiers.Flambda_debug_uid.print duid
+      Format.fprintf ppf "%@{%a}"
+        Flambda2_identifiers.Flambda_debug_uid.print duid
 
   let print ppf { module_path; location; original_ident; debug_uid } =
     let printf fmt = Format.fprintf ppf fmt in

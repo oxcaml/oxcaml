@@ -1342,7 +1342,10 @@ let rec lam ppf = function
         List.iter
           (fun { id; debug_uid=duid; def } ->
             if !spc then fprintf ppf "@ " else spc := true;
-            fprintf ppf "@[<2>%a%a@ %a@]" Ident.print id debug_uid duid lfunction def)
+            fprintf ppf "@[<2>%a%a@ %a@]"
+              Ident.print id
+              debug_uid duid
+              lfunction def)
           id_arg_list in
       fprintf ppf
         "@[<2>(letrec@ (@[<hv 1>%a@])@ %a)@]" bindings id_arg_list lam body
@@ -1403,7 +1406,8 @@ let rec lam ppf = function
         lam lbody i
         (fun ppf vars ->
            List.iter
-             (fun (x, duid, k) -> fprintf ppf " %a%a%a" Ident.print x debug_uid duid layout k)
+             (fun (x, duid, k) ->
+                fprintf ppf " %a%a%a" Ident.print x debug_uid duid layout k)
              vars
         )
         vars
@@ -1418,7 +1422,8 @@ let rec lam ppf = function
   | Lwhile {wh_cond; wh_body} ->
       fprintf ppf "@[<2>(while@ %a@ %a)@]"
         lam wh_cond lam wh_body
-  | Lfor {for_id; for_debug_uid; for_loc = _; for_from; for_to; for_dir; for_body} ->
+  | Lfor {for_id; for_debug_uid; for_loc = _;
+          for_from; for_to; for_dir; for_body} ->
       fprintf ppf "@[<2>(for %a%a@ %a@ %s@ %a@ %a)@]"
        Ident.print for_id debug_uid for_debug_uid lam for_from
        (match for_dir with Upto -> "to" | Downto -> "downto")
@@ -1480,7 +1485,9 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
         List.iter (fun (p : Lambda.lparam) ->
             let { unbox_param } = p.attributes in
             fprintf ppf "@ %a%a%s%a%s"
-              Ident.print p.name debug_uid p.debug_uid (locality_kind p.mode) layout p.layout
+              Ident.print
+                p.name debug_uid p.debug_uid
+                (locality_kind p.mode) layout p.layout
               (if unbox_param then "[@unboxable]" else "")
           ) params
     | Tupled ->
