@@ -351,6 +351,85 @@ let indexing_primitives =
   |> List.to_seq
   |> fun seq -> String.Map.add_seq seq String.Map.empty
 
+let array_vec_primitives =
+  let array_types_and_primitives =
+    [
+      ("float_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Pfloat_array_load_128 { unsafe; index_kind; mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Pfloat_array_set_128 { unsafe; index_kind; boxed }));
+      ("floatarray",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Pfloatarray_load_128 { unsafe; index_kind; mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Pfloatarray_set_128 { unsafe; index_kind; boxed }));
+      ("unboxed_float_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_float_array_load_128 { unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Punboxed_float_array_set_128 { unsafe; index_kind; boxed }));
+      ("unboxed_float32_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_float32_array_load_128 { unsafe; index_kind;
+                                           mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Punboxed_float32_array_set_128 { unsafe; index_kind; boxed }));
+      ("int_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Pint_array_load_128 { unsafe; index_kind; mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Pint_array_set_128 { unsafe; index_kind; boxed }));
+      ("unboxed_int64_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_int64_array_load_128 { unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Punboxed_int64_array_set_128 { unsafe; index_kind; boxed }));
+      ("unboxed_int32_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_int32_array_load_128 { unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Punboxed_int32_array_set_128 { unsafe; index_kind; boxed }));
+      ("unboxed_nativeint_array",
+       (fun ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_nativeint_array_load_128 { unsafe; index_kind;
+                                             mode; boxed }),
+       (fun ~unsafe ~index_kind ~boxed ->
+         Punboxed_nativeint_array_set_128 { unsafe; index_kind; boxed }));
+    ]
+  in
+  let vec_sizes = [
+    ("128", Boxed_vec128);
+  ] in
+  let index_kinds =
+    [
+      (Ptagged_int_index, "");
+      (Punboxed_int_index Unboxed_nativeint, "_indexed_by_nativeint#");
+      (Punboxed_int_index Unboxed_int32, "_indexed_by_int32#");
+      (Punboxed_int_index Unboxed_int64, "_indexed_by_int64#");
+    ]
+  in
+  (let ( let* ) x f = List.concat_map f x in
+   let* array_type, load_prim, set_prim = array_types_and_primitives in
+   let* size_str, _size = vec_sizes in
+   let* index_kind, index_kind_sigil = index_kinds in
+   let* unsafe, unsafe_sigil = [ (false, ""); (true, "u") ] in
+   let* boxed, boxed_sigil = [ (true, ""); (false, "#") ] in
+   [
+     (Printf.sprintf "%%caml_%s_get%s%s%s%s" array_type size_str unsafe_sigil
+        boxed_sigil index_kind_sigil,
+      fun ~mode ->
+        Primitive (load_prim ~unsafe ~index_kind ~mode ~boxed, 2));
+     (Printf.sprintf "%%caml_%s_set%s%s%s%s" array_type size_str unsafe_sigil
+        boxed_sigil index_kind_sigil,
+      fun ~mode:_ -> Primitive (set_prim ~unsafe ~index_kind ~boxed, 3))
+   ])
+  |> List.to_seq
+  |> fun seq -> String.Map.add_seq seq String.Map.empty
+
 let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   let runtime5 = Config.runtime5 in
   let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
@@ -741,134 +820,6 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%caml_ba_dim_1" -> Primitive ((Pbigarraydim(1)), 1)
     | "%caml_ba_dim_2" -> Primitive ((Pbigarraydim(2)), 1)
     | "%caml_ba_dim_3" -> Primitive ((Pbigarraydim(3)), 1)
-    | "%caml_float_array_get128" ->
-      Primitive ((Pfloat_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_float_array_get128u" ->
-      Primitive ((Pfloat_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_floatarray_get128" ->
-      Primitive ((Pfloatarray_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_floatarray_get128u" ->
-      Primitive ((Pfloatarray_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_unboxed_float_array_get128" ->
-      Primitive ((Punboxed_float_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_unboxed_float_array_get128u" ->
-      Primitive ((Punboxed_float_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_unboxed_float32_array_get128" ->
-      Primitive ((Punboxed_float32_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_unboxed_float32_array_get128u" ->
-      Primitive ((Punboxed_float32_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_int_array_get128" ->
-      Primitive ((Pint_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_int_array_get128u" ->
-      Primitive ((Pint_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_unboxed_int64_array_get128" ->
-      Primitive ((Punboxed_int64_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_unboxed_int64_array_get128u" ->
-      Primitive ((Punboxed_int64_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_unboxed_int32_array_get128" ->
-      Primitive ((Punboxed_int32_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_unboxed_int32_array_get128u" ->
-      Primitive ((Punboxed_int32_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_unboxed_nativeint_array_get128" ->
-      Primitive ((Punboxed_nativeint_array_load_128 {unsafe = false; mode; boxed = true}), 2)
-    | "%caml_unboxed_nativeint_array_get128u" ->
-      Primitive ((Punboxed_nativeint_array_load_128 {unsafe = true; mode; boxed = true}), 2)
-    | "%caml_float_array_set128" ->
-      Primitive ((Pfloat_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_float_array_set128u" ->
-      Primitive ((Pfloat_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_floatarray_set128" ->
-      Primitive ((Pfloatarray_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_floatarray_set128u" ->
-      Primitive ((Pfloatarray_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_unboxed_float_array_set128" ->
-      Primitive ((Punboxed_float_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_unboxed_float_array_set128u" ->
-      Primitive ((Punboxed_float_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_unboxed_float32_array_set128" ->
-      Primitive ((Punboxed_float32_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_unboxed_float32_array_set128u" ->
-      Primitive ((Punboxed_float32_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_int_array_set128" ->
-      Primitive ((Pint_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_int_array_set128u" ->
-      Primitive ((Pint_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_unboxed_int64_array_set128" ->
-      Primitive ((Punboxed_int64_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_unboxed_int64_array_set128u" ->
-      Primitive ((Punboxed_int64_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_unboxed_int32_array_set128" ->
-      Primitive ((Punboxed_int32_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_unboxed_int32_array_set128u" ->
-      Primitive ((Punboxed_int32_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_unboxed_nativeint_array_set128" ->
-      Primitive ((Punboxed_nativeint_array_set_128 {unsafe = false; boxed = true}), 3)
-    | "%caml_unboxed_nativeint_array_set128u" ->
-      Primitive ((Punboxed_nativeint_array_set_128 {unsafe = true; boxed = true}), 3)
-    | "%caml_float_array_get128#" ->
-      Primitive ((Pfloat_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_float_array_get128u#" ->
-      Primitive ((Pfloat_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_floatarray_get128#" ->
-      Primitive ((Pfloatarray_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_floatarray_get128u#" ->
-      Primitive ((Pfloatarray_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_unboxed_float_array_get128#" ->
-      Primitive ((Punboxed_float_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_unboxed_float_array_get128u#" ->
-      Primitive ((Punboxed_float_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_unboxed_float32_array_get128#" ->
-      Primitive ((Punboxed_float32_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_unboxed_float32_array_get128u#" ->
-      Primitive ((Punboxed_float32_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_int_array_get128#" ->
-      Primitive ((Pint_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_int_array_get128u#" ->
-      Primitive ((Pint_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_unboxed_int64_array_get128#" ->
-      Primitive ((Punboxed_int64_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_unboxed_int64_array_get128u#" ->
-      Primitive ((Punboxed_int64_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_unboxed_int32_array_get128#" ->
-      Primitive ((Punboxed_int32_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_unboxed_int32_array_get128u#" ->
-      Primitive ((Punboxed_int32_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_unboxed_nativeint_array_get128#" ->
-      Primitive ((Punboxed_nativeint_array_load_128 {unsafe = false; mode; boxed = false}), 2)
-    | "%caml_unboxed_nativeint_array_get128u#" ->
-      Primitive ((Punboxed_nativeint_array_load_128 {unsafe = true; mode; boxed = false}), 2)
-    | "%caml_float_array_set128#" ->
-      Primitive ((Pfloat_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_float_array_set128u#" ->
-      Primitive ((Pfloat_array_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_floatarray_set128#" ->
-      Primitive ((Pfloatarray_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_floatarray_set128u#" ->
-      Primitive ((Pfloatarray_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_unboxed_float_array_set128#" ->
-      Primitive ((Punboxed_float_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_unboxed_float_array_set128u#" ->
-      Primitive ((Punboxed_float_array_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_unboxed_float32_array_set128#" ->
-      Primitive ((Punboxed_float32_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_unboxed_float32_array_set128u#" ->
-      Primitive ((Punboxed_float32_array_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_int_array_set128#" ->
-      Primitive ((Pint_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_int_array_set128u#" ->
-      Primitive ((Pint_array_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_unboxed_int64_array_set128#" ->
-      Primitive ((Punboxed_int64_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_unboxed_int64_array_set128u#" ->
-      Primitive ((Punboxed_int64_array_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_unboxed_int32_array_set128#" ->
-      Primitive ((Punboxed_int32_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_unboxed_int32_array_set128u#" ->
-      Primitive ((Punboxed_int32_array_set_128 {unsafe = true; boxed = false}), 3)
-    | "%caml_unboxed_nativeint_array_set128#" ->
-      Primitive ((Punboxed_nativeint_array_set_128 {unsafe = false; boxed = false}), 3)
-    | "%caml_unboxed_nativeint_array_set128u#" ->
-      Primitive ((Punboxed_nativeint_array_set_128 {unsafe = true; boxed = false}), 3)
     | "%bswap16" -> Primitive (Pbswap16, 1)
     | "%bswap_int32" -> Primitive ((Pbbswap(Boxed_int32, mode)), 1)
     | "%bswap_int64" -> Primitive ((Pbbswap(Boxed_int64, mode)), 1)
@@ -944,7 +895,10 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode
-       | None -> raise (Error (loc, Unknown_builtin_primitive s)))
+       | None ->
+         match String.Map.find_opt s array_vec_primitives with
+         | Some prim -> prim ~mode
+         | None -> raise (Error (loc, Unknown_builtin_primitive s)))
     | _ -> External lambda_prim
   in
   prim
