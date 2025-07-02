@@ -709,6 +709,12 @@ let precolored_regs () =
 
 let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
+  | Creinterpret_cast V256_of_v256
+  | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
+    Arch.Extension.allow_vec256 ()
+  | Creinterpret_cast V512_of_v512
+  | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
+    Arch.Extension.allow_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -720,12 +726,28 @@ let operation_supported = function
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _
-  | Creinterpret_cast _ | Cstatic_cast _
   | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
   | Cpoll
   | Cpause
-    -> true
+  | Creinterpret_cast (Int_of_value | Value_of_int |
+                       Int64_of_float | Float_of_int64 |
+                       Float32_of_float | Float_of_float32 |
+                       Float32_of_int32 | Int32_of_float32 |
+                       V128_of_v128)
+  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+                  Int_of_float Float32 | Float_of_int Float32 |
+                  Float_of_int Float64 | Int_of_float Float64 |
+                  V128_of_scalar _ | Scalar_of_v128 _) ->
+    true
+
+let expression_supported = function
+  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+  | Cexit _ -> true
+  | Cconst_vec256 _ -> Arch.Extension.allow_vec256 ()
+  | Cconst_vec512 _ -> Arch.Extension.allow_vec512 ()
 
 let trap_size_in_bytes = 16
