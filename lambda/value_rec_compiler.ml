@@ -367,16 +367,16 @@ let compute_static_size lam =
         Block (Float_record size)
 
     | Psetufloatfield (_, _)
-    | Pbytes_set_128 _
-    | Pbigstring_set_128 _
-    | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _
-    | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _
-    | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _
-    | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _
+    | Pbytes_set_vec _
+    | Pbigstring_set_vec _
+    | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _
+    | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _
     | Parray_element_size_in_bytes _
     | Punbox_unit ->
         Constant
@@ -393,17 +393,17 @@ let compute_static_size lam =
     | Punboxed_product_field (_, _)
     | Punboxed_float_comp (_, _)
     | Punboxed_int_comp (_, _)
-    | Pstring_load_128 _
-    | Pbytes_load_128 _
-    | Pbigstring_load_128 _
-    | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _
-    | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _
-    | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _
-    | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _
+    | Pstring_load_vec _
+    | Pbytes_load_vec _
+    | Pbigstring_load_vec _
+    | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _
+    | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _
+    | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _
+    | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _
     | Pprobe_is_enabled _
     | Pobj_magic _
     | Punbox_float _
