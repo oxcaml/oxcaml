@@ -30,6 +30,10 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
 
+type error = Builtin_not_recognized of string
+
+exception Error of error * Debuginfo.t
+
 (* CR-soon gyorsh: This functor must not have state, because it is instantiated
    twice with the same [Target] (see [Asmgen] and [Peephole_utils] to avoid
    dependency cycles. *)
@@ -281,11 +285,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cconst_symbol (func, _dbg) :: rem ->
         Terminator (Call { op = Direct func; label_after }), rem
       | _ -> Terminator (Call { op = Indirect; label_after }), args)
-    | Cextcall { func; builtin = true } ->
-      Misc.fatal_errorf "Selection.select_operation: builtin not recognized %s"
-        func ()
-    | Cextcall
-        { func; alloc; ty; ty_args; returns; builtin = false; effects; _ } ->
+    | Cextcall { func; alloc; ty; ty_args; returns; builtin; effects } ->
+      if builtin && not !Oxcaml_flags.disable_builtin_check
+      then raise (Error (Builtin_not_recognized func, dbg));
       let external_call =
         { Cfg.func_symbol = func;
           alloc;
@@ -1567,3 +1569,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
        (Cfg_with_infos.make cfg_with_layout); *)
     Cfg_simplify.run cfg_with_layout
 end
+
+let report_error ppf = function
+  | Builtin_not_recognized name ->
+    Format.fprintf ppf
+      "External annotated with [@@@@builtin] is not recognized: %S" name
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (err, dbg) ->
+      let loc = Debuginfo.to_location dbg in
+      Some (Location.error_of_printer ~loc report_error err)
+    | _ -> None)
