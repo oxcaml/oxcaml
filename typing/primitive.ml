@@ -538,6 +538,10 @@ let prim_has_valid_reprs ~loc prim =
           ("64", "#", C.bits64);
           ("a128", "#", C.vec128);
           ("u128", "#", C.vec128);
+          ("a256", "#", C.vec256);
+          ("u256", "#", C.vec256);
+          ("a512", "#", C.vec512);
+          ("u512", "#", C.vec512);
         ]
       in
       let indices : (_ * Jkind_types.Sort.Const.t) list =
