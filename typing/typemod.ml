@@ -924,10 +924,6 @@ let merge_constraint initial_env loc sg lid constr =
             form might contain the thing we need to substitute. See corresponding
             test in strengthening.ml.  *)
           let sg = Mtype.expand_to initial_env sg !real_ids in
-          (* This signature will not be used directly, it will always be freshened
-            by the caller. So what we do with the scope doesn't really matter. But
-            making it local makes it unlikely that we will ever use the result of
-            this function unfreshened without issue. *)
           unsafe_signature_subst sub sg
       | None -> sg
     in

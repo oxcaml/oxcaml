@@ -93,16 +93,12 @@ let add_type_replacement types id replacement =
 
 let unsafe x = x
 
-let add_type_path id p s =
-  let types = add_type_replacement s.types id (Path p) in
+let add_type id p s =
+  let types = add_type_replacement s.types (Pident id) (Path p) in
   { s with types; last_compose = None }
 
-let add_type id p s =
-  add_type_path (Pident id) p s
-
-let add_module_path id p s =
-  { s with modules = Path.Map.add id p s.modules; last_compose = None }
-let add_module id p s = add_module_path (Pident id) p s
+let add_module id p s =
+  { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
 
 let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
@@ -1074,13 +1070,15 @@ module Unsafe = struct
 
   let add_modtype_path = add_modtype_gen
   let add_modtype id mty s = add_modtype_path (Pident id) mty s
-  let add_type_path id p s = { s with types = Path.Map.add id (Path p) s.types }
+  let add_type_path id p s =
+    { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
   let add_type_function id ~params ~body s =
     let types =
       add_type_replacement s.types id (Type_function { params; body })
     in
-    { s with types }
-  let add_module_path id p s = { s with modules = Path.Map.add id p s.modules }
+    { s with types; last_compose = None }
+  let add_module_path id p s =
+    { s with modules = Path.Map.add id p s.modules; last_compose = None }
 
   let wrap f : _ result = match f () with
     | x -> Ok x
