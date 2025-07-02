@@ -332,3 +332,134 @@ type t_any_non_null : any_non_null
 [%%expect{|
 type t_any_non_null : any_non_null
 |}]
+
+(* [or_null] in unboxed types *)
+
+type unboxed_rec = { field : int or_null } [@@unboxed]
+
+[%%expect{|
+type unboxed_rec = { field : int or_null; } [@@unboxed]
+|}]
+
+let unboxed_null = { field = Null }
+
+[%%expect{|
+val unboxed_null : unboxed_rec = {field = Null}
+|}]
+
+let unboxed_some = { field = This 42 }
+
+[%%expect{|
+val unboxed_some : unboxed_rec = {field = This 42}
+|}]
+
+let get_field (r : unboxed_rec) = r.field
+
+[%%expect{|
+val get_field : unboxed_rec -> int or_null = <fun>
+|}]
+
+type unboxed_var = Wrap of int or_null [@@unboxed]
+
+[%%expect{|
+type unboxed_var = Wrap of int or_null [@@unboxed]
+|}]
+
+let var_null = Wrap Null
+
+[%%expect{|
+val var_null : unboxed_var = <unknown constructor>
+|}]
+
+let var_some = Wrap (This 99)
+
+[%%expect{|
+val var_some : unboxed_var = <unknown constructor>
+|}]
+
+let unwrap = function
+  | Wrap x -> x
+
+[%%expect{|
+val unwrap : unboxed_var -> int or_null = <fun>
+|}]
+
+type (_, _) fail = Fail : 'a or_null -> ('a, 'a or_null) fail [@@unboxed]
+[%%expect{|
+Line 1, characters 45-55:
+1 | type (_, _) fail = Fail : 'a or_null -> ('a, 'a or_null) fail [@@unboxed]
+                                                 ^^^^^^^^^^
+Error: This type "'a or_null" should be an instance of type "('b : value)"
+       The kind of 'a or_null is immediate_or_null with 'a
+         because it is the primitive immediate_or_null type or_null.
+       But the kind of 'a or_null must be a subkind of value
+         because it instantiates an unannotated type parameter of fail,
+         chosen to have kind value.
+|}]
+
+type (_, _ : value_or_null) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@@unboxed]
+
+[%%expect{|
+type (_, _) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@@unboxed]
+|}]
+
+let gadt_null = Gadt Null
+
+[%%expect{|
+val gadt_null : ('a, 'a or_null) gadt = <unknown constructor>
+|}]
+
+let gadt_some = Gadt (This 42)
+
+[%%expect{|
+val gadt_some : (int, int or_null) gadt = <unknown constructor>
+|}]
+
+let unwrap_gadt : type a. (a, a or_null) gadt -> a or_null = function
+  | Gadt x -> x
+
+[%%expect{|
+val unwrap_gadt : ('a, 'a or_null) gadt -> 'a or_null = <fun>
+|}]
+
+let should_fail_unboxed_rec = This { field = Null }
+
+[%%expect{|
+Line 1, characters 35-51:
+1 | let should_fail_unboxed_rec = This { field = Null }
+                                       ^^^^^^^^^^^^^^^^
+Error: This expression has type "unboxed_rec"
+       but an expression was expected of type "('a : value)"
+       The kind of unboxed_rec is immediate_or_null
+         because it is the primitive immediate_or_null type or_null.
+       But the kind of unboxed_rec must be a subkind of value
+         because of the definition of t at line 1, characters 0-81.
+|}]
+
+let should_fail_unboxed_var = This (Wrap Null)
+
+[%%expect{|
+Line 1, characters 35-46:
+1 | let should_fail_unboxed_var = This (Wrap Null)
+                                       ^^^^^^^^^^^
+Error: This expression has type "unboxed_var"
+       but an expression was expected of type "('a : value)"
+       The kind of unboxed_var is immediate_or_null
+         because it is the primitive immediate_or_null type or_null.
+       But the kind of unboxed_var must be a subkind of value
+         because of the definition of t at line 1, characters 0-81.
+|}]
+
+let should_fail_unboxed_gadt = This (Gadt Null)
+
+[%%expect{|
+Line 1, characters 36-47:
+1 | let should_fail_unboxed_gadt = This (Gadt Null)
+                                        ^^^^^^^^^^^
+Error: This expression has type "('a, 'a or_null) gadt"
+       but an expression was expected of type "('b : value)"
+       The kind of ('a, 'a or_null) gadt is immediate_or_null with 'a
+         because it is the primitive immediate_or_null type or_null.
+       But the kind of ('a, 'a or_null) gadt must be a subkind of value
+         because of the definition of t at line 1, characters 0-81.
+|}]

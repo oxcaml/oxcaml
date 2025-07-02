@@ -451,6 +451,7 @@ type operation =
   | Ctuple_field of int * machtype array
   | Cdls_get
   | Cpoll
+  | Cpause
 
 type is_global =
   | Global
@@ -612,7 +613,7 @@ let iter_shallow_tail f = function
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
         | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-        | Cbeginregion | Cendregion | Cdls_get | Cpoll
+        | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
         | Capply (_, _)
         | Cextcall _ | Cload _
         | Cstore (_, _)
@@ -646,7 +647,7 @@ let map_shallow_tail f = function
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
           | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-          | Cbeginregion | Cendregion | Cdls_get | Cpoll
+          | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
           | Capply (_, _)
           | Cextcall _ | Cload _
           | Cstore (_, _)
