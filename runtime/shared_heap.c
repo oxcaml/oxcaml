@@ -1260,7 +1260,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
       evacuating this size class. It's unlikely but it may be that we had
       better success with an earlier size class and that results in some
       memory being freed up. */
-    if( pool_stats == NULL ) {
+    if (pool_stats == NULL) {
       CAML_GC_MESSAGE(COMPACT,
                       "Unable to allocate pool_stats for size class %d\n",
                       sz_class);
@@ -1485,7 +1485,7 @@ static void compact_algorithm_52(caml_domain_state* domain_state,
       caml_plat_lock_blocking(&pool_freelist.lock);
       cur_pool = pool_freelist.free;
 
-      while( cur_pool ) {
+      while (cur_pool) {
         next_pool = cur_pool->next;
         /* No stats to update so just unmap */
         caml_mem_unmap(cur_pool, Bsize_wsize(POOL_WSIZE));
@@ -1651,7 +1651,7 @@ bool compact_phase_two_mark(int participating_count,
   uintnat pools_count = 0;
 
   /* First, used pools */
-  for( int i = 0; i < participating_count; i++ ) {
+  for (int i = 0; i < participating_count; i++) {
     struct caml_heap_state* heap = participants[i]->shared_heap;
 
     for (int sz = 1; sz < NUM_SIZECLASSES; sz++) {
@@ -1708,7 +1708,7 @@ bool compact_phase_two_mark(int participating_count,
 
   /* Finally, recreate pool_freelist.free in the same order as the
      array (so we allocate the largest chunks first). So we cons up
-     the list working backwards from the end bof the array. */
+     the list working backwards from the end of the array. */
   pool* new_free = NULL;
   for (ptrdiff_t i = pools_count - 1; i >= 0; i--) {
     pool* p = pool_array[i];
@@ -1777,9 +1777,9 @@ void compact_release_freelist(void)
   uintnat current_chunk_size_debug = SIZE_MAX;
   uintnat current_chunk_debug = 0;
 
-  for( i = 0; i < free_pools_count; i++ ) {
+  for (i = 0; i < free_pools_count; i++) {
     CAMLassert(free_pools[i]->chunk_size <= current_chunk_size_debug);
-    if( free_pools[i]->chunk == current_chunk_debug ) {
+    if (free_pools[i]->chunk == current_chunk_debug) {
       CAMLassert(free_pools[i]->chunk_size == current_chunk_size_debug);
 
       if (i > 0) {
@@ -2011,10 +2011,10 @@ void compact_run_phase(struct caml_heap_state* heap,
 
     /* we don't need to check the evac_pools because they're empty */
     cur_pool = to_pools;
-    while( cur_pool != NULL ) {
+    while (cur_pool != NULL) {
       pool* next_pool = cur_pool->next;
 
-      if( cur_pool->next_obj == NULL ) {
+      if (cur_pool->next_obj == NULL) {
         /* This pool is now full */
         cur_pool->next = new_full_pools;
         new_full_pools = cur_pool;
@@ -2029,7 +2029,7 @@ void compact_run_phase(struct caml_heap_state* heap,
 
     heap->unswept_full_pools[sz_class] = new_full_pools;
     heap->unswept_avail_pools[sz_class] = new_avail_pools;
-    if( evac_pool_last != NULL ) {
+    if (evac_pool_last != NULL) {
       CAMLassert(evac_pools);
       evac_pool_last->next = domain_evac_pools;
       domain_evac_pools = evac_pools;
@@ -2054,7 +2054,7 @@ void compact_run_phase(struct caml_heap_state* heap,
 
     #ifdef DEBUG
     for (header_t *p = POOL_FIRST_BLOCK(cur_pool, cur_pool->sz);
-        p < POOL_END(cur_pool); p++) {
+         p < POOL_END(cur_pool); p++) {
       *p = Debug_free_major;
     }
     #endif
