@@ -1632,8 +1632,8 @@ void compact_phase_one_mark(struct caml_heap_state* heap)
    required, across all domains and size classes. It then identifies
    pools beyond that number to evacuate, preferentially choosing to
    evacuate pools from smaller chunks (see compact_compare_pools). */
-int compact_phase_two_mark(int participating_count,
-                           caml_domain_state** participants)
+bool compact_phase_two_mark(int participating_count,
+                            caml_domain_state** participants)
 {
   /* We need to drain any free_pools that have already been batch
     allocated. In most cases these will be part of the biggest chunk
@@ -1677,7 +1677,7 @@ int compact_phase_two_mark(int participating_count,
   if (!pool_array) {
     CAML_GC_MESSAGE(COMPACT,
                     "Unable to allocate pool array for compaction phase two.\n");
-    return 0;
+    return false;
   }
 
   /* Add all used pools to pool_array */
@@ -1739,7 +1739,7 @@ int compact_phase_two_mark(int participating_count,
 
   /* TODO: We always do a phase two at the moment. There are cases
       where we probably don't want to. */
-  return 1;
+  return true;
 }
 
 /* At the end of compaction, we unmap any whole chunks which have
@@ -2066,7 +2066,7 @@ void compact_run_phase(struct caml_heap_state* heap,
   CAML_EV_END(EV_COMPACT_RELEASE);
 }
 
-static int should_run_phase_two = 0;
+static bool should_run_phase_two = false;
 
 /* New algorithm main driver. Run in parallel for all domains.
 
