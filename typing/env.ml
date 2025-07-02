@@ -538,7 +538,7 @@ module IdTbl =
             (Pdot (root, name), desc) :: find_all wrap name next
           with Not_found ->
             find_all wrap name next
-          end
+        end
       | Map {f; next} ->
           List.map (fun (p, desc) -> (p, f desc))
             (find_all wrap name next)

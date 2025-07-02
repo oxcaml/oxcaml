@@ -826,6 +826,11 @@ let rec generalize stage_offset ty =
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
     | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
+    | Tvariant row ->
+        let ty' = row_more row in
+        if stage_offset <> 0 then
+          set_level ty' !current_level;
+        iter_type_expr (generalize stage_offset) ty
     | Tquote ty' -> generalize (stage_offset + 1) ty'
     | Tsplice ty' -> generalize (stage_offset - 1) ty'
     | Tconstr (_, _, abbrev) ->

@@ -508,6 +508,7 @@ val add_splice_lock : t -> t
 val without_open_quotations : t -> bool
 val has_open_quotations : t -> bool
 val stage : t -> int
+val quotation_locks_offset : locks -> int option
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit

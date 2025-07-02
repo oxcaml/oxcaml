@@ -89,41 +89,35 @@
 
 <[ `A 42 ]>;;
 [%%expect {|
-- : <[ [> `A of int ] ]> expr = <[ `A 42 ]>
+- : <[ [> `A of int ] as '_weak1 ]> expr = <[ `A 42 ]>
 |}];;
 
 let _ = <[ `B 123 ]>;;
 [%%expect {|
-- : <[ [> `B of int ] ]> expr = <[ `B 123 ]>
+- : <[ [> `B of int ] as '_weak2 ]> expr = <[ `B 123 ]>
 |}];;
 
 let x0 = <[ `C 543 ]>;;
 [%%expect {|
-Line 1:
-Error: Values do not match:
-         val x0 : <[ [> `C of int ] ]> expr
-       is not included in
-         val x0 : <[ [> `C of int ] ]> expr
-       The type "<[ [> `C of int ] ]> expr" is not compatible with the type
-         "<[ [> `C of int ] ]> expr"
-       Type "[> `C of int ]" is not compatible with type "[> `C of int ]"
+val x0 : <[ [> `C of int ] as '_weak3 ]> expr = <[ `C 543 ]>
 |}];;
 
 <[ if true then `A 10 else `B ("foo", 42) ]>;;
 [%%expect {|
-- : <[ [> `A of int | `B of string * int ] ]> expr =
+- : <[ [> `A of int | `B of string * int ] as '_weak4 ]> expr =
 <[ if true then (`A 10) else `B ("foo", 42) ]>
 |}];;
 
 <[ function | `A x -> x | `B (_, foo) -> foo ]>;;
 [%%expect {|
-- : <[ [< `A of $ ('a) | `B of $ ('b) * $ ('a) ] -> $ ('a) ]> expr =
-<[ function | `A x -> x | `B (_, foo) -> foo ]>
+- : <[ ([< `A of $ ('a) | `B of $ ('b) * $ ('a) ] as '_weak5) -> $ ('a) ]>
+    expr
+= <[ function | `A x -> x | `B (_, foo) -> foo ]>
 |}];;
 
 <[ function | `A x -> x | `B (_, foo) -> foo | _ -> 42 ]>;;
 [%%expect {|
-- : <[ [> `A of int | `B of $ ('a) * int ] -> int ]> expr =
+- : <[ ([> `A of int | `B of $ ('a) * int ] as '_weak6) -> int ]> expr =
 <[ function | `A x -> x | `B (_, foo) -> foo | _ -> 42 ]>
 |}];;
 
@@ -207,14 +201,15 @@ Error: Values do not match:
 
 <[ function | `A -> true | `B -> false ]>;;
 [%%expect {|
-- : <[ [< `A | `B ] -> bool ]> expr = <[ function | `A -> true | `B -> false
-]>
+- : <[ ([< `A | `B ] as '_weak7) -> bool ]> expr =
+<[ function | `A -> true | `B -> false ]>
 |}];;
 
 <[ function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0 ]>;;
 [%%expect {|
-- : <[ [< `Bar of int * int | `Baz | `Foo of int ] -> int ]> expr =
-<[ function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0 ]>
+- : <[ ([< `Bar of int * int | `Baz | `Foo of int ] as '_weak8) -> int ]>
+    expr
+= <[ function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0 ]>
 |}];;
 
 <[ function | lazy x as l -> Lazy.force l ]>;;

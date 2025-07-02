@@ -400,7 +400,7 @@ module Pat = struct
 
   let array = combinator "Pat" "array" 1
 
-  let or_ = combinator "Pat" "or_" 1
+  let or_ = combinator "Pat" "or_" 2
 
   let lazy_ = combinator "Pat" "lazy_" 1
 
@@ -1032,7 +1032,7 @@ let rec quote_computation_pattern p =
   | Tpat_or (pat1, pat2, _) ->
     let pat1 = quote_computation_pattern pat1 in
     let pat2 = quote_computation_pattern pat2 in
-    apply loc Pat.exception_ [pat1; pat2]
+    apply loc Pat.or_ [pat1; pat2]
 
 and quote_pat_extra loc pat_lam extra =
   let extra, _, _ = extra in
