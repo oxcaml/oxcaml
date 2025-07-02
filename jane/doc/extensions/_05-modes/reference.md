@@ -47,3 +47,50 @@ can construct the lazy value at `many` even if the thunk is `once` (e.g., closin
 let r = { x = 0 } in
 let l @ many = lazy (overwrite_ r with { x = 42 })
 ```
+
+# Exceptions
+
+The exception type `exn` crosses portability and contention.
+
+For backwards compatibility with OCaml, we don't require exception constructor argument
+types to cross portability and contention themselves. Instead, we treat each instance
+of an exception constructor as belonging to the capsule it originally was defined in.
+
+When the constructor is instantiated outside the original capsule
+(i.e. in a `portable` function), its arguments are required to cross contention
+and be portable. Likewise, when pattern-matched on outside the original capsule,
+its arguments must cross portability and are marked as contended.
+
+```ocaml
+exception Foo of (unit -> unit)
+exception Bar of int ref
+
+
+let (foo @ portable) f =
+  raise (Foo f) (* Here, [f] is required to be portable and must cross contention. *)
+
+let (bar @ portable) g =
+  try g () with
+  | Bar x -> ... (* And here [x] is marked as contended and must cross portaibility. *)
+```
+
+Rebinding exception constructors "resets" its originating capsule.
+It's permitted only if all its argument types cross portability and contention:
+
+```ocaml
+exception Crossing of int list
+exception Noncrossing of (string -> unit)
+
+let (cross @ portable) () =
+    let module M = struct
+        exception Crossing' = Crossing
+    end in
+    raise (Crossing [3; 4; 5])
+
+let noncross () = (* can't be portable *)
+  let module N = struct
+      exception Noncrossing' = Noncrossing
+  end in
+  let r = ref "" in
+  raise (Noncrossing ((:=) r))
+```
