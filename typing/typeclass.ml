@@ -2109,30 +2109,45 @@ let () =
 (*******************************)
 
 (* Check that there is no references through recursive modules (GPR#6491) *)
-let rec check_recmod_class_type env cty =
+let rec check_recmod_class_type env name cty =
   match cty.pcty_desc with
   | Pcty_constr(lid, _) ->
-      ignore (Env.lookup_cltype ~use:false ~loc:lid.loc lid.txt env)
+      begin try
+        ignore (Env.lookup_cltype ~use:false ~loc:lid.loc lid.txt env)
+      with
+      | Env.Error
+          (Lookup_error
+             (location, env,
+              Illegal_reference_to_recursive_module { container; unbound; })) ->
+          Env.lookup_error
+            location env
+            (Illegal_reference_to_recursive_class_type
+               { container;
+                 unbound;
+                 unbound_class_type = lid.txt;
+                 container_class_type = name.txt;
+               })
+      end
   | Pcty_extension _ -> ()
   | Pcty_arrow(_, _, cty) ->
-      check_recmod_class_type env cty
+      check_recmod_class_type env name cty
   | Pcty_open(od, cty) ->
       let _, env = !type_open_descr env od in
-      check_recmod_class_type env cty
+      check_recmod_class_type env name cty
   | Pcty_signature csig ->
-      check_recmod_class_sig env csig
+      check_recmod_class_sig env name csig
 
-and check_recmod_class_sig env csig =
+and check_recmod_class_sig env name csig =
   List.iter
     (fun ctf ->
        match ctf.pctf_desc with
-       | Pctf_inherit cty -> check_recmod_class_type env cty
+       | Pctf_inherit cty -> check_recmod_class_type env name cty
        | Pctf_val _ | Pctf_method _
        | Pctf_constraint _ | Pctf_attribute _ | Pctf_extension _ -> ())
     csig.pcsig_fields
 
 let check_recmod_decl env sdecl =
-  check_recmod_class_type env sdecl.pci_expr
+  check_recmod_class_type env sdecl.pci_name sdecl.pci_expr
 
 (* Approximate the class declaration as class ['params] id = object end *)
 let approx_class sdecl =

@@ -75,33 +75,22 @@ Error: This type cannot be unboxed because
        You should annotate it with "[@@ocaml.boxed]".
 |}]
 
-(* CR layouts v12: Once we allow products containing void in unboxed GADTs,
-   and boxed records containing void, we'll have to make sure the below fails
-   separability checking: *)
+(* #(value & void) and similar kinds are always considered separable,
+   since we don't apply the float array optimization for them. *)
 type t_void : void
 and 'a r = { a : 'a ; v : t_void }
-and bad = F : 'a r# -> bad [@@unboxed]
+and ok = F : 'a r# -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-38:
-3 | and bad = F : 'a r# -> bad [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is value_or_null & void
-         because it is an unboxed record.
-       But the kind of type "bad" must be a subkind of value & void
-         because it's an [@@unboxed] type,
-         chosen to have kind value & void.
+type t_void : void
+and 'a r = { a : 'a; v : t_void; }
+and ok = F : 'a r# -> ok [@@unboxed]
 |}]
 
 type t_void : void
 and 'a r = { a : 'a ; v : t_void }
-and bad = F : { x : 'a r# } -> bad [@@unboxed]
+and ok = F : { x : 'a r# } -> ok [@@unboxed]
 [%%expect{|
-Line 3, characters 0-46:
-3 | and bad = F : { x : 'a r# } -> bad [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is value_or_null & void
-         because it is an unboxed record.
-       But the kind of type "bad" must be a subkind of value & void
-         because it's an [@@unboxed] type,
-         chosen to have kind value & void.
+type t_void : void
+and 'a r = { a : 'a; v : t_void; }
+and ok = F : { x : 'a r#; } -> ok [@@unboxed]
 |}]

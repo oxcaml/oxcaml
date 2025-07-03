@@ -63,6 +63,8 @@ val code_being_defined : t -> Code_id.Set.t
 
 val everything_being_defined : t -> Code_id_or_symbol.Set.t
 
+val everything_being_defined_as_list : t -> Code_id_or_symbol.t list
+
 val concat : t -> t -> t
 
 val gc_roots : t -> Symbol.t list

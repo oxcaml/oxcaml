@@ -788,32 +788,14 @@ type test = float t req_non_float
 
 type unbx = { unbx : t_maybesep_val } [@@unboxed]
 
-(* CR layouts v3.4: non-separable unboxed records should be allowed. *)
-
 [%%expect{|
-Line 1, characters 0-49:
-1 | type unbx = { unbx : t_maybesep_val } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "unbx" is value_or_null mod non_null
-         because of the definition of t_maybesep_val at line 1, characters 0-48.
-       But the kind of type "unbx" must be a subkind of value
-         because it's an [@@unboxed] type,
-         chosen to have kind value.
+type unbx = { unbx : t_maybesep_val; } [@@unboxed]
 |}]
-
-(* CR layouts v3.4: non-separable unboxed variants should be allowed. *)
 
 type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 
 [%%expect{|
-Line 1, characters 0-69:
-1 | type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "unbx'" is value_or_null mod non_null
-         because of the annotation on 'a in the declaration of the type unbx'.
-       But the kind of type "unbx'" must be a subkind of value
-         because it's an [@@unboxed] type,
-         chosen to have kind value.
+type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 |}]
 
 (* Separability and unboxed records. *)

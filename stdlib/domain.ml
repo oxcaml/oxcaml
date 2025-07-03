@@ -21,6 +21,8 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+
 external runtime5 : unit -> bool @@ portable = "%runtime5"
 
 exception Encapsulated of string
@@ -132,10 +134,10 @@ module Runtime_4 = struct
   let spawn' _ = not_implemented ()
   let join _ = not_implemented ()
   let get_id _ = not_implemented ()
-  let self () = not_implemented ()
-  let cpu_relax () = not_implemented ()
-  let is_main_domain () = not_implemented ()
-  let recommended_domain_count () = not_implemented ()
+
+  let self () = 0
+  let is_main_domain () = true
+  let recommended_domain_count () = 1
 end
 
 module Runtime_5 = struct
@@ -161,18 +163,9 @@ module Runtime_5 = struct
       = "caml_domain_spawn"
     external self : unit -> t @@ portable
       = "caml_ml_domain_id" [@@noalloc]
-    external cpu_relax : unit -> unit @@ portable
-      = "caml_ml_domain_cpu_relax"
     external get_recommended_domain_count: unit -> int @@ portable
       = "caml_recommended_domain_count" [@@noalloc]
   end
-
-  (* When poll insertion is disabled, [cpu_relax] also needs to act as a polling
-     point to allow systhread preemption. *)
-  (* CR-soon mslater: make cpu_relax a primitive *)
-  let cpu_relax () =
-    Raw.cpu_relax ();
-    Sys.poll_actions ()
 
   type id = Raw.t
 
@@ -236,11 +229,12 @@ module Runtime_5 = struct
 
     let key_counter = Atomic.make 0
 
-    type key_initializer : immutable_data =
+    type key_initializer : value mod contended portable =
         KI: 'a key * ('a -> (Access.t -> 'a) @ portable) @@ portable -> key_initializer
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
-    type key_initializer_list : immutable_data = key_initializer list
+    type key_initializer_list : value mod contended portable =
+      key_initializer list
 
     let parent_keys = Atomic.make ([] : key_initializer_list)
 
@@ -340,7 +334,7 @@ module Runtime_5 = struct
     let get_initial_keys access : key_value list =
       List.map
         (fun (KI (k, split)) -> KV (k, (split (get access k))))
-        (Atomic.Contended.get parent_keys)
+        (Atomic.Contended.get parent_keys : key_initializer_list)
 
     let set_initial_keys access (l: key_value list) =
       List.iter (fun (KV (k, v)) -> set access k (v access)) l
@@ -483,7 +477,6 @@ module type S = sig
   type id = private int
   val get_id : 'a t -> id @@ portable
   val self : unit -> id @@ portable
-  val cpu_relax : unit -> unit @@ portable
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable

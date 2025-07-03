@@ -40,7 +40,7 @@ type additional_action =
   | Duplicate_variables
   | No_action
 
-type t =
+type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
@@ -48,8 +48,15 @@ type t =
     additional_action: additional_action;
 
     loc: Location.t option;
-    mutable last_compose: (t * t) option  (* Memoized composition *)
+    mutable last_compose: (s * s) option  (* Memoized composition *)
   }
+
+type 'a subst = s
+type safe = [`Safe]
+type unsafe = [`Unsafe]
+type t = safe subst
+exception Module_type_path_substituted_away of Path.t * Types.module_type
+
 let identity =
   { types = Path.Map.empty;
     modules = Path.Map.empty;
@@ -84,26 +91,19 @@ let add_type_replacement types id replacement =
         (Path.unboxed_version id) (Type_function { params; body }) types
     | _ -> types
 
-let add_type_path id p s =
-  let types = add_type_replacement s.types id (Path p) in
-  { s with types; last_compose = None }
+let unsafe x = x
 
 let add_type id p s =
-  add_type_path (Pident id) p s
-
-let add_type_function id ~params ~body s =
-  let types =
-    add_type_replacement s.types id (Type_function { params; body })
-  in
+  let types = add_type_replacement s.types (Pident id) (Path p) in
   { s with types; last_compose = None }
 
-let add_module_path id p s =
-  { s with modules = Path.Map.add id p s.modules; last_compose = None }
-let add_module id p s = add_module_path (Pident id) p s
+let add_module id p s =
+  { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
 
-let add_modtype_path p ty s =
+let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
-let add_modtype id ty s = add_modtype_path (Pident id) ty s
+let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
+let add_modtype id p s = add_modtype_path (Pident id) p s
 
 type additional_action_config =
   | Duplicate_variables
@@ -248,8 +248,9 @@ let rec module_path s path =
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
       | Mty_ident p -> p
-      | Mty_alias _ | Mty_signature _ | Mty_functor _| Mty_strengthen _ ->
-         fatal_error "Subst.modtype_path"
+      | Mty_alias _ | Mty_signature _ | Mty_functor _
+      | Mty_strengthen _ as mty ->
+         raise (Module_type_path_substituted_away (path,mty))
       | exception Not_found ->
          match path with
          | Pdot(p, n) ->
@@ -811,7 +812,7 @@ let rename_bound_idents scoping s sg =
     | Sig_modtype(id, mtd, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
-          (add_modtype id (Types.Mty_ident(Pident id')) s)
+          (add_modtype id (Pident id') s)
           (Sig_modtype(id', mtd, vis) :: sg)
           rest
     | Sig_class(id, cd, rs, vis) :: rest ->
@@ -1061,6 +1062,35 @@ let modtype_declaration sc s decl =
 
 let module_declaration scoping s decl =
   Lazy.(decl |> of_module_decl |> module_decl scoping s |> force_module_decl)
+
+module Unsafe = struct
+
+  type t = unsafe subst
+  type error = Fcm_type_substituted_away of Path.t * Types.module_type
+
+  let add_modtype_path = add_modtype_gen
+  let add_modtype id mty s = add_modtype_path (Pident id) mty s
+  let add_type_path id p s =
+    { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
+  let add_type_function id ~params ~body s =
+    let types =
+      add_type_replacement s.types id (Type_function { params; body })
+    in
+    { s with types; last_compose = None }
+  let add_module_path id p s =
+    { s with modules = Path.Map.add id p s.modules; last_compose = None }
+
+  let wrap f : _ result = match f () with
+    | x -> Ok x
+    | exception Module_type_path_substituted_away (p,mty) ->
+        Error (Fcm_type_substituted_away (p,mty))
+
+  let signature_item sc s comp = wrap (fun () -> signature_item sc s comp)
+  let signature sc s comp = wrap (fun () -> signature sc s comp )
+  let compose s1 s2 = wrap (fun () -> compose s1 s2)
+  let type_declaration s t = wrap (fun () -> type_declaration s t)
+
+end
 
 let value_description s descr =
   Lazy.(descr |> of_value_description |> value_description s |> force_value_description)

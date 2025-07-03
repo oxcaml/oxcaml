@@ -241,6 +241,7 @@ module Instruction_name : sig
     | ADRP
     | STP
     | RET
+    | YIELD
     (* neon *)
     | MOV
     | MOVI

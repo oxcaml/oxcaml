@@ -335,7 +335,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Const_symbol _ | Const_vec128 _
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
-        | Name_for_debugger _ | Probe_is_enabled _ | Opaque
+        | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Dls_get)
   | Poptrap _ | Prologue
     -> [||]
@@ -466,7 +466,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Ccmpf _
   | Ccsel _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Cpoll

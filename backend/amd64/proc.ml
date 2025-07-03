@@ -594,7 +594,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32 | Ipause
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get)
+       | Name_for_debugger _ | Dls_get | Pause)
   | Poptrap _ | Prologue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
@@ -725,6 +725,7 @@ let operation_supported = function
   | Ctuple_field _
   | Cdls_get
   | Cpoll
+  | Cpause
     -> true
 
 let trap_size_in_bytes = 16

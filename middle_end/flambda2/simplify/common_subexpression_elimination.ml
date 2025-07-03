@@ -244,6 +244,11 @@ let cse_with_eligible_lhs ~typing_env_at_fork ~cse_at_each_use ~params prev_cse
                   EP.Map.add prim map eligible))))
         cse eligible)
 
+type extra_binding =
+  { extra_param : BP.t;
+    extra_args : EA.t RI.Map.t
+  }
+
 let join_one_cse_equation ~cse_at_each_use prim bound_to_map
     (cse, extra_bindings, env_extension, allowed) =
   let has_value_on_all_paths =
@@ -268,10 +273,7 @@ let join_one_cse_equation ~cse_at_each_use prim bound_to_map
       let extra_args =
         RI.Map.map (fun simple : EA.t -> Already_in_scope simple) bound_to
       in
-      let extra_bindings =
-        EPA.add extra_bindings ~extra_param ~extra_args
-          ~invalids:Apply_cont_rewrite_id.Set.empty
-      in
+      let extra_binding = { extra_param; extra_args } in
       let env_extension =
         (* For the primitives Is_int and Get_tag, they're strongly linked to
            their argument: additional information on the cse parameter should
@@ -290,7 +292,7 @@ let join_one_cse_equation ~cse_at_each_use prim bound_to_map
       let allowed =
         Name_occurrences.add_name allowed (Name.var var) NM.normal
       in
-      cse, extra_bindings, env_extension, allowed
+      cse, (prim, extra_binding) :: extra_bindings, env_extension, allowed
 
 let cut_cse_environment ({ by_scope; _ } as t) ~scope_at_fork =
   (* This extracts those CSE equations that arose between the fork point and
@@ -335,7 +337,8 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
      defined at the fork point, having canonicalised such name, cannot be
      propagated. This step also canonicalises the right-hand sides of the CSE
      equations. *)
-  let compute_cse_one_round prev_cse extra_params env_extension ~allowed =
+  let compute_cse_one_round prev_cse extra_params typing_env_with_extra_params
+      env_extension ~allowed =
     let new_cse =
       cse_with_eligible_lhs ~typing_env_at_fork ~cse_at_each_use ~params
         prev_cse extra_params env_extension
@@ -346,11 +349,38 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
        this. Sometimes we can force an equation to satisfy the property by
        explicitly passing the value of the right-hand side as an extra parameter
        to the continuation at the join point. *)
-    let cse', extra_params', env_extension', allowed =
+    let cse', extra_bindings, env_extension', allowed =
       EP.Map.fold
         (join_one_cse_equation ~cse_at_each_use)
         new_cse
-        (EP.Map.empty, EPA.empty, TEE.empty, allowed)
+        (EP.Map.empty, [], TEE.empty, allowed)
+    in
+    let sorted_extra_bindings =
+      List.sort extra_bindings ~cmp:(fun (prim1, _) (prim2, _) ->
+          P.compare_primitive_application
+            ~compare_simple:
+              (TE.stable_compare_simples typing_env_with_extra_params)
+            (EP.to_primitive prim1) (EP.to_primitive prim2))
+    in
+    let extra_params', typing_env_with_extra_params' =
+      List.fold_left sorted_extra_bindings
+        ~init:(EPA.empty, typing_env_with_extra_params)
+        ~f:(fun
+             (extra_bindings, typing_env_with_extra_params)
+             (_, { extra_param; extra_args })
+           ->
+          let extra_bindings =
+            EPA.add extra_bindings ~extra_param ~extra_args
+              ~invalids:Apply_cont_rewrite_id.Set.empty
+          in
+          (* We need to add the new variable to the typing env in order to be
+             able to compute binding times for the following rounds. *)
+          let typing_env_with_extra_params =
+            TE.add_definition typing_env_with_extra_params
+              (Bound_name.create (BP.name extra_param) Name_mode.normal)
+              (K.With_subkind.kind (BP.kind extra_param))
+          in
+          extra_bindings, typing_env_with_extra_params)
     in
     let need_other_round =
       (* If we introduce new parameters, then CSE equations involving the
@@ -363,15 +393,29 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
        scope are used as extra arguments. *)
     let extra_params = EPA.concat ~outer:extra_params' ~inner:extra_params in
     let env_extension = TEE.disjoint_union env_extension env_extension' in
-    cse, extra_params, env_extension, allowed, need_other_round
+    ( cse,
+      extra_params,
+      typing_env_with_extra_params',
+      env_extension,
+      allowed,
+      need_other_round )
   in
   let cse, extra_params, env_extension, allowed =
-    let rec do_rounds current_round cse extra_params env_extension allowed =
-      let cse, extra_params, env_extension, allowed, need_other_round =
-        compute_cse_one_round cse extra_params env_extension ~allowed
+    let rec do_rounds current_round cse extra_params
+        typing_env_with_extra_params env_extension allowed =
+      let ( cse,
+            extra_params,
+            typing_env_with_extra_params,
+            env_extension,
+            allowed,
+            need_other_round ) =
+        compute_cse_one_round cse extra_params typing_env_with_extra_params
+          env_extension ~allowed
       in
       if need_other_round && current_round < Flambda_features.cse_depth ()
-      then do_rounds (succ current_round) cse extra_params env_extension allowed
+      then
+        do_rounds (succ current_round) cse extra_params
+          typing_env_with_extra_params env_extension allowed
       else
         ( (* Either a fixpoint has been reached or we've already explored far
              enough *)
@@ -380,7 +424,8 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
           env_extension,
           allowed )
     in
-    do_rounds 1 EP.Map.empty EPA.empty TEE.empty Name_occurrences.empty
+    do_rounds 1 EP.Map.empty EPA.empty typing_env_at_fork TEE.empty
+      Name_occurrences.empty
   in
   let have_propagated_something = ref false in
   let cse_at_join_point =

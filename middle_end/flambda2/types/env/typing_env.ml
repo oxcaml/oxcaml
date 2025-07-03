@@ -597,6 +597,68 @@ let alias_is_bound_strictly_earlier t ~bound_name ~alias =
   in
   Binding_time.strictly_earlier time_of_alias ~than:time_of_name
 
+let stable_compare_variables t var1 var2 =
+  let name1 = Name.var var1 and name2 = Name.var var2 in
+  let binding_time1 =
+    binding_time_and_mode t name1 |> Binding_time.With_name_mode.binding_time
+  and binding_time2 =
+    binding_time_and_mode t name2 |> Binding_time.With_name_mode.binding_time
+  in
+  let c = Binding_time.compare binding_time1 binding_time2 in
+  if c <> 0
+  then c
+  else
+    let compunit1 = Variable.compilation_unit var1 in
+    let compunit2 = Variable.compilation_unit var2 in
+    let c = Compilation_unit.compare compunit1 compunit2 in
+    if c <> 0
+    then c
+    else
+      let stamp1 = Variable.name_stamp var1 in
+      let stamp2 = Variable.name_stamp var2 in
+      Int.compare stamp1 stamp2
+
+let stable_compare_symbols symbol1 symbol2 =
+  let compunit1 = Symbol.compilation_unit symbol1 in
+  let compunit2 = Symbol.compilation_unit symbol2 in
+  let c = Compilation_unit.compare compunit1 compunit2 in
+  if c <> 0
+  then c
+  else
+    let linkage_name1 = Symbol.linkage_name symbol1 in
+    let linkage_name2 = Symbol.linkage_name symbol2 in
+    Linkage_name.compare linkage_name1 linkage_name2
+
+let stable_compare_names t name1 name2 =
+  Name.pattern_match name1
+    ~symbol:(fun symbol1 ->
+      Name.pattern_match name2
+        ~symbol:(fun symbol2 -> stable_compare_symbols symbol1 symbol2)
+        ~var:(fun _ -> -1))
+    ~var:(fun var1 ->
+      Name.pattern_match name2
+        ~symbol:(fun _ -> 1)
+        ~var:(fun var2 -> stable_compare_variables t var1 var2))
+
+let stable_compare_simples t simple1 simple2 =
+  Simple.pattern_match simple1
+    ~const:(fun const1 ->
+      Simple.pattern_match simple2
+        ~const:(fun const2 ->
+          let descr1 = Reg_width_const.descr const1 in
+          let descr2 = Reg_width_const.descr const2 in
+          Reg_width_const.Descr.compare descr1 descr2)
+        ~name:(fun _ ~coercion:_ -> -1))
+    ~name:(fun name1 ~coercion:_ ->
+      Simple.pattern_match simple2
+        ~const:(fun _ -> 1)
+        ~name:(fun name2 ~coercion:_ -> stable_compare_names t name1 name2))
+
+let stable_compare_simples t simple1 simple2 =
+  if Simple.equal simple1 simple2
+  then 0
+  else stable_compare_simples t simple1 simple2
+
 let with_current_level t ~current_level = { t with current_level }
 
 let with_current_level_and_next_binding_time t ~current_level next_binding_time

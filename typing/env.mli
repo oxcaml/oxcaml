@@ -25,7 +25,8 @@ type value_unbound_reason =
   | Val_unbound_ghost_recursive of Location.t
 
 type module_unbound_reason =
-  | Mod_unbound_illegal_recursion
+  | Mod_unbound_illegal_recursion of
+      { container : string option; unbound: string }
 
 type summary =
     Env_empty
@@ -246,7 +247,14 @@ type lookup_error =
   | Functor_used_as_structure of Longident.t * structure_components_reason
   | Abstract_used_as_structure of Longident.t * Path.t * structure_components_reason
   | Generative_used_as_applicative of Longident.t
-  | Illegal_reference_to_recursive_module
+  | Illegal_reference_to_recursive_module of
+      { container : string option; unbound : string }
+  | Illegal_reference_to_recursive_class_type of
+      { container : string option;
+        unbound : string;
+        unbound_class_type : Longident.t;
+        container_class_type : string
+      }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
