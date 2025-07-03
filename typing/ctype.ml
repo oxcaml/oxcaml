@@ -5012,7 +5012,7 @@ let relevant_pairs pairs v =
   | Contravariant -> pairs.contravariant_pairs
   | Bivariant -> pairs.bivariant_pairs
 
-let zap_modalities_to_floor_if_at_least level =
+let zap_modalities_to_floor_if_modes_enabled_at level =
   if Language_extension.(is_at_least Mode level)
     then Mode.Modality.Value.zap_to_floor
     else Mode.Modality.Value.zap_to_id

@@ -3555,9 +3555,9 @@ let type_module_type_of env smod =
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
+  let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
-    remove_modality_and_zero_alloc_variables_mty env
-      ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Stable) mty
+    remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
   in
   tmty, mty
 
@@ -3799,11 +3799,13 @@ let type_implementation target modulename initial_env ast =
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
         remove_mode_and_jkind_variables finalenv sg;
+        let zap_modality =
+          Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
+        in
         let simple_sg =
           (* Printing [.mli] from [.ml], we zap to identity modality for legacy
              compatibility. *)
-          remove_modality_and_zero_alloc_variables_sg finalenv
-            ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Alpha)
+          remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
             simple_sg
         in
         Typecore.force_delayed_checks ();
@@ -3905,11 +3907,13 @@ let type_implementation target modulename initial_env ast =
                 sourcefile sg "(inferred signature)" simple_sg shape)
           in
           check_nongen_signature finalenv simple_sg;
+          let zap_modality =
+            Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
+          in
           let simple_sg =
             (* Generating [cmi] without [mli]. This [cmi] will only be on the
                LHS of inclusion check, so we zap to floor (strongest). *)
-            remove_modality_and_zero_alloc_variables_sg finalenv
-              ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Stable)
+            remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
               simple_sg
           in
           normalize_signature simple_sg;
