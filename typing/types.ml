@@ -18,9 +18,16 @@
 open Allowance
 open Asttypes
 
+type atomic =
+  | Nonatomic
+  | Atomic
+
 type mutability =
   | Immutable
-  | Mutable of Mode.Value.Comonadic.lr
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+      ; atomic : atomic
+      }
 
 let is_mutable = function
   | Immutable -> false
@@ -32,6 +39,10 @@ let mutable_mode m0 : _ Mode.Value.t =
   { comonadic = m0
   ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
   }
+
+let atomic = function
+  | Mutable { atomic; mode = _ } -> atomic
+  | Immutable -> Nonatomic
 
 (* Type expressions for the core language *)
 
