@@ -60,6 +60,7 @@ module type Common_options = sig
   val _vnum : unit -> unit
   val _w : string -> unit
   val _debug_ocaml : unit -> unit
+  val _error_size : int -> unit
 
   val anonymous : string -> unit
 end
