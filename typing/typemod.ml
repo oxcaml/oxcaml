@@ -2131,12 +2131,14 @@ and transl_recmodule_modtypes env sig_modalities sdecls =
     List.map (fun x -> Option.map (Ident.create_scoped ~scope) x.pmd_name.txt)
       sdecls
   in
-  let approx_env =
+  let approx_env container =
     List.fold_left
       (fun env ->
          Option.fold ~none:env ~some:(fun id -> (* cf #5965 *)
            Env.enter_unbound_module (Ident.name id)
-             Mod_unbound_illegal_recursion env
+             (Mod_unbound_illegal_recursion
+                { container; unbound = Ident.name id })
+             env
          ))
       env ids
   in
@@ -2145,7 +2147,7 @@ and transl_recmodule_modtypes env sig_modalities sdecls =
       (fun id pmd ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
          let md_type =
-          approx_modtype approx_env pmd.pmd_type
+          approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
           |> apply_pmd_modalities env sig_modalities pmd.pmd_modalities
          in
          let md =
