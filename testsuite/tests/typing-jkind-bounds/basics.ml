@@ -1824,12 +1824,5 @@ module type S2 = S with type 'a t = 'a
 
 [%%expect{|
 module type S = sig type 'a t : value mod portable with 'a end
-Line 5, characters 24-38:
-5 | module type S2 = S with type 'a t = 'a
-                            ^^^^^^^^^^^^^^
-Error: The kind of type "'a" is value
-         because of the definition of t at line 2, characters 2-40.
-       But the kind of type "'a" must be a subkind of
-           value mod portable with 'a
-         because of the definition of t at line 2, characters 2-40.
+module type S2 = sig type 'a t = 'a end
 |}]

@@ -688,12 +688,12 @@ let verify_unboxed_attr unboxed_attr sdecl =
    1. If there is a jkind annotation, use that. We might later compute a more
       precise jkind for the type (e.g. [type t : value = int] or [type t :
       value = A | B | C]); this will be updated in [update_decl_jkind] (updates
-      from the kind) or [check_coherence] (updates from the manifest), which
-      also ensures that the updated jkind is a subjkind of the annotated
+      from the kind) or [narrow_to_manifest_jkind] (updates from the manifest),
+      which also ensures that the updated jkind is a subjkind of the annotated
       jkind.
 
    2. If there is no annotation but there is a manifest, use the jkind
-      of the manifest. This gets improved in [check_coherence], after
+      of the manifest. This gets improved in [narrow_to_manifest_jkind], after
       the manifest jkind might be more accurate.
 
    3. If there is no annotation and no manifest, the default jkind
@@ -744,12 +744,12 @@ let verify_unboxed_attr unboxed_attr sdecl =
    ]}
 
    The proper jkind of [t7] is [immediate], but that's hard to know. Because
-   [t7] has no jkind annotation and no manifest, it gets a default jkind
-   of [value]. [t7_2] gets a default of [any]. We update [t7]'s jkind to be
-   [immediate] in [update_decl_jkind]. But when updating [t7_2]'s jkind, we
-   use the *original, default* jkind for [t7]: [value]. This means that the
-   jkind recorded for [t7_2] is actually [value]. The program above is still
-   accepted, because the jkind check in [check_coherence] uses [type_jkind],
+   [t7] has no jkind annotation and no manifest, it gets a default jkind of
+   [value]. [t7_2] gets a default of [any]. We update [t7]'s jkind to be
+   [immediate] in [update_decl_jkind]. But when updating [t7_2]'s jkind, we use
+   the *original, default* jkind for [t7]: [value]. This means that the jkind
+   recorded for [t7_2] is actually [value]. The program above is still accepted,
+   because the jkind check in [narrow_to_manifest_jkind] uses [type_jkind],
    which looks through unboxed types. So it's all OK for users, but it's
    unfortunate that the stored jkind on [t7_2] is imprecise.
 
@@ -996,12 +996,13 @@ let transl_declaration env sdecl (id, uid) =
         Jkind.for_non_float ~why:Extensible_variant
       in
     let jkind =
-    (* - If there's an annotation, we use that. It's checked against
-         a kind in [update_decl_jkind] and the manifest in [check_coherence].
+    (* - If there's an annotation, we use that. It's checked against a kind in
+         [update_decl_jkind] and the manifest in [narrow_to_manifest_jkind].
          Both of those functions update the [type_jkind] field in the
          [type_declaration] as appropriate.
        - If there's no annotation but there is a manifest, just use [any].
-         This will get updated to the manifest's jkind in [check_coherence].
+         This will get updated to the manifest's jkind in
+         [narrow_to_manifest_jkind].
        - If there's no annotation and no manifest, we fill in with the
          default calculated above here. It will get updated in
          [update_decl_jkind]. See Note [Default jkinds in transl_declaration].
@@ -1537,14 +1538,14 @@ let check_kind_coherence env loc dpath decl =
 
 let check_coherence env loc dpath decl =
   check_kind_coherence env loc dpath decl;
-  begin match decl.type_unboxed_version with
+  match decl.type_unboxed_version with
   | Some decl' ->
     check_kind_coherence env loc (Path.unboxed_version dpath) decl'
-  | None -> () end;
-  narrow_to_manifest_jkind env loc decl
+  | None -> ()
 
 let check_abbrev env sdecl (id, decl) =
-  (id, check_coherence env sdecl.ptype_loc (Path.Pident id) decl)
+  check_coherence env sdecl.ptype_loc (Path.Pident id) decl;
+  (id, narrow_to_manifest_jkind env sdecl.ptype_loc decl)
 
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
@@ -4142,15 +4143,15 @@ let check_recmod_typedecl env loc recmod_ids path decl =
   check_regularity ~abs_env:env env loc path decl to_check;
   (* additional coherence check, as one might build an incoherent signature,
      and use it to build an incoherent module, cf. #7851 *)
-  (* Call [check_kind_coherence] rather than [check_coherence] here, which
-     avoids a call to [narrow_to_manifest_jkind]. That call sometimes spuriously fails on
+  (* Call just [check_kind_coherence], skipping [narrow_to_manifest_jkind].
+     That call sometimes spuriously fails on
      valid programs (see test 14 in testsuite/tests/typing-jkind-bounds/basics.ml). This
      isn't sound, but this check is already unsound otherwise (see issue #13765)! And not
      performing this check on the jkinds is no less sound than what already exists. So
      instead of fixing the spurious failures, we choose to just not perform the check,
      with the intention of fixing the jkind soundness issue once the other soundness issue
      is resolved. *)
-  ignore (check_kind_coherence env loc path decl)
+  check_kind_coherence env loc path decl
 
 
 (**** Error report ****)
