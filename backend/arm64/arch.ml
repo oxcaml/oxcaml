@@ -198,12 +198,20 @@ let print_specific_operation printreg op ppf arg =
   | Isimd op ->
     Simd.print_operation printreg op ppf arg
 
-let specific_operation_name : specific_operation -> string = fun op -<
+let specific_operation_name : specific_operation -> string = fun op ->
   match op with
   | Ifar_poll -> "far poll"
-  | Ifar_alloc { bytes; dbginfo = _ } -> "far_alloc of %d bytes" bytes
+  | Ifar_alloc { bytes; dbginfo = _ } ->
+      Printf.sprintf "far alloc of %d bytes" bytes
   | Ishiftarith (op, shift) ->
-  | Ishiftarith of arith_operation * int
+      let op_name = function
+        | Ishiftadd -> "+"
+        | Ishiftsub -> "-" in
+      let shift_mark =
+        if shift >= 0
+        then sprintf "<< %i" shift
+        else sprintf ">> %i" (-shift) in
+      Printf.sprintf "%s %s" (op_name op) shift_mark
   | Imuladd -> "muladd"
   | Imulsub -> "mulsub"
   | Inegmulf -> "negmulf"
