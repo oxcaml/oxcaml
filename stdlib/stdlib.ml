@@ -659,6 +659,7 @@ module Parsing        = Parsing
 module Printexc       = Printexc
 module Printf         = Printf
 module Queue          = Queue
+module Quote          = Quote
 module Random         = Random
 module Result         = Result
 module Scanf          = Scanf

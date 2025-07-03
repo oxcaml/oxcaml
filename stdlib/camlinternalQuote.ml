@@ -1634,8 +1634,8 @@ module Ast = struct
       args;
     pp fmt "@]"
 
-  and print_exp env fmt exp =
-    (match exp.desc with
+  and print_exp_desc env fmt desc =
+    match desc with
     | Ident id -> print_raw_ident_value env fmt id
     | Constant c -> print_const fmt c
     | Apply (exp, args) -> (
@@ -1786,7 +1786,10 @@ module Ast = struct
     | Antiquote exp -> pp fmt "@[<2>$@ %a@]" (print_exp_with_parens env) exp
     | List_comprehension _ | Array_comprehension _ ->
       pp fmt "(* comprehension *)"
-    | Unreachable | Src_pos -> pp fmt ".");
+    | Unreachable | Src_pos -> pp fmt "."
+
+  and print_exp env fmt exp =
+    print_exp_desc env fmt exp.desc;
     List.iter (print_attribute fmt) exp.attributes
 end
 
@@ -2680,9 +2683,9 @@ module Exp_desc = struct
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
 
-  let print fmt exp =
-    let ast = With_free_vars.value ~free:(fun _ _ -> ()) exp in
-    Ast.print_exp (new_env ()) fmt ast
+  let print fmt desc =
+    let ast = With_free_vars.value ~free:(fun _ _ -> ()) desc in
+    Ast.print_exp_desc (new_env ()) fmt ast
 end
 
 module Exp = struct
@@ -2693,4 +2696,8 @@ module Exp = struct
   let mk exp_desc attributes =
     let+ desc = exp_desc in
     ({ desc; attributes } : Ast.expression)
+
+  let print fmt exp =
+    let ast = With_free_vars.value ~free:(fun _ _ -> ()) exp in
+    Ast.print_exp (new_env ()) fmt ast
 end

@@ -597,13 +597,15 @@ and Exp_desc : sig
 
   val splice : Code.t -> t
 
-  val print : Format.formatter -> Exp.t -> unit
+  val print : Format.formatter -> t -> unit
 end
 
 and Exp : sig
   type t
 
   val mk : Exp_desc.t -> Exp_attribute.t list -> t
+
+  val print : Format.formatter -> t -> unit
 end
 
 and Code : sig
