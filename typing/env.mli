@@ -259,6 +259,7 @@ type lookup_error =
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
 

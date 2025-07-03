@@ -850,6 +850,7 @@ type lookup_error =
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 type error =
   | Missing_module of Location.t * Path.t * Path.t
@@ -3481,8 +3482,23 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
     end
 
 let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
-  match TycompTbl.find_all_and_locks ~mark:use s env.constrs with
-  | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
+  let cstrs = TycompTbl.find_all_and_locks ~mark:use s env.constrs in
+  let cstrs_filtered =
+    List.filter
+      (fun (_, (locks, _)) ->
+         match quotation_locks_offset locks with
+         | None | Some 0 -> true
+         | Some _ -> false)
+      cstrs
+  in
+  match cstrs_filtered with
+  | [] -> begin
+      match cstrs with
+      | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
+      | _ ->
+          may_lookup_error errors loc env
+            (No_constructor_in_stage (Lident s, loc, env.stage))
+    end
   | cstrs ->
       List.map
         (fun (cda, (locks, use_fn)) ->
@@ -4803,6 +4819,17 @@ let report_lookup_error _loc env ppf = function
         print_stage usage_stage
         Location.print_loc intro_loc
         print_stage intro_stage
+  | No_constructor_in_stage (lid, usage_loc, usage_stage) ->
+      fprintf ppf
+        "@[Constructor %a used at %a@ \
+         is unbound in this context;@ \
+         identifier %a is unbound@ \
+         in a context with %a.@]"
+        (Style.as_inline_code !print_longident) lid
+        Location.print_loc usage_loc
+        (Style.as_inline_code !print_longident) lid
+        print_stage usage_stage
+
 
 let report_error ppf = function
   | Missing_module(_, path1, path2) ->

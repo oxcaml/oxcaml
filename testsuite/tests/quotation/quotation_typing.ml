@@ -43,7 +43,7 @@ Line 1, characters 0-58:
 1 | type s6 = <[string -> bool -> [> `A | `B of string]]> expr;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: A type variable is unbound in this type declaration.
-       In type "<[ string -> bool -> [> `A | `B of string ] ]> expr"
+       In type "<[ string -> bool -> ([> `A | `B of string ] as 'a) ]> expr"
        the variable "'a" is unbound
 |}];;
 
@@ -58,6 +58,13 @@ Line 55, characters 15-17:
 55 | type 'a t2 = <['a]> expr;;
                     ^^
 Error: Type variable "a" is used at Line 55, characters 15-17
+       in a context with one layer of quotation (<[ ... ]>);
+       it should only be used in a context with no quotations or splices.
+|}, Principal{|
+Line 62, characters 15-17:
+62 | type 'a t2 = <['a]> expr;;
+                    ^^
+Error: Type variable "a" is used at Line 62, characters 15-17
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
@@ -93,6 +100,13 @@ Line 90, characters 28-30:
 90 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
                                  ^^
 Error: Type variable "a" is used at Line 90, characters 28-30
+       in a context with 2 layers of quotation (<[ ... ]>);
+       it should only be used in a context with no quotations or splices.
+|}, Principal{|
+Line 97, characters 28-30:
+97 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
+                                 ^^
+Error: Type variable "a" is used at Line 97, characters 28-30
        in a context with 2 layers of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
@@ -138,6 +152,21 @@ Error: Identifier "a" is used at Line 1, characters 38-39
 [%%expect {|
 - : <[ $ ('a) -> $ ('b) -> $ ('a) * $ ('b) ]> expr =
 <[ fun (type a) (type b) (x : a) (y : b) -> (x, y) ]>
+|}];;
+
+type t4 = A | B;;
+[%%expect {|
+type t4 = A | B
+|}];;
+
+<[A]>;;
+[%%expect {|
+Line 1, characters 2-3:
+1 | <[A]>;;
+      ^
+Error: Constructor "A" used at Line 1, characters 2-3
+       is unbound in this context; identifier "A" is unbound
+       in a context with one layer of quotation (<[ ... ]>).
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
