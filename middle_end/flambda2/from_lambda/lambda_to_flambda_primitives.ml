@@ -2628,6 +2628,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     [Ternary (Atomic_field_int_arith Or, atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
+  | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
@@ -2679,7 +2680,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Punbox_vector _
       | Pbox_vector (_, _)
       | Punbox_int _ | Pbox_int _ | Punbox_unit | Punboxed_product_field _
-      | Pget_header _ | Pufloatfield _ | Patomic_load_field _ | Pmixedfield _
+      | Pget_header _ | Pufloatfield _ | Pmixedfield _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Parray_element_size_in_bytes _ | Ppeek _ | Pmakelazyblock _ ),

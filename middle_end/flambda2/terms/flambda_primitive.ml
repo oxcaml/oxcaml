@@ -955,10 +955,11 @@ type nullary_primitive =
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
   | Dls_get
   | Poll
+  | Cpu_relax
 
 let nullary_primitive_eligible_for_cse = function
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Poll ->
+  | Dls_get | Poll | Cpu_relax ->
     false
 
 let compare_nullary_primitive p1 p2 =
@@ -971,28 +972,32 @@ let compare_nullary_primitive p1 p2 =
     Inlined_debuginfo.compare dbg1 dbg2
   | Dls_get, Dls_get -> 0
   | Poll, Poll -> 0
+  | Cpu_relax, Cpu_relax -> 0
   | ( Invalid _,
       ( Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get
-      | Poll ) ) ->
+      | Poll | Cpu_relax ) ) ->
     -1
   | ( Optimised_out _,
-      (Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get | Poll) ) ->
+      (Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get | Poll | Cpu_relax)
+    ) ->
     -1
   | Optimised_out _, Invalid _ -> 1
-  | Probe_is_enabled _, (Enter_inlined_apply _ | Dls_get | Poll) -> -1
+  | Probe_is_enabled _, (Enter_inlined_apply _ | Dls_get | Poll | Cpu_relax) ->
+    -1
   | Probe_is_enabled _, (Invalid _ | Optimised_out _) -> 1
   | Enter_inlined_apply _, (Invalid _ | Optimised_out _ | Probe_is_enabled _) ->
     1
-  | Enter_inlined_apply _, (Dls_get | Poll) -> -1
+  | Enter_inlined_apply _, (Dls_get | Poll | Cpu_relax) -> -1
   | ( Dls_get,
       (Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _)
     ) ->
     1
-  | Dls_get, Poll -> -1
-  | ( Poll,
+  | Dls_get, (Poll | Cpu_relax) -> -1
+  | ( (Poll | Cpu_relax),
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get ) ) ->
+      | Dls_get | Cpu_relax ) ) ->
     1
+  | Cpu_relax, Poll -> -1
 
 let equal_nullary_primitive p1 p2 = compare_nullary_primitive p1 p2 = 0
 
@@ -1011,6 +1016,7 @@ let print_nullary_primitive ppf p =
       Inlined_debuginfo.print dbg
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Poll -> Format.pp_print_string ppf "Poll"
+  | Cpu_relax -> Format.pp_print_string ppf "Cpu_relax"
 
 let result_kind_of_nullary_primitive p : result_kind =
   match p with
@@ -1019,7 +1025,7 @@ let result_kind_of_nullary_primitive p : result_kind =
   | Probe_is_enabled _ -> Singleton K.naked_immediate
   | Enter_inlined_apply _ -> Unit
   | Dls_get -> Singleton K.value
-  | Poll -> Unit
+  | Poll | Cpu_relax -> Unit
 
 let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
   | Local _ -> Coeffects.Has_coeffects
@@ -1038,12 +1044,12 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict
   | Dls_get -> No_effects, Has_coeffects, Strict
-  | Poll -> Arbitrary_effects, Has_coeffects, Strict
+  | Poll | Cpu_relax -> Arbitrary_effects, Has_coeffects, Strict
 
 let nullary_classify_for_printing p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Poll ->
+  | Dls_get | Poll | Cpu_relax ->
     Neither
 
 module Reinterpret_64_bit_word = struct
@@ -2308,67 +2314,68 @@ let classify_for_printing t =
   | Quaternary (prim, _, _, _, _) -> quaternary_classify_for_printing prim
   | Variadic (prim, _) -> variadic_classify_for_printing prim
 
+let compare_primitive_application ~compare_simple t1 t2 =
+  if t1 == t2
+  then 0
+  else
+    let numbering t =
+      match t with
+      | Nullary _ -> 0
+      | Unary _ -> 1
+      | Binary _ -> 2
+      | Ternary _ -> 3
+      | Quaternary _ -> 4
+      | Variadic _ -> 5
+    in
+    match t1, t2 with
+    | Nullary p, Nullary p' -> compare_nullary_primitive p p'
+    | Unary (p, s1), Unary (p', s1') ->
+      let c = compare_unary_primitive p p' in
+      if c <> 0 then c else compare_simple s1 s1'
+    | Binary (p, s1, s2), Binary (p', s1', s2') ->
+      let c = compare_binary_primitive p p' in
+      if c <> 0
+      then c
+      else
+        let c = compare_simple s1 s1' in
+        if c <> 0 then c else compare_simple s2 s2'
+    | Ternary (p, s1, s2, s3), Ternary (p', s1', s2', s3') ->
+      let c = compare_ternary_primitive p p' in
+      if c <> 0
+      then c
+      else
+        let c = compare_simple s1 s1' in
+        if c <> 0
+        then c
+        else
+          let c = compare_simple s2 s2' in
+          if c <> 0 then c else compare_simple s3 s3'
+    | Quaternary (p, s1, s2, s3, s4), Quaternary (p', s1', s2', s3', s4') ->
+      let c = compare_quaternary_primitive p p' in
+      if c <> 0
+      then c
+      else
+        let c = Simple.compare s1 s1' in
+        if c <> 0
+        then c
+        else
+          let c = Simple.compare s2 s2' in
+          if c <> 0
+          then c
+          else
+            let c = Simple.compare s3 s3' in
+            if c <> 0 then c else Simple.compare s4 s4'
+    | Variadic (p, s), Variadic (p', s') ->
+      let c = compare_variadic_primitive p p' in
+      if c <> 0 then c else List.compare compare_simple s s'
+    | (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _), _ ->
+      Stdlib.compare (numbering t1) (numbering t2)
+
 include Container_types.Make (struct
   type nonrec t = t
 
   let compare t1 t2 =
-    if t1 == t2
-    then 0
-    else
-      let numbering t =
-        match t with
-        | Nullary _ -> 0
-        | Unary _ -> 1
-        | Binary _ -> 2
-        | Ternary _ -> 3
-        | Quaternary _ -> 4
-        | Variadic _ -> 5
-      in
-      match t1, t2 with
-      | Nullary p, Nullary p' -> compare_nullary_primitive p p'
-      | Unary (p, s1), Unary (p', s1') ->
-        let c = compare_unary_primitive p p' in
-        if c <> 0 then c else Simple.compare s1 s1'
-      | Binary (p, s1, s2), Binary (p', s1', s2') ->
-        let c = compare_binary_primitive p p' in
-        if c <> 0
-        then c
-        else
-          let c = Simple.compare s1 s1' in
-          if c <> 0 then c else Simple.compare s2 s2'
-      | Ternary (p, s1, s2, s3), Ternary (p', s1', s2', s3') ->
-        let c = compare_ternary_primitive p p' in
-        if c <> 0
-        then c
-        else
-          let c = Simple.compare s1 s1' in
-          if c <> 0
-          then c
-          else
-            let c = Simple.compare s2 s2' in
-            if c <> 0 then c else Simple.compare s3 s3'
-      | Quaternary (p, s1, s2, s3, s4), Quaternary (p', s1', s2', s3', s4') ->
-        let c = compare_quaternary_primitive p p' in
-        if c <> 0
-        then c
-        else
-          let c = Simple.compare s1 s1' in
-          if c <> 0
-          then c
-          else
-            let c = Simple.compare s2 s2' in
-            if c <> 0
-            then c
-            else
-              let c = Simple.compare s3 s3' in
-              if c <> 0 then c else Simple.compare s4 s4'
-      | Variadic (p, s), Variadic (p', s') ->
-        let c = compare_variadic_primitive p p' in
-        if c <> 0 then c else Simple.List.compare s s'
-      | ( ( Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _
-          | Variadic _ ),
-          _ ) ->
-        Stdlib.compare (numbering t1) (numbering t2)
+    compare_primitive_application ~compare_simple:Simple.compare t1 t2
 
   let equal t1 t2 = compare t1 t2 = 0
 
@@ -2431,7 +2438,7 @@ let free_names t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Poll ) ->
+      | Dls_get | Poll | Cpu_relax ) ->
     Name_occurrences.empty
   | Unary (prim, x0) ->
     Name_occurrences.union
@@ -2465,7 +2472,7 @@ let apply_renaming t renaming =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Poll ) ->
+      | Dls_get | Poll | Cpu_relax ) ->
     t
   | Unary (prim, x0) ->
     let prim' = apply_renaming_unary_primitive prim renaming in
@@ -2504,7 +2511,7 @@ let ids_for_export t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Poll ) ->
+      | Dls_get | Poll | Cpu_relax ) ->
     Ids_for_export.empty
   | Unary (prim, x0) ->
     Ids_for_export.union
