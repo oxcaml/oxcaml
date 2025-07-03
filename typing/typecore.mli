@@ -293,6 +293,7 @@ type error =
   | Extension_not_enabled : _ Language_extension.t -> error
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
+  | Atomic_in_pattern of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
