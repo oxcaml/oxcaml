@@ -494,6 +494,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
                 mode =
                   if is_atomic
                   then
+                    (* CR aspsmith: extract this to a constant somewhere *)
                     Mode.Value.Comonadic.of_const
                       { Mode.Value.Comonadic.Const.legacy
                          with portability = Portable }
