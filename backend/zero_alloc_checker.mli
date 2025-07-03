@@ -54,7 +54,7 @@ module Witness : sig
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
-    | Arch_specific
+    | Arch_specific of Arch.specific_operation
     | Probe of
         { name : string;
           handler_code_sym : string

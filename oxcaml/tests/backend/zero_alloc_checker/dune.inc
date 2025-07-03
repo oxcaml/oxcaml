@@ -1565,3 +1565,23 @@
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (deps test_custom_error_msg_sig.opt.output test_custom_error_msg_sig.opt.output.corrected)
  (action (diff test_custom_error_msg_sig.opt.output test_custom_error_msg_sig.opt.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_arch_specific_witness.output.corrected)
+ (deps (:ml test_arch_specific_witness.ml) filter.sh)
+ (action
+   (with-outputs-to test_arch_specific_witness.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -flambda2-expert-cont-specialization-budget 0
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_arch_specific_witness.output test_arch_specific_witness.output.corrected)
+ (action (diff test_arch_specific_witness.output test_arch_specific_witness.output.corrected)))

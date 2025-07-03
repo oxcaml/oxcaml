@@ -288,4 +288,6 @@ let () =
     ~extra_dep:(Some "test_custom_error_msg_sig.mli")
     ~extra_flags:"-zero-alloc-check all" ~exit_code:2
     "test_custom_error_msg_sig";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
+    "test_arch_specific_witness";
   ()

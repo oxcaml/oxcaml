@@ -103,6 +103,8 @@ val print_addressing :
   (Format.formatter -> 'a -> unit) -> addressing_mode ->
   Format.formatter -> 'a array -> unit
 
+val specific_operation_name : specific_operation -> string
+
 val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->
   Format.formatter -> 'a array -> unit
