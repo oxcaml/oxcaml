@@ -30,6 +30,7 @@ type out_ident =
   | Oide_apply of out_ident * out_ident
   | Oide_dot of out_ident * string
   | Oide_ident of out_name
+  | Oide_hash of out_ident
 
 type out_string =
   | Ostr_string
@@ -104,8 +105,9 @@ type out_ret_mode =
 type out_jkind_const =
   | Ojkind_const_default
   | Ojkind_const_abbreviation of string
-  | Ojkind_const_mod of out_jkind_const * string list
-  | Ojkind_const_with of out_jkind_const * out_type
+  (** The base of [Ojkind_const_mod] is optional to enable printing individual axes *)
+  | Ojkind_const_mod of out_jkind_const option * string list
+  | Ojkind_const_with of out_jkind_const * out_type * out_modality_new list
   | Ojkind_const_kind_of of out_type
   | Ojkind_const_product of out_jkind_const list
 
@@ -154,6 +156,7 @@ and out_type =
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
+  | Otyp_of_kind of out_jkind
 
 and out_constructor = {
   ocstr_name: string;

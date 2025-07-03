@@ -238,50 +238,46 @@ CAMLexport CAMLweakdef void caml_modify (volatile value *fp, value val)
 */
 CAMLexport void caml_alloc_dependent_memory (value v, mlsize_t nbytes)
 {
-  /* No-op for now */
+  if (nbytes == 0) return;
+  CAMLassert (Is_block (v));
+  /* Maximum dependent allocation before a minor GC or a major slice */
+  uintnat max_alloc =
+    Bsize_wsize (Caml_state->minor_heap_wsz) / 100 * caml_custom_minor_ratio;
+  if (Is_young (v)){
+    Caml_state->stat_minor_dependent_bytes += nbytes;
+    add_to_dependent_table (&Caml_state->minor_tables->dependent, v, nbytes);
+    Caml_state->minor_dependent_bsz += nbytes;
+    if (Caml_state->minor_dependent_bsz > max_alloc) {
+      caml_request_minor_gc ();
+    }
+  } else {
+    caml_add_dependent_bytes (Caml_state->shared_heap, nbytes);
+    Caml_state->allocated_dependent_bytes += nbytes;
+    if (Caml_state->allocated_dependent_bytes > max_alloc){
+      CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
+      caml_request_major_slice(1);
+    }
+  }
 }
 
 CAMLexport void caml_free_dependent_memory (value v, mlsize_t nbytes)
 {
-  /* No-op for now */
+  CAMLassert (Is_block (v));
+  if (Is_young (v)){
+    Caml_state->minor_dependent_bsz -= nbytes;
+  }else{
+    caml_add_dependent_bytes (Caml_state->shared_heap, -nbytes);
+  }
 }
 
-/* Use this function to tell the major GC to speed up when you use
-   finalized blocks to automatically deallocate resources (other
-   than memory). The GC will do at least one cycle every [max]
-   allocated resources; [res] is the number of resources allocated
-   this time.
-   Note that only [res/max] is relevant.  The units (and kind of
-   resource) can change between calls to [caml_adjust_gc_speed].
-
-   If [max] = 0, then we use a number proportional to the major heap
-   size and [caml_custom_major_ratio]. In this case, [mem] should
-   be a number of bytes and the trade-off between GC work and space
-   overhead is under the control of the user through
-   [caml_custom_major_ratio].
-*/
 CAMLexport void caml_adjust_gc_speed (mlsize_t res, mlsize_t max)
 {
-  if (max == 0) max = caml_custom_get_max_major ();
-  if (res > max) res = max;
-  Caml_state->extra_heap_resources += (double) res / (double) max;
-  if (Caml_state->extra_heap_resources > 0.2){
-    CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ADJUST_GC_SPEED, 1);
-    caml_request_major_slice (1);
-  }
+  /* No-op, present only for compatibility */
 }
 
-/* This function is analogous to [caml_adjust_gc_speed]. When the
-   accumulated sum of [res/max] values reaches 1, a minor GC is
-   triggered.
-*/
 CAMLexport void caml_adjust_minor_gc_speed (mlsize_t res, mlsize_t max)
 {
-  if (max == 0) max = 1;
-  Caml_state->extra_heap_resources_minor += (double) res / (double) max;
-  if (Caml_state->extra_heap_resources_minor > 1.0) {
-    caml_request_minor_gc ();
-  }
+  /* No-op, present only for compatibility */
 }
 
 /* You must use [caml_intialize] to store the initial value in a field of a
@@ -497,7 +493,9 @@ CAMLprim value caml_atomic_lxor (value ref, value incr)
 CAMLexport int caml_is_stack (value v)
 {
   int i;
-  struct caml_local_arenas* loc = Caml_state->local_arenas;
+  // We elide a call to caml_refresh_locals here for speed, since we never 
+  // read the local sp.
+  struct caml_local_arenas* loc = Caml_state->current_stack->local_arenas;
   if (!Is_block(v)) return 0;
   if (Color_hd(Hd_val(v)) != NOT_MARKABLE) return 0;
   if (loc == NULL) return 0;
@@ -530,32 +528,55 @@ CAMLexport void caml_modify_local (value obj, intnat i, value val)
   }
 }
 
-CAMLexport caml_local_arenas* caml_get_local_arenas(caml_domain_state* dom)
+CAMLexport caml_local_arenas* caml_refresh_locals(struct stack_info* stack)
 {
-  caml_local_arenas* s = dom->local_arenas;
-  if (s != NULL)
-    s->saved_sp = dom->local_sp;
+  caml_local_arenas* s = stack->local_arenas;
+
+  // OCaml code may have updated [Caml_state->local_sp], so sync it to
+  // the [stack_info] structure, in the case where we are working with
+  // the current stack.
+
+  if (stack == Caml_state->current_stack) {
+    Caml_state->current_stack->local_sp = Caml_state->local_sp;
+  }
+
   return s;
 }
 
-CAMLexport void caml_set_local_arenas(caml_domain_state* dom, caml_local_arenas* s)
+CAMLexport void caml_use_local_arenas(caml_local_arenas* s, uintnat local_sp)
 {
-  dom->local_arenas = s;
+  Caml_state->current_stack->local_arenas = s;
   if (s != NULL) {
     struct caml_local_arena a = s->arenas[s->count - 1];
-    dom->local_sp = s->saved_sp;
-    dom->local_top = (void*)(a.base + a.length);
-    dom->local_limit = - a.length;
+    Caml_state->current_stack->local_sp = local_sp;
+    Caml_state->current_stack->local_top = (void*)(a.base + a.length);
+    Caml_state->current_stack->local_limit = - a.length;
   } else {
-    dom->local_sp = 0;
-    dom->local_top = NULL;
-    dom->local_limit = 0;
+    Caml_state->current_stack->local_sp = 0;
+    Caml_state->current_stack->local_top = NULL;
+    Caml_state->current_stack->local_limit = 0;
   }
+
+  // Sync changes to the root of [Caml_state], ready for OCaml code.
+  Caml_state->local_sp = Caml_state->current_stack->local_sp;
+  Caml_state->local_top = Caml_state->current_stack->local_top;
+  Caml_state->local_limit = Caml_state->current_stack->local_limit;
+}
+
+void caml_free_local_arenas(caml_local_arenas* s) {
+
+  if (s == NULL) return;
+
+  for (int i = 0; i < s->count; i++) {
+    caml_stat_free(s->arenas[i].alloc_block);
+  }
+
+  caml_stat_free(s);
 }
 
 void caml_local_realloc(void)
 {
-  caml_local_arenas* s = caml_get_local_arenas(Caml_state);
+  caml_local_arenas* s = caml_refresh_locals(Caml_state->current_stack);
   intnat i;
   char* arena;
   caml_stat_block block;
@@ -563,7 +584,6 @@ void caml_local_realloc(void)
     s = caml_stat_alloc(sizeof(*s));
     s->count = 0;
     s->next_length = 0;
-    s->saved_sp = Caml_state->local_sp;
   }
   if (s->count == Max_local_arenas)
     caml_fatal_error("Local allocation stack overflow - exceeded Max_local_arenas");
@@ -577,7 +597,7 @@ void caml_local_realloc(void)
       s->next_length *= 4;
     }
     /* may need to loop, if a very large allocation was requested */
-  } while (s->saved_sp + s->next_length < 0);
+  } while (Caml_state->local_sp + s->next_length < 0);
 
   arena = caml_stat_alloc_aligned_noexc(s->next_length, 0, &block);
   if (arena == NULL)
@@ -587,17 +607,17 @@ void caml_local_realloc(void)
     *((header_t*)(arena + i)) = Debug_uninit_local;
   }
 #endif
-  for (i = s->saved_sp; i < 0; i += sizeof(value)) {
+  for (i = Caml_state->local_sp; i < 0; i += sizeof(value)) {
     *((header_t*)(arena + s->next_length + i)) = Local_uninit_hd;
   }
-  caml_gc_message(0x08,
+  CAML_GC_MESSAGE(STACKS,
                   "Growing local stack to %"ARCH_INTNAT_PRINTF_FORMAT"d kB\n",
                   s->next_length / 1024);
   s->count++;
   s->arenas[s->count-1].length = s->next_length;
   s->arenas[s->count-1].base = arena;
   s->arenas[s->count-1].alloc_block = block;
-  caml_set_local_arenas(Caml_state, s);
+  caml_use_local_arenas(s, Caml_state->local_sp);
   CAMLassert(Caml_state->local_limit <= Caml_state->local_sp);
 }
 
@@ -954,13 +974,21 @@ CAMLexport caml_stat_string caml_stat_strdup(const char *s)
 
 #ifdef _WIN32
 
-CAMLexport wchar_t * caml_stat_wcsdup(const wchar_t *s)
+CAMLexport wchar_t * caml_stat_wcsdup_noexc(const wchar_t *s)
 {
   int slen = wcslen(s);
   wchar_t* result = caml_stat_alloc((slen + 1)*sizeof(wchar_t));
   if (result == NULL)
-    caml_fatal_out_of_memory();
+    return NULL;
   memcpy(result, s, (slen + 1)*sizeof(wchar_t));
+  return result;
+}
+
+CAMLexport wchar_t * caml_stat_wcsdup(const wchar_t *s)
+{
+  wchar_t* result = caml_stat_wcsdup_noexc(s);
+  if (result == NULL)
+    caml_raise_out_of_memory();
   return result;
 }
 
@@ -1028,4 +1056,47 @@ CAMLexport wchar_t* caml_stat_wcsconcat(int n, ...)
   return result;
 }
 
+#endif
+
+#ifdef WITH_ADDRESS_SANITIZER
+/* Provides reasonable default settings for AddressSanitizer.
+   Ideally we'd make this a weak symbol so that user programs
+   could easily override it at compile time, but unfortunately that
+   doesn't work because the AddressSanitizer runtime library itself
+   already provides a weak symbol with this name, so there'd be no
+   guarantee which would get used if this symbol was also weak.
+
+   Users can still customize the behavior of AddressSanitizer via the
+   [ASAN_OPTIONS] environment variable at runtime.
+   */
+const char *
+#ifdef __clang___
+__attribute__((used, retain))
+#else
+__attribute__((used))
+#endif
+__asan_default_options(void) {
+  return "detect_leaks=false,"
+         "halt_on_error=false,"
+         "detect_stack_use_after_return=false";
+}
+
+#define CREATE_ASAN_REPORT_WRAPPER(memory_access, size) \
+void __asan_report_ ## memory_access ## size ## _noabort(const void* addr); \
+CAMLexport void __attribute__((preserve_all)) caml_asan_report_ ## memory_access ## size ## _noabort(const void* addr) { \
+  return __asan_report_ ## memory_access ## size ## _noabort(addr); \
+}
+
+CREATE_ASAN_REPORT_WRAPPER(load, 1)
+CREATE_ASAN_REPORT_WRAPPER(load, 2)
+CREATE_ASAN_REPORT_WRAPPER(load, 4)
+CREATE_ASAN_REPORT_WRAPPER(load, 8)
+CREATE_ASAN_REPORT_WRAPPER(load, 16)
+CREATE_ASAN_REPORT_WRAPPER(store, 1)
+CREATE_ASAN_REPORT_WRAPPER(store, 2)
+CREATE_ASAN_REPORT_WRAPPER(store, 4)
+CREATE_ASAN_REPORT_WRAPPER(store, 8)
+CREATE_ASAN_REPORT_WRAPPER(store, 16)
+
+#undef CREATE_ASAN_REPORT_WRAPPER
 #endif

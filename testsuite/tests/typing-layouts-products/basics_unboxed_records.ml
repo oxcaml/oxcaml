@@ -6,6 +6,9 @@
  }
 *)
 
+(* NOTE: When adding tests to this file, also update
+   [typing-layouts-products/basics_implicit_unboxed_records.ml] *)
+
 open Stdlib_upstream_compatible
 
 (**************************************************************************)
@@ -242,18 +245,24 @@ Line 2, characters 0-37:
 2 | and r_bad = #{ y : float#; z : s t2 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r_bad is any & any
+       The layout of r_bad is '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed record.
        But the layout of r_bad must be a sublayout of value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
-(* CR layouts v7.2: the following should typecheck. *)
 type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
 and r = #{ i : int ; f : float# }
 [%%expect{|
 type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r
 and r = #{ i : int; f : float#; }
+|}]
+
+type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
+and r = #{ i : int }
+[%%expect{|
+type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r
+and r = #{ i : int; }
 |}]
 
 (*******************)
@@ -399,6 +408,7 @@ type u : immediate
 type t = #{ x : float#; y : u; }
 |}]
 
+(********************)
 (* Recursive groups *)
 
 type ('a : float64) t_float64_id = 'a
@@ -547,27 +557,27 @@ Error: Signature mismatch:
 (*****************************************************)
 (* Special-cased errors for boxed/unboxed mismatches *)
 
-type t_u = #{ u : int }
-type t = { b : int }
+type t_u = #{ u : float# }
+type t = { b : float# }
 [%%expect{|
-type t_u = #{ u : int; }
-type t = { b : int; }
+type t_u = #{ u : float#; }
+type t = { b : float#; }
 |}]
 
-let f () : t_u = { b = 1 }
+let f () : t_u = { b = #1.0 }
 [%%expect{|
-Line 1, characters 17-26:
-1 | let f () : t_u = { b = 1 }
-                     ^^^^^^^^^
+Line 1, characters 17-29:
+1 | let f () : t_u = { b = #1.0 }
+                     ^^^^^^^^^^^^
 Error: This boxed record expression should be unboxed instead,
        the expected type is "t_u"
 |}]
 
-let f () : t = #{ u = 2 }
+let f () : t = #{ u = #2.0 }
 [%%expect{|
-Line 1, characters 15-25:
-1 | let f () : t = #{ u = 2 }
-                   ^^^^^^^^^^
+Line 1, characters 15-28:
+1 | let f () : t = #{ u = #2.0 }
+                   ^^^^^^^^^^^^^
 Error: This unboxed record expression should be boxed instead,
        the expected type is "t"
 |}]
@@ -608,19 +618,20 @@ Error: This expression has type "t",
        which is a boxed record rather than an unboxed one.
 |}]
 
-let _ = #{ b = 5 }
+let _ = #{ b = #5.0 }
 [%%expect{|
 Line 1, characters 11-12:
-1 | let _ = #{ b = 5 }
+1 | let _ = #{ b = #5.0 }
                ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
+      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
-let _ = { u = 5 }
+let _ = { u = #5.0 }
 [%%expect{|
 Line 1, characters 10-11:
-1 | let _ = { u = 5 }
+1 | let _ = { u = #5.0 }
               ^
 Error: Unbound record field "u"
 Hint: There is an unboxed record field with this name.
@@ -633,6 +644,7 @@ Line 1, characters 22-23:
                           ^
 Error: Unbound record field "u"
 Hint: There is an unboxed record field with this name.
+      To project an unboxed record field, use ".#u" instead of ".u".
 |}]
 
 let bad_get t = t.#b
@@ -642,8 +654,10 @@ Line 1, characters 19-20:
                        ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
+      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
+(*****************************************************************************)
 (* Initial expressions for functionally updated records are always evaluated *)
 
 type t = #{ x : string }
@@ -724,20 +738,14 @@ Error: The universal type variable 'a was declared to have kind any.
 type a = B of b
 and b : any = #{ i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-15:
-1 | type a = B of b
-             ^^^^^^
-Error: Type "b" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b
+and b = #{ i : int; j : int; }
 |}]
 type a = B of b_portable
 and b_portable : any mod portable = #{ i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-24:
-1 | type a = B of b_portable
-             ^^^^^^^^^^^^^^^
-Error: Type "b_portable" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b_portable
+and b_portable = #{ i : int; j : int; }
 |}]
 type a = B of b
 and b : any & any & any = #{ i : int ; j : int }
@@ -751,3 +759,20 @@ Error:
        But the layout of b must be representable
          because it's the type of a constructor field.
 |}]
+
+type q : any mod portable = #{ x : int -> int; y : int -> q }
+
+[%%expect{|
+Line 1, characters 0-61:
+1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "q" is
+         value mod aliased immutable non_float
+         & value mod aliased immutable non_float
+         because it is an unboxed record.
+       But the kind of type "q" must be a subkind of
+         value_or_null mod portable & value_or_null mod portable
+         because of the annotation on the declaration of the type q.
+|}]
+(* CR layouts v2.8: That error message is incomprehensible without
+   with-bounds. *)

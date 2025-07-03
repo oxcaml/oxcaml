@@ -33,7 +33,7 @@ module Runtime_4 = struct
     end
 
     let[@inline] access f =
-      try f Access.Access with
+      try (f [@inlined hint]) Access.Access with
       | exn ->
         let bt = Printexc.get_raw_backtrace () in
         let exn_string = Printexc.to_string exn in
@@ -44,7 +44,7 @@ module Runtime_4 = struct
 
     let init () = ()
 
-    type 'a key : value mod portable uncontended = Key of (int * (Access.t -> 'a))
+    type 'a key : value mod portable contended = Key of (int * (Access.t -> 'a))
     [@@unboxed]
     [@@unsafe_allow_any_mode_crossing "runtime4 only"]
 
@@ -94,12 +94,12 @@ module Runtime_4 = struct
   (******** Callbacks **********)
 
   (* first spawn, domain startup and at exit functionality *)
-  let first_domain_spawned = Atomic.Safe.make false
+  let first_domain_spawned = Atomic.make false
 
   let first_spawn_function = ref (fun () -> ())
 
   let before_first_spawn f =
-    if Atomic.Safe.get first_domain_spawned then
+    if Atomic.Contended.get first_domain_spawned then
       raise (Invalid_argument "first domain already spawned")
     else begin
       let old_f = !first_spawn_function in
@@ -127,7 +127,7 @@ module Runtime_4 = struct
   (* Unimplemented functions *)
   let not_implemented () =
     failwith "Multi-domain functionality not supported in runtime4"
-  type !'a t
+  type !'a t : value mod portable contended with 'a
   type id = int
   let spawn' _ = not_implemented ()
   let join _ = not_implemented ()
@@ -150,14 +150,14 @@ module Runtime_5 = struct
       | Running
       | Finished of ('a, exn) result [@warning "-unused-constructor"]
 
-    type 'a term_sync = {
+    type 'a term_sync : value mod portable contended with 'a = {
       (* protected by [mut] *)
       mutable state : 'a state [@warning "-unused-field"] ;
       mut : Mutex.t ;
       cond : Condition.t ;
-    }
+    } [@@unsafe_allow_any_mode_crossing]
 
-    external spawn : (unit -> 'a) @ portable -> 'a term_sync -> t @@ portable
+    external spawn : (unit -> 'a) @ portable once -> 'a term_sync -> t @@ portable
       = "caml_domain_spawn"
     external self : unit -> t @@ portable
       = "caml_ml_domain_id" [@@noalloc]
@@ -185,7 +185,7 @@ module Runtime_5 = struct
     end
 
     let[@inline] access (f : Access.t -> 'a @ portable contended) =
-      try f Access.Access with
+      try (f [@inlined hint]) Access.Access with
       | exn ->
         let bt = Printexc.get_raw_backtrace () in
         let exn_string = Printexc.to_string exn in
@@ -227,27 +227,26 @@ module Runtime_5 = struct
 
     let init () = create_dls ()
 
-    (* CR with-kinds: Remove [Key] wrapper. *)
-    type 'a key : value mod portable uncontended =
-        Key of (int * (Access.t -> 'a) Modes.Portable.t) [@@unboxed]
-    [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
+    type 'a key = int * (Access.t -> 'a) Modes.Portable.t
 
-    let key_counter = Atomic.Safe.make 0
+    let key_counter = Atomic.make 0
 
-    type key_initializer : value mod portable uncontended =
+    type key_initializer : immutable_data =
         KI: 'a key * ('a -> (Access.t -> 'a) @ portable) @@ portable -> key_initializer
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
-    let parent_keys = Atomic.Safe.make ([] : key_initializer list)
+    type key_initializer_list : immutable_data = key_initializer list
+
+    let parent_keys = Atomic.make ([] : key_initializer_list)
 
     let rec add_parent_key ki =
-      let l = Atomic.Safe.get parent_keys in
-      if not (Atomic.Safe.compare_and_set parent_keys l (ki :: l))
+      let l = Atomic.Contended.get parent_keys in
+      if not (Atomic.Contended.compare_and_set parent_keys l (ki :: l))
       then add_parent_key ki
 
     let new_key' ?split_from_parent init_orphan =
       let idx = Atomic.fetch_and_add key_counter 1 in
-      let k = Key (idx, { Modes.Portable.portable = init_orphan }) in
+      let k = idx, { Modes.Portable.portable = init_orphan } in
       begin match split_from_parent with
       | None -> ()
       | Some split -> add_parent_key (KI(k, split))
@@ -282,7 +281,7 @@ module Runtime_5 = struct
         else maybe_grow idx
       end
 
-    let set (type a) (_ : Access.t) (Key (idx, _init)) (x : a) =
+    let set (type a) (_ : Access.t) (idx, _init) (x : a) =
       let st = maybe_grow idx in
       (* [Sys.opaque_identity] ensures that flambda does not look at the type of
       * [x], which may be a [float] and conclude that the [st] is a float array.
@@ -299,7 +298,7 @@ module Runtime_5 = struct
         true
       ) else false
 
-    let get (type a) access (Key (idx, init) : a key) : a =
+    let get (type a) access ((idx, init) : a key) : a =
       let st = maybe_grow idx in
       let obj = st.(idx) in
       if Obj_opt.is_some obj
@@ -329,15 +328,14 @@ module Runtime_5 = struct
         end
       end
 
-    type key_value : value mod portable uncontended =
+    type key_value : value mod portable contended =
         KV : 'a key * (Access.t -> 'a) @@ portable -> key_value
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
     let get_initial_keys access : key_value list =
       List.map
         (fun (KI (k, split)) -> KV (k, (split (get access k))))
-        (* CR with-kinds: Unnecessary magic. *)
-        (Obj.magic_uncontended (Atomic.Safe.get parent_keys))
+        (Atomic.Contended.get parent_keys)
 
     let set_initial_keys access (l: key_value list) =
       List.iter (fun (KV (k, v)) -> set access k (v access)) l
@@ -354,12 +352,12 @@ module Runtime_5 = struct
   (******** Callbacks **********)
 
   (* first spawn, domain startup and at exit functionality *)
-  let first_domain_spawned = Atomic.Safe.make false
+  let first_domain_spawned = Atomic.make false
 
   let first_spawn_function = Obj.magic_portable (ref (fun () -> ()))
 
   let before_first_spawn f =
-    if Atomic.Safe.get first_domain_spawned then
+    if Atomic.Contended.get first_domain_spawned then
       raise (Invalid_argument "first domain already spawned")
     else begin
       let old_f = !first_spawn_function in
@@ -368,8 +366,8 @@ module Runtime_5 = struct
     end
 
   let do_before_first_spawn () =
-    if not (Atomic.Safe.get first_domain_spawned) then begin
-      Atomic.Safe.set first_domain_spawned true;
+    if not (Atomic.Contended.get first_domain_spawned) then begin
+      Atomic.Contended.set first_domain_spawned true;
       let first_spawn_function = Obj.magic_uncontended first_spawn_function in
       !first_spawn_function();
       (* Release the old function *)
@@ -395,9 +393,7 @@ module Runtime_5 = struct
 
   let spawn' f =
     do_before_first_spawn ();
-    let pk = DLS.access (fun access -> DLS.get_initial_keys access
-      |> Obj.magic_portable (* CR with-kinds: Unnecessary magic. *))
-    in
+    let pk = DLS.access (fun access -> DLS.get_initial_keys access) in
 
     (* [term_sync] is used to synchronize with the joining domains *)
     let term_sync =
@@ -407,7 +403,6 @@ module Runtime_5 = struct
     in
 
     let body () =
-      let pk = Obj.magic_uncontended pk (* CR with-kinds: Unneccessary magic. *) in
       match
         DLS.create_dls ();
         let access = DLS.Access.Access in
@@ -458,10 +453,10 @@ module type S = sig
       val for_initial_domain : t @@ nonportable
     end
 
-    type 'a key : value mod portable uncontended
+    type 'a key : value mod portable contended
 
     val access
-      :  (Access.t -> 'a @ portable contended) @ local portable
+      :  (Access.t -> 'a @ portable contended) @ local portable unyielding once
       -> 'a @ portable contended
       @@ portable
 
@@ -477,8 +472,8 @@ module type S = sig
     val init : unit -> unit
   end
 
-  type !'a t
-  val spawn' : (DLS.Access.t -> 'a) @ portable -> 'a t @@ portable
+  type !'a t : value mod portable contended with 'a
+  val spawn' : (DLS.Access.t -> 'a) @ portable once -> 'a t @@ portable
   val join : 'a t -> 'a @@ portable
   type id = private int
   val get_id : 'a t -> id @@ portable

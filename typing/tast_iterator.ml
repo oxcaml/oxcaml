@@ -262,15 +262,20 @@ let pat
   | Tpat_construct (lid, _, l, vto) ->
       iter_loc sub lid;
       List.iter (sub.pat sub) l;
-      Option.iter (fun (ids, ct) ->
-        List.iter (iter_loc sub) ids; sub.typ sub ct) vto
+      Option.iter (fun (vs, ct) ->
+        List.iter
+          (fun (v, jk) ->
+             iter_loc sub v;
+             Option.iter (sub.jkind_annotation sub) jk)
+          vs;
+        sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
   | Tpat_record (l, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_record_unboxed_product (l, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
-  | Tpat_alias (p, _, s, _, _) -> sub.pat sub p; iter_loc sub s
+  | Tpat_alias (p, _, s, _, _, _) -> sub.pat sub p; iter_loc sub s
   | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
@@ -308,7 +313,7 @@ let function_body sub body =
   | Tfunction_cases
       { fc_cases; fc_exp_extra; fc_loc; fc_attributes; fc_env;
         fc_arg_mode = _; fc_arg_sort = _; fc_ret_type = _;
-        fc_partial = _; fc_param = _;
+        fc_partial = _; fc_param = _; fc_param_debug_uid = _;
       } ->
       List.iter (sub.case sub) fc_cases;
       Option.iter (extra sub) fc_exp_extra;
@@ -358,11 +363,11 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
   | Texp_record { fields; extended_expression; _} ->
       iter_fields fields;
-      Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
+      Option.iter (fun (exp, _, _) -> sub.expr sub exp) extended_expression;
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
-  | Texp_field (exp, lid, _, _, _) ->
+  | Texp_field (exp, _, lid, _, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
   | Texp_unboxed_field (exp, _, lid, _, _) ->
@@ -674,6 +679,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
       sub.typ sub t
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
+  | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 
 let class_structure sub {cstr_self; cstr_fields; _} =

@@ -1,5 +1,5 @@
 (******************************************************************************
- *                             flambda-backend                                *
+ *                                  OxCaml                                    *
  *                       Mark Shinwell, Jane Street                           *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
@@ -26,6 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+open! Int_replace_polymorphic_compare
 open! Asm_targets
 open! Dwarf_low
 open! Dwarf_high

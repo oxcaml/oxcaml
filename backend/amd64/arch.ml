@@ -12,7 +12,9 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-[@@@ocaml.warning "+4"]
+[@@@ocaml.warning "+a-40-41-42"]
+
+open! Int_replace_polymorphic_compare
 
 module Extension = struct
   module T = struct
@@ -29,7 +31,20 @@ module Extension = struct
       | BMI
       | BMI2
 
-    let compare = compare
+    let rank = function
+      | POPCNT -> 0
+      | PREFETCHW -> 1
+      | PREFETCHWT1 -> 2
+      | SSE3 -> 3
+      | SSSE3 -> 4
+      | SSE4_1 -> 5
+      | SSE4_2 -> 6
+      | CLMUL -> 7
+      | LZCNT -> 8
+      | BMI -> 9
+      | BMI2 -> 10
+
+    let compare left right = Int.compare (rank left) (rank right)
   end
 
   include T
@@ -94,6 +109,8 @@ let trap_notes = ref true
 (* Emit extension symbols for CPUID startup check  *)
 let arch_check_symbols = ref true
 
+let is_asan_enabled = ref Config.with_address_sanitizer
+
 (* Machine-specific command-line options *)
 
 let command_line_options =
@@ -104,7 +121,11 @@ let command_line_options =
     "-ftrap-notes", Arg.Set trap_notes,
       " Emit .note.ocaml_eh section with trap handling information (default)";
     "-fno-trap-notes", Arg.Clear trap_notes,
-      " Do not emit .note.ocaml_eh section with trap handling information"
+      " Do not emit .note.ocaml_eh section with trap handling information";
+    "-fno-asan",
+      Arg.Clear is_asan_enabled,
+      " Disable AddressSanitizer. This is only meaningful if the compiler was \
+       built with AddressSanitizer support enabled."
   ] @ Extension.args
 
 (* Specific operations for the AMD64 processor *)
@@ -112,6 +133,12 @@ let command_line_options =
 open Format
 
 type sym_global = Global | Local
+
+let equal_sym_global left right =
+  match left, right with
+  | Global, Global
+  | Local, Local -> true
+  | (Global | Local), _ -> false
 
 type addressing_mode =
     Ibased of string * sym_global * int (* symbol + displ *)
@@ -132,6 +159,7 @@ type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
 type float_width = Cmm.float_width
 
+(* Specific operations, including [Simd], must not raise. *)
 type specific_operation =
     Ilea of addressing_mode            (* "lea" gives scaled adds *)
   | Istore_int of nativeint * addressing_mode * bool
@@ -151,6 +179,7 @@ type specific_operation =
   | Isfence                            (* store fence *)
   | Imfence                            (* memory fence *)
   | Ipause                             (* hint for spin-wait loops *)
+  | Ipackf32                           (* UNPCKLPS on registers; see Cpackf32 *)
   | Isimd of Simd.operation            (* SIMD instruction set operations *)
   | Isimd_mem of Simd.Mem.operation * addressing_mode
                                        (* SIMD instruction set operations
@@ -273,6 +302,8 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "mfence"
   | Irdpmc ->
       fprintf ppf "rdpmc %a" printreg arg.(0)
+  | Ipackf32 ->
+      fprintf ppf "packf32 %a %a" printreg arg.(0) printreg arg.(1)
   | Isimd simd ->
       Simd.print_operation printreg simd ppf arg
   | Isimd_mem (simd, addr) ->
@@ -281,7 +312,7 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "pause"
   | Icldemote _ ->
       fprintf ppf "cldemote %a" printreg arg.(0)
-  | Iprefetch { is_write; locality; } ->
+  | Iprefetch { is_write; locality; _ } ->
       fprintf ppf "prefetch is_write=%b prefetch_temporal_locality_hint=%s %a"
         is_write (string_of_prefetch_temporal_locality_hint locality)
         printreg arg.(0)
@@ -302,24 +333,16 @@ let operation_is_pure = function
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
-  | Isimd op -> Simd.is_pure op
-  | Isimd_mem (op, _addr) -> Simd.Mem.is_pure op
-
-(* Specific operations that can raise *)
-(* Keep in sync with [Vectorize_specific] *)
-let operation_can_raise = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32
-  | Ifloatarithmem _
-  | Irdtsc | Irdpmc | Ipause | Isimd _ | Isimd_mem _
-  | Ilfence | Isfence | Imfence
-  | Istore_int (_, _, _) | Ioffset_loc (_, _)
-  | Icldemote _ | Iprefetch _ -> false
+  | Ipackf32 -> true
+  | Isimd op -> Simd.is_pure_operation op
+  | Isimd_mem (op, _addr) -> Simd.Mem.is_pure_operation op
 
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
   | Ifloatarithmem _
-  | Irdtsc | Irdpmc | Ipause | Isimd _ | Isimd_mem _
+  | Irdtsc | Irdpmc | Ipause | Ipackf32
+  | Isimd _ | Isimd_mem _
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
@@ -346,7 +369,7 @@ let float_cond_and_need_swap cond =
 let equal_addressing_mode left right =
   match left, right with
   | Ibased (left_sym, left_glob, left_displ), Ibased (right_sym, right_glob, right_displ) ->
-    String.equal left_sym right_sym && left_glob = right_glob && Int.equal left_displ right_displ
+    String.equal left_sym right_sym && equal_sym_global left_glob right_glob && Int.equal left_displ right_displ
   | Iindexed left_displ, Iindexed right_displ ->
     Int.equal left_displ right_displ
   | Iindexed2 left_displ, Iindexed2 right_displ ->
@@ -401,7 +424,10 @@ let equal_specific_operation left right =
     true
   | Imfence, Imfence ->
     true
-  | Ipause, Ipause -> true
+  | Ipause, Ipause ->
+    true
+  | Ipackf32, Ipackf32 ->
+    true
   | Icldemote x, Icldemote x' -> equal_addressing_mode x x'
   | Iprefetch { is_write = left_is_write; locality = left_locality; addr = left_addr; },
     Iprefetch { is_write = right_is_write; locality = right_locality; addr = right_addr; } ->
@@ -414,7 +440,7 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-     Ipause | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+     Ipause | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
     false
 
 (* addressing mode functions *)
@@ -510,7 +536,10 @@ let isomorphic_specific_operation op1 op2 =
     true
   | Imfence, Imfence ->
     true
-  | Ipause, Ipause -> true
+  | Ipause, Ipause ->
+    true
+  | Ipackf32, Ipackf32 ->
+    true
   | Icldemote x, Icldemote x' -> equal_addressing_mode_without_displ x x'
   | Iprefetch { is_write = left_is_write; locality = left_locality; addr = left_addr; },
     Iprefetch { is_write = right_is_write; locality = right_locality; addr = right_addr; } ->
@@ -523,5 +552,5 @@ let isomorphic_specific_operation op1 op2 =
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-     Ipause | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+     Ipause | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
     false

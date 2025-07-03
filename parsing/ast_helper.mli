@@ -92,6 +92,7 @@ module Typ :
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
+    val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
     val force_poly: core_type -> core_type
@@ -124,7 +125,7 @@ module Pat:
                        -> (string option * pattern) list -> closed_flag
                        -> pattern
     val construct: ?loc:loc -> ?attrs:attrs ->
-      lid -> (str list * pattern) option -> pattern
+      lid -> ((str * jkind_annotation option) list * pattern) option -> pattern
     val variant: ?loc:loc -> ?attrs:attrs -> label -> pattern option -> pattern
     val record: ?loc:loc -> ?attrs:attrs -> (lid * pattern) list -> closed_flag
                 -> pattern

@@ -99,7 +99,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       | (_, _, Some ([], _t)) ->
           fprintf ppf "@[<2>%s@ @[(%a : _)@]@]" name (pretty_vals ",") vs
       | (_, _, Some (vl, _t)) ->
-          let vars = List.map (fun x -> Ident.name x.txt) vl in
+          let vars = List.map (fun (x, _) -> Ident.name x.txt) vl in
           fprintf ppf "@[<2>%s@ (type %s)@ @[(%a : _)@]@]"
             name (String.concat " " vars) (pretty_vals ",") vs
       end
@@ -114,7 +114,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
-  | Tpat_alias (v, x, _, _, _) ->
+  | Tpat_alias (v, x, _, _, _, _) ->
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)

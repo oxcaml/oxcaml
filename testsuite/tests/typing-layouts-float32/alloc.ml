@@ -1,6 +1,5 @@
 (* TEST
  flambda2;
- arch_amd64;
  {
    include stdlib_stable;
    native;
@@ -9,7 +8,7 @@
 
 (* mshinwell: This test is now only run with flambda2, as the corresponding
    ocamltest predicate is reliable for testing whether this is an
-   flambda-backend build. *)
+   oxcaml build. *)
 
 (* A test comparing allocations with unboxed floats to allocations with boxed
    floats. *)

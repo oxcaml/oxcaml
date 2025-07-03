@@ -214,7 +214,7 @@ let iter_on_occurrences
           f ~namespace:Value exp_env path lid
       | Texp_construct (lid, constr_desc, _, _) ->
           add_constructor_description exp_env lid constr_desc
-      | Texp_field (_, lid, label_desc, _, _)
+      | Texp_field (_, _, lid, label_desc, _, _)
       | Texp_setfield (_, _, lid, label_desc, _) ->
           add_label ~namespace:Label exp_env lid label_desc
       | Texp_unboxed_field (_, _, lid, label_desc, _) ->
@@ -267,7 +267,7 @@ let iter_on_occurrences
       | Ttyp_open (path, lid, _ct) ->
           f ~namespace:Module ctyp_env path lid
       | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
-      | Ttyp_unboxed_tuple _ | Ttyp_quote _ | Ttyp_splice _
+      | Ttyp_unboxed_tuple _ | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
       | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos -> ());
       default_iterator.typ sub ct);
 

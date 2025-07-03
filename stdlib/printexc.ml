@@ -22,7 +22,9 @@ open Printf
 
 type t = exn = ..
 
-let printers = Atomic.Safe.make []
+type printers = (exn -> string option) Modes.Portable.t list
+
+let printers : printers Atomic.t = Atomic.make []
 
 let locfmt () = format_of_string "File \"%s\", line %d, characters %d-%d: %s"
 
@@ -50,12 +52,12 @@ let fields x =
 
 let use_printers x =
   let rec conv = function
-    | hd :: tl ->
+    | { Modes.Portable.portable = hd } :: tl ->
         (match hd x with
          | None | exception _ -> conv tl
          | Some s -> Some s)
     | [] -> None in
-  conv (Atomic.Safe.get printers)
+  conv (Atomic.Contended.get printers)
 
 let destruct_ext_constructor x =
   if Obj.tag x <> 0 then
@@ -104,7 +106,7 @@ let catch fct arg =
     eprintf "Uncaught exception: %s\n" (to_string x);
     exit 2
 
-type raw_backtrace_slot
+type raw_backtrace_slot : immutable_data
 type raw_backtrace_entry = private int
 type raw_backtrace = raw_backtrace_entry array
 
@@ -113,7 +115,8 @@ let raw_backtrace_entries bt = bt
 external get_raw_backtrace:
   unit -> raw_backtrace @@ portable = "caml_get_exception_raw_backtrace"
 
-external raise_with_backtrace: exn -> raw_backtrace -> 'a @ portable @@ portable
+external raise_with_backtrace: ('a : value_or_null).
+  exn -> raw_backtrace -> 'a @ portable unique @@ portable
   = "%raise_with_backtrace"
 
 (* Disable warning 37: values are constructed in the runtime *)
@@ -286,9 +289,9 @@ external record_backtrace: bool -> unit @@ portable = "caml_record_backtrace"
 external backtrace_status: unit -> bool @@ portable = "caml_backtrace_status"
 
 let rec register_printer_safe fn =
-  let old_printers = Atomic.Safe.get printers in
-  let new_printers = fn :: old_printers in
-  let success = Atomic.Safe.compare_and_set printers old_printers new_printers in
+  let old_printers = Atomic.Contended.get printers in
+  let new_printers = { Modes.Portable.portable = fn } :: old_printers in
+  let success = Atomic.Contended.compare_and_set printers old_printers new_printers in
   if not success then register_printer_safe fn
 
 let register_printer_unsafe fn = register_printer_safe (Obj.magic_portable fn)
@@ -325,7 +328,6 @@ let errors = [| "";
       bytecode executable program file cannot be opened;\n \
       -- too many open files. Try running with OCAMLRUNPARAM=b=2)"
 |]
-|> Obj.magic_portable (* CR with-kinds: Unnecessary magic. *)
 
 let default_uncaught_exception_handler exn raw_backtrace =
   eprintf "Fatal error: exception %s\n" (to_string exn);
@@ -339,10 +341,11 @@ let default_uncaught_exception_handler exn raw_backtrace =
     prerr_endline errors.(abs status);
   flush stderr
 
-let uncaught_exception_handler = Atomic.Safe.make default_uncaught_exception_handler
+let uncaught_exception_handler =
+  Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
-let set_uncaught_exception_handler_safe fn = Atomic.Safe.set uncaught_exception_handler fn
-
+let set_uncaught_exception_handler_safe fn =
+  Atomic.Contended.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 let set_uncaught_exception_handler_unsafe fn =
   set_uncaught_exception_handler_safe (Obj.magic_portable fn)
@@ -367,7 +370,7 @@ let handle_uncaught_exception' exn debugger_in_use =
     in
     (try Stdlib.do_at_exit () with _ -> ());
     try
-      (Atomic.Safe.get uncaught_exception_handler) exn raw_backtrace
+      (Atomic.Contended.get uncaught_exception_handler).portable exn raw_backtrace
     with exn' ->
       let raw_backtrace' = try_get_raw_backtrace () in
       eprintf "Fatal error: exception %s\n" (to_string exn);

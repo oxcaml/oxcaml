@@ -241,11 +241,13 @@ let rec core_type i ppf x =
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
       core_type i ppf t
   | Ptyp_quote t ->
-    line i ppf "Ptyp_quote\n";
-    core_type i ppf t
+      line i ppf "Ptyp_quote\n";
+      core_type i ppf t
   | Ptyp_splice t ->
       line i ppf "Ptyp_splice\n";
       core_type i ppf t
+  | Ptyp_of_kind jkind ->
+      line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
@@ -283,7 +285,11 @@ and pattern i ppf x =
       line i ppf "Ppat_construct %a\n" fmt_longident_loc li;
       option i
         (fun i ppf (vl, p) ->
-          list i string_loc ppf vl;
+          list i
+            (fun i ppf (v, jk) ->
+               string_loc i ppf v;
+               jkind_annotation_opt i ppf jk)
+            ppf vl;
           pattern i ppf p)
         ppf po
   | Ppat_variant (l, po) ->
@@ -544,10 +550,11 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
       line i ppf "Mod\n";
       jkind_annotation (i+1) ppf jkind;
       modes (i+1) ppf m
-  | With (jkind, type_) ->
+  | With (jkind, type_, modalities) ->
       line i ppf "With\n";
       jkind_annotation (i+1) ppf jkind;
-      core_type (i+1) ppf type_
+      core_type (i+1) ppf type_;
+      list i modality ppf modalities
   | Kind_of type_ ->
       line i ppf "Kind_of\n";
       core_type (i+1) ppf type_

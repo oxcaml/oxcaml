@@ -59,14 +59,43 @@ let identity =
     last_compose = None;
   }
 
+(* Add a replacement for both a path and its unboxed version, even if that
+   unboxed version doesn't exist (as we can't tell here whether it exists).
+   Asserts we never add an unboxed version directly. *)
+let add_type_replacement types id replacement =
+  match replacement with
+  | Path p ->
+    let types = Path.Map.add id (Path p) types in
+    if Path.is_unboxed_version p then
+      types
+    else
+      Path.Map.add
+        (Path.unboxed_version id) (Path (Path.unboxed_version p)) types
+  | Type_function { params; body } ->
+    let types = Path.Map.add id (Type_function { params; body }) types in
+    match get_desc body with
+    | Tconstr (path, args, _)
+      when not (Path.is_unboxed_version path) ->
+      let body =
+        newty3 ~level:(get_level body) ~scope:(get_scope body)
+          (Tconstr(Path.unboxed_version path, args, ref Mnil))
+      in
+      Path.Map.add
+        (Path.unboxed_version id) (Type_function { params; body }) types
+    | _ -> types
+
 let add_type_path id p s =
-  { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
-let add_type id p s = add_type_path (Pident id) p s
+  let types = add_type_replacement s.types id (Path p) in
+  { s with types; last_compose = None }
+
+let add_type id p s =
+  add_type_path (Pident id) p s
 
 let add_type_function id ~params ~body s =
-  { s with types = Path.Map.add id (Type_function { params; body }) s.types;
-    last_compose = None
-  }
+  let types =
+    add_type_replacement s.types id (Type_function { params; body })
+  in
+  { s with types; last_compose = None }
 
 let add_module_path id p s =
   { s with modules = Path.Map.add id p s.modules; last_compose = None }
@@ -80,17 +109,58 @@ type additional_action_config =
   | Duplicate_variables
   | Prepare_for_saving
 
-let with_additional_action =
-  (* Memoize the built-in jkinds *)
-  let builtins =
+(* Memoize the built-in jkinds, either best or not-best *)
+module Builtins_memo : sig
+  val find :
+    quality:('l * 'r) jkind_quality ->
+    ('l * 'r) Jkind.Const.t ->
+    ('l * 'r) jkind option
+end = struct
+  open Allowance
+
+  type 'd builtins = ('d Jkind.Const.t * 'd jkind) list
+
+  let make_builtins (type l r) (quality : (l * r) jkind_quality) : (l * r) builtins =
     Jkind.Const.Builtin.all
-    |> List.map (fun (builtin : _ Jkind.Const.Builtin.t) ->
-          builtin.jkind,
-          Jkind.of_const builtin.jkind
-            ~annotation:(Some { pjkind_loc = Location.none;
-                                pjkind_desc = Abbreviation builtin.name })
-            ~why:Jkind.History.Imported)
-  in
+    |> List.map (fun (builtin : Jkind.Const.Builtin.t) ->
+      let const_jkind : (l * r) Jkind.Const.t =
+        builtin.jkind |> Jkind.Const.allow_left |> Jkind.Const.allow_right in
+      const_jkind,
+      Jkind.of_const
+        const_jkind
+        ~quality
+        ~annotation:(Some { pjkind_loc = Location.none;
+                            pjkind_desc = Abbreviation builtin.name })
+        ~why:Jkind.History.Imported)
+
+  let best_builtins : (allowed * disallowed) builtins = make_builtins Best
+  let not_best_builtins : (allowed * allowed) builtins = make_builtins Not_best
+
+  let find
+        (type l r)
+        ~(quality : (l * r) jkind_quality)
+        (const : (l * r) Jkind.Const.t)
+    : (l * r) jkind option
+    =
+    (match quality with
+     | Best ->
+       List.find_opt (fun ((builtin, _) : (allowed * disallowed) Jkind.Const.t * _) ->
+         Jkind.Const.no_with_bounds_and_equal
+           (const |> Jkind.Const.disallow_right)
+           (builtin |> Jkind.Const.allow_left))
+       best_builtins
+       |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left)
+     | Not_best ->
+       List.find_opt (fun (builtin, _) ->
+         Jkind.Const.no_with_bounds_and_equal
+           const
+           (builtin |> Jkind.Const.allow_left |> Jkind.Const.allow_right))
+         not_best_builtins
+       |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left |> Jkind.allow_right)
+    )
+end
+
+let with_additional_action =
   fun (config : additional_action_config) s ->
   (* CR layouts: it would be better to put all this stuff outside this
      function, but it's in here because we really want to tailor the reason
@@ -106,17 +176,12 @@ let with_additional_action =
     match config with
     | Duplicate_variables -> Duplicate_variables
     | Prepare_for_saving ->
-        let prepare_jkind loc jkind =
+        let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
           match Jkind.get_const jkind with
           | Some const ->
-            let builtin =
-              List.find_opt (fun (builtin, _) ->
-                  Jkind.Const.equal_after_all_inference_is_done const builtin)
-                builtins
-            in
-            begin match builtin with
-            | Some (_, jkind) -> jkind |> Jkind.allow_left |> Jkind.allow_right
-            | None -> Jkind.of_const const ~annotation:None ~why:Imported
+            begin match Builtins_memo.find ~quality:jkind.quality const with
+            | Some jkind -> jkind
+            | None -> Jkind.of_const ~quality:jkind.quality const ~annotation:None ~why:Imported
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
@@ -213,7 +278,8 @@ let rec type_path s path =
         fatal_error "Subst.type_path"
      | Pextra_ty (p, extra) ->
          match extra with
-         | Pcstr_ty _ -> Pextra_ty (type_path s p, extra)
+         | Pcstr_ty _ | Punboxed_ty ->
+           Pextra_ty (type_path s p, extra)
          | Pext_ty -> Pextra_ty (value_path s p, extra)
 
 let to_subst_by_type_function s p =
@@ -408,7 +474,8 @@ let rec typexp copy_scope s ty =
               let more' =
                 match mored with
                   Tsubst (ty, None) -> ty
-                | Tconstr _ | Tquote _ | Tsplice _ | Tnil -> typexp copy_scope s more
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
+                    typexp copy_scope s more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
                     else if dup && is_Tvar more then newgenty mored
@@ -493,7 +560,17 @@ let constructor_declaration copy_scope s c =
     cd_uid = c.cd_uid;
   }
 
-let type_declaration' copy_scope s decl =
+let unsafe_mode_crossing copy_scope s loc
+      { unsafe_mod_bounds; unsafe_with_bounds } =
+  { unsafe_mod_bounds;
+    unsafe_with_bounds =
+      Jkind.With_bounds.map_type_expr (typexp copy_scope s loc)
+        unsafe_with_bounds }
+
+let rec type_declaration' copy_scope s decl =
+  let unsafe_mode_crossing =
+    Option.map (unsafe_mode_crossing copy_scope s decl.type_loc)
+  in
   { type_params = List.map (typexp copy_scope s decl.type_loc) decl.type_params;
     type_arity = decl.type_arity;
     type_kind =
@@ -501,12 +578,17 @@ let type_declaration' copy_scope s decl =
         Type_abstract r -> Type_abstract r
       | Type_variant (cstrs, rep, umc) ->
           Type_variant (List.map (constructor_declaration copy_scope s) cstrs,
-                        rep, umc)
+                        rep,
+                        unsafe_mode_crossing umc)
       | Type_record(lbls, rep, umc) ->
-          Type_record (List.map (label_declaration copy_scope s) lbls, rep, umc)
+          Type_record (List.map (label_declaration copy_scope s) lbls,
+                       rep,
+                       unsafe_mode_crossing umc)
       | Type_record_unboxed_product(lbls, rep, umc) ->
           Type_record_unboxed_product
-            (List.map (label_declaration copy_scope s) lbls, rep, umc)
+            (List.map (label_declaration copy_scope s) lbls,
+             rep,
+             unsafe_mode_crossing umc)
       | Type_open -> Type_open
       end;
     type_manifest =
@@ -517,10 +599,13 @@ let type_declaration' copy_scope s decl =
       end;
     type_jkind =
       begin
-        match s.additional_action with
-        | Prepare_for_saving { prepare_jkind } ->
+        let jkind =
+          match s.additional_action with
+          | Prepare_for_saving { prepare_jkind } ->
             prepare_jkind decl.type_loc decl.type_jkind
-        | Duplicate_variables | No_action -> decl.type_jkind
+          | Duplicate_variables | No_action -> decl.type_jkind
+        in
+        Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
     type_private = decl.type_private;
     type_variance = decl.type_variance;
@@ -531,6 +616,8 @@ let type_declaration' copy_scope s decl =
     type_attributes = attrs s decl.type_attributes;
     type_unboxed_default = decl.type_unboxed_default;
     type_uid = decl.type_uid;
+    type_unboxed_version =
+      Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
   }
 
 let type_declaration s decl =
@@ -625,6 +712,15 @@ let extension_constructor s ext =
    and return resulting merged map. *)
 let merge_path_maps f m1 m2 =
   Path.Map.fold (fun k d accu -> Path.Map.add k (f d) accu) m1 m2
+
+let merge_type_path_maps (f : type_replacement -> type_replacement)  m1 m2 =
+  Path.Map.fold
+    (fun k d accu ->
+      if Path.is_unboxed_version k then
+        accu
+      else
+        add_type_replacement accu k (f d))
+    m1 m2
 
 let keep_latest_loc l1 l2 =
   match l2 with
@@ -873,7 +969,7 @@ and compose s1 s2 =
   | Some (t,s) when t == s1 -> s
   | _ ->
       let s =
-        { types = merge_path_maps (type_replacement s2) s1.types s2.types;
+        { types = merge_type_path_maps (type_replacement s2) s1.types s2.types;
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
           additional_action = begin

@@ -49,20 +49,7 @@ exception Dont_match of value_mismatch
 
 type mmodes =
   | All
-  | Legacy
-
-(** Mode cross a right mode *)
-(* This is very similar to Ctype.mode_cross_right. Any bugs here are likely bugs
-   there, too. *)
-let right_mode_cross_jkind jkind mode =
-  let upper_bounds = Jkind.get_modal_upper_bounds jkind in
-  let upper_bounds = Const.alloc_as_value upper_bounds in
-  Value.imply upper_bounds mode
-
-let right_mode_cross env ty mode=
-  if not (Ctype.is_principal ty) then mode else
-  let jkind = Ctype.type_jkind_purely env ty in
-  right_mode_cross_jkind jkind mode
+  | Legacy of Env.held_locks option
 
 let native_repr_args nra1 nra2 =
   let rec loop i nra1 nra2 =
@@ -127,19 +114,29 @@ let value_descriptions ~loc env name
       | Ok () -> ()
       | Error e -> raise (Dont_match (Modality e))
       end;
-  | Legacy when (vd1.val_modalities == vd2.val_modalities) ->
+  | Legacy close_over_coercion ->
+    match Mode.Modality.Value.to_const_opt vd2.val_modalities with
       (* [wrap_constraint_with_shape] invokes inclusion check with identical
         inferred modalities, which we need to workaround. *)
-      ()
-  | Legacy ->
+    | None -> ()
+    | Some val2_modalities ->
       let mmode1, mmode2 =
         Mode.Value.(disallow_right legacy), Mode.Value.(disallow_left legacy)
       in
       let mode1 = Mode.Modality.Value.apply vd1.val_modalities mmode1 in
-      let mode2 =
-        Mode.Modality.Value.(Const.apply (to_const_exn vd2.val_modalities) mmode2)
+      let mode2 = Mode.Modality.Value.(Const.apply val2_modalities mmode2) in
+      let mode1 =
+        match close_over_coercion with
+        | Some held_locks ->
+          (* Cross modes according to RHS type as it tends to be by the user. *)
+          let mode1 = Ctype.cross_left env vd2.val_type mode1 in
+          let mode1 =
+            Env.walk_locks ~env ~item:Value mode1 (Some vd1.val_type) held_locks
+          in
+          mode1.mode
+        | None -> mode1
       in
-      let mode2 = right_mode_cross env vd2.val_type mode2 in
+      let mode2 = Ctype.cross_right env vd2.val_type mode2 in
       begin match Mode.Value.submode mode1 mode2 with
       | Ok () -> ()
       | Error e -> raise (Dont_match (Mode e))
@@ -149,37 +146,31 @@ let value_descriptions ~loc env name
   | Val_prim p1 -> begin
      match vd2.val_kind with
      | Val_prim p2 -> begin
-         let ty1_global, _, _ = Ctype.instance_prim p1 vd1.val_type in
-         let ty2_global =
-           let ty2, mode2, _ = Ctype.instance_prim p2 vd2.val_type in
-           Option.iter
-             (fun m -> Mode.Locality.submode_exn m Mode.Locality.global)
-             mode2;
-           ty2
-         in
-         (try Ctype.moregeneral env true ty1_global ty2_global
-          with Ctype.Moregen err -> raise (Dont_match (Type err)));
-         let ty1_local, _, _ = Ctype.instance_prim p1 vd1.val_type in
-         let ty2_local =
-           let ty2, mode2, _ = Ctype.instance_prim p2 vd2.val_type in
-           Option.iter
-             (fun m -> Mode.Locality.submode_exn Mode.Locality.local m)
-             mode2;
-           ty2
-         in
-         (try Ctype.moregeneral env true ty1_local ty2_local
-          with Ctype.Moregen err -> raise (Dont_match (Type err)));
+         let locality = [ Mode.Locality.global; Mode.Locality.local ] in
+         let yielding = [ Mode.Yielding.unyielding; Mode.Yielding.yielding ] in
+         List.iter (fun loc ->
+           List.iter (fun yield ->
+             let ty1, _, _, _ = Ctype.instance_prim p1 vd1.val_type in
+             let ty2, mode_l2, mode_y2, _ = Ctype.instance_prim p2 vd2.val_type in
+             Option.iter (Mode.Locality.equate_exn loc) mode_l2;
+             Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
+             try 
+               Ctype.moregeneral env true ty1 ty2
+             with Ctype.Moregen err -> 
+               raise (Dont_match (Type err))
+           ) yielding
+         ) locality;
          match primitive_descriptions p1 p2 with
          | None -> Tcoerce_none
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-        let ty1, mode1, sort1 = Ctype.instance_prim p1 vd1.val_type in
+        let ty1, mode_l1, _, sort1 = Ctype.instance_prim p1 vd1.val_type in
         (try Ctype.moregeneral env true ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
-           pc_poly_mode = Option.map Mode.Locality.disallow_right mode1;
+           pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
            pc_poly_sort=sort1;
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
@@ -294,7 +285,7 @@ type variant_change =
 
 type unsafe_mode_crossing_mismatch =
   | Mode_crossing_only_on of position
-  | Mode_crossing_not_equal
+  | Bounds_not_equal of unsafe_mode_crossing * unsafe_mode_crossing
 
 type type_mismatch =
   | Arity
@@ -597,6 +588,11 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
     second
     (kind_to_string kind2)
 
+let print_unsafe_mode_crossing ppf umc =
+  Format.fprintf ppf "mod %a@ %a"
+    Mode.Crossing.print umc.unsafe_mod_bounds
+    Jkind.With_bounds.format umc.unsafe_with_bounds
+
 let report_unsafe_mode_crossing_mismatch first second ppf e =
   let pr fmt = Format.fprintf ppf fmt in
   match e with
@@ -604,9 +600,15 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
     pr "%s has [%@%@unsafe_allow_any_mode_crossing], but %s does not"
       (choose ord first second)
       (choose_other ord first second)
-  | Mode_crossing_not_equal ->
+  | Bounds_not_equal (first_umc, second_umc) ->
+    (* CR layouts v2.8: It'd be nice to specifically highlight the offending axis,
+       rather than printing all axes here. *)
     pr "Both specify [%@%@unsafe_allow_any_mode_crossing], but their \
-        mod-bounds are not equal"
+        bounds are not equal@,\
+        @[%s has:@ %a@]@ \
+        @[but %s has:@ %a@]"
+      first print_unsafe_mode_crossing first_umc
+      second print_unsafe_mode_crossing second_umc
 
 let report_type_mismatch first second decl env ppf err =
   let pr fmt = Format.fprintf ppf fmt in
@@ -658,19 +660,25 @@ let report_type_mismatch first second decl env ppf err =
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first ppf v
   | Unsafe_mode_crossing mismatch ->
-    pr "They have different unsafe mode crossing behavior:@,";
-    report_unsafe_mode_crossing_mismatch first second ppf mismatch
+    pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
+      (fun ppf (first, second, mismatch) ->
+         report_unsafe_mode_crossing_mismatch first second ppf mismatch)
+      (first, second, mismatch)
 
-let compare_unsafe_mode_crossing umc1 umc2 =
+let compare_unsafe_mode_crossing ~env umc1 umc2 =
   match umc1, umc2 with
   | None, None -> None
   | Some _, None -> Some (Unsafe_mode_crossing (Mode_crossing_only_on First))
   | None, Some _ -> Some (Unsafe_mode_crossing (Mode_crossing_only_on Second))
-  | Some ({ modal_upper_bounds = mub1 }),
-    Some ({ modal_upper_bounds = mub2 }) ->
-    if (Mode.Alloc.Const.le mub1 mub2 && Mode.Alloc.Const.le mub2 mub1)
+  | Some umc1, Some umc2 ->
+    if equal_unsafe_mode_crossing
+         ~type_equal:(Ctype.type_equal env)
+         umc1 umc2
     then None
-    else Some (Unsafe_mode_crossing Mode_crossing_not_equal)
+    else
+      Some (
+        Unsafe_mode_crossing (
+          Bounds_not_equal (umc1, umc2)))
 
 module Record_diffing = struct
 
@@ -684,9 +692,9 @@ module Record_diffing = struct
           | Immutable, Mutable _ -> Some Second
           | Mutable m1, Mutable m2 ->
             let open Mode.Alloc.Comonadic.Const in
-            (if not (eq m1 legacy) then
+            (if not (Misc.Le_result.equal ~le m1 legacy) then
               Misc.fatal_errorf "Unexpected mutable(%a)" print m1);
-            (if not (eq m2 legacy) then
+            (if not (Misc.Le_result.equal ~le m2 legacy) then
               Misc.fatal_errorf "Unexpected mutable(%a)" print m2);
             None
         in
@@ -801,10 +809,9 @@ module Record_diffing = struct
       Some (diffing loc env params1 params2 l r)
 
   let find_mismatch_in_mixed_record_representations
-      ({ value_prefix_len = v1; flat_suffix = s1 } : mixed_product_shape)
-      ({ value_prefix_len = v2; flat_suffix = s2 } : mixed_product_shape)
+      (s1 : mixed_product_shape) (s2 : mixed_product_shape)
     =
-    if v1 = v2 then None
+    if s1 = s2 then None
     else
       let has_float_boxed_on_read fields =
         Array.exists (function
@@ -1363,7 +1370,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
   let mark_and_compare_records record_form labels1 rep1 labels2 rep2 =
     if mark then begin
       let mark usage lbls =
-        List.iter (Env.mark_label_used record_form usage) lbls
+        List.iter (Env.mark_label_used usage) lbls
       in
       let usage : Env.label_usage =
         if decl2.type_private = Public then Env.Exported
@@ -1378,15 +1385,22 @@ let type_declarations ?(equality = false) ~loc env ~mark name
       rep1 rep2
   in
   let err = match (decl1.type_kind, decl2.type_kind) with
-      (_, Type_abstract _) -> begin
-        (* Note that [decl2.type_jkind] is an upper bound. If it isn't tight, [decl2] must
-           have a manifest, which we're already checking for equality above. Similarly,
-           [decl1]'s kind may conservatively approximate its jkind, but [check_decl_jkind]
-           will expand its manifest. *)
-        match Ctype.check_decl_jkind env decl1 decl2.type_jkind  with
-        | Ok _ -> None
-        | Error v -> Some (Jkind v)
-      end
+      (_, Type_abstract _) ->
+        (* No need to check jkinds if decl2 has a manifest; we've already
+           checked for type equality, above. Oddly, this is not just an
+           optimization; unconditionally checking jkinds causes a failure
+           around recursive modules (test case: shapes/recmodules.ml).
+           Richard spent several hours trying to understand what was going
+           on there (after the substitution in [Typemod.check_recmodule_inclusion],
+           there was a type_declaration whose [type_jkind] didn't match its
+           [type_manifest]), but just skipping this check when there is a
+           manifest fixes the problem. *)
+        if Option.is_none decl2.type_manifest then
+          (* Note that [decl2.type_jkind] is an upper bound *)
+          match Ctype.check_decl_jkind env decl1 decl2.type_jkind with
+           | Ok _ -> None
+           | Error v -> Some (Jkind v)
+        else None
     | (Type_variant (cstrs1, rep1, umc1), Type_variant (cstrs2, rep2, umc2)) -> begin
         if mark then begin
           let mark usage cstrs =
@@ -1407,18 +1421,18 @@ let type_declarations ?(equality = false) ~loc env ~mark name
               cstrs2
               rep1
               rep2)
-          (fun () -> compare_unsafe_mode_crossing umc1 umc2)
+          (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
     | (Type_record(labels1,rep1,umc1), Type_record(labels2,rep2,umc2)) -> begin
         Misc.Stdlib.Option.first_some
           (mark_and_compare_records Legacy labels1 rep1 labels2 rep2)
-          (fun () -> compare_unsafe_mode_crossing umc1 umc2)
+          (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
     | (Type_record_unboxed_product(labels1,rep1,umc1),
        Type_record_unboxed_product(labels2,rep2,umc2)) -> begin
         Misc.Stdlib.Option.first_some
           (mark_and_compare_records Unboxed_product labels1 rep1 labels2 rep2)
-          (fun () -> compare_unsafe_mode_crossing umc1 umc2)
+          (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
     | (Type_open, Type_open) -> None
     | (_, _) -> Some (Kind (of_kind decl1.type_kind, of_kind decl2.type_kind))
@@ -1434,10 +1448,12 @@ let type_declarations ?(equality = false) ~loc env ~mark name
          (match name with None -> "_" | Some n -> "'" ^ n)
          Printtyp.type_expr ty
   | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
+     let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
      Some (Parameter_jkind
-             (ty, Jkind.Violation.of_
+             (ty, Jkind.Violation.of_ ~jkind_of_type
                     (Not_a_subjkind (Jkind.disallow_right original_jkind,
-                                     Jkind.disallow_left inferred_jkind))))
+                                     Jkind.disallow_left inferred_jkind,
+                                     []))))
   | All_good ->
   let abstr = Btype.type_kind_is_abstract decl2 && decl2.type_manifest = None in
   let need_variance =

@@ -76,6 +76,7 @@ module Typ = struct
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
   let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
+  let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
 
   let force_poly t =
     match t.ptyp_desc with
@@ -138,6 +139,8 @@ module Typ = struct
             Ptyp_quote core_type
         | Ptyp_splice core_type ->
             Ptyp_splice core_type
+        | Ptyp_of_kind jkind ->
+            Ptyp_of_kind (loop_jkind jkind)
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
       in
@@ -148,7 +151,7 @@ module Typ = struct
         | Default as x -> x
         | Abbreviation _ as x -> x
         | Mod (jkind, modes) -> Mod (loop_jkind jkind, modes)
-        | With (jkind, typ) -> With (loop_jkind jkind, loop typ)
+        | With (jkind, typ, modalities) -> With (loop_jkind jkind, loop typ, modalities)
         | Kind_of typ -> Kind_of (loop typ)
         | Product jkinds -> Product (List.map loop_jkind jkinds)
       in

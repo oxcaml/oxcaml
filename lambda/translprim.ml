@@ -25,6 +25,11 @@ open Translmode
 
 module String = Misc.Stdlib.String
 
+type invalid_stack_primitive =
+  | Not_primitive
+  | Not_allocating
+  | Allocating_on_heap
+
 type error =
   | Unknown_builtin_primitive of string
   | Wrong_arity_builtin_primitive of string
@@ -32,6 +37,7 @@ type error =
   | Invalid_floatarray_glb
   | Product_iarrays_unsupported
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
+  | Invalid_stack_primitive of invalid_stack_primitive
 
 exception Error of Location.t * error
 
@@ -549,19 +555,15 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
           (gen_array_set_kind (get_first_arg_mode ()), Punboxed_int_index Unboxed_nativeint)),
         3)
     | "%makearray_dynamic" ->
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
       Primitive (Pmakearray_dynamic (gen_array_kind, mode, With_initializer), 2)
     | "%makearray_dynamic_uninit" ->
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
       Primitive (Pmakearray_dynamic (gen_array_kind, mode, Uninitialized), 1)
     | "%arrayblit" ->
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
       Primitive (Parrayblit {
         src_mutability = Mutable;
         dst_array_set_kind = gen_array_set_kind (get_third_arg_mode ())
       }, 5);
     | "%arrayblit_src_immut" ->
-      Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
       Primitive (Parrayblit {
         src_mutability = Immutable;
         dst_array_set_kind = gen_array_set_kind (get_third_arg_mode ())
@@ -1240,7 +1242,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   in
   match prim, param_tys with
   | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
-      match maybe_pointer_type env p2 with
+      match fst (maybe_pointer_type env p2) with
       | Pointer -> None
       | Immediate -> Some (Primitive (Psetfield(n, Immediate, init), arity))
     end
@@ -1248,7 +1250,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       (* try strength reduction based on the *result type* *)
       let is_int = match is_function_type env ty with
         | None -> Pointer
-        | Some (_p1, rhs) -> maybe_pointer_type env rhs in
+        | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
@@ -1377,12 +1379,12 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
                arity), _ ->begin
       let is_int = match is_function_type env ty with
         | None -> Pointer
-        | Some (_p1, rhs) -> maybe_pointer_type env rhs in
+        | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
       Some (Primitive (Patomic_load {immediate_or_pointer = is_int}, arity))
     end
   | Primitive (Patomic_set { immediate_or_pointer = Pointer },
                arity), [_; p2] -> begin
-      match maybe_pointer_type env p2 with
+      match fst (maybe_pointer_type env p2) with
       | Pointer -> None
       | Immediate ->
         Some
@@ -1392,7 +1394,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | Primitive (Patomic_exchange { immediate_or_pointer = Pointer },
                arity), [_; p2] -> begin
-      match maybe_pointer_type env p2 with
+      match fst (maybe_pointer_type env p2) with
       | Pointer -> None
       | Immediate ->
           Some
@@ -1402,7 +1404,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | Primitive (Patomic_compare_exchange { immediate_or_pointer = Pointer },
                arity), [_; p2; p3] -> begin
-      match maybe_pointer_type env p2, maybe_pointer_type env p3 with
+      match fst (maybe_pointer_type env p2),
+            fst (maybe_pointer_type env p3) with
       | Pointer, _ | _, Pointer -> None
       | Immediate, Immediate ->
           Some
@@ -1412,7 +1415,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | Primitive (Patomic_compare_set { immediate_or_pointer = Pointer },
                arity), [_; p2; p3] -> begin
-      match maybe_pointer_type env p2, maybe_pointer_type env p3 with
+      match fst (maybe_pointer_type env p2),
+            fst (maybe_pointer_type env p3) with
       | Pointer, _ | _, Pointer -> None
       | Immediate, Immediate ->
           Some
@@ -1426,7 +1430,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       Some (Comparison(comp, Compare_ints))
     end else if (is_base_type env p1 Predef.path_int
         || is_base_type env p1 Predef.path_char
-        || (maybe_pointer_type env p1 = Immediate)) then begin
+        || ((* Non-null external types are always represented by tagged integers. *)
+            maybe_pointer_type env p1 = (Immediate, Non_nullable))) then begin
       Some (Comparison(comp, Compare_ints))
     end else if is_base_type env p1 Predef.path_float then begin
       Some (Comparison(comp, Compare_floats))
@@ -1659,13 +1664,14 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim(Praise kind, [arg], loc)
   | Raise_with_backtrace, [exn; bt] ->
       let vexn = Ident.create_local "exn" in
+      let vexn_duid = Lambda.debug_uid_none in
       let raise_arg =
         match arg_exps with
         | None -> Lvar vexn
         | Some [exn_exp; _] -> event_after loc exn_exp (Lvar vexn)
         | Some _ -> assert false
       in
-      Llet(Strict, Lambda.layout_block, vexn, exn,
+      Llet(Strict, Lambda.layout_block, vexn, vexn_duid, exn,
            Lsequence(Lprim(Pccall caml_restore_raw_backtrace,
                            [Lvar vexn; bt],
                            loc),
@@ -1805,6 +1811,9 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
           let arg_mode = to_locality arg in
           let params, return = make_params ret_ty repr_args repr_res in
           { name = Ident.create_local "prim";
+            debug_uid = Lambda.debug_uid_none;
+            (* The eta expansion is not actually visible at the source level,
+               so we do not generate a fresh [debug_uid] here. *)
             layout = arg_layout;
             attributes = Lambda.default_param_attribute;
             mode = arg_mode }
@@ -1878,7 +1887,6 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
        ~body
        ~mode:alloc_heap
        ~ret_mode:(to_locality p.prim_native_repr_res)
-       ~region
 
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that
@@ -1925,7 +1933,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore | Psetglobal _
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakemixedblock _
+  | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pfield _ | Pfield_computed _ | Psetfield _
@@ -1970,12 +1978,35 @@ let primitive_needs_event_after = function
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
   | Peek _ | Poke _ | Unsupported _ -> false
 
-let transl_primitive_application loc p env ty ~poly_mode ~poly_sort
+let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =
   let prim =
     lookup_primitive_and_mark_used
       (to_location loc) ~poly_mode ~poly_sort pos p env (Some path)
   in
+  if stack then begin
+    match prim with
+    | Primitive (prim, _) ->
+        begin match Lambda.primitive_may_allocate prim with
+        (*
+        Assumption: If a primitive allocates, the allocation mode is the return mode.
+
+        Here we are only checking (not enforcing) stack allocation, because:
+
+        - If the primitive has [@local_opt] as its return mode, then the mode is
+        registered as allocation in [Typecore.type_ident], and pushed towards local before
+        lambda stage.
+
+        - If the primitive does not have [@local_opt] as its return mode, then its return
+        mode is constant, and therefore its allocation mode, if any, is already constant.
+          *)
+        | Some Alloc_local -> ()
+        | Some Alloc_heap ->
+            raise (Error (to_location loc, Invalid_stack_primitive Allocating_on_heap))
+        | None -> raise (Error (to_location loc, Invalid_stack_primitive Not_allocating))
+        end
+    | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
+  end;
   let has_constant_constructor =
     match arg_exps with
     | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _)}]
@@ -2026,6 +2057,20 @@ let report_error ppf = function
         "%%makearray_dynamic_uninit can only be used for GC-ignorable arrays@ \
          not involving tagged immediates; and arrays of unboxed numbers.@ Use \
          %%makearray instead, providing an initializer."
+  | Invalid_stack_primitive Not_allocating ->
+      fprintf ppf
+        "This cannot be marked as stack_,@ \
+        because this primitive does not allocate."
+  | Invalid_stack_primitive Not_primitive ->
+      fprintf ppf
+        "This cannot be marked as stack_,@ \
+        because it is either not a primitive,@ \
+        or the primitive does not allocate."
+  | Invalid_stack_primitive Allocating_on_heap ->
+      fprintf ppf
+        "This primitive always allocates on heap@ \
+        (maybe it should be declared with %a or %a?)"
+        Style.inline_code "[@local_opt]" Style.inline_code "local_"
 
 let () =
   Location.register_error_of_exn

@@ -1,10 +1,12 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
+open! Int_replace_polymorphic_compare
+
 (* Finds independent scalar operations within the same basic block and tries to
    use vector operations if possible *)
 (* CR gyorsh: how does the info from [reg_map] flow between blocks? *)
 
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 module State : sig
   type t
@@ -13,9 +15,9 @@ module State : sig
 
   val create : Format.formatter -> Cfg_with_layout.t -> t
 
-  val next_available_instruction : t -> int
+  val next_available_instruction : t -> InstructionId.t
 
-  val liveness : t -> int -> live_regs
+  val liveness : t -> InstructionId.t -> live_regs
 
   val dump_debug : t -> ('a, Format.formatter, unit) format -> 'a
 
@@ -29,7 +31,6 @@ module State : sig
 end = struct
   type t =
     { ppf_dump : Format.formatter;
-      mutable max_instruction_id : int;
       cfg_with_infos : Cfg_with_infos.t Lazy.t;
       cfg_with_layout : Cfg_with_layout.t
     }
@@ -41,26 +42,13 @@ end = struct
   let fun_dbg t = (Cfg_with_layout.cfg t.cfg_with_layout).fun_dbg
 
   let next_available_instruction t =
-    let id = t.max_instruction_id + 1 in
-    t.max_instruction_id <- id;
-    id
-
-  let init_instructon_max_id cl =
-    (* CR gyorsh: Duplicated from backend/regalloc/regalloc_utils.ml. Should
-       probably move it to Cfg or Cfg_with_infos. *)
-    let max_id = ref Int.min_int in
-    let update_max_id (instr : _ Cfg.instruction) : unit =
-      max_id := Int.max !max_id instr.id
-    in
-    Cfg_with_layout.iter_instructions cl ~instruction:update_max_id
-      ~terminator:update_max_id;
-    !max_id
+    InstructionId.get_and_incr
+      (Cfg_with_layout.cfg t.cfg_with_layout).next_instruction_id
 
   let create ppf_dump cl =
     (* CR-someday tip: the function may someday take a cfg_with_infos instead of
        creating a new one *)
     { ppf_dump;
-      max_instruction_id = init_instructon_max_id cl;
       cfg_with_layout = cl;
       cfg_with_infos = lazy (Cfg_with_infos.make cl)
     }
@@ -71,7 +59,7 @@ end = struct
   let extra_debug = true
 
   let dump_if c t =
-    if c && !Flambda_backend_flags.dump_vectorize
+    if c && !Oxcaml_flags.dump_vectorize
     then Format.fprintf t.ppf_dump
     else Format.ifprintf t.ppf_dump
 
@@ -152,7 +140,7 @@ module Instruction : sig
      blocks only, and removing it would simplify the code and reduce
      allocation. *)
   module Id : sig
-    type t
+    type t = InstructionId.t
 
     include Identifiable.S with type t := t
   end
@@ -187,14 +175,14 @@ module Instruction : sig
     Cfg.basic Cfg.instruction ->
     arg:Reg.t array ->
     res:Reg.t array ->
-    id:int ->
+    id:Id.t ->
     desc:Cfg.basic ->
     Cfg.basic Cfg.instruction
 end = struct
   module Id = struct
-    include Numbers.Int
+    include InstructionId
 
-    let print ppf t = Format.fprintf ppf "(id:%d)" t
+    let print ppf t = Format.fprintf ppf "(id:%a)" InstructionId.format t
   end
 
   type t =
@@ -238,7 +226,8 @@ end = struct
       let desc = basic_instruction.desc in
       match desc with
       | Op op -> Some op
-      | Reloadretaddr | Pushtrap _ | Poptrap | Prologue | Stack_check _ -> None)
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+        None)
     | Terminator _ -> None
 
   let copy (i : Cfg.basic Cfg.instruction) ~arg ~res ~id ~desc =
@@ -281,20 +270,21 @@ end = struct
       Cmm.equal_memory_chunk memory_chunk1 memory_chunk2
       && Arch.equal_addressing_mode_without_displ addressing_mode1
            addressing_mode2
-      && mutability1 = mutability2 && is_atomic1 = is_atomic2
+      && Operation.equal_mutable_flag mutability1 mutability2
+      && Bool.equal is_atomic1 is_atomic2
     | ( Store (memory_chunk1, addressing_mode1, is_assignment1),
         Store (memory_chunk2, addressing_mode2, is_assignment2) ) ->
       Cmm.equal_memory_chunk memory_chunk1 memory_chunk2
       && Arch.equal_addressing_mode_without_displ addressing_mode1
            addressing_mode2
-      && is_assignment1 = is_assignment2
+      && Bool.equal is_assignment1 is_assignment2
     | Intop intop1, Intop intop2 ->
-      Simple_operation.equal_integer_operation intop1 intop2
+      Operation.equal_integer_operation intop1 intop2
     | Intop_imm (intop1, _), Intop_imm (intop2, _) ->
-      Simple_operation.equal_integer_operation intop1 intop2
+      Operation.equal_integer_operation intop1 intop2
     | Floatop (width1, floatop1), Floatop (width2, floatop2) ->
-      Simple_operation.equal_float_width width1 width2
-      && Simple_operation.equal_float_operation floatop1 floatop2
+      Operation.equal_float_width width1 width2
+      && Operation.equal_float_operation floatop1 floatop2
     | Specific specific_operation1, Specific specific_operation2 ->
       Arch.isomorphic_specific_operation specific_operation1 specific_operation2
     | Move, _
@@ -796,11 +786,25 @@ end = struct
                 match Instruction.op instruction with
                 | None -> None
                 | Some op -> (
-                  match[@warning "-fragile-match"] op with
+                  match op with
                   | Move | Spill | Reload -> Some (reg, 0)
                   | Intop_imm (Iadd, n) -> Some (reg, n)
                   | Intop_imm (Isub, n) -> Some (reg, -n)
-                  | _ -> None))
+                  | Intop_imm
+                      ( ( Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
+                        | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _
+                          ),
+                        _ )
+                  | Opaque | Begin_region | End_region | Dls_get | Poll
+                  | Const_int _ | Const_float32 _ | Const_float _
+                  | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+                  | Store (_, _, _)
+                  | Intop _ | Intop_atomic _
+                  | Floatop (_, _)
+                  | Csel _ | Reinterpret_cast _ | Static_cast _
+                  | Probe_is_enabled _ | Specific _ | Name_for_debugger _
+                  | Alloc _ ->
+                    None))
               | _ -> None
             in
             match next with
@@ -1981,7 +1985,7 @@ module Computation : sig
   module Seed : sig
     type t
 
-    val from_block : Block.t -> Dependencies.t -> t list
+    val from_block : Block.t -> Dependencies.t Lazy.t -> t list
 
     val dump : Format.formatter -> t list -> unit
   end
@@ -2242,7 +2246,7 @@ end = struct
 
     val group : t -> Group.t
 
-    val from_block : Block.t -> Dependencies.t -> t list
+    val from_block : Block.t -> Dependencies.t Lazy.t -> t list
 
     val dump : Format.formatter -> t list -> unit
 
@@ -2354,7 +2358,7 @@ end = struct
                   "Seeds.from_block: instructions=\n(%a)\n"
                   (pp_print_list Instruction.print_id)
                   instructions);
-              match init ~width_in_bits instructions deps with
+              match init ~width_in_bits instructions (Lazy.force deps) with
               | None -> loop tl acc
               | Some t -> loop tl (t :: acc)))
       in
@@ -3123,7 +3127,7 @@ let count block computation =
     |> Profile.Counters.set "tried_to_vectorize_blocks" 1
     |> Profile.Counters.set "block_size" (Block.size block)
   in
-  if Block.size block > !Flambda_backend_flags.vectorize_max_block_size
+  if Block.size block > !Oxcaml_flags.vectorize_max_block_size
   then counter |> Profile.Counters.set "block_too_big" 1
   else
     match computation with
@@ -3139,50 +3143,55 @@ let maybe_vectorize block =
   let instruction_count = Block.size block in
   let label = Block.start block in
   State.dump state "\nBlock %a:\n" Label.print label;
-  if instruction_count > !Flambda_backend_flags.vectorize_max_block_size
+  if instruction_count > !Oxcaml_flags.vectorize_max_block_size
   then (
     State.dump state
       "Skipping block %a with %d instructions (> %d = \
        max_block_size_to_vectorize).\n"
       Label.print label instruction_count
-      !Flambda_backend_flags.vectorize_max_block_size;
+      !Oxcaml_flags.vectorize_max_block_size;
     None)
   else
-    let deps = Dependencies.from_block block in
+    let deps = lazy (Dependencies.from_block block) in
     let seeds = Computation.Seed.from_block block deps in
     State.dump_debug state "%a@." Computation.Seed.dump seeds;
-    let computations =
-      List.filter_map (Computation.from_seed block deps) seeds
-    in
-    State.dump_debug state "%a@." (Computation.dump_all ~block) computations;
-    match Computation.select_and_join computations block deps with
-    | None -> None
-    | Some computation ->
-      let scoped_name =
-        State.fun_dbg state |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
-        |> List.map (fun dbg ->
-               Debuginfo.(
-                 Scoped_location.string_of_scopes ~include_zero_alloc:false
-                   dbg.dinfo_scopes))
-        |> String.concat ","
+    match seeds with
+    | [] -> None
+    | seeds -> (
+      (* [deps] has been forced *)
+      let deps = Lazy.force deps in
+      let computations =
+        List.filter_map (Computation.from_seed block deps) seeds
       in
-      State.dump state "**** Vectorize selected computation: %a (%s)\n"
-        Computation.dump_one_line_stat computation scoped_name;
-      State.dump_debug state "%a\n" (Computation.dump ~block) computation;
-      if State.extra_debug then validate computation block deps;
-      let dump_block msg block =
-        let size = DLL.length (Block.body block) in
-        State.dump state "Block %a in %s: %s body instruction count=%d\n"
-          Label.print (Block.start block) (State.fun_name state) msg size;
-        DLL.iter (Block.body block) ~f:(fun i ->
-            State.dump_debug state "%a\n" Instruction.print
-              (Instruction.basic i))
-      in
-      dump_block "before vectorize" block;
-      (* This is the only function that changes the [block]. *)
-      vectorize block computation;
-      dump_block "after vectorize" block;
-      Some computation
+      State.dump_debug state "%a@." (Computation.dump_all ~block) computations;
+      match Computation.select_and_join computations block deps with
+      | None -> None
+      | Some computation ->
+        let scoped_name =
+          State.fun_dbg state |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
+          |> List.map (fun dbg ->
+                 Debuginfo.(
+                   Scoped_location.string_of_scopes ~include_zero_alloc:false
+                     dbg.dinfo_scopes))
+          |> String.concat ","
+        in
+        State.dump state "**** Vectorize selected computation: %a (%s)\n"
+          Computation.dump_one_line_stat computation scoped_name;
+        State.dump_debug state "%a\n" (Computation.dump ~block) computation;
+        if State.extra_debug then validate computation block deps;
+        let dump_block msg block =
+          let size = DLL.length (Block.body block) in
+          State.dump state "Block %a in %s: %s body instruction count=%d\n"
+            Label.print (Block.start block) (State.fun_name state) msg size;
+          DLL.iter (Block.body block) ~f:(fun i ->
+              State.dump_debug state "%a\n" Instruction.print
+                (Instruction.basic i))
+        in
+        dump_block "before vectorize" block;
+        (* This is the only function that changes the [block]. *)
+        vectorize block computation;
+        dump_block "after vectorize" block;
+        Some computation)
 
 let cfg ppf_dump cl =
   let state = State.create ppf_dump cl in

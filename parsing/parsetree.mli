@@ -202,8 +202,9 @@ and core_type_desc =
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
-  | Ptyp_quote of core_type (** [<=T=>] *)
+  | Ptyp_quote of core_type (** [<[T]>] *)
   | Ptyp_splice of core_type (** [$T] *)
+  | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
 
 and arg_label = Asttypes.arg_label =
@@ -292,13 +293,17 @@ and pattern_desc =
           - If Closed, [n >= 2]
           - If Open, [n >= 1]
         *)
-  | Ppat_construct of Longident.t loc * (string loc list * pattern) option
+  | Ppat_construct of
+      Longident.t loc
+      * ((string loc * jkind_annotation option) list * pattern) option
       (** [Ppat_construct(C, args)] represents:
             - [C]               when [args] is [None],
             - [C P]             when [args] is [Some ([], P)]
             - [C (P1, ..., Pn)] when [args] is
                                            [Some ([], Ppat_tuple [P1; ...; Pn])]
-            - [C (type a b) P]  when [args] is [Some ([a; b], P)]
+            - [C (type a b) P]  when [args] is [Some ([a, None; b, None], P)]
+            - [C (type (a : k) b) P]
+                                when [args] is [Some ([a, Some k; b, None], P)]
          *)
   | Ppat_variant of label * pattern option
       (** [Ppat_variant(`A, pat)] represents:
@@ -1213,7 +1218,7 @@ and module_expr_desc =
       (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]]
 
           The name of an instance module. Gets converted to [Global.Name.t] in
-          the flambda-backend compiler. *)
+          the OxCaml compiler. *)
 
 and module_instance =
   { pmod_instance_head : string;
@@ -1300,8 +1305,10 @@ and module_binding =
 and jkind_annotation_desc =
   | Default
   | Abbreviation of string
+  (* CR layouts v2.8: [mod] can have only layouts on the left, not
+     full kind annotations. We may want to narrow this type some. *)
   | Mod of jkind_annotation * modes
-  | With of jkind_annotation * core_type
+  | With of jkind_annotation * core_type * modalities
   | Kind_of of core_type
   | Product of jkind_annotation list
 

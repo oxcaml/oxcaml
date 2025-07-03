@@ -337,7 +337,8 @@ static void readfloats(struct caml_intern_state* s,
 
 CAMLnoret static void intern_stack_overflow(struct caml_intern_state* s)
 {
-  caml_gc_message (0x04, "Stack overflow in un-marshaling value\n");
+  CAML_GC_MESSAGE(DEBUG,
+                  "Stack overflow in un-marshaling value\n");
   intern_cleanup(s);
   caml_raise_out_of_memory();
 }
@@ -715,7 +716,7 @@ static void intern_rec(struct caml_intern_state* s,
           s->intern_obj_table[s->obj_counter++] = v;
         if (ops->finalize != NULL && Is_young(v)) {
           /* Remember that the block has a finalizer. */
-          add_to_custom_table (&d->minor_tables->custom, v, 0, 1);
+          add_to_custom_table (&d->minor_tables->custom, v);
         }
         break;
       }

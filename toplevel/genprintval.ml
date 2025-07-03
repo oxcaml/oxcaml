@@ -75,7 +75,17 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     type t = O.t
 
-    external is_null : O.t -> bool = "%is_null"
+    (* Normally, [Obj.t] has layout [value], but we need to handle nullable
+       values at toplevel. flambda2 is allowed to optimise calls to [is_null]
+       on an argument with [value] layout to [false], so first convert
+       (opaquely!) to a type with [value_or_null] layout. *)
+    type obj_or_null : value_or_null
+
+    external obj_or_null : t -> obj_or_null = "%opaque"
+
+    external is_null : obj_or_null -> bool = "%is_null"
+
+    let[@inline] is_null obj = is_null (obj_or_null obj)
 
     (* Normally, [Obj.is_block] can't be called on [value_or_null]s.
        But here we need to handle nullable values at toplevel. *)
@@ -588,7 +598,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 find (row_fields row)
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tquote _ | Tsplice _ ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
+          | Tquote _ | Tsplice _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
@@ -623,12 +634,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       nest tree_of_val (depth - 1) fld ty_arg
                   | Outval_record_mixed_block shape ->
                       let fld =
-                        match Types.get_mixed_product_element shape pos with
-                        | Value_prefix -> `Continue (O.field obj pos)
-                        | Flat_suffix Imm -> `Continue (O.field obj pos)
-                        | Flat_suffix (Float_boxed | Float64) ->
+                        match shape.(pos) with
+                        | Value -> `Continue (O.field obj pos)
+                        | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
-                        | Flat_suffix (Float32 | Bits32 | Bits64 | Vec128 | Word) ->
+                        | Float32 | Bits32 | Bits64 | Vec128 | Word
+                        | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
                       in
                       match fld with

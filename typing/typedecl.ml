@@ -64,14 +64,6 @@ type mixed_product_violation =
         max_value_prefix_len : int;
         mixed_product_kind : Mixed_product_kind.t;
       }
-  | Flat_field_expected of
-      { boxed_lbl : Ident.t;
-        non_value_lbl : Ident.t;
-      }
-  | Flat_constructor_arg_expected of
-      { boxed_arg : type_expr;
-        non_value_arg : type_expr;
-      }
   | Insufficient_level of
       { required_layouts_level : Language_extension.maturity;
         mixed_product_kind : Mixed_product_kind.t;
@@ -147,6 +139,8 @@ type error =
       }
   | Non_abstract_reexport of Path.t
   | Unsafe_mode_crossing_on_invalid_type_kind
+  | Illegal_baggage of jkind_l
+  | No_unboxed_version of Path.t
 
 open Typedtree
 
@@ -268,18 +262,33 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
   let type_jkind =
     Jkind.of_type_decl_default
       ~context:(Type_declaration path)
-      ~default:any
+      (* CR layouts v2.8: This next line is truly terrible. But I think it's OK
+         for now: it will mean that any [with] constraints get interpreted to
+         mean that the thing does not cross that mode. That's OK: the jkind
+         produced here can be an overapproximation of the correct jkind (note
+         that [any] is the default).  Indeed the only reason (I think) we need a
+         non-[any] jkind here is to produce better error messages.
+
+         Doing better here will be annoying, because a type is in scope in its
+         own jkind... and yet we don't have an env that we can use at this
+         point. I think probably the solution will be to have
+         [Jkind.of_type_decl_default] just return [max] every time it sees a
+         [with]-kind... which basically just does this [type_exn] trick but much
+         more sanely. *)
+      ~transl_type:(fun _ -> Predef.type_exn)
+      ~default:(Jkind.disallow_right any)
       sdecl
   in
-  let abstract_source, type_manifest =
+  let abstract_source, type_manifest, unboxed_type_manifest =
     match sdecl.ptype_manifest, abstract_abbrevs with
     (* Make a manifest with an unrestricted type variable. This type variable
        essentially collects constraints that arise from the usage of the
        type being constructed. Nothing is gained by using the jkind from
        an annotation here, and doing so with separated left- and right-jkinds
        is hard to do. *)
-    | None, _ | Some _, None -> Definition, Some (Ctype.newvar any)
-    | Some _, Some reason -> reason, None
+    | None, _ | Some _, None ->
+      Definition, Some (Ctype.newvar any), Some (Ctype.newvar any)
+    | Some _, Some reason -> reason, None, None
 in
   let type_params =
     List.map (fun (param, _) ->
@@ -287,6 +296,26 @@ in
         let jkind = get_type_param_jkind path param in
         Btype.newgenvar ?name jkind)
       sdecl.ptype_params
+  in
+  (* In the temporary environment, all types get an unboxed version.
+     See Note [Typechecking unboxed versions of types]. *)
+  let type_unboxed_version =
+    Some { type_params;
+      type_arity = arity;
+      type_kind = Type_abstract abstract_source;
+      type_jkind;
+      type_private = sdecl.ptype_private;
+      type_manifest = unboxed_type_manifest;
+      type_variance = Variance.unknown_signature ~injective:false ~arity;
+      type_separability = Types.Separability.default_signature ~arity;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = sdecl.ptype_loc;
+      type_attributes = sdecl.ptype_attributes;
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version uid;
+      type_unboxed_version = None;
+    }
   in
   let decl =
     { type_params;
@@ -303,6 +332,7 @@ in
       type_attributes = sdecl.ptype_attributes;
       type_unboxed_default = false;
       type_uid = uid;
+      type_unboxed_version;
     }
   in
   add_type ~check:true id decl env
@@ -335,13 +365,27 @@ in
 let update_type temp_env env id loc =
   let path = Path.Pident id in
   let decl = Env.find_type path temp_env in
-  match decl.type_manifest with None -> assert false
-  | Some ty ->
-      try
-        Ctype.(unify_delaying_jkind_checks env
-                 (newconstr path decl.type_params) ty)
-      with Ctype.Unify err ->
-        raise (Error(loc, Type_clash (env, err)))
+  try
+    let checks =
+      match decl.type_manifest with
+      | Some ty ->
+        Ctype.unify_delaying_jkind_checks
+          env (Ctype.newconstr path decl.type_params) ty
+      | None -> Misc.fatal_error "Typedecl.update_type"
+    in
+    match decl.type_unboxed_version with
+    | None ->
+      checks
+    | Some { type_manifest = Some ty; type_params; _ } ->
+      let checks_from_unboxed_version =
+        Ctype.unify_delaying_jkind_checks env
+          (Ctype.newconstr (Path.unboxed_version path) type_params) ty
+      in
+      checks @ checks_from_unboxed_version
+    | Some { type_manifest = None; _ } ->
+      Misc.fatal_error "Typedecl.update_type"
+  with Ctype.Unify err ->
+    raise (Error(loc, Type_clash (env, err)))
 
 (* Determine if a type's values are represented by floats at run-time. *)
 (* CR layouts v2.5: Should we check for unboxed float here? Is a record with all
@@ -353,7 +397,7 @@ let update_type temp_env env id loc =
    be possible.
 *)
 let is_float env ty =
-  match get_desc (Ctype.get_unboxed_type_approximation env ty) with
+  match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
     Tconstr(p, _, _) -> Path.same p Predef.path_float
   | _ -> false
 
@@ -418,29 +462,13 @@ let set_private_row env loc p decl =
    should be replaced with checks at the places where values of those types are
    constructed.  We've been conservative here in the first version. This is the
    same issue as with arrows. *)
-let check_representable ~why ~allow_unboxed env loc kloc typ =
+let check_representable ~why env loc kloc typ =
   match Ctype.type_sort ~why ~fixed:false env typ with
-  (* CR layouts v5: This is a convenient place to rule out non-value types in
-      structures that don't support them yet. (A callsite passes
-      [~allow_unboxed:true] to indicate that non-value types are allowed.)
-      When we support mixed blocks everywhere, this [check_representable]
-      will have outlived its usefulness and we can delete it.
-  *)
-  (* CR layouts v2.5: This rules out non-value types in [@@unboxed] types. No
-      real need to rule that out - I just haven't had time to write tests for it
-      yet. *)
-  | Ok s -> begin
-    if not allow_unboxed then
-      match Jkind.Sort.default_to_value_and_get s with
-      | Base (Void | Value) -> ()
-      | Base (Float64 | Float32 | Word | Bits32 | Bits64 | Vec128)
-      | Product _ as const ->
-        raise (Error (loc, Invalid_jkind_in_block (typ, const, kloc)))
-    end
+  | Ok _ -> ()
   | Error err -> raise (Error (loc,Jkind_sort {kloc; typ; err}))
 
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
-      ~allow_unboxed env univars closed lbls kloc =
+      env univars closed lbls kloc =
   assert (lbls <> []);
   let all_labels = ref String.Set.empty in
   List.iter
@@ -462,7 +490,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
          let modalities =
-          Typemode.transl_modalities ~maturity:Stable mut attrs modalities
+          Typemode.transl_modalities ~maturity:Stable mut modalities
          in
          let arg = Ast_helper.Typ.force_poly arg in
          let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
@@ -481,7 +509,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          let ty = ld.ld_type.ctyp_type in
          let ty = match get_desc ty with Tpoly(t,[]) -> t | _ -> ty in
          check_representable ~why:(Label_declaration ld.ld_id)
-          ~allow_unboxed env ld.ld_loc kloc ty;
+           env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
           ld_modalities = ld.ld_modalities;
@@ -496,22 +524,20 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       lbls in
   lbls, lbls'
 
-let transl_types_gf ~new_var_jkind ~allow_unboxed
-  env loc univars closed cal kloc =
+let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
   let mk arg =
     let cty =
       transl_simple_type ~new_var_jkind env ?univars ~closed
         Mode.Alloc.Const.legacy arg.pca_type
     in
     let gf =
-      Typemode.transl_modalities ~maturity:Stable Immutable []
-        arg.pca_modalities
+      Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
     {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
   in
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
-    check_representable ~why:(Constructor_declaration idx) ~allow_unboxed
+    check_representable ~why:(Constructor_declaration idx)
       env loc kloc ca.ca_type.ctyp_type;
     {
       Types.ca_modalities = ca.ca_modalities;
@@ -527,19 +553,14 @@ let transl_constructor_arguments ~new_var_jkind ~unboxed
   env loc univars closed = function
   | Pcstr_tuple l ->
       let flds, flds' =
-        (* CR layouts: we forbid [@@unboxed] variants from being
-           non-value, see comment in [check_representable]. *)
-        transl_types_gf ~new_var_jkind ~allow_unboxed:(not unboxed)
+        transl_types_gf ~new_var_jkind
           env loc univars closed l (Cstr_tuple { unboxed })
       in
       Types.Cstr_tuple flds', Cstr_tuple flds
   | Pcstr_record l ->
       let lbls, lbls' =
-        (* CR layouts: we forbid [@@unboxed] variants from being
-           non-value, see comment in [check_representable]. *)
         transl_labels ~record_form:Legacy ~new_var_jkind
-          ~allow_unboxed:(not unboxed) env univars closed l
-          (Inlined_record { unboxed })
+          env univars closed l (Inlined_record { unboxed })
       in
       Types.Cstr_record lbls',
       Cstr_record lbls
@@ -732,6 +753,15 @@ let verify_unboxed_attr unboxed_attr sdecl =
    which looks through unboxed types. So it's all OK for users, but it's
    unfortunate that the stored jkind on [t7_2] is imprecise.
 
+   The way this interacts with checking of with-bounds is somewhat subtle and complex.
+   With-bounds for mutually recursive type declarations need to be normalized and checked
+   in a pass /after/ computing the the proper (best) jkinds for all the types and storing
+   them in the environment, so that they can be queried during normalization. But it's
+   important that we call [Jkind.Layout.sub] on each type /eagerly/, so that its sort
+   variables (which might be referenced from the jkinds of other types) get filled in with
+   the right sort. So we do that early, in [update_decl_jkind], then check the full jkind
+   against the dummy jkind later, after normalizing in [transl_type_decl].
+
    (* CR layouts: see if we can do better here. *)
 *)
 
@@ -785,8 +815,28 @@ let transl_declaration env sdecl (id, uid) =
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
   verify_unboxed_attr unboxed_attr sdecl;
+  (* CR layouts v2.8: This next call to [transl_simple_type] probably can loop
+     because it will do perhaps-circular jkind checks. But actually I think the
+     same problem exists in e.g. record fields. We should probably look into this. *)
+  let transl_type sty =
+    (* CR layouts v2.8: The [~new_var_jkind:Any] is weird. The type is closed,
+       and so there shouldn't be any new vars. Investigate. *)
+    let cty =
+      Ctype.with_local_level begin fun () ->
+        Typetexp.transl_simple_type env ~new_var_jkind:Any
+          ~closed:true Mode.Alloc.Const.legacy sty
+      end
+      (* This call to [generalize_structure] is necessary so that copying
+         during instantiation traverses inside of any type constructors in the
+         [with]-bound. It's also necessary because the variables here are at
+         generic level, and so any containers of them should be, too! *)
+      ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
+    in
+    cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
+                      add with-kinds to Typedtree. *)
+  in
   let jkind_from_annotation, jkind_annotation =
-    match Jkind.of_type_decl ~context:(Type_declaration path) sdecl with
+    match Jkind.of_type_decl ~context:(Type_declaration path) ~transl_type sdecl with
     | Some (jkind, annot) ->
         Some jkind, annot
     | None -> None, None
@@ -823,10 +873,7 @@ let transl_declaration env sdecl (id, uid) =
               { definition = path; expected = Predef.path_or_null }))
           in
           let type_kind = Predef.or_null_kind param in
-          let jkind =
-            Jkind.Builtin.value_or_null
-              ~why:(Primitive Predef.ident_or_null)
-          in
+          let jkind = Predef.or_null_jkind param in
           Ttype_abstract, type_kind, jkind
       | (Ptype_variant _ | Ptype_record _ | Ptype_record_unboxed_product _
         | Ptype_open)
@@ -888,8 +935,7 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed,
-            Jkind.of_new_legacy_sort ~why:Old_style_unboxed_type
+            Variant_unboxed, Jkind.of_new_legacy_sort ~why:Old_style_unboxed_type
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -908,16 +954,13 @@ let transl_declaration env sdecl (id, uid) =
                    Constructor_uniform_value, sorts)
                 (Array.of_list cstrs)
             ),
-            Jkind.Builtin.value ~why:Boxed_variant
+          Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
           let lbls, lbls' =
-            (* CR layouts: we forbid [@@unboxed] records from being
-               non-value, see comment in [check_representable]. *)
             transl_labels ~record_form:Legacy ~new_var_jkind:Any
-              ~allow_unboxed:(not unbox) env None true lbls
-              (Record { unboxed = unbox })
+              env None true lbls (Record { unboxed = unbox })
           in
           let rep, jkind =
             if unbox then
@@ -929,7 +972,7 @@ let transl_declaration env sdecl (id, uid) =
                [Record_mixed].  Those cases are fixed up after we can get
                accurate sorts for the fields, in [update_decl_jkind]. *)
               Record_boxed (Array.make (List.length lbls) Jkind.Sort.Const.void),
-              Jkind.Builtin.value ~why:Boxed_record
+              Jkind.for_non_float ~why:Boxed_record
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
       | Ptype_record_unboxed_product lbls ->
@@ -937,19 +980,20 @@ let transl_declaration env sdecl (id, uid) =
             Language_extension.Stable;
           let lbls, lbls' =
             transl_labels ~record_form:Unboxed_product ~new_var_jkind:Any
-              ~allow_unboxed:true env None true lbls Record_unboxed_product
+              env None true lbls Record_unboxed_product
           in
           (* The jkinds below, and the ones in [lbls], are dummy jkinds which
              are replaced and made to correspond to each other in
              [update_decl_jkind]. *)
-          let jkind_ls =
-            List.map (fun _ -> Jkind.Builtin.any ~why:Initial_typedecl_env) lbls
+          let jkind =
+            Jkind.Builtin.product_of_sorts ~why:Unboxed_record
+              (List.length lbls)
           in
-          let jkind = Jkind.Builtin.product ~why:Unboxed_record jkind_ls in
           Ttype_record_unboxed_product lbls,
           Type_record_unboxed_product(lbls', Record_unboxed_product, None), jkind
       | Ptype_open ->
-        Ttype_open, Type_open, Jkind.Builtin.value ~why:Extensible_variant
+        Ttype_open, Type_open,
+        Jkind.for_non_float ~why:Extensible_variant
       in
     let jkind =
     (* - If there's an annotation, we use that. It's checked against
@@ -968,20 +1012,23 @@ let transl_declaration env sdecl (id, uid) =
       | None, None -> jkind_default
     in
     let jkind =
-      (* Hack: unboxed records are given a product-of-[any]s jkind
+      (* Hack: unboxed records are given a product-of-[any]s layout
          when they would otherwise be given [any].
 
          This allows [estimate_type_jkind] to give an estimate that's
          just barely good enough, such that [constain_type_jkind] can always
          decompose the product of [any]s and recurse on the labels.
-         See https://github.com/ocaml-flambda/flambda-backend/pull/3399. *)
-      match sdecl.ptype_kind with
-      | Ptype_record_unboxed_product lbls
-        when Jkind.has_layout_any (Jkind.terrible_relax_l jkind) ->
-        Jkind.Builtin.product ~why:Unboxed_record
-          (List.map (fun _ -> jkind) lbls)
-      | Ptype_abstract | Ptype_variant _ | Ptype_record _
-      | Ptype_record_unboxed_product _ | Ptype_open -> jkind
+         See https://github.com/oxcaml/oxcaml/pull/3399. *)
+      match kind with
+      | Type_record_unboxed_product _ ->
+        begin match Jkind.get_layout jkind with
+        | Some Any ->
+          (* [jkind_default] has just what we need here *)
+          Jkind.set_layout jkind (Jkind.extract_layout jkind_default)
+        | _ -> jkind
+        end
+      | Type_abstract _ | Type_variant _ | Type_record _
+      | Type_open -> jkind
     in
     let arity = List.length params in
     let decl =
@@ -999,6 +1046,9 @@ let transl_declaration env sdecl (id, uid) =
         type_attributes = sdecl.ptype_attributes;
         type_unboxed_default = unboxed_default;
         type_uid = uid;
+        type_unboxed_version = None;
+        (* Unboxed versions are computed after all declarations have been
+           translated, in [derive_unboxed_versions] *)
       } in
   (* Check constraints *)
     List.iter
@@ -1045,9 +1095,176 @@ let transl_declaration env sdecl (id, uid) =
     decl, typ_shape
   end
 
+(* Note [Typechecking unboxed versions of types]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Unboxed versions are computed in three steps:
+
+   1. In the temporary environment computed by [enter_type], all types get an
+      unboxed version.
+
+   2. After translating declarations, [derive_unboxed_versions] gives the
+      [Record_boxed] records unboxed versions.
+
+   3. But some of these [Record_boxed]s are a lie, and become
+      [Record_float]/[Record_ufloat]/[Record_mixed] after [update_decls_jkind].
+      As float records should not end up with unboxed versions, we then remove
+      theirs in [remove_unboxed_versions].
+
+   After steps 2 and 3, the set of unboxed versions decreases, so we check for
+   newly-unbound unboxed paths with [check_unboxed_paths].
+*)
+
+(* Record declarations with representation [Record_boxed] get an implicit
+   unboxed record stored in [type_unboxed_version]. If that record is also an
+   alias, so is its stored unboxed version. E.g. [type t = r = { i : int }]'s
+   unboxed version gets kind [#{ i : int}] and manifest [r#].
+
+   Note that all aliases of types with unboxed versions, with an abstract kind,
+   also have unboxed versions, but these aren't stored in
+   [type_unboxed_version].
+*)
+let record_gets_unboxed_version = function
+  | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
+  | Record_boxed _ -> true
+  | Record_mixed shape ->
+    let rec shape_has_float_boxed shape =
+      Array.exists
+        (fun (kind : mixed_block_element) ->
+          match kind with
+          | Value | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word -> false
+          | Float_boxed -> true
+          | Product shape -> shape_has_float_boxed shape)
+        shape
+    in
+    not (shape_has_float_boxed shape)
+let gets_unboxed_version decl =
+  (* This must be kept in sync with the match in [derive_unboxed_version] *)
+  match decl.type_kind with
+  | Type_abstract _ | Type_open | Type_record_unboxed_product _
+  | Type_variant _ -> false
+  | Type_record (_, repr, _) -> record_gets_unboxed_version repr
+let derive_unboxed_version env path_in_group_has_unboxed_version decl =
+  (* This must be kept in sync with the match in [gets_unboxed_version] *)
+  match decl.type_kind with
+  | Type_abstract _ | Type_open | Type_record_unboxed_product _
+  | Type_variant _ ->
+    None
+  | Type_record (_, repr, _) when not (record_gets_unboxed_version repr) ->
+    None
+  | Type_record (lbls, _, umc) ->
+    let keep_attribute a =
+      (* If we keep [@deprecated_mutable], then a record that aliases
+         a record with a [@deprecated_mutable] label will cause two alerts,
+         if both have unboxed versions (because the unboxed version is a second
+         alias). *)
+      not (Builtin_attributes.attr_equals_builtin a "deprecated_mutable")
+    in
+    let lbls_unboxed =
+      List.map
+        (fun (ld : Types.label_declaration) ->
+            { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
+            ld_mutable = Immutable;
+            ld_modalities = ld.ld_modalities;
+              (* Inherit modalities from the boxed version. Note that these
+                  are affected by the mutability of the boxed label, even
+                  though the unboxed version is always immutable. *)
+            ld_sort = Jkind.Sort.Const.void;
+            ld_type = ld.ld_type;
+            ld_loc = ld.ld_loc;
+            ld_attributes = List.filter keep_attribute ld.ld_attributes;
+              (* Copy label attributes to the unboxed version *)
+            ld_uid = Uid.unboxed_version ld.ld_uid;
+          })
+        lbls
+    in
+    (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
+    let jkind =
+      Jkind.Builtin.product_of_sorts ~why:Unboxed_record (List.length lbls) in
+    let kind =
+      Type_record_unboxed_product(lbls_unboxed, Record_unboxed_product, umc)
+    in
+    let type_manifest =
+      let has_unboxed_version path =
+        match Path.Map.find_opt path path_in_group_has_unboxed_version with
+        | Some b -> b
+        | None ->
+          try Option.is_some (Env.find_type path env).type_unboxed_version with
+          | Not_found -> Misc.fatal_error "Typedecl.derive_unboxed_versions"
+      in
+      match decl.type_manifest with
+      | None -> None
+      | Some ty ->
+        match get_desc ty with
+        | Tconstr (path, args, _) when has_unboxed_version path ->
+          Some (Ctype.newconstr (Path.unboxed_version path) args)
+        | _ ->
+          (* We're in one of two scenarios:
+
+             1. The manifest is a Tconstr to a type without an unboxed version.
+             2. The manifest is not a Tconstr, and [check_coherence] will reject
+                this declaration later.
+
+             In both cases, we could just not give this type an unboxed version,
+             but it's fine to do so, as we already give unboxed versions to
+             types that don't have one (float and [@@unboxed] records), and this
+             simplifies things. *)
+          None
+    in
+    Some
+      {
+        type_params = decl.type_params;
+        type_arity = decl.type_arity;
+        type_kind = kind;
+        type_jkind = jkind;
+        type_private = decl.type_private;
+        type_manifest;
+        type_variance =
+          Variance.unknown_signature ~injective:false ~arity:decl.type_arity;
+        type_separability =
+          Types.Separability.default_signature ~arity:decl.type_arity;
+        type_is_newtype = false;
+        type_expansion_scope = Btype.lowest_level;
+        type_loc = decl.type_loc;
+        type_attributes = decl.type_attributes;
+        type_unboxed_default = false;
+        type_uid = Uid.unboxed_version decl.type_uid;
+        type_unboxed_version = None;
+      }
+
+let derive_unboxed_versions decls env =
+  let path_in_group_has_unboxed_version =
+    Path.Map.of_seq
+      (List.to_seq decls |>
+       Seq.map (fun (id, d) -> Path.Pident id, gets_unboxed_version d))
+  in
+  List.map
+    (fun (id, d) ->
+       let type_unboxed_version =
+         derive_unboxed_version env path_in_group_has_unboxed_version d
+       in
+       id, { d with type_unboxed_version })
+    decls
+
+(* Removes unboxed versions from type declarations not satisfying
+   [gets_unboxed_version]. In practice, it is float records that lose their
+   unboxed versions. See Note [Typechecking unboxed versions of types].
+
+   Returns new decls and paths whose unboxed versions got removed. *)
+let remove_unboxed_versions decls =
+  List.fold_left_map
+    (fun removed (id, d) ->
+      match Option.is_some d.type_unboxed_version, gets_unboxed_version d with
+      | false, false | true, true -> removed, (id, d)
+      | true, false ->
+        Path.Set.add (Pident id) removed,
+        (id, { d with type_unboxed_version = None })
+      | false, true -> Misc.fatal_error "Typedecl.remove_unboxed_versions")
+    Path.Set.empty decls
+
 (* Generalize a type declaration *)
 
-let generalize_decl decl =
+let rec generalize_decl decl =
+  Option.iter generalize_decl (decl.type_unboxed_version);
   List.iter Ctype.generalize decl.type_params;
   Btype.iter_type_expr_kind Ctype.generalize decl.type_kind;
   begin match decl.type_manifest with
@@ -1079,10 +1296,12 @@ let rec check_constraints_rec env loc visited ty =
         | Unification_failure err ->
           raise (Error(loc, Constraint_failed (env, err)))
         | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
+          let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
           let violation =
-            Jkind.Violation.of_
+            Jkind.Violation.of_ ~jkind_of_type
               (Not_a_subjkind (Jkind.disallow_right original_jkind,
-                               Jkind.disallow_left inferred_jkind))
+                               Jkind.disallow_left inferred_jkind,
+                               []))
           in
           raise (Error(loc, Jkind_mismatch_due_to_bad_inference
                             (ty, violation, Check_constraints)))
@@ -1090,7 +1309,7 @@ let rec check_constraints_rec env loc visited ty =
       end;
       List.iter (check_constraints_rec env loc visited) args
   | Tpoly (ty, tl) ->
-      let _, ty = Ctype.instance_poly ~fixed:false tl ty in
+      let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
   | _ ->
       Btype.iter_type_expr (check_constraints_rec env loc visited) ty
@@ -1190,14 +1409,82 @@ let check_constraints env sdecl (_, decl) =
    immediate, we should check the manifest is immediate). Also, update the
    resulting jkind to match the manifest. *)
 let narrow_to_manifest_jkind env loc decl =
-  match decl.type_manifest with
-  | None -> decl
-  | Some ty ->
-    let jkind' = Ctype.type_jkind_purely env ty in
-    match Jkind.sub_jkind_l jkind' decl.type_jkind with
-    | Ok jkind' -> { decl with type_jkind = jkind' }
-    | Error v ->
-      raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
+  match decl.type_manifest, decl.type_kind with
+  | None, _ -> decl
+  | Some _, (Type_record _ | Type_record_unboxed_product _ | Type_variant _ | Type_open)
+    when not (Builtin_attributes.has_or_null_reexport decl.type_attributes)
+    ->
+    (* If there's both a manifest and a non-abstract kind, there's no reason to check that
+       the jkind of the manifest matches the annotation ([decl.type_jkind]). This is
+       because the manifest's jkind is exactly the kind's jkind, and we've already checked
+       and updated [type_jkind] based on the kind. *)
+    decl
+  | Some ty, _ ->
+    (* CR layouts v2.8: Remove this use of [type_jkind_purely], which is slow
+       and effectful. But we cannot do so easily, sadly. I tried using
+       [estimate_type_jkind] here instead, but this runs aground with mutually
+       recursive declarations with manifests. Example:
+
+       {[
+         type s1 = float#
+         and s2 = s1
+       ]}
+
+       We assign jkind [any] to both [s1] and [s2] in [transl_declaration],
+       because we really can't do better at that point. But then when we get
+       here, [estimate_type_jkind] on [s1] returns [any] -- it won't expand
+       the manifest to get [float64]. That's not unsound, because a jkind is
+       always just an approximation. But it does mean that we need to load more
+       cmi files in practice to get the "real" jkind. This was observed when
+       compiling Jane Street's codebase, requiring lots more dependencies to be
+       added. Boo. [type_jkind_purely] avoids this problem, by looking deeply
+       to find the [float#] and thus the [float64] jkind.
+
+       The solution I have in mind here is to change the jkind assigned in
+       [transl_declaration] to be [kind_of 'a], where ['a] is the type variable
+       invented in [enter_type]; that variable can be thought of an empty vessel
+       that accumulates information about jkinds from usages. It also,
+       critically, gets unified with the actual type being defined, in
+       [update_type], which happens before [narrow_to_manifest_jkind]. If we use
+       [kind_of 'a] in [transl_declaration], then [decl.type_jkind] will be
+       [kind_of 'a] here, and that will force the [constrain_type_jkind] below
+       to work just hard enough to find a jkind less than [kind_of 'a] --
+       exactly what we want to record in the final [type_jkind] of the decl.
+       (This will require changing [constrain_type_jkind] to return its best
+       jkind, but that is easy to do, and indeed used to be the case until the
+       result was never used anywhere.)
+
+       Do not try this (that is, removing the use of [type_jkind_purely]) before
+       removing the "horrible hack" just below, as that horrible hack sometimes
+       avoids calling [constrain_type_jkind], which is necessary for the plan
+       above to work.  *)
+    let manifest_jkind = Ctype.type_jkind_purely env ty in
+    (* CR layouts v2.8: Remove this horrible hack. In practice, this
+       [try_allow_r] fails in the case of a record re-export, because the jkind
+       from the record has been calculated and put in decl.type_jkind at this
+       point.  So we need to use the deeply broken [type_jkind_purely] and then
+       [sub_jkind_l] here. The right way forward is to parameterize
+       [constrain_type_jkind] over the [l]-ness of its bound. But probably not
+       until we have proper subsumption working, as this hack will likely hold
+       up for a little while. *)
+    begin match Jkind.try_allow_r decl.type_jkind with
+    | None -> begin
+        let type_equal = Ctype.type_equal env in
+        let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+        match
+          Jkind.sub_jkind_l ~type_equal ~jkind_of_type
+            manifest_jkind decl.type_jkind
+        with
+        | Ok () -> ()
+        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
+      end
+    | Some type_jkind -> begin
+        match Ctype.constrain_type_jkind env ty type_jkind with
+        | Ok () -> ()
+        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
+      end
+    end;
+    { decl with type_jkind = manifest_jkind }
 
 (* Check that the type expression (if present) is compatible with the kind.
    If both a variant/record definition and a type equation are given,
@@ -1221,13 +1508,13 @@ let check_kind_coherence env loc dpath decl =
             | exception Ctype.Equality err ->
                 Some (Includecore.Constraint err)
             | () ->
-                Includecore.type_declarations ~loc ~equality:true env
-                  ~mark:true
-                  (Path.last path)
-                  decl'
-                  dpath
-                  (Subst.type_declaration
-                     (Subst.add_type_path dpath path Subst.identity) decl)
+              Includecore.type_declarations ~loc ~equality:true env
+                ~mark:true
+                (Path.last path)
+                decl'
+                dpath
+                (Subst.type_declaration
+                    (Subst.add_type_path dpath path Subst.identity) decl)
           end
         in
         if err <> None then
@@ -1241,6 +1528,10 @@ let check_kind_coherence env loc dpath decl =
 
 let check_coherence env loc dpath decl =
   check_kind_coherence env loc dpath decl;
+  begin match decl.type_unboxed_version with
+  | Some decl' ->
+    check_kind_coherence env loc (Path.unboxed_version dpath) decl'
+  | None -> () end;
   narrow_to_manifest_jkind env loc decl
 
 let check_abbrev env sdecl (id, decl) =
@@ -1252,6 +1543,7 @@ let check_abbrev env sdecl (id, decl) =
 *)
 (* [update_label_sorts] additionally returns whether all the jkinds
    were void, and the jkinds of the labels *)
+(* CR reisenberg: remove all_void return *)
 let update_label_sorts env loc lbls named =
   (* [named] is [Some sorts] for top-level records (we will update the
      sorts) and [None] for inlined records. *)
@@ -1349,117 +1641,85 @@ module Element_repr = struct
     | Bits64
     | Vec128
     | Word
+    | Product of t array
 
-  type t =
+  and t =
     | Unboxed_element of unboxed_element
-    | Imm_element
     | Float_element
     | Value_element
     | Element_without_runtime_component of { loc : Location.t; ty : type_expr }
+    (* This type technically permits [Float_element] to appear in an unboxed
+       product, but we never generate that and make no attempt to apply the
+       float record optimization to records of unboxed products of floats. Kinds
+       don't give us enough information to do this reliably, and you could just
+       use unboxed floats instead. *)
 
-  let classify env loc kloc ty jkind =
+  let classify env loc ty jkind =
     if is_float env ty then Float_element
     else
       let layout = Jkind.get_layout_defaulting_to_value jkind in
-      let sort = Jkind.Layout.Const.get_sort layout in
-      let externality_upper_bound = Jkind.get_externality_upper_bound jkind in
-      let base = match sort with
+      let sort =
+        match Jkind.Layout.Const.get_sort layout with
         | None ->
-            Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
-        | Some (Product _ as c) ->
-            raise (Error (loc, Invalid_jkind_in_block (ty, c, kloc)))
-        | Some (Base b) -> b
+          Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
+        | Some s -> s
       in
-      match base, externality_upper_bound with
-      (* CR layouts v5.1: We don't allow [External64] in the flat suffix of
-         mixed blocks. That's because we haven't committed to whether the
-         unboxing features of flambda2 can be used together with 32 bit
-         platforms. (If flambda2 stores unboxed things as flat in 32 bits, then
-         immediate64s must be banned in the flat suffix with backends for 32 bit
-         platforms that pass through flambda2. Further, we want a record
-         declaration to be accepted consistently in 32 bits vs. 64 bits.
-         So, immediate64s must always be banned in the flat suffix.)
+      let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
+      | Base Value -> Value_element
+      | Base Float64 -> Unboxed_element Float64
+      | Base Float32 -> Unboxed_element Float32
+      | Base Word -> Unboxed_element Word
+      | Base Bits32 -> Unboxed_element Bits32
+      | Base Bits64 -> Unboxed_element Bits64
+      | Base Vec128 -> Unboxed_element Vec128
+      | Base Void -> Element_without_runtime_component { loc; ty }
+      | Product l ->
+        Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
+      in
+      sort_to_t sort
 
-         In practice, users can put immediate64s in the value prefix.
-         (We may consider teaching the middle-ends to mark immediate64s that
-         abut the non-scannable suffix as non-scannable on 64 bit platforms.)
-
-         We may revisit this decision later when we know better whether we want
-         flambda2 to unbox for 32 bit platforms.
-      *)
-      | Value, (Internal | External64) -> Value_element
-      | Value, External -> Imm_element
-      | Float64, _ -> Unboxed_element Float64
-      | Float32, _ -> Unboxed_element Float32
-      | Word, _ -> Unboxed_element Word
-      | Bits32, _ -> Unboxed_element Bits32
-      | Bits64, _ -> Unboxed_element Bits64
-      | Vec128, _ -> Unboxed_element Vec128
-      | Void, _ -> Element_without_runtime_component { loc; ty }
-
-  let unboxed_to_flat : unboxed_element -> flat_element = function
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Word -> Word
-
-  let to_flat : _ -> flat_element option = function
-    | Imm_element -> Some Imm
-    | Unboxed_element unboxed -> Some (unboxed_to_flat unboxed)
-    (* CR layouts v7: Supporting void with mixed blocks will require
-       updating some assumptions in lambda, e.g. the translation
-       of [value_prefix_len]. *)
-    | Element_without_runtime_component { loc; ty } ->
-        raise (Error (loc, Invalid_jkind_in_block (ty, Base Void,
-                                                   Mixed_product)))
-    | Float_element | Value_element -> None
-
-  (* Compute the [flat_suffix] field of a mixed block record kind. *)
-  let mixed_product_flat_suffix ts ~on_flat_field_expected =
-    let rec find_flat_suffix ts =
-      match ts with
-      | [] -> None
-      | (t1, t1_extra) :: ts ->
-          match t1 with
-          | Float_element | Imm_element | Value_element -> find_flat_suffix ts
-          | Unboxed_element unboxed ->
-              let suffix =
-                List.map (fun (t2, t2_extra) ->
-                    match to_flat t2 with
-                    | Some flat -> flat
-                    | None ->
-                        on_flat_field_expected
-                          ~non_value:t1_extra
-                          ~boxed:t2_extra)
-                  ts
-              in
-              Some (unboxed_to_flat unboxed :: suffix)
-          (* CR layouts v7: Supporting void with mixed blocks will require
-             updating some assumptions in lambda, e.g. the translation
-             of [value_prefix_len]. *)
-          | Element_without_runtime_component { loc; ty } -> begin
-              match find_flat_suffix ts with
-              | None -> None
-              | Some _ ->
-                  raise (Error (loc,
-                    Invalid_jkind_in_block (ty, Base Void,
-                                            Mixed_product)))
-            end
+  and mixed_product_shape loc ts kind =
+    let to_shape_element (t,ty) : mixed_block_element =
+      let rec of_t : t -> mixed_block_element = function
+      | Unboxed_element unboxed -> of_unboxed_element unboxed
+      | Float_element | Value_element -> Value
+      | Element_without_runtime_component _ ->
+        (* CR layouts v7: Supporting void with mixed blocks will require
+           updating some assumptions in lambda, e.g. the translation of
+           [value_prefix_len]. *)
+        raise (Error (loc,
+                      Invalid_jkind_in_block (ty, Base Void,
+                                              Mixed_product)))
+      and of_unboxed_element : unboxed_element -> mixed_block_element = function
+        | Float64 -> Float64
+        | Float32 -> Float32
+        | Bits32 -> Bits32
+        | Bits64 -> Bits64
+        | Vec128 -> Vec128
+        | Word -> Word
+        | Product l -> Product (Array.map of_t l)
+      in
+      of_t t
     in
-    match find_flat_suffix ts with
-    | None -> None
-    | Some flat_suffix -> Some (Array.of_list flat_suffix)
-
-  let mixed_product_shape loc ts kind ~on_flat_field_expected =
-    let flat_suffix = mixed_product_flat_suffix ts ~on_flat_field_expected in
-    match flat_suffix with
-    | None -> None
-    | Some flat_suffix ->
-        let value_prefix_len = List.length ts - Array.length flat_suffix in
-        assert_mixed_product_support loc kind ~value_prefix_len;
-        Some { value_prefix_len; flat_suffix }
+    let boxed_elements =
+      let rec count_boxed_in_t acc : t -> int = function
+        | Unboxed_element u -> count_boxed_in_unboxed_element acc u
+        | Element_without_runtime_component _ -> acc
+        | Float_element | Value_element -> acc + 1
+      and count_boxed_in_unboxed_element acc : unboxed_element -> int =
+        function
+        | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word -> acc
+        | Product l -> Array.fold_left count_boxed_in_t acc l
+      in
+      List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
+    in
+    let mixed =
+      List.exists (function (Unboxed_element _, _) -> true | _ -> false) ts
+    in
+    if not mixed then None else begin
+      assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
+      Some (List.map to_shape_element ts |> Array.of_list)
+    end
 end
 
 let update_constructor_representation
@@ -1471,37 +1731,18 @@ let update_constructor_representation
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            let kloc : jkind_sort_loc = Cstr_tuple { unboxed = false } in
-            Element_repr.classify env loc kloc arg_type arg_jkind, arg_type)
+            Element_repr.classify env loc arg_type arg_jkind, arg_type)
             arg_types_and_modes arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_tuple
-          ~on_flat_field_expected:(fun ~non_value ~boxed ->
-              let violation =
-                Flat_constructor_arg_expected
-                  { non_value_arg = non_value;
-                    boxed_arg = boxed;
-                  }
-              in
-              raise (Error (loc, Illegal_mixed_product violation)))
     | Cstr_record fields ->
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
-              let kloc = Inlined_record { unboxed = false } in
-              Element_repr.classify env loc kloc ld.Types.ld_type arg_jkind,
-              ld)
+              Element_repr.classify env loc ld.Types.ld_type arg_jkind,
+              ld.Types.ld_type)
             fields arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
-          ~on_flat_field_expected:(fun ~non_value ~boxed ->
-            let violation =
-              Flat_field_expected
-                { non_value_lbl = non_value.Types.ld_id;
-                  boxed_lbl = boxed.Types.ld_id;
-                }
-            in
-            raise (Error (non_value.Types.ld_loc,
-                          Illegal_mixed_product violation)))
   in
   match flat_suffix with
   | None -> Constructor_uniform_value
@@ -1514,21 +1755,33 @@ let update_constructor_representation
       Constructor_mixed shape
 
 
+let add_types_to_env decls shapes env =
+  List.fold_right2
+    (fun (id, decl) shape env ->
+      add_type ~check:true ~shape id decl env)
+    decls shapes env
+
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
 
-   This function is an important part
-   of correctness, as it also checks that the jkind computed from a kind
-   is consistent with (i.e. a subjkind of) any jkind annotation.
-   See Note [Default jkinds in transl_declaration].
+   This function does not do any /checks/ on the jkind after performing the update; the
+   annotation, for example, is checked in the caller, [update_decls_jkind], so that
+   mutually recursive type decls see each others' best kinds during normalization and
+   subsumption
 *)
-let update_decl_jkind env dpath decl =
+let rec update_decl_jkind env dpath decl =
+  let type_unboxed_version =
+    Option.map
+      (fun d ->
+        update_decl_jkind env (Path.unboxed_version dpath) d)
+      decl.type_unboxed_version
+  in
+  let decl = { decl with type_unboxed_version } in
   let open struct
     (* For tracking what types appear in record blocks. *)
     type element_repr_summary =
-      {  mutable values : bool; (* excludes [imm], but includes [imm64] *)
-         mutable imms : bool;
+      {  mutable values : bool; (* includes immediates. *)
          mutable floats: bool;
          (* For purposes of this record, [floats] tracks whether any field
             has layout value and is known to be a float.
@@ -1542,27 +1795,29 @@ let update_decl_jkind env dpath decl =
   let update_record_kind loc lbls rep =
     match lbls, rep with
     | [Types.{ld_type} as lbl], Record_unboxed ->
-      let jkind = Ctype.type_jkind env ld_type in
+      let jkind =
+        Ctype.type_jkind env ld_type |>
+        Jkind.apply_modality_l lbl.ld_modalities
+      in
       (* This next line is guaranteed to be OK because of a call to
          [check_representable] *)
       let sort = Jkind.sort_of_jkind jkind in
       let ld_sort = Jkind.Sort.default_to_value_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
     | _, Record_boxed sorts ->
-      let lbls, all_void, jkinds =
+      let lbls, _all_void, jkinds =
         update_label_sorts env loc lbls (Some sorts)
       in
-      let jkind = Jkind.for_boxed_record ~all_void in
+      let jkind = Jkind.for_boxed_record lbls in
       let reprs =
         List.map2
           (fun lbl jkind ->
-             let kloc = Record { unboxed = false } in
-             Element_repr.classify env loc kloc lbl.Types.ld_type jkind,
-             lbl)
+             Element_repr.classify env loc lbl.Types.ld_type jkind,
+             lbl.Types.ld_type)
           lbls jkinds
       in
       let repr_summary =
-        { values = false; imms = false; floats = false; float64s = false;
+        { values = false; floats = false; float64s = false;
           non_float64_unboxed_fields = false;
         }
       in
@@ -1570,9 +1825,9 @@ let update_decl_jkind env dpath decl =
         (fun ((repr : Element_repr.t), _lbl) ->
            match repr with
            | Float_element -> repr_summary.floats <- true
-           | Imm_element -> repr_summary.imms <- true
            | Unboxed_element Float64 -> repr_summary.float64s <- true
-           | Unboxed_element (Float32 | Bits32 | Bits64 | Vec128 | Word) ->
+           | Unboxed_element ( Float32 | Bits32 | Bits64 | Vec128 | Word
+                             | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
            | Value_element -> repr_summary.values <- true
            | Element_without_runtime_component _ -> ())
@@ -1582,10 +1837,10 @@ let update_decl_jkind env dpath decl =
         (* We store mixed float/float64 records as flat if there are no
             non-float fields.
         *)
-        | { values = false; imms = false; floats = true;
+        | { values = false; floats = true;
             float64s = true; non_float64_unboxed_fields = false; }
           [@warning "+9"] ->
-            let flat_suffix =
+            let shape =
               List.map
                 (fun ((repr : Element_repr.t), _lbl) ->
                   match repr with
@@ -1595,30 +1850,20 @@ let update_decl_jkind env dpath decl =
                       raise (Error (loc,
                         Invalid_jkind_in_block (ty, Base Void,
                                                 Mixed_product)))
-                  | Unboxed_element _ | Imm_element | Value_element ->
+                  | Unboxed_element _ | Value_element ->
                       Misc.fatal_error "Expected only floats and float64s")
                 reprs
               |> Array.of_list
             in
             assert_mixed_product_support loc Record ~value_prefix_len:0;
-            Record_mixed { value_prefix_len = 0; flat_suffix }
+            Record_mixed shape
         (* For other mixed blocks, float fields are stored as flat
            only when they're unboxed.
         *)
         | { values = true; float64s = true }
-        | { imms = true; float64s = true }
         | { non_float64_unboxed_fields = true } ->
             let shape =
               Element_repr.mixed_product_shape loc reprs Record
-                ~on_flat_field_expected:(fun ~non_value ~boxed ->
-                  let violation =
-                    Flat_field_expected
-                      { non_value_lbl = non_value.Types.ld_id;
-                        boxed_lbl = boxed.Types.ld_id;
-                      }
-                  in
-                  raise (Error (boxed.Types.ld_loc,
-                                Illegal_mixed_product violation)))
             in
             let shape =
               match shape with
@@ -1628,17 +1873,16 @@ let update_decl_jkind env dpath decl =
             Record_mixed shape
         (* value-only records are stored as boxed records *)
         | { values = true; float64s = false; non_float64_unboxed_fields = false }
-        | { imms = true; float64s = false; non_float64_unboxed_fields = false }
           -> rep
         (* All-float and all-float64 records are stored as flat float records.
         *)
-        | { values = false; imms = false; floats = true ; float64s = false;
+        | { values = false; floats = true ; float64s = false;
             non_float64_unboxed_fields = false } ->
           Record_float
-        | { values = false; imms = false; floats = false; float64s = true;
+        | { values = false; floats = false; float64s = true;
             non_float64_unboxed_fields = false } ->
           Record_ufloat
-        | { values = false; imms = false; floats = false; float64s = false;
+        | { values = false; floats = false; float64s = false;
             non_float64_unboxed_fields = false }
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
@@ -1683,8 +1927,8 @@ let update_decl_jkind env dpath decl =
           assert false
       end
     | cstrs, Variant_boxed cstr_shapes ->
-      let (_,cstrs,all_voids) =
-        List.fold_left (fun (idx,cstrs,all_voids) cstr ->
+      let (_,cstrs) =
+        List.fold_left (fun (idx,cstrs) cstr ->
           let arg_sorts =
             match cstr_shapes.(idx) with
             | Constructor_uniform_value, arg_sorts -> arg_sorts
@@ -1693,7 +1937,7 @@ let update_decl_jkind env dpath decl =
                   "Typedecl.update_variant_kind doesn't expect mixed \
                    constructor as input"
           in
-          let cd_args, all_void, jkinds =
+          let cd_args, _all_void, jkinds =
             update_constructor_arguments_sorts env cstr.Types.cd_loc
               cstr.Types.cd_args (Some arg_sorts)
           in
@@ -1708,107 +1952,107 @@ let update_decl_jkind env dpath decl =
             | Constructor_mixed _ -> cstr_shapes.(idx) <- cstr_repr, arg_sorts
           in
           let cstr = { cstr with Types.cd_args } in
-          (idx+1,cstr::cstrs,all_voids && all_void)
-        ) (0,[],true) cstrs
+          (idx+1,cstr::cstrs)
+        ) (0,[]) cstrs
       in
-      let jkind = Jkind.for_boxed_variant ~all_voids in
+      let jkind =
+        Jkind.for_boxed_variant
+          ~decl_params:decl.type_params
+          ~type_apply:(Ctype.apply env)
+          ~free_vars:(Ctype.free_variable_set_of_list env)
+          cstrs
+      in
       List.rev cstrs, rep, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
   in
 
-  let new_decl, new_jkind = match decl.type_kind with
-    | Type_abstract _ -> decl, decl.type_jkind
+
+  let new_decl =
+    match decl.type_kind with
+    | Type_abstract _ ->
+      (* Abstract types should never have quality=best, but let's double check that here
+         just to be safe *)
+      assert (not (Jkind.is_best decl.type_jkind));
+      decl
     | Type_open ->
-      let type_jkind = Jkind.Builtin.value ~why:Extensible_variant in
-      { decl with type_jkind }, type_jkind
+      let type_jkind =
+        Jkind.for_non_float ~why:Extensible_variant
+        (* It's unlikely we'll ever be able to give better kinds than [value] to
+           extensible variants, so we're not worried about backwards compatibility if we
+           mark them as best here, and we want to be able to normalize them away *)
+        (* See Note [Quality of jkinds during inference] for more information about when
+           we mark jkinds as best *)
+        |> Jkind.mark_best
+      in
+      { decl with type_jkind }
     | Type_record (lbls, rep, umc) ->
       let lbls, rep, type_jkind = update_record_kind decl.type_loc lbls rep in
-      { decl with type_kind = Type_record (lbls, rep, umc); type_jkind },
-      type_jkind
+      (* See Note [Quality of jkinds during inference] for more information about when we
+         mark jkinds as best *)
+      let type_jkind = Jkind.mark_best type_jkind in
+      { decl with type_kind = Type_record (lbls, rep, umc); type_jkind }
+    (* CR layouts v3.0: handle this case in [update_variant_jkind] when
+       [Variant_with_null] introduced.
+
+       No updating required for [or_null_reexport], and we must not
+       incorrectly override the jkind to [non_null].
+    *)
     | Type_record_unboxed_product (lbls, rep, umc) ->
         begin match rep with
         | Record_unboxed_product ->
-          let lbls, jkinds =
+          let lbls =
             List.map (fun (Types.{ld_type} as lbl) ->
               let jkind = Ctype.type_jkind env ld_type in
               (* This next line is guaranteed to be OK because of a call to
                  [check_representable] *)
               let sort = Jkind.sort_of_jkind jkind in
               let ld_sort = Jkind.Sort.default_to_value_and_get sort in
-              {lbl with ld_sort}, jkind
+              {lbl with ld_sort}
             ) lbls
-            |> List.split
           in
-          let type_jkind = Jkind.Builtin.product ~why:Unboxed_record jkinds in
+          let type_jkind = Jkind.for_unboxed_record lbls in
+          (* See Note [Quality of jkinds during inference] for more information about when we
+             mark jkinds as best *)
+          let type_jkind = Jkind.mark_best type_jkind in
           { decl with type_kind = Type_record_unboxed_product (lbls, rep, umc);
-                      type_jkind },
-          type_jkind
+                      type_jkind }
         end
+    | Type_variant _ when
+      Builtin_attributes.has_or_null_reexport decl.type_attributes ->
+      decl
     | Type_variant (cstrs, rep, umc) ->
       let cstrs, rep, type_jkind = update_variant_kind cstrs rep in
-      { decl with type_kind = Type_variant (cstrs, rep, umc);
-                  type_jkind },
-      type_jkind
+      (* See Note [Quality of jkinds during inference] for more information about when we
+         mark jkinds as best *)
+      let type_jkind = Jkind.mark_best type_jkind in
+      { decl with type_kind = Type_variant (cstrs, rep, umc); type_jkind }
   in
 
-  let allow_any_crossing =
-    Builtin_attributes.has_unsafe_allow_any_mode_crossing decl.type_attributes
-  in
+  (* Check the layout here, both to check it, but more importantly to fill in any sort
+     variables in the original decl's jkind, which might be shared with the jkinds of
+     other types in a (maybe mutually recursive) type declaration. See Note [Default
+     jkinds in transl_declaration]) *)
+  match
+    Jkind.Layout.sub new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
+  with
+  | Not_le reason ->
+    let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+    raise (Error (
+      decl.type_loc,
+      Jkind_mismatch_of_path (
+        dpath,
+        Jkind.Violation.of_ ~jkind_of_type (
+          Not_a_subjkind (
+            new_decl.type_jkind, decl.type_jkind, Nonempty_list.to_list reason)))))
+  | Less | Equal -> new_decl
 
-  (* Check that the attribute is valid, if set (unconditionally, for consistency). *)
-  if allow_any_crossing then begin
-    match decl.type_kind with
-    | Type_abstract _ | Type_open ->
-      raise(Error(decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-    | _ -> ()
-  end;
-
-  (* check that the jkind computed from the kind matches the jkind
-     annotation, which was stored in decl.type_jkind *)
-  if new_jkind != decl.type_jkind then
-    (* CR layouts v2.8: Consider making a function that doesn't compute
-       histories for this use-case, which doesn't need it. *)
-    begin match Jkind.sub_jkind_l ~allow_any_crossing new_jkind decl.type_jkind with
-    | Ok _ ->
-      (* If the user is asking us to allow any crossing, we use the modal bounds from
-         the annotation rather than the modal bounds inferred from the type_kind.
-         However, we /only/ take the modal bounds, not the layout - because we still
-         want to be able to eg locally use a type declared as layout [any] as [value]
-         if that's its actual layout! *)
-      let type_jkind =
-        Jkind.unsafely_set_upper_bounds ~from:decl.type_jkind
-          new_decl.type_jkind
-      in
-      if allow_any_crossing then
-        let umc =
-          Some { modal_upper_bounds = Jkind.get_modal_upper_bounds type_jkind }
-        in
-        let type_kind =
-          match new_decl.type_kind with
-          | Type_abstract _ | Type_open -> assert false (* Checked above *)
-          | Type_record (lbls, rep, _) ->
-            Type_record (lbls, rep, umc)
-          | Type_record_unboxed_product (lbls, rep, _) ->
-            Type_record_unboxed_product (lbls, rep, umc)
-          | Type_variant (cs, rep, _) ->
-            Type_variant (cs, rep, umc)
-        in
-        { new_decl with
-          type_jkind;
-          type_kind; }
-      else new_decl
-    | Error err ->
-      raise(Error(decl.type_loc, Jkind_mismatch_of_path (dpath,err)))
-    end
-  else new_decl
-
-let update_decls_jkind_reason decls =
+let update_decls_jkind_reason env decls =
   List.map
     (fun (id, decl) ->
        let update_generalized =
         Ctype.check_and_update_generalized_ty_jkind
-          ~name:id ~loc:decl.type_loc
+          ~name:id ~loc:decl.type_loc env
        in
        List.iter update_generalized decl.type_params;
        Btype.iter_type_expr_kind update_generalized decl.type_kind;
@@ -1822,9 +2066,52 @@ let update_decls_jkind_reason decls =
 
 let update_decls_jkind env decls =
   List.map
-    (fun (id, decl) -> (id, update_decl_jkind env (Pident id) decl))
+    (fun (id, decl) ->
+       let allow_any_crossing =
+         Builtin_attributes.has_unsafe_allow_any_mode_crossing decl.type_attributes
+       in
+
+       (* Check that the attribute is valid, if set (unconditionally, for consistency). *)
+       if allow_any_crossing then begin
+         match decl.type_kind with
+         | Type_abstract _ | Type_open ->
+           raise(Error(decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+         | _ -> ()
+       end;
+
+       (id, decl, allow_any_crossing, update_decl_jkind env (Pident id) decl))
     decls
 
+(* See Note [Typechecking unboxed versions of types]. *)
+let check_unboxed_paths decls ~unboxed_version_banned =
+  (* We iterate on all subexpressions of the declaration to check "in depth"
+     that no non-existent unboxed version is used. *)
+  let open Btype in
+  let checked =
+    (* [checked] remembers the types that the iterator already
+        checked, to avoid looping on cyclic types. *)
+    ref TypeSet.empty
+  in
+  let check_ty loc ty =
+    match get_desc ty with
+    | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
+      when unboxed_version_banned path ->
+        raise (Error (loc, No_unboxed_version path))
+    | _ -> ()
+  in
+  let check_decl d =
+    let it =
+      {type_iterators with it_type_expr =
+        (fun self ty ->
+          if not (TypeSet.mem ty !checked) then begin
+            check_ty d.type_loc ty;
+            checked := TypeSet.add ty !checked;
+            self.it_do_type_expr self ty
+          end)}
+    in
+    it.it_type_declaration it (Ctype.generic_instance_declaration d)
+  in
+  List.iter (fun (_, d) -> check_decl d) decls
 
 (* Note: Well-foundedness for OCaml types
 
@@ -2118,7 +2405,7 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
    e.g. [type 'a t = #{ a : 'a } and x = int t t], either by using layouts
    variables or the algorithm from "Unboxed data constructors - or, how cpp
    decides a halting problem."
-   See https://github.com/ocaml-flambda/flambda-backend/pull/3407.
+   See https://github.com/oxcaml/oxcaml/pull/3407.
 *)
 type step_result =
   | Contained of type_expr list
@@ -2176,7 +2463,13 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
 let check_unboxed_recursion_decl ~abs_env env loc path decl to_check =
   let decl = Ctype.generic_instance_declaration decl in
   let ty = Btype.newgenty (Tconstr (path, decl.type_params, ref Mnil)) in
-  check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check
+  check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check;
+  match decl.type_unboxed_version with
+  | None -> ()
+  | Some decl ->
+      let path = Path.unboxed_version path in
+      let ty = Btype.newgenty (Tconstr (path, decl.type_params, ref Mnil)) in
+      check_unboxed_recursion ~abs_env env loc (Path.name path) ty to_check
 
 (* Check for non-regular abbreviations; an abbreviation
    [type 'a t = ...] is non-regular if the expansion of [...]
@@ -2234,8 +2527,7 @@ let check_regularity ~abs_env env loc path decl to_check =
           end;
           List.iter (check_subtype cpath args prev_exp trace ty) args'
       | Tpoly (ty, tl) ->
-          let (_, ty) =
-            Ctype.instance_poly ~keep_names:true ~fixed:false tl ty in
+          let ty = Ctype.instance_poly ~keep_names:true tl ty in
           check_regular cpath args prev_exp trace ty
       | _ ->
           Btype.iter_type_expr
@@ -2337,11 +2629,112 @@ let check_redefined_unit (td: Parsetree.type_declaration) =
   | _ ->
       ()
 
-let add_types_to_env decls shapes env =
-  List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-    decls shapes env
+
+(* Note [Quality of jkinds during inference]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   We're careful during inference of jkinds for type declarations not to ever call
+   [Jkind.mark_best] on a jkind before we've added all the various pieces of information
+   to the jkind (the full layout, and all the with-bounds). Early in translation, we give
+   "dummy" kinds to types, without any with bounds, and have been careful not to mark
+   these as having a [Best] quality. Later on, in [update_decls_jkind], once we've learned
+   everything there is to know about a type declaration, we mark the new kind as [Best].
+   It's important to do this /before/ [normalize_decl_jkinds], so that mutually recursive
+   type declarations can look up each others' (best, though perhaps not normalized!)
+   jkind.
+*)
+
+(* Normalize the jkinds in a list of (potentially mutually recursive) type declarations *)
+let normalize_decl_jkinds env shapes decls =
+  let rec normalize_decl_jkind env original_decl allow_any_crossing decl path =
+    let type_unboxed_version =
+      Option.map (fun type_unboxed_version ->
+        normalize_decl_jkind env (Option.get original_decl.type_unboxed_version)
+          allow_any_crossing type_unboxed_version (Path.unboxed_version path))
+      decl.type_unboxed_version
+    in
+    let normalized_jkind =
+      Jkind.normalize
+        ~mode:Require_best
+        ~jkind_of_type:(fun ty -> Some (Ctype.type_jkind env ty))
+        decl.type_jkind
+    in
+    let decl =
+      { decl with type_jkind = normalized_jkind; type_unboxed_version }
+    in
+    if normalized_jkind != original_decl.type_jkind then begin
+      (* If the jkind has changed, check that it is a subjkind of the original jkind
+        that we computed, either from a user-written annotation or as a dummy jkind.
+
+         (see Note [Default jkinds in transl_declaration]) *)
+      (* CR layouts v2.8: it almost definitely has changed, but also we probably trust
+         the new jkind (we really only want this check here to check against the
+         user-written annotation). We might be able to do a better job here and save
+         some work. *)
+      let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+      let type_equal = Ctype.type_equal env in
+      match
+        (* CR layouts v2.8: Consider making a function that doesn't compute
+           histories for this use-case, which doesn't need it. *)
+        Jkind.sub_jkind_l
+          ~type_equal
+          ~jkind_of_type
+          ~allow_any_crossing
+          decl.type_jkind
+          original_decl.type_jkind
+      with
+      | Ok _ ->
+        if allow_any_crossing then
+          (* If the user is asking us to allow any crossing, we use the mod- and
+             with-bounds from the annotation rather than the modal bounds inferred from
+             the type_kind. However, we /only/ take the bounds, not the layout - because
+             we still want to be able to eg locally use a type declared as layout [any] as
+             [value] if that's its actual layout! *)
+          let type_jkind =
+            Jkind.unsafely_set_bounds ~from:original_decl.type_jkind decl.type_jkind
+          in
+          let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
+          let type_kind =
+            match decl.type_kind with
+            | Type_abstract _ | Type_open -> assert false (* Checked above *)
+            | Type_record (lbls, rep, _) ->
+              Type_record (lbls, rep, umc)
+            | Type_record_unboxed_product (lbls, rep, _) ->
+              Type_record_unboxed_product (lbls, rep, umc)
+            | Type_variant (cs, rep, _) ->
+              Type_variant (cs, rep, umc)
+          in
+          { decl with type_jkind; type_kind; }
+        else decl
+      | Error err ->
+        raise(Error(decl.type_loc,
+                    Jkind_mismatch_of_path (path, err)))
+    end
+    else decl
+  in
+  (* Add the types, with non-normalized kinds, to the environment to start, so that eg
+     types can look up their own (potentially non-normalized) kinds *)
+  let env =
+    List.fold_right2
+      (fun (id, _, _, decl) shape env ->
+         add_type ~check:true ~shape id decl env)
+      decls shapes env
+  in
+  Misc.Stdlib.List.fold_left_map2
+    (fun env (id, original_decl, allow_any_crossing, decl) shape ->
+       let decl =
+         normalize_decl_jkind env original_decl allow_any_crossing decl
+           (Pident id)
+       in
+       (* Add the decl with the normalized kind back to the environment, so that later
+          kinds don't have to normalize this kind if they mention this type in their
+          with-bounds *)
+       let env = add_type ~check:false ~shape:shape id decl env in
+       env, (id, decl)
+    )
+    env
+    decls
+    shapes
 
 (* Translate a set of type declarations, mutually recursive or not *)
 let transl_type_decl env rec_flag sdecl_list =
@@ -2416,10 +2809,12 @@ let transl_type_decl env rec_flag sdecl_list =
          enviroment. *)
       let tdecls =
         List.map2 transl_declaration sdecl_list (List.map ids_slots ids_list) in
-      let decls, shapes =
-        List.map (fun (tdecl, shape) ->
-          (tdecl.typ_id, tdecl.typ_type), shape) tdecls
-        |> List.split
+      let tdecls, shapes = List.split tdecls in
+      let decls = List.map (fun d -> (d.typ_id, d.typ_type)) tdecls in
+      let decls = derive_unboxed_versions decls env in
+      let tdecls =
+        List.map2
+          (fun tdecl (_, decl) -> { tdecl with typ_type = decl }) tdecls decls
       in
       current_slot := None;
       (* Check for duplicates *)
@@ -2453,19 +2848,27 @@ let transl_type_decl env rec_flag sdecl_list =
     List.fold_left2
       (enter_type ~abstract_abbrevs:Rec_check_regularity rec_flag)
       env sdecl_list ids_list in
+  check_unboxed_paths decls
+    ~unboxed_version_banned:(fun path ->
+       match Env.find_type (Path.unboxed_version path) new_env with
+        | _ -> false | exception Not_found -> true);
   List.iter (fun (id, decl) ->
     check_well_founded_manifest ~abs_env new_env (List.assoc id id_loc_list)
       (Path.Pident id) decl)
     decls;
   let to_check =
-    function Path.Pident id -> List.mem_assoc id id_loc_list | _ -> false in
+    function
+    | Path.Pident id | Path.Pextra_ty (Path.Pident id, Punboxed_ty) ->
+      List.mem_assoc id id_loc_list
+    | _ -> false
+  in
   List.iter (fun (id, decl) ->
     check_well_founded_decl ~abs_env new_env (List.assoc id id_loc_list)
       (Path.Pident id)
       decl to_check)
     decls;
-  List.iter (fun (tdecl, _shape) ->
-    check_abbrev_regularity ~abs_env new_env id_loc_list to_check tdecl) tdecls;
+  List.iter
+    (check_abbrev_regularity ~abs_env new_env id_loc_list to_check) tdecls;
   List.iter (fun (id, decl) ->
     check_unboxed_recursion_decl ~abs_env new_env (List.assoc id id_loc_list)
       (Path.Pident id)
@@ -2512,7 +2915,7 @@ let transl_type_decl env rec_flag sdecl_list =
      check_constraints will succeed via mutation, be backtracked, and then
      perhaps a sort variable gets defaulted to value. Bad bad.) *)
   List.iter2
-    (fun sdecl (tdecl, _shape) ->
+    (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
        match Ctype.closed_type_decl decl with
          Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
@@ -2521,14 +2924,21 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Check that constraints are enforced *)
   List.iter2 (check_constraints new_env) sdecl_list decls;
   (* Add type properties to declarations *)
-  let decls =
+  let new_env, decls =
     try
-      decls
-      |> name_recursion_decls sdecl_list
-      |> Typedecl_variance.update_decls env sdecl_list
-      |> Typedecl_separability.update_decls env
-      |> update_decls_jkind new_env
-      |> update_decls_jkind_reason
+      let new_env, decls =
+        decls
+        |> name_recursion_decls sdecl_list
+        |> Typedecl_variance.update_decls env sdecl_list
+        |> Typedecl_separability.update_decls env
+        |> update_decls_jkind new_env
+        |> normalize_decl_jkinds new_env shapes
+      in
+      let removed, decls = remove_unboxed_versions decls in
+      if not (Path.Set.is_empty removed) then
+        check_unboxed_paths decls
+          ~unboxed_version_banned:(fun p -> Path.Set.mem p removed);
+      new_env, update_decls_jkind_reason new_env decls
     with
     | Typedecl_variance.Error (loc, err) ->
         raise (Error (loc, Variance err))
@@ -2542,7 +2952,7 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Keep original declaration *)
   let final_decls =
     List.map2
-      (fun (tdecl, _shape) (_id2, decl) ->
+      (fun tdecl (_id2, decl) ->
         { tdecl with typ_type = decl }
       ) tdecls decls
   in
@@ -2580,7 +2990,10 @@ let transl_extension_constructor ~scope env type_path type_params
         let usage : Env.constructor_usage =
           if priv = Public then Env.Exported else Env.Exported_private
         in
-        let cdescr = Env.lookup_constructor ~loc:lid.loc usage lid.txt env in
+        let cdescr, locks =
+          Env.lookup_constructor ~loc:lid.loc usage lid.txt env
+        in
+        let held_locks = (locks, lid.txt, lid.loc) in
         let (args, cstr_res, _ex) =
           Ctype.instance_constructor Keep_existentials_flexible cdescr
         in
@@ -2614,6 +3027,8 @@ let transl_extension_constructor ~scope env type_path type_params
               | _ -> ())
             typext_params
         end;
+        Ctype.check_constructor_crossing env cdescr.cstr_tag ~res:cstr_res args
+          held_locks;
         (* Ensure that constructor's type matches the type being extended *)
         let cstr_type_path = Btype.cstr_type_path cdescr in
         let cstr_type_params = (Env.find_type cstr_type_path env).type_params in
@@ -2903,7 +3318,8 @@ type sort_or_poly = Sort of Jkind.Sort.Const.t | Poly
 let native_repr_of_type env kind ty sort_or_poly =
   match kind, get_desc (Ctype.expand_head_opt env ty) with
   | Untagged, Tconstr (_, _, _) when
-         Typeopt.maybe_pointer_type env ty = Lambda.Immediate
+         Typeopt.maybe_pointer_type env ty
+         = (Lambda.Immediate, Lambda.Non_nullable)
       (* Only allow [@untagged] on immediate values. [maybe_pointer_type]
          currently returns [Immediate] on unboxed number types, which
          do not support [@untagged].
@@ -2976,7 +3392,7 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
 let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
   error_if_has_deep_native_repr_attributes core_type;
   let sort_or_poly =
-    match get_desc (Ctype.get_unboxed_type_approximation env ty) with
+    match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
     (* This only captures tvars with layout [any] explicitly quantified within
        the declaration.
 
@@ -3210,14 +3626,42 @@ let error_if_containing_unexpected_jkind prim cty ty =
   Primitive.prim_has_valid_reprs ~loc:cty.ctyp_loc prim;
   unexpected_layout_any_check prim cty ty
 
+(* [@@@zero_alloc assert all] in signatures uses the apparent arity of each
+   declaration just by looking at the number of arrows in the type.  If the type
+   is an alias to an arrow type, the apparent arity is zero, and the item won't
+   get any zero alloc checking.  This is probably not the user's intent, so we
+   give a warning in that case.  *)
+let check_for_hidden_arrow env loc ty =
+  match !Clflags.zero_alloc_assert with
+  | Assert_all | Assert_all_opt ->
+    let check () =
+      begin match get_desc (Ctype.expand_head env ty) with
+      | Tarrow _ ->
+        let attr =
+          match !Clflags.zero_alloc_assert with
+          | Assert_all -> "all"
+          | Assert_all_opt -> "all_opt"
+          | Assert_default -> assert false
+        in
+        Location.prerr_warning loc (Warnings.Zero_alloc_all_hidden_arrow attr)
+      | _ -> ()
+      end
+    in
+    if !Clflags.principal || Env.has_local_constraints env then
+      let snap = Btype.snapshot () in
+      check ();
+      Btype.backtrack snap
+    else
+      check()
+  | Assert_default -> ()
+
 (* Translate a value declaration *)
 let transl_value_decl env loc ~sig_modalities valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let modalities =
     match valdecl.pval_modalities with
     | [] -> sig_modalities
-    | l -> Typemode.transl_modalities ~maturity:Stable Immutable
-        valdecl.pval_attributes l
+    | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
   in
   let modalities = Mode.Modality.Value.of_const modalities in
   (* CR layouts v5: relax this to check for representability. *)
@@ -3225,7 +3669,8 @@ let transl_value_decl env loc ~sig_modalities valdecl =
                 (Jkind.Builtin.value_or_null ~why:Structure_element) with
   | Ok () -> ()
   | Error err ->
-    raise(Error(cty.ctyp_loc, Non_value_in_sig(err,valdecl.pval_name.txt,cty.ctyp_type)))
+    raise(Error(cty.ctyp_loc,
+                Non_value_in_sig(err,valdecl.pval_name.txt,cty.ctyp_type)))
   end;
   let ty = cty.ctyp_type in
   let v =
@@ -3241,18 +3686,38 @@ let transl_value_decl env loc ~sig_modalities valdecl =
       in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:true
+          ~on_application:false
           ~default_arity valdecl.pval_attributes
       in
       let zero_alloc  =
         match zero_alloc with
-        | Default_zero_alloc -> Zero_alloc.default
+        | Default_zero_alloc ->
+          (* We fabricate a "Check" attribute if a top-level annotation
+             specifies that all functions should be checked for zero alloc. *)
+          if default_arity = 0 then begin
+            check_for_hidden_arrow env loc ty;
+            Zero_alloc.default
+          end else
+            let create_const ~opt =
+              Zero_alloc.create_const
+                (Check { strict = false;
+                         arity = default_arity;
+                         custom_error_msg = None;
+                         loc;
+                         opt })
+            in
+            (match !Clflags.zero_alloc_assert with
+             | Assert_default -> Zero_alloc.default
+             | Assert_all -> create_const ~opt:false
+             | Assert_all_opt -> create_const ~opt:true)
+        | Ignore_assert_all -> Zero_alloc.ignore_assert_all
         | Check za ->
           if default_arity = 0 && za.arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_non_function));
           if za.arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_bad_user_arity));
           Zero_alloc.create_const zero_alloc
-        | Assume _ | Ignore_assert_all ->
+        | Assume _ ->
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
       { val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
@@ -3305,7 +3770,7 @@ let transl_value_decl env loc ~sig_modalities valdecl =
     Env.enter_value ~mode:Mode.Value.legacy valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
-  Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc ty;
+  Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc newenv ty;
   let desc =
     {
      val_id = id;
@@ -3401,6 +3866,44 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   if arity_ok && not sig_decl_abstract
   && sdecl.ptype_private = Private then
     Location.deprecated loc "spurious use of private";
+  let type_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
+  let type_unboxed_version =
+    match get_desc man with
+    | Tconstr (path, args, _) ->
+      begin match Env.find_type path sig_env with
+      | { type_unboxed_version = Some decl ; _ } ->
+        let man = Ctype.newconstr (Path.unboxed_version path) args in
+        let type_kind =
+          match sig_decl.type_unboxed_version, arity_ok with
+          | Some { type_kind ; _ }, true -> type_kind
+          | None, _ | _, false -> Type_abstract Definition
+        in
+        let type_jkind = decl.type_jkind in
+        Some {
+          type_params = params;
+          type_arity = arity;
+          type_kind;
+          type_jkind;
+          type_private = priv;
+          type_manifest = Some man;
+          type_variance = [];
+          type_separability = Types.Separability.default_signature ~arity;
+          type_is_newtype = false;
+          type_expansion_scope = Btype.lowest_level;
+          type_loc = loc;
+          type_attributes = decl.type_attributes;
+          type_unboxed_default = false;
+          type_uid = Uid.unboxed_version type_uid;
+          type_unboxed_version = None;
+        }
+      | { type_unboxed_version = None ; _ } ->
+        None
+      | exception Not_found ->
+        (* If [man] was translated already, this should be unreachable *)
+        Misc.fatal_error "Typedecl.transl_with_constraint"
+      end
+    | _ -> None
+  in
   let type_kind, type_unboxed_default, type_jkind =
     if arity_ok then
       sig_decl.type_kind,
@@ -3423,7 +3926,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_loc = loc;
       type_attributes = sdecl.ptype_attributes;
       type_unboxed_default;
-      type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+      type_uid;
+      type_unboxed_version;
     }
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
@@ -3433,9 +3937,10 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   end;
   let new_sig_decl = name_recursion sdecl id new_sig_decl in
   let new_type_variance =
-    let required = Typedecl_variance.variance_of_sdecl sdecl in
+    let required = Typedecl_variance.variance_of_params sdecl.ptype_params in
     try
-      Typedecl_variance.compute_decl env ~check:(Some id) new_sig_decl required
+      Typedecl_variance.compute_decl env ~check:(Some (id, false)) new_sig_decl
+        required
     with Typedecl_variance.Error (loc, err) ->
       raise (Error (loc, Variance err)) in
   let new_type_separability =
@@ -3461,8 +3966,33 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_attributes = new_sig_decl.type_attributes;
       type_uid = new_sig_decl.type_uid;
 
+      (* For every recomputed field added below, consider if we also must
+         recompute it for the unboxed version. *)
       type_variance = new_type_variance;
       type_separability = new_type_separability;
+      type_unboxed_version =
+        Option.map (fun d ->
+          let type_variance =
+            let required =
+              Typedecl_variance.variance_of_params sdecl.ptype_params in
+            try
+              Typedecl_variance.compute_decl env ~check:(Some (id, true))
+                d required
+            with Typedecl_variance.Error (loc, err) ->
+              raise (Error (loc, Variance err))
+          in
+          let type_separability =
+            try
+              Typedecl_separability.compute_decl env d
+            with Typedecl_separability.Error (loc, err) ->
+              raise (Error (loc, Separability err))
+          in
+          {
+            d with
+            type_variance;
+            type_separability;
+          })
+        new_sig_decl.type_unboxed_version
     } in
   {
     typ_id = id;
@@ -3501,6 +4031,7 @@ let transl_package_constraint ~loc ty =
     type_attributes = [];
     type_unboxed_default = false;
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+    type_unboxed_version = None;
   }
 
 (* Approximate a type declaration: just make all types abstract *)
@@ -3523,6 +4054,24 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_attributes = [];
       type_unboxed_default = false;
       type_uid = Uid.internal_not_actually_unique;
+      type_unboxed_version =
+        Some {
+          type_params = params;
+          type_arity = arity;
+          type_kind = Type_abstract Definition;
+          type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+          type_private = Public;
+          type_manifest = None;
+          type_variance = Variance.unknown_signature ~injective ~arity;
+          type_separability = Types.Separability.default_signature ~arity;
+          type_is_newtype = false;
+          type_expansion_scope = Btype.lowest_level;
+          type_loc = Location.none;
+          type_attributes = [];
+          type_unboxed_default = false;
+          type_uid = Uid.internal_not_actually_unique;
+          type_unboxed_version = None;
+        };
     }
   end
 
@@ -3533,9 +4082,17 @@ let approx_type_decl sdecl_list =
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in
        let path = Path.Pident id in
        let injective = sdecl.ptype_kind <> Ptype_abstract in
+       let transl_type sty =
+         Misc.fatal_errorf
+           "@[I do not yet know how to deal with [with]-types (such as %a)@ in \
+            recursive modules. Please contact the Jane Street OCaml Language@ \
+            team for help if you see this."
+           Pprintast.core_type sty
+       in
        let jkind =
          Jkind.of_type_decl_default
            ~context:(Type_declaration path)
+           ~transl_type
            ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
            sdecl
        in
@@ -3558,7 +4115,15 @@ let check_recmod_typedecl env loc recmod_ids path decl =
   check_regularity ~abs_env:env env loc path decl to_check;
   (* additional coherence check, as one might build an incoherent signature,
      and use it to build an incoherent module, cf. #7851 *)
-  ignore (check_coherence env loc path decl)
+  (* Call [check_kind_coherence] rather than [check_coherence] here, which
+     avoids a call to [narrow_to_manifest_jkind]. That call sometimes spuriously fails on
+     valid programs (see test 14 in testsuite/tests/typing-jkind-bounds/basics.ml). This
+     isn't sound, but this check is already unsound otherwise (see issue #13765)! And not
+     performing this check on the jkinds is no less sound than what already exists. So
+     instead of fixing the spurious failures, we choose to just not perform the check,
+     with the intention of fixing the jkind soundness issue once the other soundness issue
+     is resolved. *)
+  ignore (check_kind_coherence env loc path decl)
 
 
 (**** Error report ****)
@@ -3723,8 +4288,8 @@ let report_error ppf = function
       let get_jkind_error : _ Errortrace.elt -> _ = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
-      | Unequal_var_jkinds _ | Diff _ | Variant _ | Obj _
-      | Escape _ | Incompatible_fields _ | Rec_occur _ -> None
+      | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
+      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->
@@ -3856,12 +4421,22 @@ let report_error ppf = function
            Printtyp.prepare_for_printing [ variable ];
            Printtyp.Naming_context.reset ();
            begin match context with
-           | Type_declaration (id, decl) ->
+           | Type_declaration { id ; decl ; unboxed_version } ->
+               let pre, post =
+                 if unboxed_version then
+                   (* Unexpected; errors in the unboxed version should have also
+                      been present and reported first for the boxed version. *)
+                   "In the unboxed version of the definition",
+                 "@ Please report this error to the Jane Street compilers team."
+                 else
+                   "In the definition", ""
+               in
                Printtyp.add_type_declaration_to_preparation id decl;
-               fprintf ppf "@[<v>%s@;<1 2>%a@;"
-                 "In the definition"
+               fprintf ppf "@[<v>%s@;<1 2>%a@;%s"
+                 pre
                  (Style.as_inline_code @@ Printtyp.prepared_type_declaration id)
                  decl
+                 post
            | Gadt_constructor c ->
                Printtyp.add_constructor_to_preparation c;
                fprintf ppf "@[<v>%s@;<1 2>%a@;"
@@ -3941,7 +4516,11 @@ let report_error ppf = function
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)
     let offender ppf =
-      fprintf ppf "type %a" Style.inline_code (Ident.name (Path.head dpath))
+      let head_name = Ident.name (Path.head dpath) in
+      let path_end =
+        if Path.is_unboxed_version dpath then head_name ^ "#" else head_name
+      in
+      fprintf ppf "type %a" Style.inline_code path_end
     in
     Jkind.Violation.report_with_offender ~offender ppf v
   | Jkind_mismatch_of_type (ty,v) ->
@@ -4001,25 +4580,13 @@ let report_error ppf = function
       struct_desc
   | Illegal_mixed_product error -> begin
       match error with
-      | Flat_field_expected { boxed_lbl; non_value_lbl } ->
-          fprintf ppf
-            "@[Expected all flat fields after non-value field, %a,@]@,@ \
-             @[but found boxed field, %a.@]"
-            Style.inline_code (Ident.name non_value_lbl)
-            Style.inline_code (Ident.name boxed_lbl)
-      | Flat_constructor_arg_expected { boxed_arg; non_value_arg } ->
-          fprintf ppf
-            "@[Expected all flat constructor arguments after non-value \
-             argument, %a,@]@,@ @[but found boxed argument, %a.@]"
-            (Style.as_inline_code Printtyp.type_expr) non_value_arg
-            (Style.as_inline_code Printtyp.type_expr) boxed_arg
       | Runtime_support_not_enabled mixed_product_kind ->
           fprintf ppf
             "@[This OCaml runtime doesn't support mixed %s.@]"
             (Mixed_product_kind.to_plural_string mixed_product_kind)
       | Extension_constructor ->
           fprintf ppf
-            "@[Extensible types can't have fields of unboxed type. Consider \
+            "@[Extensible types can't have fields of unboxed type.@ Consider \
              wrapping the unboxed fields in a record.@]"
       | Value_prefix_too_long
           { value_prefix_len; max_value_prefix_len; mixed_product_kind } ->
@@ -4123,8 +4690,16 @@ let report_error ppf = function
       (Path.name definition)
   | Unsafe_mode_crossing_on_invalid_type_kind ->
     fprintf ppf
-      "@[[%@%@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.\
-       @ Only records, unboxed products, and variants are supported.@]"
+      "@[[%@%@unsafe_allow_any_mode_crossing] is not allowed on this kind of \
+       type declaration.@ Only records, unboxed products, and variants are \
+       supported.@]"
+  | Illegal_baggage jkind ->
+    fprintf ppf
+      "@[Illegal %a in kind annotation of an abbreviation:@ %a@]"
+      Style.inline_code "with" Jkind.format jkind
+  | No_unboxed_version p ->
+      fprintf ppf "@[The type %a@ has no unboxed version.@]"
+        (Style.as_inline_code Printtyp.path) p
 
 let () =
   Location.register_error_of_exn

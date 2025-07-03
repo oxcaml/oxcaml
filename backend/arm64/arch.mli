@@ -14,11 +14,12 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-
+[@@@ocaml.warning "+a-40-41-42"]
 (* Specific operations for the ARM processor, 64-bit mode *)
 
 val macosx : bool
-
+val is_asan_enabled : bool ref
+val feat_cssc : bool ref
 (* Machine-specific command-line options *)
 
 val command_line_options : (string * Arg.spec * string) list
@@ -42,8 +43,8 @@ type cmm_label = Label.t
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
 type specific_operation =
-  | Ifar_poll of { return_label: cmm_label option }
-  | Ifar_alloc of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo }
+  | Ifar_poll
+  | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
   | Ishiftarith of arith_operation * int
   | Imuladd       (* multiply and add *)
   | Imulsub       (* multiply and subtract *)
@@ -56,6 +57,7 @@ type specific_operation =
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
+  | Isimd of Simd.operation
 
 and arith_operation =
     Ishiftadd
@@ -112,8 +114,6 @@ val operation_is_pure : specific_operation -> bool
 val operation_allocates : specific_operation -> bool
 
 (* Specific operations that can raise *)
-
-val operation_can_raise : specific_operation -> bool
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
 

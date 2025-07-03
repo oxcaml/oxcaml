@@ -127,6 +127,7 @@ let rec add_type bv ty =
       add_type bv t
   | Ptyp_splice t ->
       add_type bv t
+  | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_extension e -> handle_extension e
 
 and add_type_labeled_tuple bv tl =
@@ -143,9 +144,9 @@ and add_jkind bv (jkind : jkind_annotation) =
   | Default -> ()
   | Abbreviation _ -> ()
   | Mod (jkind, (_ : modes)) -> add_jkind bv jkind
-  | With (jkind, typ) ->
+  | With (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
-      add_type bv typ
+      add_type bv typ;
   | Kind_of typ ->
       add_type bv typ
   | Product jkinds ->

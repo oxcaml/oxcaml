@@ -127,9 +127,6 @@ let label_usage_complaint priv mut lu
 let used_labels : label_usage usage_tbl ref =
   s_table Types.Uid.Tbl.create 16
 
-let used_unboxed_labels : label_usage usage_tbl ref =
-  s_table Types.Uid.Tbl.create 16
-
 (** Map indexed by the name of module components. *)
 module NameMap = String.Map
 
@@ -187,38 +184,48 @@ module TycompTbl =
         and constructors).  We keep a representation of each nested
         "open" and the set of local bindings between each of them. *)
 
-    type 'a t = {
+    type ('lock, 'a) t = {
       current: 'a Ident.tbl;
       (** Local bindings since the last open. *)
 
-      opened: 'a opened option;
-      (** Symbolic representation of the last (innermost) open, if any. *)
+      layer: ('lock, 'a) layer;
+      (** Symbolic representation of the last (innermost) layer *)
     }
 
-    and 'a opened = {
-      components: ('a list) NameMap.t;
-      (** Components from the opened module. We keep a list of
-          bindings for each name, as in comp_labels and
-          comp_constrs. *)
+    and ('lock, 'a) layer =
+      | Open of {
+        components: ('a list) NameMap.t;
+        (** Components from the opened module. We keep a list of
+            bindings for each name, as in comp_labels and
+            comp_constrs. *)
 
-      root: Path.t;
-      (** Only used to check removal of open *)
+        root: Path.t;
+        (** Only used to check removal of open *)
 
-      using: (string -> ('a * 'a) option -> unit) option;
-      (** A callback to be applied when a component is used from this
-          "open".  This is used to detect unused "opens".  The
-          arguments are used to detect shadowing. *)
+        using: (string -> ('a * 'a) option -> unit) option;
+        (** A callback to be applied when a component is used from this
+            "open".  This is used to detect unused "opens".  The
+            arguments are used to detect shadowing. *)
 
-      next: 'a t;
-      (** The table before opening the module. *)
-    }
+        next: ('lock, 'a) t;
+        (** The table before opening the module. *)
 
-    let empty = { current = Ident.empty; opened = None }
+        locks: 'lock list;
+        (** List of locks from the definition of [root] to this [Open], in that
+            order *)
+      }
+      | Lock of {
+          lock : 'lock;
+          next : ('lock, 'a) t;
+      }
+      | Nothing
+
+    let empty = { current = Ident.empty; layer = Nothing }
 
     let add id x tbl =
       {tbl with current = Ident.add id x tbl.current}
 
-    let add_open slot wrap root components next =
+    let add_open slot wrap root components locks next =
       let using =
         match slot with
         | None -> None
@@ -226,12 +233,12 @@ module TycompTbl =
       in
       {
         current = Ident.empty;
-        opened = Some {using; components; root; next};
+        layer = Open {using; components; root; locks; next};
       }
 
     let remove_last_open rt tbl =
-      match tbl.opened with
-      | Some {root; next; _} when Path.same rt root ->
+      match tbl.layer with
+      | Open {root; next; _} when Path.same rt root ->
           { next with current =
             Ident.fold_all Ident.add tbl.current next.current }
       | _ ->
@@ -240,9 +247,10 @@ module TycompTbl =
     let rec find_same id tbl =
       try Ident.find_same id tbl.current
       with Not_found as exn ->
-        begin match tbl.opened with
-        | Some {next; _} -> find_same id next
-        | None -> raise exn
+        begin match tbl.layer with
+        | Open {next; _} -> find_same id next
+        | Lock {next; _} -> find_same id next
+        | Nothing -> raise exn
         end
 
     let nothing = fun () -> ()
@@ -259,9 +267,10 @@ module TycompTbl =
     let rec find_all ~mark name tbl =
       List.map (fun (_id, desc) -> desc, nothing)
         (Ident.find_all name tbl.current) @
-      match tbl.opened with
-      | None -> []
-      | Some {using; next; components; root = _} ->
+      match tbl.layer with
+      | Nothing -> []
+      | Lock {next; _} -> find_all ~mark name next
+      | Open {using; next; components; root = _} ->
           let rest = find_all ~mark name next in
           let using = if mark then using else None in
           match NameMap.find name components with
@@ -272,23 +281,50 @@ module TycompTbl =
                 opened
               @ rest
 
+    let add_lock lock next =
+      { current = Ident.empty; layer = Lock {lock; next} }
+
+    let rec find_all_and_locks ~mark name tbl acc =
+      List.map (fun (_id, desc) -> (desc, (acc, nothing)))
+        (Ident.find_all name tbl.current) @
+      match tbl.layer with
+      | Nothing -> []
+      | Lock {lock;next} ->
+          find_all_and_locks ~mark name next (lock :: acc)
+      | Open {using; next; components; locks; root = _} ->
+          let rest = find_all_and_locks ~mark name next acc in
+          let using = if mark then using else None in
+          match NameMap.find name components with
+          | exception Not_found -> rest
+          | opened ->
+              List.map
+                (fun desc -> desc,
+                  (locks @ acc, mk_callback rest name desc using))
+                opened
+              @ rest
+
+    let find_all_and_locks ~mark name tbl =
+      find_all_and_locks ~mark name tbl []
+
     let rec fold_name f tbl acc =
       let acc = Ident.fold_name (fun _id d -> f d) tbl.current acc in
-      match tbl.opened with
-      | Some {using = _; next; components; root = _} ->
+      match tbl.layer with
+      | Open {using = _; next; components; root = _} ->
           acc
           |> NameMap.fold
             (fun _name -> List.fold_right f)
             components
           |> fold_name f next
-      | None ->
+      | Lock {next; _} -> fold_name f next acc
+      | Nothing ->
           acc
 
     let rec local_keys tbl acc =
       let acc = Ident.fold_all (fun k _ accu -> k::accu) tbl.current acc in
-      match tbl.opened with
-      | Some o -> local_keys o.next acc
-      | None -> acc
+      match tbl.layer with
+      | Open o -> local_keys o.next acc
+      | Lock {next; _} -> local_keys next acc
+      | Nothing -> acc
 
     let diff_keys is_local tbl1 tbl2 =
       let keys2 = local_keys tbl2 [] in
@@ -344,6 +380,8 @@ type lock =
 
 type locks = lock list
 
+type held_locks = locks * Longident.t * Location.t
+
 let locks_empty = []
 
 let locks_is_empty l = l = locks_empty
@@ -352,6 +390,7 @@ type lock_item =
   | Value
   | Module
   | Class
+  | Constructor
 
 module IdTbl =
   struct
@@ -632,9 +671,9 @@ let in_signature_flag = 0x01
 
 type t = {
   values: (lock, value_entry, value_data) IdTbl.t;
-  constrs: constructor_data TycompTbl.t;
-  labels: label_data TycompTbl.t;
-  unboxed_labels: unboxed_label_description TycompTbl.t;
+  constrs: (lock, constructor_data) TycompTbl.t;
+  labels: (empty, label_data) TycompTbl.t;
+  unboxed_labels: (empty, unboxed_label_description) TycompTbl.t;
   types: (lock, type_data, type_data) IdTbl.t;
   modules: (lock, module_entry, module_data) IdTbl.t;
   modtypes: (lock, modtype_data, modtype_data) IdTbl.t;
@@ -721,7 +760,8 @@ and label_data = label_description
 and type_data =
   { tda_declaration : type_declaration;
     tda_descriptions : type_descriptions;
-    tda_shape : Shape.t; }
+    tda_shape : Shape.t;
+    tda_unboxed_version_descriptions : type_descriptions option }
 
 and module_data =
   { mda_declaration : Subst.Lazy.module_declaration;
@@ -752,8 +792,6 @@ and class_data =
 and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
-
-let mda_mode = Mode.Value.legacy |> Mode.Value.disallow_right
 
 let clda_mode = Mode.Value.legacy |> Mode.Value.disallow_right
 
@@ -786,7 +824,7 @@ type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
   | Unbound_constructor of Longident.t
-  | Unbound_label of (Longident.t * record_form_packed)
+  | Unbound_label of Longident.t * record_form_packed * label_usage
   | Unbound_module of Longident.t
   | Unbound_class of Longident.t
   | Unbound_modtype of Longident.t
@@ -809,6 +847,7 @@ type lookup_error =
       Mode.Value.Comonadic.error * closure_context
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
+  | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
 
@@ -816,7 +855,7 @@ type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
-  | Incomplete_instantiation of { unset_param : Global_module.Name.t }
+  | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
 
 exception Error of error
 
@@ -835,16 +874,8 @@ let mode_default mode = {
   context = None
 }
 
-let used_labels_by_form (type rep) (record_form : rep record_form) =
-  match record_form with
-  | Legacy -> !used_labels
-  | Unboxed_product -> !used_unboxed_labels
-
-let find_used_label_by_uid (type rep) (record_form : rep record_form) uid =
-  Types.Uid.Tbl.find (used_labels_by_form record_form) uid
-
 let env_labels (type rep) (record_form : rep record_form) env
-    : rep gen_label_description TycompTbl.t  =
+    : (empty, rep gen_label_description) TycompTbl.t  =
   match record_form with
   | Legacy -> env.labels
   | Unboxed_product -> env.unboxed_labels
@@ -971,14 +1002,14 @@ let check_functor_application =
   (* to be filled by Includemod *)
   ref ((fun ~errors:_ ~loc:_
          ~lid_whole_app:_  ~f0_path:_ ~args:_
-         ~arg_path:_ ~arg_mty:_ ~arg_mode:_ ~param_mty:_
+         ~arg_path:_ ~arg_mty:_ ~param_mty:_
          _env
          -> assert false) :
          errors:bool -> loc:Location.t ->
        lid_whole_app:Longident.t ->
-       f0_path:Path.t -> args:(Path.t * Types.module_type * Mode.Value.l) list ->
-       arg_path:Path.t -> arg_mty:module_type -> arg_mode:Mode.Value.l ->
-       param_mty:module_type -> t -> unit)
+       f0_path:Path.t -> args:(Path.t * Types.module_type) list ->
+       arg_path:Path.t -> arg_mty:module_type -> param_mty:module_type ->
+       t -> unit)
 
 let scrape_alias =
   (* to be filled with Mtype.scrape_alias *)
@@ -1022,18 +1053,22 @@ let rec address_head = function
 
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
-  val get : unit -> Compilation_unit.t option
-  val set : Compilation_unit.t option -> unit
+  val get : unit -> Unit_info.t option
+  val set : Unit_info.t option -> unit
   val is : string -> bool
   val is_ident : Ident.t -> bool
   val is_path : Path.t -> bool
 end = struct
+  let current_unit : Unit_info.t option ref =
+    ref None
   let get () =
-    Compilation_unit.get_current ()
-  let set comp_unit =
-    Compilation_unit.set_current comp_unit
+    !current_unit
+  let set unit_info =
+    current_unit := unit_info
+  let get_cu () =
+    Option.map Unit_info.modname (get ())
   let get_name () =
-    Option.map Compilation_unit.name (get ())
+    Option.map Compilation_unit.name (get_cu ())
   let is name =
     let current_name_string =
       Option.map Compilation_unit.Name.to_string (get_name ())
@@ -1155,14 +1190,16 @@ let import_crcs ~source crcs =
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
 
+let is_bound_to_runtime_parameter id =
+  Persistent_env.is_bound_to_runtime_parameter !persistent_env id
+
 let parameters () = Persistent_env.parameters !persistent_env
 
-let read_pers_mod modname cmi ~add_binding =
-  Persistent_env.read !persistent_env read_sign_of_cmi modname cmi
-    ~add_binding
+let read_pers_mod modname cmi =
+  Persistent_env.read !persistent_env modname cmi
 
-let find_pers_mod name =
-  Persistent_env.find !persistent_env read_sign_of_cmi name
+let find_pers_mod name ~allow_excess_args =
+  Persistent_env.find !persistent_env read_sign_of_cmi name ~allow_excess_args
 
 let check_pers_mod ~loc name =
   Persistent_env.check !persistent_env read_sign_of_cmi ~loc name
@@ -1191,11 +1228,10 @@ let reset_declaration_caches () =
   Types.Uid.Tbl.clear !module_declarations;
   Types.Uid.Tbl.clear !used_constructors;
   Types.Uid.Tbl.clear !used_labels;
-  Types.Uid.Tbl.clear !used_unboxed_labels;
   ()
 
 let reset_cache ~preserve_persistent_env =
-  Compilation_unit.set_current None;
+  Current_unit_name.set None;
   if not preserve_persistent_env then
     Persistent_env.clear !persistent_env;
   reset_declaration_caches ();
@@ -1245,12 +1281,12 @@ let modtype_of_functor_appl fcomp p1 p2 =
 let check_functor_appl
     ~errors ~loc ~lid_whole_app ~f0_path ~args
     ~f_comp
-    ~arg_path ~arg_mty ~arg_mode ~param_mty
+    ~arg_path ~arg_mty ~param_mty
     env =
   if not (Hashtbl.mem f_comp.fcomp_cache arg_path) then
     !check_functor_application
       ~errors ~loc ~lid_whole_app ~f0_path ~args
-      ~arg_path ~arg_mty ~arg_mode ~param_mty
+      ~arg_path ~arg_mty ~param_mty
       env
 
 (* Lookup by identifier *)
@@ -1261,7 +1297,24 @@ let find_ident_module id env =
   | Mod_unbound _ -> raise Not_found
   | Mod_persistent ->
       match Ident.to_global id with
-      | Some global_name -> find_pers_mod ~allow_hidden:true global_name
+      | Some global_name ->
+          let allow_excess_args =
+            (* This may be a global that arose by substituting instance
+               arguments into an overapproximated instance name, so we have to
+               allow it to have more arguments than expected. For example, if
+               [foo.ml] is compiled with [-parameter P] and says
+               [module Alias = M], we assume that [m.ml] was (or will be)
+               compiled with [-parameter P] as well, sa [foo.cmi] will record
+               [M{P}] as an approximate elaboration of [M]. Then if [bar.ml]
+               refers to [Foo[P:Int]], we substitute in [Foo]'s signature and
+               get [module Alias = M[P:Int]] whether or not [M] takes [P].) *)
+            (* CR-someday lmaurer: This does mean that the original alias may
+               have had too many arguments and we'll never have checked them.
+               One solution would be to remember somewhere what the user
+               actually typed in addition to the approximation. *)
+            true
+          in
+          find_pers_mod ~allow_hidden:true ~allow_excess_args global_name
       | None -> Misc.fatal_errorf "Not global: %a" Ident.print id
 
 let rec find_module_components path env =
@@ -1354,18 +1407,44 @@ let type_of_cstr path = function
           tda_declaration = decl;
           tda_descriptions = Type_record (labels, repr, umc);
           tda_shape = Shape.leaf decl.type_uid;
+          tda_unboxed_version_descriptions = None;
         }
       | _ -> assert false
       end
   | _ -> assert false
 
-let rec find_type_data path env =
+type unboxed_version_step =
+  | Lacks_unboxed_version
+  | Aliases of Path.t * type_expr list
+  | Has_unboxed_version of type_declaration
+let step_find_unboxed_version decl =
+  match decl.type_unboxed_version with
+  | Some ud -> Has_unboxed_version ud
+  | None ->
+    (* If there's no stored unboxed version, then we must follow aliases. We
+        only follow this alias if the kind is abstract (we could follow all
+        aliases, but this gives better errors when typechecking mutually
+        recursive typedecls). *)
+    match decl.type_kind with
+    | Type_record_unboxed_product _ | Type_variant _ | Type_open
+    | Type_record _ ->
+      Lacks_unboxed_version
+    | Type_abstract _ ->
+      match decl.type_manifest with
+      | None -> Lacks_unboxed_version
+      | Some ty ->
+        match get_desc ty with
+        | Tconstr (path, args, _) -> Aliases (path, args)
+        | _ -> Lacks_unboxed_version
+
+let rec find_type_data path env seen =
   match Path.Map.find path env.local_constraints with
   | decl ->
     {
       tda_declaration = decl;
       tda_descriptions = Type_abstract (Btype.type_origin decl);
       tda_shape = Shape.leaf decl.type_uid;
+      tda_unboxed_version_descriptions = None;
     }
   | exception Not_found -> begin
       match path with
@@ -1382,10 +1461,12 @@ let rec find_type_data path env =
           | Pext_ty ->
               let cda = find_extension_full p env in
               type_of_cstr path cda.cda_description
+          | Punboxed_ty ->
+              find_type_unboxed_version_data p env seen
         end
     end
 and find_cstr path name env =
-  let tda = find_type_data path env in
+  let tda = find_type_data path env Path.Set.empty in
   match tda.tda_descriptions with
   | Type_variant (cstrs, _, _) ->
       List.find (fun cstr -> cstr.cstr_name = name) cstrs
@@ -1393,6 +1474,67 @@ and find_cstr path name env =
   | Type_open ->
       raise Not_found
 
+
+and find_type_unboxed_version path env seen =
+  if Path.Set.mem path seen then raise Not_found else
+  let seen = Path.Set.add path seen in
+  let decl = (find_type_data path env seen).tda_declaration in
+  match step_find_unboxed_version decl with
+  | Has_unboxed_version ud -> ud
+  | Lacks_unboxed_version -> raise Not_found
+  | Aliases (path, args) ->
+    let ud = find_type_unboxed_version path env seen in
+    let man =
+      Btype.newgenty
+        (Tconstr (Path.unboxed_version path, args, ref Mnil)) in
+    let jkind = ud.type_jkind in
+    (* CR layouts v7.2: compute the exact separability *)
+    (* As this unboxed version aliases [ud], its params' separabilities can
+        be conservatively set to the max of the separabilities of [ud]
+        (to account for the alias possibly shuffling params).
+    *)
+    let max_sep_of_ud =
+      List.fold_left Separability.max Separability.Ind ud.type_separability
+    in
+    let type_separability =
+      List.map (fun _ -> max_sep_of_ud) decl.type_separability
+    in
+    {
+      type_params = decl.type_params;
+      type_arity = decl.type_arity;
+      type_kind = decl.type_kind;
+      type_jkind = jkind;
+      type_private = decl.type_private;
+      type_manifest = Some man;
+      type_variance = decl.type_variance;
+      (* Variance is the same as the boxed version *)
+      type_separability;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = decl.type_loc;
+      type_attributes = decl.type_attributes;
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version decl.type_uid;
+      type_unboxed_version = None;
+    }
+(* CR layouts v7.2: this should be reworked to expand abbrevations, e.g.
+   in [type 'a id = 'a and f = float id], [f] can have an unboxed type.
+   Parts of the logic looking at type kinds also belong in Ctype.
+   See https://github.com/oxcaml/oxcaml/pull/3526#discussion_r1957157050
+*)
+and find_type_unboxed_version_data path env seen =
+  let tda_declaration = find_type_unboxed_version path env seen in
+  let descrs =
+    match (find_type_data path env seen).tda_unboxed_version_descriptions with
+    | Some descrs -> descrs
+    | None -> Type_abstract Definition (* path is an alias *)
+  in
+  {
+    tda_declaration;
+    tda_descriptions = descrs;
+    tda_shape = Shape.leaf tda_declaration.type_uid;
+    tda_unboxed_version_descriptions = None
+  }
 
 let find_modtype_lazy path env =
   match path with
@@ -1440,9 +1582,9 @@ let find_ident_label record_form id env =
   TycompTbl.find_same id (env_labels record_form env)
 
 let find_type p env =
-  (find_type_data p env).tda_declaration
+  (find_type_data p env Path.Set.empty).tda_declaration
 let find_type_descrs p env =
-  (find_type_data p env).tda_descriptions
+  (find_type_data p env Path.Set.empty).tda_descriptions
 
 let rec find_module_address path env =
   match path with
@@ -1510,6 +1652,7 @@ let global_of_instance_compilation_unit cu =
     (* We could just convert the global name ourselves by filling in empty lists
        of hidden arguments, but this doubles as a typecheck of the instance. *)
     Persistent_env.global_of_global_name !persistent_env global_name ~check:true
+      ~allow_excess_args:false
   in
   let rec check (global : Global_module.t) =
     match global.hidden_args with
@@ -1651,6 +1794,31 @@ and expand_modtype_path env path =
   match (find_modtype_lazy path env).mtd_type with
   | Some (Mty_ident path) -> normalize_modtype_path env path
   | _ | exception Not_found -> path
+
+let normalize_instance_names_in_ident ident =
+  if Ident.is_instance ident then
+    let modname = Ident.to_global_exn ident in
+    let modname2 =
+      Persistent_env.normalize_global_name !persistent_env modname
+    in
+    if modname == modname2 then ident else Ident.create_global modname2
+  else
+    ident
+
+let rec normalize_instance_names_in_module_path path =
+  match path with
+  | Pident i ->
+      let i2 = normalize_instance_names_in_ident i in
+      if i == i2 then path else Pident i2
+  | Pdot (p, s) ->
+      let p2 = normalize_instance_names_in_module_path p in
+      if p == p2 then path else Pdot (p2, s)
+  | Pextra_ty (p, extra) ->
+      let p2 = normalize_instance_names_in_module_path p in
+      if p == p2 then path else Pextra_ty (p2, extra)
+  | Papply (p, a) ->
+      let p2 = normalize_instance_names_in_module_path p in
+      if p == p2 then path else Papply (p2, a)
 
 let find_module_lazy path env =
   find_module_lazy ~alias:false path env
@@ -1995,8 +2163,8 @@ let rec components_of_module_maker
             let final_decl = Subst.type_declaration sub decl in
             Btype.set_static_row_name final_decl
               (Subst.type_path sub (Path.Pident id));
-            let descrs =
-              match decl.type_kind with
+            let store_decl path final_decl =
+              match final_decl.type_kind with
               | Type_variant (_,repr,umc) ->
                   let cstrs = List.map snd
                     (Datarepr.constructors_of_type path final_decl
@@ -2037,11 +2205,17 @@ let rec components_of_module_maker
               | Type_abstract r -> Type_abstract r
               | Type_open -> Type_open
             in
+            let descrs = store_decl path final_decl in
+            let unboxed_descrs =
+              Option.map (store_decl (Path.unboxed_version path))
+                final_decl.type_unboxed_version
+            in
             let shape = Shape.proj cm_shape (Shape.Item.type_ id) in
             let tda =
               { tda_declaration = final_decl;
                 tda_descriptions = descrs;
-                tda_shape = shape; }
+                tda_shape = shape;
+                tda_unboxed_version_descriptions = unboxed_descrs }
             in
             c.comp_types <- NameMap.add (Ident.name id) tda c.comp_types;
             env := store_type_infos ~tda_shape:shape id decl !env
@@ -2242,9 +2416,20 @@ and store_label
     let loc = lbl.lbl_loc in
     let mut = lbl.lbl_mut in
     let k = lbl.lbl_uid in
-    if not (Types.Uid.Tbl.mem (used_labels_by_form record_form) k) then
+    match k with
+    | Unboxed_version k_boxed ->
+      (* Never warn if an unboxed version of a label is unused, but its uses
+         count as uses of the boxed version. *)
+      begin match Types.Uid.Tbl.find_opt !used_labels k_boxed with
+      | Some boxed_usages ->
+        Types.Uid.Tbl.add !used_labels k boxed_usages
+      | None ->
+        ()
+      end
+    | _ ->
+    if not (Types.Uid.Tbl.mem !used_labels k) then
       let used = label_usages () in
-      Types.Uid.Tbl.add (used_labels_by_form record_form) k
+      Types.Uid.Tbl.add !used_labels k
         (add_label_usage used);
       if not (ty_name = "" || ty_name.[0] = '_' || name.[0] = '_')
       then !add_delayed_check_forward
@@ -2272,8 +2457,7 @@ and store_type ~check id info shape env =
     check_usage loc id info.type_uid
       (fun s -> Warnings.Unused_type_declaration s)
       !type_declarations;
-  let descrs, env =
-    let path = Pident id in
+  let store_decl path info env =
     match info.type_kind with
     | Type_variant (_,repr,umc) ->
         let constructors = Datarepr.constructors_of_type path info
@@ -2302,10 +2486,21 @@ and store_type ~check id info shape env =
     | Type_abstract r -> Type_abstract r, env
     | Type_open -> Type_open, env
   in
+  let descrs, env = store_decl (Pident id) info env in
+  let unboxed_descrs, env =
+    match info.type_unboxed_version with
+    | Some uinfo ->
+      let unboxed_descrs, env =
+        store_decl (Path.unboxed_version (Pident id)) uinfo env
+      in
+      Some unboxed_descrs, env
+    | None -> None, env
+  in
   let tda =
     { tda_declaration = info;
       tda_descriptions = descrs;
-      tda_shape = shape }
+      tda_shape = shape;
+      tda_unboxed_version_descriptions = unboxed_descrs }
   in
   Builtin_attributes.mark_alerts_used info.type_attributes;
   { env with
@@ -2322,7 +2517,10 @@ and store_type_infos ~tda_shape id info env =
     {
       tda_declaration = info;
       tda_descriptions = Type_abstract (Btype.type_origin info);
-      tda_shape
+      tda_shape;
+      tda_unboxed_version_descriptions =
+        Option.map (fun uinfo -> Type_abstract (Btype.type_origin uinfo))
+          info.type_unboxed_version;
     }
   in
   { env with
@@ -2591,6 +2789,7 @@ let add_lock lock env =
     modules = IdTbl.add_lock lock env.modules;
     modtypes = IdTbl.add_lock lock env.modtypes;
     classes = IdTbl.add_lock lock env.classes;
+    constrs = TycompTbl.add_lock lock env.constrs;
   }
 
 let add_escape_lock escaping_context env =
@@ -2741,8 +2940,8 @@ let enter_unbound_module name reason env =
     summary = Env_module_unbound(env.summary, name, reason) }
 
 (* Read a signature from a file *)
-let read_signature modname cmi ~add_binding =
-  let mty = read_pers_mod modname cmi ~add_binding in
+let read_signature modname cmi =
+  let mty = read_pers_mod modname cmi in
   Subst.Lazy.force_signature mty
 
 let register_parameter modname =
@@ -2809,7 +3008,7 @@ let add_language_extension_types env =
     |> add SIMD Stable Predef.add_simd_stable_extension_types
     |> add Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Alpha Predef.add_or_null)
+    |> add Layouts Stable Predef.add_or_null)
 
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
@@ -2835,7 +3034,13 @@ let mark_value_used uid =
   | mark -> mark ()
   | exception Not_found -> ()
 
-let mark_type_used uid =
+let mark_type_used (uid : Uid.t) =
+  let uid =
+    (* Using the unboxed version of a type counts as using the boxed version *)
+    match uid with
+    | Unboxed_version uid -> uid
+    | _ -> uid
+  in
   match Types.Uid.Tbl.find !type_declarations uid with
   | mark -> mark ()
   | exception Not_found -> ()
@@ -2855,8 +3060,8 @@ let mark_extension_used usage ext =
   | mark -> mark usage
   | exception Not_found -> ()
 
-let mark_label_used record_form usage ld =
-  match find_used_label_by_uid record_form ld.ld_uid with
+let mark_label_used usage ld =
+  match Types.Uid.Tbl.find !used_labels ld.ld_uid with
   | mark -> mark usage
   | exception Not_found -> ()
 
@@ -2867,14 +3072,14 @@ let mark_constructor_description_used usage env cstr =
   | mark -> mark usage
   | exception Not_found -> ()
 
-let mark_label_description_used record_form usage env lbl =
+let mark_label_description_used usage env lbl =
   let ty_path =
     match get_desc lbl.lbl_res with
     | Tconstr(path, _, _) -> path
     | _ -> assert false
   in
   mark_type_path_used env ty_path;
-  match find_used_label_by_uid record_form lbl.lbl_uid with
+  match Types.Uid.Tbl.find !used_labels lbl.lbl_uid with
   | mark -> mark usage
   | exception Not_found -> ()
 
@@ -2983,9 +3188,9 @@ let use_cltype ~use ~loc path desc =
       (Path.name path)
   end
 
-let use_label ~record_form ~use ~loc usage env lbl =
+let use_label ~use ~loc usage env lbl =
   if use then begin
-    mark_label_description_used record_form usage env lbl;
+    mark_label_description_used usage env lbl;
     Builtin_attributes.check_alerts loc lbl.lbl_attributes lbl.lbl_name;
     if is_mutating_label_usage usage then
       Builtin_attributes.check_deprecated_mutable loc lbl.lbl_attributes
@@ -3013,7 +3218,7 @@ let lookup_global_name_module_no_locks
       check_pers_mod ~allow_hidden:false ~loc name;
       path, (() : a)
   | Load -> begin
-      match find_pers_mod ~allow_hidden:false name with
+      match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
       | mda ->
           use_module ~use ~loc path mda;
           path, (mda : a)
@@ -3048,7 +3253,7 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
         (Once_value_used_in (item, lid, shared_context))
   | Ok () ->
     let mode =
-      Mode.Value.join_with (Monadic Uniqueness) Mode.Uniqueness.Const.Aliased
+      Mode.Value.join_with Uniqueness Mode.Uniqueness.Const.Aliased
         vmode.mode
     in
     {mode; context = Some shared_context}
@@ -3262,12 +3467,13 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
       ~use ~loc usage s env =
   match find_all_labels ~record_form ~mark:use s env with
   | [] ->
-    may_lookup_error errors loc env (Unbound_label (Lident s, P record_form))
+    may_lookup_error errors loc env
+      (Unbound_label (Lident s, P record_form, usage))
   | lbls -> begin
       List.map
         (fun (lbl, use_fn) ->
            let use_fn () =
-             use_label ~record_form ~use ~loc usage env lbl;
+             use_label ~use ~loc usage env lbl;
              use_fn ()
            in
            (lbl, use_fn))
@@ -3275,16 +3481,16 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
     end
 
 let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
-  match TycompTbl.find_all ~mark:use s env.constrs with
+  match TycompTbl.find_all_and_locks ~mark:use s env.constrs with
   | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
   | cstrs ->
       List.map
-        (fun (cda, use_fn) ->
+        (fun (cda, (locks, use_fn)) ->
            let use_fn () =
              use_constructor ~use ~loc usage env cda;
              use_fn ()
            in
-           (cda.cda_description, use_fn))
+           ((cda.cda_description, locks), use_fn))
         cstrs
 
 let rec lookup_module_components ~errors ~use ~loc lid env =
@@ -3299,7 +3505,8 @@ let rec lookup_module_components ~errors ~use ~loc lid env =
       let f_path, f_comp, arg = lookup_apply ~errors ~use ~loc lid env in
       let comps =
         !components_of_functor_appl' ~loc ~f_path ~f_comp ~arg env in
-      Papply (f_path, arg), [], comps
+      (* [Lapply] is for [F(M).t] so nothing is closed over. *)
+      Papply (f_path, arg), locks_empty, comps
 
 and lookup_structure_components ~errors ~use ~loc ?(reason = Project) lid env =
   let path, locks, comps = lookup_module_components ~errors ~use ~loc lid env in
@@ -3332,43 +3539,44 @@ and lookup_all_args ~errors ~use ~loc lid0 env =
     | Lident _ | Ldot _ as f_lid ->
         (f_lid, args)
     | Lapply (f_lid, arg_lid) ->
-        let arg_path, arg_md, arg_vmode =
-          lookup_module ~errors ~use ~lock:false ~loc arg_lid env
-        in
-        loop_lid_arg ((f_lid,arg_path,arg_md.md_type,arg_vmode)::args) f_lid
+        (* [Lapply] only appears in e.g. [F(M).t], which does not incur functor
+         application at runtime and thus both the functor and the arguments are not closed
+         over. Therefore, they all remains at legacy mode which don't need to be tracked.
+         *)
+        let arg_path, arg_md, _ = lookup_module ~errors ~use ~loc arg_lid env in
+        loop_lid_arg ((f_lid,arg_path,arg_md.md_type)::args) f_lid
   in
   loop_lid_arg [] lid0
 
 and lookup_apply ~errors ~use ~loc lid0 env =
   let f0_lid, args0 = lookup_all_args ~errors ~use ~loc lid0 env in
-  let args_for_errors = List.map (fun (_,p,mty,vmode) -> (p,mty,vmode.mode)) args0 in
+  let args_for_errors = List.map (fun (_,p,mty) -> (p,mty)) args0 in
   let f0_path, _, f0_comp =
     lookup_module_components ~errors ~use ~loc f0_lid env
   in
-  let check_one_apply ~errors ~loc ~f_lid ~f_comp ~arg_path ~arg_mty ~arg_mode
-    env =
+  let check_one_apply ~errors ~loc ~f_lid ~f_comp ~arg_path ~arg_mty env =
     let f_comp, param_mty =
       get_functor_components ~errors ~loc f_lid env f_comp
     in
     check_functor_appl
       ~errors ~loc ~lid_whole_app:lid0
       ~f0_path ~args:args_for_errors ~f_comp
-      ~arg_path ~arg_mty ~arg_mode:arg_mode.mode ~param_mty
+      ~arg_path ~arg_mty ~param_mty
       env;
     arg_path, f_comp
   in
   let rec check_apply ~path:f_path ~comp:f_comp = function
     | [] -> invalid_arg "Env.lookup_apply: empty argument list"
-    | [ f_lid, arg_path, arg_mty, arg_mode ] ->
+    | [ f_lid, arg_path, arg_mty ] ->
         let arg_path, comps =
           check_one_apply ~errors ~loc ~f_lid ~f_comp
-            ~arg_path ~arg_mty ~arg_mode env
+            ~arg_path ~arg_mty env
         in
         f_path, comps, arg_path
-    | (f_lid, arg_path, arg_mty, arg_mode) :: args ->
+    | (f_lid, arg_path, arg_mty) :: args ->
         let arg_path, f_comp =
           check_one_apply ~errors ~loc ~f_lid ~f_comp
-            ~arg_path ~arg_mty ~arg_mode env
+            ~arg_path ~arg_mty env
         in
         let comp =
           !components_of_functor_appl' ~loc ~f_path ~f_comp ~arg:arg_path env
@@ -3378,29 +3586,21 @@ and lookup_apply ~errors ~use ~loc lid0 env =
   in
   check_apply ~path:f0_path ~comp:f0_comp args0
 
-and lookup_module ~errors ~use ~lock ~loc lid env =
-  let path, locks, md =
-    match lid with
-    | Lident s ->
-        let path, locks, data = lookup_ident_module Load ~errors ~use ~loc s env in
-        let md = Subst.Lazy.force_module_decl data.mda_declaration in
-        path, locks, md
-    | Ldot(l, s) ->
-        let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
-        let md = Subst.Lazy.force_module_decl data.mda_declaration in
-        path, locks, md
-    | Lapply _ as lid ->
-        let path_f, comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
-        let md = md (modtype_of_functor_appl comp_f path_f path_arg) in
-        Papply(path_f, path_arg), [], md
-  in
-  let vmode =
-    if lock then
-      walk_locks ~errors ~loc ~env ~item:Module ~lid mda_mode None locks
-    else
-      mode_default mda_mode
-  in
-  path, md, vmode
+and lookup_module ~errors ~use ~loc lid env =
+  match lid with
+  | Lident s ->
+      let path, locks, data = lookup_ident_module Load ~errors ~use ~loc s env in
+      let md = Subst.Lazy.force_module_decl data.mda_declaration in
+      path, md, locks
+  | Ldot(l, s) ->
+      let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
+      let md = Subst.Lazy.force_module_decl data.mda_declaration in
+      path, md, locks
+  | Lapply _ as lid ->
+      let path_f, comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
+      let md = md (modtype_of_functor_appl comp_f path_f path_arg) in
+      (* [Lapply] is for [F(M).t] so nothing is closed over. *)
+      Papply(path_f, path_arg), md, locks_empty
 
 and lookup_dot_module ~errors ~use ~loc l s env =
   let p, locks, comps = lookup_structure_components ~errors ~use ~loc l env in
@@ -3471,11 +3671,11 @@ let lookup_all_dot_labels ~record_form ~errors ~use ~loc usage l s env =
   match NameMap.find s (comp_labels record_form comps) with
   | [] | exception Not_found ->
       may_lookup_error errors loc env
-        (Unbound_label (Ldot(l, s), P record_form))
+        (Unbound_label (Ldot(l, s), P record_form, usage))
   | lbls ->
       List.map
         (fun lbl ->
-           let use_fun () = use_label ~record_form ~use ~loc usage env lbl in
+           let use_fun () = use_label ~use ~loc usage env lbl in
            (lbl, use_fun))
         lbls
 
@@ -3486,7 +3686,9 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
       lookup_all_ident_constructors
         ~errors ~use ~loc usage s (Lazy.force initial)
   | _ ->
-      let (_, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
+      let (_, locks, comps) =
+        lookup_structure_components ~errors ~use ~loc l env
+      in
       match NameMap.find s comps.comp_constrs with
       | [] | exception Not_found ->
           may_lookup_error errors loc env (Unbound_constructor (Ldot(l, s)))
@@ -3494,14 +3696,17 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
           List.map
             (fun cda ->
                let use_fun () = use_constructor ~use ~loc usage env cda in
-               (cda.cda_description, use_fun))
+               ((cda.cda_description, locks), use_fun))
             cstrs
 
 (* Open a signature path *)
 
 let add_components slot root env0 comps locks =
   let add_l w comps env0 =
-    TycompTbl.add_open slot w root comps env0
+    TycompTbl.add_open slot w root comps ([] : empty list) env0
+  in
+  let add_c w comps env0 =
+    TycompTbl.add_open slot w root comps locks env0
   in
   let add_v w comps env0 =
     IdTbl.add_open slot w root comps locks env0
@@ -3510,7 +3715,7 @@ let add_components slot root env0 comps locks =
     IdTbl.add_open slot w root comps ([] : empty list) env0
   in
   let constrs =
-    add_l (fun x -> `Constructor x) comps.comp_constrs env0.constrs
+    add_c (fun x -> `Constructor x) comps.comp_constrs env0.constrs
   in
   let labels =
     add_l (fun x -> `Label x) comps.comp_labels env0.labels
@@ -3552,7 +3757,7 @@ let add_components slot root env0 comps locks =
 
 let open_signature_by_path path env0 =
   let comps = find_structure_components path env0 in
-  add_components None path env0 comps []
+  add_components None path env0 comps locks_empty
 
 let open_signature ~errors ~loc slot lid env0 =
   let (root, locks, comps) =
@@ -3673,7 +3878,8 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
       path, locks
   | Lapply _ as lid ->
       let path_f, _comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
-      Papply(path_f, path_arg), []
+      (* [Lapply] is for [F(M).t] so nothing is closed over. *)
+      Papply(path_f, path_arg), locks_empty
 
 let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
@@ -3704,27 +3910,9 @@ let lookup_value ~errors ~use ~loc lid env =
   let path, locks, vda =
     lookup_value_lazy ~errors ~use ~loc lid env
   in
-  (* There can be locks between the definition and a use of a value. For
-  example, if a function closes over a value, there will be Closure_lock between
-  the value's definition and the value's use in the function. Walking the locks
-  will constrain the function and the value's modes accrodingly.
-
-  Here, we apply the modalities to acquire the mode of the value at the
-  definition site, using which we walk the locks. That means the surrounding
-  closure would be closing over the value instead of the module. The latter can
-  be achieved by walking the locks before apply modalities.
-
-  Our route provides better ergonomics, but is dangerous as it doesn't reflect
-  the real runtime behaviour. With the current set-up, it is sound. *)
   let vd, mode = normalize_vda_mode vda in
   let vd = Subst.Lazy.force_value_description vd in
-  let vmode =
-    if use then
-      walk_locks ~errors ~loc ~env ~item:Value ~lid mode (Some vd.val_type) locks
-    else
-      mode_default mode
-  in
-  path, vd, vmode
+  path, vd, mode, locks
 
 let lookup_type_full ~errors ~use ~loc lid env =
   match lid with
@@ -3732,9 +3920,40 @@ let lookup_type_full ~errors ~use ~loc lid env =
   | Ldot(l, s) -> lookup_dot_type ~errors ~use ~loc l s env
   | Lapply _ -> assert false
 
+let string_without_hash s =
+  if String.ends_with ~suffix:"#" s then
+    Some (String.sub s 0 (String.length s - 1))
+  else
+    None
+
+let lid_without_hash = function
+  | Lident s -> begin
+      match string_without_hash s with
+      | Some s -> Some (Lident s)
+      | None -> None
+      end
+  | Ldot(l, s) -> begin
+      match string_without_hash s with
+      | Some s -> Some (Ldot(l, s))
+      | None -> None
+      end
+  | Lapply _ -> None
+
 let lookup_type ~errors ~use ~loc lid env =
-  let (path, _, tda) = lookup_type_full ~errors ~use ~loc lid env in
-  path, tda.tda_declaration
+  match lid_without_hash lid with
+  | None ->
+    let path, _, tda = lookup_type_full ~errors ~use ~loc lid env in
+    path, tda.tda_declaration
+  | Some lid ->
+    (* To get the hash version, look up without the hash, then look for the
+       unboxed version *)
+    let path, _, data = lookup_type_full ~errors ~use ~loc lid env in
+    match find_type_unboxed_version path env Path.Set.empty with
+    | decl ->
+      Path.unboxed_version path, decl
+    | exception Not_found ->
+      may_lookup_error errors loc env
+        (No_unboxed_version (lid, data.tda_declaration))
 
 let lookup_modtype_lazy ~errors ~use ~loc lid env =
   match lid with
@@ -3789,13 +4008,13 @@ let lookup_all_labels_from_type (type rep) ~use ~(record_form : rep record_form)
   | (Type_record (lbls, _, _), Legacy) ->
       List.map
         (fun lbl ->
-           let use_fun () = use_label ~record_form ~use ~loc usage env lbl in
+           let use_fun () = use_label ~use ~loc usage env lbl in
            (lbl, use_fun))
         lbls
   | (Type_record_unboxed_product (lbls, _, _), Unboxed_product) ->
       List.map
         (fun lbl ->
-           let use_fun () = use_label ~record_form ~use ~loc usage env lbl in
+           let use_fun () = use_label ~use ~loc usage env lbl in
            (lbl, use_fun))
         lbls
   | (Type_record (_, _, _), Unboxed_product) -> []
@@ -3810,7 +4029,7 @@ let lookup_all_constructors ~errors ~use ~loc usage lid env =
 let lookup_constructor ~errors ~use ~loc usage lid env =
   match lookup_all_constructors ~errors ~use ~loc usage lid env with
   | [] -> assert false
-  | (desc, use) :: _ -> use (); desc
+  | ((desc, locks), use) :: _ -> use (); desc, locks
 
 let lookup_all_constructors_from_type ~use ~loc usage ty_path env =
   match find_type_descrs ty_path env with
@@ -3823,7 +4042,7 @@ let lookup_all_constructors_from_type ~use ~loc usage ty_path env =
            let use_fun () =
              use_constructor_desc ~use ~loc usage env cstr
            in
-           (cstr, use_fun))
+           ((cstr, locks_empty), use_fun))
         cstrs
 
 (* Lookup functions that do not mark the item as used or
@@ -3832,14 +4051,12 @@ let lookup_all_constructors_from_type ~use ~loc usage ty_path env =
 
 let find_module_by_name lid env =
   let loc = Location.(in_file !input_name) in
-  let path, desc, _ =
-    lookup_module ~errors:false ~use:false ~lock:false ~loc lid env
-  in
+  let path, desc, _ = lookup_module ~errors:false ~use:false ~loc lid env in
   path, desc
 
 let find_value_by_name lid env =
   let loc = Location.(in_file !input_name) in
-  let path, desc, _ = lookup_value ~errors:false ~use:false ~loc lid env in
+  let path, desc, _, _ = lookup_value ~errors:false ~use:false ~loc lid env in
   path, desc
 
 let find_type_by_name lid env =
@@ -3862,6 +4079,7 @@ let find_cltype_by_name lid env =
 let find_constructor_by_name lid env =
   let loc = Location.(in_file !input_name) in
   lookup_constructor ~errors:false ~use:false ~loc Positive lid env
+  |> fst
 
 let find_label_by_name record_form lid env =
   let loc = Location.(in_file !input_name) in
@@ -3886,7 +4104,7 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 
 (* Ordinary lookup functions *)
 
-let walk_locks ~loc ~env ~item ~lid mode ty locks =
+let walk_locks ~env ~item mode ty (locks, lid, loc) =
   walk_locks ~errors:true ~loc ~env ~item ~lid mode ty locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
@@ -3895,9 +4113,8 @@ let lookup_module_path ?(use=true) ~loc ~load lid env =
 let lookup_module_instance_path ?(use=true) ~loc ~load lid env =
   lookup_module_instance_path ~errors:true ~use ~loc ~load lid env
 
-let lookup_module ?(use=true) ?(lock=use) ~loc lid env =
-  let path, desc, vmode = lookup_module ~errors:true ~use ~lock ~loc lid env in
-  path, desc, vmode.mode
+let lookup_module ?(use=true) ~loc lid env =
+  lookup_module ~errors:true ~use ~loc lid env
 
 let lookup_value ?(use=true) ~loc lid env =
   lookup_value ~errors:true ~use ~loc lid env
@@ -3974,10 +4191,10 @@ let bound_module name env =
       if Current_unit_name.is name then false
       else begin
         match
-          find_pers_mod ~allow_hidden:false
+          find_pers_mod ~allow_hidden:false ~allow_excess_args:false
             (Global_module.Name.create_no_args name)
         with
-        | _ -> true
+        | (_ : module_data) -> true
         | exception Not_found -> false
       end
 
@@ -4322,10 +4539,17 @@ let sharedness_hint ppf : shared_context -> _ = function
 
 let print_lock_item ppf (item, lid) =
   match item with
-  | Module -> fprintf ppf "Modules are"
-  | Class -> fprintf ppf "Classes are"
+  | Module ->
+      fprintf ppf "%a is a module, and modules are always"
+        (Style.as_inline_code !print_longident) lid
+  | Class ->
+      fprintf ppf "%a is a class, and classes are always"
+        (Style.as_inline_code !print_longident) lid
   | Value -> fprintf ppf "The value %a is"
       (Style.as_inline_code !print_longident) lid
+  | Constructor ->
+      fprintf ppf "The constructor %a is"
+        (Style.as_inline_code !print_longident) lid
 
 module Style = Misc.Style
 
@@ -4372,7 +4596,7 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf "Unbound constructor %a"
         (Style.as_inline_code !print_longident) lid;
       spellcheck ppf extract_constructors env lid;
-  | Unbound_label (lid, record_form) ->
+  | Unbound_label (lid, record_form, usage) ->
       let P record_form = record_form in
       fprintf ppf "Unbound %s field %a"
         (record_form_to_string record_form)
@@ -4391,7 +4615,25 @@ let report_lookup_error _loc env ppf = function
       (match label_of_other_form with
       | Some other_form ->
         Format.fprintf ppf
-          "@\n@{<hint>Hint@}: There is %s field with this name." other_form
+          "@\n@{<hint>Hint@}: @[There is %s field with this name." other_form;
+        (match record_form, usage with
+        | Unboxed_product, _ ->
+          (* If an unboxed field isn't in scope but a boxed field is, then
+             the boxed field must come from a record that didn't get an unboxed
+             version. *)
+          Format.fprintf ppf
+            "@ Note that float- and [%@%@unboxed]- records don't get unboxed \
+             versions."
+        | Legacy, Projection ->
+          let print_projection ppf (op, lid) =
+            fprintf ppf "%s%a" op !print_longident lid
+          in
+          fprintf ppf "@ To project an unboxed record field, use %a instead of \
+                       %a."
+            (Style.as_inline_code print_projection) (".#", lid)
+            (Style.as_inline_code print_projection) (".", lid)
+        | _ -> ());
+        Format.fprintf ppf "@]"
       | None -> ());
   | Unbound_class lid -> begin
       fprintf ppf "Unbound class %a"
@@ -4493,6 +4735,9 @@ let report_lookup_error _loc env ppf = function
         | Error (Linearity, _) -> "once", "is many"
         | Error (Portability, _) -> "nonportable", "is portable"
         | Error (Yielding, _) -> "yielding", "may not yield"
+        | Error (Statefulness, {left; right}) ->
+          asprintf "%a" Mode.Statefulness.Const.print left,
+          asprintf "is %a" Mode.Statefulness.Const.print right
       in
       let s, hint =
         match context with
@@ -4528,8 +4773,23 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf "@[%a must have a type of layout value because it is \
                    captured by an object.@ %a@]"
         (Style.as_inline_code !print_longident) lid
-        (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> !print_type_expr ppf typ)) err
+        (fun v -> Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> !print_type_expr ppf typ) v) err
+  | No_unboxed_version (lid, decl) ->
+      fprintf ppf "@[The type %a has no unboxed version.@]"
+        (Style.as_inline_code !print_longident) lid;
+      begin match decl.type_kind with
+      | Type_record (_, Record_unboxed, _) ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: \
+             [%@%@unboxed] records don't get unboxed versions.@]"
+      | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
+          fprintf ppf
+            "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
+      | Type_record_unboxed_product _ ->
+          fprintf ppf "@.@[@{<hint>Hint@}: It is already an unboxed record.@]";
+      | _ -> ()
+      end
   | Error_from_persistent_env err ->
       Persistent_env.report_error ppf err
   | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
@@ -4565,7 +4825,7 @@ let report_error ppf = function
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
                    required.@]"
-        Global_module.Name.print unset_param
+        Global_module.Parameter_name.print unset_param
 
 let () =
   Location.register_error_of_exn
@@ -4587,3 +4847,9 @@ let () =
       | _ ->
           None
     )
+
+let () =
+  let get_current_compilation_unit () =
+    Option.map Unit_info.modname (get_unit_name ())
+  in
+  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit

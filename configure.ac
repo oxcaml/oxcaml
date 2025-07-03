@@ -17,11 +17,11 @@
 
 # Require Autoconf 2.71 for repeatability in CI
 AC_PREREQ([2.71])
-AC_INIT([The Flambda backend for OCaml],
-        5.2.0+jst,
-        [mshinwell@janestreet.com],
-        [flambda_backend],
-        [http://github.com/ocaml-flambda/flambda_backend])
+AC_INIT([OxCaml],
+        5.2.0+ox,
+        [opensource@janestreet.com],
+        [oxcaml],
+        [http://github.com/oxcaml/oxcaml])
 
 
 ## Command-line arguments passed to configure
@@ -31,7 +31,7 @@ CONFIGURE_ARGS="$*"
 
 DUNE_MAX_VERSION=[3.15]
 
-AC_MSG_NOTICE([Configuring Flambda backend version AC_PACKAGE_VERSION])
+AC_MSG_NOTICE([Configuring OxCaml version AC_PACKAGE_VERSION])
 
 m4_include([build-aux/ax_compare_version.m4])
 
@@ -61,11 +61,10 @@ AC_MSG_NOTICE([Using dune executable: $dune])
 
 AC_ARG_ENABLE([middle-end],
   [AS_HELP_STRING([--enable-middle-end],
-    [Select which middle end to use: flambda2 (default) or upstream-closure])],
+    [Deprecated: must provide 'flambda2'])],
   [AS_CASE([$enable_middle_end],
-    [upstream-closure], [middle_end=closure],
     [flambda2], [middle_end=flambda2],
-    [*], [AC_MSG_ERROR([Invalid middle end: must be flambda2 or upstream-closure])])],
+    [*], [AC_MSG_ERROR([Invalid middle end: must be 'flambda2'])])],
   [middle_end=flambda2])
 
 AC_ARG_ENABLE([runtime5],
@@ -189,7 +188,7 @@ AS_IF([test x"$enable_runtime5" = xyes],
       [runtime_suffix=4])
 
 AC_ARG_ENABLE([stack_checks],
-  [AS_HELP_STRING([--enable-stack_checks],
+  [AS_HELP_STRING([--enable-stack-checks],
     [Enable stack checks])])
 
 ## Output variables
@@ -340,6 +339,7 @@ AC_SUBST([profinfo_width])
 AC_SUBST([custom_ops_struct_size])
 AC_SUBST([no_partial_inlining_cflags])
 AC_SUBST([frame_pointers])
+AC_SUBST([address_sanitizer])
 AC_SUBST([cpp_mangling])
 AC_SUBST([flambda])
 AC_SUBST([flambda2])
@@ -360,6 +360,7 @@ AC_SUBST([compute_deps])
 AC_SUBST([intel_jcc_bug_cflags])
 AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
+AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
 AC_SUBST([ocaml_bindir])
 AC_SUBST([ocaml_libdir])
@@ -579,6 +580,10 @@ AC_ARG_ENABLE([frame-pointers],
   [AS_HELP_STRING([--enable-frame-pointers],
     [use frame pointers in runtime and generated code])])
 
+AC_ARG_ENABLE([address-sanitizer],
+  [AS_HELP_STRING([--enable-address-sanitizer],
+    [use Address Sanitizer and alter codegen to expose native OCaml operations to ASAN (also enables frame pointers)])])
+
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
     [use cpp mangling for exported symbols])])
@@ -695,6 +700,10 @@ AC_ARG_ENABLE([stack-allocation],
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
     [enable insertion of poll points])])
+
+AC_ARG_ENABLE([multidomain],
+  [AS_HELP_STRING([--enable-multidomain],
+    [allow the creation of multiple domains])])
 
 AC_ARG_WITH([flexdll],
   [AS_HELP_STRING([--with-flexdll],
@@ -2552,8 +2561,7 @@ AS_CASE([$host],
     # global CFLAGS and LIBS variables. This means that all the subsequent
     # tests can rely on the assumption that pthread is enabled.
     CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-    LIBS="$LIBS $PTHREAD_LIBS"
-    AC_CHECK_FUNC([sigwait], [AC_DEFINE([HAS_SIGWAIT])])],
+    LIBS="$LIBS $PTHREAD_LIBS"],
     [AC_MSG_ERROR(m4_normalize([POSIX threads are required but not supported on
       this platform]))])])
 
@@ -2620,10 +2628,10 @@ AS_IF([$native_compiler],
 
 ## Frame pointers
 
-AS_IF([test x"$enable_frame_pointers" = "xyes"],
+AS_IF([test x"$enable_frame_pointers" = "xyes" -o x"$enable_address_sanitizer" = "xyes"],
   [AS_CASE(["$host,$ocaml_cc_vendor"],
     [x86_64-*-linux*,gcc-*|x86_64-*-linux*,clang-*],
-      [common_cflags="$common_cflags -g  -fno-omit-frame-pointer"
+      [common_cflags="$common_cflags -g -fno-omit-frame-pointer"
       frame_pointers=true
       AC_DEFINE([WITH_FRAME_POINTERS])
       AC_MSG_NOTICE([using frame pointers])],
@@ -2631,6 +2639,22 @@ AS_IF([test x"$enable_frame_pointers" = "xyes"],
   )],
   [AC_MSG_NOTICE([not using frame pointers])
   frame_pointers=false])
+
+## Address Sanitizer
+
+AS_IF([test x"$enable_address_sanitizer" = "xyes"],
+  [AS_CASE(["$host,$ocaml_cc_vendor"],
+    [x86_64-*-linux*,gcc-*|x86_64-*-linux*,clang-*],
+      [common_cflags="$common_cflags -fsanitize=address -fsanitize-recover=address"
+       oc_ldflags="$oc_ldflags -fsanitize=address -fsanitize-recover=address"
+       address_sanitizer=true
+      AC_DEFINE([WITH_ADDRESS_SANITIZER])
+      AC_MSG_NOTICE([using Address Sanitizer])],
+    [AC_MSG_ERROR([Address Sanitizer is not supported on this platform])]
+  )],
+  [AC_MSG_NOTICE([not using Address Sanitizer])
+  address_sanitizer=false])
+
 
 ## CPP mangling
 
@@ -2814,6 +2838,15 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
   [AC_DEFINE([POLL_INSERTION])
    poll_insertion=true],
   [poll_insertion=false])
+
+# Multidomain is permitted without stack checks, you'll just get large
+# non-resizeable fiber stacks.
+AS_IF([test x"$enable_multidomain" = "xyes"],
+  [AS_IF([test x"$enable_runtime5" = "xyes" &&
+          test x"$enable_poll_insertion" = "xyes"],
+    [AC_DEFINE([MULTIDOMAIN]), enable_multidomain=true],
+    [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
+poll insertion enabled.])])], [])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"

@@ -2,7 +2,6 @@
  modules = "stubs.c";
  reference = "${test_source_directory}/c_api.reference";
  flambda2;
- arch_amd64;
  {
    flags = "-extension small_numbers";
    native;
@@ -26,7 +25,7 @@
 
 (* mshinwell: This test is now only run with flambda2, as the corresponding
    ocamltest predicate is reliable for testing whether this is an
-   flambda-backend build. *)
+   oxcaml build. *)
 
 (* This file tests using external C functions with float32#. *)
 

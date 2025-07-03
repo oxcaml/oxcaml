@@ -642,6 +642,7 @@ let func ids body =
   let param_from_name name =
     { name;
       layout = Ptop;
+      debug_uid = debug_uid_none;
       attributes = { unbox_param = false };
       mode = alloc_heap
     }
@@ -650,9 +651,9 @@ let func ids body =
     ~kind:(Curried { nlocal = List.length ids })
     ~params:(List.map param_from_name ids)
     ~return:Ptop ~attr:default_function_attribute ~body ~loc:Loc_unknown
-    ~mode:alloc_heap ~ret_mode:alloc_heap ~region:false
+    ~mode:alloc_heap ~ret_mode:alloc_heap
 
-let bind id def body = Llet (Strict, Ptop, id, def, body)
+let bind id def body = Llet (Strict, Ptop, id, debug_uid_none, def, body)
 
 let mk_exp_noattr loc desc = apply loc Exp.mk [desc; nil]
 
@@ -941,7 +942,7 @@ let rec with_new_idents_pat pat =
     if is_module pat
     then with_new_idents_modules [id]
     else with_new_idents_values [id]
-  | Tpat_alias (pat, id, _, _, _) ->
+  | Tpat_alias (pat, id, _, _, _, _) ->
     with_new_idents_values [id];
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
@@ -970,7 +971,7 @@ let rec without_idents_pat pat =
     if is_module pat
     then without_idents_modules [id]
     else without_idents_values [id]
-  | Tpat_alias (pat, id, _, _, _) ->
+  | Tpat_alias (pat, id, _, _, _, _) ->
     without_idents_values [id];
     without_idents_pat pat
   | Tpat_constant _ -> ()
@@ -1052,7 +1053,7 @@ and quote_value_pattern p =
       if is_module p
       then apply loc Pat.unpack [Lvar id]
       else apply loc Pat.var [Lvar id]
-    | Tpat_alias (pat, id, _, _, _) ->
+    | Tpat_alias (pat, id, _, _, _, _) ->
       let pat = quote_value_pattern pat in
       apply loc Pat.alias [pat; Lvar id]
     | Tpat_constant const ->
@@ -1241,6 +1242,7 @@ and quote_core_type ~in_constraint ty =
     if in_constraint then apply loc Type.var [none]
     else apply loc Type.splice [quote_core_type ~in_constraint ty]
   | Ttyp_open _ -> fatal_error "Still not implemented."
+  | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> fatal_error "Still not implemented."
 
 let rec case_binding transl stage case =
@@ -1651,11 +1653,11 @@ and quote_expression_desc transl stage e =
       in
       let base =
         Option.map
-          (fun (e, _) -> quote_expression transl stage e)
+          (fun (e, _, _) -> quote_expression transl stage e)
           record.extended_expression
       in
       apply loc Exp_desc.record [mk_list (Array.to_list lbl_exps); option base]
-    | Texp_field (rcd, lid, lbl, _, _) ->
+    | Texp_field (rcd, _, lid, lbl, _, _) ->
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in
       apply loc Exp_desc.field [rcd; lbl]

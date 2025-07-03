@@ -352,10 +352,10 @@ let random_key =
 
 let[@inline] apply0 f () = DLS.access (fun access -> f (DLS.get access random_key))
 
-let[@inline] apply1 (type (a : value mod portable uncontended)) (f : State.t -> a -> a) v =
+let[@inline] apply1 (type (a : value mod portable contended)) (f : State.t -> a -> a) v =
   DLS.access (fun access -> f (DLS.get access random_key) v)
 
-let[@inline] apply_in_range (type (a : value mod portable uncontended))
+let[@inline] apply_in_range (type (a : value mod portable contended))
       (f : State.t -> min:a -> max:a -> a) ~min ~max =
   DLS.access (fun access -> f (DLS.get access random_key) ~min ~max)
 
@@ -375,9 +375,7 @@ let bits32 = apply0 State.bits32
 let bits64 = apply0 State.bits64
 let nativebits = apply0 State.nativebits
 
-let full_init seed =
-  (* CR with-kinds: Unnecessary magic. *)
-  let seed = Obj.magic_portable seed in
+let full_init (seed : int array @ uncontended) =
   DLS.access (fun access ->
     State.reinit
       (DLS.get access random_key)

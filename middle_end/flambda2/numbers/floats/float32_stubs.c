@@ -185,7 +185,7 @@ value compiler_float32_to_float_boxed(value i)
 }
 
 /* The following functions are nearly identical to those in runtime/float32.c,
-   but we cannot reuse them because the flambda-backend compiler must be
+   but we cannot reuse them because the OxCaml compiler must be
    compiled using the upstream runtime. Additionally, we cannot reuse the
    64-bit float parsing functions because they have different rounding
    behavior. */
@@ -339,7 +339,7 @@ CAMLprim value compiler_float32_format(value fmt, value arg)
 // They must be weak symbols with the same names as in runtime/ because the stage
 // two compiler will link against runtime/.
 
-CAMLweakdef value caml_float32_is_stage1(value v) {
+CAMLweakdef value caml_is_boot_compiler(value v) {
   (void)v;
   return Val_true;
 }

@@ -122,7 +122,7 @@ type control =
     (** The size (in words) of the minor heap.  Changing
        this parameter will trigger a minor collection. The total size of the
        minor heap used by this program is the sum of the heap sizes of the
-       active domains. Default: 256k. *)
+       active domains. Default: 1M. *)
 
     major_heap_increment : int;
     (** How much to add to the major heap when increasing it. If this
@@ -130,33 +130,62 @@ type control =
         the current heap size (i.e. setting it to 100 will double the heap
         size at each increase). If it is more than 1000, it is a fixed
         number of words that will be added to the heap. Default: 15.
-        This metric is currently not available in OCaml 5: the field value is
-        always [0]. *)
+
+        In runtime5, the "current heap size" metric does not include those
+        allocations of more than 128 words. *)
 
     space_overhead : int;
     (** The major GC speed is computed from this parameter.
-       This is the memory that will be "wasted" because the GC does not
-       immediately collect unreachable blocks.  It is expressed as a
-       percentage of the memory used for live data.
-       The GC will work more (use more CPU time and collect
-       blocks more eagerly) if [space_overhead] is smaller.
-       Default: 120. *)
+        This is the memory that will be "wasted" because the GC does not
+        immediately collect unreachable blocks.  It is expressed as a
+        percentage of the memory used for live data.
+        The GC will work more (use more CPU time and collect
+        blocks more eagerly) if [space_overhead] is smaller.
+        On runtime 4 this doesn't account correctly for bigarrays; you
+        may find the GC works much harder than necessary to satisfy this
+        parameter.
+        Runtime 4 default: 100. Runtime 5 default: 80. *)
 
     verbose : int;
     (** This value controls the GC messages on standard error output.
        It is a sum of some of the following flags, to print messages
        on the corresponding events:
-       - [0x001] Start and end of major GC cycle.
-       - [0x002] Minor collection and major GC slice.
-       - [0x004] Growing and shrinking of the heap.
-       - [0x008] Resizing of stacks and memory manager tables.
-       - [0x010] Heap compaction.
-       - [0x020] Change of GC parameters.
-       - [0x040] Computation of major GC slice size.
-       - [0x080] Calling of finalisation functions.
-       - [0x100] Bytecode executable and shared library search at start-up.
-       - [0x200] Computation of compaction-triggering condition.
-       - [0x400] Output GC statistics at program exit.
+        - [0x00001]    Main events of each major GC cycle
+        - [0x00002]    Minor collection events
+        - [0x00004]    Per-slice events
+        - [0x00008]    Heap compaction
+        - [0x00010]    GC policy computations
+        - [0x00020]    Address space reservation changes
+        - [0x00040]    Major domain events (such as creation and termination)
+        - [0x00080]    Stop-the-world events
+        - [0x00100]    Minor heap events (such as creation and resizing)
+        - [0x00200]    Major heap events (such as creation and teardown)
+        - [0x00400]    Resizing of GC tables
+        - [0x00800]    Allocation and resizing of stacks
+        - [0x01000]    Output GC statistics at program exit
+        - [0x02000]    Change of GC parameters
+        - [0x04000]    Calling of finalization functions
+        - [0x08000]    Bytecode executable and shared library search at start-up
+        - [0x10000]    GC debugging messages
+        - [0x20000]    Changes to the major GC mark stack
+        - [0x10000000] Do not include timestamp and domain ID in log messages
+
+        For runtime 4, the flags are as follows (although the messages
+        produced may not fit these descriptions very well):
+       - [0x0001] Start and end of major GC cycle.
+       - [0x0002] Minor collection and major GC slice.
+       - [0x0004] Growing and shrinking of the heap.
+       - [0x0008] Resizing of stacks and memory manager tables.
+       - [0x0010] Heap compaction.
+       - [0x0020] Change of GC parameters.
+       - [0x0040] Computation of major GC slice size.
+       - [0x0080] Calling of finalisation functions.
+       - [0x0100] Bytecode executable and shared library search at start-up.
+       - [0x0200] Computation of compaction-triggering condition.
+       - [0x0400] Output GC statistics at program exit.
+       - [0x0800] GC debugging messages.
+       - [0x1000] Include domain ID in log messages.
+       - [0x2000] Include timestamp in log messages.
        Default: 0. *)
 
     max_overhead : int;
@@ -168,9 +197,7 @@ type control =
        If [max_overhead >= 1000000], compaction is never triggered.
        On runtime4, if compaction is permanently disabled, it is strongly
        suggested to set [allocation_policy] to 2.
-       Default: 500.
-       This metric is currently not available in OCaml 5: the field value is
-       always [0]. *)
+        Default: 500. *)
 
     stack_limit : int;
     (** The maximum size of the fiber stacks (in words).
@@ -466,7 +493,7 @@ val finalise_release : unit -> unit
     GC that it can launch the next finalisation function without waiting
     for the current one to return. *)
 
-type alarm : value mod portable uncontended
+type alarm : value mod portable contended
 (** An alarm is a piece of data that calls a user function at the end of
    major GC cycle.  The following functions are provided to create
    and delete alarms. *)
@@ -567,7 +594,7 @@ end
     similar in most regards.)
 
    *)
-module (Memprof @ nonportable) :
+module (Memprof @@ nonportable) :
   sig @@ portable
     type t
     (** the type of a profile *)
@@ -581,8 +608,7 @@ module (Memprof @ nonportable) :
         (** The size of the block, in words, excluding the header. *)
 
         source : allocation_source;
-        (** The cause of the allocation; [Marshal] cannot be produced
-          since OCaml 5. *)
+        (** The cause of the allocation. *)
 
         callstack : Printexc.raw_backtrace
         (** The callstack for the allocation. *)
@@ -721,7 +747,7 @@ end
 
         OCAMLRUNPARAM='Xfoo=42'
     *)
-module (Tweak @ nonportable) : sig
+module (Tweak @@ nonportable) : sig
   (** Change a parameter.
       Raises Invalid_argument if no such parameter exists *)
   val set : string -> int -> unit

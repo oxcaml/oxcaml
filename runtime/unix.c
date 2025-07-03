@@ -73,6 +73,7 @@
 #include "caml/io.h"
 #include "caml/alloc.h"
 #include "caml/platform.h"
+#include "caml/startup_aux.h"
 
 #ifndef S_ISREG
 #define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
@@ -510,14 +511,11 @@ void caml_init_os_params(void)
 }
 
 #ifndef __CYGWIN__
-
-static void* mmap_named(void* addr, size_t length, int prot, int flags,
-                        int fd, off_t offset, const char* name)
+void caml_plat_mem_name_map(void *mem, size_t length, const char *name)
 {
-  void* p = mmap(addr, length, prot, flags, fd, offset);
-#ifdef __linux__
-  if (p != MAP_FAILED) {
-    /* On Linux, use PR_SET_VMA_ANON_NAME to name the allocation */
+#if defined(__linux__) && !defined(WITH_ADDRESS_SANITIZER)
+  if (name) {
+    /* On Linux, use PR_SET_VMA_ANON_NAME to name a mapping */
     char buf[80];
     snprintf(buf, sizeof buf, "OCaml: %s", name);
     /* The constants PR_SET_VMA and PR_SET_VMA_ANON_NAME are stable
@@ -526,36 +524,69 @@ static void* mmap_named(void* addr, size_t length, int prot, int flags,
        So, it's more portable to hardcode these numbers */
     enum { PR_SET_VMA_ = 0x53564d41, PR_SET_VMA_ANON_NAME_ = 0 };
     prctl(PR_SET_VMA_, PR_SET_VMA_ANON_NAME_,
-          (unsigned long)p, length, (unsigned long)buf);
+          (unsigned long)mem, length, (unsigned long)buf);
     /* No error checking or reporting here: it's a best-effort tool
        for debugging, and may fail if e.g. this prctl is not supported
        on this kernel version. */
   }
+#else
+  (void)mem;
+  (void)length;
+  (void)name;
 #endif
-  return p;
 }
 
-void *caml_plat_mem_map(uintnat size, int reserve_only, const char* name)
+#ifndef WITH_ADDRESS_SANITIZER
+static void* mmap_named(void* addr, size_t length, int prot, int flags,
+                        int fd, off_t offset, const char* name)
 {
+  void* p = mmap(addr, length, prot, flags, fd, offset);
+  if (p != MAP_FAILED) {
+    caml_plat_mem_name_map(p, length, name);
+  }
+  return p;
+}
+#endif
+
+void *caml_plat_mem_map(uintnat size, uintnat caml_flags, const char* name)
+{
+  uintnat alignment = caml_plat_hugepagesize;
+#ifdef WITH_ADDRESS_SANITIZER
+  return aligned_alloc(alignment, (size + (alignment - 1)) & ~(alignment - 1));
+#else
+  uintnat reserve_only = caml_flags & CAML_MAP_RESERVE_ONLY;
+  uintnat no_hugetlb = caml_flags & CAML_MAP_NO_HUGETLB;
+  (void)no_hugetlb; /* avoid unused variable warning */
+
   void* mem;
   int prot = reserve_only ? PROT_NONE : (PROT_READ | PROT_WRITE);
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
-  uintnat alignment = caml_plat_hugepagesize;
 
   if (size < alignment || alignment < caml_plat_pagesize) {
     /* Short mapping or unknown/bad hugepagesize.
        Either way, not worth bothering with alignment. */
     mem = mmap_named(0, size, prot, flags, -1, 0, name);
     if (mem == MAP_FAILED) mem = NULL;
+
     return mem;
   }
+
+#ifdef HAS_HUGE_PAGES
+  if (caml_params->use_hugetlb_pages && !reserve_only && !no_hugetlb) {
+    /* If requested, try mapping with MAP_HUGETLB */
+    mem = mmap_named(0, size, prot, flags | MAP_HUGETLB, -1, 0, name);
+    if (mem == MAP_FAILED) mem = NULL;
+    return mem;
+  }
+#endif
 
   /* Sensible kernels (on Linux, that means >= 6.7) will always provide aligned
      mappings. To avoid penalising such kernels, try mapping the exact desired
      size first and see if it happens to be aligned. */
-  mem = mmap_named(0, size, prot, flags, -1, 0, name);
+  mem = mmap(0, size, prot, flags, -1, 0);
   if (mem == MAP_FAILED) return NULL;
-  if ((((uintnat)mem) & (alignment - 1)) == 0) return mem;
+  uintnat res = (uintnat)mem;
+  if ((((uintnat)mem) & (alignment - 1)) == 0) goto got_mapping;
 
   /* Misaligned pointer, so unmap and try again.
      munmap is unlikely to fail and there's not much we can do if it does, so
@@ -563,16 +594,21 @@ void *caml_plat_mem_map(uintnat size, int reserve_only, const char* name)
   munmap(mem, size);
 
   /* Allocate a longer region than needed and trim it afterwards */
-  mem = mmap_named(0, size + alignment, prot, flags, -1, 0, name);
+  mem = mmap(0, size + alignment, prot, flags, -1, 0);
   if (mem == MAP_FAILED) return NULL;
 
-  uintnat aligned = ((uintnat)mem + alignment) & ~(alignment - 1);
-  uintnat offset = aligned - (uintnat)mem;
-  munmap(mem, offset);
-  if (offset != alignment) munmap((void*)(aligned + size), alignment - offset);
-  return (void*)aligned;
+  res = ((uintnat)mem + alignment) & ~(alignment - 1);
+  uintnat offset = res - (uintnat)mem; /* possibly zero this time! */
+  if (offset) munmap(mem, offset);
+  if (offset != alignment) munmap((void*)(res + size), alignment - offset);
+
+got_mapping:
+  caml_plat_mem_name_map((void*)res, size, name);
+  return (void*)res;
+#endif
 }
 
+#ifndef WITH_ADDRESS_SANITIZER
 static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
 {
   if (mmap_named(mem, size, prot, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
@@ -582,6 +618,7 @@ static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
     return mem;
   }
 }
+#endif
 
 #else
 
@@ -591,9 +628,12 @@ static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
    done using mprotect, since Cygwin's mmap doesn't implement the required
    functions for committing using mmap. */
 
-void *caml_plat_mem_map(uintnat size, int reserve_only, const char* name)
+void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
 {
   void* mem;
+  uintnat reserve_only = caml_flags & CAML_MAP_RESERVE_ONLY;
+  uintnat no_hugetlb = caml_flags & CAML_MAP_NO_HUGETLB;
+  (void)no_hugetlb; /* Not used on Cygwin */
 
   mem = mmap(0, size, reserve_only ? PROT_NONE : (PROT_READ | PROT_WRITE),
              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -603,6 +643,7 @@ void *caml_plat_mem_map(uintnat size, int reserve_only, const char* name)
   return mem;
 }
 
+#ifndef WITH_ADDRESS_SANITIZER
 static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
 {
   if (mprotect(mem, size, prot) != 0) {
@@ -611,11 +652,15 @@ static void* map_fixed(void* mem, uintnat size, int prot, const char* name)
     return mem;
   }
 }
+#endif
 
 #endif /* !__CYGWIN__ */
 
 void* caml_plat_mem_commit(void* mem, uintnat size, const char* name)
 {
+#ifdef WITH_ADDRESS_SANITIZER
+  return mem;
+#else
   void* p = map_fixed(mem, size, PROT_READ | PROT_WRITE, name);
   /*
     FIXME: On Linux, it might be useful to populate page tables with
@@ -623,15 +668,25 @@ void* caml_plat_mem_commit(void* mem, uintnat size, const char* name)
     a later point.
   */
   return p;
+#endif
 }
 
 void caml_plat_mem_decommit(void* mem, uintnat size, const char* name)
 {
+#ifdef WITH_ADDRESS_SANITIZER
+  /* We don't need the strength of [MADV_DONTNEED]. */
+  madvise(mem, size, MADV_FREE);
+#else
   map_fixed(mem, size, PROT_NONE, name);
+#endif
 }
 
 void caml_plat_mem_unmap(void* mem, uintnat size)
 {
+#ifdef WITH_ADDRESS_SANITIZER
+  free(mem);
+#else
   if (munmap(mem, size) != 0)
     CAMLassert(0);
+#endif
 }

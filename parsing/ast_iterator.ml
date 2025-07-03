@@ -157,6 +157,8 @@ module T = struct
         sub.typ sub t
     | Ptyp_quote t -> sub.typ sub t
     | Ptyp_splice t -> sub.typ sub t
+    | Ptyp_of_kind jkind ->
+        sub.jkind_annotation sub jkind
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub
@@ -573,8 +575,12 @@ module P = struct
         iter_loc sub l;
         iter_opt
           (fun (vl,p) ->
-            List.iter (iter_loc sub) vl;
-            sub.pat sub p)
+             List.iter
+               (fun (v,j) ->
+                  iter_loc sub v;
+                  iter_opt (sub.jkind_annotation sub) j)
+               vl;
+             sub.pat sub p)
           p
     | Ppat_variant (_l, p) -> iter_opt (sub.pat sub) p
     | Ppat_record (lpl, _cf)
@@ -846,9 +852,10 @@ let default_iterator =
          | Mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list
-         | With (t, ty) ->
+         | With (t, ty, modalities) ->
              this.jkind_annotation this t;
-             this.typ this ty
+             this.typ this ty;
+             this.modalities this modalities
          | Kind_of ty -> this.typ this ty
          | Product ts -> List.iter (this.jkind_annotation this) ts);
 

@@ -161,6 +161,7 @@ and 'k pattern_desc =
         (** x *)
   | Tpat_alias :
       value general_pattern * Ident.t * string loc * Uid.t * Mode.Value.l
+      * Types.type_expr
         -> value pattern_desc
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
@@ -183,7 +184,9 @@ and 'k pattern_desc =
          *)
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
-        value general_pattern list * (Ident.t loc list * core_type) option ->
+        value general_pattern list *
+        ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
+          option ->
       value pattern_desc
         (** C                             ([], None)
             C P                           ([P], None)
@@ -191,7 +194,9 @@ and 'k pattern_desc =
             C (P : t)                     ([P], Some ([], t))
             C (P1, ..., Pn : t)           ([P1; ...; Pn], Some ([], t))
             C (type a) (P : t)            ([P], Some ([a], t))
-            C (type a) (P1, ..., Pn : t)  ([P1; ...; Pn], Some ([a], t))
+            C (type a) (P1, ..., Pn : t)  ([P1; ...; Pn], Some ([a, None], t))
+            C (type (a : k)) (P1, ..., Pn : t)
+                                   ([P1; ...; Pn], Some ([a, Some k], t))
           *)
   | Tpat_variant :
       label * value general_pattern option * Types.row_desc ref ->
@@ -406,7 +411,7 @@ and expression_desc =
   | Texp_record of {
       fields : ( Types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
-      extended_expression : (expression * Unique_barrier.t) option;
+      extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
     }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
@@ -439,10 +444,12 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
-  | Texp_field of expression * Longident.t loc * Types.label_description *
-      texp_field_boxing * Unique_barrier.t
-    (** [texp_field_boxing] provides extra information depending on if the
-        projection requires boxing. *)
+  | Texp_field of expression * Jkind.sort * Longident.t loc *
+      Types.label_description * texp_field_boxing * Unique_barrier.t
+    (** - The sort is the sort of the whole record (which may be non-value if
+          the record is @@unboxed).
+        - [texp_field_boxing] provides extra information depending on if the
+          projection requires boxing. *)
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
         unique_use
@@ -462,6 +469,7 @@ and expression_desc =
     }
   | Texp_for of {
       for_id  : Ident.t;
+      for_debug_uid: Shape.Uid.t;
       for_pat : Parsetree.pattern;
       for_from : expression;
       for_to   : expression;
@@ -487,6 +495,7 @@ and expression_desc =
       let_ : binding_op;
       ands : binding_op list;
       param : Ident.t;
+      param_debug_uid : Shape.Uid.t;
       param_sort : Jkind.sort;
       body : value case;
       body_sort : Jkind.sort;
@@ -519,6 +528,7 @@ and function_param =
     (** [fp_param] is the identifier that is to be used to name the
         parameter of the function.
     *)
+    fp_param_debug_uid: Shape.Uid.t;
     fp_partial: partial;
     (**
        [fp_partial] =
@@ -573,6 +583,7 @@ and function_cases =
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
     fc_param: Ident.t;
+    fc_param_debug_uid : Shape.Uid.t;
     fc_loc: Location.t;
     fc_exp_extra: exp_extra option;
     fc_attributes: attributes;
@@ -615,6 +626,7 @@ and comprehension_clause_binding =
 and comprehension_iterator =
   | Texp_comp_range of
       { ident     : Ident.t
+      ; ident_debug_uid : Shape.Uid.t
       ; pattern   : Parsetree.pattern (** Redundant with [ident] *)
       ; start     : expression
       ; stop      : expression
@@ -648,9 +660,10 @@ and binding_op =
     bop_loc : Location.t;
   }
 
+(* See Note [Type-checking applications] in Typecore *)
 and ('a, 'b) arg_or_omitted =
-  | Arg of 'a
-  | Omitted of 'b
+  | Arg of 'a (* an argument actually passed to a function *)
+  | Omitted of 'b (* an argument not passed due to partial application *)
 
 and omitted_parameter =
   { mode_closure : Mode.Alloc.r;
@@ -741,6 +754,8 @@ and module_type_constraint =
 
 and functor_parameter =
   | Unit
+  (* CR sspies: We should add an additional [debug_uid] here to support functor
+     arguments in the debugger. *)
   | Named of Ident.t option * string option loc * module_type
 
 and module_expr_desc =
@@ -982,6 +997,7 @@ and core_type_desc =
   | Ttyp_open of Path.t * Longident.t loc * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
+  | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
           argument ([lbl:[%call_pos] -> ...]). *)

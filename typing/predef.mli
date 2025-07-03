@@ -40,7 +40,6 @@ val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
 val type_code: type_expr -> type_expr
-val type_code_ty: type_expr -> type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
 val type_unboxed_nativeint:type_expr
@@ -84,7 +83,6 @@ val path_extension_constructor: Path.t
 val path_floatarray: Path.t
 val path_lexing_position: Path.t
 val path_code: Path.t
-val path_code_ty: Path.t
 
 val path_unboxed_float: Path.t
 val path_unboxed_float32: Path.t
@@ -122,9 +120,9 @@ val ident_some : Ident.t
 val ident_or_null : Ident.t
 
 (* The jkind used for optional function argument types *)
-val option_argument_jkind : 'd jkind
+val option_argument_jkind : jkind_lr
 (* The jkind used for list argument types *)
-val list_argument_jkind : 'd jkind
+val list_argument_jkind : jkind_lr
 
 (* To build the initial environment. Since there is a nasty mutual
    recursion between predef and env, we break it by parameterizing
@@ -159,6 +157,11 @@ val add_or_null :
    while users can't define their own types with null constructors. *)
 (* CR layouts v3.5: remove this when users can define null constructors. *)
 val or_null_kind : type_expr -> ('a, 'b, constructor_declaration) type_kind
+
+(* Construct the [jkind] of [or_null]. For re-exporting [or_null]
+   while users can't define their own types with null constructors. *)
+(* CR layouts v3.5: remove this when users can define null constructors. *)
+val or_null_jkind : Types.type_expr -> Types.jkind_l
 
 (* To initialize linker tables *)
 

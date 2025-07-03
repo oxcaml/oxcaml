@@ -21,6 +21,8 @@ module View : sig
   type t = private
     | Code_present of Code.t
     | Metadata_only of Code_metadata.t
+
+  val print : Format.formatter -> t -> unit
 end
 
 val view : t -> View.t
@@ -30,13 +32,15 @@ val get_code : t -> Code.t
 
 val print : Format.formatter -> t -> unit
 
+val print_view : Format.formatter -> t -> unit
+
 val merge : Code_id.t -> t -> t -> t option
 
 val create : Code.t -> t
 
 val create_metadata_only : Code_metadata.t -> t
 
-val from_raw : sections:Flambda_backend_utils.File_sections.t -> raw -> t
+val from_raw : sections:Oxcaml_utils.File_sections.t -> raw -> t
 
 val to_raw : add_section:(Obj.t -> int) -> t -> raw
 

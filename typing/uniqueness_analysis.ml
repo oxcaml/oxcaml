@@ -1598,20 +1598,14 @@ end = struct
 
   let child proj t = List.map (UF.Path.child proj) t
 
-  let modal_child gf proj t =
+  let modal_child modalities proj t =
     (* CR zqian: Instead of just ignoring such children, we should add modality
        to [Projection.t] and add corresponding logic in [UsageTree]. *)
-    let gf = Modality.Value.Const.to_list gf in
-    let l =
-      List.filter
-        (function
-         | Atom (Monadic Uniqueness, Join_with Aliased) -> true
-         | Atom (Comonadic Linearity, Meet_with Many) -> true
-         | _ -> false
-          : Modality.t -> _)
-        gf
-    in
-    if List.length l = 2 then untracked else child proj t
+    let uni = Modality.Value.Const.proj (Monadic Uniqueness) modalities in
+    let lin = Modality.Value.Const.proj (Comonadic Linearity) modalities in
+    match uni, lin with
+    | Join_with Aliased, Meet_with Many -> untracked
+    | _ -> child proj t
 
   let tuple_field i t = child (Projection.Tuple_field i) t
 
@@ -1626,7 +1620,7 @@ end = struct
   let variant_field s t = child (Projection.Variant_field s) t
 
   let array_index mut i t =
-    let modality = Typemode.transl_modalities ~maturity:Stable mut [] [] in
+    let modality = Typemode.transl_modalities ~maturity:Stable mut [] in
     modal_child modality (Projection.Array_index i) t
 
   let memory_address t = child Projection.Memory_address t
@@ -1998,7 +1992,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
     | Tpat_var (id, _, _, _) -> Ienv.Extension.singleton id paths, UF.unused
-    | Tpat_alias (pat', id, _, _, _) ->
+    | Tpat_alias (pat', id, _, _, _, _) ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
@@ -2089,14 +2083,24 @@ let comp_pattern_match pat value =
   | Some pat' -> pattern_match pat' value
   | None -> Ienv.Extension.empty, UF.unused
 
-let value_of_ident ienv unique_use occ path =
+(** Given some [ienv], find the [Value.t] corresponding to an identifier.
+
+There are two cases that it might be missing, both of which are related to
+"module and class boundary" (see below):
+- We are checking inside a module, and the identifier is refering to a value
+defined outside of the module. In such case, we force this identifier to
+[aliased].
+- Another case is used by [open_variables]. See comments there.
+*)
+let value_of_ident ienv ?(force_missing = true) unique_use occ path =
   match path with
   | Path.Pident id -> (
     match Ienv.find_opt id ienv with
     (* TODO: for better error message, we should record in ienv why some
        variables are not in it. *)
     | None ->
-      force_aliased_boundary ~reason:Out_of_mod_class unique_use occ;
+      if force_missing
+      then force_aliased_boundary ~reason:Out_of_mod_class unique_use occ;
       None
     | Some paths ->
       let value = Value.existing paths unique_use occ in
@@ -2108,8 +2112,8 @@ let value_of_ident ienv unique_use occ path =
     None
   | Path.Papply _ | Path.Pextra_ty _ -> assert false
 
-(* TODO: replace the dirty hack.
-   The following functions are dirty hacks and used for modules and classes.
+(* Module and class boundary
+
    Currently we treat the boundary between modules/classes and their surrounding
    environment coarsely. To be specific, all references in the modules/classes
    pointing to the environment are treated as many and aliased. This translates
@@ -2127,8 +2131,15 @@ let open_variables ienv f =
         (fun self e ->
           (match e.exp_desc with
           | Texp_ident (path, _, _, _, unique_use) -> (
+            (* We test if a variable is open by looking it up in the current
+               [ienv]: the [ienv] does not contain the internally-bound
+               variables in the module. In other words, open variables will be
+               found, and closed variables will be missing. For the latter, we
+               of course should not force them to [aliased]. *)
             let occ = Occurrence.mk e.exp_loc in
-            match value_of_ident ienv unique_use occ path with
+            match
+              value_of_ident ienv ~force_missing:false unique_use occ path
+            with
             | None -> ()
             | Some value -> ll := value :: !ll)
           | _ -> ());
@@ -2270,7 +2281,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let value, uf_ext =
       match extended_expression with
       | None -> Value.fresh, UF.unused
-      | Some (exp, unique_barrier) ->
+      | Some (exp, _, unique_barrier) ->
         let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
         Unique_barrier.enable unique_barrier;
         let uf_read =
@@ -2466,7 +2477,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
       | Some value -> value
     in
     value, UF.unused
-  | Texp_field (e, _, l, float, unique_barrier) -> (
+  | Texp_field (e, _, _, l, float, unique_barrier) -> (
     let value, uf = check_uniqueness_exp_as_value ienv e in
     match Value.paths value with
     | None ->

@@ -27,7 +27,7 @@
 
     @since 5.0 *)
 
-type !'a t
+type !'a t : value mod portable contended with 'a
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
@@ -99,7 +99,7 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
 module DLS : sig
 (** Domain-local Storage *)
 
-    type 'a key : value mod portable uncontended
+    type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
     val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key @@ nonportable
@@ -186,7 +186,7 @@ module Safe : sig
           executed on the primary domain. *)
     end
 
-    type 'a key : value mod portable uncontended = 'a DLS.key
+    type 'a key : value mod portable contended = 'a DLS.key
     (** See {!DLS.key}. *)
 
     (* CR: Update this to use the Capsule API when that is merged into stdlib. *)
@@ -195,7 +195,7 @@ module Safe : sig
         [Encapsulated] to avoid leaking access to data in the DLS. *)
 
     val access
-      :  (Access.t -> 'a @ portable contended) @ local portable
+      :  (Access.t -> 'a @ portable contended) @ local portable unyielding once
       -> 'a @ portable contended
       @@ portable
     (** [access f] scopes the computation [f] to (conceptually) run it in the current
@@ -248,7 +248,7 @@ module Safe : sig
         does not unsafely close over data from the current capsule. *)
   end
 
-  val spawn : (unit -> 'a) @ portable -> 'a t @@ portable
+  val spawn : (unit -> 'a) @ portable once -> 'a t @@ portable
   [@@alert unsafe_parallelism
              "This function is unsafe and should not be used in production \
               code.\nA safe interface for parallelism is forthcoming."]
@@ -256,7 +256,7 @@ module Safe : sig
       computation must be [portable], and so cannot close over and interact with any
       unsynchronized mutable data in the current domain. *)
 
-  val spawn' : (DLS.Access.t -> 'a) @ portable -> 'a t @@ portable
+  val spawn' : (DLS.Access.t -> 'a) @ portable once -> 'a t @@ portable
   [@@alert unsafe_parallelism
              "This function is unsafe and should not be used in production \
               code.\nA safe interface for parallelism is forthcoming."]

@@ -542,7 +542,7 @@ Line 2, characters 28-32:
 Error: This expression has type "('a : float64)"
        but an expression was expected of type "int64#"
        The layout of int64# is bits64
-         because it is the primitive type int64#.
+         because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a sublayout of float64
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
@@ -624,8 +624,8 @@ Line 1, characters 28-58:
 1 | external[@layout_poly] id : ('a : any). 'a list -> 'a list = "%identity"
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind any.
-       But it was inferred to have kind value
-         because the type argument of list has kind value.
+       But it was inferred to have kind value_or_null
+         because the type argument of list has kind value_or_null.
 |}]
 
 (* Test this when sorts can be inside unboxed records *)
@@ -711,34 +711,37 @@ Error: "[@layout_poly]" on this external declaration has no
        variable for it to operate on.
 |}]
 
-(********************************************************)
-(* Newer prims are gated to appropriate maturity levels *)
+(*********************************************)
+(* Tuple array prims no longer gated to beta *)
 
 external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
   "%makearray_dynamic"
 [%%expect{|
-Lines 1-2, characters 0-22:
-1 | external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
-2 |   "%makearray_dynamic"
-Error: This construct requires the beta version of the extension "layouts", which is disabled and cannot be used
+external makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array
+  = "%makearray_dynamic" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit :
   ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit =
   "%arrayblit"
 [%%expect{|
-Lines 1-3, characters 0-14:
-1 | external[@layout_poly] arrayblit :
-2 |   ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit =
-3 |   "%arrayblit"
-Error: This construct requires the beta version of the extension "layouts", which is disabled and cannot be used
+external arrayblit :
+  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit
+  = "%arrayblit" [@@layout_poly]
 |}]
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a array =
   "%makearray_dynamic_uninit"
 [%%expect{|
-Lines 1-2, characters 0-29:
-1 | external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
-2 |   "%makearray_dynamic_uninit"
-Error: This construct requires the beta version of the extension "layouts", which is disabled and cannot be used
+external makearray_dynamic : ('a : any_non_null). int -> 'a array
+  = "%makearray_dynamic_uninit" [@@layout_poly]
+|}]
+
+external[@layout_poly] arrayblit_src_immut :
+  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit =
+  "%arrayblit_src_immut"
+[%%expect{|
+external arrayblit_src_immut :
+  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit
+  = "%arrayblit_src_immut" [@@layout_poly]
 |}]

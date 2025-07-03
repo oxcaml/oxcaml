@@ -24,6 +24,18 @@
 
     No primitive raises an exception. (Bounds checking is handled separately.) *)
 
+module Lazy_block_tag : sig
+  type t = Lambda.lazy_block_tag =
+    | Lazy_tag
+    | Forward_tag
+
+  val print : Format.formatter -> t -> unit
+
+  val compare : t -> t -> int
+
+  val to_tag : t -> Tag.t
+end
+
 module Block_kind : sig
   type t =
     | Values of Tag.Scannable.t * Flambda_kind.With_subkind.t list
@@ -312,13 +324,6 @@ type nullary_primitive =
           let-binding. *)
   | Probe_is_enabled of { name : string }
       (** Returns a boolean saying whether the given tracing probe is enabled. *)
-  | Begin_region of { ghost : bool }
-      (** Starting delimiter of local allocation region, returning a region
-          name. For regions for the "try" part of a "try...with", use
-          [Begin_try_region] (below) instead. *)
-  | Begin_try_region of { ghost : bool }
-      (** Starting delimiter of local allocation region, when used for a "try"
-          body. *)
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
       (** Used in classic mode to denote the start of an inlined function body.
           This is then used in to_cmm to correctly add inlined debuginfo. *)
@@ -334,9 +339,7 @@ type nullary_primitive =
     encoding a 16-bit quantity (described in the least significant 16 bits of
     the immediate after untagging) and exchanges the two halves of the 16-bit
     quantity. The higher-order bits are zeroed. *)
-type unary_int_arith_op =
-  | Neg
-  | Swap_byte_endianness
+type unary_int_arith_op = Swap_byte_endianness
 
 (** Naked float unary arithmetic operations. *)
 type unary_float_arith_op =
@@ -446,6 +449,7 @@ type unary_primitive =
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
      deleting [Atomic_load] *)
   | Peek of Flambda_kind.Standard_int_or_float.t
+  | Make_lazy of Lazy_block_tag.t
 
 (** Whether a comparison is to yield a boolean result, as given by a particular
     comparison operator, or whether it is to behave in the manner of "compare"
@@ -524,10 +528,25 @@ type ternary_primitive =
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
   | Atomic_compare_and_set of Block_access_field_kind.t
-  | Atomic_compare_exchange of Block_access_field_kind.t
+  | Atomic_compare_exchange of
+      { atomic_kind : Block_access_field_kind.t;
+            (** The kind of values which the atomic can hold. *)
+        args_kind : Block_access_field_kind.t
+            (** The kind of values which the compare-exchange operation is to
+                be used with on this particular occasion.  Note that this might
+                be [Immediate] even though the atomic is marked as [Any_value],
+                for example. *)
+      }
 
 (** Primitives taking zero or more arguments. *)
 type variadic_primitive =
+  | Begin_region of { ghost : bool }
+      (** Starting delimiter of local allocation region, returning a region
+          name. For regions for the "try" part of a "try...with", use
+          [Begin_try_region] (below) instead. *)
+  | Begin_try_region of { ghost : bool }
+      (** Starting delimiter of local allocation region, when used for a "try"
+          body. *)
   | Make_block of Block_kind.t * Mutability.t * Alloc_mode.For_allocations.t
   | Make_array of Array_kind.t * Mutability.t * Alloc_mode.For_allocations.t
 (* CR mshinwell: Invariant checks -- e.g. that the number of arguments matches
@@ -581,6 +600,7 @@ val args_kind_of_ternary_primitive :
 type arg_kinds =
   | Variadic_mixed of Flambda_kind.Mixed_block_shape.t
   | Variadic_all_of_kind of Flambda_kind.t
+  | Variadic_zero_or_one of Flambda_kind.t
   | Variadic_unboxed_product of Flambda_kind.t list
 
 val args_kind_of_variadic_primitive : variadic_primitive -> arg_kinds

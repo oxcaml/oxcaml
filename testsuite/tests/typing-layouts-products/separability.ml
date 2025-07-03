@@ -7,6 +7,9 @@
  }
 *)
 
+(* NOTE: When adding tests to this file, consider updating
+   [typing-layouts-products/separability_implicit_unboxed_records.ml] *)
+
 type 'a r = #{ a : 'a }
 and 'a ok = F : 'a r -> 'a ok [@@unboxed]
 [%%expect{|
@@ -78,26 +81,57 @@ type t_void : void
 and 'a r = #{ a : 'a ; v : t_void }
 and bad = F : 'a r -> bad [@@unboxed]
 [%%expect{|
-Line 2, characters 0-35:
-2 | and 'a r = #{ a : 'a ; v : t_void }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of 'a r is any & any
+Line 3, characters 0-37:
+3 | and bad = F : 'a r -> bad [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bad" is value_or_null & void
          because it is an unboxed record.
-       But the layout of 'a r must be a sublayout of value
-         because it's the type of a constructor field.
+       But the kind of type "bad" must be a subkind of value & void
+         because it's an [@@unboxed] type,
+         chosen to have kind value & void.
 |}]
 
 type t_void : void
 and 'a r = #{ a : 'a ; v : t_void }
 and bad = F : { x : 'a r } -> bad [@@unboxed]
 [%%expect{|
-Line 2, characters 0-35:
-2 | and 'a r = #{ a : 'a ; v : t_void }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of 'a r is any & any
+Line 3, characters 0-45:
+3 | and bad = F : { x : 'a r } -> bad [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bad" is value_or_null & void
          because it is an unboxed record.
-       But the layout of 'a r must be a sublayout of value
-         because it is the type of record field x.
+       But the kind of type "bad" must be a subkind of value & void
+         because it's an [@@unboxed] type,
+         chosen to have kind value & void.
+|}]
+
+type t_void : void
+and ('a : value) r = #{ a : 'a ; v : t_void }
+and bad = F : 'a r -> bad [@@unboxed]
+[%%expect{|
+Line 3, characters 0-37:
+3 | and bad = F : 'a r -> bad [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bad" is value_or_null & void
+         because it is an unboxed record.
+       But the kind of type "bad" must be a subkind of value & void
+         because it's an [@@unboxed] type,
+         chosen to have kind value & void.
+|}]
+
+(* CR layouts v12: Double-check this is safe when we add [void]. *)
+(* CR reisenberg: This is obviously terrible. The workaround is not
+   to use [any] in the kind annotation there, when [void] would be
+   more accurate. I think fixing this properly will require enhancing
+   [Ctype.unbox_once] to look through unboxed records better.
+   My local branch [expand-unboxed-records] (in my [fl-kinds] clone)
+   has a start to a solution. But I think ccasinghino doesn't like
+   it, so we should discuss. *)
+type t_void : void
+and 'a r : value & any = #{ a : 'a ; v : t_void }
+and bad = F : { x : 'a r } -> bad [@@unboxed]
+[%%expect{|
+>> Fatal error: Jkind.sort_of_jkind
+Uncaught exception: Misc.Fatal_error
+
 |}]

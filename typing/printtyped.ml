@@ -55,6 +55,12 @@ let rec fmt_path_aux f x =
   | Path.Papply (y, z) ->
       fprintf f "%a(%a)" fmt_path_aux y fmt_path_aux z
   | Path.Pextra_ty (y, Pext_ty) -> fmt_path_aux f y
+  | Path.Pextra_ty (y, Punboxed_ty) ->
+      match y with
+      | Path.Pident id ->
+        fprintf f "%a#" fmt_ident id
+      | Path.Pdot (y, s) -> fprintf f "%a.%s" fmt_path_aux y (s ^ "#")
+      | Path.Papply _ | Path.Pextra_ty _ -> assert false
 
 let fmt_path f x = fprintf f "\"%a\"" fmt_path_aux x
 
@@ -201,8 +207,8 @@ let variant_representation i ppf = let open Types in function
   | Variant_extensible -> line i ppf "Variant_inlined\n"
   | Variant_with_null -> line i ppf "Variant_with_null\n"
 
-let flat_element i ppf flat_element =
-  line i ppf "%s\n" (Types.flat_element_to_string flat_element)
+let mixed_block_element i ppf mixed_block_element =
+  line i ppf "%s\n" (Types.mixed_block_element_to_string mixed_block_element)
 
 let record_representation i ppf = let open Types in function
   | Record_unboxed ->
@@ -213,9 +219,9 @@ let record_representation i ppf = let open Types in function
     line i ppf "Record_inlined (%a, %a)\n" tag t (variant_representation i) v
   | Record_float -> line i ppf "Record_float\n"
   | Record_ufloat -> line i ppf "Record_ufloat\n"
-  | Record_mixed { value_prefix_len; flat_suffix } ->
-    line i ppf "Record_mixed (value_prefix_len %d)\n" value_prefix_len;
-    array (i+1) flat_element ppf flat_suffix
+  | Record_mixed shape ->
+    line i ppf "Record_mixed\n";
+    array (i+1) mixed_block_element ppf shape
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
@@ -308,6 +314,8 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_of_kind jkind ->
+      line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
 
 and labeled_core_type i ppf (l, t) =
@@ -333,7 +341,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_var (s,_,_,m) ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
       value_mode i ppf m
-  | Tpat_alias (p, s,_,_,m) ->
+  | Tpat_alias (p, s,_,_,m,_) ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
       value_mode i ppf m;
       pattern i ppf p;
@@ -349,8 +357,11 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       list i pattern ppf po;
       option i
         (fun i ppf (vl,ct) ->
-          let names = List.map (fun {txt} -> "\""^Ident.name txt^"\"") vl in
-          line i ppf "[%s]\n" (String.concat "; " names);
+          line i ppf "vars%a\n"
+            (fun ppf ->
+              List.iter (fun ({txt}, jk) ->
+                typevar_jkind ~print_quote:false ppf (Ident.name txt, jk)))
+            vl;
           core_type i ppf ct)
         ppf vto
   | Tpat_variant (l, po, _) ->
@@ -415,7 +426,8 @@ and function_body i ppf (body : function_body) =
       expression (i+1) ppf e
   | Tfunction_cases
       { fc_cases; fc_loc; fc_exp_extra; fc_attributes; fc_arg_mode;
-        fc_arg_sort; fc_param = _; fc_partial; fc_env = _; fc_ret_type = _ }
+        fc_arg_sort; fc_param = _; fc_param_debug_uid = _;
+        fc_partial; fc_env = _; fc_ret_type = _ }
     ->
       line i ppf "Tfunction_cases%a %a\n"
         fmt_partiality fc_partial
@@ -540,7 +552,7 @@ and expression i ppf x =
       line i ppf "representation =\n";
       record_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";
-      option (i+1) expression ppf (Option.map fst extended_expression);
+      option (i+1) expression ppf (Option.map Misc.fst3 extended_expression);
   | Texp_record_unboxed_product
         { fields; representation; extended_expression } ->
       line i ppf "Texp_record_unboxed_product\n";
@@ -551,7 +563,7 @@ and expression i ppf x =
       record_unboxed_product_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";
       option (i+1) expression ppf (Option.map fst extended_expression);
-  | Texp_field (e, li, _, _, _) ->
+  | Texp_field (e, _, li, _, _, _) ->
       line i ppf "Texp_field\n";
       expression i ppf e;
       longident i ppf li;

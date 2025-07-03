@@ -344,8 +344,8 @@ static void stw_handler(caml_domain_state* domain);
 static int handle_incoming(struct interruptor* s)
 {
   int handled = interruptor_has_pending(s);
-  CAMLassert (s->running);
   if (handled) {
+    CAMLassert (s->running);
     interruptor_set_handled(s);
 
     stw_handler(domain_self->state);
@@ -432,14 +432,16 @@ Caml_inline void check_minor_heap(void) {
   caml_domain_state* domain_state = Caml_state;
   CAMLassert(domain_state->young_ptr == domain_state->young_end);
 
-  caml_gc_log("young_start: %p, young_end: %p, minor_heap_area_start: %p,"
-      " minor_heap_area_end: %p, minor_heap_wsz: %"
-      ARCH_SIZET_PRINTF_FORMAT "u words",
-      domain_state->young_start,
-      domain_state->young_end,
-      (value*)domain_self->minor_heap_area_start,
-      (value*)domain_self->minor_heap_area_end,
-      domain_state->minor_heap_wsz);
+  CAML_GC_MESSAGE(DEBUG,
+                  "check_minor_heap: "
+                  "young_start: %p, young_end: %p, minor_heap_area_start: %p,"
+                  " minor_heap_area_end: %p, minor_heap_wsz: %"
+                  ARCH_SIZET_PRINTF_FORMAT "u words\n",
+                  domain_state->young_start,
+                  domain_state->young_end,
+                  (value*)domain_self->minor_heap_area_start,
+                  (value*)domain_self->minor_heap_area_end,
+                  domain_state->minor_heap_wsz);
   CAMLassert(
     (/* uninitialized minor heap */
       domain_state->young_start == NULL
@@ -453,9 +455,10 @@ Caml_inline void check_minor_heap(void) {
 static void free_minor_heap(void) {
   caml_domain_state* domain_state = Caml_state;
 
-  caml_gc_log ("trying to free old minor heap: %"
-        ARCH_SIZET_PRINTF_FORMAT "uk words",
-        domain_state->minor_heap_wsz / 1024);
+  CAML_GC_MESSAGE(MINOR_HEAP,
+                  "Freeing old minor heap: %"
+                  ARCH_SIZET_PRINTF_FORMAT "uk words\n",
+                  domain_state->minor_heap_wsz / 1024);
 
   check_minor_heap();
 
@@ -485,8 +488,9 @@ static int allocate_minor_heap(asize_t wsize) {
 
   CAMLassert (wsize <= caml_minor_heap_max_wsz);
 
-  caml_gc_log ("trying to allocate minor heap: %"
-               ARCH_SIZET_PRINTF_FORMAT "uk words", wsize / 1024);
+  CAML_GC_MESSAGE(MINOR_HEAP,
+                  "Allocating minor heap: %"
+                  ARCH_SIZET_PRINTF_FORMAT "uk words\n", wsize / 1024);
 
   char name[32];
   snprintf(name, sizeof name, "minor heap %d", domain_self->id);
@@ -560,10 +564,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   dom_internal* d = 0;
   caml_domain_state* domain_state;
   struct interruptor* s;
-  uintnat stack_wsize = caml_get_init_stack_wsize(-1 /* main thread */);
+  uintnat stack_wsize = caml_get_init_stack_wsize(STACK_SIZE_MAIN);
 
   CAMLassert (domain_self == 0);
 
+  CAML_GC_MESSAGE(DOMAIN, "Creating a domain.\n");
   /* take the all_domains_lock so that we can alter the STW participant
      set atomically */
   caml_plat_lock_blocking(&all_domains_lock);
@@ -658,13 +663,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   CAMLassert(!interruptor_has_pending(s));
 
-  domain_state->extra_heap_resources = 0.0;
-  domain_state->extra_heap_resources_minor = 0.0;
+  domain_state->allocated_dependent_bytes = 0;
+  domain_state->minor_dependent_bsz = 0;
 
-  domain_state->dependent_size = 0;
-  domain_state->dependent_allocated = 0;
-
-  domain_state->major_work_done_between_slices = 0;
+  domain_state->sweep_work_done_between_slices = 0;
+  domain_state->mark_work_done_between_slices = 0;
 
   /* the minor heap will be initialized by
      [caml_reallocate_minor_heap] below. */
@@ -730,6 +733,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->allocated_words = 0;
   domain_state->allocated_words_direct = 0;
+  domain_state->minor_words_at_last_slice = 0;
   domain_state->swept_words = 0;
 
   domain_state->local_roots = NULL;
@@ -739,7 +743,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->backtrace_active = 0;
   caml_register_generational_global_root(&domain_state->backtrace_last_exn);
 
-  domain_state->local_arenas = NULL;
   domain_state->local_sp = 0;
   domain_state->local_top = NULL;
   domain_state->local_limit = 0;
@@ -788,7 +791,11 @@ init_memprof_failure:
 
 
 domain_init_complete:
-  caml_gc_log("domain init complete");
+  if (domain_self) {
+    CAML_GC_MESSAGE(DOMAIN, "Creation complete.\n");
+  } else {
+    CAML_GC_MESSAGE(DOMAIN, "Creation failed.\n");
+  }
   caml_plat_unlock(&all_domains_lock);
 }
 
@@ -830,15 +837,16 @@ static void reserve_minor_heaps_from_stw_single(void) {
   minor_heap_reservation_bsize = minor_heap_max_bsz * caml_params->max_domains;
 
   /* reserve memory space for minor heaps */
-  heaps_base = caml_mem_map(minor_heap_reservation_bsize, 1 /* reserve_only */, "minor reservation");
+  heaps_base = caml_mem_map(minor_heap_reservation_bsize, CAML_MAP_RESERVE_ONLY, "minor reservation");
   if (heaps_base == NULL)
     caml_fatal_error("Not enough heap memory to reserve minor heaps");
 
   caml_minor_heaps_start = (uintnat) heaps_base;
   caml_minor_heaps_end = (uintnat) heaps_base + minor_heap_reservation_bsize;
 
-  caml_gc_log("new minor heap reserved from %p to %p",
-              (value*)caml_minor_heaps_start, (value*)caml_minor_heaps_end);
+  CAML_GC_MESSAGE(MINOR_HEAP,
+                  "Minor heaps reserved from %p to %p.\n",
+                  (value*)caml_minor_heaps_start, (value*)caml_minor_heaps_end);
 
   for (int i = 0; i < caml_params->max_domains; i++) {
     struct dom_internal* dom = &all_domains[i];
@@ -857,7 +865,7 @@ static void reserve_minor_heaps_from_stw_single(void) {
 static void unreserve_minor_heaps_from_stw_single(void) {
   uintnat size;
 
-  caml_gc_log("unreserve_minor_heaps");
+  CAML_GC_MESSAGE(MINOR_HEAP, "Unreserving minor heaps.\n");
 
   for (int i = 0; i < caml_params->max_domains; i++) {
     struct dom_internal* dom = &all_domains[i];
@@ -890,8 +898,7 @@ static
 void domain_resize_heap_reservation_from_stw_single(uintnat new_minor_wsz)
 {
   CAML_EV_BEGIN(EV_DOMAIN_RESIZE_HEAP_RESERVATION);
-  caml_gc_log("stw_resize_minor_heap_reservation: "
-              "unreserve_minor_heaps");
+  CAML_GC_MESSAGE(MINOR_HEAP, "Unreserving old minor heaps.\n");
 
   unreserve_minor_heaps_from_stw_single();
   /* new_minor_wsz is (huge)page-aligned because caml_norm_minor_heap_size has
@@ -899,7 +906,7 @@ void domain_resize_heap_reservation_from_stw_single(uintnat new_minor_wsz)
      [reserve_minor_heaps_from_stw_single].)
   */
   caml_minor_heap_max_wsz = new_minor_wsz;
-  caml_gc_log("stw_resize_minor_heap_reservation: reserve_minor_heaps");
+  CAML_GC_MESSAGE(MINOR_HEAP, "Reserving new minor heaps.\n");
   reserve_minor_heaps_from_stw_single();
   /* The call to [reserve_minor_heaps_from_stw_single] makes a new
      reservation, and it also updates the reservation boundaries of each
@@ -917,22 +924,18 @@ static void
 stw_resize_minor_heap_reservation(caml_domain_state* domain,
                                   void* minor_wsz_data,
                                   int participating_count,
-                                  caml_domain_state** participating) {
-  caml_gc_log("stw_resize_minor_heap_reservation: "
-              "caml_empty_minor_heap_no_major_slice_from_stw");
+                                  caml_domain_state** participating)
+{
+  uintnat new_minor_wsz = *(uintnat*) minor_wsz_data;
   caml_empty_minor_heap_no_major_slice_from_stw(
     domain, NULL, participating_count, participating);
 
-  caml_gc_log("stw_resize_minor_heap_reservation: free_minor_heap");
   free_minor_heap();
 
   Caml_global_barrier_if_final(participating_count) {
-    uintnat new_minor_wsz = (uintnat) minor_wsz_data;
     domain_resize_heap_reservation_from_stw_single(new_minor_wsz);
   }
 
-  caml_gc_log("stw_resize_minor_heap_reservation: "
-              "allocate_minor_heap");
   /* Note: each domain allocates its own minor heap. This seems
      important to get good NUMA behavior. We don't want a single
      domain to allocate all minor heaps, which could create locality
@@ -940,15 +943,20 @@ stw_resize_minor_heap_reservation(caml_domain_state* domain,
   if (allocate_minor_heap(Caml_state->minor_heap_wsz) < 0) {
     caml_fatal_error("Fatal error: No memory for minor heap");
   }
+  CAML_GC_MESSAGE(MINOR_HEAP,
+                  "Changed minor heap max wsize to "
+                  "%"ARCH_INTNAT_PRINTF_FORMAT"u.\n",
+                  new_minor_wsz);
 }
 
 void caml_update_minor_heap_max(uintnat requested_wsz) {
-  caml_gc_log("Changing heap_max_wsz from %" ARCH_INTNAT_PRINTF_FORMAT
-              "u to %" ARCH_INTNAT_PRINTF_FORMAT "u.",
+  CAML_GC_MESSAGE(MINOR_HEAP,
+                  "Changing minor heap max wsize from %" ARCH_INTNAT_PRINTF_FORMAT
+                  "u to %" ARCH_INTNAT_PRINTF_FORMAT "u.\n",
               caml_minor_heap_max_wsz, requested_wsz);
   while (requested_wsz > caml_minor_heap_max_wsz) {
     caml_try_run_on_all_domains(
-      &stw_resize_minor_heap_reservation, (void*)requested_wsz, 0);
+      &stw_resize_minor_heap_reservation, (void*)&requested_wsz, 0);
   }
   check_minor_heap();
 }
@@ -1233,9 +1241,11 @@ static void* domain_thread_func(void* v)
   struct domain_ml_values *ml_values = p->ml_values;
 
 #ifndef _WIN32
-  void * signal_stack = caml_init_signal_stack();
+  errno = 0;
+  size_t signal_stack_size = 0;
+  void * signal_stack = caml_init_signal_stack(&signal_stack_size);
   if (signal_stack == NULL) {
-    caml_fatal_error("Failed to create domain: signal stack");
+    caml_fatal_error("Failed to create domain: signal stack (errno %d)", errno);
   }
 #endif
 
@@ -1259,8 +1269,9 @@ static void* domain_thread_func(void* v)
   if (domain_self) {
     install_backup_thread(domain_self);
 
-    caml_gc_log("Domain starting (unique_id = %"ARCH_INTNAT_PRINTF_FORMAT"u)",
-                domain_self->interruptor.unique_id);
+    CAML_GC_MESSAGE(DOMAIN,
+                    "Domain starting (unique ID %"ARCH_INTNAT_PRINTF_FORMAT"u)\n",
+                    domain_self->interruptor.unique_id);
     CAML_EV_LIFECYCLE(EV_DOMAIN_SPAWN, getpid());
     /* FIXME: ignoring errors during domain initialization is unsafe
        and/or can deadlock. */
@@ -1292,11 +1303,9 @@ static void* domain_thread_func(void* v)
        destroyed by [caml_mutex_finalize] finaliser while it remains
        locked, leading to undefined behaviour. */
     free_domain_ml_values(ml_values);
-  } else {
-    caml_gc_log("Failed to create domain");
   }
 #ifndef _WIN32
-  caml_free_signal_stack(signal_stack);
+  caml_free_signal_stack(signal_stack, signal_stack_size);
 #endif
   return 0;
 }
@@ -1322,6 +1331,7 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
                                     sizeof(struct domain_ml_values));
   init_domain_ml_values(p.ml_values, callback, term_sync);
 
+  CAML_GC_MESSAGE(DOMAIN, "Creating a child domain.\n");
   err = pthread_create(&th, 0, domain_thread_func, (void*)&p);
 
   if (err) {
@@ -1453,7 +1463,7 @@ static void decrement_stw_domains_still_processing(void)
     caml_plat_lock_blocking(&all_domains_lock);
     atomic_store_release(&stw_leader, 0);
     caml_plat_broadcast(&all_domains_cond);
-    caml_gc_log("clearing stw leader");
+    CAML_GC_MESSAGE(STW, "End of STW.\n");
     caml_plat_unlock(&all_domains_lock);
   }
 }
@@ -1614,7 +1624,7 @@ int caml_try_run_on_all_domains_with_spin_work(
   int i;
   caml_domain_state* domain_state = domain_self->state;
 
-  caml_gc_log("requesting STW, sync=%d", sync);
+  CAML_GC_MESSAGE(STW, "Request STW, sync=%d\n", sync);
 
   /* Don't touch the lock if there's already a stw leader
      OR we can't get the lock.
@@ -1654,7 +1664,7 @@ int caml_try_run_on_all_domains_with_spin_work(
   atomic_store_release(&stw_leader, (uintnat)domain_self);
 
   CAML_EV_BEGIN(EV_STW_LEADER);
-  caml_gc_log("causing STW");
+  CAML_GC_MESSAGE(STW, "Stopping the world.\n");
 
   /* set up all fields for this stw_request; they must be available
      for domains when they get interrupted */
@@ -1823,8 +1833,13 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
      long-running C code (that may regularly poll with
      caml_process_pending_actions), we want to force a query of all
      callbacks at every minor collection or major slice (similarly to
-     the OCaml behaviour). */
-  caml_set_action_pending(dom_st);
+     the OCaml behaviour).
+
+     We don't need to check for internally triggered pending actions
+     (Memprof and finalisers), because they will already have set
+     action_pending if needed. */
+  if (caml_check_pending_signals() || Caml_state->requested_external_interrupt)
+    caml_set_action_pending(dom_st);
 }
 
 void caml_update_young_limit_after_c_call(caml_domain_state * dom_st)
@@ -2027,7 +2042,7 @@ static void domain_terminate (void)
   struct interruptor* s = &domain_self->interruptor;
   int finished = 0;
 
-  caml_gc_log("Domain terminating");
+  CAML_GC_MESSAGE(DOMAIN, "Domain terminating.\n");
   s->terminating = 1;
 
   /* Join ongoing systhreads, if necessary, and then run user-defined
@@ -2132,8 +2147,6 @@ static void domain_terminate (void)
   }
   caml_free_backtrace_buffer(domain_state->backtrace_buffer);
   caml_free_gc_regs_buckets(domain_state->gc_regs_buckets);
-
-  // CR sdolan: free locals stack
 
   /* signal the domain termination to the backup thread
      NB: for a program with no additional domains, the backup thread

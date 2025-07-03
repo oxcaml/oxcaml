@@ -100,14 +100,6 @@ type mixed_product_violation =
         max_value_prefix_len : int;
         mixed_product_kind : Mixed_product_kind.t;
       }
-  | Flat_field_expected of
-      { boxed_lbl : Ident.t;
-        non_value_lbl : Ident.t;
-      }
-  | Flat_constructor_arg_expected of
-      { boxed_arg : type_expr;
-        non_value_arg : type_expr;
-      }
   | Insufficient_level of
       { required_layouts_level : Language_extension.maturity;
         mixed_product_kind : Mixed_product_kind.t;
@@ -183,6 +175,8 @@ type error =
       }
   | Non_abstract_reexport of Path.t
   | Unsafe_mode_crossing_on_invalid_type_kind
+  | Illegal_baggage of jkind_l
+  | No_unboxed_version of Path.t
 
 exception Error of Location.t * error
 

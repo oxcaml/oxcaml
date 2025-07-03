@@ -108,12 +108,13 @@ script = "some-directory\\
    is interpreted as the OCaml string "some-directory\\ foo".
    *)
 and string acc = parse
-  | [^ '\\' '"' ]+
+  | [^ '\\' '"' '\010' ]+
     { string (acc ^ Lexing.lexeme lexbuf) lexbuf }
   | '\\' newline blank* ('\\' (blank as blank))?
     { let space =
         match blank with None -> "" | Some blank -> String.make 1 blank
       in
+      Lexing.new_line lexbuf;
       string (acc ^ space) lexbuf }
   | '\\'
     {string (acc ^ "\\") lexbuf}
@@ -137,6 +138,11 @@ and comment = parse
     {
       let pos = List.hd !comment_start_pos in
       lexer_error_at pos "unterminated comment"
+    }
+  | newline
+    {
+      Lexing.new_line lexbuf;
+      comment lexbuf
     }
   | _
     {

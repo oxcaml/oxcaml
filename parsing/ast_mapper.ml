@@ -196,6 +196,8 @@ module T = struct
         quote ~loc ~attrs t
     | Ptyp_splice t ->
         splice ~loc ~attrs t
+    | Ptyp_of_kind jkind ->
+        of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub
@@ -655,7 +657,12 @@ module P = struct
     | Ppat_construct (l, p) ->
         construct ~loc ~attrs (map_loc sub l)
           (map_opt
-             (fun (vl, p) -> List.map (map_loc sub) vl, sub.pat sub p)
+             (fun (vl, p) ->
+                List.map
+                  (fun (v, jk) ->
+                     map_loc sub v, Option.map (sub.jkind_annotation sub) jk)
+                  vl,
+                sub.pat sub p)
              p)
     | Ppat_variant (l, p) -> variant ~loc ~attrs l (map_opt (sub.pat sub) p)
     | Ppat_record (lpl, cf) ->
@@ -952,8 +959,8 @@ let default_mapper =
         | Abbreviation (s : string) -> Abbreviation s
         | Mod (t, mode_list) ->
           Mod (this.jkind_annotation this t, this.modes this mode_list)
-        | With (t, ty) ->
-          With (this.jkind_annotation this t, this.typ this ty)
+        | With (t, ty, modalities) ->
+          With (this.jkind_annotation this t, this.typ this ty, this.modalities this modalities)
         | Kind_of ty -> Kind_of (this.typ this ty)
         | Product ts -> Product (List.map (this.jkind_annotation this) ts)
       in

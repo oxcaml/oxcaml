@@ -29,12 +29,12 @@ let free_vars ?(param=false) ty =
       | Tvar _ ->
           ret := TypeSet.add ty !ret
       | Tvariant row ->
-          iter_row loop row;
-          if not (static_row row) then begin
-            match get_desc (row_more row) with
-            | Tvar _ when param -> ret := TypeSet.add ty !ret
-            | _ -> loop (row_more row)
-          end
+        iter_row loop row;
+        if not (static_row row) then begin
+          match get_desc (row_more row) with
+          | Tvar _ when param -> ret := TypeSet.add ty !ret
+          | _ -> loop (row_more row)
+        end
       (* XXX: What about Tobject ? *)
       | _ ->
           iter_type_expr loop ty
@@ -70,10 +70,11 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       in
       let type_params = TypeSet.elements arg_vars_set in
       let arity = List.length type_params in
-      let is_void_label lbl = Jkind.Sort.Const.(equal void lbl.ld_sort) in
-      let jkind =
-        Jkind.for_boxed_record ~all_void:(List.for_all is_void_label lbls)
-      in
+      (* CR layouts v2.8: We could call [Jkind.normalize ~mode:Require_best] on this
+         jkind, and plausibly gain some perf wins by building up smaller jkinds that are
+         cheaper to deal with later. But doing so runs into some confusing mutual
+         recursion that's non-trivial to debug. Reinvestigate later *)
+      let jkind = Jkind.for_boxed_record lbls in
       let tdecl =
         {
           type_params;
@@ -90,6 +91,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
           type_attributes = [];
           type_unboxed_default = false;
           type_uid = Uid.mk ~current_unit;
+          type_unboxed_version = None;
         }
       in
       existentials,
@@ -280,16 +282,17 @@ let find_constr ~constant tag cstrs =
   try
     List.find
       (function
-        | ({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_) ->
+        | (({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_),_) ->
           tag' = tag && cstr_constant = constant
-        | ({cstr_tag=Null; cstr_constant}, _) -> tag = -1 && cstr_constant = constant
-        | ({cstr_tag=Extension _},_) -> false)
+        | (({cstr_tag=Null; cstr_constant}, _),_) ->
+          tag = -1 && cstr_constant = constant
+        | (({cstr_tag=Extension _},_),_) -> false)
       cstrs
   with
   | Not_found -> raise Constr_not_found
 
 let find_constr_by_tag ~constant tag cstrlist =
-  fst (find_constr ~constant tag cstrlist)
+  fst (fst (find_constr ~constant tag cstrlist))
 
 let constructors_of_type ~current_unit ty_path decl =
   match decl.type_kind with

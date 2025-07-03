@@ -123,7 +123,6 @@ struct caml_thread_struct {
   /* Note: we do not save Caml_state->stack_cache, because it can
      safely be shared between all threads on the same domain. */
   struct caml__roots_block *local_roots; /* saved value of local_roots */
-  struct caml_local_arenas *local_arenas;
   int backtrace_pos;           /* saved value of Caml_state->backtrace_pos */
   backtrace_slot * backtrace_buffer;
     /* saved value of Caml_state->backtrace_buffer */
@@ -135,6 +134,7 @@ struct caml_thread_struct {
   char * async_exn_handler;  /* saved value of Caml_state->async_exn_handler */
   memprof_thread_t memprof;  /* memprof's internal thread data structure */
   void * signal_stack;       /* this thread's signal stack */
+  size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
 
 #ifndef NATIVE_CODE
@@ -267,8 +267,7 @@ static void caml_thread_scan_roots(
       if (th != active) {
         if (th->current_stack != NULL)
           caml_do_local_roots(action, fflags, fdata,
-                              th->local_roots, th->current_stack, th->gc_regs,
-                              th->local_arenas);
+                              th->local_roots, th->current_stack, th->gc_regs);
       }
       th = th->next;
     } while (th != active);
@@ -289,13 +288,13 @@ static void save_runtime_state(void)
   caml_thread_t th = Active_thread;
   CAMLassert(th != NULL);
   th->current_stack = Caml_state->current_stack;
+  th->current_stack->local_sp = Caml_state->local_sp;
   th->c_stack = Caml_state->c_stack;
   th->gc_regs = Caml_state->gc_regs;
   th->gc_regs_buckets = Caml_state->gc_regs_buckets;
   th->exn_handler = Caml_state->exn_handler;
   th->async_exn_handler = Caml_state->async_exn_handler;
   th->local_roots = Caml_state->local_roots;
-  th->local_arenas = caml_get_local_arenas(Caml_state);
   th->backtrace_pos = Caml_state->backtrace_pos;
   th->backtrace_buffer = Caml_state->backtrace_buffer;
   th->backtrace_last_exn = Caml_state->backtrace_last_exn;
@@ -317,13 +316,13 @@ static void restore_runtime_state(caml_thread_t th)
   CAMLassert(th != NULL);
   Active_thread = th;
   Caml_state->current_stack = th->current_stack;
+  caml_use_local_arenas(th->current_stack->local_arenas, th->current_stack->local_sp);
   Caml_state->c_stack = th->c_stack;
   Caml_state->gc_regs = th->gc_regs;
   Caml_state->gc_regs_buckets = th->gc_regs_buckets;
   Caml_state->exn_handler = th->exn_handler;
   Caml_state->async_exn_handler = th->async_exn_handler;
   Caml_state->local_roots = th->local_roots;
-  caml_set_local_arenas(Caml_state, th->local_arenas);
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
   caml_modify_generational_global_root
@@ -351,6 +350,7 @@ CAMLexport void caml_switch_runtime_locking_scheme(struct caml_locking_scheme* n
     caml_fatal_error("Switching locking scheme is unsupported in multicore programs");
   CAMLassert (!caml_domain_is_multicore());
   save_runtime_state();
+  domain_lockmode = LOCKMODE_CUSTOM_SCHEME;
   old = atomic_exchange(&Locking_scheme(dom_id), new);
   /* We hold 'old', but it is no longer the runtime lock */
   old->unlock(old->context);
@@ -395,19 +395,6 @@ static void caml_thread_leave_blocking_section(void)
   restore_runtime_state(th);
 }
 
-static int get_pthreads_stack_size_in_bytes(void)
-{
-  pthread_attr_t attr;
-  size_t res =
-    // default value, retrieved from a recent system (May 2024)
-    8388608;
-  if (pthread_attr_init(&attr) == 0) {
-    pthread_attr_getstacksize(&attr, &res);
-  }
-  pthread_attr_destroy(&attr);
-  return res;
-}
-
 /* Create and setup a new thread info block.
    This block has no associated thread descriptor and
    is not inserted in the list of threads. */
@@ -415,8 +402,7 @@ static caml_thread_t caml_thread_new_info(void)
 {
   caml_thread_t th = NULL;
   caml_domain_state *domain_state = Caml_state;
-  uintnat stack_wsize =
-    caml_get_init_stack_wsize(Wsize_bsize(get_pthreads_stack_size_in_bytes()));
+  uintnat stack_wsize = caml_get_init_stack_wsize(STACK_SIZE_THREAD);
 
   th = (caml_thread_t)caml_stat_alloc_noexc(sizeof(struct caml_thread_struct));
   if (th == NULL) return NULL;
@@ -439,7 +425,6 @@ static caml_thread_t caml_thread_new_info(void)
 
   th->c_stack = NULL;
   th->local_roots = NULL;
-  th->local_arenas = NULL;
   th->backtrace_pos = 0;
   th->backtrace_buffer = NULL;
   th->backtrace_last_exn = Val_unit;
@@ -486,8 +471,6 @@ void caml_thread_free_info(caml_thread_t th)
   caml_memprof_delete_thread(th->memprof);
   caml_free_stack(th->current_stack);
   caml_free_backtrace_buffer(th->backtrace_buffer);
-
-  // CR sdolan: free local arenas
 
   /* Remark: we could share gc_regs_buckets between threads on a same
      domain, but this might break the invariant that it is always
@@ -629,6 +612,27 @@ static void caml_thread_domain_stop_hook(void) {
 
 static atomic_bool threads_initialized = false;
 
+CAMLprim value caml_thread_use_domains(value unit)
+{
+  if (domain_lockmode == LOCKMODE_DOMAINS)
+    return Val_unit;
+
+  if (domain_lockmode == LOCKMODE_CUSTOM_SCHEME)
+    caml_failwith("Thread.use_domains cannot be used with a non-default runtime locking scheme.");
+
+  CAMLassert(domain_lockmode == LOCKMODE_STARTUP);
+  CAMLassert(!caml_domain_is_multicore());
+
+  if (threads_initialized && !This_thread->is_main)
+    caml_failwith("Thread.use_domains: first use must be from the main thread.");
+
+  /* We are on the main thread, so we hold the domain_lock,
+     so we can switch lockmode */
+  domain_lockmode = LOCKMODE_DOMAINS;
+
+  return Val_unit; 
+}
+
 static void caml_thread_domain_spawn_hook(void)
 {
   if (domain_lockmode == LOCKMODE_DOMAINS)
@@ -684,6 +688,7 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->backtrace_last_exn = Val_unit;
   new_thread->memprof = caml_memprof_main_thread(Caml_state);
   new_thread->is_main = 1;
+  new_thread->signal_stack = NULL;
 
   st_tls_set(caml_thread_key, new_thread);
 
@@ -786,7 +791,7 @@ static void thread_detach_from_runtime(void)
   caml_threadstatus_terminate(Terminated(th->descr));
   /* Remove signal stack */
   CAMLassert(th->signal_stack != NULL);
-  caml_free_signal_stack(th->signal_stack);
+  caml_free_signal_stack(th->signal_stack, th->signal_stack_size);
   /* The following also sets Active_thread to a sane value in case the
      backup thread does a GC before the domain lock is acquired
      again.  It also removes the thread from memprof. */
@@ -802,7 +807,7 @@ static void thread_init_current(caml_thread_t th)
 {
   st_tls_set(caml_thread_key, th);
   restore_runtime_state(th);
-  th->signal_stack = caml_init_signal_stack();
+  th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
 
 /* Create a thread */

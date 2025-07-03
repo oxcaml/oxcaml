@@ -19,11 +19,12 @@ module Uid = struct
     | Item of { comp_unit: string; id: int }
     | Internal
     | Predef of string
+    | Unboxed_version of t
 
   include Identifiable.Make(struct
     type nonrec t = t
 
-    let compare (x : t) y =
+    let rec compare (x : t) y =
       match x, y with
       | Compilation_unit s1, Compilation_unit s2 -> String.compare s1 s2
       | Item c1, Item c2 ->
@@ -31,22 +32,30 @@ module Uid = struct
         if c <> 0 then c else String.compare c1.comp_unit c2.comp_unit
       | Internal, Internal -> 0
       | Predef s1, Predef s2 -> String.compare s1 s2
-      | Compilation_unit _, (Item _ | Internal | Predef _) -> -1
-      | Item _, (Internal | Predef _) -> -1
-      | Internal, Predef _ -> -1
-      | (Item _ | Internal | Predef _), Compilation_unit _ -> 1
-      | (Internal | Predef _), Item _ -> 1
-      | Predef _, Internal -> 1
+      | Unboxed_version t1, Unboxed_version t2 -> compare t1 t2
+      | Compilation_unit _,
+        (Item _ | Internal | Predef _ | Unboxed_version _) ->
+        -1
+      | Item _, (Internal | Predef _| Unboxed_version _) -> -1
+      | Internal, (Predef _ | Unboxed_version _) -> -1
+      | Predef _, Unboxed_version _ -> -1
+      | (Item _ | Internal | Predef _ | Unboxed_version _),
+        Compilation_unit _ ->
+        1
+      | (Internal | Predef _ | Unboxed_version _), Item _ -> 1
+      | (Predef _ | Unboxed_version _), Internal -> 1
+      | Unboxed_version _, Predef _ -> 1
 
     let equal x y = compare x y = 0
 
     let hash (x : t) = Hashtbl.hash x
 
-    let print fmt = function
+    let rec print fmt = function
       | Internal -> Format.pp_print_string fmt "<internal>"
       | Predef name -> Format.fprintf fmt "<predef:%s>" name
       | Compilation_unit s -> Format.pp_print_string fmt s
       | Item { comp_unit; id } -> Format.fprintf fmt "%s.%d" comp_unit id
+      | Unboxed_version t -> Format.fprintf fmt "%a#" print t
 
     let output oc t =
       let fmt = Format.formatter_of_out_channel oc in
@@ -61,7 +70,8 @@ module Uid = struct
       incr id;
       let comp_unit =
         match current_unit with
-        | Some cu -> cu |> Compilation_unit.full_path_as_string
+        | Some cu ->
+          Unit_info.modname cu |> Compilation_unit.full_path_as_string
         | None -> ""
       in
       Item { comp_unit; id = !id }
@@ -69,12 +79,21 @@ module Uid = struct
   let of_compilation_unit_id id =
     Compilation_unit (id |> Compilation_unit.full_path_as_string)
 
+  let of_compilation_unit_name name =
+    Compilation_unit (name |> Compilation_unit.Name.to_string)
+
   let of_predef_id id =
     if not (Ident.is_predef id) then
       Misc.fatal_errorf "Types.Uid.of_predef_id %S" (Ident.name id);
     Predef (Ident.name id)
 
   let internal_not_actually_unique = Internal
+
+  let unboxed_version t =
+    match t with
+    | Unboxed_version _ ->
+      Misc.fatal_error "Shape.unboxed_version"
+    | _ -> Unboxed_version t
 
   let for_actual_declaration = function
     | Item _ -> true
@@ -385,9 +404,17 @@ let of_path ~find_shape ~namespace path =
     Path of label:
       M.t.lbl
     Path of label of inline record:
-      M.t.C.lbl *)
+      M.t.C.lbl
+    Path of label of implicit unboxed record:
+      M.t#.lbl
+  *)
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
+    | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
+      (match ns with
+       Unboxed_label -> ()
+       | _ -> Misc.fatal_error "Shape.of_path");
+      proj (aux Type path) (name, Label)
     | Pdot (path, name) ->
       let namespace :  Sig_component_kind.t =
         match (ns : Sig_component_kind.t) with
@@ -402,6 +429,7 @@ let of_path ~find_shape ~namespace path =
         match extra with
           Pcstr_ty name -> proj (aux Type path) (name, Constructor)
         | Pext_ty -> aux Extension_constructor path
+        | Punboxed_ty -> aux ns path
       end
   in
   aux namespace path

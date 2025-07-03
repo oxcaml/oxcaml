@@ -66,16 +66,12 @@ let unary_int_prim_size kind op =
     ( (kind : Flambda_kind.Standard_int.t),
       (op : Flambda_primitive.unary_int_arith_op) )
   with
-  | Tagged_immediate, Neg -> 1
   | Tagged_immediate, Swap_byte_endianness ->
     (* CR pchambart: size depends a lot of the architecture. If the backend
        handles it, this is a single arith op. *)
     2 + does_not_need_caml_c_call_extcall_size + 1
-  | Naked_immediate, Neg -> 1
   | Naked_immediate, Swap_byte_endianness ->
     does_not_need_caml_c_call_extcall_size + 1
-  | Naked_int64, Neg when arch32 -> does_not_need_caml_c_call_extcall_size + 1
-  | (Naked_int32 | Naked_int64 | Naked_nativeint), Neg -> 1
   | (Naked_int32 | Naked_int64 | Naked_nativeint), Swap_byte_endianness ->
     does_not_need_caml_c_call_extcall_size + 1
 
@@ -333,8 +329,6 @@ let nullary_prim_size prim =
   | Invalid _ -> 0
   | Optimised_out _ -> 0
   | Probe_is_enabled { name = _ } -> 4
-  | Begin_region { ghost } -> if ghost then 0 else 1
-  | Begin_try_region { ghost } -> if ghost then 0 else 1
   | Enter_inlined_apply _ -> 0
   | Dls_get -> 1
   | Poll -> alloc_size
@@ -382,6 +376,7 @@ let unary_prim_size prim =
   | Obj_dup -> needs_caml_c_call_extcall_size + 1
   | Get_header -> 2
   | Atomic_load _ | Peek _ -> 1
+  | Make_lazy _ -> alloc_size + 1
 
 let binary_prim_size prim =
   match (prim : Flambda_primitive.binary_primitive) with
@@ -419,12 +414,15 @@ let ternary_prim_size prim =
   | Bigarray_set (_dims, _kind, _layout) -> 2
   (* ~ 1 block_load + 1 block_set *)
   | Atomic_compare_and_set Immediate -> 3
-  | Atomic_compare_exchange Immediate -> 1
-  | Atomic_compare_and_set Any_value | Atomic_compare_exchange Any_value ->
+  | Atomic_compare_exchange { atomic_kind = _; args_kind = Immediate } -> 1
+  | Atomic_compare_and_set Any_value
+  | Atomic_compare_exchange { atomic_kind = _; args_kind = Any_value } ->
     does_not_need_caml_c_call_extcall_size
 
 let variadic_prim_size prim args =
   match (prim : Flambda_primitive.variadic_primitive) with
+  | Begin_region { ghost } -> if ghost then 0 else 1
+  | Begin_try_region { ghost } -> if ghost then 0 else 1
   | Make_block (_, _mut, _alloc_mode)
   (* CR mshinwell: I think Make_array for a generic array ("Anything") is more
      expensive than the other cases *)
@@ -466,7 +464,7 @@ let apply apply =
 let apply_cont apply_cont =
   let size =
     match Apply_cont_expr.trap_action apply_cont with
-    (* Current rough estimates are from amd64/emit.mlp *)
+    (* Current rough estimates are from amd64/emit.ml *)
     | None -> 0
     | Some (Push _) -> 4
     | Some (Pop _) -> 2

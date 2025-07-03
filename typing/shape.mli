@@ -60,13 +60,16 @@ module Uid : sig
     | Item of { comp_unit: string; id: int }
     | Internal
     | Predef of string
+    | Unboxed_version of t
 
   val reinit : unit -> unit
 
-  val mk : current_unit:Compilation_unit.t option -> t
+  val mk : current_unit:Unit_info.t option -> t
   val of_compilation_unit_id : Compilation_unit.t -> t
+  val of_compilation_unit_name : Compilation_unit.Name.t -> t
   val of_predef_id : Ident.t -> t
   val internal_not_actually_unique : t
+  val unboxed_version : t -> t
 
   val for_actual_declaration : t -> bool
 

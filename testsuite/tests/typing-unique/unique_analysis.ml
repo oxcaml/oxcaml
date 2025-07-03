@@ -1,11 +1,8 @@
 (* TEST
- flags += "-extension layouts_beta";
  expect;
 *)
 
 (* This file is to test uniqueness_analysis.ml *)
-(* CR layouts v7.1: When tuples are out of beta, this test no longer needs
-   -extension layouts_beta *)
 
 (* First some helper functions *)
 let unique_id : unique_ 'a -> unique_ 'a = fun x -> x
@@ -606,6 +603,7 @@ Line 3, characters 14-17:
                   ^^^
 
 |}]
+(* CR aspsmith: This should not be accepted *)
 
 let foo () =
   let r = {x = Value.mk (); y = Value.mk ()} in
@@ -694,6 +692,7 @@ Line 4, characters 14-15:
                   ^
 
 |}]
+(* CR aspsmith: This should not be accepted *)
 
 let foo () =
   let r = R_aliased (Value.mk (), Value.mk ()) in

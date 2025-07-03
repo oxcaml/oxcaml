@@ -127,15 +127,19 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-(* Flambda_backend specific warnings: numbers should go down from 199 *)
+(* Oxcaml specific warnings: numbers should go down from 199 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
   | Probe_name_too_long of string           (* 190 *)
+  | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
   | Mod_by_top of string                    (* 211 *)
-  | Unnecessary_allow_any_kind              (* 212 *)
+  | Modal_axis_specified_twice of {
+      axis : string;
+      overriden_by : string;
+    }                                       (* 213 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
@@ -188,3 +192,5 @@ type description =
     since : Sys.ocaml_release_info option; }
 
 val descriptions : description list
+
+val parsed_ocamlparam : string ref

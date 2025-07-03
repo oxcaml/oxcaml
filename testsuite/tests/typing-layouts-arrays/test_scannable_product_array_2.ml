@@ -6,18 +6,14 @@
  modules = "${readonly_files}";
  flambda2;
  stack-allocation;
- arch_amd64;
  {
-   flags = "-extension layouts_beta";
    bytecode;
  }
  {
-   flags = "-extension layouts_beta";
    native;
  }
 *)
 
-(* CR mshinwell: enable for arm64 once float32 is available *)
 
 open Gen_product_array_helpers
 open Stdlib_stable
