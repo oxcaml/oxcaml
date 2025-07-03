@@ -757,7 +757,10 @@ module F : functor () -> sig end @@ stateless
 module (G @ portable) () = F
 
 [%%expect{|
-module G : functor () () -> sig end @@ stateless
+Line 1, characters 27-28:
+1 | module (G @ portable) () = F
+                               ^
+Error: This is "contended", but expected to be "uncontended" because it is a functor body.
 |}]
 
 module (G' @ portable) = F

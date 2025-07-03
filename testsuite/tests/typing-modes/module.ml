@@ -361,3 +361,16 @@ Line 3, characters 24-25:
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]
+
+let (foo @ nonportable) () = ()
+
+module (F @ portable) () = struct
+    let bar = foo
+end
+[%%expect{|
+val foo : unit -> unit = <fun>
+Line 4, characters 14-17:
+4 |     let bar = foo
+                  ^^^
+Error: The value "foo" is nonportable, so cannot be used inside a functor that is portable.
+|}]

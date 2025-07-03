@@ -2671,11 +2671,16 @@ let rec type_module ?alias sttn funct_body anchor env smod =
   in
   md, shape
 
-and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body anchor env smod =
-  Builtin_attributes.warning_scope smod.pmod_attributes
-    (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod)
+(* the optional [expected_mode] is for better error messages and not
+strictly enforced. The caller is reponsible to enforce mode constraint by
+inspecting the [mod_mode] field of the returned [Typedtree.module]. *)
+(* CR zqian: Remove this hack once we have mode error chain. *)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
+and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body anchor env ?expected_mode smod =
+  Builtin_attributes.warning_scope smod.pmod_attributes
+    (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode smod)
+
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode smod =
   (* If the module is an identifier, there might be locks between the declaration
   site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -2740,6 +2745,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
           var, true
       in
       let _, mode = register_allocation () in
+      Option.iter (Value.submode_exn mode) expected_mode;
       let newenv = Env.add_closure_lock Functor mode.comonadic newenv in
       let body, body_shape = type_module true funct_body None newenv sbody in
       let mode = mode_without_locks_exn body.mod_mode in
@@ -2760,13 +2766,13 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
-      let arg, arg_shape =
-        type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
-          anchor env sarg
-      in
       let mode = smode
         |> Typemode.transl_mode_annots
         |> new_mode_var_from_annots
+      in
+      let arg, arg_shape =
+        type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
+          anchor env ~expected_mode:mode sarg
       in
       let md, final_shape =
         match smty with
