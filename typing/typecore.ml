@@ -7042,7 +7042,6 @@ and type_expect_
           let mode = Modality.Value.Const.apply label.lbl_modalities rmode in
           let mode = cross_left env ty_arg mode in
           submode ~loc ~env mode argument_mode;
-          (* let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) In *)
           rue {
             exp_desc =
               Texp_atomic_loc
