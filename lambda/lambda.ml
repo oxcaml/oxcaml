@@ -357,6 +357,7 @@ type primitive =
   | Pdls_get
   (* Poll for runtime actions *)
   | Ppoll
+  | Pcpu_relax
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -2074,6 +2075,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
+  | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
   | Patomic_set_field _
   | Patomic_exchange_field _
@@ -2255,7 +2257,8 @@ let primitive_can_raise prim =
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
   | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
-  | Pdls_get | Ppoll | Preinterpret_tagged_int63_as_unboxed_int64
+  | Pdls_get | Ppoll | Pcpu_relax
+  | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _ | Ppeek _ | Ppoke _ ->
     false
@@ -2512,6 +2515,7 @@ let primitive_result_layout (p : primitive) =
   | Patomic_lor_field
   | Patomic_lxor_field
   | Ppoll -> layout_unit
+  | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63 -> layout_int
   | Ppeek layout -> (

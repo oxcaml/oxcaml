@@ -151,6 +151,10 @@ val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
 val alias_is_bound_strictly_earlier :
   t -> bound_name:Name.t -> alias:Simple.t -> bool
 
+(** [stable_compare_simples t simple1 simple2] is a total extension of the
+    binding time order that does not depend on [Int_ids] hashing. *)
+val stable_compare_simples : t -> Simple.t -> Simple.t -> int
+
 (* CR vlaviron: If the underlying level in the extension defines several
    variables, then there is no guarantee that the binding order in the result
    will match the binding order used to create the level. If they don't match,

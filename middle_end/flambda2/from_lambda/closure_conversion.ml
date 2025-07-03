@@ -1090,7 +1090,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_compare_set_field _ | Patomic_fetch_add_field
       | Patomic_add_field | Patomic_sub_field | Patomic_land_field
       | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ppoll
-      | Patomic_load_field _ | Patomic_set_field _
+      | Patomic_load_field _ | Patomic_set_field _ | Pcpu_relax
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pmakelazyblock _ ->
@@ -1456,11 +1456,11 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           match simplify_block_load acc body_env ~block ~field with
           | Unknown -> bind acc body_env
           | Not_a_block ->
-            if Flambda_features.check_invariants ()
+            if Flambda_features.kind_checks ()
             then
-              (* CR keryan: This is hidden behind invariants check because it
-                 can appear on correct code using Lazy or GADT. It might warrant
-                 a proper warning at some point. *)
+              (* CR keryan: This is hidden behind kind checks because it can
+                 appear on correct code using Lazy or GADT. It might warrant a
+                 proper warning at some point. *)
               Misc.fatal_errorf
                 "Unexpected approximation found when block approximation was \
                  expected in [Closure_conversion]: %a"
