@@ -260,6 +260,8 @@ val add_alias :
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
   t * To_cmm_result.t
 
+val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
+
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
   ?consider_inlining_effectful_expressions:bool ->
