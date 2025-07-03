@@ -69,20 +69,11 @@ let simplify_bigarray_set ~num_dimensions:_ _bigarray_kind _bigarray_layout dacc
   SPR.create_unit dacc ~result_var ~original_term
 
 let simplify_atomic_field_int_arith (op : P.int_atomic_op) ~original_prim dacc
-    ~original_term:_ dbg ~arg1:atomic ~arg1_ty:_ ~arg2:field ~arg2_ty:_
-    ~arg3:value ~arg3_ty:_ ~result_var =
-  let new_term =
-    Named.create_prim
-      (Ternary (Atomic_field_int_arith op, atomic, field, value))
-      dbg
-  in
-  let result_kind = P.result_kind' original_prim in
-  let dacc =
-    if Flambda_kind.equal result_kind Flambda_kind.value
-    then DA.add_variable dacc result_var T.any_value
-    else DA.add_variable dacc result_var T.any_tagged_immediate
-  in
-  SPR.create new_term ~try_reify:false dacc
+    ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_
+    ~arg3:_ ~arg3_ty:_ ~result_var =
+  SPR.create_unknown dacc ~result_var
+    (P.result_kind' original_prim)
+    ~original_term
 
 let simplify_atomic_set_field ~original_prim dacc ~original_term _dbg ~arg1:_
     ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var =
