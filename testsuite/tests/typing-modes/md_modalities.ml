@@ -134,5 +134,6 @@ Error: Signature mismatch:
          sig module M' = M @@ unyielding many stateless nonportable end
        is not included in
          S
+       In module "M'":
        Got "nonportable" but expected "portable".
 |}]

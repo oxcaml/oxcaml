@@ -870,8 +870,9 @@ let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx (diff : _ mdiff) 
         diff.symptom
   | Functor Params d -> (* We jump directly to the functor param error *)
       functor_params ~expansion_token ~env ~before ~ctx d
-  | Mode e -> (* jump directly to the module mode mismatch, without types *)
-      Location.msg "%a" (Includecore.report_mode_sub_error "got" "expected") e :: before
+  | Mode _ -> (* jump directly to the module mode mismatch, without types *)
+      module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx
+        diff.symptom
   | _ ->
       let inner = if eqmode then eq_module_types else module_types in
       let next =
@@ -905,8 +906,10 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       in
       dwith_context ctx printer :: before
   | Mode e ->
-      Location.msg "%a" (Includecore.report_mode_sub_error "first is" "second is") e
-        :: before
+      let printer ppf =
+        Includecore.report_mode_sub_error "Got" "expected" ppf e
+      in
+      dwith_context ctx printer :: before
 
 and functor_params ~expansion_token ~env ~before ~ctx {got;expected;_} =
   let d = Functor_suberror.Inclusion.patch env got expected in
