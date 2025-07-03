@@ -2,10 +2,10 @@
    expect;
 *)
 
-type 'a atomic = { mutable contents : 'a [@atomic] }
+type 'a atomic = { mutable contents : 'a @@ local [@atomic] }
 
 [%%expect{|
-type 'a atomic = { mutable(<non-legacy>) contents : 'a; }
+type 'a atomic = { mutable(<non-legacy>) contents : 'a @@ local [@atomic]; }
 |}]
 
 let contents_loc t = [%atomic.loc t.contents]
@@ -17,6 +17,12 @@ let contents_loc_local (t @ local) = exclave_ [%atomic.loc t.contents]
 [%%expect{|
 val contents_loc_local : local_ 'a atomic -> local_ 'a atomic_loc = <fun>
 |}]
+
+let regular_field_escape (t @ local) = t.contents
+[%%expect{|
+val regular_field_escape : local_ 'a atomic -> local_ 'a = <fun>
+|}]
+
 
 let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
 [%%expect{|
