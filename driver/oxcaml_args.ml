@@ -212,7 +212,7 @@ let mk_function_layout f =
 
 let mk_disable_builtin_check f =
   "-disable-builtin-check", Arg.Unit f,
-  " If an external annotated with [@builtin] is not recognized, \
+  " If an external annotated with [@@builtin] is not recognized, \
     fall back to the corresponding C stub, instead of compilation error."
 
 let mk_disable_poll_insertion f =
