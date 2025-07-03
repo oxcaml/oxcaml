@@ -85,17 +85,14 @@ Line 2, characters 15-16:
 Error: This is "local", but expected to be "global" because it is inside a module.
 |}]
 
-(* CR zqian: currently modules are checked bottom-up, which gives worse error
-  messages. The following example should point to [foo] instead. *)
 module M @ many = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Lines 1-3, characters 18-3:
-1 | ..................struct
+Line 2, characters 9-12:
 2 |     let (foo @ once) () = ()
-3 | end
-Error: This is "once", but expected to be "many".
+             ^^^
+Error: This is "once", but expected to be "many" because it is inside a "many" module.
 |}]
 
 (* Monadic axes don't have such constraint *)
@@ -252,7 +249,7 @@ module Module_type_nested :
       sig
         val x : 'a -> 'a @@ stateless
         module N : sig val y : string ref end
-      end @@ stateless contended
+      end @@ contended
   end
 |}]
 
@@ -298,6 +295,9 @@ end
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
+|}, Principal{|
+module Inclusion_fail :
+  sig module M : sig val x : string ref end @@ contended end
 |}]
 
 module Inclusion_fail = struct
@@ -394,6 +394,8 @@ end
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
+|}, Principal{|
+module Inclusion_match : sig module M : sig val x : int ref end end
 |}]
 
 (* [foo] closes over [M.x] instead of [M]. This is better ergonomics. *)
@@ -650,7 +652,7 @@ end = struct
   let foo @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig val foo : int @@ portable end @@ stateless
+module M : sig val foo : int @@ portable end @@ stateless nonportable
 |}]
 
 (* The RHS type (expected type) is used for mode crossing. The following still
@@ -663,7 +665,7 @@ end = struct
   let t @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig type t val t : t @@ portable end @@ stateless
+module M : sig type t val t : t @@ portable end @@ stateless nonportable
 |}]
 
 (* LHS type is a subtype of RHS type, which means more type-level information.
@@ -677,6 +679,7 @@ end = struct
 end
 [%%expect{|
 module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
+  nonportable
 |}]
 
 module M : sig
@@ -1476,11 +1479,10 @@ module M @ portable = struct
   class foo = object end
 end
 [%%expect{|
-Lines 1-3, characters 22-3:
-1 | ......................struct
+Line 2, characters 2-24:
 2 |   class foo = object end
-3 | end
-Error: This is "nonportable", but expected to be "portable".
+      ^^^^^^^^^^^^^^^^^^^^^^
+Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" module.
 |}]
 
 module M @ nonportable = struct class foo = object end end

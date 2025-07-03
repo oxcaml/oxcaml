@@ -252,11 +252,10 @@ module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Lines 1-3, characters 14-3:
-1 | ..............struct
+Line 2, characters 9-12:
 2 |     let (foo @ once) () = ()
-3 | end
-Error: This is "once", but expected to be "many" because it is a functor body.
+             ^^^
+Error: This is "once", but expected to be "many" because it is inside a "many" module.
 |}]
 
 module type Empty = sig end

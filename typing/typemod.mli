@@ -28,10 +28,16 @@ module Signature_names : sig
   val simplify: Env.t -> t -> signature -> signature
 end
 
+(* In the following, the optional [expected_mode] is for better error messages
+and not strictly enforced. The caller is reponsible to enforce mode constraint
+by inspecting the returned mode. *)
+(* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
+
 val type_module:
-        Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+        Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.module_expr ->
+        Typedtree.module_expr * Shape.t
 val type_structure:
-  Env.t -> Parsetree.structure ->
+  Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
   Shape.t * Env.t
 val type_toplevel_phrase:

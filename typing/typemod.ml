@@ -2720,16 +2720,11 @@ let rebase_modalities ~loc ~env ~md_mode ~mode sg =
     | item -> item
     ) sg
 
-let rec type_module ?alias sttn funct_body anchor env smod =
+let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
   let md, shape =
-    type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor env smod
+    type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor env ?expected_mode smod
   in
   md, shape
-
-(* the optional [expected_mode] is for better error messages and not
-strictly enforced. The caller is reponsible to enforce mode constraint by
-inspecting the [mod_mode] field of the returned [Typedtree.module]. *)
-(* CR zqian: Remove this hack once we have mode error chain. *)
 
 and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body anchor env ?expected_mode smod =
   Builtin_attributes.warning_scope smod.pmod_attributes
@@ -2750,7 +2745,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid smod
   | Pmod_structure sstr ->
       let (str, sg, mode, names, shape, _finalenv) =
-        type_structure funct_body anchor env sstr in
+        type_structure funct_body anchor env ?expected_mode sstr in
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
@@ -2768,7 +2763,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let _, mode = register_allocation () in
-      Option.iter (Value.submode_exn mode) expected_mode;
+      Option.iter (fun x -> Value.submode mode x |> ignore) expected_mode;
       let newenv = Env.add_closure_lock Functor mode.comonadic env in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
@@ -2802,9 +2797,14 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
           Named (id, param, mty), Types.Named (id, mty.mty_type), newenv,
           var, true
       in
-      let body, body_shape = type_module true funct_body None newenv sbody in
+      let expected_mode =
+        alloc_as_value Types.functor_res_mode |> Value.disallow_left
+      in
+      let body, body_shape =
+        type_module true funct_body None newenv ~expected_mode sbody
+      in
       let body_mode = mode_without_locks_exn body.mod_mode in
-      begin match Value.submode body_mode (alloc_as_value Types.functor_res_mode) with
+      begin match Value.submode body_mode  expected_mode with
       | Ok () -> ()
       | Error e -> raise (Error (sbody.pmod_loc, newenv,
           Legacy_module (Functor_body, e)))
@@ -2827,7 +2827,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
-          anchor env ~expected_mode:mode sarg
+          anchor env ~expected_mode:(mode |> Value.disallow_left) sarg
       in
       let md, final_shape =
         match smty with
@@ -3168,9 +3168,10 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) funct_body anchor env sstr =
+and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode sstr =
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
+  Option.iter (fun x -> Value.submode md_mode x |> ignore) expected_mode;
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -3553,7 +3554,11 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
         Tstr_open od, sg, shape_map, newenv
     | Pstr_class cl ->
-        Value.Comonadic.(submode_exn legacy md_mode.comonadic);
+        begin match Mode.Value.submode Value.legacy md_mode with
+          | Ok () -> ()
+          | Error e ->
+              raise (Error (loc, env, Value_weaker_than_module e))
+        end;
         let (classes, new_env) = Typeclass.class_declarations env cl in
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
@@ -3673,8 +3678,9 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
+  let expected_mode = Value.(legacy |> disallow_left) in
   let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) false None env s in
+    type_structure ~toplevel:(Some sig_acc) false None env ~expected_mode s in
   begin match Value.submode mode Value.legacy with
   | Ok () -> ()
   | Error e -> raise (Error (Location.none, env, (Legacy_module (Toplevel, e))))
@@ -3732,8 +3738,9 @@ let type_module_type_of env smod =
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
   (* Must zap module to floor first, otherwise the modality zapping will mutate
-  the module to ceil, which might be too high if the module is a .ml file and
-  expected to be legacy. *)
+  the module to ceil, which might be too high if the module is subject to
+    further mode constraints.*)
+  (* CR zqian: remove this once the mode solver supports binary morphisms *)
   (fst tmty.mod_mode).comonadic |> Mode.Value.Comonadic.zap_to_floor |> ignore;
   let mty =
     remove_modality_and_zero_alloc_variables_mty env
@@ -3977,9 +3984,10 @@ let type_implementation target modulename initial_env ast =
         ignore @@ Warnings.parse_options false "-32-34-37-38-60";
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
+      let expected_mode = Env.mode_unit |> Value.disallow_left in
       let (str, sg, mode, names, shape, finalenv) =
         Profile.record_call "infer" (fun () ->
-          type_structure initial_env ast) in
+          type_structure initial_env ~expected_mode ast) in
       begin match Value.submode mode Env.mode_unit with
       | Ok () -> ()
       | Error e -> error (Legacy_module (Compilation_unit, e))
