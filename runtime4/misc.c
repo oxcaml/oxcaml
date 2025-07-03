@@ -252,6 +252,12 @@ CAMLprim value caml_atomic_load(value ref)
   return Field(ref, 0);
 }
 
+CAMLprim value caml_atomic_set(value ref, value v)
+{
+  caml_modify_local(ref, 0, v);
+  return Val_unit;
+}
+
 CAMLprim value caml_atomic_compare_exchange(value ref, value oldv, value newv)
 {
   value* p = Op_val(ref);
