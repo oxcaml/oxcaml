@@ -712,6 +712,7 @@ end
 module F :
   functor (M : sig val foo : 'a -> 'a end) ->
     sig module M' : sig val foo : 'a -> 'a @@ global many end end
+  @@ stateless
 |}]
 
 (* Similiar for recursive modules *)
@@ -737,7 +738,7 @@ module F : functor (M : sig val f : 'a -> 'a @@ global many end) -> sig end
 
 module G (M : sig val f : 'a -> 'a end) = F(M)
 [%%expect{|
-module G : functor (M : sig val f : 'a -> 'a end) -> sig end
+module G : functor (M : sig val f : 'a -> 'a end) -> sig end @@ stateless
 |}]
 
 (* Similiar for [include_functor] *)
@@ -747,6 +748,7 @@ module G (M : sig val f : 'a -> 'a end) = struct
 end
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig val f : 'a -> 'a end
+  @@ stateless
 |}]
 
 (* functor declaration inclusion check  looks at the modes of parameter and
@@ -755,7 +757,8 @@ module F : (sig val foo : 'a -> 'a end) -> (sig val bar : 'a -> 'a @@ global man
 functor (M : sig val foo : 'a -> 'a @@ global many end) -> struct let bar = M.foo end
 [%%expect{|
 module F :
-  sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a @@ global many end
+  sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a @@ global many end @@
+  stateless
 |}]
 
 (* CR zqian: package subtyping doesn't look at the package mode for simplicity.

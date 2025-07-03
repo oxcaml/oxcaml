@@ -13,15 +13,18 @@ module M = struct
     type 'a t = int
     let x _ = ()
 end
+let (foo @ nonportable) () = ()
 module F (X : S) = struct
     type t = int
     let x = X.x
+    let _ = foo
 end
 [%%expect{|
 val portable_use : 'a @ portable -> unit = <fun>
 module type S = sig val x : 'a -> unit end
 module type SL = sig type 'a t end
 module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
+val foo : unit -> unit = <fun>
 module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
 |}]
 
@@ -373,4 +376,13 @@ Line 4, characters 14-17:
 4 |     let bar = foo
                   ^^^
 Error: The value "foo" is nonportable, so cannot be used inside a functor that is portable.
+|}]
+
+module (F @ portable) (X : sig val x : int -> int end) = struct
+    let bar = X.x
+end
+[%%expect{|
+module F :
+  functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
+  stateless
 |}]

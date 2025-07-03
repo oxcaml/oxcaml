@@ -2712,17 +2712,20 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       in
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
+      let _, mode = register_allocation () in
+      Option.iter (Value.submode_exn mode) expected_mode;
+      let newenv = Env.add_closure_lock Functor mode.comonadic env in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
-          Unit, Types.Unit, env, Shape.for_unnamed_functor_param, false
+          Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           check_unsupported_modal_module ~env Functor_param smode;
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
           let (id, newenv, var) =
             match param.txt with
-            | None -> None, env, Shape.for_unnamed_functor_param
+            | None -> None, newenv, Shape.for_unnamed_functor_param
             | Some name ->
               let md_uid =  Uid.mk ~current_unit:(Env.get_unit_name ()) in
               let arg_md =
@@ -2737,21 +2740,18 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
               let shape = Shape.var md_uid id in
               let mode = alloc_as_value functor_param_mode in
               let newenv = Env.add_module_declaration
-                ~shape ~arg:true ~check:true id Mp_present arg_md ~mode env
+                ~shape ~arg:true ~check:true id Mp_present arg_md ~mode newenv
               in
               Some id, newenv, id
           in
           Named (id, param, mty), Types.Named (id, mty.mty_type), newenv,
           var, true
       in
-      let _, mode = register_allocation () in
-      Option.iter (Value.submode_exn mode) expected_mode;
-      let newenv = Env.add_closure_lock Functor mode.comonadic newenv in
       let body, body_shape = type_module true funct_body None newenv sbody in
-      let mode = mode_without_locks_exn body.mod_mode in
-      begin match Value.submode mode (alloc_as_value Types.functor_res_mode) with
+      let body_mode = mode_without_locks_exn body.mod_mode in
+      begin match Value.submode body_mode (alloc_as_value Types.functor_res_mode) with
       | Ok () -> ()
-      | Error e -> raise (Error (sbody.pmod_loc, env,
+      | Error e -> raise (Error (sbody.pmod_loc, newenv,
           Legacy_module (Functor_body, e)))
       end;
       { mod_desc = Tmod_functor(t_arg, body);
