@@ -422,3 +422,101 @@ Error: In this "with" constraint, the new definition of "M.N"
          type t = M.r
        The type "X.t" is not equal to the type "M.r" = "M.N.s"
 |}]
+
+(*** [with type] with type constraints ***)
+
+(* This first test is a regression test for #14117. *)
+module type Non_destructive_with_type_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type 'a t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, _) t = 'a t2
+end
+[%%expect{|
+module type Non_destructive_with_type_with_constraint =
+  sig
+    module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
+    type 'a t2 constraint 'a = 'l * 'r
+    module type S2 = sig type ('a, 'b) t = 'a t2 constraint 'a = 'l * 'r end
+  end
+|}]
+
+module type Non_destructive_with_type_alias_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+end
+[%%expect{|
+module type Non_destructive_with_type_alias_with_constraint =
+  sig
+    module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
+    type ('a, 'b) t2 constraint 'a = 'l * 'r
+    module type S2 =
+      sig type ('a, 'b) t = ('a, 'b) t2 constraint 'a = 'l * 'r end
+  end
+|}]
+
+module type Non_destructive_with_type_alias_with_inconsistent_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r * 's
+  module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+end
+[%%expect{|
+Line 6, characters 32-34:
+6 |   module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+                                    ^^
+Error: The type constraints are not consistent.
+       Type "'a * 'b * 'c" is not compatible with type "'l * 'r"
+|}]
+
+module type Destructive_with_type_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type 'a t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, _) t := 'a t2
+end
+[%%expect{|
+Line 6, characters 19-49:
+6 |   module type S2 = S with type ('a, _) t := 'a t2
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Destructive substitutions are not supported for constrained
+       types (other than when replacing a type constructor with
+       a type constructor with the same arguments).
+|}]
+
+module type Destructive_with_type_alias_with_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r
+  module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+end
+[%%expect{|
+module type Destructive_with_type_alias_with_constraint =
+  sig
+    module type S = sig type ('a, 'b) t constraint 'a = 'l * 'r end
+    type ('a, 'b) t2 constraint 'a = 'l * 'r
+    module type S2 = sig end
+  end
+|}]
+
+module type Destructive_with_type_alias_with_inconsistent_constraint = sig
+  module type S = sig
+    type ('a, 'b) t constraint 'a = 'l * 'r
+  end
+  type ('a, 'b) t2 constraint 'a = 'l * 'r * 's
+  module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+end
+[%%expect{|
+Line 6, characters 32-34:
+6 |   module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+                                    ^^
+Error: The type constraints are not consistent.
+       Type "'a * 'b * 'c" is not compatible with type "'l * 'r"
+|}]
