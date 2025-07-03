@@ -2,11 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*                       Pierre Chambart, OCamlPro                        *)
-(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*           Tomasz Nowak and Mark Shinwell, Jane Street Europe           *)
 (*                                                                        *)
-(*   Copyright 2013--2019 OCamlPro SAS                                    *)
-(*   Copyright 2014--2019 Jane Street Group LLC                           *)
+(*   Copyright 2023 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -14,19 +12,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Variables with name modes, as occur on the left-hand sides of
-    [Let]-expressions (see [Bound_pattern]). *)
+(** Conversion of type shape information into DWARF types. *)
 
-type t
+open! Dwarf_low
+open! Dwarf_high
+module Uid = Flambda2_identifiers.Flambda_debug_uid
 
-val create : Variable.t -> Flambda_debug_uid.t -> Name_mode.t -> t
-
-val var : t -> Variable.t
-
-val debug_uid : t -> Flambda_debug_uid.t
-
-val name_mode : t -> Name_mode.t
-
-val with_name_mode : t -> Name_mode.t -> t
-
-include Bindable.S with type t := t
+val variable_to_die :
+  Dwarf_state.t -> Uid.t -> parent_proto_die:Proto_die.t -> Proto_die.reference
