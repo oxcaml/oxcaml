@@ -2368,7 +2368,8 @@ let compare_primitive_application ~compare_simple t1 t2 =
     | Variadic (p, s), Variadic (p', s') ->
       let c = compare_variadic_primitive p p' in
       if c <> 0 then c else List.compare compare_simple s s'
-    | (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _), _ ->
+    | ( (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _),
+        _ ) ->
       Stdlib.compare (numbering t1) (numbering t2)
 
 include Container_types.Make (struct
