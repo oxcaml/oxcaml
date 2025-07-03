@@ -114,6 +114,7 @@ let builtin_attrs =
   ; "error_message"
   ; "layout_poly"
   ; "or_null_reexport"
+  ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
   ]
 
