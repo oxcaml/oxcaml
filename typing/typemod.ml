@@ -1822,7 +1822,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         sincl.pincl_attributes
     in
     let sg = apply_modalities_signature ~recursive env modalities sg in
-    let sg, newenv = Env.enter_signature ~scope sg env in
+    (* Assume the structure is legacy, for backward compatibility *)
+    let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
     Signature_group.iter
       (Signature_names.check_sig_item names loc)
       sg;
@@ -1944,11 +1945,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           | None -> None, env
           | Some name ->
             let id, newenv =
-              (* We are in a signature, [newenv] is used to check later
-              signature items, and thus modes in [newenv] doesn't matter.
-              Therefore, we enter the strongest mode to avoid false mode errors. *)
+              (* Assume the enclosing structure is legacy, for backward
+                 compatibility *)
               Env.enter_module_declaration ~scope name pres md
-                ~mode:Value.min env
+                ~mode:Value.legacy env
             in
             Signature_names.check_module names pmd.pmd_name.loc id;
             Some id, newenv
@@ -1990,8 +1990,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           | Mty_alias _ -> Mp_absent
           | _ -> Mp_present
         in
+        (* Assume the enclosing structure is legacy, for backward
+            compatibility *)
         let id, newenv =
-          Env.enter_module_declaration ~scope pms.pms_name.txt pres md env
+          Env.enter_module_declaration ~scope pms.pms_name.txt pres md
+            ~mode:Value.legacy env
         in
         let info =
           `Substituted_away (Subst.add_module id path Subst.identity)
