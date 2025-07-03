@@ -255,7 +255,7 @@ end
 Line 2, characters 9-12:
 2 |     let (foo @ once) () = ()
              ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" module.
+Error: This is "once", but expected to be "many" because it is inside a "many" structure.
 |}]
 
 module type Empty = sig end

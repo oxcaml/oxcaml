@@ -123,7 +123,7 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
-  | Value_weaker_than_module of Mode.Value.error
+  | Item_weaker_than_structure of Mode.Value.error
   | Unsupported_modal_module of unsupported_modal_module
   | Legacy_module of legacy_module * Mode.Value.error
 
@@ -2697,7 +2697,7 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
       md_mode.Mode.comonadic with
       | Ok () -> ()
       | Error (Error (ax, e)) ->
-          raise (Error (loc, env, Value_weaker_than_module
+          raise (Error (loc, env, Item_weaker_than_structure
             (Error (Comonadic ax, e))))
     end;
     Mode.Modality.Value.infer ~md_mode ~mode
@@ -3557,7 +3557,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode sstr 
         begin match Mode.Value.submode Value.legacy md_mode with
           | Ok () -> ()
           | Error e ->
-              raise (Error (loc, env, Value_weaker_than_module e))
+              raise (Error (loc, env, Item_weaker_than_structure e))
         end;
         let (classes, new_env) = Typeclass.class_declarations env cl in
         let shape_map = List.fold_left (fun acc cls ->
@@ -4634,12 +4634,12 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
-  | Value_weaker_than_module (Error (ax, {left; right})) ->
+  | Item_weaker_than_structure (Error (ax, {left; right})) ->
       let d =
         match ax with
-        | Comonadic Areality -> Format.dprintf "a module"
+        | Comonadic Areality -> Format.dprintf "a structure"
         | _ ->
-            Format.dprintf "a %a module"
+            Format.dprintf "a %a structure"
               (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
       in
       Location.errorf ~loc

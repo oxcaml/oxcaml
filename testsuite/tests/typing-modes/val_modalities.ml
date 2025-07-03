@@ -82,7 +82,7 @@ end
 Line 2, characters 15-16:
 2 |     let local_ x = "hello"
                    ^
-Error: This is "local", but expected to be "global" because it is inside a module.
+Error: This is "local", but expected to be "global" because it is inside a structure.
 |}]
 
 module M @ many = struct
@@ -92,7 +92,7 @@ end
 Line 2, characters 9-12:
 2 |     let (foo @ once) () = ()
              ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" module.
+Error: This is "once", but expected to be "many" because it is inside a "many" structure.
 |}]
 
 (* Monadic axes don't have such constraint *)
@@ -1482,7 +1482,7 @@ end
 Line 2, characters 2-24:
 2 |   class foo = object end
       ^^^^^^^^^^^^^^^^^^^^^^
-Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" module.
+Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
 |}]
 
 module M @ nonportable = struct class foo = object end end
