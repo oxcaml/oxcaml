@@ -16,8 +16,10 @@ end
 module type S =
   sig
     module M :
-      sig val foo : 'a -> 'a module N : sig val bar : 'a -> 'a end end @@
-      portable
+      sig
+        val foo : 'a -> 'a @@ portable
+        module N : sig val bar : 'a -> 'a @@ portable end
+      end
   end
 |}]
 
@@ -33,8 +35,10 @@ end
 module type S =
   sig
     module M :
-      sig val foo : 'a -> 'a module N : sig val bar : 'a -> 'a end end @@
-      portable
+      sig
+        val foo : 'a -> 'a @@ portable
+        module N : sig val bar : 'a -> 'a @@ portable end
+      end
   end
 |}]
 
@@ -70,7 +74,7 @@ end
 module type S =
   sig
     module rec M : sig val foo : 'a -> 'a end
-    and N : sig val bar : 'a -> 'a end @@ portable
+    and N : sig val bar : 'a -> 'a @@ portable end
   end
 |}]
 
@@ -84,7 +88,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module type T = sig val foo : 'a -> 'a end
-module type S = sig module M : T @@ portable end
+module type S = sig module M : sig val foo : 'a -> 'a @@ portable end end
 |}]
 
 (* works for Mty_functor *)
@@ -93,10 +97,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module type S =
-  sig
-    module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end @@
-      portable
-  end
+  sig module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end end
 |}]
 
 module M : T = struct
@@ -110,7 +111,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module M : T @@ stateless nonportable
-module type S = sig module M' = M @@ portable end
+module type S = sig module M' = M end
 |}]
 
 (* works for Mty_strenthen, and type check keeps working *)
@@ -118,7 +119,7 @@ module type S = sig @@ portable
   module M' : T with M
 end
 [%%expect{|
-module type S = sig module M' : sig val foo : 'a -> 'a end @@ portable end
+module type S = sig module M' : sig val foo : 'a -> 'a @@ portable end end
 |}]
 
 module M : S = struct
@@ -135,5 +136,14 @@ Error: Signature mismatch:
        is not included in
          S
        In module "M'":
-       Got "nonportable" but expected "portable".
+       Modules do not match:
+         sig val foo : 'a -> 'a end (* in a structure at nonportable *)
+       is not included in
+         sig val foo : 'a -> 'a @@ portable end (* in a structure at nonportable *)
+       In module "M'":
+       Values do not match:
+         val foo : 'a -> 'a (* in a structure at nonportable *)
+       is not included in
+         val foo : 'a -> 'a @@ portable (* in a structure at nonportable *)
+       The first is "nonportable" but the second is "portable".
 |}]
