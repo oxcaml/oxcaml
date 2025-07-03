@@ -198,6 +198,25 @@ let print_specific_operation printreg op ppf arg =
   | Isimd op ->
     Simd.print_operation printreg op ppf arg
 
+let specific_operation_name : specific_operation -> string = fun op -<
+  match op with
+  | Ifar_poll -> "far poll"
+  | Ifar_alloc { bytes; dbginfo = _ } -> "far_alloc of %d bytes" bytes
+  | Ishiftarith (op, shift) ->
+  | Ishiftarith of arith_operation * int
+  | Imuladd -> "muladd"
+  | Imulsub -> "mulsub"
+  | Inegmulf -> "negmulf"
+  | Imuladdf -> "muladdf"
+  | Inegmuladdf -> "negmuladdf"
+  | Imulsubf -> "mulsubf"
+  | Inegmulsubf -> "negmulsubf"
+  | Isqrtf -> "sqrtf"
+  | Ibswap _ -> "bswap"
+  | Imove32 -> "move32"
+  | Isignext _ -> "signext"
+  | Isimd _ -> "simd"
+
 let equal_addressing_mode left right =
   match left, right with
   | Iindexed left_int, Iindexed right_int ->
