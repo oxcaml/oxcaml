@@ -948,7 +948,7 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed, Jkind.of_new_legacy_sort ~why:Old_style_unboxed_type
+            Variant_unboxed, Jkind.of_new_sort ~why:Old_style_unboxed_type
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -978,7 +978,7 @@ let transl_declaration env sdecl (id, uid) =
           let rep, jkind =
             if unbox then
               Record_unboxed,
-              Jkind.of_new_legacy_sort ~why:Old_style_unboxed_type
+              Jkind.of_new_sort ~why:Old_style_unboxed_type
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or
@@ -1522,13 +1522,21 @@ let check_kind_coherence env loc dpath decl =
             | exception Ctype.Equality err ->
                 Some (Includecore.Constraint err)
             | () ->
+              let subst =
+                Subst.Unsafe.add_type_path dpath path Subst.identity in
+              let decl =
+                match Subst.Unsafe.type_declaration subst decl with
+                | Ok decl -> decl
+                | Error (Fcm_type_substituted_away _) ->
+                      (* no module type substitution in [subst] *)
+                    assert false
+              in
               Includecore.type_declarations ~loc ~equality:true env
                 ~mark:true
                 (Path.last path)
                 decl'
                 dpath
-                (Subst.type_declaration
-                    (Subst.add_type_path dpath path Subst.identity) decl)
+                decl
           end
         in
         if err <> None then
@@ -1976,13 +1984,7 @@ let rec update_decl_jkind env dpath decl =
           (idx+1,cstr::cstrs)
         ) (0,[]) cstrs
       in
-      let jkind =
-        Jkind.for_boxed_variant
-          ~decl_params:decl.type_params
-          ~type_apply:(Ctype.apply env)
-          ~free_vars:(Ctype.free_variable_set_of_list env)
-          cstrs
-      in
+      let jkind = Jkind.for_boxed_variant cstrs in
       List.rev cstrs, rep, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false

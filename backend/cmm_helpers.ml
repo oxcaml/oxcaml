@@ -4705,7 +4705,7 @@ let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
 
 let atomic_fetch_and_add_field ~dbg atomic ~field i =
   atomic_arith ~dbg ~untag:true ~op:Fetch_and_add
-    ~ext_name:"caml_atomic_fetch_add" atomic ~field i
+    ~ext_name:"caml_atomic_fetch_add_field" atomic ~field i
 
 let atomic_add_field ~dbg atomic ~field i =
   atomic_arith ~dbg ~untag:true ~op:Add ~ext_name:"caml_atomic_add_field" atomic
@@ -4994,6 +4994,10 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
       dbg )
 
 let poll ~dbg = return_unit dbg (Cop (Cpoll, [], dbg))
+
+let cpu_relax ~dbg =
+  let pause = return_unit dbg (Cop (Cpause, [], dbg)) in
+  if Config.poll_insertion then pause else sequence pause (poll ~dbg)
 
 module Scalar_type = struct
   module Float_width = struct

@@ -342,6 +342,9 @@ type nullary_primitive =
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and
           GC slices, so should not be moved or optimised away. *)
+  | Cpu_relax
+      (** Arch-specific pause. If poll insertion is disabled, also acts
+          as a polling point. *)
 
 (** Untagged binary integer arithmetic operations.
 
@@ -720,6 +723,9 @@ val equal_quaternary_primitive :
   quaternary_primitive -> quaternary_primitive -> bool
 
 val equal_variadic_primitive : variadic_primitive -> variadic_primitive -> bool
+
+val compare_primitive_application :
+  compare_simple:(Simple.t -> Simple.t -> int) -> t -> t -> int
 
 val is_begin_or_end_region : t -> bool
 

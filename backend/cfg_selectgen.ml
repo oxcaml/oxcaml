@@ -61,7 +61,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         List.for_all is_simple_expr args
         (* The following may have side effects *)
       | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll ->
+      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -110,7 +110,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         match op with
         | Cextcall { effects = e; coeffects = ce } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
-        | Capply _ | Cprobe _ | Copaque | Cpoll -> EC.arbitrary
+        | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
         | Calloc (Heap, _) -> EC.none
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
@@ -340,6 +340,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
         args )
     | Cpoll -> SU.basic_op Poll, args
+    | Cpause -> SU.basic_op Pause, args
     | Caddi -> select_arith_comm Iadd args
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
