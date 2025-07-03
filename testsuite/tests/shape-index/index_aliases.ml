@@ -7,7 +7,7 @@ all_modules = "index_aliases.ml";
 ocamlc.byte;
 check-ocamlc.byte-output;
 
-program = "-quiet -index -decls index_aliases.cmt";
+program = "-quiet -index -uid-deps -decls index_aliases.cmt";
 output = "out_objinfo";
 ocamlobjinfo;
 

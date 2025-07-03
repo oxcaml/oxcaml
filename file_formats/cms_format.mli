@@ -32,7 +32,7 @@ type cms_infos = {
   cms_ident_occurrences :
     (Longident.t Location.loc * Shape_reduce.result) array;
   cms_declaration_dependencies :
-    (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+    (Uid.Deps.kind * Uid.t * Uid.t) list;
 }
 
 type error =
@@ -53,7 +53,7 @@ val save_cms :
   Cmt_format.binary_annots ->
   Env.t -> (* initial env *)
   Shape.t option ->
-  (Cmt_format.dependency_kind * Uid.t * Uid.t) list ->
+  (Shape.Uid.Deps.kind * Uid.t * Uid.t) list ->
   unit
 
 val register_toplevel_attributes :

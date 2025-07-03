@@ -61,6 +61,13 @@ module Uid : sig
         comp_unit: string;
         id: int;
         from: Unit_info.intf_or_impl }
+    | Ghost_item of { comp_unit: string; id: int }
+      (** "Ghost" items are used to give uids to usages of values of which the
+            definition is not known statically. This notably happens when
+            accessing first-class modules' items or usages of a functor
+            parameter's items inside the body of hte functor itself. Having Uids
+            synthesized for these usages is useful for tools that provides
+            occurrences and renaming features. *)
     | Internal
     | Predef of string
     | Unboxed_version of t
@@ -68,6 +75,7 @@ module Uid : sig
   val reinit : unit -> unit
 
   val mk : current_unit:Unit_info.t option -> t
+  val mk_ghost : current_unit:(Unit_info.t option) -> t
   val of_compilation_unit_id : Compilation_unit.t -> t
   val of_compilation_unit_name : Compilation_unit.Name.t -> t
   val of_predef_id : Ident.t -> t
@@ -77,6 +85,15 @@ module Uid : sig
   val for_actual_declaration : t -> bool
 
   include Identifiable.S with type t := t
+
+  (* Dependencies between related Uids are recorded and written in CMT files *)
+  module Deps : sig
+    type kind = Definition_to_declaration | Declaration_to_declaration
+
+    val clear : unit -> unit
+    val get : unit -> (kind * t * t) list
+    val record_declaration_dependency: kind * t * t -> unit
+  end
 end
 
 module Sig_component_kind : sig
@@ -134,6 +151,7 @@ and desc =
   | Abs of var * t
   | App of t * t
   | Struct of t Item.Map.t
+  | Pack of Ident.t
   | Alias of t
   | Leaf
   | Proj of t * Item.t
@@ -169,7 +187,7 @@ val decompose_abs : t -> (var * t) option
 
 (* CR lmaurer: Should really take a [Compilation_unit.t] *)
 val for_persistent_unit : string -> t
-val leaf_for_unpack : t
+val leaf_for_unpack : Ident.t -> t
 
 module Map : sig
   type shape = t

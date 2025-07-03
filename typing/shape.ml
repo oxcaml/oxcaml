@@ -17,6 +17,7 @@ module Uid = struct
   type t =
     | Compilation_unit of string
     | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
+    | Ghost_item of { comp_unit: string; id: int }
     | Internal
     | Predef of string
     | Unboxed_version of t
@@ -33,19 +34,24 @@ module Uid = struct
           if c <> 0 then c else String.compare c1.comp_unit c2.comp_unit
         in
         if c <> 0 then c else Stdlib.compare c1.from c2.from
+      | Ghost_item c1, Ghost_item c2 ->
+        let c = Int.compare c1.id c2.id in
+        if c <> 0 then c else String.compare c1.comp_unit c2.comp_unit
       | Internal, Internal -> 0
       | Predef s1, Predef s2 -> String.compare s1 s2
       | Unboxed_version t1, Unboxed_version t2 -> compare t1 t2
       | Compilation_unit _,
-        (Item _ | Internal | Predef _ | Unboxed_version _) ->
+        (Item _ | Ghost_item _ | Internal | Predef _ | Unboxed_version _) ->
         -1
-      | Item _, (Internal | Predef _| Unboxed_version _) -> -1
+      | Item _ , (Internal | Predef _| Unboxed_version _) -> -1
+      | Ghost_item _ , (Internal | Predef _| Unboxed_version _) -> -1
       | Internal, (Predef _ | Unboxed_version _) -> -1
       | Predef _, Unboxed_version _ -> -1
-      | (Item _ | Internal | Predef _ | Unboxed_version _),
+      | (Item _ | Ghost_item _ | Internal | Predef _ | Unboxed_version _),
         Compilation_unit _ ->
         1
-      | (Internal | Predef _ | Unboxed_version _), Item _ -> 1
+      | ( Ghost_item _ | Internal | Predef _ | Unboxed_version _), Item _  -> 1
+      | ( Item _ | Internal | Predef _ | Unboxed_version _), Ghost_item _  -> -1
       | (Predef _ | Unboxed_version _), Internal -> 1
       | Unboxed_version _, Predef _ -> 1
 
@@ -64,6 +70,8 @@ module Uid = struct
       | Item { comp_unit; id; from } ->
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
+      | Ghost_item { comp_unit; id } ->
+          Format.fprintf fmt "[G]%s.%d" comp_unit id
 
     let output oc t =
       let fmt = Format.formatter_of_out_channel oc in
@@ -71,8 +79,11 @@ module Uid = struct
   end)
 
   let id = ref (-1)
+  let id_param = ref (-1)
 
-  let reinit () = id := (-1)
+  let reinit () =
+    id := (-1);
+    id_param := (-1)
 
   let mk  ~current_unit =
       let comp_unit, from =
@@ -84,6 +95,17 @@ module Uid = struct
       in
       incr id;
       Item { comp_unit; id = !id; from }
+
+  let mk_ghost ~current_unit =
+    let comp_unit =
+      let open Unit_info in
+      match current_unit with
+      | None -> ""
+      | Some ui ->
+        Compilation_unit.full_path_as_string (modname ui)
+    in
+    incr id_param;
+    Ghost_item { comp_unit; id = !id_param }
 
   let of_compilation_unit_id id =
     Compilation_unit (id |> Compilation_unit.full_path_as_string)
@@ -107,6 +129,20 @@ module Uid = struct
   let for_actual_declaration = function
     | Item _ -> true
     | _ -> false
+
+  module Deps = struct
+    type kind = Definition_to_declaration | Declaration_to_declaration
+
+    let uids_deps : (kind * t * t) list ref = ref []
+
+    let clear () = uids_deps := []
+
+    let get () = !uids_deps
+
+    let record_declaration_dependency (rk, uid1, uid2) =
+      if not (equal uid1 uid2) then
+        uids_deps := (rk, uid1, uid2) :: !uids_deps
+    end
 end
 
 module Sig_component_kind = struct
@@ -214,6 +250,7 @@ and desc =
   | Abs of var * t
   | App of t * t
   | Struct of t Item.Map.t
+  | Pack of Ident.t
   | Alias of t
   | Leaf
   | Proj of t * Item.t
@@ -239,15 +276,27 @@ let rec equal_desc d1 d2 =
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
   | Comp_unit c1, Comp_unit c2 -> String.equal c1 c2
-  | Var _, (Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Abs _, (Var _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | App _, (Var _ | Abs _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Struct _, (Var _ | Abs _ | App _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Leaf, (Var _ | Abs _ | App _ | Struct _ | Proj _ | Comp_unit _ | Alias _ | Error _)
-  | Proj _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Comp_unit _ | Alias _ | Error _)
-  | Comp_unit _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Alias _ | Error _)
-  | Alias _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Error _)
-  | Error _, (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _)
+  | Pack id1, Pack id2 -> Ident.equal id1 id2
+  | Var _,
+    (Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Abs _,
+    (Var _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | App _,
+    (Var _ | Abs _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Struct _,
+    (Var _ | Abs _ | App _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Leaf,
+    (Var _ | Abs _ | App _ | Struct _ | Proj _ | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Proj _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Comp_unit _ | Alias _ | Error _ | Pack _)
+  | Comp_unit _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Alias _ | Error _ | Pack _)
+  | Alias _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Error _ | Pack _)
+  | Error _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Pack _)
+  | Pack _,
+    (Var _ | Abs _ | App _ | Struct _ | Leaf | Proj _ | Comp_unit _ | Alias _ | Error _)
     -> false
 
 and equal t1 t2 =
@@ -310,6 +359,8 @@ let print fmt t =
           Format.fprintf fmt "@[<hv>{%a}@]" print_uid_opt uid
         else
           Format.fprintf fmt "{@[<v>%a@,%a@]}" print_uid_opt uid print_map map
+    | Pack id ->
+        Format.fprintf fmt "@[<hv>{Pack:%a}@]" Ident.print id
     | Alias t ->
         Format.fprintf fmt "Alias@[(@[<v>%a@,%a@])@]" print_uid_opt uid aux t
     | Error s ->
@@ -446,7 +497,9 @@ let of_path ~find_shape ~namespace path =
 let for_persistent_unit s =
   comp_unit ~uid:(Compilation_unit s) s
 
-let leaf_for_unpack = leaf' None
+let leaf_for_unpack id =
+  { uid = None; desc = Pack id; hash = Hashtbl.hash (hash_leaf, id);
+    approximated = false }
 
 let set_uid_if_none t uid =
   match t.uid with
