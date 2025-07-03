@@ -4,7 +4,7 @@
 
 type r = { mutable f : int ref [@atomic] }
 [%%expect{|
-type r = { mutable(<non-legacy>) f : int ref; }
+type r = { mutable(<non-legacy>) f : int ref [@atomic]; }
 |}]
 
 let get (r @ contended) = r.f
@@ -14,7 +14,7 @@ val get : r @ contended -> int ref @ contended = <fun>
 
 type r = { mutable f : (unit -> unit) [@atomic] }
 [%%expect{|
-type r = { mutable(<non-legacy>) f : unit -> unit; }
+type r = { mutable(<non-legacy>) f : unit -> unit [@atomic]; }
 |}]
 
 let set r v = r.f <- v
@@ -51,7 +51,7 @@ Error: This value is "nonportable" but expected to be "portable".
 
 type r = { mutable f : (unit -> unit) @@ portable [@atomic] }
 [%%expect{|
-type r = { mutable(<non-legacy>) f : unit -> unit @@ portable; }
+type r = { mutable(<non-legacy>) f : unit -> unit @@ portable [@atomic]; }
 |}]
 
 let set r v = r.f <- v
