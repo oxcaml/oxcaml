@@ -724,6 +724,9 @@ val equal_quaternary_primitive :
 
 val equal_variadic_primitive : variadic_primitive -> variadic_primitive -> bool
 
+val compare_primitive_application :
+  compare_simple:(Simple.t -> Simple.t -> int) -> t -> t -> int
+
 val is_begin_or_end_region : t -> bool
 
 val is_begin_region : t -> bool
