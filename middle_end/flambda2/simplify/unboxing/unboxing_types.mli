@@ -34,7 +34,7 @@ module Extra_param_and_args : sig
       args : EPA.Extra_arg.t Apply_cont_rewrite_id.Map.t
     }
 
-  val create : name:string -> t
+  val create : name:string -> Flambda_kind.t -> t
 
   val update_param_args : t -> Apply_cont_rewrite_id.t -> EPA.Extra_arg.t -> t
 end

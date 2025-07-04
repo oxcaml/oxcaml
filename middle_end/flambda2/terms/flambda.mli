@@ -187,6 +187,9 @@ module Named : sig
       necessarily type-correct, at the given kind. *)
   val dummy_value : Flambda_kind.t -> t
 
+  (** Return the kind of the expression *)
+  val kind : t -> Flambda_kind.t
+
   (** Returns [true] iff the given expression is a set of closures that will be
       allocated on the OCaml heap during execution (i.e. not a
       statically-allocated set of closures). *)

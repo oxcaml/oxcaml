@@ -57,8 +57,8 @@ let let_prim ~dbg v prim (free_names, body) =
 (* ******************************** *)
 
 let simplify_comparison_of_tagged_immediates ~dbg dacc ~cmp_prim cont a b =
-  let v_comp = Variable.create "comp" in
-  let tagged = Variable.create "tagged" in
+  let v_comp = Variable.create "comp" K.naked_immediate in
+  let tagged = Variable.create "tagged" K.value in
   let _free_names, res =
     let_prim ~dbg v_comp (P.Binary (cmp_prim, a, b))
     @@ let_prim ~dbg tagged (P.Unary (Tag_immediate, Simple.var v_comp))
@@ -67,10 +67,14 @@ let simplify_comparison_of_tagged_immediates ~dbg dacc ~cmp_prim cont a b =
   Specialised (dacc, res, RO.specialized_poly_compare)
 
 let simplify_comparison_of_boxed_numbers ~dbg dacc ~kind ~cmp_prim cont a b =
-  let a_naked = Variable.create "unboxed" in
-  let b_naked = Variable.create "unboxed" in
-  let v_comp = Variable.create "comp" in
-  let tagged = Variable.create "tagged" in
+  let a_naked =
+    Variable.create "unboxed" (K.Boxable_number.unboxed_kind kind)
+  in
+  let b_naked =
+    Variable.create "unboxed" (K.Boxable_number.unboxed_kind kind)
+  in
+  let v_comp = Variable.create "comp" K.naked_immediate in
+  let tagged = Variable.create "tagged" K.value in
   let _free_names, res =
     (* XXX try to remove @@ *)
     let_prim ~dbg a_naked (P.Unary (Unbox_number kind, a))
