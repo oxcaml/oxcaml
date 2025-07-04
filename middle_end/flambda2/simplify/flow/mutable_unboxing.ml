@@ -484,7 +484,8 @@ module Fold_prims = struct
                         "[Mutable Unboxing] Cannot unbox constants")
                 in
                 let var = Variable.create (Printf.sprintf "%s_%i" name i) in
-                Bound_parameter.create var kind)
+                let var_duid = Flambda_debug_uid.none in
+                Bound_parameter.create var kind var_duid)
               fields_kinds
           in
           let env =
