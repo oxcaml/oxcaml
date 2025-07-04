@@ -122,10 +122,10 @@ end
 [%%expect{|
 module Module_type_of_comonadic :
   sig
-    module M : sig val x : 'a -> 'a end @@ portable
-    module type S = sig val x : 'a -> 'a end
+    module M : sig val x : 'a -> 'a @@ stateless end
+    module type S = sig val x : 'a -> 'a @@ stateless end
     module M' = M
-  end @@ stateless nonportable
+  end
 |}]
 
 (* zapping behavior can cause type error that shouldn't happen in upstream ocaml *)
@@ -152,9 +152,9 @@ Lines 8-12, characters 33-5:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val y : int ref @@ unyielding many stateless
-           val z : 'a -> 'a @@ unyielding many
-           val x : 'a -> 'a @@ unyielding many
+           val y : int ref @@ stateless
+           val z : 'a -> 'a
+           val x : 'a -> 'a
          end (* in a structure at nonportable *)
        is not included in
          sig
@@ -163,7 +163,7 @@ Error: Signature mismatch:
            val x : 'a -> 'a @@ stateless
          end (* in a structure at nonportable *)
        Values do not match:
-         val x : 'a -> 'a @@ unyielding many (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".
@@ -176,11 +176,7 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig
-           val y : int ref @@ unyielding many
-           val z : 'a -> 'a @@ unyielding many
-           val x : 'a -> 'a @@ unyielding many
-         end (* in a structure at nonportable *)
+         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* in a structure at nonportable *)
        is not included in
          sig
            val y : int ref
@@ -188,7 +184,7 @@ Error: Signature mismatch:
            val x : 'a -> 'a @@ stateless
          end (* in a structure at nonportable *)
        Values do not match:
-         val x : 'a -> 'a @@ unyielding many (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".
@@ -232,11 +228,17 @@ https://github.com/oxcaml/oxcaml/pull/3922#discussion_r2059000469
 [%%expect{|
 module Module_type_nested :
   sig
-    module M : sig val x : 'a -> 'a module N : sig val y : string ref end end
+    module M :
+      sig
+        val x : 'a -> 'a @@ stateless
+        module N : sig val y : string ref end @@ stateless
+      end
     module M' :
-      sig val x : 'a -> 'a module N : sig val y : string ref end end @@
-      contended
-  end @@ stateless
+      sig
+        val x : 'a -> 'a @@ stateless
+        module N : sig val y : string ref end @@ stateless
+      end @@ stateless contended
+  end
 |}, Principal{|
 module Module_type_nested :
   sig
@@ -314,11 +316,11 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ unyielding many stateless contended end (* in a structure at uncontended *)
+         sig val x : string ref @@ stateless contended end (* in a structure at uncontended *)
        is not included in
          sig val x : string ref end (* in a structure at uncontended *)
        Values do not match:
-         val x : string ref @@ unyielding many stateless contended (* in a structure at uncontended *)
+         val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
        The first is "contended" but the second is "uncontended".
@@ -329,11 +331,11 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ unyielding many contended end (* in a structure at uncontended *)
+         sig val x : string ref @@ contended end (* in a structure at uncontended *)
        is not included in
          sig val x : string ref end (* in a structure at uncontended *)
        Values do not match:
-         val x : string ref @@ unyielding many contended (* in a structure at uncontended *)
+         val x : string ref @@ contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
        The first is "contended" but the second is "uncontended".
@@ -473,17 +475,15 @@ Lines 3-6, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val x : 'a -> 'a @@ unyielding many stateless nonportable
-           external length : string -> int @@ unyielding many
-             = "%string_length"
+           val x : 'a -> 'a @@ stateless nonportable
+           external length : string -> int = "%string_length"
          end (* in a structure at nonportable *)
        is not included in
          sig
            external length : string -> int @@ portable = "%string_length"
          end (* in a structure at nonportable *)
        Values do not match:
-         external length : string -> int @@ unyielding many
-           = "%string_length" (* in a structure at nonportable *)
+         external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
          external length : string -> int @@ portable = "%string_length" (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".
@@ -594,7 +594,7 @@ Lines 13-19, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           module Plain : sig val f : int -> int end @@ unyielding many
+           module Plain : sig val f : int -> int end
            module type S_plain =
              sig module M : sig val f : int -> int end end
          end (* in a structure at nonportable *)
@@ -694,14 +694,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val t : [> `Foo ] @@ unyielding many stateless nonportable end (* in a structure at nonportable *)
+         sig val t : [> `Foo ] @@ stateless nonportable end (* in a structure at nonportable *)
        is not included in
          sig
            val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
              portable
          end (* in a structure at nonportable *)
        Values do not match:
-         val t : [> `Foo ] @@ unyielding many stateless nonportable (* in a structure at nonportable *)
+         val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".
@@ -1427,11 +1427,11 @@ Lines 8-10, characters 20-3:
 10 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ unyielding many stateless nonportable end (* in a structure at nonportable *)
+         sig val f : 'a -> 'a @@ stateless nonportable end (* in a structure at nonportable *)
        is not included in
          sig val f : 'a -> 'a @@ portable end (* in a structure at nonportable *)
        Values do not match:
-         val f : 'a -> 'a @@ unyielding many stateless nonportable (* in a structure at nonportable *)
+         val f : 'a -> 'a @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a @@ portable (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".
@@ -1454,11 +1454,11 @@ Lines 3-5, characters 17-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ unyielding many stateless nonportable end (* in a structure at nonportable *)
+         sig val f : 'a -> 'a @@ stateless nonportable end (* in a structure at nonportable *)
        is not included in
          sig val f : 'a -> 'a end (* in a structure at portable *)
        Values do not match:
-         val f : 'a -> 'a @@ unyielding many stateless nonportable (* in a structure at nonportable *)
+         val f : 'a -> 'a @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a (* in a structure at portable *)
        The first is "nonportable" but the second is "portable".

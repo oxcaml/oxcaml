@@ -132,7 +132,7 @@ Lines 1-3, characters 15-3:
 3 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig module M' = M @@ unyielding many stateless nonportable end
+         sig module M' = M @@ stateless nonportable end
        is not included in
          S
        In module "M'":

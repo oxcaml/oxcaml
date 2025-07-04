@@ -3737,11 +3737,6 @@ let type_module_type_of env smod =
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
-  (* Must zap module to floor first, otherwise the modality zapping will mutate
-  the module to ceil, which might be too high if the module is subject to
-    further mode constraints.*)
-  (* CR zqian: remove this once the mode solver supports binary morphisms *)
-  (fst tmty.mod_mode).comonadic |> Mode.Value.Comonadic.zap_to_floor |> ignore;
   let mty =
     remove_modality_and_zero_alloc_variables_mty env
       ~zap_modality:(Ctype.zap_modalities_to_floor_if_at_least Stable) mty

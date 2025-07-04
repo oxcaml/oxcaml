@@ -320,8 +320,8 @@ end
 [%%expect{|
 module Test_incl :
   sig
-    module M : sig val foo : 'a -> 'a end @@ stateless
-    module type S = sig val foo : 'a -> 'a end
+    module M : sig val foo : 'a -> 'a @@ stateless end
+    module type S = sig val foo : 'a -> 'a @@ stateless end
     module N :
       sig
         val x : int ref @@ stateless
