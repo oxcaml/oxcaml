@@ -21,6 +21,19 @@ type t
 (** Free names for cmm expressions *)
 type free_vars = Backend_var.Set.t
 
+(** Delayed symbol initializations *)
+module Symbol_inits : sig
+  type t
+
+  val empty : t
+
+  val merge : t -> t -> t
+
+  val is_empty : t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
 (** A cmm expression along with extra information *)
 type expr_with_info =
   { cmm : Cmm.expression;
@@ -260,6 +273,8 @@ val add_alias :
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
   t * To_cmm_result.t
 
+val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
+
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
   ?consider_inlining_effectful_expressions:bool ->
@@ -279,9 +294,19 @@ val flush_delayed_lets :
   mode:flush_mode ->
   t ->
   To_cmm_result.t ->
-  (Cmm.expression -> free_vars -> Cmm.expression * free_vars)
+  (Cmm.expression ->
+  free_vars ->
+  Symbol_inits.t ->
+  Cmm.expression * free_vars * Symbol_inits.t)
   * t
   * To_cmm_result.t
+
+val place_symbol_inits :
+  params:(Backend_var.With_provenance.t * _) list ->
+  Cmm.expression ->
+  free_vars ->
+  Symbol_inits.t ->
+  Cmm.expression * free_vars * Symbol_inits.t
 
 (** Fetch the extra info for a Flambda variable (if any), specified as a
     [Simple]. *)
