@@ -257,7 +257,7 @@ Error: Signature mismatch:
        is not included in
          sig module A = X.A end
        In module "N.A":
-       Module "X.A" cannot be aliased
+       Modules do not match: (module N.A) is not included in (module X.A)
 |}]
 
 module Destructive_with3 = struct

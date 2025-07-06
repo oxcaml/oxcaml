@@ -691,7 +691,7 @@ module type A = Alias with module N := F(List);;
 module rec Bad : A = Bad;;
 [%%expect{|
 module type Alias = sig module N : sig end module M = N end
-module F : (X : sig end) -> sig type t end
+module F : functor (X : sig end) -> sig type t end
 Line 3, characters 16-46:
 3 | module type A = Alias with module N := F(List);;
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

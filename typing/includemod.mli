@@ -59,6 +59,7 @@ module Error: sig
     | Mt_core of core_module_type_symptom
     | Signature of signature_symptom
     | Functor of functor_symptom
+    | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
 
 

@@ -65,6 +65,7 @@ module Error = struct
     | Mt_core of core_module_type_symptom
     | Signature of signature_symptom
     | Functor of functor_symptom
+    | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
 
 
@@ -712,11 +713,22 @@ and try_modtypes ~direction ~loc env subst ~modes mty1 mty2 orig_shape =
         try_modtypes ~direction ~loc env subst ~modes mty1 mty2 orig_shape
     | None ->
         (* Report error *)
+        (* | _, Mty_strengthen (_,p,Aliasable) when Env.is_functor_arg p env ->
+         *     Error (Error.Invalid_module_alias p)
+         * | (Mty_ident _ | Mty_strengthen _), _ ->
+         *     Error (Error.Mt_core Abstract_module_type)
+         * | (Mty_alias _, Mty_alias p2) ->
+         *     if Env.is_functor_arg p2 env then
+         *       Error (Error.Invalid_module_alias p2)
+         *     else
+         *       Error Error.(Mt_core Incompatible_aliases) *)
         match mty1, mty2 with
         | _, Mty_strengthen (_,p,Aliasable) when Env.is_functor_arg p env ->
-            Misc.fatal_error "unreachable 1"
+            Error (Error.Invalid_module_alias p)
+            (* Misc.fatal_error "unreachable 1" *)
         | (Mty_ident _ | Mty_strengthen _), _ ->
-            Misc.fatal_error "unreachable 2"
+            Error (Error.Mt_core Abstract_module_type)
+            (* Misc.fatal_error "unreachable 2" *)
         | (Mty_alias _, Mty_alias p2) ->
             if Env.is_functor_arg p2 env then
               Misc.fatal_error "unreachable 3"
