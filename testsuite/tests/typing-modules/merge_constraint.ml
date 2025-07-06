@@ -751,7 +751,10 @@ end
 [%%expect{|
 module Empty : sig end
 module rec X :
-  sig module type T = sig end module F : (A : T) -> sig type t end end
+  sig
+    module type T = sig end
+    module F : functor (A : T) -> sig type t end
+  end
 and Y : sig type t = X.F(Empty).t end
 |}]
 
