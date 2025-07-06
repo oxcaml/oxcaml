@@ -27,6 +27,9 @@ type u64  = int64
 type s128 = int (* Ahem, we don't expect 128 bits to really consume 128 bits *)
 type u128 = int
 
+module U128Map : Map.S with type key = u128
+module S128Map : Map.S with type key = s128
+
 (** A mutable cursor, pointing to an arbitrary position of a buffer *)
 type cursor = {
   buffer: t;

@@ -16,10 +16,16 @@ type pointers_to_other_sections = {
 
     [pointers_to_other_sections] are needed in DWARF 5 because filenames can be
     pointers to strings in entirely separate sections of DWARF. You can use
-    {! Owee_elf.debug_line_pointers} to construct such a value. *)
+    {! Owee_elf.debug_line_pointers} to construct such a value.
+
+    [get_comp_dir] is needed in DWARF 4 and prior because the comp dir is stored inside
+    the DIE information. You can use {! Owee_debug_info.comp_dir } to construct
+    such a value.
+*)
 val read_chunk
-  :  cursor
-  -> pointers_to_other_sections:pointers_to_other_sections
+  :  ?get_comp_dir:(int -> string option)
+  -> cursor
+  -> pointers_to_other_sections:pointers_to_other_sections option
   -> (header * cursor) option
 
 (** State of the linenumber automaton.
