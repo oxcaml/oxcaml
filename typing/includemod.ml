@@ -65,7 +65,6 @@ module Error = struct
     | Mt_core of core_module_type_symptom
     | Signature of signature_symptom
     | Functor of functor_symptom
-    | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
 
 
@@ -595,6 +594,10 @@ and try_modtypes ~direction ~loc env subst ~modes mty1 mty2 orig_shape =
     | _ -> false
   in
   match mty1, mty2 with
+  (* CR rtjoa: i added this case, kind of  *)
+  | (Mty_alias p1, Mty_alias p2)
+      when not (equal_module_paths env p1 subst p2) ->
+        Error Error.(Mt_core Incompatible_aliases)
   | _ when shallow_modtypes env subst mty1 mty2 ->
     walk_locks ~env ~item:Module modes;
     Ok (Tcoerce_none, orig_shape)
@@ -711,14 +714,14 @@ and try_modtypes ~direction ~loc env subst ~modes mty1 mty2 orig_shape =
         (* Report error *)
         match mty1, mty2 with
         | _, Mty_strengthen (_,p,Aliasable) when Env.is_functor_arg p env ->
-            Error (Error.Invalid_module_alias p)
+            Misc.fatal_error "unreachable 1"
         | (Mty_ident _ | Mty_strengthen _), _ ->
-            Error (Error.Mt_core Abstract_module_type)
+            Misc.fatal_error "unreachable 2"
         | (Mty_alias _, Mty_alias p2) ->
             if Env.is_functor_arg p2 env then
-              Error (Error.Invalid_module_alias p2)
+              Misc.fatal_error "unreachable 3"
             else
-              Error Error.(Mt_core Incompatible_aliases)
+              Misc.fatal_error "unreachable 4"
         | Mty_functor _, _
         | _, Mty_functor _ ->
             let params1 =
