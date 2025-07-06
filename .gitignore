@@ -146,6 +146,8 @@ ocaml/primitives.new
 /emacs/ocamltags
 /emacs/*.elc
 
+/.vscode/
+
 /flexdll-sources
 
 /lambda/runtimedef.ml
