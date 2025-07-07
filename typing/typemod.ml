@@ -2661,8 +2661,7 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty
     | false, None   -> Includemod.Error.Anonymous, mty
 
-let maybe_infer_modalities ~loc ~env ~md_mode ~mode =
-  if Language_extension.(is_at_least Mode Stable) then begin
+let infer_modalities ~loc ~env ~md_mode ~mode =
     (* Values are packed into a structure at modes weaker than they actually
       are. This is to allow our legacy zapping behavior. For example:
 
@@ -2691,13 +2690,6 @@ let maybe_infer_modalities ~loc ~env ~md_mode ~mode =
       | Error (Error (ax, e)) -> raise (Error (loc, env, Submode_failed (Error (Comonadic ax, e))))
     end;
     Mode.Modality.Value.infer ~md_mode ~mode
-  end else begin
-    begin match Mode.Value.submode mode md_mode with
-      | Ok () -> ()
-      | Error e -> raise (Error (loc, env, Submode_failed e))
-    end;
-    Mode.Modality.Value.id
-  end
 
 let rec type_module ?alias sttn funct_body anchor env smod =
   let md, shape, held_locks =
@@ -3236,7 +3228,7 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
               let vd, mode =  Env.find_value_no_locks_exn id newenv in
               let vd = Subst.Lazy.force_value_description vd in
               let modalities =
-                maybe_infer_modalities ~loc:first_loc ~env ~md_mode ~mode
+                infer_modalities ~loc:first_loc ~env ~md_mode ~mode
               in
               let vd =
                 { vd with
@@ -3644,9 +3636,9 @@ let type_module_type_of env smod =
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
+  let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
-    remove_modality_and_zero_alloc_variables_mty env
-      ~zap_modality:Mode.Modality.Value.zap_to_floor mty
+    remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
   in
   tmty, mty
 
@@ -3888,11 +3880,14 @@ let type_implementation target modulename initial_env ast =
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
         remove_mode_and_jkind_variables finalenv sg;
+        let zap_modality =
+          Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
+        in
         let simple_sg =
           (* Printing [.mli] from [.ml], we zap to identity modality for legacy
              compatibility. *)
-          remove_modality_and_zero_alloc_variables_sg finalenv
-            ~zap_modality:Mode.Modality.Value.zap_to_id simple_sg
+          remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
+            simple_sg
         in
         Typecore.force_delayed_checks ();
         Typecore.optimise_allocations ();
@@ -3993,11 +3988,15 @@ let type_implementation target modulename initial_env ast =
                 sourcefile sg "(inferred signature)" simple_sg shape)
           in
           check_nongen_signature finalenv simple_sg;
+          let zap_modality =
+            (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
+               inclusion check, so we zap to identity if mode extension is
+               disabled. Otherwise, zapping to floor (strongest) is better. *)
+            Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
+          in
           let simple_sg =
-            (* Generating [cmi] without [mli]. This [cmi] will only be on the
-               LHS of inclusion check, so we zap to floor (strongest). *)
-            remove_modality_and_zero_alloc_variables_sg finalenv
-              ~zap_modality:Mode.Modality.Value.zap_to_floor simple_sg
+            remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
+              simple_sg
           in
           normalize_signature simple_sg;
           let argument_interface =
