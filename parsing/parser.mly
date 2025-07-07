@@ -1062,6 +1062,7 @@ let maybe_pmod_constraint mode expr =
 %token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
+%token <string> GENOPTLABEL   "?'label:" (* just an example *)
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
@@ -2681,10 +2682,18 @@ labeled_simple_pattern:
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
+  | QUESTION QUOTE LPAREN label_let_pattern generic_opt_default RPAREN
+      { (Generic_optional (fst $4), $5, snd $4) }
+  | QUESTION QUOTE label_var
+      { (Generic_optional (fst $3), None, snd $3) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
+  | GENOPTLABEL LPAREN let_pattern opt_default RPAREN
+      { (Generic_optional $1, $4, $3) }
+  | GENOPTLABEL pattern_var
+      { (Generic_optional $1, None, $2) }
   | TILDE LPAREN label_let_pattern RPAREN
       { (Labelled (fst $3), None, snd $3) }
   | TILDE label_var
@@ -2704,6 +2713,11 @@ pattern_var:
 
 %inline opt_default:
   preceded(EQUAL, seq_expr)?
+    { $1 }
+;
+
+%inline generic_opt_default:
+  preceded(LESSMINUS, seq_expr)?
     { $1 }
 ;
 
@@ -3158,8 +3172,13 @@ labeled_simple_expr:
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
+  | QUESTION QUOTE label = LIDENT
+      { let loc = $loc(label) in
+        (Generic_optional label, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
+  | GENOPTLABEL simple_expr %prec below_HASH
+      { (Generic_optional $1, $2) }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -4500,6 +4519,8 @@ strict_function_or_labeled_tuple_type:
 %inline strict_arg_label:
   | label = optlabel
       { Optional label }
+  | label = genoptlabel
+      { Generic_optional label }
   | label = LIDENT COLON
       { Labelled label }
 ;
@@ -5170,6 +5191,10 @@ additive:
 optlabel:
    | OPTLABEL                                   { $1 }
    | QUESTION LIDENT COLON                      { $2 }
+;
+genoptlabel:
+   | GENOPTLABEL                                   { $1 }
+   | QUESTION QUOTE LIDENT COLON                      { $3 }
 ;
 
 /* Attributes and extensions */
