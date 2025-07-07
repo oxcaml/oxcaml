@@ -1526,7 +1526,7 @@ val triangle_10 : int = 55
 module M : S = struct
 let concat ?'(sep : string option <- " ") xs =
   String.concat sep xs
-end
+end ;;
 
 [%%expect{|
 val triangle_10 : int = 55
