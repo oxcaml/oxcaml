@@ -413,7 +413,7 @@ let indexing_primitives =
    let arity = if String.is_substring string ~substring:"get" then 2 else 3 in
    [ (string, fun ~mode -> Primitive (primitive ~mode, arity)) ])
   |> List.to_seq
-  |> fun seq -> String.Map.add_seq seq String.Map.empty
+  |> String.Map.of_seq
 
 let array_vec_primitives =
   let array_types_and_primitives =
@@ -494,7 +494,7 @@ let array_vec_primitives =
       fun ~mode:_ -> Primitive (set_prim ~size ~unsafe ~index_kind ~boxed, 3))
    ])
   |> List.to_seq
-  |> fun seq -> String.Map.add_seq seq String.Map.empty
+  |> String.Map.of_seq
 
 let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   let runtime5 = Config.runtime5 in

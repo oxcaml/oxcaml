@@ -524,6 +524,7 @@ let prim_has_valid_reprs ~loc prim =
   let module C = Jkind_types.Sort.Const in
 
   let check =
+    (* Corresponds to [indexing_primitives] in [translprim.ml]. *)
     let stringlike_indexing_primitives =
       let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
         [
@@ -590,6 +591,7 @@ let prim_has_valid_reprs ~loc prim =
       |> List.to_seq
       |> fun seq -> String.Map.add_seq seq String.Map.empty
     in
+    (* Corresponds to [array_vec_primitives] in [translprim.ml]. *)
     let vector_array_indexing_primitives =
       let vector_sizes = [
         ("128", "", C.value);
