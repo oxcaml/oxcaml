@@ -385,3 +385,18 @@ module F :
   functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
   stateless
 |}]
+
+
+module type S = sig
+    module F (X : sig end) : sig end
+    module G (X : sig end) : sig
+        module type T = module type of (F (X))
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    module F : functor (X : sig end) -> sig end
+    module G : functor (X : sig end) -> sig module type T = sig end end
+  end
+|}]

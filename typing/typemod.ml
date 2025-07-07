@@ -1744,7 +1744,7 @@ and transl_modtype_aux env smty =
                   }
                 in
                 Env.enter_module_declaration ~scope ~arg:true name Mp_present
-                  arg_md env
+                  ~mode:(alloc_as_value functor_param_mode) arg_md env
               in
               Some id, newenv
           in
