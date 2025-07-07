@@ -2690,9 +2690,6 @@ let set_externality_upper_bound jk externality_upper_bound =
 let all_except_nullability =
   Axis_set.singleton (Nonmodal Nullability) |> Axis_set.complement
 
-let all_except_separability =
-  Axis_set.singleton (Nonmodal Separability) |> Axis_set.complement
-
 let get_nullability ~jkind_of_type jk =
   (* Optimization: Usually, no with-bounds are relevant to nullability. If we check for
      this case, we can avoid calling normalize. *)
@@ -2729,26 +2726,6 @@ let set_separability_upper_bound jk separability_upper_bound =
       }
   }
 
-let get_separability ~jkind_of_type jk =
-  (* Optimization: Usually, no with-bounds are relevant to separability. If we check for
-     this case, we can avoid calling normalize. *)
-  let all_with_bounds_are_irrelevant =
-    jk.jkind.with_bounds
-    |> With_bounds.for_all
-         (fun _ ({ relevant_axes } : With_bounds_type_info.t) ->
-           not (Axis_set.mem relevant_axes (Nonmodal Separability)))
-  in
-  if all_with_bounds_are_irrelevant
-  then Mod_bounds.separability jk.jkind.mod_bounds
-  else
-    let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
-            (_ * allowed) jkind_desc),
-          _ ) =
-      Layout_and_axes.normalize ~mode:Ignore_best ~jkind_of_type
-        ~skip_axes:all_except_separability jk.jkind
-    in
-    Mod_bounds.get mod_bounds ~axis:(Nonmodal Separability)
-
 let set_layout jk layout = { jk with jkind = { jk.jkind with layout } }
 
 let apply_modality_l modality jk =
@@ -2777,6 +2754,18 @@ let apply_modality_r modality jk =
       (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+let apply_or_null jkind =
+  match Mod_bounds.nullability jkind.jkind.mod_bounds with
+  | Maybe_null ->
+    let jkind = set_nullability_upper_bound jkind Non_null in
+    let jkind =
+      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      | Maybe_separable -> jkind
+      | Separable | Non_float -> set_separability_upper_bound jkind Non_float
+    in
+    Ok jkind
+  | Non_null -> Error ()
 
 let get_annotation jk = jk.annotation
 

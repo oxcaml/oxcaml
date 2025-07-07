@@ -2535,39 +2535,17 @@ let constrain_type_jkind ~fixed env ty jkind =
              end
           in
           let or_null ~fuel ty is_open modality =
-            let jkind_nullability =
-              Jkind.get_nullability
-                ~jkind_of_type:(fun ty -> Some (estimate_type_jkind env ty)) jkind
-            in
-            begin match jkind_nullability with
-            | Jkind_axis.Nullability.Maybe_null ->
-              let jkind = Jkind.apply_modality_r modality jkind in
-              let jkind =
-                Jkind.set_nullability_upper_bound
-                  jkind
-                  Jkind_axis.Nullability.Non_null
-              in
-              let jkind_separability =
-                Jkind.get_separability
-                  ~jkind_of_type:(fun ty -> Some (estimate_type_jkind env ty))
-                  jkind
-              in
-              let jkind =
-                match jkind_separability with
-                | Jkind_axis.Separability.Maybe_separable -> jkind
-                (* If the target jkind is separable, the jkind of the type
-                   inside [_ or_null] must be non-float.  *)
-                | Separable | Non_float ->
-                  Jkind.set_separability_upper_bound jkind
-                    Jkind_axis.Separability.Non_float
-              in
+            let jkind = Jkind.apply_modality_r modality jkind in
+            match
+              Jkind.apply_or_null jkind
+            with
+            | Ok jkind ->
               loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
                 (estimate_type_jkind env ty) jkind
-            | Non_null ->
+            | Error () ->
               (* [_ or_null] fails against a non-null jkind. *)
               Error (Jkind.Violation.of_ ~jkind_of_type
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-            end
           in
           match get_desc ty with
           | Tconstr _ ->
