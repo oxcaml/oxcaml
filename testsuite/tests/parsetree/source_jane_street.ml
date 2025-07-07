@@ -1509,3 +1509,46 @@ let triangle_10 = let mutable x = 0 in
 [%%expect{|
 val triangle_10 : int = 55
 |}]
+
+
+(******************************)
+(* generic optional arguments *)
+
+module type S = sig
+val concat : ?'sep:string -> string list -> string
+end ;;
+
+[%%expect{|
+val triangle_10 : int = 55
+|}]
+
+(* Implementation *)
+module M : S = struct
+let concat ?'(sep : string option <- " ") xs =
+  String.concat sep xs
+end
+
+[%%expect{|
+val triangle_10 : int = 55
+|}]
+
+let default_concat ys = M.concat ys in default_conat ["x"; "y"; "z"] ;;
+[%%expect{|
+val triangle_10 : int = 55
+|}]
+
+let comma_concat zs = M.concat ~sep:"," zs in comma_concat ["x"; "y"; "z"] ;;
+[%%expect{|
+val triangle_10 : int = 55
+|}]
+
+let chain_call ?'(sep : string option) arg = M.concat ?'sep arg in chain_call ["x"; "y"; "z"] ;;
+[%%expect{|
+val triangle_10 : int = 55
+|}]
+
+let chain_call ?'(sep : string option) arg = M.concat ?'sep arg
+in chain_call ?'sep:(Some ",") ["x"; "y"; "z"] ;;
+[%%expect{|
+val triangle_10 : int = 55
+|}]
