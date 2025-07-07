@@ -79,7 +79,7 @@ module Witness = struct
     | Missing_summary ->
       Format.fprintf ppf
         "@.Hint: Build artifacts for the library containing the callee are not \
-         available.@.Try adding the library as an explicity dependency.@."
+         available.@.Try adding the library as an explicit dependency.@."
     | Conservative ->
       Format.fprintf ppf
         "@.Hint: Recompile without -disable-precise-zero-alloc-checker for \
