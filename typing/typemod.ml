@@ -3908,11 +3908,12 @@ let type_implementation target modulename initial_env ast =
           in
           check_nongen_signature finalenv simple_sg;
           let zap_modality =
+            (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
+               inclusion check, so we zap to identity if mode extension is
+               disabled. Otherwise, zapping to floor (strongest) is better. *)
             Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
           in
           let simple_sg =
-            (* Generating [cmi] without [mli]. This [cmi] will only be on the
-               LHS of inclusion check, so we zap to floor (strongest). *)
             remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
               simple_sg
           in
