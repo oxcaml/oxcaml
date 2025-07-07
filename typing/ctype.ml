@@ -2215,7 +2215,7 @@ let unbox_once env ty =
             Stepped_or_null { ty = apply arg.ca_type;
                               is_open = false;
                               modality = arg.ca_modalities }
-          | _ -> Final_result
+          | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
         | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
           Final_result
@@ -2535,17 +2535,29 @@ let constrain_type_jkind ~fixed env ty jkind =
              end
           in
           let or_null ~fuel ty is_open modality =
+            let error =
+              Error (Jkind.Violation.of_ ~jkind_of_type
+                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            in
             let jkind = Jkind.apply_modality_r modality jkind in
             match
               Jkind.apply_or_null jkind
             with
             | Ok jkind ->
-              loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
-                (estimate_type_jkind env ty) jkind
+              (match
+                loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
+                  (estimate_type_jkind env ty) jkind
+              with
+              | Ok () -> Ok ()
+              | Error _ ->
+                (* Since [constrain_type_jkind] reports errors for the original
+                   type on the left, return the original error.
+                   We could do something smarter here, updating the [loop]-ed
+                   error to have correct jkinds. *)
+                error)
             | Error () ->
               (* [_ or_null] fails against a non-null jkind. *)
-              Error (Jkind.Violation.of_ ~jkind_of_type
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+              error
           in
           match get_desc ty with
           | Tconstr _ ->

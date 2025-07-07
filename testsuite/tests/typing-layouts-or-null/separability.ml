@@ -504,10 +504,9 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "t_val or_null" should be an instance of type
          "('a : any mod separable)"
-       The kind of t_val or_null is value
-         because of the definition of t_val at line 1, characters 0-18.
-       But the kind of t_val or_null must be a subkind of
-         any_non_null mod non_float
+       The kind of t_val or_null is value_or_null
+         because it is the primitive value_or_null type or_null.
+       But the kind of t_val or_null must be a subkind of any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -560,11 +559,9 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any mod separable)"
-       The kind of float or_null is
-           value mod many unyielding stateless immutable
-         because it is the primitive type float.
-       But the kind of float or_null must be a subkind of
-         any_non_null mod non_float
+       The kind of float or_null is value_or_null
+         because it is the primitive value_or_null type or_null.
+       But the kind of float or_null must be a subkind of any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -835,11 +832,10 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any mod non_float)"
-       The kind of float Or_null_reexport.t is
-         value mod many unyielding stateless immutable
-         because it is the primitive type float.
+       The kind of float Or_null_reexport.t is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of float Or_null_reexport.t must be a subkind of
-         any_non_null mod non_float
+         any mod non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -851,11 +847,10 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any mod separable)"
-       The kind of float Or_null_reexport.t is
-         value mod many unyielding stateless immutable
-         because it is the primitive type float.
+       The kind of float Or_null_reexport.t is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of float Or_null_reexport.t must be a subkind of
-         any_non_null mod non_float
+         any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -883,10 +878,9 @@ Line 1, characters 13-31:
                  ^^^^^^^^^^^^^^^^^^
 Error: This type "float unbx or_null" should be an instance of type
          "('a : any mod separable)"
-       The kind of float unbx or_null is
-         value mod many unyielding stateless immutable
-         because it is the primitive type float.
+       The kind of float unbx or_null is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of float unbx or_null must be a subkind of
-         any_non_null mod non_float
+         any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
