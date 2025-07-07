@@ -921,6 +921,18 @@ let mk_directive ~loc name arg =
    may also get re-inlined at that point *)
 let unboxed_literals_extension = Language_extension.Layouts
 
+let generic_optional_arguments_extension = Language_extension.Generic_optional_arguments
+
+let generic_optional label loc =
+  if Language_extension.is_enabled generic_optional_arguments_extension then
+    Generic_optional label
+  else
+    raise
+      Syntaxerr.(
+        Error
+          (Generic_optional_arguments_not_allowed
+             (make_loc loc)))
+
 type sign = Positive | Negative
 
 let with_sign sign num =
@@ -2683,17 +2695,17 @@ labeled_simple_pattern:
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
   | QUESTION QUOTE LPAREN label_let_pattern generic_opt_default RPAREN
-      { (Generic_optional (fst $4), $5, snd $4) }
+      { (generic_optional (fst $4) $sloc, $5, snd $4) }
   | QUESTION QUOTE label_var
-      { (Generic_optional (fst $3), None, snd $3) }
+      { (generic_optional (fst $3) $sloc, None, snd $3) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
   | GENOPTLABEL LPAREN let_pattern opt_default RPAREN
-      { (Generic_optional $1, $4, $3) }
+      { (generic_optional $1 $sloc, $4, $3) }
   | GENOPTLABEL pattern_var
-      { (Generic_optional $1, None, $2) }
+      { (generic_optional $1 $sloc, None, $2) }
   | TILDE LPAREN label_let_pattern RPAREN
       { (Labelled (fst $3), None, snd $3) }
   | TILDE label_var
@@ -3174,11 +3186,11 @@ labeled_simple_expr:
         (Optional label, mkexpvar ~loc label) }
   | QUESTION QUOTE label = LIDENT
       { let loc = $loc(label) in
-        (Generic_optional label, mkexpvar ~loc label) }
+        (generic_optional label $sloc, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
   | GENOPTLABEL simple_expr %prec below_HASH
-      { (Generic_optional $1, $2) }
+      { (generic_optional $1 $sloc, $2) }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -4520,7 +4532,7 @@ strict_function_or_labeled_tuple_type:
   | label = optlabel
       { Optional label }
   | label = genoptlabel
-      { Generic_optional label }
+      { generic_optional label $sloc}
   | label = LIDENT COLON
       { Labelled label }
 ;

@@ -192,6 +192,14 @@ let prepare_error err =
          @{<hint>Hint@}: If you really want a mutable function variable, \
          use the de-sugared syntax:\n  %a"
          Style.inline_code "let mutable f = fun x -> .."
+  | Generic_optional_arguments_not_allowed loc ->
+    Location.errorf ~loc
+        "Syntax error: Generic optional arguments are not allowed. Make sure \
+         you have the correct language extension enabled."
+
+
+
+
 
 let () =
   Location.register_error_of_exn
