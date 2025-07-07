@@ -1811,3 +1811,18 @@ end
 module M :
   sig type 'a t : value mod contended portable with 'a @@ portable end
 |}]
+
+(***********************************************)
+(* Test 19: identity type in a with-constraint *)
+
+(* This tests a bug seen in practice *)
+module type S = sig
+  type 'a t : value mod portable with 'a
+end
+
+module type S2 = S with type 'a t = 'a
+
+[%%expect{|
+module type S = sig type 'a t : value mod portable with 'a end
+module type S2 = sig type 'a t = 'a end
+|}]

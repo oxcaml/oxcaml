@@ -317,7 +317,10 @@ let check_type_decl env sg loc id row_id newdecl decl =
   in
   let env = Env.add_signature sg env in
   Includemod.type_declarations ~mark:true ~loc env fresh_id newdecl decl;
-  ignore (Typedecl.check_coherence env loc path newdecl)
+  Typedecl.check_coherence env loc path newdecl
+    (* The use of [check_coherence] here skips the manifest subkind check
+       in [narrow_to_manifest_jkind], but that's ok, because this check already
+       has happened in [Includemod.type_declarations]. *)
 
 let make_variance p n i =
   let open Variance in
