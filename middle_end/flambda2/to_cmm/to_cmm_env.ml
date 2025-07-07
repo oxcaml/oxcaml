@@ -653,7 +653,9 @@ and split_in_env env res var binding =
     let env, res =
       List.fold_left
         (fun (env, res) new_binding ->
-          let flambda_var = Variable.create "to_cmm_tmp" in
+          let flambda_var =
+            Variable.create "to_cmm_tmp" Flambda_kind.value (*TODO:fix*)
+          in
           add_binding_to_env env res flambda_var new_binding)
         (env, res) new_bindings
     in

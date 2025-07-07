@@ -80,7 +80,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
        (which just returns unit) doesn't use any of the parameters. *)
     C.continuation_bound_parameters env
       (Bound_parameters.create
-         [ Bound_parameter.create (Variable.create "*ret*")
+         [ Bound_parameter.create
+             (Variable.create "*ret*" Flambda_kind.value)
              Flambda_kind.With_subkind.any_value ])
   in
   let return_cont, env =

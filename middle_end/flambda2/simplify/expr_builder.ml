@@ -262,7 +262,7 @@ let create_coerced_singleton_let uacc var defining_expr
     | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> (
       let uncoerced_var =
         let name = "uncoerced_" ^ Variable.unique_name (VB.var var) in
-        Variable.create name
+        Variable.create name (Variable.kind (VB.var var))
       in
       (* Generate [let var = uncoerced_var @ <coercion>] *)
       let ((body, uacc, inner_result) as inner) =
@@ -817,7 +817,8 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
          binds [kinded_params]. *)
       let params =
         List.map
-          (fun _kind -> Variable.create "param")
+          (fun kind ->
+            Variable.create "param" (Flambda_kind.With_subkind.kind kind))
           (Flambda_arity.unarized_components arity)
       in
       let params =

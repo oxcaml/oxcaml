@@ -237,7 +237,10 @@ module Env = struct
       | Not_user_visible -> None
       | User_visible -> Some ()
     in
-    let var = Variable.create_with_same_name_as_ident ?user_visible id in
+    let var =
+      Variable.create_with_same_name_as_ident ?user_visible id
+        (Flambda_kind.With_subkind.kind kind)
+    in
     add_var t id var kind, var
 
   let add_vars_like t ids =
@@ -249,7 +252,9 @@ module Env = struct
             | Not_user_visible -> None
             | User_visible -> Some ()
           in
-          Variable.create_with_same_name_as_ident ?user_visible id, kind)
+          ( Variable.create_with_same_name_as_ident ?user_visible id
+              (Flambda_kind.With_subkind.kind kind),
+            kind ))
         ids
     in
     add_vars t (List.map (fun (id, _, _) -> id) ids) vars, List.map fst vars

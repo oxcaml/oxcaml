@@ -89,7 +89,7 @@ let init_env () =
   let error_continuation =
     Exn_continuation.create ~exn_handler ~extra_args:[]
   in
-  let toplevel_region = Variable.create "toplevel" in
+  let toplevel_region = Variable.create "toplevel" Flambda_kind.region in
   { done_continuation;
     error_continuation;
     continuations = CM.empty;
@@ -128,8 +128,8 @@ let fresh_exn_cont env { Fexpr.txt = name; loc = _ } =
       exn_continuations = CM.add name e env.exn_continuations
     } )
 
-let fresh_var env { Fexpr.txt = name; loc = _ } =
-  let v = Variable.create name ~user_visible:() in
+let fresh_var env { Fexpr.txt = name; loc = _ } k =
+  let v = Variable.create name ~user_visible:() k in
   v, { env with variables = VM.add name v env.variables }
 
 let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
@@ -634,7 +634,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     let bound_vars, env =
       let convert_binding env (var, _) : Bound_var.t * env =
-        let var, env = fresh_var env var in
+        let var, env = fresh_var env var Flambda_kind.value in
         let var = Bound_var.create var Name_mode.normal in
         var, env
       in
@@ -660,7 +660,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     Misc.fatal_errorf "'with' clause only allowed when defining closures"
   | Let { bindings = [{ var; defining_expr = d }]; body; value_slots = None } ->
     let named = defining_expr env d in
-    let id, env = fresh_var env var in
+    let id, env = fresh_var env var (Flambda.Named.kind named) in
     let body = expr env body in
     let var = Bound_var.create id Name_mode.normal in
     let bound = Bound_pattern.singleton var in
@@ -693,10 +693,11 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
       let env, parameters =
         List.fold_right
           (fun ({ param; kind } : Fexpr.kinded_parameter) (env, args) ->
-            let var, env = fresh_var env param in
-            let param =
-              Bound_parameter.create var (value_kind_with_subkind_opt kind)
+            let kind = value_kind_with_subkind_opt kind in
+            let var, env =
+              fresh_var env param (Flambda_kind.With_subkind.kind kind)
             in
+            let param = Bound_parameter.create var kind in
             env, param :: args)
           params (env, [])
       in
@@ -917,17 +918,20 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           let params, env =
             map_accum_left
               (fun env ({ param; kind } : Fexpr.kinded_parameter) ->
-                let var, env = fresh_var env param in
-                let param =
-                  Bound_parameter.create var (value_kind_with_subkind_opt kind)
+                let kind = value_kind_with_subkind_opt kind in
+                let var, env =
+                  fresh_var env param (Flambda_kind.With_subkind.kind kind)
                 in
+                let param = Bound_parameter.create var kind in
                 param, env)
               env params
           in
-          let my_closure, env = fresh_var env closure_var in
-          let my_region, env = fresh_var env region_var in
-          let my_ghost_region, env = fresh_var env ghost_region_var in
-          let my_depth, env = fresh_var env depth_var in
+          let my_closure, env = fresh_var env closure_var Flambda_kind.value in
+          let my_region, env = fresh_var env region_var Flambda_kind.region in
+          let my_ghost_region, env =
+            fresh_var env ghost_region_var Flambda_kind.region
+          in
+          let my_depth, env = fresh_var env depth_var Flambda_kind.rec_info in
           let return_continuation, env =
             fresh_cont env ret_cont ~sort:Return
               ~arity:(Flambda_arity.cardinal_unarized result_arity)
@@ -1150,5 +1154,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : Flambda_unit.t =
   let body = expr env fexpr.body in
   Flambda_unit.create ~return_continuation ~exn_continuation
     ~toplevel_my_region:toplevel_region
-    ~toplevel_my_ghost_region:(Variable.create "my_ghost_region")
+    ~toplevel_my_ghost_region:
+      (Variable.create "my_ghost_region" Flambda_kind.region)
     ~body ~module_symbol ~used_value_slots:Unknown

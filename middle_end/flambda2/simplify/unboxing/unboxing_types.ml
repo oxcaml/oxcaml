@@ -34,8 +34,10 @@ module Extra_param_and_args = struct
       args : EPA.Extra_arg.t Apply_cont_rewrite_id.Map.t
     }
 
-  let create ~name =
-    { param = Variable.create name; args = Apply_cont_rewrite_id.Map.empty }
+  let create ~name kind =
+    { param = Variable.create name kind;
+      args = Apply_cont_rewrite_id.Map.empty
+    }
 
   let update_param_args t rewrite_id extra_arg =
     assert (not (Apply_cont_rewrite_id.Map.mem rewrite_id t.args));
