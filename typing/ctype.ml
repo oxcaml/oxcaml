@@ -2212,6 +2212,8 @@ let unbox_once env ty =
         | Type_variant ([_; cd2], Variant_with_null, _) ->
           begin match cd2.cd_args with
           | Cstr_tuple [arg] ->
+            (* [arg.ca_modalities] is currently always empty, but won't be
+               when we let users define custom or-null-like types. *)
             Stepped_or_null { ty = apply arg.ca_type;
                               is_open = false;
                               modality = arg.ca_modalities }
@@ -2535,7 +2537,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              end
           in
           let or_null ~fuel ty is_open modality =
-            let error =
+            let error () =
               Error (Jkind.Violation.of_ ~jkind_of_type
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
             in
@@ -2545,19 +2547,22 @@ let constrain_type_jkind ~fixed env ty jkind =
             with
             | Ok jkind ->
               (match
-                loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
+                loop ~fuel ~expanded:false ty ~is_open
                   (estimate_type_jkind env ty) jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
-                (* Since [constrain_type_jkind] reports errors for the original
+                (* CR or_null:
+                   Since [constrain_type_jkind] reports errors for the original
                    type on the left, return the original error.
                    We could do something smarter here, updating the [loop]-ed
                    error to have correct jkinds. *)
-                error)
+                error ())
             | Error () ->
-              (* [_ or_null] fails against a non-null jkind. *)
-              error
+              (* CR or_null:
+                 [_ or_null] fails against a non-null jkind.
+                 We could still estimate the kind on the left better. *)
+              error ()
           in
           match get_desc ty with
           | Tconstr _ ->
