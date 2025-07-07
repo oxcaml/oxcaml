@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Typing_env
+type t
 
 type 'a meet_return_value =
   | Left_input
@@ -27,6 +27,19 @@ type meet_type =
   Type_grammar.t ->
   Type_grammar.t ->
   (Type_grammar.t meet_return_value * t) Or_bottom.t
+
+val create : Typing_env.t -> t
+
+val use_meet_env : Typing_env.t -> f:(t -> t) -> Typing_env.t
+
+val use_meet_env_strict :
+  Typing_env.t -> f:(t -> t Or_bottom.t) -> Typing_env.t Or_bottom.t
+
+val typing_env : t -> Typing_env.t
+
+val with_typing_env : t -> Typing_env.t -> t
+
+val map_typing_env : t -> f:(Typing_env.t -> Typing_env.t) -> t
 
 val add_equation : t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t
 

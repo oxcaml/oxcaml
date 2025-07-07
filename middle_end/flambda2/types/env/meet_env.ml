@@ -19,6 +19,8 @@ module TG = Type_grammar
 module TE = Typing_env
 module TEL = Typing_env_level
 
+type t = TE.t
+
 type 'a meet_return_value =
   | Left_input
   | Right_input
@@ -30,6 +32,18 @@ type meet_type =
   Type_grammar.t ->
   Type_grammar.t ->
   (Type_grammar.t meet_return_value * TE.t) Or_bottom.t
+
+let create t = t
+
+let typing_env t = t
+
+let with_typing_env _ t = t
+
+let use_meet_env t ~f = f t
+
+let use_meet_env_strict t ~f = f t
+
+let map_typing_env t ~f = f t
 
 let replace_concrete_equation t name ty =
   match TG.must_be_singleton ty with

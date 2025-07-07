@@ -41,7 +41,7 @@ let map_return_value f (x : _ meet_return_value) =
 
 type 'a meet_result =
   | Bottom of unit meet_return_value
-  | Ok of 'a meet_return_value * TE.t
+  | Ok of 'a meet_return_value * ME.t
 
 type 'a n_way_join_result = 'a Or_unknown.t * Join_env.t
 
@@ -128,7 +128,7 @@ type ('key, 'data, 'mapping) fold2 =
   }
 
 let meet_mapping (type key data mapping)
-    ~(meet_data : TE.t -> data -> data -> data meet_result)
+    ~(meet_data : ME.t -> data -> data -> data meet_result)
     ~(fold2 : (key, data, mapping) fold2) ~env ~(left : mapping)
     ~(right : mapping) ~(rebuild : (key * data) list -> mapping) :
     mapping meet_result =
@@ -138,7 +138,7 @@ let meet_mapping (type key data mapping)
       { all_left : bool;
         all_right : bool;
         mapping : (key * data) list;
-        env : TE.t
+        env : ME.t
       }
 
     exception Bottom_result
@@ -189,7 +189,7 @@ let meet_mapping (type key data mapping)
   with Bottom_result -> Bottom (New_result ())
 
 module Map_meet (M : Container_types_intf.Map) = struct
-  let meet ~(meet_data : TE.t -> 'a -> 'a -> 'a meet_result) env (left : 'a M.t)
+  let meet ~(meet_data : ME.t -> 'a -> 'a -> 'a meet_result) env (left : 'a M.t)
       (right : 'a M.t) : 'a M.t meet_result =
     let fold2 f m1 m2 init =
       let r = ref init in
@@ -215,7 +215,7 @@ module Value_slot_map_meet = Map_meet (Value_slot.Map)
 module Combine_results_meet_ops = struct
   type _ t =
     | [] : unit t
-    | ( :: ) : ((TE.t -> 'a -> 'a -> 'a meet_result) * 'b t) -> ('a * 'b) t
+    | ( :: ) : ((ME.t -> 'a -> 'a -> 'a meet_result) * 'b t) -> ('a * 'b) t
 end
 
 module Combine_results_inputs = struct
@@ -241,7 +241,7 @@ let combine_results env ~(meet_ops : 'a Combine_results_meet_ops.t)
     'b meet_result =
   let rec do_meets :
       type a.
-      TE.t ->
+      ME.t ->
       a Combine_results_meet_ops.t ->
       a Combine_results_inputs.t ->
       a Combine_results_inputs.t ->
@@ -295,13 +295,18 @@ let add_defined_vars env level =
 
 let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     initial_env val_a1 val_b1 extensions1 val_a2 val_b2 extensions2 =
-  let join_scope = TE.current_scope initial_env in
-  let env = TE.increment_scope initial_env in
+  let initial_tenv = ME.typing_env initial_env in
+  let join_scope = TE.current_scope initial_tenv in
+  let env = ME.map_typing_env initial_env ~f:TE.increment_scope in
   let direct_return r =
     map_env r ~f:(fun scoped_env ->
         (* Need to cut as a level because we could have added new variables. *)
-        let level = TE.cut scoped_env ~cut_after:join_scope in
-        let initial_env = add_defined_vars initial_env level in
+        let scoped_tenv = ME.typing_env scoped_env in
+        let level = TE.cut scoped_tenv ~cut_after:join_scope in
+        let initial_env =
+          ME.map_typing_env initial_env ~f:(fun initial_tenv ->
+              add_defined_vars initial_tenv level)
+        in
         let ext = TEE.from_map (TEL.equations level) in
         ME.add_env_extension_strict initial_env ext ~meet_type)
   in
@@ -358,16 +363,23 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
       (* Not strict, as we don't expect to be able to get bottom equations from
          joining non-bottom ones *)
       Join_env.cut_and_n_way_join ~meet_type ~n_way_join_type:n_way_join
-        ~cut_after:join_scope initial_env [env_a; env_b]
+        ~cut_after:join_scope initial_env
+        [ME.typing_env env_a; ME.typing_env env_b]
     in
-    let when_a_level = TE.cut env_a ~cut_after:join_scope in
-    let when_b_level = TE.cut env_b ~cut_after:join_scope in
+    let when_a_level = TE.cut (ME.typing_env env_a) ~cut_after:join_scope in
+    let when_b_level = TE.cut (ME.typing_env env_b) ~cut_after:join_scope in
     (* New variables introduced by either [meet_a] or [meet_b] are not
        guaranteed to end up in the [result_env] (in fact, they will probably get
        renamed), but they can still appear in [a_result] and [b_result], so we
        need to add them back. *)
-    let result_env = add_defined_vars result_env when_a_level in
-    let result_env = add_defined_vars result_env when_b_level in
+    let result_env =
+      ME.map_typing_env result_env ~f:(fun result_env ->
+          add_defined_vars result_env when_a_level)
+    in
+    let result_env =
+      ME.map_typing_env result_env ~f:(fun result_env ->
+          add_defined_vars result_env when_b_level)
+    in
     let extensions =
       if TEL.is_empty when_a_level && TEL.is_empty when_b_level
       then
@@ -403,14 +415,15 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     in
     Ok (result, result_env)
 
-let meet_code_id (env : TE.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
+let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
     Code_id.t meet_result =
   if Code_id.equal code_id1 code_id2
   then Ok (Both_inputs, env)
   else
     match
-      Code_age_relation.meet (TE.code_age_relation env)
-        ~resolver:(TE.code_age_relation_resolver env)
+      Code_age_relation.meet
+        (TE.code_age_relation (ME.typing_env env))
+        ~resolver:(TE.code_age_relation_resolver (ME.typing_env env))
         code_id1 code_id2
     with
     | Bottom -> Bottom (New_result ())
@@ -579,7 +592,7 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   let kind = TG.kind t1 in
   let simple1 =
     match
-      TE.get_alias_then_canonical_simple_exn env t1
+      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t1
         ~min_name_mode:Name_mode.in_types
     with
     | exception Not_found -> None
@@ -587,7 +600,7 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   in
   let simple2 =
     match
-      TE.get_alias_then_canonical_simple_exn env t2
+      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t2
         ~min_name_mode:Name_mode.in_types
     with
     | exception Not_found -> None
@@ -596,13 +609,13 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   match simple1 with
   | None -> (
     let expanded1 =
-      Expand_head.expand_head0 env t1
+      Expand_head.expand_head0 (ME.typing_env env) t1
         ~known_canonical_simple_at_in_types_mode:simple1
     in
     match simple2 with
     | None ->
       let expanded2 =
-        Expand_head.expand_head0 env t2
+        Expand_head.expand_head0 (ME.typing_env env) t2
           ~known_canonical_simple_at_in_types_mode:simple2
       in
       map_result ~f:ET.to_type (meet_expanded_head env expanded1 expanded2)
@@ -623,7 +636,7 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
     match simple2 with
     | None -> (
       let expanded2 =
-        Expand_head.expand_head0 env t2
+        Expand_head.expand_head0 (ME.typing_env env) t2
           ~known_canonical_simple_at_in_types_mode:simple2
       in
       (* We always return [Left_input] (see comment above) *)
@@ -670,8 +683,8 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
 
 and meet_or_unknown_or_bottom :
     type a b.
-    (TE.t -> a -> a -> b meet_result) ->
-    TE.t ->
+    (ME.t -> a -> a -> b meet_result) ->
+    ME.t ->
     a Or_unknown_or_bottom.t ->
     a Or_unknown_or_bottom.t ->
     b meet_result =
@@ -1228,7 +1241,7 @@ and meet_head_of_kind_region env () () : _ meet_result = Ok (Both_inputs, env)
 
 and meet_row_like :
       'lattice 'shape 'maps_to 'row_tag 'known.
-      meet_maps_to:(TE.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
+      meet_maps_to:(ME.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
       equal_index:('lattice -> 'lattice -> bool) ->
       subset_index:('lattice -> 'lattice -> bool) ->
       union_index:('lattice -> 'lattice -> 'lattice) ->
@@ -1245,7 +1258,7 @@ and meet_row_like :
         'known ->
         'known ->
         'known) ->
-      TE.t ->
+      ME.t ->
       known1:'known ->
       known2:'known ->
       other1:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
@@ -1255,11 +1268,12 @@ and meet_row_like :
  fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
      ~is_empty_map_known ~get_singleton_map_known ~merge_map_known initial_env
      ~known1 ~known2 ~other1 ~other2 ->
-  let common_scope = TE.current_scope initial_env in
+  let initial_tenv = ME.typing_env initial_env in
+  let common_scope = TE.current_scope initial_tenv in
   (* Keep track of the variables used by all extensions and lift them to the
      result env in [extract_and_join_extensions]. *)
   let extra_variables = ref Variable.Map.empty in
-  let base_env = TE.increment_scope initial_env in
+  let base_env = ME.map_typing_env initial_env ~f:TE.increment_scope in
   let add_extra_variables_and_extract_extension scoped_env =
     let level = TE.cut scoped_env ~cut_after:common_scope in
     extra_variables
@@ -1281,17 +1295,17 @@ and meet_row_like :
       Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join ~meet_type
         ~cut_after:common_scope initial_env scoped_envs
     in
-    Variable.Map.fold
-      (fun var kind env ->
-        TE.add_definition env
-          (Bound_name.create_var
-             (Bound_var.create var Flambda_debug_uid.none
-                (* Variables with [Name_mode.in_types] do not exist at runtime,
-                   so we do not equip them with a [Flambda_debug_uid.t]. See
-                   #3967. *)
-                Name_mode.in_types))
-          kind)
-      !extra_variables result_env
+    ME.map_typing_env result_env ~f:(fun result_env ->
+        Variable.Map.fold
+          (fun var kind env ->
+            TE.add_definition env
+              (Bound_name.create_var
+                 (* Variables with [Name_mode.in_types] do not exist at runtime,
+                    so we do not equip them with a [Flambda_debug_uid.t]. See
+                    #3967. *)
+                 (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
+              kind)
+          !extra_variables result_env)
   in
   let open struct
     type result_env =
@@ -1409,7 +1423,7 @@ and meet_row_like :
         match env with
         | Bottom -> bottom_case (New_result ())
         | Ok env ->
-          join_result_env env;
+          join_result_env (ME.typing_env env);
           update_refs index_result;
           update_refs maps_to_result;
           let index = extract_value index_result case1.index case2.index in
@@ -1418,7 +1432,7 @@ and meet_row_like :
           in
           let env_extension =
             if need_join
-            then add_extra_variables_and_extract_extension env
+            then add_extra_variables_and_extract_extension (ME.typing_env env)
             else TEE.empty
           in
           if TEE.is_empty env_extension
@@ -1460,7 +1474,7 @@ and meet_row_like :
           with
           | Bottom -> None
           | Ok env ->
-            join_result_env env;
+            join_result_env (ME.typing_env env);
             result_is_t1 := false;
             result_is_t2 := false;
             Some (Known other_case))
@@ -1479,7 +1493,7 @@ and meet_row_like :
           with
           | Bottom -> None
           | Ok env ->
-            join_result_env env;
+            join_result_env (ME.typing_env env);
             result_is_t1 := false;
             result_is_t2 := false;
             Some (Known other_case))
@@ -1487,7 +1501,7 @@ and meet_row_like :
     | Some case1, Some case2 -> (
       match case1, case2 with
       | Unknown, Unknown ->
-        join_result_env base_env;
+        join_result_env (ME.typing_env base_env);
         Some Unknown
       | Known case, Unknown -> (
         match
@@ -1495,7 +1509,7 @@ and meet_row_like :
         with
         | Bottom -> None
         | Ok env ->
-          join_result_env env;
+          join_result_env (ME.typing_env env);
           result_is_t2 := false;
           Some (Known case))
       | Unknown, Known case -> (
@@ -1504,7 +1518,7 @@ and meet_row_like :
         with
         | Bottom -> None
         | Ok env ->
-          join_result_env env;
+          join_result_env (ME.typing_env env);
           result_is_t1 := false;
           Some (Known case))
       | Known case1, Known case2 -> meet_case base_env case1 case2)
@@ -1539,7 +1553,7 @@ and meet_row_like :
       | Extension scoped_envs ->
         (* We used add_env_extension_strict here before, but we don't expect to
            get bottom equations from joining non-bottom ones. *)
-        Or_bottom.Ok (extract_and_join_extensions scoped_envs)
+        Ok (extract_and_join_extensions scoped_envs)
     in
     let match_with_input v =
       match !result_is_t1, !result_is_t2 with
@@ -1606,7 +1620,7 @@ and meet_row_like_for_closures env
        ~get_singleton_map_known:Function_slot.Map.get_singleton ~merge_map_known
        env ~known1 ~known2 ~other1 ~other2)
 
-and meet_closures_entry (env : TE.t)
+and meet_closures_entry (env : ME.t)
     ({ function_types = function_types1;
        closure_types = closure_types1;
        value_slot_types = value_slot_types1
@@ -1676,7 +1690,7 @@ and meet_array_of_types env fields1 fields2 ~length =
   let fold2 = { fold2 } in
   meet_mapping ~meet_data:meet ~fold2 ~env ~left:fields1 ~right:fields2 ~rebuild
 
-and meet_function_type (env : TE.t)
+and meet_function_type (env : ME.t)
     (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
     (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
     TG.Function_type.t Or_unknown_or_bottom.t meet_result =
@@ -1697,7 +1711,7 @@ and meet_function_type (env : TE.t)
       ~right_a:code_id2 ~meet_b:meet ~left_b:rec_info1 ~right_b:rec_info2
 
 and meet_type env t1 t2 : _ Or_bottom.t =
-  if TE.is_bottom env
+  if TE.is_bottom (ME.typing_env env)
   then Bottom
   else
     match meet env t1 t2 with
@@ -2871,8 +2885,9 @@ let meet env ty1 ty2 : _ Or_bottom.t =
   if TE.is_bottom env
   then Bottom
   else
-    match meet env ty1 ty2 with
+    match meet (ME.create env) ty1 ty2 with
     | Bottom _ -> Bottom
     | Ok (r, env) ->
+      let env = ME.typing_env env in
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
