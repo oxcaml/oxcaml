@@ -448,6 +448,9 @@ and type_with_label ctxt f (label, c, mode) =
   | Optional s ->
     pp f "?%a:%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
+  | Generic_optional s ->
+    pp f "?'%a:%a" ident_of_name s
+      (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
   | Default -> pp f "_"
@@ -862,6 +865,9 @@ and label_exp ctxt f (l,opt,p) =
                 ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
           | None -> pp f "?%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
       end
+  | Generic_optional _rest -> (
+    failwith "TODO869"
+  )
   | Labelled l -> match p with
     | {ppat_desc  = Ppat_var {txt;_}; ppat_attributes = []}
       when txt = l ->
@@ -2202,6 +2208,11 @@ and label_x_expression_param ctxt f (l,e) =
         pp f "?%a" ident_of_name str
       else
         pp f "?%a:%a" ident_of_name str (simple_expr ctxt) e
+  | Generic_optional str ->
+      if Some str = simple_name then
+        pp f "?'%a" ident_of_name str
+      else
+        pp f "?'%a:%a" ident_of_name str (simple_expr ctxt) e
   | Labelled lbl ->
       if Some lbl = simple_name then
         pp f "~%a" ident_of_name lbl

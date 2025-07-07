@@ -670,6 +670,7 @@ let transl_label (label : Parsetree.arg_label)
       -> raise (Error (arg.ptyp_loc, Env.empty, Invalid_label_for_call_pos label))
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
+  | Generic_optional l, _ -> Generic_optional l
   | Nolabel, _ -> Nolabel
 
 (* Parallel to [transl_label_from_expr]. *)
@@ -1628,6 +1629,7 @@ let report_error env ppf =
         (match arg_label with
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
+        | Generic_optional _ -> "generic optional"
         | Labelled _ -> assert false )
 
 let () =

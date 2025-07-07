@@ -7460,6 +7460,7 @@ and type_function
             let arg_label =
               match arg_label with
               | Optional arg_label -> arg_label
+              | Generic_optional arg_label -> arg_label
               | Nolabel | Labelled _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
@@ -8330,6 +8331,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
            (* CR layouts v5: relax value requirement *)
            unify_exp env arg
              (type_option(newvar Predef.option_argument_jkind))
+       | Generic_optional _ ->
+           (* CR generic-optional: CHANGE *)
+           unify_exp env arg
+             (type_option(newvar Predef.option_argument_jkind))
        | Position _ ->
            unify_exp env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg))
@@ -8394,6 +8399,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       | Optional _ ->
           let arg = type_option_none env (instance ty_arg) Location.none in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
+      | Generic_optional _ ->
+          failwith "NI8403: Generic_optional not implemented"
       | Position _ ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
@@ -10691,7 +10698,7 @@ let report_error ~loc env =
   | Apply_wrong_label (l, ty, extra_info) ->
       let print_label ppf = function
         | Nolabel -> fprintf ppf "without label"
-        |(Labelled _ | Optional _) as l ->
+        |(Labelled _ | Optional _ | Generic_optional _) as l ->
             fprintf ppf "with label %a"
               Style.inline_code (prefixed_label_name l)
         | Position _ -> assert false
@@ -10854,7 +10861,7 @@ let report_error ~loc env =
       let label ~long ppf = function
         | Nolabel -> fprintf ppf "unlabeled"
         | Position l -> Style.inline_code ppf (sprintf "~(%s:[%%call_pos])" l)
-        | (Labelled _ | Optional _) as l ->
+        | (Labelled _ | Optional _ | Generic_optional _) as l ->
             if long then
               fprintf ppf "labeled %a" Style.inline_code (prefixed_label_name l)
             else
@@ -11193,7 +11200,7 @@ let report_error ~loc env =
           let lbl =
             match lbl with
             | Nolabel -> "_"
-            | Labelled s | Optional s | Position s -> s
+            | Labelled s | Optional s | Position s | Generic_optional s -> s
           in
           [Location.msg
              "@[Hint: Try splitting the application in two. The arguments that come@ \
@@ -11283,6 +11290,7 @@ let report_error ~loc env =
         (match arg_label with
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
+        | Generic_optional _ -> "generic optional"
         | Labelled _ | Position _ -> assert false )
   | Nonoptional_call_pos_label label ->
     Location.errorf ~loc

@@ -209,6 +209,7 @@ and arg_label = Asttypes.arg_label =
     Nolabel
   | Labelled of string
   | Optional of string
+  |Generic_optional of string
 
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
 (** As {!package_type} typed values:
