@@ -59,6 +59,8 @@ and head_of_kind_value_non_null = private
       { immediates : t Or_unknown.t;
         blocks : row_like_for_blocks Or_unknown.t;
         extensions : variant_extensions;
+        is_int_var : Name.t option;
+        get_tag_var : Name.t option;
         is_unique : bool
       }
   (* CR mshinwell: It would be better to track per-field mutability. *)
@@ -178,8 +180,8 @@ and env_extension = private { equations : t Name.Map.t } [@@unboxed]
 and variant_extensions =
   | No_extensions
   | Ext of
-      { when_immediate : env_extension;
-        when_block : env_extension
+      { when_block : env_extension;
+        when_immediate : env_extension
       }
 
 type flambda_type = t
@@ -548,6 +550,8 @@ module Row_like_for_blocks : sig
   val all_tags_and_sizes :
     t -> (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Map.t Or_unknown.t
 
+  val only_these_tags : t -> Tag.Set.t -> t
+
   (** If the type corresponds to a single block of known size (as created by
       [create_exactly_multiple]) then return it. *)
   val get_singleton :
@@ -814,6 +818,8 @@ module Head_of_kind_value_non_null : sig
     blocks:Row_like_for_blocks.t Or_unknown.t ->
     immediates:flambda_type Or_unknown.t ->
     extensions:variant_extensions ->
+    is_int_var:Name.t option ->
+    get_tag_var:Name.t option ->
     t
 
   val create_mutable_block : Alloc_mode.For_types.t -> t

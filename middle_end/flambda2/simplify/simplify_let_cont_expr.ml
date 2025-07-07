@@ -1261,9 +1261,9 @@ and after_downwards_traversal_of_body_and_handlers ~simplify_expr ~denv_for_join
       in
       down_to_up dacc ~rebuild:(prepare_to_rebuild_handlers data))
 
-and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
-    ~consts_lifted_after_fork continuation_sort is_exn_handler_cont uses
-    ~lifted_params ~arg_types_by_use_id =
+and prepare_dacc_for_handlers ?join_id dacc ~replay ~env_at_fork ~params
+    ~is_recursive ~consts_lifted_after_fork continuation_sort
+    is_exn_handler_cont uses ~lifted_params ~arg_types_by_use_id =
   (* In the recursive case, [params] are actually the invariant params, as we
      prepare a common dacc for all handlers. *)
   let env_at_fork = DE.enter_continuation_handler lifted_params env_at_fork in
@@ -1283,7 +1283,7 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
        handler. We should look into whether it's actually useful, and try
        enabling unboxing for those (while avoiding re-unboxing parameters that
        have already been unboxed). *)
-    Join_points.compute_handler_env uses ?replay ~params ~is_recursive
+    Join_points.compute_handler_env ?join_id uses ?replay ~params ~is_recursive
       ~env_at_fork ~consts_lifted_after_fork
       ~previous_extra_params_and_args:lifted_cont_extra_params_and_args
   in
@@ -1557,9 +1557,11 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
                 [cont; DE.unit_toplevel_exn_continuation denv])
       in
       let denv = DE.set_at_unit_toplevel_state denv at_unit_toplevel in
+      let join_id = T.Join_id.create () in
+      let dacc = DA.set_join_id_for_continuation dacc cont join_id in
       let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
-        prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~lifted_params
-          ~consts_lifted_after_fork:consts_lifted_during_body
+        prepare_dacc_for_handlers ~join_id dacc ~env_at_fork:denv ~params
+          ~lifted_params ~consts_lifted_after_fork:consts_lifted_during_body
           ~is_recursive:false ~replay:None (Continuation.sort cont)
           (if is_exn_handler then Some cont else None)
           (Continuation_uses.get_uses uses)

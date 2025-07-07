@@ -16,6 +16,8 @@
 
 type t
 
+exception Depth_exceeded
+
 type 'a meet_return_value =
   | Left_input
   | Right_input
@@ -42,6 +44,9 @@ val with_typing_env : t -> Typing_env.t -> t
 val map_typing_env : t -> f:(Typing_env.t -> Typing_env.t) -> t
 
 val add_equation : t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t
+
+val add_equation_on_simple :
+  t -> Simple.t -> Type_grammar.t -> meet_type:meet_type -> t
 
 val add_equation_strict :
   t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t Or_bottom.t

@@ -19,6 +19,8 @@ module TG = Type_grammar
 module TE = Typing_env
 module TEL = Typing_env_level
 
+exception Depth_exceeded
+
 type t = TE.t
 
 type 'a meet_return_value =
@@ -239,6 +241,10 @@ let add_env_extension_maybe_bottom t env_extension ~meet_type =
 
 let add_equation t name ty ~meet_type =
   try add_equation ~raise_on_bottom:true t name ty ~meet_type
+  with Bottom_equation -> TE.make_bottom t
+
+let add_equation_on_simple t simple ty ~meet_type =
+  try add_equation_on_simple ~raise_on_bottom:true t simple ty ~meet_type
   with Bottom_equation -> TE.make_bottom t
 
 let add_env_extension t env_extension ~meet_type =

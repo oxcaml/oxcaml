@@ -159,3 +159,9 @@ val add_specialization :
   old:Continuation.t ->
   specialized:Continuation.t ->
   t
+
+val set_join_id_for_continuation :
+  t -> Continuation.t -> Flambda2_types.Join_id.t -> t
+
+val get_join_id_for_continuation :
+  t -> Continuation.t -> Flambda2_types.Join_id.t option

@@ -1262,12 +1262,16 @@ end = struct
           | Variant
               { immediates = _;
                 blocks = Unknown;
+                is_int_var = _;
+                get_tag_var = _;
                 extensions = _;
                 is_unique = _
               }
           | Variant
               { immediates = Unknown;
                 blocks = _;
+                is_int_var = _;
+                get_tag_var = _;
                 extensions = _;
                 is_unique = _
               } ->
@@ -1275,6 +1279,8 @@ end = struct
           | Variant
               { immediates = Known imms;
                 blocks = Known blocks;
+                is_int_var = _;
+                get_tag_var = _;
                 extensions = _;
                 is_unique = _
               } ->

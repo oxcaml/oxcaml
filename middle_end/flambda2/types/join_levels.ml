@@ -43,25 +43,34 @@ let check_join_inputs ~env_at_fork _envs_with_levels ~params
           Symbol.print symbol)
     extra_lifted_consts_in_use_envs
 
-let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
-    ~extra_lifted_consts_in_use_envs =
+let cut_and_n_way_join ?join_id:_ definition_typing_env ts_and_use_ids ~params
+    ~cut_after ~extra_lifted_consts_in_use_envs =
   let params = Bound_parameters.to_list params in
   check_join_inputs ~env_at_fork:definition_typing_env ts_and_use_ids ~params
     ~extra_lifted_consts_in_use_envs;
   let ts = List.rev_map (fun (t, _, _) -> t) ts_and_use_ids in
   Meet_env.use_meet_env definition_typing_env ~f:(fun target_env ->
-      Join_env.cut_and_n_way_join ~meet_type:Meet_and_n_way_join.meet_type
-        ~n_way_join_type:Meet_and_n_way_join.n_way_join target_env ~cut_after ts)
+      let t =
+        Join_env.cut_and_n_way_join ~meet_type:Meet_and_n_way_join.meet_type
+          ~n_way_join_type:Meet_and_n_way_join.n_way_join target_env ~cut_after
+          ts
+      in
+      if Flambda_features.debug_flambda2 ()
+      then (
+        Format.eprintf "====== DOING A JOIN ======@.";
+        Format.eprintf "%a@." TE.print (Meet_env.typing_env t);
+        Format.eprintf "====================================@.");
+      t)
 
-let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
-    ~extra_lifted_consts_in_use_envs ~extra_allowed_names =
+let cut_and_n_way_join ?join_id definition_typing_env ts_and_use_ids ~params
+    ~cut_after ~extra_lifted_consts_in_use_envs ~extra_allowed_names =
   match Flambda_features.join_algorithm () with
   | Binary ->
     Join_levels_old.cut_and_n_way_join definition_typing_env ts_and_use_ids
       ~params ~cut_after ~extra_lifted_consts_in_use_envs ~extra_allowed_names
   | N_way ->
-    cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
-      ~extra_lifted_consts_in_use_envs
+    cut_and_n_way_join ?join_id definition_typing_env ts_and_use_ids ~params
+      ~cut_after ~extra_lifted_consts_in_use_envs
   | Checked ->
     let ignore_names =
       String.split_on_char ','

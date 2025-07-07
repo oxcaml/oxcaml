@@ -26,6 +26,7 @@ type result = private
   }
 
 val compute_handler_env :
+  ?join_id:Flambda2_types.Join_id.t ->
   ?replay:Replay_history.t * bool ->
   ?cut_after:Scope.t ->
   One_continuation_use.t list ->

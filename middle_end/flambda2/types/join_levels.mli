@@ -18,6 +18,7 @@
     each of the corresponding continuation's uses. *)
 
 val cut_and_n_way_join :
+  ?join_id:Join_id.t ->
   Typing_env.t ->
   (Typing_env.t * Apply_cont_rewrite_id.t * Continuation_use_kind.t) list ->
   params:Bound_parameters.t ->

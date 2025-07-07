@@ -128,8 +128,21 @@ let prove_equals_to_simple_of_kind env t kind : Simple.t proof_of_property =
 let prove_is_int_generic_value ~variant_only env
     (value_head : TG.head_of_kind_value_non_null) : bool generic_proof =
   match value_head with
-  | Variant blocks_imms -> (
-    match blocks_imms.blocks, blocks_imms.immediates with
+  | Variant
+      { immediates;
+        blocks;
+        is_int_var = _;
+        get_tag_var = _;
+        extensions = _;
+        is_unique = _
+      } -> (
+    (* bclement: We could reduce [is_int_var] here, but I don't expect that we
+       can get much out of it, since we will propagate back into this [Variant]
+       when we learn the exact value of the [is_int_var].
+
+       We could also reduce [get_tag_var] to try and discover [Bottom], but that
+       seems unlikely to be useful either. *)
+    match blocks, immediates with
     | Unknown, Unknown -> Unknown
     | Unknown, Known imms ->
       if is_bottom env imms then Proved false else Unknown
@@ -183,14 +196,22 @@ let prove_is_not_a_pointer env t =
 let prove_get_tag_generic_value env
     (value_head : TG.head_of_kind_value_non_null) : Tag.Set.t generic_proof =
   match value_head with
-  | Variant blocks_imms -> (
-    match blocks_imms.immediates with
+  | Variant
+      { immediates;
+        blocks;
+        is_int_var = _;
+        get_tag_var = _;
+        extensions = _;
+        is_unique = _
+      } -> (
+    (* bclement: Consider reducing [is_int_var] and [get_tag_var]. Or not. *)
+    match immediates with
     | Unknown -> Unknown
     | Known imms -> (
       if not (is_bottom env imms)
       then Unknown
       else
-        match blocks_imms.blocks with
+        match blocks with
         | Unknown -> Unknown
         | Known blocks -> (
           (* CR mshinwell: maybe [all_tags] should return the [Invalid] case
@@ -275,7 +296,15 @@ let meet_naked_immediates env t =
 let prove_equals_tagged_immediates_value env
     (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
   match value_head with
-  | Variant { immediates; blocks; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates;
+        blocks;
+        is_int_var = _;
+        get_tag_var = _;
+        extensions = _;
+        is_unique = _
+      } -> (
+    (* CR bclement: consider reducing. *)
     match blocks with
     | Unknown -> Unknown
     | Known blocks ->
@@ -300,7 +329,14 @@ let prove_equals_tagged_immediates env t =
 let meet_equals_tagged_immediates_value env
     (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
   match value_head with
-  | Variant { immediates; blocks = _; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates;
+        blocks = _;
+        extensions = _;
+        is_int_var = _;
+        get_tag_var = _;
+        is_unique = _
+      } -> (
     match immediates with
     | Unknown -> Unknown
     | Known imms -> prove_naked_immediates_generic env imms)
@@ -470,8 +506,16 @@ let prove_variant_like_generic_value env
     (value_head : TG.head_of_kind_value_non_null) :
     variant_like_proof generic_proof =
   match value_head with
-  | Variant blocks_imms -> (
-    match blocks_imms.blocks with
+  | Variant
+      { immediates = imms;
+        blocks;
+        is_int_var = _;
+        get_tag_var = _;
+        extensions = _;
+        is_unique = _
+      } -> (
+    (* CR bclement: consider reducing. *)
+    match blocks with
     | Unknown -> Unknown
     | Known blocks -> (
       match TG.Row_like_for_blocks.all_tags_and_sizes blocks with
@@ -495,7 +539,7 @@ let prove_variant_like_generic_value env
         | Unknown -> Unknown
         | Known non_const_ctors_with_sizes ->
           let const_ctors : _ Or_unknown.t =
-            match blocks_imms.immediates with
+            match imms with
             | Unknown -> Unknown
             | Known imms -> (
               match prove_naked_immediates_generic env imms with
@@ -526,7 +570,14 @@ let prove_is_a_boxed_or_tagged_number_value _env
     (value_head : TG.head_of_kind_value_non_null) :
     boxed_or_tagged_number generic_proof =
   match value_head with
-  | Variant { blocks; immediates = _; extensions = _; is_unique = _ } -> (
+  | Variant
+      { blocks;
+        immediates = _;
+        extensions = _;
+        is_int_var = _;
+        get_tag_var = _;
+        is_unique = _
+      } -> (
     match blocks with
     | Unknown -> Unknown
     | Known blocks ->
@@ -624,13 +675,23 @@ let prove_unique_tag_and_size_value env
     * Alloc_mode.For_types.t)
     generic_proof =
   match value_head with
-  | Variant blocks_imms -> (
-    match blocks_imms.immediates with
+  | Variant
+      { immediates;
+        blocks;
+        is_int_var = _;
+        get_tag_var = _;
+        extensions = _;
+        is_unique = _
+      } -> (
+    (* No need to reduce [is_int_var] or [get_tag_var]: they could only be
+       useful if their value is exactly known, in which case we propagate
+       backwards during [meet]. *)
+    match immediates with
     | Unknown -> Unknown
     | Known immediates ->
       if is_bottom env immediates
       then
-        match blocks_imms.blocks with
+        match blocks with
         | Unknown -> Unknown
         | Known blocks -> (
           match TG.Row_like_for_blocks.get_singleton blocks with
@@ -822,7 +883,14 @@ type tagging_proof_kind =
 let[@inline always] inspect_tagging_of_simple_value proof_kind ~min_name_mode
     env (value_head : TG.head_of_kind_value_non_null) : Simple.t generic_proof =
   match value_head with
-  | Variant { immediates; blocks; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates;
+        blocks;
+        extensions = _;
+        is_int_var = _;
+        get_tag_var = _;
+        is_unique = _
+      } -> (
     let inspect_immediates () =
       match immediates with
       | Unknown -> Unknown
@@ -977,7 +1045,14 @@ let meet_boxed_vec512_containing_simple =
 let meet_block_field_simple_value ~min_name_mode ~field_kind field_index env
     (value_head : TG.head_of_kind_value_non_null) : Simple.t generic_proof =
   match value_head with
-  | Variant { immediates = _; blocks; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates = _;
+        blocks;
+        is_int_var = _;
+        get_tag_var = _;
+        extensions = _;
+        is_unique = _
+      } -> (
     match blocks with
     | Unknown -> Unknown
     | Known blocks -> (
@@ -1233,6 +1308,8 @@ let prove_physical_equality env t1 t2 =
               { immediates = _;
                 blocks = Known blocks;
                 extensions = _;
+                is_int_var = _;
+                get_tag_var = _;
                 is_unique = _
               },
             ( Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
@@ -1245,6 +1322,8 @@ let prove_physical_equality env t1 t2 =
               { immediates = _;
                 blocks = Known blocks;
                 extensions = _;
+                is_int_var = _;
+                get_tag_var = _;
                 is_unique = _
               } )
           when TG.Row_like_for_blocks.is_bottom blocks ->
@@ -1256,12 +1335,16 @@ let prove_physical_equality env t1 t2 =
         | ( Variant
               { immediates = immediates1;
                 blocks = blocks1;
+                is_int_var = _;
+                get_tag_var = _;
                 extensions = _;
                 is_unique = _
               },
             Variant
               { immediates = immediates2;
                 blocks = blocks2;
+                is_int_var = _;
+                get_tag_var = _;
                 extensions = _;
                 is_unique = _
               } ) -> (

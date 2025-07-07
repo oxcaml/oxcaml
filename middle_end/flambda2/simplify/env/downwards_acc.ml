@@ -40,7 +40,8 @@ type t =
     continuations_to_specialize : Continuation.Set.t;
     (* CR gbury: we could try and encode the set of continuations to specialize
        into the map below as the keys of the map *)
-    specialization_map : Continuation.t Continuation_callsite_map.t
+    specialization_map : Continuation.t Continuation_callsite_map.t;
+    join_point_for_continuation : Join_id.t Continuation.Map.t
   }
 
 let print_lifted_cont ppf (denv, original_handlers) =
@@ -53,7 +54,8 @@ let [@ocamlformat "disable"] print ppf
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
-        continuation_specialization_budget; continuations_to_specialize; specialization_map; } =
+        continuation_specialization_budget; continuations_to_specialize; specialization_map;
+        join_point_for_continuation = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
       @[<hov 1>(continuation_uses_env@ %a)@]@ \
@@ -113,7 +115,8 @@ let create denv slot_offsets continuation_uses_env =
     continuation_specialization_budget =
       Flambda_features.Expert.cont_spec_budget ();
     continuations_to_specialize = Continuation.Set.empty;
-    specialization_map = Continuation.Map.empty
+    specialization_map = Continuation.Map.empty;
+    join_point_for_continuation = Continuation.Map.empty
   }
 
 let denv t = t.denv
@@ -353,3 +356,12 @@ let add_specialization t id ~old ~specialized =
   { t with specialization_map }
 
 let specialization_map t = t.specialization_map
+
+let set_join_id_for_continuation t cont join_id =
+  let join_point_for_continuation =
+    Continuation.Map.add cont join_id t.join_point_for_continuation
+  in
+  { t with join_point_for_continuation }
+
+let get_join_id_for_continuation t cont =
+  Continuation.Map.find_opt cont t.join_point_for_continuation

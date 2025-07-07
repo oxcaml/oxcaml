@@ -238,7 +238,15 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
         (Ok
           { is_null = Not_null;
             non_null =
-              Ok (Variant { is_unique; blocks; immediates; extensions = _ })
+              Ok
+                (Variant
+                  { is_unique;
+                    blocks;
+                    immediates;
+                    is_int_var = _;
+                    get_tag_var = _;
+                    extensions = _
+                  })
           }) -> (
       match blocks, immediates with
       | Known blocks, Known imms ->

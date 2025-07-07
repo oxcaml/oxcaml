@@ -73,8 +73,8 @@ let introduce_extra_params_for_join denv use_envs_with_ids
     in
     denv, use_envs_with_ids
 
-let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
-    ~previous_extra_params_and_args =
+let join ?join_id ?cut_after denv params ~consts_lifted_after_fork
+    ~use_envs_with_ids ~previous_extra_params_and_args =
   let definition_scope = DE.get_continuation_scope denv in
   let extra_lifted_consts_in_use_envs =
     LCS.all_defined_symbols consts_lifted_after_fork
@@ -109,7 +109,7 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
   in
   let cut_after = Option.value cut_after ~default:definition_scope in
   let handler_env =
-    T.cut_and_n_way_join (DE.typing_env denv) use_envs_with_ids'
+    T.cut_and_n_way_join ?join_id (DE.typing_env denv) use_envs_with_ids'
       ~params:
         (Bound_parameters.append params
            (EPA.extra_params extra_params_and_args))
@@ -185,8 +185,9 @@ let compute_use_env_with_ids ?replay ~is_recursive ~params use =
   in
   use_env, U.id use, U.use_kind use
 
-let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
-    ~consts_lifted_after_fork ~params ~previous_extra_params_and_args =
+let compute_handler_env ?join_id ?replay ?cut_after uses ~is_recursive
+    ~env_at_fork ~consts_lifted_after_fork ~params
+    ~previous_extra_params_and_args =
   (* Augment the environment at each use with the parameter definitions and
      associated equations. *)
   match uses with
@@ -277,7 +278,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
            environments *)
         let denv = DE.define_parameters denv ~extra:false ~params in
         Profile.record_call ~accumulate:true "join" (fun () ->
-            join ?cut_after denv params ~consts_lifted_after_fork
+            join ?join_id ?cut_after denv params ~consts_lifted_after_fork
               ~use_envs_with_ids ~previous_extra_params_and_args)
       else
         (* Define parameters with basic equations from the subkinds *)

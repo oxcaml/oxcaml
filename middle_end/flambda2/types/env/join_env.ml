@@ -1213,6 +1213,11 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
     List.fold_left
       (fun (discriminant, joined_envs, joined_levels) typing_env ->
         let level = TE.cut typing_env ~cut_after in
+        if Flambda_features.debug_flambda2 ()
+        then (
+          Format.eprintf "====== LEVEL %a ======@." Index.print discriminant;
+          Format.eprintf "%a@." TEL.print level;
+          Format.eprintf "====================================@.");
         ( Index.succ discriminant,
           Index.Map.add discriminant typing_env joined_envs,
           Index.Map.add discriminant level joined_levels ))

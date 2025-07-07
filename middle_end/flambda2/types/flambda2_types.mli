@@ -267,7 +267,16 @@ val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t
 
 val meet_shape : Typing_env.t -> t -> shape:t -> Typing_env.t Or_bottom.t
 
+module Join_id : sig
+  type t
+
+  val create : unit -> t
+
+  include Container_types.S with type t := t
+end
+
 val cut_and_n_way_join :
+  ?join_id:Join_id.t ->
   Typing_env.t ->
   (Typing_env.t * Apply_cont_rewrite_id.t * Continuation_use_kind.t) list ->
   params:Bound_parameters.t ->
