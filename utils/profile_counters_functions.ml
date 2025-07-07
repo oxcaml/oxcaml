@@ -8,7 +8,7 @@ let count_language_extensions typing_input =
    fun lang_ext ->
     match lang_ext with
     | Comprehensions | Include_functor | Immutable_arrays | Module_strengthening
-    | Labeled_tuples ->
+    | Labeled_tuples | Generic_optional_arguments ->
       Language_extension_kernel.to_string lang_ext
     | Mode | Unique | Polymorphic_parameters | Layouts | SIMD | Small_numbers
     | Instances | Overwriting | Separability | Let_mutable ->
