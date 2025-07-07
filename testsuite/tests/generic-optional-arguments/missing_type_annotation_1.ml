@@ -1,3 +1,5 @@
+(* TEST *)
+
 (* Interface *)
 val concat : ?'sep:string -> string list -> string
 
