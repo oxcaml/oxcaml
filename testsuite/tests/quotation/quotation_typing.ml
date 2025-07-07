@@ -60,13 +60,6 @@ Line 55, characters 15-17:
 Error: Type variable "a" is used at Line 55, characters 15-17
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
-|}, Principal{|
-Line 62, characters 15-17:
-62 | type 'a t2 = <['a]> expr;;
-                    ^^
-Error: Type variable "a" is used at Line 62, characters 15-17
-       in a context with one layer of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
 |}];;
 
 type 'a t3 = $'a -> $'a -> 'a expr;;
@@ -96,13 +89,6 @@ Error: Type variable "a" is used at Line 1, characters 26-28
 
 fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 90, characters 28-30:
-90 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
-                                 ^^
-Error: Type variable "a" is used at Line 90, characters 28-30
-       in a context with 2 layers of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
-|}, Principal{|
 Line 97, characters 28-30:
 97 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
                                  ^^
@@ -204,4 +190,60 @@ Error: Constructor "A" used at Line 1, characters 2-3
 <[
   fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g
 ]>
+|}];;
+
+(* The mk_pair examples exist to test whether unification behaves well when
+   splices and quotations are present. *)
+
+let mk_pair x = <[$x, $x]>;;
+[%%expect {|
+val mk_pair : <[ $ ('a) ]> expr -> <[ $ ('a) * $ ('a) ]> expr = <fun>
+|}];;
+
+mk_pair <[123]>;;
+[%%expect {|
+- : <[ int * int ]> expr = <[ (123, 123) ]>
+|}, Principal{|
+- : <[ $ (<[ int ]>) * $ (<[ int ]>) ]> expr = <[ (123, 123) ]>
+|}];;
+
+mk_pair <[[]]>;;
+[%%expect {|
+- : <[ $ ('a) list * $ ('a) list ]> expr = <[ ([], []) ]>
+|}, Principal{|
+- : <[ $ (<[ $ ('a) list ]>) * $ (<[ $ ('a) list ]>) ]> expr = <[ ([], []) ]>
+|}];;
+
+mk_pair <[None]>;;
+[%%expect {|
+- : <[ $ ('a) option * $ ('a) option ]> expr = <[ (None, None) ]>
+|}, Principal{|
+- : <[ $ (<[ $ ('a) option ]>) * $ (<[ $ ('a) option ]>) ]> expr =
+<[ (None, None) ]>
+|}];;
+
+mk_pair <[Some 123]>;;
+[%%expect {|
+- : <[ int option * int option ]> expr = <[ ((Some 123), (Some 123)) ]>
+|}, Principal{|
+- : <[ $ (<[ int option ]>) * $ (<[ int option ]>) ]> expr =
+<[ ((Some 123), (Some 123)) ]>
+|}];;
+
+mk_pair <[fun () -> 42]>;;
+[%%expect {|
+- : <[ (unit -> int) * (unit -> int) ]> expr =
+<[ ((fun () -> 42), (fun () -> 42)) ]>
+|}, Principal{|
+- : <[ $ (unit -> int) * $ (unit -> int) ]> expr =
+<[ ((fun () -> 42), (fun () -> 42)) ]>
+|}];;
+
+mk_pair <[fun x -> x]>;;
+[%%expect {|
+- : <[ ('_weak1 -> '_weak1) * ('_weak1 -> '_weak1) ]> expr =
+<[ ((fun x -> x), (fun x -> x)) ]>
+|}, Principal{|
+- : <[ $ ('_weak1 -> '_weak1) * $ ('_weak1 -> '_weak1) ]> expr =
+<[ ((fun x -> x), (fun x -> x)) ]>
 |}];;

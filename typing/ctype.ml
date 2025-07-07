@@ -2140,8 +2140,10 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tquote ty -> extract_concrete_typedecl env ty
+  | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ | Tquote _ | Tsplice _ | Tof_kind _ ->
+  | Tvariant _ | Tpackage _ | Tof_kind _ ->
       Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
   | Tlink _ | Tsubst _ -> assert false
@@ -3387,6 +3389,14 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
             mcomp type_pairs env t1 t2
+        | (Tsplice t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1' t2
+        | (Tquote t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tquote t2, _, _) ->
+            mcomp type_pairs env t1' t2
         | (_, _, _, _) ->
             raise Incompatible
       end
@@ -4111,6 +4121,24 @@ and unify3 uenv t1 t1' t2 t2' =
           unify uenv t1 t2
       | (Tsplice t1, Tsplice t2) ->
           unify uenv t1 t2
+      | (Tsplice s1, _) ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
+          in
+          unify uenv s1 t
+      | (_, Tsplice s2) ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
+      | (Tquote s1, _) ->
+          set_type_desc t2' d2;
+          unify uenv s1 t2
+      | (_, Tquote s2) ->
+          set_type_desc t1' d1;
+          unify uenv s2 t1
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
@@ -4523,7 +4551,7 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-let filter_arrow env t l ~force_tpoly =
+let rec filter_arrow env t l ~force_tpoly =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -4588,6 +4616,8 @@ let filter_arrow env t l ~force_tpoly =
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
+  | Tsplice ty -> filter_arrow env ty l ~force_tpoly
+  | Tquote ty -> filter_arrow env ty l ~force_tpoly
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 
