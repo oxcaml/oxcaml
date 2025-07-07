@@ -154,9 +154,9 @@ let value_descriptions ~loc env name
              let ty2, mode_l2, mode_y2, _ = Ctype.instance_prim p2 vd2.val_type in
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-             try 
+             try
                Ctype.moregeneral env true ty1 ty2
-             with Ctype.Moregen err -> 
+             with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
          ) locality;
@@ -656,7 +656,8 @@ let report_type_mismatch first second decl env ppf err =
   | With_null_representation ord ->
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
-         "has a null constructor"
+         "has a constructor represented as a null pointer";
+      pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first ppf v
   | Unsafe_mode_crossing mismatch ->
