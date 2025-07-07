@@ -846,7 +846,8 @@ let add_alias t ~canonical_element1 ~canonical_element2 :
   | Bottom -> Bottom
   | exception Binding_time_resolver_failure ->
     (* Addition of aliases between names that are both in external compilation
-       units failed, e.g. due to a missing .cmx file. Simply drop the equation. *)
+       units failed, e.g. due to a missing .cmx file. Simply drop the
+       equation. *)
     Unknown
   | Ok { canonical_element; demoted_name; t = aliases } ->
     Ok { canonical_element; demoted_name; t = with_aliases t ~aliases }
