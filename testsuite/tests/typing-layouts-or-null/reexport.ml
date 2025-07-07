@@ -160,7 +160,7 @@ Error: This expression has type "'a Or_null.t" = "'a or_null"
        The kind of 'a Or_null.t is value_or_null
          because it is the primitive value_or_null type or_null.
        But the kind of 'a Or_null.t must be a subkind of
-         value_or_null mod non_null
+           value_or_null mod non_null
          because of the definition of t at line 2, characters 2-63.
 |}]
 

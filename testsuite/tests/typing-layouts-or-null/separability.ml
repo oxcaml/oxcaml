@@ -835,7 +835,7 @@ Error: This type "float Or_null_reexport.t" = "float or_null"
        The kind of float Or_null_reexport.t is value_or_null
          because it is the primitive value_or_null type or_null.
        But the kind of float Or_null_reexport.t must be a subkind of
-         any mod non_float
+           any mod non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
 |}]
 
@@ -850,7 +850,7 @@ Error: This type "float Or_null_reexport.t" = "float or_null"
        The kind of float Or_null_reexport.t is value_or_null
          because it is the primitive value_or_null type or_null.
        But the kind of float Or_null_reexport.t must be a subkind of
-         any mod separable
+           any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
 
@@ -881,6 +881,6 @@ Error: This type "float unbx or_null" should be an instance of type
        The kind of float unbx or_null is value_or_null
          because it is the primitive value_or_null type or_null.
        But the kind of float unbx or_null must be a subkind of
-         any mod separable
+           any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]

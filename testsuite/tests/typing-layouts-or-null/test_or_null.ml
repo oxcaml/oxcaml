@@ -102,7 +102,7 @@ Error: This type "int or_null" should be an instance of type
        The kind of int or_null is value_or_null
          because it is the primitive value_or_null type or_null.
        But the kind of int or_null must be a subkind of
-         value_or_null mod non_null
+           value_or_null mod non_null
          because the type argument of or_null has kind value.
 |}]
 
@@ -352,8 +352,8 @@ Line 1, characters 45-55:
 1 | type (_, _) fail = Fail : 'a or_null -> ('a, 'a or_null) fail [@@unboxed]
                                                  ^^^^^^^^^^
 Error: This type "'a or_null" should be an instance of type "('b : value)"
-       The kind of 'a or_null is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of 'a or_null is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of 'a or_null must be a subkind of value
          because it instantiates an unannotated type parameter of fail,
          chosen to have kind value.
@@ -392,10 +392,10 @@ Line 1, characters 35-51:
                                        ^^^^^^^^^^^^^^^^
 Error: This expression has type "unboxed_rec"
        but an expression was expected of type "('a : value)"
-       The kind of unboxed_rec is immediate_or_null
-         because it is the primitive immediate_or_null type or_null.
+       The kind of unboxed_rec is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of unboxed_rec must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
 
 let should_fail_unboxed_var = This (Wrap Null)
@@ -406,10 +406,10 @@ Line 1, characters 35-46:
                                        ^^^^^^^^^^^
 Error: This expression has type "unboxed_var"
        but an expression was expected of type "('a : value)"
-       The kind of unboxed_var is immediate_or_null
-         because it is the primitive immediate_or_null type or_null.
+       The kind of unboxed_var is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of unboxed_var must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
 
 let should_fail_unboxed_gadt = This (Gadt Null)
@@ -420,8 +420,8 @@ Line 1, characters 36-47:
                                         ^^^^^^^^^^^
 Error: This expression has type "('a, 'a or_null) gadt"
        but an expression was expected of type "('b : value)"
-       The kind of ('a, 'a or_null) gadt is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of ('a, 'a or_null) gadt is value_or_null
+         because it is the primitive value_or_null type or_null.
        But the kind of ('a, 'a or_null) gadt must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
