@@ -1543,12 +1543,14 @@ val triangle_10 : int = 55
 |}]
 
 let chain_call ?'(sep : string option) arg = M.concat ?'sep arg in chain_call ["x"; "y"; "z"] ;;
+
 [%%expect{|
 val triangle_10 : int = 55
 |}]
 
-let chain_call ?'(sep : string option) arg = M.concat ?'sep arg
-in chain_call ?'sep:(Some ",") ["x"; "y"; "z"] ;;
+let chain_call ?'(sep : string option) arg = M.concat ?'sep arg in
+  chain_call ?'sep:(Some ",") ["x"; "y"; "z"] ;;
+
 [%%expect{|
 val triangle_10 : int = 55
 |}]
