@@ -177,7 +177,7 @@ module Axis = struct
   end
 
   type 'a t =
-    | Modal : ('a, _, _) Mode.Alloc.Axis.t -> 'a t
+    | Modal : ('a, _, _) Mode.Alloc.Axis.t -> 'a Mode.Crossing.Atom.t t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]
@@ -195,25 +195,17 @@ module Axis = struct
     let equal a b = Misc.Le_result.is_equal (less_or_equal a b)
   end
 
-  let get (type a) : a t -> (module Axis_ops with type t = a) = function
-    | Modal axis ->
-      (module Accent_lattice ((val Mode.Alloc.Const.lattice_of_axis axis)))
-    | Nonmodal Externality -> (module Externality)
-    | Nonmodal Nullability -> (module Nullability)
-    | Nonmodal Separability -> (module Separability)
+  let get_nonmodal (type a) : a Nonmodal.t -> (module Axis_ops with type t = a)
+      = function
+    | Externality -> (module Externality)
+    | Nullability -> (module Nullability)
+    | Separability -> (module Separability)
 
   let all =
-    [ Pack (Modal (Comonadic Areality));
-      Pack (Modal (Monadic Uniqueness));
-      Pack (Modal (Comonadic Linearity));
-      Pack (Modal (Monadic Contention));
-      Pack (Modal (Comonadic Portability));
-      Pack (Modal (Comonadic Yielding));
-      Pack (Modal (Comonadic Statefulness));
-      Pack (Modal (Monadic Visibility));
-      Pack (Nonmodal Externality);
-      Pack (Nonmodal Nullability);
-      Pack (Nonmodal Separability) ]
+    List.map (fun ax -> Pack (Modal ax)) Mode.Alloc.Axis.all
+    @ [ Pack (Nonmodal Externality);
+        Pack (Nonmodal Nullability);
+        Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
     | Modal axis -> Format.asprintf "%a" Mode.Alloc.Axis.print axis
@@ -229,18 +221,13 @@ module Axis_set = struct
 
   type t = int
 
+  let nonmodal_index_base = Mode.Value.Axis.num
+
   let[@inline] axis_index (type a) : a Axis.t -> _ = function
-    | Modal (Comonadic Areality) -> 0
-    | Modal (Comonadic Linearity) -> 1
-    | Modal (Monadic Uniqueness) -> 2
-    | Modal (Comonadic Portability) -> 3
-    | Modal (Monadic Contention) -> 4
-    | Modal (Comonadic Yielding) -> 5
-    | Modal (Comonadic Statefulness) -> 6
-    | Modal (Monadic Visibility) -> 7
-    | Nonmodal Externality -> 8
-    | Nonmodal Nullability -> 9
-    | Nonmodal Separability -> 10
+    | Modal ax -> Mode.Value.Axis.index ax
+    | Nonmodal Externality -> nonmodal_index_base
+    | Nonmodal Nullability -> nonmodal_index_base + 1
+    | Nonmodal Separability -> nonmodal_index_base + 2
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
