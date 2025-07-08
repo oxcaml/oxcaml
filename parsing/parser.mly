@@ -928,7 +928,8 @@ let generic_optional label _loc =
 
   CR: move the following to type checking:
   {v
-    let generic_optional_arguments_extension = Language_extension.Generic_optional_arguments
+    let generic_optional_arguments_extension =
+      Language_extension.Generic_optional_arguments
     if Language_extension.is_enabled generic_optional_arguments_extension then
       Generic_optional label
     else

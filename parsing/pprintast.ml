@@ -879,7 +879,8 @@ and label_exp ctxt f (l,opt,p) =
           | Some o ->
               pp f "?'%a:(%a<-@;%a)@;"
                 ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
-          | None -> pp f "?'%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
+          | None ->
+              pp f "?'%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
       end
   )
   | Labelled l -> match p with
