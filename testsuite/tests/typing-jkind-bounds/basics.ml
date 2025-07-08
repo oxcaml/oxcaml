@@ -216,7 +216,7 @@ Error: The layout of type "a" is value
 type a : value mod global aliased many immutable stateless external_ unyielding non_float
 type b : value mod local unique once contended nonportable internal = a
 [%%expect{|
-type a : immediate
+type a : immediate64 mod external_
 type b = a
 |}]
 
@@ -307,7 +307,7 @@ type d : float64 = c
 [%%expect{|
 type a = float#
 type b = a
-type c : float64 mod everything
+type c : float64 mod global aliased many stateless immutable external_
 type d = c
 |}]
 
@@ -318,7 +318,7 @@ type d : float32 = c
 [%%expect{|
 type a = float32#
 type b = a
-type c : float32 mod everything
+type c : float32 mod global aliased many stateless immutable external_
 type d = c
 |}]
 
@@ -488,13 +488,7 @@ Error: The kind of type "t_value" is value
 
 type t : any mod portable = t_value
 [%%expect{|
-Line 1, characters 0-35:
-1 | type t : any mod portable = t_value
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_value" is value
-         because of the definition of t_value at line 1, characters 0-20.
-       But the kind of type "t_value" must be a subkind of any mod portable
-         because of the definition of t at line 1, characters 0-35.
+type t = t_value
 |}]
 
 type t : any mod external_ = t_value
@@ -1285,7 +1279,7 @@ type ('a : bits32 mod aliased) t = ('a : any mod global)
 type ('a : value mod global aliased) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
-type ('a : immediate) t = 'a
+type ('a : immediate64 mod external_) t = 'a
 type 'a t = 'a
 type 'a t = 'a
 type ('a : bits32 mod global aliased) t = 'a

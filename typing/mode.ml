@@ -45,7 +45,7 @@ module type CoHeyting = sig
   val subtract : t -> t -> t
 end
 
-(* Even though our lattices are all bi-heyting algebras, that knowledge is
+(* Even thoudgh our lattices are all bi-heyting algebras, that knowledge is
    internal to this module. Externally they are seen as normal lattices. *)
 module Lattices = struct
   module Total = struct
