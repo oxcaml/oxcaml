@@ -354,7 +354,7 @@ type settable_variable =
   | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
 
 (** For a mutable variable, [use] means mark as mutated. For an instance
-    variable, it means mark as used (unclear if this is desired). *)
+    variable, it means mark as used. *)
 val lookup_settable_variable:
   ?use:bool -> loc:Location.t -> string -> t -> settable_variable
 

@@ -576,7 +576,7 @@ let x_18_1 =
 Line 2, characters 14-15:
 2 |   let mutable x = 3 in x + 1
                   ^
-Warning 186 [unused-mutable]: mutable variable x is never mutated.
+Warning 186 [unused-mutable]: variable x does not need to be mutable.
 
 val x_18_1 : int = 4
 |}]
@@ -589,9 +589,22 @@ let x_18_2 =
 Line 2, characters 14-15:
 2 |   let mutable x = 3 in x <- 4; 4
                   ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: variable x was mutated but never used.
 
 val x_18_2 : int = 4
+|}]
+
+(* Test 18.3: Mutable variable isn't mutated or used *)
+let x_18_3 =
+  let mutable x = 3 in 5
+;;
+[%%expect{|
+Line 2, characters 14-15:
+2 |   let mutable x = 3 in 5
+                  ^
+Warning 26 [unused-var]: unused variable x.
+
+val x_18_3 : int = 5
 |}]
 
 (* Tests 19 and 20: some mode crossing *)

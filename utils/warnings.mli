@@ -74,8 +74,10 @@ type t =
   | Useless_record_with of string           (* 23 *)
   | Bad_module_name of string               (* 24 *)
   | All_clauses_guarded                     (* 8, used to be 25 *)
-  | Unused_var of string                    (* 26 *)
-  | Unused_var_strict of string             (* 27 *)
+  | Unused_var of { name : string ; mutated : bool } (* 26
+    [mutated] is set if the variable was mutated ([x <- 5]), allowing for a
+    more helpful error message. *)
+  | Unused_var_strict of { name : string ; mutated : bool } (* 27 *)
   | Wildcard_arg_to_constant_constr         (* 28 *)
   | Eol_in_string                           (* 29
       Note: since OCaml 5.2, the lexer normalizes \r\n sequences in

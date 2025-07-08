@@ -72,8 +72,8 @@ type t =
   | Useless_record_with of string           (* 23 *)
   | Bad_module_name of string               (* 24 *)
   | All_clauses_guarded                     (* 8, used to be 25 *)
-  | Unused_var of string                    (* 26 *)
-  | Unused_var_strict of string             (* 27 *)
+  | Unused_var of { name : string ; mutated : bool } (* 26 *)
+  | Unused_var_strict of { name : string ; mutated : bool } (* 27 *)
   | Wildcard_arg_to_constant_constr         (* 28 *)
   | Eol_in_string                           (* 29 *)
   | Duplicate_definitions of string * string * string * string (*30 *)
@@ -575,9 +575,8 @@ let descriptions = [
   { number = 186;
     names = ["unused-mutable"];
     description =
-    "Suspicious mutable variable is never mutated: mutable variable that is\n\
-    \    bound with \"let\" or \"as\", and doesn't start with an\n\
-    \    underscore (\"_\") character.";
+    "Variable does not need to be mutable: mutable variable that\n\
+    \    doesn't start with an underscore (\"_\") character.";
     since = since 5 2 };
   { number = 187;
     names = ["incompatible-with-upstream"];
@@ -1026,7 +1025,12 @@ let message = function
   | All_clauses_guarded ->
       "this pattern-matching is not exhaustive.\n\
        All clauses in this pattern-matching are guarded."
-  | Unused_var v | Unused_var_strict v -> "unused variable " ^ v ^ "."
+  | Unused_var { name = v; mutated = false }
+  | Unused_var_strict { name = v; mutated = false } ->
+    "unused variable " ^ v ^ "."
+  | Unused_var { name = v; mutated = true }
+  | Unused_var_strict { name = v; mutated = true } ->
+    "variable " ^ v ^ " was mutated but never used."
   | Wildcard_arg_to_constant_constr ->
      "wildcard pattern given as argument to a constant constructor"
   | Eol_in_string ->
@@ -1222,7 +1226,7 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
-  | Unused_mutable v -> "mutable variable " ^ v ^ " is never mutated."
+  | Unused_mutable v -> "variable " ^ v ^ " does not need to be mutable."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
       "Usage of layout immediate/immediate64 in %s \n\
