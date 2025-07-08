@@ -59,7 +59,7 @@ module Axis : sig
 
   (** Represents an axis of a jkind *)
   type 'a t =
-    | Modal : ('a, _, _) Mode.Alloc.Axis.t -> 'a t
+    | Modal : 'a Mode.Value.Axis.t -> 'a Mode.Crossing.Atom.t t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]
@@ -67,7 +67,7 @@ module Axis : sig
   (* CR zqian: push ['a t] into the module to avoid first-class module. *)
 
   (** Given a jkind axis, get its interface *)
-  val get : 'a t -> (module Axis_ops with type t = 'a)
+  val get_nonmodal : 'a Nonmodal.t -> (module Axis_ops with type t = 'a)
 
   val all : packed list
 

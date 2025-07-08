@@ -1989,10 +1989,22 @@ module type Areality = sig
   val zap_to_legacy : (Const.t, allowed * 'r) Solver.mode -> Const.t
 end
 
-module Lattice_Product (L : Lattice) = struct
+module type Axis = sig
+  type 'a t
+
+  type packed = P : 'a t -> packed
+
+  val all : packed list
+end
+
+module Lattice_Product
+    (L : Lattice)
+    (Obj : Obj with type const = L.t)
+    (Axis' : Axis with type 'a t = (L.t, 'a) Axis.t) =
+struct
   open L
 
-  type 'a axis = (t, 'a) Axis.t
+  type error = Error : 'a Axis'.t * 'a Solver.error -> error
 
   let min_with ax c = Axis.set ax c min
 
@@ -2001,6 +2013,25 @@ module Lattice_Product (L : Lattice) = struct
   let min_axis ax = Axis.proj ax min
 
   let max_axis ax = Axis.proj ax max
+
+  let proj_obj ax = C.proj_obj ax Obj.obj
+
+  let le_axis ax t0 t1 =
+    let obj = proj_obj ax in
+    C.le obj t0 t1
+
+  let sub t0 t1 : _ Result.t =
+    List.find_map
+      (fun (Axis'.P ax) ->
+        let left = Axis.proj ax t0 in
+        let right = Axis.proj ax t1 in
+        if le_axis ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis'.all
+    |> function
+    | None -> Ok ()
+    | Some e -> (Error e : _ Result.t)
 end
 
 module Comonadic_with (Areality : Areality) = struct
@@ -2012,9 +2043,17 @@ module Comonadic_with (Areality : Areality) = struct
 
   include Comonadic_gen (Obj)
 
-  type 'a axis = (Obj.const, 'a) C.Axis.t
+  module Axis = struct
+    type 'a t = (Obj.const, 'a) C.Axis.t
 
-  type error = Error : 'a axis * 'a Solver.error -> error
+    type packed = P : 'a t -> packed
+
+    let all : packed list =
+      [P Areality; P Linearity; P Portability; P Yielding; P Statefulness]
+      |> List.sort (fun (P ax0) (P ax1) -> C.Axis.compare ax0 ax1)
+  end
+
+  type error = Error : 'a Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -2032,7 +2071,7 @@ module Comonadic_with (Areality : Areality) = struct
       let obj = proj_obj ax in
       C.le obj a b
 
-    let lattice_of_axis (type a) (axis : (t, a) Axis.t) :
+    let lattice_of_axis (type a) (axis : a Axis.t) :
         (module Lattice with type t = a) =
       match axis with
       | Areality -> (module Areality.Const)
@@ -2066,52 +2105,15 @@ module Comonadic_with (Areality : Areality) = struct
   let legacy = of_const Const.legacy
 
   let axis_of_error (err : Obj.const Solver.error) : error =
-    let { left =
-            { areality = areality1;
-              linearity = linearity1;
-              portability = portability1;
-              yielding = yielding1;
-              statefulness = statefulness1
-            };
-          right =
-            { areality = areality2;
-              linearity = linearity2;
-              portability = portability2;
-              yielding = yielding2;
-              statefulness = statefulness2
-            }
-        } =
-      err
-    in
-    if Areality.Const.le areality1 areality2
-    then
-      if Linearity.Const.le linearity1 linearity2
-      then
-        if Portability.Const.le portability1 portability2
-        then
-          if Yielding.Const.le yielding1 yielding2
-          then
-            if Statefulness.Const.le statefulness1 statefulness2
-            then assert false
-            else
-              Error
-                ( Statefulness,
-                  { left = err.left.statefulness;
-                    right = err.right.statefulness
-                  } )
-          else
-            Error
-              ( Yielding,
-                { left = err.left.yielding; right = err.right.yielding } )
-        else
-          Error
-            ( Portability,
-              { left = err.left.portability; right = err.right.portability } )
-      else
-        Error
-          (Linearity, { left = err.left.linearity; right = err.right.linearity })
-    else
-      Error (Areality, { left = err.left.areality; right = err.right.areality })
+    List.find_map
+      (fun ax ->
+        let left = Const.proj ax err.left in
+        let right = Const.proj ax err.right in
+        if Const.le_axis ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis.all
+    |> Option.get |> Result.error
 
   (* overriding to report the offending axis *)
   let submode_log m0 m1 ~log : _ result =
@@ -2136,9 +2138,17 @@ module Monadic = struct
 
   include Monadic_gen (Obj)
 
-  type 'a axis = (Obj.const, 'a) C.Axis.t
+  module Axis = struct
+    type 'a t = (Obj.const, 'a) C.Axis.t
 
-  type error = Error : 'a axis * 'a Solver.error -> error
+    type packed = P : 'a t -> packed
+
+    let all : packed all =
+      [P Uniqueness; P Contention; P Visibility]
+      |> List.sort (fun (P ax0) (P ax1) -> C.Axis.compare ax0 ax1)
+  end
+
+  type error = Error : 'a Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -2156,7 +2166,7 @@ module Monadic = struct
       let obj = proj_obj ax in
       C.le obj b a
 
-    let lattice_of_axis (type a) (axis : (t, a) Axis.t) :
+    let lattice_of_axis (type a) (axis : a Axis.t) :
         (module Lattice with type t = a) =
       match axis with
       | Uniqueness -> (module Uniqueness.Const_op)
@@ -2189,37 +2199,15 @@ module Monadic = struct
   let legacy = of_const Const.legacy
 
   let axis_of_error (err : Obj.const Solver.error) : error =
-    let { left =
-            { uniqueness = uniqueness1;
-              contention = contention1;
-              visibility = visibility1
-            };
-          right =
-            { uniqueness = uniqueness2;
-              contention = contention2;
-              visibility = visibility2
-            }
-        } =
-      err
-    in
-    if Uniqueness.Const.le uniqueness1 uniqueness2
-    then
-      if Contention.Const.le contention1 contention2
-      then
-        if Visibility.Const.le visibility1 visibility2
-        then assert false
-        else
-          Error
-            ( Visibility,
-              { left = err.left.visibility; right = err.right.visibility } )
-      else
-        Error
-          ( Contention,
-            { left = err.left.contention; right = err.right.contention } )
-    else
-      Error
-        ( Uniqueness,
-          { left = err.left.uniqueness; right = err.right.uniqueness } )
+    List.find_map
+      (fun ax ->
+        let left = Const.proj ax err.left in
+        let right = Const.proj ax err.right in
+        if Const.le_axis ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis.all
+    |> Option.get |> Result.error
 
   (* overriding to report the offending axis *)
   let submode_log m0 m1 ~log : _ result =
@@ -2271,15 +2259,8 @@ module Value_with (Areality : Areality) = struct
       | Comonadic ax -> Axis.print ppf ax
 
     let all =
-      [ P (Comonadic Areality);
-        P (Comonadic Linearity);
-        P (Monadic Uniqueness);
-        P (Comonadic Portability);
-        P (Monadic Contention);
-        P (Comonadic Yielding);
-        P (Comonadic Statefulness);
-        P (Monadic Visibility) ]
-      |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
+      List.map (fun (P ax) -> P (Comonadic ax)) Comonadic.Axis.all
+      @ List.map (fun (P ax) -> P (Monadic ax)) Monadic.Axis.all
   end
 
   let proj_obj : type a d0 d1. (a, d0, d1) Axis.t -> a C.obj = function
@@ -2356,6 +2337,31 @@ module Value_with (Areality : Areality) = struct
         Statefulness.Const.t,
         Visibility.Const.t )
       modes
+
+    module Axis = struct
+      type 'a t =
+        | Monadic : (Monadic.Const.t, 'a) Axis.t -> 'a t
+        | Comonadic : (Comonadic.Const.t, 'a) Axis.t -> 'a t
+
+      let compare : type a d0 d1 b e0 e1. a t -> b t -> int =
+       fun t0 t1 ->
+        match t0, t1 with
+        | Monadic t0, Monadic t1 -> Axis.compare t0 t1
+        | Monadic _, Comonadic _ -> 1
+        | Comonadic _, Monadic _ -> -1
+        | Comonadic t0, Comonadic t1 -> Axis.compare t0 t1
+
+      type packed = P : 'a t -> packed
+
+      let print (type a) ppf (t : a t) =
+        match t with
+        | Monadic ax -> Axis.print ppf ax
+        | Comonadic ax -> Axis.print ppf ax
+
+      let all =
+        List.map (fun (P ax) -> P (Comonadic ax)) Comonadic.Axis.all
+        @ List.map (fun (P ax) -> P (Monadic ax)) Monadic.Axis.all
+    end
 
     let min = merge { comonadic = Comonadic.min; monadic = Monadic.min }
 
@@ -2601,7 +2607,7 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  type error = Error : ('a, _, _) Axis.t * 'a Solver.error -> error
+  type error = Error : 'a Const.Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -3380,6 +3386,14 @@ module Crossing = struct
      then [f0 m0 <= f0 m1].
   *)
 
+  module Atom = struct
+    type 'a t = 'a Modality.raw
+
+    type packed = P : ('a, _, _) Value.Axis.t * 'a t -> packed
+
+    let print ppf (P (ax, t)) = Modality.print ppf (Atom (ax, t))
+  end
+
   module Monadic = struct
     module Modality = Modality.Monadic.Const
     module Mode = Value.Monadic
@@ -3401,6 +3415,17 @@ module Crossing = struct
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
+
+    type error = Error : 'a Mode.Axis.t * 'a Atom.t Solver.error -> error
+
+    let sub (t0 : t) (t1 : t) =
+      match t0, t1 with
+      | Join_const c0, Join_const c1 -> (
+        match Mode.Const.sub c1 c0 with
+        | Ok () as ok -> ok
+        | Error (ax, { left; right }) ->
+          Error (Error (ax, { left = Join_with right; right = Join_with left }))
+        )
 
     let top : t = Join_const Mode.Const.min
 
@@ -3430,6 +3455,17 @@ module Crossing = struct
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1
+
+    type error = Error : 'a Mode.Axis.t * 'a Atom.t Solver.error -> error
+
+    let sub (t0 : t) (t1 : t) =
+      match t0, t1 with
+      | Meet_const c0, Meet_const c1 -> (
+        match Mode.Const.sub c0 c1 with
+        | Ok () as ok -> ok
+        | Error (ax, { left; right }) ->
+          Error (Error (ax, { left = Meet_with right; right = Meet_with left }))
+        )
 
     let top : t = Meet_const Mode.Const.max
 
@@ -3508,4 +3544,17 @@ module Crossing = struct
         Value.Axis.all
     in
     Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
+
+  type error =
+    | Error : ('a, _, _) Value.Axis.t * 'a Atom.t Solver.error -> error
+
+  let sub t0 t1 =
+    match Monadic.sub t0.monadic t1.monadic with
+    | Error (Error (ax, { left; right })) ->
+      Error (Error (Monadic ax, { left; right }))
+    | Ok () -> (
+      match Comonadic.sub t0.comonadic t1.comonadic with
+      | Error (Error (ax, { left; right })) ->
+        Error (Error (Comonadic ax, { left; right }))
+      | Ok () as ok -> ok)
 end

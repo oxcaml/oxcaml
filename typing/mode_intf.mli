@@ -396,7 +396,7 @@ module type S = sig
       include
         Common_product
           with type Const.t = monadic
-           and type 'a axis := (monadic, 'a) Axis.t
+           and type 'a axis = (monadic, 'a) Axis.t
 
       module Const_op : Lattice with type t = Const.t
     end
@@ -404,23 +404,35 @@ module type S = sig
     module Comonadic :
       Common_product
         with type Const.t = Areality.Const.t comonadic_with
-         and type 'a axis := (Areality.Const.t comonadic_with, 'a) Axis.t
+         and type 'a axis = (Areality.Const.t comonadic_with, 'a) Axis.t
 
     module Axis' := Axis
 
     module Axis : sig
       (** Represents a mode axis in this product whose constant is ['a], and whose
       allowance is ['d1] given the product's allowance ['d0]. *)
-      type ('a, 'd0, 'd1) t =
-        | Monadic : (Monadic.Const.t, 'a) Axis.t -> ('a, 'd, 'd neg) t
-        | Comonadic : (Comonadic.Const.t, 'a) Axis.t -> ('a, 'd, 'd pos) t
+      type ('a, 'd0, 'd1) t' =
+        | Monadic : 'a Monadic.axis -> ('a, 'd, 'd neg) t'
+        | Comonadic : 'a Comonadic.axis -> ('a, 'd, 'd pos) t'
+
+      (** Represents a mode axis in this product whose constant is ['a] *)
+      type 'a t =
+        | Monadic : 'a Monadic.axis -> 'a t
+        | Comonadic : 'a Comonadic.axis -> 'a t
 
       (** Compare two axes in implication order. If A implies B, then A is before B. *)
-      val compare : ('a, 'd0, 'd1) t -> ('b, 'e0, 'e1) t -> int
+      val compare : 'a t -> 'b t -> int
 
-      type packed = P : (_, _, _) t -> packed
+      type packed = P : _ t -> packed
 
-      val print : Format.formatter -> ('a, _, _) t -> unit
+      (** Returns the zero-based index of an axis.
+          Index is in implication order: if A implies B, then A is before B. *)
+      val index : 'a t -> int
+
+      (** Number of axes  *)
+      val num : int
+
+      val print : Format.formatter -> _ t -> unit
 
       (** List of all axes, ordered by [compare]. *)
       val all : packed list
@@ -451,11 +463,6 @@ module type S = sig
               Visibility.Const.t )
             modes
 
-      (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
-        monadic ones. *)
-      val lattice_of_axis :
-        ('a, _, _) Axis.t -> (module Lattice with type t = 'a)
-
       module Option : sig
         type some = t
 
@@ -477,9 +484,9 @@ module type S = sig
         val print : Format.formatter -> t -> unit
       end
 
-      val is_max : ('a, _, _) Axis.t -> 'a -> bool
+      val is_max : 'a Axis.t -> 'a -> bool
 
-      val is_min : ('a, _, _) Axis.t -> 'a -> bool
+      val is_min : 'a Axis.t -> 'a -> bool
 
       val split : t -> (Monadic.Const.t, Comonadic.Const.t) monadic_comonadic
 
@@ -496,10 +503,10 @@ module type S = sig
       val partial_apply : t -> t
 
       (** Prints a constant on any axis. *)
-      val print_axis : ('a, _, _) Axis.t -> Format.formatter -> 'a -> unit
+      val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
-    type error = Error : ('a, _, _) Axis.t * 'a Solver.error -> error
+    type error = Error : 'a Axis.t * 'a Solver.error -> error
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
@@ -515,7 +522,9 @@ module type S = sig
     end
 
     val proj :
-      ('a, 'l0 * 'r0, 'l1 * 'r1) Axis.t -> ('l0 * 'r0) t -> ('a, 'l1 * 'r1) mode
+      ('a, 'l0 * 'r0, 'l1 * 'r1) Axis.t' ->
+      ('l0 * 'r0) t ->
+      ('a, 'l1 * 'r1) mode
 
     val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
 
@@ -523,13 +532,13 @@ module type S = sig
 
     (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
     val max_with :
-      ('a, 'l0 * 'r0, 'l1 * 'r1) Axis.t ->
+      ('a, 'l0 * 'r0, 'l1 * 'r1) Axis.t' ->
       ('a, 'l1 * 'r1) mode ->
       (disallowed * 'r0) t
 
     (** [min_with ax elt] returns [min] but with the axis [ax] set to [elt]. *)
     val min_with :
-      ('a, 'l0 * 'r0, 'l1 * 'r1) Axis.t ->
+      ('a, 'l0 * 'r0, 'l1 * 'r1) Axis.t' ->
       ('a, 'l1 * 'r1) mode ->
       ('l0 * disallowed) t
 
@@ -606,7 +615,7 @@ module type S = sig
           in which case it's the identity modality. *)
 
     (** An atom modality is a [raw] accompanied by the axis it acts on. *)
-    type t = Atom : ('a, _, _) Value.Axis.t * 'a raw -> t
+    type t = Atom : 'a Value.Axis.t * 'a raw -> t
 
     (** Test if the given modality is the identity modality. *)
     val is_id : t -> bool
@@ -620,8 +629,7 @@ module type S = sig
     module Value : sig
       type atom := t
 
-      type error =
-        | Error : ('a, _, _) Value.Axis.t * 'a raw Solver.error -> error
+      type error = Error : 'a Value.Axis.t * 'a raw Solver.error -> error
 
       type nonrec equate_error = equate_step * error
 
@@ -656,10 +664,10 @@ module type S = sig
         val concat : then_:t -> t -> t
 
         (** [set ax a t] overwrite the [ax] axis of [t] to be [a]. *)
-        val set : ('a, _, _) Value.Axis.t -> 'a raw -> t -> t
+        val set : 'a Value.Axis.t -> 'a raw -> t -> t
 
         (** Project out the [raw] for the given axis in the given modality. *)
-        val proj : ('a, _, _) Value.Axis.t -> t -> 'a raw
+        val proj : 'a Value.Axis.t -> t -> 'a raw
 
         (** [diff t0 t1] returns a list of atoms in [t1] that are different than
         [t0]. *)
@@ -755,7 +763,7 @@ module type S = sig
     programs mode-check. The adjustment is called mode crossing. *)
     type t
 
-    (* CR zqian: Complete the lattice structure of mode crossing. *)
+    include Lattice with type t := t
 
     (* CR zqian: jkind modal bounds should just be our [t]. In particular, jkind
        should infer the modal bounds of a type in the form of [Value] instead of
@@ -794,16 +802,47 @@ module type S = sig
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic ->
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
 
-    (** [le t0 t1] returns [true] if [t0] allows more mode crossing than [t1]. *)
-    val le : t -> t -> bool
-
-    (** The trivial mode crossing that crosses nothing. *)
-    val top : t
-
-    (** The mode crossing that crosses everything. *)
-    val bot : t
-
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Format.formatter -> t -> unit
+
+    module Atom : sig
+      (** The mode crossing capability, projected to an axis whose carrier type
+      is ['a]. *)
+      type 'a t = Modality : 'a Modality.raw -> 'a t
+
+      type packed = P : 'a Value.Axis.t * 'a t -> packed
+
+      (** [modality m t] gives the mode crossing of type [T] wrapped in modality
+      [m] where [T] has mode crossing [t]. *)
+      val modality : 'a Modality.raw -> 'a t -> 'a t
+
+      include
+        Solver_intf.Lattices
+          with type 'a obj := 'a Value.Axis.t
+           and type 'a elt := 'a t
+    end
+
+    (* val create :
+       locality:Locality.Const.t Atom.t ->
+       linearity:Linearity.Const.t Atom.t ->
+       uniqueness:Uniqueness.Const.t Atom.t ->
+       portability:Portability.Const.t Atom.t ->
+       contention:Contention.Const.t Atom.t ->
+       yielding:Yielding.Const.t Atom.t ->
+       statefulness:Statefulness.Const.t Atom.t ->
+       visibility:Visibility.Const.t Atom.t ->
+       t *)
+
+    val create : (Value.Axis.packed -> Atom.packed) -> t
+
+    val proj : 'a Value.Axis.t -> t -> 'a Atom.t
+
+    val set : 'a Value.Axis.t -> 'a Atom.t -> t -> t
+
+    (* type error = *)
+    (* | Error : ('a, _, _) Value.Axis.t * 'a Atom.t Solver.error -> error *)
+
+    (** Similiar to [le], but returns offending axis in case of error. *)
+    (* val sub : t -> t -> (unit, error) Result.t *)
   end
 end
