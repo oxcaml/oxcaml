@@ -1510,7 +1510,6 @@ let triangle_10 = let mutable x = 0 in
 val triangle_10 : int = 55
 |}]
 
-
 (******************************)
 (* generic optional arguments *)
 (*
@@ -1535,8 +1534,8 @@ module type S =
 
 (* Implementation *)
 module M : S = struct
-let rec concat ?'(sep : string <- " ") xs =
-   String.concat sep xs
+  let rec concat ?'(sep : string <- " ") xs =
+    String.concat sep xs
 end
 
 [%%expect{|
@@ -1576,7 +1575,7 @@ val chain_call : ?'sep:string option -> string List.t -> string = <fun>
 - : string = "x y z"
 |}]
 
-let chain_call ?'(sep : string option) arg = M.concat ?'sep arg ;;
+let chain_call ?'sep:(sep : string option) arg = M.concat ?'sep arg ;;
 chain_call ?'sep:(Some ",") ["x"; "y"; "z"] ;;
 
 [%%expect{|

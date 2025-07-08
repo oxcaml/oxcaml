@@ -2710,7 +2710,7 @@ labeled_simple_pattern:
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
-  | GENOPTLABEL LPAREN let_pattern opt_default RPAREN
+  | GENOPTLABEL LPAREN let_pattern generic_opt_default RPAREN
       { (generic_optional $1 $sloc, $4, $3) }
   | GENOPTLABEL pattern_var
       { (generic_optional $1 $sloc, None, $2) }
