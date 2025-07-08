@@ -69,7 +69,7 @@ module type Set = sig
         with [s1]. *)
   val diff_sharing : t -> t -> t
 
-  (** [diff_shared s1 s2] is [diff_sharing s1 s2], with a fast path for shared
+  (** [diff_shared s1 s2] is [diff s1 s2], with a fast path for shared
         subsets of [s1] and [s2]. *)
   val diff_shared : t -> t -> t
 
@@ -259,9 +259,9 @@ module type Map = sig
       sharing of the result with [m1]. *)
   val diff_sharing : (key -> 'a -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
 
-  (** [diff_shared f m1 m2] is a version of [diff_sharing f m1 m2] that also
-      exploits sharing of [m1] and [m2] to avoid calling [f] when possible,
-      assuming that [f x x] always returns [None]. *)
+  (** [diff_shared f m1 m2] is a version of [diff f m1 m2] that exploits
+      sharing of [m1] and [m2] to avoid calling [f] when possible, assuming that
+      [f x x] always returns [None]. *)
   val diff_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
   val inter_domain_is_non_empty : 'a t -> 'a t -> bool
