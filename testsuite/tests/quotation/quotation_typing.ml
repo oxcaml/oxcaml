@@ -27,24 +27,19 @@ type ('a, 'b, 'c) s4 = <[$'a list -> $'b option -> $'c]> expr;;
 type ('a, 'b, 'c) s4 = <[ $ ('a) list -> $ ('b) option -> $ ('c) ]> expr
 |}];;
 
-type ('a, 'b) s5 = <['a -> [> `A of 'b ]]> expr;;
+type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
 [%%expect {|
-Line 30, characters 21-23:
-30 | type ('a, 'b) s5 = <['a -> [> `A of 'b ]]> expr;;
-                          ^^
-Error: Type variable "a" is used at Line 30, characters 21-23
+Line 30, characters 35-37:
+30 | type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
+                                        ^^
+Error: Type variable "b" is used at Line 30, characters 35-37
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
 
-type s6 = <[string -> bool -> [> `A | `B of string]]> expr;;
+type s6 = <[string -> bool -> [`A | `B of string]]> expr;;
 [%%expect {|
-Line 1, characters 0-58:
-1 | type s6 = <[string -> bool -> [> `A | `B of string]]> expr;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: A type variable is unbound in this type declaration.
-       In type "<[ string -> bool -> ([> `A | `B of string ] as 'a) ]> expr"
-       the variable "'a" is unbound
+type s6 = <[ string -> bool -> [ `A | `B of string ] ]> expr
 |}];;
 
 type 'a t1 = 'a expr;;
@@ -54,10 +49,17 @@ type 'a t1 = 'a expr
 
 type 'a t2 = <['a]> expr;;
 [%%expect {|
-Line 55, characters 15-17:
-55 | type 'a t2 = <['a]> expr;;
+Line 50, characters 15-17:
+50 | type 'a t2 = <['a]> expr;;
                     ^^
-Error: Type variable "a" is used at Line 55, characters 15-17
+Error: Type variable "a" is used at Line 50, characters 15-17
+       in a context with one layer of quotation (<[ ... ]>);
+       it should only be used in a context with no quotations or splices.
+|}, Principal{|
+Line 57, characters 15-17:
+57 | type 'a t2 = <['a]> expr;;
+                    ^^
+Error: Type variable "a" is used at Line 57, characters 15-17
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
@@ -89,10 +91,17 @@ Error: Type variable "a" is used at Line 1, characters 26-28
 
 fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 97, characters 28-30:
-97 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
+Line 92, characters 28-30:
+92 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
                                  ^^
-Error: Type variable "a" is used at Line 97, characters 28-30
+Error: Type variable "a" is used at Line 92, characters 28-30
+       in a context with 2 layers of quotation (<[ ... ]>);
+       it should only be used in a context with no quotations or splices.
+|}, Principal{|
+Line 99, characters 28-30:
+99 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
+                                 ^^
+Error: Type variable "a" is used at Line 99, characters 28-30
        in a context with 2 layers of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
