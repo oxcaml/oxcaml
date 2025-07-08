@@ -493,6 +493,7 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
    removed. The implications on the monadic axes will stay. Implied modalities
    can be overriden. *)
 (* CR zqian: decouple mutable and comonadic modalities *)
+(* CR jcutler: why is this? Why aliased? Can we get away without *)
 let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let comonadic : Modality.t list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);

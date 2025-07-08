@@ -234,6 +234,7 @@ module Jkind_mod_bounds = struct
       then Externality.min
       else t.externality
     in
+
     let nullability =
       if mem min_axes (Nonmodal Nullability)
       then Nullability.min

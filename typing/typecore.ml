@@ -758,7 +758,7 @@ let register_allocation ~loc ~env (expected_mode : expected_mode) =
     register_allocation_value_mode ~loc ~env (as_single_mode expected_mode)
       expected_mode.allocator
   in
-  let alloc_mode : alloc_mode =
+  let alloc_mode =
     { mode = alloc_mode;
       locality_context = expected_mode.locality_context }
   in
@@ -6381,6 +6381,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
+     (* rmode is the mode of the record. *)
       let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -8169,6 +8170,7 @@ and type_label_exp
      - first try: we try with [ty_arg] as expected type;
      - second try; if that fails, we backtrack and try without
   *)
+    (* CR jcutler: ty_Arg is the expected? real? type of the argument *)
   let (vars, ty_arg, snap, arg) =
     (* try the first approach *)
     with_local_level begin fun () ->
