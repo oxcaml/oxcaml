@@ -1,19 +1,4 @@
-(* TEST
- flags = "-extension-universe upstream_compatible";
-*)
-
-(* Interface *)
-module type S = sig
-  val concat : ?'sep:string -> string list -> string
-end
-
-(* Implementation *)
-module M : S = struct
-  let concat ?'(sep : string option <- " ") xs =
-    String.concat sep xs
-end
-
-(* Usage *)
-let default_concat ys = M.concat ys
-let comma_concat zs = M.concat ~sep:" " zs
-let chain_call ?'(sep : string option) arg = M.concat ?'sep arg
+File "extension_not_allowed.ml", line 12, characters 15-21:
+12 |   val concat : ?'sep:string -> string list -> string
+                    ^^^^^^
+Error: Syntax error: Generic optional arguments are not allowed. Make sure you have the correct language extension enabled.
