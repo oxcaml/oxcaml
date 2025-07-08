@@ -256,7 +256,8 @@ let zap_axis_to_floor
   | Comonadic Yielding ->
       Mode.Yielding.zap_to_floor (Mode.Value.proj (Comonadic Yielding) m)
   | Comonadic Statefulness ->
-      Mode.Statefulness.zap_to_floor (Mode.Value.proj (Comonadic Statefulness) m)
+      Mode.Statefulness.zap_to_floor
+        (Mode.Value.proj (Comonadic Statefulness) m)
   | Monadic Uniqueness ->
       Mode.Uniqueness.zap_to_floor (Mode.Value.proj (Monadic Uniqueness) m)
   | Monadic Contention ->
@@ -884,7 +885,8 @@ let core_module_type_symptom (x:Err.core_module_type_symptom)  =
 
 (* Construct a linearized error message from the error tree *)
 
-let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx (diff : _ mdiff) =
+let rec module_type ~expansion_token ~eqmode ~env ~before ~ctx
+  (diff : _ mdiff) =
   match diff.symptom with
   | Invalid_module_alias _ (* the difference is non-informative here *)
   | After_alias_expansion _ (* we print only the expanded module types *) ->

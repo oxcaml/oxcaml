@@ -3872,7 +3872,8 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
   | Lapply _ as lid ->
       let path_f, _comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
       (* [Lapply] is for [F(M).t] so nothing is closed over. *)
-      Papply(path_f, path_arg), (Mode.alloc_as_value fcomp_res_mode, locks_empty)
+      Papply(path_f, path_arg),
+      (Mode.alloc_as_value fcomp_res_mode, locks_empty)
 
 let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through

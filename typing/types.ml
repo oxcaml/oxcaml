@@ -899,7 +899,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       val_uid
     }
 
-  let module_declaration m {md_type; md_modalities; md_attributes; md_loc; md_uid} =
+  let module_declaration m {md_type; md_modalities; md_attributes;
+    md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
       md_modalities;

@@ -2883,8 +2883,8 @@ let rebase_modalities ~loc ~env ~md_mode ~mode sg =
 
 let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
   let md, shape =
-    type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor env
-      ?expected_mode smod
+    type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor
+      env ?expected_mode smod
   in
   md, shape
 
@@ -2896,8 +2896,8 @@ and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
 
 and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   ?expected_mode smod =
-  (* If the module is an identifier, there might be locks between the declaration
-  site and the use site.
+  (* If the module is an identifier, there might be locks between the
+  declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
   - If [hold_locks] is [false], the locks are walked.
 
@@ -3339,7 +3339,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
 and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode sstr =
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
-  Option.iter (fun x -> Value.submode md_mode x |> ignore) expected_mode;
+  Option.iter (fun x -> Value.submode md_mode x |> ignore)
+    expected_mode;
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
