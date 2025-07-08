@@ -239,9 +239,10 @@ module Axis_set = struct
     | Modal (Comonadic Yielding) -> 5
     | Modal (Comonadic Statefulness) -> 6
     | Modal (Monadic Visibility) -> 7
-    | Nonmodal Externality -> 8
-    | Nonmodal Nullability -> 9
-    | Nonmodal Separability -> 10
+    | Modal (Comonadic Externality) -> 8
+    | Nonmodal Externality -> 9
+    | Nonmodal Nullability -> 10
+    | Nonmodal Separability -> 11
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 

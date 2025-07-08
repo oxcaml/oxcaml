@@ -11156,6 +11156,7 @@ let report_error ~loc env =
         | Error (Comonadic Portability, _ ) -> []
         | Error (Comonadic Yielding, _) -> []
         | Error (Comonadic Statefulness, _) -> []
+        | Error (Comonadic Externality, _) -> [] (* CR jcutler: fixme *)
       in
       Location.errorf ~loc ~sub "@[%t@]" begin
         match fail_reason with

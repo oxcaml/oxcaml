@@ -4710,6 +4710,7 @@ let report_lookup_error _loc env ppf = function
         | Error (Statefulness, {left; right}) ->
           asprintf "%a" Mode.Statefulness.Const.print left,
           asprintf "is %a" Mode.Statefulness.Const.print right
+        | Error (Externality, _) -> failwith "unimplemented" (* CR jcutler: fixme *)
       in
       let s, hint =
         match context with

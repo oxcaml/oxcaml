@@ -351,7 +351,7 @@ module Layout = struct
     pp_element ~nested:false ppf layout
 end
 
-module Externality = Externality
+module Externality = Jkind_axis.Externality
 module Nullability = Nullability
 module Separability = Jkind_axis.Separability
 
@@ -547,6 +547,8 @@ module Mod_bounds = struct
     | Modal (Comonadic Yielding) -> yielding t
     | Modal (Comonadic Statefulness) -> statefulness t
     | Modal (Monadic Visibility) -> visibility t
+    | Modal (Comonadic Externality) ->
+      Mode.Externality.Const.Internal (* CR jcutler: fixme *)
     | Nonmodal Externality -> externality t
     | Nonmodal Nullability -> nullability t
     | Nonmodal Separability -> separability t
@@ -607,7 +609,9 @@ module Mod_bounds = struct
               linearity = linearity t;
               portability = portability t;
               yielding = yielding t;
-              statefulness = statefulness t
+              statefulness = statefulness t;
+              externality =
+                Mode.Externality.Const.Internal (* CR jcutler: fixme*)
             };
           monadic =
             { uniqueness = uniqueness t;
@@ -2534,7 +2538,13 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let ({ linearity; areality = locality; portability; yielding; statefulness }
+  let ({ linearity;
+         areality = locality;
+         portability;
+         yielding;
+         statefulness;
+         externality = _externality (* CR jcutler: fixme *)
+       }
         : Mode.Alloc.Comonadic.Const.t) =
     Alloc.Comonadic.Const.legacy
   in
@@ -2630,7 +2640,8 @@ let get_modal_bounds (type l r) ~jkind_of_type (jk : (l * r) jkind) =
           linearity = linearity mod_bounds;
           portability = portability mod_bounds;
           yielding = yielding mod_bounds;
-          statefulness = statefulness mod_bounds
+          statefulness = statefulness mod_bounds;
+          externality = Mode.Externality.Const.Internal (* CR jcutler: fixme *)
         };
       monadic =
         { uniqueness = uniqueness mod_bounds;
