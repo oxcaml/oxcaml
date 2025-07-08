@@ -1064,9 +1064,20 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let vd = {vd with val_modalities} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
-      let md_type = apply_modalities_module_type env modalities md.md_type in
-      let md = {md with md_type} in
-      Sig_module (id, pres, md, rec_, vis)
+      begin match apply_modalities_module_type env modalities md.md_type with
+      | Some md_type ->
+          let md = {md with md_type} in
+          Sig_module (id, pres, md, rec_, vis)
+      | None ->
+          let md_modalities =
+            md.md_modalities
+            |> Mode.Modality.Value.to_const_exn
+            |> (fun then_ -> Mode.Modality.Value.Const.concat ~then_ modalities)
+            |> Mode.Modality.Value.of_const
+          in
+          let md = {md with md_modalities} in
+          Sig_module (id, pres, md, rec_, vis)
+      end
   | item -> item
   ) sg
 
@@ -1074,15 +1085,16 @@ and apply_modalities_module_type env modalities = function
   | Mty_ident p ->
       let mtd = Env.find_modtype p env in
       begin match mtd.mtd_type with
-      | None -> Mty_ident p
+      | None -> Some (Mty_ident p)
       | Some mty -> apply_modalities_module_type env modalities mty
       end
   | Mty_strengthen (mty, p, alias) ->
-      Mty_strengthen (apply_modalities_module_type env modalities mty, p, alias)
+      Option.map (fun mty -> Mty_strengthen (mty, p, alias))
+        (apply_modalities_module_type env modalities mty)
   | Mty_signature sg ->
       let sg = apply_modalities_signature ~recursive:true env modalities sg in
-      Mty_signature sg
-  | (Mty_functor _ | Mty_alias _) as mty -> mty
+      Some (Mty_signature sg)
+  | (Mty_functor _ | Mty_alias _) -> None
 
 let loc_of_modes (modes : Parsetree.mode loc list) : Location.t option =
   (* CR zqian: [Parsetree.modes] should be a record with a field that is
@@ -1132,8 +1144,11 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   We still don't support [pmd_modalities] on functors.
   *)
   match Mode.Modality.Value.Const.is_id modalities with
-  | true -> mty
-  | false -> apply_modalities_module_type env modalities mty
+  | true -> mty, Mode.Modality.Value.id
+  | false ->
+      match apply_modalities_module_type env modalities mty with
+      | Some mty -> mty, Mode.Modality.Value.id
+      | None -> mty, Mode.Modality.Value.of_const modalities
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
@@ -1954,11 +1969,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env pmd.pmd_type)
         in
-        let mty_type =
+        let mty_type, md_modalities =
           apply_pmd_modalities env ~default_modalities:sig_modalities
             pmd.pmd_modalities tmty.mty_type
         in
-        let md_modalities = Modality.Value.id in
         let tmty = {tmty with mty_type} in
         let pres =
           match tmty.mty_type with
@@ -2228,12 +2242,12 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
           Builtin_attributes.warning_scope pmd.pmd_attributes
             (fun () -> transl_modtype env_c pmd.pmd_type)
         in
-        let mty_type =
+        let mty_type, md_modalities =
           apply_pmd_modalities env ~default_modalities:sig_modalities
             pmd.pmd_modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
-        let md = { md with Types.md_type = tmty.mty_type } in
+        let md = { md with Types.md_type = tmty.mty_type; md_modalities } in
         (id_shape, id_loc, md, mmode, tmty))
       sdecls curr in
   let map_mtys curr =
@@ -2260,12 +2274,11 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
-         let md_type =
+         let md_type, md_modalities =
           approx_modtype approx_env pmd.pmd_type
           |> apply_pmd_modalities env ~default_modalities:sig_modalities
               pmd.pmd_modalities
          in
-         let md_modalities = Modality.Value.id in
          let md =
            { md_type;
              md_modalities;
