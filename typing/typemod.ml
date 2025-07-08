@@ -1210,7 +1210,11 @@ and apply_modalities_module_type env modalities = function
   | Mty_signature sg ->
       let sg = apply_modalities_signature ~recursive:true env modalities sg in
       Some (Mty_signature sg)
-  | (Mty_functor _ | Mty_alias _) -> None
+  | Mty_functor _ as mty ->
+      (* CR zqian: for backward compatibility, functors won't be affected by
+        modalities *)
+      Some mty
+  | Mty_alias _ -> None
 
 let loc_of_modes (modes : Parsetree.mode loc list) : Location.t option =
   (* CR zqian: [Parsetree.modes] should be a record with a field that is
