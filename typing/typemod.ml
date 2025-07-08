@@ -1231,7 +1231,8 @@ let check_unsupported_modal_module ~env reason modes =
   | None -> ()
   | Some loc -> raise(Error(loc, env, Unsupported_modal_module reason))
 
-let transl_modalities ?(default_modalities = Mode.Modality.Value.Const.id) modalities =
+let transl_modalities ?(default_modalities = Mode.Modality.Value.Const.id)
+  modalities =
   match modalities with
   | [] -> default_modalities
   | _ :: _ ->
@@ -2194,7 +2195,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         in
         sig_item, [], newenv
     | Psig_recmodule sdecls ->
-        (* None of the modules have modes specified, since we're in a signature *)
+        (* None of the modules have modes specified, since we're in a signature
+           *)
         let sdecls = List.map (fun sdecl -> (sdecl, None)) sdecls in
         let (tdecls, newenv) =
           transl_recmodule_modtypes env ~sig_modalities sdecls in
@@ -2219,7 +2221,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             Sig_module(id, Mp_present, d, rs, Exported))
             decls []
         in
-        mksig (Tsig_recmodule (List.map (fun (md, _, _, _) -> md) tdecls)) env loc,
+        mksig (Tsig_recmodule (List.map (fun (md, _, _, _) -> md) tdecls))
+          env loc,
         sig_items,
         newenv
     | Psig_modtype pmtd ->
@@ -2394,7 +2397,8 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
   in
   let scope = Ctype.create_scope () in
   let ids =
-    List.map (fun (x, _) -> Option.map (Ident.create_scoped ~scope) x.pmd_name.txt)
+    List.map (fun (x, _) -> Option.map (Ident.create_scoped ~scope)
+      x.pmd_name.txt)
       sdecls
   in
   let approx_env container =
@@ -2648,7 +2652,8 @@ let check_recmodule_inclusion env bindings =
       (* Base case: check inclusion of s(mty_actual) in s(mty_decl)
          and insert coercion if needed *)
       let check_inclusion
-            (id, name, mty_decl, modl, mty_actual, mode_decl, attrs, loc, shape, uid) =
+            (id, name, mty_decl, modl, mty_actual, mode_decl, attrs, loc, shape
+            ,uid) =
         let mty_decl' = Subst.modtype (Rescope scope) s mty_decl.mty_type
         and mty_actual' = subst_and_strengthen scope s id mty_actual in
         let mode_actual, locks = modl.mod_mode in
@@ -2878,15 +2883,19 @@ let rebase_modalities ~loc ~env ~md_mode ~mode sg =
 
 let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
   let md, shape =
-    type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor env ?expected_mode smod
+    type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor env
+      ?expected_mode smod
   in
   md, shape
 
-and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body anchor env ?expected_mode smod =
+and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
+  anchor env ?expected_mode smod =
   Builtin_attributes.warning_scope smod.pmod_attributes
-    (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode smod)
+    (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
+      ?expected_mode smod)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode smod =
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
+  ?expected_mode smod =
   (* If the module is an identifier, there might be locks between the declaration
   site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -2898,7 +2907,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       let path, mode_with_locks =
         Env.lookup_module_path ~load:(not alias) ~loc:smod.pmod_loc lid.txt env
       in
-      type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid smod
+      type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid
+        smod
   | Pmod_structure sstr ->
       let (str, sg, mode, names, shape, _finalenv) =
         type_structure funct_body anchor env ?expected_mode sstr in
@@ -3011,7 +3021,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       let mode = Value.newvar () in
       let exp =
         Ctype.with_local_level_if_principal
-          (fun () -> Typecore.type_exp env sexp ~mode:(Value.disallow_left mode))
+          (fun () -> Typecore.type_exp env sexp
+            ~mode:(Value.disallow_left mode))
           ~post:Typecore.generalize_structure_exp
       in
       let mty =
@@ -3062,7 +3073,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode
       type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid
         smod
 
-and type_module_path_aux ~alias ~hold_locks sttn env path (mode, locks) (lid : _ loc) smod =
+and type_module_path_aux ~alias ~hold_locks sttn env path
+  (mode, locks) (lid : _ loc) smod =
   let mod_mode =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
     else
@@ -3647,7 +3659,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode sstr 
                let mty' =
                  enrich_module_type anchor name.txt modl.mod_type newenv
                in
-               (id, name, mty, modl, mty', Option.get mode, attrs, loc, shape, uid))
+               (id, name, mty, modl, mty', Option.get mode, attrs, loc, shape,
+                uid))
             decls sbind in
         let newenv = (* allow aliasing recursive modules from outside *)
           List.fold_left
@@ -4017,8 +4030,8 @@ let type_package env m p fl =
 
 let type_open_decl ?used_slot env od =
   let od, _, _, env =
-    type_open_decl ?used_slot ?toplevel:None false (Signature_names.create ()) env
-      od
+    type_open_decl ?used_slot ?toplevel:None false (Signature_names.create ())
+      env od
   in
   od, env
 

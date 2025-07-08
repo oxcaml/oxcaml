@@ -208,8 +208,8 @@ let dmodtype mty =
 let space ppf () = Format.fprintf ppf "@ "
 
 
-(** Checks if the error is a mode error at the leaf node, and returns the offending axis.
-  *)
+(** Checks if the error is a mode error at the leaf node, and returns the
+  offending axis. *)
 module Is_modal = struct
   open Err
   let rec module_type_symptom = function
@@ -247,27 +247,43 @@ let zap_axis_to_floor
   : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> Mode.Value.l -> a
   = fun ax m ->
   match ax with
-  | Comonadic Areality -> Mode.Regionality.zap_to_floor (Mode.Value.proj (Comonadic Areality) m)
-  | Comonadic Linearity -> Mode.Linearity.zap_to_floor (Mode.Value.proj (Comonadic Linearity) m)
-  | Comonadic Portability -> Mode.Portability.zap_to_floor (Mode.Value.proj (Comonadic Portability)  m)
-  | Comonadic Yielding -> Mode.Yielding.zap_to_floor (Mode.Value.proj (Comonadic Yielding) m)
-  | Comonadic Statefulness -> Mode.Statefulness.zap_to_floor (Mode.Value.proj (Comonadic Statefulness) m)
-  | Monadic Uniqueness -> Mode.Uniqueness.zap_to_floor (Mode.Value.proj (Monadic Uniqueness) m)
-  | Monadic Contention -> Mode.Contention.zap_to_floor (Mode.Value.proj (Monadic Contention) m)
-  | Monadic Visibility -> Mode.Visibility.zap_to_floor (Mode.Value.proj (Monadic Visibility) m)
+  | Comonadic Areality ->
+      Mode.Regionality.zap_to_floor (Mode.Value.proj (Comonadic Areality) m)
+  | Comonadic Linearity ->
+      Mode.Linearity.zap_to_floor (Mode.Value.proj (Comonadic Linearity) m)
+  | Comonadic Portability ->
+      Mode.Portability.zap_to_floor (Mode.Value.proj (Comonadic Portability)  m)
+  | Comonadic Yielding ->
+      Mode.Yielding.zap_to_floor (Mode.Value.proj (Comonadic Yielding) m)
+  | Comonadic Statefulness ->
+      Mode.Statefulness.zap_to_floor (Mode.Value.proj (Comonadic Statefulness) m)
+  | Monadic Uniqueness ->
+      Mode.Uniqueness.zap_to_floor (Mode.Value.proj (Monadic Uniqueness) m)
+  | Monadic Contention ->
+      Mode.Contention.zap_to_floor (Mode.Value.proj (Monadic Contention) m)
+  | Monadic Visibility ->
+      Mode.Visibility.zap_to_floor (Mode.Value.proj (Monadic Visibility) m)
 
 let zap_axis_to_ceil
   : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> Mode.Value.r -> a
   = fun ax m ->
   match ax with
-  | Comonadic Areality -> Mode.Regionality.zap_to_ceil (Mode.Value.proj (Comonadic Areality) m)
-  | Comonadic Linearity -> Mode.Linearity.zap_to_ceil (Mode.Value.proj (Comonadic Linearity) m)
-  | Comonadic Portability -> Mode.Portability.zap_to_ceil (Mode.Value.proj (Comonadic Portability) m)
-  | Comonadic Yielding -> Mode.Yielding.zap_to_ceil (Mode.Value.proj (Comonadic Yielding) m)
-  | Comonadic Statefulness -> Mode.Statefulness.zap_to_ceil (Mode.Value.proj (Comonadic Statefulness) m)
-  | Monadic Uniqueness -> Mode.Uniqueness.zap_to_ceil (Mode.Value.proj (Monadic Uniqueness) m)
-  | Monadic Contention -> Mode.Contention.zap_to_ceil (Mode.Value.proj (Monadic Contention) m)
-  | Monadic Visibility -> Mode.Visibility.zap_to_ceil (Mode.Value.proj (Monadic Visibility) m)
+  | Comonadic Areality ->
+      Mode.Regionality.zap_to_ceil (Mode.Value.proj (Comonadic Areality) m)
+  | Comonadic Linearity ->
+      Mode.Linearity.zap_to_ceil (Mode.Value.proj (Comonadic Linearity) m)
+  | Comonadic Portability ->
+      Mode.Portability.zap_to_ceil (Mode.Value.proj (Comonadic Portability) m)
+  | Comonadic Yielding ->
+      Mode.Yielding.zap_to_ceil (Mode.Value.proj (Comonadic Yielding) m)
+  | Comonadic Statefulness ->
+      Mode.Statefulness.zap_to_ceil (Mode.Value.proj (Comonadic Statefulness) m)
+  | Monadic Uniqueness ->
+      Mode.Uniqueness.zap_to_ceil (Mode.Value.proj (Monadic Uniqueness) m)
+  | Monadic Contention ->
+      Mode.Contention.zap_to_ceil (Mode.Value.proj (Monadic Contention) m)
+  | Monadic Visibility ->
+      Mode.Visibility.zap_to_ceil (Mode.Value.proj (Monadic Visibility) m)
 
 let print_out_mode
 : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> a -> _
@@ -419,7 +435,11 @@ module With_shorthand = struct
               "%s@ =@ %t" name (dmodtype mty)
 
   let definition ~is_modal x =
-    let mode = Types.functor_param_mode |> Mode.alloc_as_value |> Mode.Value.disallow_right in
+    let mode =
+      Types.functor_param_mode
+      |> Mode.alloc_as_value
+      |> Mode.Value.disallow_right
+    in
     let mode = maybe_print_mode_l ~is_modal mode in
     Format.dprintf "%t%t" (definition_aux x) mode
 
@@ -622,7 +642,9 @@ module Functor_suberror = struct
     let single_diff ~is_modal g e more =
       let _arg, mty, (mode1, locks) = g.With_shorthand.item in
       let mode2 =
-        Types.functor_param_mode |> Mode.alloc_as_value |> Mode.Value.disallow_left
+        Types.functor_param_mode
+        |> Mode.alloc_as_value
+        |> Mode.Value.disallow_left
       in
       let modes : Includemod.modes = Specific (mode1, mode2, locks) in
       let mode1, mode2 = maybe_print_modes ~is_modal modes in
@@ -1083,7 +1105,8 @@ let report_apply_error ~loc env (app_name, mty_f, args) =
           ~ctx:[] mty_diff.symptom
       in
       let is_modal = Is_modal.module_type_symptom mty_diff.symptom in
-      Location.errorf ~loc "%t" (Functor_suberror.App.single_diff ~is_modal g e more)
+      Location.errorf ~loc "%t"
+        (Functor_suberror.App.single_diff ~is_modal g e more)
   | _ ->
       let not_functor =
         List.for_all (function _, Diffing.Delete _ -> true | _ -> false) d

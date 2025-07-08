@@ -60,7 +60,8 @@ module Error = struct
     | Class_mode of Mode.Value.error
 
   type core_sigitem_symptom =
-    | Value_descriptions of (value_description, Includecore.value_mismatch) mdiff
+    | Value_descriptions of
+        (value_description, Includecore.value_mismatch) mdiff
     | Type_declarations of (type_declaration, Includecore.type_mismatch) diff
     | Extension_constructors of
         (extension_constructor, Includecore.extension_constructor_mismatch) diff
@@ -312,13 +313,15 @@ let class_declarations env subst id ~mmodes decl1 decl2 =
   let modes = Includecore.child_modes (Ident.name id) mmodes in
   match Includecore.check_modes env ~item:Class modes with
   | Error e ->
-      Error Error.(Core(Class_declarations(mdiff decl1 decl2 mmodes (Class_mode e))))
+      Error Error.(Core(Class_declarations(
+        mdiff decl1 decl2 mmodes (Class_mode e))))
   | Ok () ->
   let decl2 = Subst.class_declaration subst decl2 in
   match Includeclass.class_declarations env decl1 decl2 with
     []     -> Ok Tcoerce_none
   | reason ->
-     Error Error.(Core(Class_declarations(mdiff decl1 decl2 mmodes (Class_type reason))))
+     Error Error.(Core(Class_declarations(
+      mdiff decl1 decl2 mmodes (Class_type reason))))
 
 (* Extract name, kind and ident from a signature item *)
 
@@ -631,7 +634,8 @@ let rec modtypes ~direction ~loc env subst ~modes mty1 mty2 shape =
     in
     Error Error.(mdiff mty1 mty2 modes reason)
 
-and try_modtypes ?(allow_shallow = true) ~direction ~loc env subst ~modes mty1 mty2 orig_shape =
+and try_modtypes ?(allow_shallow = true) ~direction ~loc env subst ~modes
+  mty1 mty2 orig_shape =
   let open Subst.Lazy in
   (* Do a quick nominal comparison for simple types and if that fails, try to
       unfold one of them. For structured types, do a deep comparison. *)
@@ -766,7 +770,7 @@ and try_modtypes ?(allow_shallow = true) ~direction ~loc env subst ~modes mty1 m
     in
     match red with
     | Some (mty1,mty2) ->
-        try_modtypes ~allow_shallow ~direction ~loc env subst ~modes mty1 mty2 orig_shape
+        try_modtypes ~direction ~loc env subst ~modes mty1 mty2 orig_shape
     | None ->
         (* Report error *)
         match mty1, mty2 with
@@ -1192,14 +1196,16 @@ exception Apply_error of {
     env : Env.t ;
     app_name : application_name ;
     mty_f : module_type ;
-    args : (Error.functor_arg_descr * module_type * Typedtree.mode_with_locks) list ;
+    args : (Error.functor_arg_descr * module_type
+      * Typedtree.mode_with_locks) list ;
   }
 
 let check_functor_application_raw ~loc env mty1 path1 mty2 =
   let aliasable = can_alias env path1 in
   let direction = Directionality.unknown ~mark:true in
   strengthened_modtypes ~direction ~loc ~aliasable env
-    Subst.identity ~modes:modes_functor_param_legacy mty1 path1 mty2 Shape.dummy_mod
+    Subst.identity ~modes:modes_functor_param_legacy mty1 path1 mty2
+      Shape.dummy_mod
   |> Result.map fst
 
 let check_functor_application ~loc env mty1 path1 mty2 =
@@ -1382,7 +1388,8 @@ end
 module Functor_app_diff = struct
   module I = Functor_inclusion_diff
   module Defs= struct
-    type left = Error.functor_arg_descr * Types.module_type * Typedtree.mode_with_locks
+    type left = Error.functor_arg_descr * Types.module_type
+      * Typedtree.mode_with_locks
     type right = Types.functor_parameter
     type eq = Typedtree.module_coercion
     type diff = (Error.functor_arg_descr, unit) Error.functor_param_symptom
@@ -1459,8 +1466,8 @@ module Functor_app_diff = struct
                let direction = Directionality.unknown ~mark:false in
                 match
                   modtypes ~direction ~loc state.env
-                    state.subst ~modes:(modes_functor_param arg_mode) arg_mty param
-                    Shape.dummy_mod
+                    state.subst arg_mty param
+                    ~modes:(modes_functor_param arg_mode) Shape.dummy_mod
                 with
                 | Error mty -> Result.Error (Error.Mismatch mty)
                 | Ok (cc, _) -> Ok cc

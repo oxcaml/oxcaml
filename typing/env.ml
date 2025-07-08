@@ -2668,7 +2668,8 @@ and add_extension ~check ?shape ~rebind id ext env =
   store_extension ~check ~rebind id addr ext shape env
 
 and add_module_declaration_lazy
-      ~update_summary ?(arg=false) ?shape ~check id presence md ?(mode = Mode.Value.(allow_right max)) ?(locks = []) env =
+      ~update_summary ?(arg=false) ?shape ~check id presence md
+      ?(mode = Mode.Value.(allow_right max)) ?(locks = []) env =
   let check =
     if not check then
       None
@@ -2685,7 +2686,8 @@ and add_module_declaration_lazy
   in
   if arg then add_functor_arg id env else env
 
-let add_module_declaration ?(arg=false) ?shape ~check id presence md ?mode ?locks env =
+let add_module_declaration ?(arg=false) ?shape ~check id presence md
+  ?mode ?locks env =
   add_module_declaration_lazy ~update_summary:true ~arg ?shape ~check id
     presence (Subst.Lazy.of_module_decl md) ?mode ?locks env
 
@@ -2713,7 +2715,8 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}
   in
-  add_module_declaration_lazy ~update_summary ~check:false id presence md ?mode env
+  add_module_declaration_lazy ~update_summary ~check:false id presence md ?mode
+    env
 
 let add_module ?arg ?shape id presence mty ?mode env =
   add_module_declaration ~check:false ?arg ?shape id presence (md mty) ?mode env
@@ -2749,7 +2752,8 @@ let enter_extension ~scope ~rebind name ext env =
 
 let enter_module_declaration ~scope ?arg ?shape s presence md ?mode ?locks env =
   let id = Ident.create_scoped ~scope s in
-  (id, add_module_declaration ?arg ?shape ~check:true id presence md ?mode ?locks env)
+  (id, add_module_declaration ?arg ?shape ~check:true id presence md ?mode
+    ?locks env)
 
 let enter_modtype ~scope name mtd env =
   let id = Ident.create_scoped ~scope name in
@@ -2812,7 +2816,8 @@ module Add_signature(T : Types.Wrapped)(M : sig
   val add_value: ?shape:Shape.t -> mode:(Mode.allowed * 'r0) Mode.Value.t -> Ident.t ->
     T.value_description  -> t -> t
   val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool
-    -> Ident.t -> module_presence -> T.module_declaration -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks ->
+    -> Ident.t -> module_presence -> T.module_declaration
+    -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks ->
     t -> t
   val add_modtype: ?shape:Shape.t -> Ident.t -> T.modtype_declaration -> t -> t
 end) = struct
@@ -2831,7 +2836,8 @@ end) = struct
         map, add_extension ~check:false ?shape ~rebind:false id ext env
     | Sig_module(id, presence, md, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_ id) in
-        map, M.add_module_declaration ~check:false ?shape id presence md ~mode env
+        map, M.add_module_declaration ~check:false ?shape id presence md ~mode
+          env
     | Sig_modtype(id, decl, _)  ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_type id) in
         map, M.add_modtype ?shape id decl env
@@ -2842,7 +2848,8 @@ end) = struct
         let map, shape = proj_shape map mod_shape (Shape.Item.class_type id) in
         map, add_cltype ?shape id decl env
 
-  let rec add_signature map mod_shape sg ?(mode = Mode.Value.(allow_right max)) env =
+  let rec add_signature map mod_shape sg ?(mode = Mode.Value.(allow_right max))
+    env =
     match sg with
         [] -> map, env
     | comp :: rem ->
@@ -3474,7 +3481,9 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
 let rec lookup_module_components ~errors ~use ~loc lid env =
   match lid with
   | Lident s ->
-      let path, (_, locks), data = lookup_ident_module Load ~errors ~use ~loc s env in
+      let path, (_, locks), data =
+        lookup_ident_module Load ~errors ~use ~loc s env
+      in
       path, (data.mda_mode, locks), data.mda_components
   | Ldot(l, s) ->
       let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
@@ -3484,10 +3493,13 @@ let rec lookup_module_components ~errors ~use ~loc lid env =
       let comps =
         !components_of_functor_appl' ~loc ~f_path ~f_comp ~arg env in
       (* [Lapply] is for [F(M).t] so nothing is closed over. *)
-      Papply (f_path, arg), (Mode.alloc_as_value fcomp_res_mode, locks_empty), comps
+      Papply (f_path, arg), (Mode.alloc_as_value fcomp_res_mode, locks_empty),
+        comps
 
 and lookup_structure_components ~errors ~use ~loc ?(reason = Project) lid env =
-  let path, mode_with_locks, comps = lookup_module_components ~errors ~use ~loc lid env in
+  let path, mode_with_locks, comps =
+    lookup_module_components ~errors ~use ~loc lid env
+  in
   match get_components_res comps with
   | Ok (Structure_comps comps) -> path, mode_with_locks, comps
   | Ok (Functor_comps _) ->
@@ -3567,7 +3579,9 @@ and lookup_apply ~errors ~use ~loc lid0 env =
 and lookup_module ~errors ~use ~loc lid env =
   match lid with
   | Lident s ->
-      let path, mode_with_locks, data = lookup_ident_module Load ~errors ~use ~loc s env in
+      let path, mode_with_locks, data =
+        lookup_ident_module Load ~errors ~use ~loc s env
+      in
       let md = Subst.Lazy.force_module_decl data.mda_declaration in
       path, md, mode_with_locks
   | Ldot(l, s) ->
@@ -3579,7 +3593,8 @@ and lookup_module ~errors ~use ~loc lid env =
       let path_f, comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
       let md = md (modtype_of_functor_appl comp_f path_f path_arg) in
       (* [Lapply] is for [F(M).t] so nothing is closed over. *)
-      Papply(path_f, path_arg), md, (Mode.alloc_as_value fcomp_res_mode, locks_empty)
+      Papply(path_f, path_arg), md,
+      (Mode.alloc_as_value fcomp_res_mode, locks_empty)
 
 and lookup_dot_module ~errors ~use ~loc l s env =
   let p, (_, locks), comps =
@@ -3626,7 +3641,9 @@ let lookup_dot_modtype ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_modtype (Ldot(l, s)))
 
 let lookup_dot_class ~errors ~use ~loc l s env =
-  let (p, (_, locks), comps) = lookup_structure_components ~errors ~use ~loc l env in
+  let (p, (_, locks), comps) =
+    lookup_structure_components ~errors ~use ~loc l env
+  in
   match NameMap.find s comps.comp_classes with
   | clda ->
       let path = Pdot(p, s) in

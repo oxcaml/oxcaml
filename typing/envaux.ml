@@ -81,7 +81,8 @@ let rec env_from_summary ~allow_missing_modules sum subst =
             Subst.Lazy.module_decl Keep subst (Subst.Lazy.of_module_decl desc)
           in
           Env.add_module_declaration_lazy ~update_summary:true id pres desc
-            ~mode ~locks ~arg:true (env_from_summary ~allow_missing_modules s subst)
+            ~mode ~locks
+            ~arg:true (env_from_summary ~allow_missing_modules s subst)
       | Env_functor_arg _ -> assert false
       | Env_constraints(s, map) ->
           Path.Map.fold
