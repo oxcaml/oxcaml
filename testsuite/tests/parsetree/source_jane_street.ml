@@ -1513,44 +1513,73 @@ val triangle_10 : int = 55
 
 (******************************)
 (* generic optional arguments *)
+(*
+The following syntaxes are tested
+
+1. in type declaration [?'lbl:tp -> ...]
+2. function parameter with default argument [?'(lbl: tp <- val)]
+3. function declaration without default argument [?'(lbl : tp)]
+4. function call with expression [?'lbl:(<expr>)]
+5. function call without expression [?'lbl]
+*)
 
 module type S = sig
-val concat : ?'sep:string -> string list -> string
-end ;;
+val concat : ?'sep:string option -> string Stdlib.List.t -> string
+end
 
 [%%expect{|
-val triangle_10 : int = 55
+module type S =
+  sig val concat : ?'sep:string option -> string List.t -> string end
 |}]
+
 
 (* Implementation *)
 module M : S = struct
-let concat ?'(sep : string option <- " ") xs =
-  String.concat sep xs
-end ;;
+let rec concat ?'(sep : string <- " ") xs =
+   String.concat sep xs
+end
 
 [%%expect{|
-val triangle_10 : int = 55
+module M : S
 |}]
 
-let default_concat ys = M.concat ys in default_conat ["x"; "y"; "z"] ;;
+let default_concat ys = M.concat ys ;;
+default_concat ["x"; "y"; "z"] ;;
+
 [%%expect{|
-val triangle_10 : int = 55
+val default_concat : string List.t -> string = <fun>
+- : string = "x y z"
 |}]
 
-let comma_concat zs = M.concat ~sep:"," zs in comma_concat ["x"; "y"; "z"] ;;
+
+let comma_concat zs = M.concat ~sep:(Some ",") zs ;;
+comma_concat ["x"; "y"; "z"] ;;
+
 [%%expect{|
-val triangle_10 : int = 55
+val comma_concat : string List.t -> string = <fun>
+- : string = "x,y,z"
 |}]
 
-let chain_call ?'(sep : string option) arg = M.concat ?'sep arg in chain_call ["x"; "y"; "z"] ;;
+let comma_concat_2 zs = M.concat ?'sep:(Some ",") zs ;;
+comma_concat ["x"; "y"; "z"] ;;
 
 [%%expect{|
-val triangle_10 : int = 55
+val comma_concat_2 : string List.t -> string = <fun>
+- : string = "x,y,z"
 |}]
 
-let chain_call ?'(sep : string option) arg = M.concat ?'sep arg in
-  chain_call ?'sep:(Some ",") ["x"; "y"; "z"] ;;
+let chain_call ?'(sep : string option) arg = M.concat ?'sep arg ;;
+chain_call ["x"; "y"; "z"] ;;
 
 [%%expect{|
-val triangle_10 : int = 55
+val chain_call : ?'sep:string option -> string List.t -> string = <fun>
+- : string = "x y z"
+|}]
+
+let chain_call ?'(sep : string option) arg = M.concat ?'sep arg ;;
+chain_call ?'sep:(Some ",") ["x"; "y"; "z"] ;;
+
+[%%expect{|
+val chain_call : ?'sep:string option -> string List.t -> string = <fun>
+- : string = "x,y,z"
 |}]

@@ -865,8 +865,22 @@ and label_exp ctxt f (l,opt,p) =
                 ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
           | None -> pp f "?%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
       end
-  | Generic_optional _rest -> (
-    failwith "TODO869"
+  | Generic_optional rest -> (
+    (*= CR generic-optional : Change *)
+      begin match p with
+      | {ppat_desc = Ppat_var {txt;_}; ppat_attributes = []}
+        when txt = rest ->
+          (match opt with
+           | Some o ->
+              pp f "?(%a=@;%a)" ident_of_name rest (expression ctxt) o
+           | None -> pp f "?%a" ident_of_name rest)
+      | _ ->
+          (match opt with
+          | Some o ->
+              pp f "?%a:(%a=@;%a)@;"
+                ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
+          | None -> pp f "?%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
+      end
   )
   | Labelled l -> match p with
     | {ppat_desc  = Ppat_var {txt;_}; ppat_attributes = []}
