@@ -44,7 +44,7 @@ module Jkind_mod_bounds = struct
   module Yielding = Mode.Yielding.Const
   module Statefulness = Mode.Statefulness.Const
   module Visibility = Mode.Visibility.Const_op
-  module Externality = Jkind_axis.Externality
+  module Externality = Mode.Externality.Const
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
 
@@ -157,7 +157,7 @@ module Jkind_mod_bounds = struct
       else t.visibility
     in
     let externality =
-      if mem max_axes (Nonmodal Externality)
+      if mem max_axes (Modal (Comonadic Externality))
       then Externality.max
       else t.externality
     in
@@ -230,10 +230,11 @@ module Jkind_mod_bounds = struct
       else t.visibility
     in
     let externality =
-      if mem min_axes (Nonmodal Externality)
-      then Externality.min
+      if mem min_axes (Modal (Comonadic Externality))
+      then Externality.max
       else t.externality
     in
+
     let nullability =
       if mem min_axes (Nonmodal Nullability)
       then Nullability.min
@@ -276,7 +277,7 @@ module Jkind_mod_bounds = struct
      Statefulness.(le max (statefulness t))) &&
     (not (mem axes (Modal (Monadic Visibility))) ||
      Visibility.(le max (visibility t))) &&
-    (not (mem axes (Nonmodal Externality)) ||
+    (not (mem axes (Modal (Comonadic Externality))) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
      Nullability.(le max (nullability t))) &&
@@ -292,7 +293,7 @@ module Jkind_mod_bounds = struct
         yielding = Yielding;
         statefulness = Stateful;
         visibility = Read_write;
-        externality = External;
+        externality = Internal;
         nullability = Maybe_null;
         separability = Maybe_separable } -> true
     | _ -> false

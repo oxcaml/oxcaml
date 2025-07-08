@@ -81,7 +81,7 @@ module Jkind_mod_bounds : sig
   module Yielding = Mode.Yielding.Const
   module Statefulness = Mode.Statefulness.Const
   module Visibility = Mode.Visibility.Const_op
-  module Externality = Jkind_axis.Externality
+  module Externality = Mode.Externality.Const
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
 
