@@ -2620,9 +2620,11 @@ let constrain_type_jkind env ty jkind =
 let () =
   Env.constrain_type_jkind := constrain_type_jkind
 
-let check_type_externality env ty ext =
+let check_type_externality env ty externality =
   let upper_bound =
-    Jkind.set_externality_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) ext
+    Jkind.set_externality_upper_bound
+      (Jkind.Builtin.any ~why:Dummy_jkind)
+      externality
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
@@ -2707,7 +2709,7 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
          might turn out later to be value. This is the conservative choice. *)
       let jkind_of_type = type_jkind_purely_if_principal env in
       let ext = Jkind.get_externality_upper_bound ~jkind_of_type jkind in
-      Jkind_axis.Externality.le ext External64 &&
+      Mode.Externality.Const.le ext External64 &&
       match Jkind.get_layout jkind with
       | Some (Base Value) | None -> true
       | _ -> false
@@ -5078,6 +5080,7 @@ let mode_crossing_structure_memaddr =
       portability = Portable;
       yielding = Unyielding;
       statefulness = Stateless;
+      externality = Internal;
   }}
 
 (** The mode crossing of a functor. *)
@@ -5094,6 +5097,7 @@ let mode_crossing_functor =
       portability = Nonportable;
       yielding = Yielding;
       statefulness = Stateful;
+      externality = Internal;
   }}
 
 (** The mode crossing of any module. *)

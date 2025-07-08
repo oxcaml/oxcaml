@@ -351,7 +351,6 @@ module Layout = struct
     pp_element ~nested:false ppf layout
 end
 
-module Externality = Externality
 module Nullability = Nullability
 module Separability = Jkind_axis.Separability
 
@@ -415,7 +414,6 @@ let relevant_axes_of_modality ~relevant_for_shallow ~modality =
          mode-crossing. In the future, we may want to complexify the modal-kinds
          setup to allow for more mode-crossing in the presence of non-constant
          non-identity modalities. *)
-      | Nonmodal Externality -> true
       | Nonmodal Nullability -> (
         match relevant_for_shallow with
         | `Relevant -> true
@@ -514,7 +512,7 @@ module Mod_bounds = struct
             (visibility t2))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Externality.le
-            ~axis:(Pack (Nonmodal Externality)) (externality t1)
+            ~axis:(Pack (Modal (Comonadic Externality))) (externality t1)
             (externality t2))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Nullability.le
@@ -547,7 +545,7 @@ module Mod_bounds = struct
     | Modal (Comonadic Yielding) -> yielding t
     | Modal (Comonadic Statefulness) -> statefulness t
     | Modal (Monadic Visibility) -> visibility t
-    | Nonmodal Externality -> externality t
+    | Modal (Comonadic Externality) -> externality t
     | Nonmodal Nullability -> nullability t
     | Nonmodal Separability -> separability t
 
@@ -583,7 +581,7 @@ module Mod_bounds = struct
          (Modal (Monadic Visibility))
     |> add_if
          (Externality.le Externality.max (externality t))
-         (Nonmodal Externality)
+         (Modal (Comonadic Externality))
     |> add_if
          (Nullability.le Nullability.max (nullability t))
          (Nonmodal Nullability)
@@ -607,7 +605,8 @@ module Mod_bounds = struct
               linearity = linearity t;
               portability = portability t;
               yielding = yielding t;
-              statefulness = statefulness t
+              statefulness = statefulness t;
+              externality = externality t
             };
           monadic =
             { uniqueness = uniqueness t;
@@ -1063,7 +1062,8 @@ module Layout_and_axes = struct
                 ~statefulness:
                   (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
                 ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
-                ~externality:(value_for_axis ~axis:(Nonmodal Externality))
+                ~externality:
+                  (value_for_axis ~axis:(Modal (Comonadic Externality)))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
@@ -1305,7 +1305,10 @@ module Const = struct
         name : string
       }
 
-    let mk_jkind ~mode_crossing ~nullability ~separability
+    (* NB: mode_crossing = true does not imply anything about externality. We
+       always explicitly pass externality, since it is not always obvious if
+       types that "cross everything" should cross at external or byte_external *)
+    let mk_jkind ~mode_crossing ~nullability ~separability ~externality
         (layout : Layout.Const.t) =
       let mod_bounds =
         (match mode_crossing with
@@ -1313,20 +1316,21 @@ module Const = struct
         | false -> Mod_bounds.max)
         |> Mod_bounds.set_nullability nullability
         |> Mod_bounds.set_separability separability
+        |> Mod_bounds.set_externality externality
       in
       { layout; mod_bounds; with_bounds = No_with_bounds }
 
     let any =
       { jkind =
           mk_jkind Any ~mode_crossing:false ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Maybe_separable ~externality:Internal;
         name = "any"
       }
 
     let any_mod_everything =
       { jkind =
           mk_jkind Any ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Maybe_separable ~externality:Byte_external;
         name = "any mod everything"
       }
 
@@ -1335,7 +1339,7 @@ module Const = struct
     let any_non_null =
       { jkind =
           mk_jkind Any ~mode_crossing:false ~nullability:Non_null
-            ~separability:Separable;
+            ~separability:Separable ~externality:Internal;
         name = "any_non_null"
       }
 
@@ -1344,28 +1348,28 @@ module Const = struct
     let any_non_null_mod_everything =
       { jkind =
           mk_jkind Any ~mode_crossing:true ~nullability:Non_null
-            ~separability:Separable;
+            ~separability:Separable ~externality:Byte_external;
         name = "any_non_null mod everything"
       }
 
     let value_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:false ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Maybe_separable ~externality:Internal;
         name = "value_or_null"
       }
 
     let value_or_null_mod_everything =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Maybe_separable ~externality:Byte_external;
         name = "value_or_null mod everything"
       }
 
     let value =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Separable;
+            ~separability:Separable ~externality:Internal;
         name = "value"
       }
 
@@ -1379,7 +1383,8 @@ module Const = struct
                 ~uniqueness:Uniqueness.Const_op.max
                 ~contention:Contention.Const_op.min
                 ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.min ~externality:Externality.max
+                ~visibility:Visibility.Const_op.min
+                ~externality:Mod_bounds.Externality.max
                 ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
@@ -1397,7 +1402,8 @@ module Const = struct
                 ~uniqueness:Uniqueness.Const_op.max
                 ~contention:Contention.Const_op.min
                 ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.max ~externality:Externality.max
+                ~visibility:Visibility.Const_op.max
+                ~externality:Mod_bounds.Externality.max
                 ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
@@ -1415,7 +1421,8 @@ module Const = struct
                 ~contention:Contention.Const_op.max
                 ~uniqueness:Uniqueness.Const_op.max
                 ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.max ~externality:Externality.max
+                ~visibility:Visibility.Const_op.max
+                ~externality:Mod_bounds.Externality.max
                 ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
@@ -1428,14 +1435,14 @@ module Const = struct
     let void =
       { jkind =
           mk_jkind (Base Void) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "void"
       }
 
     let immediate =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Byte_external;
         name = "immediate"
       }
 
@@ -1444,7 +1451,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Non_float;
+            ~separability:Maybe_separable ~externality:Byte_external;
         name = "immediate_or_null"
       }
 
@@ -1482,7 +1489,7 @@ module Const = struct
       { jkind =
           { immediate.jkind with
             mod_bounds =
-              Mod_bounds.set_externality Externality.External64
+              Mod_bounds.set_externality Mod_bounds.Externality.External64
                 immediate.jkind.mod_bounds
           };
         name = "immediate64"
@@ -1493,7 +1500,7 @@ module Const = struct
     let float64 =
       { jkind =
           mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float64"
@@ -1502,9 +1509,11 @@ module Const = struct
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
     let kind_of_unboxed_float =
-      { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+      let jkind =
+        mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
+          ~separability:Non_float ~externality:External
+      in
+      { jkind;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float64 mod everything"
@@ -1515,7 +1524,7 @@ module Const = struct
     let float32 =
       { jkind =
           mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float32"
@@ -1526,7 +1535,7 @@ module Const = struct
     let kind_of_unboxed_float32 =
       { jkind =
           mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float32 mod everything"
@@ -1537,7 +1546,7 @@ module Const = struct
     let word =
       { jkind =
           mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "word"
       }
 
@@ -1546,7 +1555,7 @@ module Const = struct
     let kind_of_unboxed_nativeint =
       { jkind =
           mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         name = "word mod everything"
       }
 
@@ -1555,7 +1564,7 @@ module Const = struct
     let bits32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "bits32"
       }
 
@@ -1564,7 +1573,7 @@ module Const = struct
     let kind_of_unboxed_int32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         name = "bits32 mod everything"
       }
 
@@ -1573,7 +1582,7 @@ module Const = struct
     let bits64 =
       { jkind =
           mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "bits64"
       }
 
@@ -1582,7 +1591,7 @@ module Const = struct
     let kind_of_unboxed_int64 =
       { jkind =
           mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         name = "bits64 mod everything"
       }
 
@@ -1591,7 +1600,7 @@ module Const = struct
     let vec128 =
       { jkind =
           mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "vec128"
       }
 
@@ -1600,7 +1609,7 @@ module Const = struct
     let vec256 =
       { jkind =
           mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "vec256"
       }
 
@@ -1609,7 +1618,7 @@ module Const = struct
     let vec512 =
       { jkind =
           mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:Internal;
         name = "vec512"
       }
 
@@ -1618,7 +1627,7 @@ module Const = struct
     let kind_of_unboxed_128bit_vectors =
       { jkind =
           mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         name = "vec128 mod everything"
       }
 
@@ -1627,7 +1636,7 @@ module Const = struct
     let kind_of_unboxed_256bit_vectors =
       { jkind =
           mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         name = "vec256 mod everything"
       }
 
@@ -1636,7 +1645,7 @@ module Const = struct
     let kind_of_unboxed_512bit_vectors =
       { jkind =
           mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float;
+            ~separability:Non_float ~externality:External;
         name = "vec512 mod everything"
       }
 
@@ -1710,6 +1719,14 @@ module Const = struct
       | Not_le -> `Invalid
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
+      (* We don't ever want to show byte_external to the user, so we just promote
+         our base/actual to be at least external for pretty printing. *)
+      let base =
+        Mod_bounds.join base (Mod_bounds.set_externality External base)
+      in
+      let actual =
+        Mod_bounds.join actual (Mod_bounds.set_externality External actual)
+      in
       Axis.all
       |> List.map (fun (Axis.Pack axis) ->
              let base = Mod_bounds.get ~axis base in
@@ -2416,7 +2433,7 @@ let for_non_float ~(why : History.value_creation_reason) =
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.Const.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
@@ -2515,8 +2532,9 @@ let for_open_boxed_row =
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+      ~visibility:Visibility.Const_op.max
+      ~externality:Mod_bounds.Externality.max ~nullability:Nullability.Non_null
+      ~separability:Separability.Non_float
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
@@ -2552,7 +2570,13 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let ({ linearity; areality = locality; portability; yielding; statefulness }
+  let ({ linearity;
+         areality = locality;
+         portability;
+         yielding;
+         statefulness;
+         externality
+       }
         : Mode.Alloc.Comonadic.Const.t) =
     Alloc.Comonadic.Const.legacy
   in
@@ -2563,9 +2587,8 @@ let for_object =
     { layout = Sort (Base Value);
       mod_bounds =
         Mod_bounds.create ~linearity ~locality ~uniqueness ~portability
-          ~contention ~yielding ~statefulness ~visibility
-          ~externality:Externality.max ~nullability:Non_null
-          ~separability:Separability.Non_float;
+          ~contention ~yielding ~statefulness ~visibility ~externality
+          ~nullability:Non_null ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
@@ -2576,8 +2599,9 @@ let for_float ident =
       ~linearity:Linearity.Const.min ~portability:Portability.Const.min
       ~yielding:Yielding.Const.min ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.min ~statefulness:Statefulness.Const.min
-      ~visibility:Visibility.Const_op.min ~externality:Externality.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Separable
+      ~visibility:Visibility.Const_op.min
+      ~externality:Mod_bounds.Externality.max ~nullability:Nullability.Non_null
+      ~separability:Separability.Separable
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
@@ -2648,7 +2672,8 @@ let get_modal_bounds (type l r) ~jkind_of_type (jk : (l * r) jkind) =
           linearity = linearity mod_bounds;
           portability = portability mod_bounds;
           yielding = yielding mod_bounds;
-          statefulness = statefulness mod_bounds
+          statefulness = statefulness mod_bounds;
+          externality = externality mod_bounds
         };
       monadic =
         { uniqueness = uniqueness mod_bounds;
@@ -2667,7 +2692,7 @@ let to_unsafe_mode_crossing jkind =
   }
 
 let all_except_externality =
-  Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
+  Axis_set.singleton (Modal (Comonadic Externality)) |> Axis_set.complement
 
 let get_externality_upper_bound ~jkind_of_type jk =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
@@ -2676,7 +2701,7 @@ let get_externality_upper_bound ~jkind_of_type jk =
     Layout_and_axes.normalize ~mode:Ignore_best
       ~skip_axes:all_except_externality ~jkind_of_type jk.jkind
   in
-  Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
+  Mod_bounds.get mod_bounds ~axis:(Modal (Comonadic Externality))
 
 let set_externality_upper_bound jk externality_upper_bound =
   { jk with

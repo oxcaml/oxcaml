@@ -4813,6 +4813,8 @@ let report_lookup_error _loc env ppf = function
         | Error (Statefulness, {left; right}) ->
           asprintf "%a" Mode.Statefulness.Const.print left,
           asprintf "is %a" Mode.Statefulness.Const.print right
+        | Error (Externality, _) ->
+            Misc.fatal_error "Externally-allocated closures are not supported."
       in
       let s, hint =
         match context with

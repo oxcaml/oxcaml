@@ -55,10 +55,15 @@ module Axis_pair = struct
     | "maybe_null" ->
       Any_axis_pair (Nonmodal Nullability, Nullability.Maybe_null)
     | "non_null" -> Any_axis_pair (Nonmodal Nullability, Nullability.Non_null)
-    | "internal" -> Any_axis_pair (Nonmodal Externality, Externality.Internal)
+    | "internal" ->
+      Any_axis_pair (Modal (Comonadic Externality), Externality.Const.Internal)
     | "external64" ->
-      Any_axis_pair (Nonmodal Externality, Externality.External64)
-    | "external_" -> Any_axis_pair (Nonmodal Externality, Externality.External)
+      Any_axis_pair (Modal (Comonadic Externality), Externality.Const.External64)
+    | "external_" ->
+      Any_axis_pair (Modal (Comonadic Externality), Externality.Const.External)
+    | "byte_external" ->
+      Any_axis_pair
+        (Modal (Comonadic Externality), Externality.Const.Byte_external)
     | "yielding" ->
       Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Yielding)
     | "unyielding" ->
@@ -116,7 +121,7 @@ module Transled_modifiers = struct
       yielding : Mode.Yielding.Const.t Location.loc option;
       statefulness : Mode.Statefulness.Const.t Location.loc option;
       visibility : Mode.Visibility.Const.t Location.loc option;
-      externality : Jkind_axis.Externality.t Location.loc option;
+      externality : Mode.Externality.Const.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
     }
@@ -145,7 +150,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> t.yielding
     | Modal (Comonadic Statefulness) -> t.statefulness
     | Modal (Monadic Visibility) -> t.visibility
-    | Nonmodal Externality -> t.externality
+    | Modal (Comonadic Externality) -> t.externality
     | Nonmodal Nullability -> t.nullability
     | Nonmodal Separability -> t.separability
 
@@ -160,7 +165,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> { t with yielding = value }
     | Modal (Comonadic Statefulness) -> { t with statefulness = value }
     | Modal (Monadic Visibility) -> { t with visibility = value }
-    | Nonmodal Externality -> { t with externality = value }
+    | Modal (Comonadic Externality) -> { t with externality = value }
     | Nonmodal Nullability -> { t with nullability = value }
     | Nonmodal Separability -> { t with separability = value }
 end
@@ -194,7 +199,7 @@ let transl_mod_bounds annots =
           portability = Some { txt = Portability.Const.min; loc };
           contention = Some { txt = Contention.Const_op.min; loc };
           yielding = Some { txt = Yielding.Const.min; loc };
-          externality = Some { txt = Externality.min; loc };
+          externality = Some { txt = Mode.Externality.Const.min; loc };
           statefulness = Some { txt = Statefulness.Const.min; loc };
           visibility = Some { txt = Visibility.Const_op.min; loc };
           nullability =
@@ -337,7 +342,8 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
       contention = Option.map get_txt modes.contention;
       yielding = Option.map get_txt modes.yielding;
       statefulness = Option.map get_txt modes.statefulness;
-      visibility = Option.map get_txt modes.visibility
+      visibility = Option.map get_txt modes.visibility;
+      externality = Option.map get_txt modes.externality
     }
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
@@ -420,6 +426,8 @@ let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
       Modality.Atom (Comonadic Statefulness, Meet_with mode)
     | Modal_axis_pair (Monadic Visibility, mode) ->
       Modality.Atom (Monadic Visibility, Join_with mode)
+    | Modal_axis_pair (Comonadic Externality, mode) ->
+      Modality.Atom (Comonadic Externality, Meet_with mode)
   in
   atom, loc
 
@@ -455,7 +463,24 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
     | Atom (Monadic Visibility, Join_with Visibility.Const.Read) -> "read"
     | Atom (Monadic Visibility, Join_with Visibility.Const.Read_write) ->
       "read_write"
-    | _ -> failwith "BUG: impossible modality atom"
+    | Atom
+        (Comonadic Externality, Meet_with Mode.Externality.Const.Byte_external)
+      ->
+      (* We don't want to show byte_external to users, so we print external_ instead.
+         See the comment in mode.ml to understand more of the rationale behind this.*)
+      "external_"
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External) ->
+      "external_"
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External64)
+      ->
+      "external64"
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.Internal) ->
+      "internal"
+    | _ ->
+      let s =
+        Format.asprintf "BUG: impossible modality atom %a!\n" Modality.print a
+      in
+      failwith s
   in
   { txt = Modality s; loc = Location.none }
 

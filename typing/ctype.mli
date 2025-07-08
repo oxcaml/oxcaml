@@ -663,7 +663,7 @@ val constrain_type_jkind :
    Potentially cheaper than just calling [type_jkind], because this can stop
    expansion once it succeeds. *)
 val check_type_externality :
-  Env.t -> type_expr -> Jkind_axis.Externality.t -> bool
+  Env.t -> type_expr -> Jkind_mod_bounds.Externality.t -> bool
 
 (* Check whether a type's nullability is less than some target.
    Uses get_nullability which is potentially cheaper than calling type_jkind

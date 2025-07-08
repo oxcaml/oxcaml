@@ -371,12 +371,38 @@ module type S = sig
     val read_write : lr
   end
 
+  module Externality : sig
+    module Const : sig
+      type t =
+        | Byte_external
+        | External
+        | External64
+        | Internal
+
+      include Lattice with type t := t
+    end
+
+    include
+      Common_axis
+        with module Const := Const
+         and type 'd t = (Const.t, 'd pos) mode
+
+    val byte_external : lr
+
+    val external_ : lr
+
+    val external64 : lr
+
+    val internal : lr
+  end
+
   type 'a comonadic_with =
     { areality : 'a;
       linearity : Linearity.Const.t;
       portability : Portability.Const.t;
       yielding : Yielding.Const.t;
-      statefulness : Statefulness.Const.t
+      statefulness : Statefulness.Const.t;
+      externality : Externality.Const.t
     }
 
   type monadic =
@@ -396,6 +422,7 @@ module type S = sig
       | Linearity : ('areality comonadic_with, Linearity.Const.t) t
       | Statefulness : ('areality comonadic_with, Statefulness.Const.t) t
       | Portability : ('areality comonadic_with, Portability.Const.t) t
+      | Externality : ('areality comonadic_with, Externality.Const.t) t
       | Uniqueness : (monadic, Uniqueness.Const.t) t
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
@@ -432,7 +459,7 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) modes =
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) modes =
       { areality : 'a;
         linearity : 'b;
         uniqueness : 'c;
@@ -440,7 +467,8 @@ module type S = sig
         contention : 'e;
         yielding : 'f;
         statefulness : 'g;
-        visibility : 'h
+        visibility : 'h;
+        externality : 'i
       }
 
     module Const : sig
@@ -454,7 +482,8 @@ module type S = sig
               Contention.Const.t,
               Yielding.Const.t,
               Statefulness.Const.t,
-              Visibility.Const.t )
+              Visibility.Const.t,
+              Externality.Const.t )
             modes
 
       (** Gets the normal lattice for comonadic axes and the "op"ped lattice for
@@ -472,7 +501,8 @@ module type S = sig
             Contention.Const.t option,
             Yielding.Const.t option,
             Statefulness.Const.t option,
-            Visibility.Const.t option )
+            Visibility.Const.t option,
+            Externality.Const.t option )
           modes
 
         val none : t

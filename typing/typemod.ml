@@ -148,6 +148,8 @@ let register_allocation () =
     Alloc.(newvar_below
       (max_with_comonadic Areality Locality.global))
   in
+  let externality = Alloc.proj (Comonadic Externality) m in
+  Externality.submode_exn Externality.internal externality;
   m, alloc_as_value m
 
 open Typedtree
