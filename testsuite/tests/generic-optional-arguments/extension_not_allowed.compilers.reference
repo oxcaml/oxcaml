@@ -1,4 +1,5 @@
-File "extension_not_allowed.ml", line 12, characters 15-21:
-12 |   val concat : ?'sep:string -> string list -> string
-                    ^^^^^^
-Error: Syntax error: Generic optional arguments are not allowed. Make sure you have the correct language extension enabled.
+File "extension_not_allowed.ml", line 19, characters 39-42:
+19 |   let concat ?'(sep : string option <- " ") xs =
+                                            ^^^
+Error: This expression has type "string" but an expression was expected of type
+         "string option"

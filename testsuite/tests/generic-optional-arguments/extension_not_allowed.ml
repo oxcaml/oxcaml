@@ -7,6 +7,8 @@
  check-ocamlc.byte-output;
 *)
 
+(* CR generic-optiona: Reject this file in type checking *)
+
 (* Interface *)
 module type S = sig
   val concat : ?'sep:string -> string list -> string
