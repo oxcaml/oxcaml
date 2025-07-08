@@ -634,7 +634,7 @@ let rec modtypes ~direction ~loc env subst ~modes mty1 mty2 shape =
     in
     Error Error.(mdiff mty1 mty2 modes reason)
 
-and try_modtypes ?(allow_shallow = true) ~direction ~loc env subst ~modes
+and try_modtypes ~direction ~loc env subst ~modes
   mty1 mty2 orig_shape =
   let open Subst.Lazy in
   (* Do a quick nominal comparison for simple types and if that fails, try to
@@ -644,12 +644,20 @@ and try_modtypes ?(allow_shallow = true) ~direction ~loc env subst ~modes
     | _ -> false
   in
   match mty1, mty2 with
-  | _ when allow_shallow && shallow_modtypes env subst mty1 mty2 ->
+  | _ when shallow_modtypes env subst mty1 mty2 ->
     begin match Includecore.check_modes env ~item:Module
       ~crossing:Ctype.mode_crossing_module modes with
-    | Error _ ->
-        try_modtypes ~allow_shallow:false ~direction ~loc env subst ~modes mty1
-          mty2 orig_shape
+    | Error e ->
+        let mty1 = Mtype.reduce_alias_lazy env mty1 in
+        let mty2 =
+          Subst.Lazy.modtype Keep subst mty2 |> Mtype.reduce_alias_lazy env
+        in
+        begin match mty1, mty2 with
+        | Some mty1, Some mty2 ->
+            try_modtypes ~direction ~loc env subst ~modes mty1 mty2 orig_shape
+        | _, _ ->
+            Error (Error.Mode e)
+        end
     | Ok () ->
     Ok (Tcoerce_none, orig_shape)
     end
