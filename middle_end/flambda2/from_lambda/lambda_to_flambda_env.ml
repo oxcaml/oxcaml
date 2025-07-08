@@ -71,12 +71,14 @@ end
 type t =
   { current_unit : Compilation_unit.t;
     current_values_of_mutables_in_scope :
-      ((Ident.t * Flambda_kind.With_subkind.full_kind) list
+      ((Ident.t * Flambda_debug_uid.t * Flambda_kind.With_subkind.full_kind)
+       list
       * [`Complex] Flambda_arity.Component_for_creation.t)
       Ident.Map.t;
     mutables_needed_by_continuations : Ident.Set.t Continuation.Map.t;
     unboxed_product_components_in_scope :
-      ([`Complex] Flambda_arity.Component_for_creation.t * Ident.t list)
+      ([`Complex] Flambda_arity.Component_for_creation.t
+      * (Ident.t * Flambda_debug_uid.t) list)
       Ident.Map.t;
     try_stack : Continuation.t list;
     try_stack_at_handler : Continuation.t list Continuation.Map.t;
@@ -125,6 +127,10 @@ let register_mutable_variable t id ~before_unarization =
   let fields =
     Flambda_arity.fresh_idents_unarized ~id
       (Flambda_arity.create [before_unarization])
+    |> Flambda_debug_uid.add_proj_debugging_uids_to_fields
+         ~duid:Lambda.debug_uid_none
+    (* CR sspies: We should propagate the debugging uid here for mutable
+       variables. *)
   in
   let current_values_of_mutables_in_scope =
     Ident.Map.add id
@@ -142,6 +148,10 @@ let update_mutable_variable t id =
     let fields =
       Flambda_arity.fresh_idents_unarized ~id
         (Flambda_arity.create [before_unarization])
+      |> Flambda_debug_uid.add_proj_debugging_uids_to_fields
+           ~duid:Lambda.debug_uid_none
+      (* CR sspies: We should derive/copy the debugging uids here from
+         before_unarization/old_ids_and_kinds. *)
     in
     let current_values_of_mutables_in_scope =
       Ident.Map.add id
@@ -163,12 +173,13 @@ let register_unboxed_product t ~unboxed_product ~before_unarization ~fields =
 let register_unboxed_product_with_kinds t ~unboxed_product ~before_unarization
     ~fields =
   register_unboxed_product t ~unboxed_product ~before_unarization
-    ~fields:(List.map fst fields)
+    ~fields:(List.map (fun (id, duid, _) -> id, duid) fields)
 
 type add_continuation_result =
   { body_env : t;
     handler_env : t;
-    extra_params : (Ident.t * Flambda_kind.With_subkind.t) list
+    extra_params :
+      (Ident.t * Flambda_debug_uid.t * Flambda_kind.With_subkind.t) list
   }
 
 let add_continuation t cont ~push_to_try_stack ~pop_region
@@ -204,6 +215,10 @@ let add_continuation t cont ~push_to_try_stack ~pop_region
         let fields =
           Flambda_arity.fresh_idents_unarized ~id:mut_var
             (Flambda_arity.create [before_unarization])
+          |> Flambda_debug_uid.add_proj_debugging_uids_to_fields
+               ~duid:Lambda.debug_uid_none
+          (* CR sspies: We should derive/copy the debugging uids here from
+             before_unarization/old_ids_and_kinds. *)
         in
         fields, before_unarization)
       t.current_values_of_mutables_in_scope
@@ -291,7 +306,9 @@ let extra_args_for_continuation_with_kinds t cont =
       mutables
 
 let extra_args_for_continuation t cont =
-  List.map fst (extra_args_for_continuation_with_kinds t cont)
+  List.map
+    (fun (arg, _, _) -> arg)
+    (extra_args_for_continuation_with_kinds t cont)
 
 let get_mutable_variable_with_kinds t id =
   match Ident.Map.find id t.current_values_of_mutables_in_scope with

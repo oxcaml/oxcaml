@@ -451,6 +451,8 @@ let error_style_reader = {
 
 let unboxed_types = ref false
 
+let dump_debug_uids = ref false         (* -ddebug-uids *)
+
 (* This is used by the -save-ir-after and -save-ir-before options. *)
 module Compiler_ir = struct
   type t = Linear | Cfg
