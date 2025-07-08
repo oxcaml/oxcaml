@@ -491,6 +491,84 @@ module Lattices = struct
     end)
   end
 
+  module Externality = struct
+    module Const = struct
+      type t =
+        | Byte_external
+        | External
+        | External64
+        | Internal
+    end
+
+    include Total.Heyting (struct
+      open Const
+
+      type nonrec t = t
+
+      let min = Const.Byte_external
+
+      let max = Const.Internal
+
+      let legacy = Const.Internal
+
+      let le a b =
+        match a, b with
+        | Byte_external, _ -> true
+        | External, (External | External64 | Internal) -> true
+        | External, Byte_external -> false
+        | External64, (External64 | Internal) -> true
+        | External64, (Byte_external | External) -> false
+        | Internal, Internal -> true
+        | Internal, (Byte_external | External | External64) -> false
+
+      let equal a b =
+        match a, b with
+        | Byte_external, Byte_external -> true
+        | External, External -> true
+        | External64, External64 -> true
+        | Internal, Internal -> true
+        | Byte_external, (External | External64 | Internal)
+        | External, (Byte_external | External64 | Internal)
+        | External64, (Byte_external | External | Internal)
+        | Internal, (Byte_external | External | External64) ->
+          false
+
+      let join a b =
+        match a, b with
+        | Byte_external, _ -> b
+        | External, Byte_external -> External
+        | External, _ -> b
+        | External64, (Byte_external | External) -> External64
+        | External64, _ -> b
+        | Internal, _ -> Internal
+
+      let meet a b =
+        match a, b with
+        | Byte_external, (Byte_external | External | External64 | Internal) ->
+          Byte_external
+        | External, Byte_external -> Byte_external
+        | External, (External | External64 | Internal) -> External
+        | External64, (Byte_external | External64) -> External64
+        | External64, (External | Internal) -> b
+        | Internal, (Byte_external | External | External64) -> b
+        | Internal, Internal -> Internal
+
+      let print ppf = function
+        | Byte_external -> Format.fprintf ppf "byte_external"
+        | External -> Format.fprintf ppf "external_"
+        | External64 -> Format.fprintf ppf "external64"
+        | Internal -> Format.fprintf ppf "internal"
+    end)
+
+    let byte_external = Const.Byte_external
+
+    let external_ = Const.External
+
+    let external64 = Const.External64
+
+    let internal = Const.Internal
+  end
+
   type monadic =
     { uniqueness : Uniqueness.t;
       contention : Contention.t;

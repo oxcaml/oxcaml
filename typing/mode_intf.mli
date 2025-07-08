@@ -355,6 +355,33 @@ module type S = sig
     val read_write : lr
   end
 
+  module Externality : sig
+    module Const : sig
+      type t =
+        | Byte_external
+        | External
+        | External64
+        | Internal
+
+      include Lattice with type t := t
+    end
+
+    module Const_op : Lattice with type t = Const.t
+
+    include
+      Common_axis
+        with module Const := Const
+         and type 'd t = (Const.t, 'd pos) mode
+
+    val byte_external : lr
+
+    val external_ : lr
+
+    val external64 : lr
+
+    val internal : lr
+  end
+
   type 'a comonadic_with =
     { areality : 'a;
       linearity : Linearity.Const.t;

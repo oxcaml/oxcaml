@@ -20,6 +20,7 @@ module type Axis_ops = sig
   val equal : t -> t -> bool
 end
 
+(* TODO jcutler: rm this! *)
 module Externality = struct
   type t =
     | External
