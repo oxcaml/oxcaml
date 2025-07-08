@@ -1243,9 +1243,11 @@ and approx_sig_items env ssg=
             | Mty_alias _ -> Mp_absent
             | _ -> Mp_present
           in
+          (* Assume the enclosing structure is legacy, for backward
+              compatibility *)
           let id, newenv =
             Env.enter_module_declaration ~scope (Option.get pmd.pmd_name.txt)
-              pres md env
+              pres md ~mode:Value.legacy env
           in
           Sig_module(id, pres, md, Trec_not, Exported) :: approx_sig_items newenv srem
       | Psig_modsubst pms ->
@@ -1259,8 +1261,11 @@ and approx_sig_items env ssg=
             | Mty_alias _ -> Mp_absent
             | _ -> Mp_present
           in
+          (* Assume the enclosing structure is legacy, for backward
+              compatibility *)
           let _, newenv =
             Env.enter_module_declaration ~scope pms.pms_name.txt pres md env
+              ~mode:Value.legacy
           in
           approx_sig_items newenv srem
       | Psig_recmodule sdecls ->

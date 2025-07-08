@@ -400,3 +400,19 @@ module type S =
     module G : functor (X : sig end) -> sig module type T = sig end end
   end
 |}]
+
+module type S = sig
+    module F (X : sig end) : sig end
+    module rec M : sig
+        module N : sig
+        end
+        include module type of F(N)
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    module F : functor (X : sig end) -> sig end
+    module rec M : sig module N : sig end end
+  end
+|}]
