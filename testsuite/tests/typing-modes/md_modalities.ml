@@ -1,9 +1,9 @@
 (* TEST
-    flags += "-extension mode";
+    flags += "-extension mode_alpha";
     expect;
 *)
 
-(* the workaround semantics of pmd_modalities *)
+(* the semantics of pmd_modalities *)
 module type S = sig @@ portable
     module M : sig
         val foo : 'a -> 'a
@@ -91,27 +91,30 @@ module type T = sig val foo : 'a -> 'a end
 module type S = sig module M : sig val foo : 'a -> 'a @@ portable end end
 |}]
 
-(* doesn't work for Mty_functor *)
+(* works for Mty_functor *)
 module type S = sig @@ portable
   module M : (sig val foo : 'a -> 'a end) -> (sig val bar : 'a -> 'a end)
 end
 [%%expect{|
 module type S =
-  sig module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end end
+  sig
+    module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end @@
+      portable
+  end
 |}]
 
 module M : T = struct
-  let foo x = x
+  let (foo @ nonportable) x = x
 end
 
 
-(* Doesn't work for Mty_alias *)
+(* works for Mty_alias *)
 module type S = sig @@ portable
   module M' = M
 end
 [%%expect{|
-module M : T
-module type S = sig module M' = M end
+module M : T @@ stateless nonportable
+module type S = sig module M' = M @@ portable end
 |}]
 
 (* works for Mty_strenthen, and type check keeps working *)
@@ -131,16 +134,19 @@ Lines 1-3, characters 15-3:
 2 |   module M' = M
 3 | end
 Error: Signature mismatch:
-       Modules do not match: sig module M' = M end is not included in S
+       Modules do not match:
+         sig module M' = M @@ stateless nonportable end
+       is not included in
+         S
        In module "M'":
        Modules do not match:
-         sig val foo : 'a -> 'a end
+         sig val foo : 'a -> 'a end (* in a structure at nonportable *)
        is not included in
-         sig val foo : 'a -> 'a @@ portable end
+         sig val foo : 'a -> 'a @@ portable end (* in a structure at nonportable *)
        In module "M'":
        Values do not match:
-         val foo : 'a -> 'a
+         val foo : 'a -> 'a (* in a structure at nonportable *)
        is not included in
-         val foo : 'a -> 'a @@ portable
-       The second is portable and the first is nonportable.
+         val foo : 'a -> 'a @@ portable (* in a structure at nonportable *)
+       The first is "nonportable" but the second is "portable".
 |}]

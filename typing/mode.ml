@@ -3207,6 +3207,11 @@ module Modality = struct
       | Const c -> c
       | Undefined -> Misc.fatal_error "modality Undefined should not be zapped."
       | Exactly (mm, m) ->
+        (* The following zaps [mm] to ceil, which might conflict with future
+           mode constraints on [mm]. We find constraining [mm] to [legacy] a
+           good workaround. *)
+        (* CR zqian: Find a better solution *)
+        Mode.submode mm Mode.legacy |> ignore;
         let m = Mode.zap_to_floor m in
         let mm = Mode.zap_to_ceil mm in
         let c = Mode.Const.imply mm m in
