@@ -97,10 +97,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module type S =
-  sig
-    module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end @@
-      portable
-  end
+  sig module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end end
 |}]
 
 module M : T = struct
