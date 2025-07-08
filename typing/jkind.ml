@@ -1498,7 +1498,6 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
-    (* CR jcutler: ensure all the kind/kind_of_unboxed pairs have this pattern.*)
     let float64 =
       { jkind =
           mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null

@@ -142,6 +142,23 @@ let print_unsupported_stack_allocation ppf = function
   | List_comprehension -> Format.fprintf ppf "list comprehensions"
   | Array_comprehension -> Format.fprintf ppf "array comprehensions"
 
+
+type unsupported_external_allocation =
+  | Lazy
+  | Module
+  | Object
+  | Comprehension
+  | Function
+  | Array
+
+let print_unsupported_external_allocation ppf = function
+  | Lazy -> Format.fprintf ppf "lazy expressions"
+  | Module -> Format.fprintf ppf "modules"
+  | Object -> Format.fprintf ppf "objects"
+  | Comprehension -> Format.fprintf ppf "comprehensions"
+  | Function -> Format.fprintf ppf "functions"
+  | Array -> Format.fprintf ppf "arrays"
+
 type mutable_restriction =
   | In_group
   | In_rec
@@ -288,6 +305,7 @@ type error =
   | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
+  | Unsupported_external_allocation of unsupported_external_allocation
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
@@ -409,11 +427,16 @@ type expected_mode =
     mode : Value.r;
     (** The upper bound, hence r (right) *)
 
-    strictly_local : bool;
-    (** Indicates that the expression was directly annotated with [local], which
-    should force any allocations to be on the stack. No invariant between this
-    field and [mode]: this field being [true] while [mode] being [global] is
-    sensible, but not very useful as it will fail all expressions. *)
+    (* CR-someday jcutler: This really should not be a part of the [expected_mode].
+    There are a bunch of places (i.e. [mode_default]) where tying the current
+    allocator to the expected mode is a potential source of confusion or even bugs. *)
+
+    allocator : allocator;
+    (** Indicates which allocator the expression was allocated with.  If
+        [stack_], this will be Allocator_stack. If [malloc_], this will be
+        Allocator_malloc. Otherwise Allocator_heap. The only invariant between
+        this field and [mode] is that if [allocator = Allocator_malloc],
+        [mode] should have externality at most [external_]. *)
 
     tuple_modes : Value.r list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
@@ -486,13 +509,13 @@ let meet_regional mode =
   let mode = Value.disallow_left mode in
   Value.meet_with Areality Regionality.Const.Regional mode
 
-let mode_default mode =
+let mode_default ?(allocator = Allocator_heap) mode =
   { position = RNontail;
     locality_context = None;
     contention_context = None;
     visibility_context = None;
     mode = Value.disallow_left mode;
-    strictly_local = false;
+    allocator = allocator;
     tuple_modes = None }
 
 let mode_legacy = mode_default Value.legacy
@@ -516,7 +539,9 @@ let mode_morph f expected_mode =
 let mode_modality modality expected_mode =
   as_single_mode expected_mode
   |> Modality.Value.Const.apply modality
-  |> mode_default
+  (* CR external-mode: This is another place where the expected mode was getting
+     clobbered in unfortunate ways. *)
+  |> mode_default ~allocator:expected_mode.allocator
 
 (* used when entering a function;
 mode is the mode of the function region *)
@@ -556,12 +581,12 @@ let mode_exclave expected_mode =
      |> alloc_as_value
   in
   { (mode_default mode)
-    with strictly_local = true
+    with allocator = Allocator_stack
   }
 
 let mode_strictly_local expected_mode =
   { expected_mode
-    with strictly_local = true
+    with allocator = Allocator_stack
   }
 
 let mode_coerce mode expected_mode =
@@ -697,6 +722,7 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
+<<<<<<< HEAD
 let lower_bound_externality ~loc ~env lower_bound alloc_mode =
   let externality = Alloc.proj_comonadic Externality alloc_mode in
   let res = Externality.submode lower_bound externality in
@@ -717,10 +743,29 @@ let register_allocation_mode ~loc ~env alloc_mode =
   lower_bound_externality ~loc ~env Externality.internal alloc_mode;
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
+=======
+let register_allocation_mode ~loc ~env alloc_mode allocator =
+  match allocator with
+  | Allocator_heap | Allocator_stack ->
+    let externality = Alloc.proj (Comonadic Externality) alloc_mode in
+    let res = Externality.submode Externality.internal externality in
+    (match res with
+    | Ok () -> ()
+    | Error failure_reason ->
+        let error =
+          Submode_failed(Value.Error (Comonadic Externality,failure_reason), Other, None,
+            None, None, None)
+        in
+        raise (Error(loc, env, error)));
+    let alloc_mode = Alloc.disallow_left alloc_mode in
+    allocations := alloc_mode :: !allocations
+  | Allocator_malloc ->
+    ()
+>>>>>>> 9bdb8baa8a (some progress towards malloc)
 
-let register_allocation_value_mode ~loc ~env mode =
+let register_allocation_value_mode ~loc ~env mode allocator =
   let alloc_mode = value_to_alloc_r2g mode in
-  register_allocation_mode ~loc ~env alloc_mode;
+  register_allocation_mode ~loc ~env alloc_mode allocator;
   let mode = alloc_as_value alloc_mode in
   alloc_mode, mode
 
@@ -729,13 +774,13 @@ let register_allocation_value_mode ~loc ~env mode =
     of potential subcomponents. *)
 let register_allocation ~loc ~env (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    register_allocation_value_mode ~loc ~env (as_single_mode expected_mode)
+    register_allocation_value_mode ~loc ~env expected_mode.mode expected_mode.allocator
   in
   let alloc_mode : alloc_mode =
     { mode = alloc_mode;
       locality_context = expected_mode.locality_context }
   in
-  alloc_mode, mode_default mode
+  alloc_mode, (mode_default mode)
 
 let register_bytecode_allocation ~loc ~env (expected_mode : expected_mode) =
   let alloc_mode = value_to_alloc_r2g (as_single_mode expected_mode) in
@@ -4271,7 +4316,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                Alloc.newvar_above (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
-             register_allocation_mode ~loc ~env mode_closure;
+             register_allocation_mode ~loc ~env mode_closure Allocator_heap;
              let arg =
               Omitted {
                 mode_closure = Alloc.disallow_left mode_closure;
@@ -4413,6 +4458,7 @@ let rec is_nonexpansive exp =
   (* Texp_hole can always be replaced by a field read from the old allocation,
      which is non-expansive: *)
   | Texp_hole _ -> true
+  | Texp_alloc (e,_) -> is_nonexpansive e
 
 and is_nonexpansive_prim (prim : Primitive.description) args =
   match prim.prim_name, args with
@@ -4857,7 +4903,7 @@ let check_partial_application ~statement exp =
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
-            | Texp_function _ ->
+            | Texp_function _ | Texp_alloc _ ->
                 check_statement ()
             | Texp_match (_, _, cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases
@@ -5264,7 +5310,7 @@ let split_function_ty
          function deserves a separate allocation mode.
       *)
       let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
-      fst (register_allocation_value_mode ~loc ~env mode)
+      fst (register_allocation_value_mode ~loc ~env mode Allocator_heap)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn Locality.local
@@ -7087,6 +7133,51 @@ and type_expect_
       end;
       let exp_extra = (Texp_stack, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
+    | Pexp_malloc e ->
+      let unsupported category =
+        raise (Error (e.pexp_loc, env, Unsupported_external_allocation category))
+      in
+      let not_alloc () =
+        raise (Error (e.pexp_loc, env, Not_allocation))
+      in
+      (* If we do the same thing as Pexp_stack here and typecheck *anything*
+         before checking if it's actually malloc-able, we get worse error
+         messages. Better to prune based on syntax first, and then type errors. *)
+       (match e.pexp_desc with
+       | Pexp_function _ -> unsupported Function
+       | Pexp_comprehension _ -> unsupported Comprehension
+       | Pexp_new _ -> unsupported Object
+       | Pexp_lazy _ -> unsupported Lazy
+       | Pexp_object _ -> unsupported Object
+       | Pexp_pack _ -> unsupported Module
+       | Pexp_array _ -> unsupported Array
+       | Pexp_record _ -> ()
+       | Pexp_tuple _ -> ()
+       | Pexp_construct (_,Some _) -> ()
+       | Pexp_variant (_,Some _) -> ()
+       | _ -> not_alloc ()
+       );
+        let unify_as_mallocd ty_expected =
+          let inner_ty = newgenvar (Jkind.Builtin.value ~why:(Type_argument { parent_path = Predef.path_mallocd ; position = 1; arity = 1})) in
+          let to_unify = Predef.type_mallocd inner_ty in
+          with_explanation (fun () ->
+            unify_exp_types loc env to_unify ty_expected);
+          inner_ty
+        in
+      let inner_ty = unify_as_mallocd ty_expected in
+      let expected_mode = mode_coerce (Value.max_with (Comonadic Externality) Externality.external_) expected_mode in
+      let exp = type_expect env {expected_mode with allocator = Allocator_malloc} e {ty = inner_ty; explanation} in
+
+      let exp_desc = Texp_alloc (exp,Allocator_malloc) in
+      re {
+        exp_desc = exp_desc;
+        exp_type = Predef.type_mallocd exp.exp_type;
+        exp_loc = loc;
+        exp_extra = [];
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env;
+      }
+
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
       type_comprehension_expr
@@ -7380,11 +7471,15 @@ and type_ident env ?(recarg=Rejected) lid =
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
 <<<<<<< HEAD
+<<<<<<< HEAD
            register_allocation_mode ~loc:lid.loc ~env
               (Alloc.max_with_comonadic Areality mode)
 =======
            register_allocation_mode ~loc:lid.loc ~env (Alloc.max_with (Comonadic Areality) mode)
 >>>>>>> 6206867253 (add externality modal axis)
+=======
+           register_allocation_mode ~loc:lid.loc ~env (Alloc.max_with (Comonadic Areality) mode) Allocator_heap
+>>>>>>> 9bdb8baa8a (some progress towards malloc)
        | _ -> ()
        end;
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
@@ -8579,12 +8674,16 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let arity = List.length sexpl in
   assert (arity >= 2);
 <<<<<<< HEAD
+<<<<<<< HEAD
   let alloc_mode, argument_mode =
     register_allocation_value_mode ~loc ~env expected_mode.mode
   in
 =======
   let alloc_mode, argument_mode = register_allocation_value_mode ~loc ~env expected_mode.mode in
 >>>>>>> 6206867253 (add externality modal axis)
+=======
+  let alloc_mode, argument_mode = register_allocation_value_mode ~loc ~env expected_mode.mode expected_mode.allocator in
+>>>>>>> 9bdb8baa8a (some progress towards malloc)
   let alloc_mode =
     { mode = alloc_mode;
       locality_context = expected_mode.locality_context }
@@ -8613,12 +8712,16 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
 <<<<<<< HEAD
+<<<<<<< HEAD
           List.map
             (fun mode -> snd (register_allocation_value_mode ~loc ~env mode))
             tuple_modes
 =======
           List.map (fun mode -> snd (register_allocation_value_mode ~loc ~env mode)) tuple_modes
 >>>>>>> 6206867253 (add externality modal axis)
+=======
+          List.map (fun mode -> snd (register_allocation_value_mode ~loc ~env mode Allocator_heap)) tuple_modes
+>>>>>>> 9bdb8baa8a (some progress towards malloc)
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
@@ -8837,10 +8940,16 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          ty_args)
       overwrite
   in
+  let argument_allocator =
+    match recarg with
+    | Allowed | Rejected -> Allocator_heap
+    | Required -> expected_mode.allocator
+  in
   let args =
     Misc.Stdlib.List.map3
       (fun e ({Types.ca_type=ty; ca_modalities=gf; _},t0) overwrite ->
          let argument_mode = mode_modality gf argument_mode in
+         let argument_mode = {argument_mode with allocator = argument_allocator} in
          type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
   in
@@ -11433,6 +11542,9 @@ let report_error ~loc env =
       print_unsupported_stack_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
+  | Unsupported_external_allocation category ->
+    Location.errorf ~loc "@[Externally allocating %a is not supported yet.@]"
+      print_unsupported_external_allocation category
   | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
       let hint ppf =
         if some_args_ok

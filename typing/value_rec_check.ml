@@ -257,7 +257,7 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-
+    | Texp_alloc _ -> Static
     | Texp_new _
     | Texp_instvar _
     | Texp_object _
@@ -1048,6 +1048,7 @@ let rec expression : Typedtree.expression -> term_judg =
       expression handler << Dereference
     | Texp_probe_is_enabled _ -> empty
     | Texp_exclave e -> expression e
+    | Texp_alloc (e,_) -> expression e
     | Texp_src_pos -> empty
     | Texp_overwrite (exp1, exp2) ->
       (* This is untested, since we currently mark Texp_overwrite as Dynamic and
