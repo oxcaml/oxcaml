@@ -174,7 +174,5 @@ let print_extfuns ppf { version; extfuns } =
 
 let print_extfuns_readable fmt exts =
   Format.fprintf fmt "Version %s@\n%a" exts.version
-    (Format.pp_print_list
-      ~pp_sep:Format.pp_print_newline
-      print_ext_fun_readable)
+    (Format.pp_print_list ~pp_sep:Format.pp_print_newline print_ext_fun_readable)
     exts.extfuns

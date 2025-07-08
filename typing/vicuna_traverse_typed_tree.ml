@@ -17,7 +17,6 @@ open! Types
 open! Vicuna_value_shapes
 open! Typedtree
 
-
 (* There are various features in the type system that Vicuna does not support,
    including, for example, mixed records. When the externals extraction was
    outside of the compiler, failing whenever such a feature was encountered was
@@ -32,8 +31,6 @@ type unsupported_feature =
   | WithNullVariants
 
 exception VicunaUnsupported of unsupported_feature
-
-
 
 (* Helper utility for debugging. *)
 let _pp_type fmt ty =
@@ -330,8 +327,7 @@ and value_kind_record env subst ~visited ~depth
     raise (VicunaUnsupported MixedRecords)
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
-  | Record_inlined (Null, _, _) ->
-    raise (VicunaUnsupported WithNullVariants)
+  | Record_inlined (Null, _, _) -> raise (VicunaUnsupported WithNullVariants)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type
@@ -441,9 +437,8 @@ let extract_from_typed_tree tt =
   let iter_structure_item (it : iterator) (si : structure_item) =
     match si.str_desc with
     | Tstr_primitive prim ->
-      (try
-        extract_external_declaration outp prim;
-      with VicunaUnsupported _ -> ());
+      (try extract_external_declaration outp prim
+       with VicunaUnsupported _ -> ());
       it.value_description it prim
     | _ -> default_iterator.structure_item it si
   in
