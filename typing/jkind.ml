@@ -433,16 +433,16 @@ module Mod_bounds = struct
       ~uniqueness:Uniqueness.min ~portability:Portability.min
       ~contention:Contention.min ~yielding:Yielding.min
       ~statefulness:Statefulness.min ~visibility:Visibility.min
-      ~externality_mod:Externality_mod.min ~externality:Externality.min
-      ~nullability:Nullability.min ~separability:Separability.min
+      ~externality_mod:Externality_mod.min ~nullability:Nullability.min
+      ~separability:Separability.min
 
   let max =
     create ~locality:Locality.max ~linearity:Linearity.max
       ~uniqueness:Uniqueness.max ~portability:Portability.max
       ~contention:Contention.max ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.max
-      ~externality_mod:Externality_mod.max ~externality:Externality.max
-      ~nullability:Nullability.max ~separability:Separability.max
+      ~externality_mod:Externality_mod.max ~nullability:Nullability.max
+      ~separability:Separability.max
 
   let join t1 t2 =
     let locality = Locality.join (locality t1) (locality t2) in
@@ -453,15 +453,13 @@ module Mod_bounds = struct
     let yielding = Yielding.join (yielding t1) (yielding t2) in
     let statefulness = Statefulness.join (statefulness t1) (statefulness t2) in
     let visibility = Visibility.join (visibility t1) (visibility t2) in
-    let externality = Externality.join (externality t1) (externality t2) in
     let externality_mod =
       Externality_mod.join (externality_mod t1) (externality_mod t2)
     in
     let nullability = Nullability.join (nullability t1) (nullability t2) in
     let separability = Separability.join (separability t1) (separability t2) in
     create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
-      ~statefulness ~visibility ~externality_mod ~externality ~nullability
-      ~separability
+      ~statefulness ~visibility ~externality_mod ~nullability ~separability
 
   let meet t1 t2 =
     let locality = Locality.meet (locality t1) (locality t2) in
@@ -472,15 +470,13 @@ module Mod_bounds = struct
     let yielding = Yielding.meet (yielding t1) (yielding t2) in
     let statefulness = Statefulness.meet (statefulness t1) (statefulness t2) in
     let visibility = Visibility.meet (visibility t1) (visibility t2) in
-    let externality = Externality.meet (externality t1) (externality t2) in
     let externality_mod =
       Externality_mod.meet (externality_mod t1) (externality_mod t2)
     in
     let nullability = Nullability.meet (nullability t1) (nullability t2) in
     let separability = Separability.meet (separability t1) (separability t2) in
     create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
-      ~statefulness ~visibility ~externality_mod ~externality ~nullability
-      ~separability
+      ~statefulness ~visibility ~externality_mod ~nullability ~separability
 
   let less_or_equal t1 t2 =
     let[@inline] axis_less_or_equal ~le ~axis a b : Sub_result.t =
@@ -521,9 +517,9 @@ module Mod_bounds = struct
             ~axis:(Pack (Modal (Monadic Visibility))) (visibility t1)
             (visibility t2))
     @@ Sub_result.combine
-         (axis_less_or_equal ~le:Externality.le
-            ~axis:(Pack (Nonmodal Externality)) (externality t1)
-            (externality t2))
+         (axis_less_or_equal ~le:Externality_mod.le
+            ~axis:(Pack (Modal (Comonadic Externality))) (externality_mod t1)
+            (externality_mod t2))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Nullability.le
             ~axis:(Pack (Nonmodal Nullability)) (nullability t1)
@@ -541,7 +537,7 @@ module Mod_bounds = struct
     && Yielding.equal (yielding t1) (yielding t2)
     && Statefulness.equal (statefulness t1) (statefulness t2)
     && Visibility.equal (visibility t1) (visibility t2)
-    && Externality.equal (externality t1) (externality t2)
+    && Externality_mod.equal (externality_mod t1) (externality_mod t2)
     && Nullability.equal (nullability t1) (nullability t2)
     && Separability.equal (separability t1) (separability t2)
 
@@ -555,9 +551,8 @@ module Mod_bounds = struct
     | Modal (Comonadic Yielding) -> yielding t
     | Modal (Comonadic Statefulness) -> statefulness t
     | Modal (Monadic Visibility) -> visibility t
-    | Modal (Comonadic Externality) ->
-      Mode.Externality.Const.Internal (* CR jcutler: fixme *)
-    | Nonmodal Externality -> externality t
+    | Modal (Comonadic Externality) -> externality_mod t
+    | Nonmodal Externality -> failwith "RM" (* CR jcutler fixme*)
     | Nonmodal Nullability -> nullability t
     | Nonmodal Separability -> separability t
 
@@ -592,8 +587,8 @@ module Mod_bounds = struct
          (Visibility.le Visibility.max (visibility t))
          (Modal (Monadic Visibility))
     |> add_if
-         (Externality.le Externality.max (externality t))
-         (Nonmodal Externality)
+         (Externality_mod.le Externality_mod.max (externality_mod t))
+         (Modal (Comonadic Externality))
     |> add_if
          (Nullability.le Nullability.max (nullability t))
          (Nonmodal Nullability)
@@ -607,8 +602,7 @@ module Mod_bounds = struct
       ~contention:Contention.min ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.min
       ~externality_mod:Externality_mod.max (* CR jcutler: is this right? *)
-      ~externality:Externality.max ~nullability:Nullability.Non_null
-      ~separability:Separability.Non_float
+      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
 
   let to_mode_crossing t =
     Mode.Crossing.of_bounds
@@ -619,8 +613,7 @@ module Mod_bounds = struct
               portability = portability t;
               yielding = yielding t;
               statefulness = statefulness t;
-              externality =
-                Mode.Externality.Const.Internal (* CR jcutler: fixme*)
+              externality = externality_mod t
             };
           monadic =
             { uniqueness = uniqueness t;
@@ -1076,7 +1069,6 @@ module Layout_and_axes = struct
                 ~statefulness:
                   (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
                 ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
-                ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~externality_mod:
                   (value_for_axis ~axis:(Modal (Comonadic Externality)))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
@@ -1394,7 +1386,7 @@ module Const = struct
                 ~uniqueness:Uniqueness.Const_op.max
                 ~contention:Contention.Const_op.min
                 ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.min ~externality:Externality.max
+                ~visibility:Visibility.Const_op.min
                 ~externality_mod:Mod_bounds.Externality_mod.max
                   (* CR jcutler: is this right? *)
                 ~nullability:Nullability.Non_null
@@ -1417,7 +1409,7 @@ module Const = struct
                 ~visibility:Visibility.Const_op.max
                 ~externality_mod:Mod_bounds.Externality_mod.max
                   (* CR jcutler: is this right? *)
-                ~externality:Externality.max ~nullability:Nullability.Non_null
+                ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
           };
@@ -1434,7 +1426,7 @@ module Const = struct
                 ~contention:Contention.Const_op.max
                 ~uniqueness:Uniqueness.Const_op.max
                 ~statefulness:Statefulness.Const.min
-                ~visibility:Visibility.Const_op.max ~externality:Externality.max
+                ~visibility:Visibility.Const_op.max
                 ~externality_mod:Mod_bounds.Externality_mod.max
                 ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
@@ -1502,8 +1494,8 @@ module Const = struct
       { jkind =
           { immediate.jkind with
             mod_bounds =
-              Mod_bounds.set_externality Externality.External64
-                immediate.jkind.mod_bounds
+              Mod_bounds.set_externality_mod
+                Mod_bounds.Externality_mod.External64 immediate.jkind.mod_bounds
           };
         name = "immediate64"
       }
@@ -2436,7 +2428,7 @@ let for_non_float ~(why : History.value_creation_reason) =
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~visibility:Visibility.Const_op.max
       ~externality_mod:Mod_bounds.Externality_mod.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
@@ -2521,8 +2513,7 @@ let for_open_boxed_row =
       ~visibility:Visibility.Const_op.max
       ~externality_mod:Mod_bounds.Externality_mod.max
         (* CR jcutler: is this right? *)
-      ~externality:Externality.max ~nullability:Nullability.Non_null
-      ~separability:Separability.Non_float
+      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
@@ -2576,7 +2567,6 @@ let for_object =
       mod_bounds =
         Mod_bounds.create ~linearity ~locality ~uniqueness ~portability
           ~contention ~yielding ~statefulness ~visibility
-          ~externality:Externality.max
           ~externality_mod:Mod_bounds.Externality_mod.max ~nullability:Non_null
           ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
@@ -2592,8 +2582,7 @@ let for_float ident =
       ~visibility:Visibility.Const_op.min
       ~externality_mod:Mod_bounds.Externality_mod.max
         (* CR jcutler: is this right? *)
-      ~externality:Externality.max ~nullability:Nullability.Non_null
-      ~separability:Separability.Separable
+      ~nullability:Nullability.Non_null ~separability:Separability.Separable
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
@@ -2700,7 +2689,8 @@ let set_externality_upper_bound jk externality_upper_bound =
     jkind =
       { jk.jkind with
         mod_bounds =
-          Mod_bounds.set_externality externality_upper_bound jk.jkind.mod_bounds
+          Mod_bounds.set_externality_mod externality_upper_bound
+            jk.jkind.mod_bounds
       }
   }
 

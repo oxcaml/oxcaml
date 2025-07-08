@@ -281,10 +281,6 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Externality_mod.max
       modifiers.externality_mod
   in
-  let externality =
-    Option.fold ~some:Location.get_txt ~none:Externality.max
-      modifiers.externality
-  in
   let nullability =
     Option.fold ~some:Location.get_txt ~none:Nullability.max
       modifiers.nullability
@@ -294,8 +290,7 @@ let transl_mod_bounds annots =
       modifiers.separability
   in
   create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
-    ~statefulness ~visibility ~externality_mod ~externality ~nullability
-    ~separability
+    ~statefulness ~visibility ~externality_mod ~nullability ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [yielding] has a different default depending on whether [areality]

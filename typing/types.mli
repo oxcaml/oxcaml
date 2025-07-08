@@ -82,7 +82,6 @@ module Jkind_mod_bounds : sig
   module Statefulness = Mode.Statefulness.Const
   module Visibility = Mode.Visibility.Const_op
   module Externality_mod = Mode.Externality.Const
-  module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
 
@@ -98,7 +97,6 @@ module Jkind_mod_bounds : sig
     statefulness:Statefulness.t ->
     visibility:Visibility.t ->
     externality_mod:Externality_mod.t ->
-    externality:Externality.t ->
     nullability:Nullability.t ->
     separability:Separability.t ->
     t
@@ -112,7 +110,6 @@ module Jkind_mod_bounds : sig
   val statefulness : t -> Statefulness.t
   val visibility : t -> Visibility.t
   val externality_mod : t -> Externality_mod.t
-  val externality : t -> Externality.t
   val nullability : t -> Nullability.t
   val separability : t -> Separability.t
 
@@ -125,7 +122,6 @@ module Jkind_mod_bounds : sig
   val set_statefulness : Statefulness.t -> t -> t
   val set_visibility : Visibility.t -> t -> t
   val set_externality_mod : Externality_mod.t -> t -> t
-  val set_externality : Externality.t -> t -> t
   val set_nullability : Nullability.t -> t -> t
   val set_separability : Separability.t -> t -> t
 
