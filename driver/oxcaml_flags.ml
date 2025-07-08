@@ -124,6 +124,8 @@ let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
   | Set O2 -> o2
   | Set O3 -> o3
 
+let llvm_backend = ref false
+
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
 
