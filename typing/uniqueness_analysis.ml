@@ -2386,6 +2386,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_probe { handler } -> check_uniqueness_exp ~overwrite:None ienv handler
   | Texp_probe_is_enabled _ -> UF.unused
   | Texp_exclave e -> check_uniqueness_exp ~overwrite:None ienv e
+  | Texp_alloc (e, _) -> check_uniqueness_exp ~overwrite:None ienv e
   | Texp_src_pos -> UF.unused
   | Texp_overwrite (e1, e2) ->
     let value, uf = check_uniqueness_exp_as_value ienv e1 in

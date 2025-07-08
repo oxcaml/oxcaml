@@ -135,7 +135,7 @@ module Transled_modifiers = struct
       yielding = None;
       statefulness = None;
       visibility = None;
-      externality = None;
+      externality_mod = None;
       nullability = None;
       separability = None
     }
@@ -277,7 +277,7 @@ let transl_mod_bounds annots =
   in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
-      modifiers.externality
+      modifiers.externality_mod
   in
   let nullability =
     Option.fold ~some:Location.get_txt ~none:Nullability.max
@@ -490,6 +490,7 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
    removed. The implications on the monadic axes will stay. Implied modalities
    can be overriden. *)
 (* CR zqian: decouple mutable and comonadic modalities *)
+(* CR jcutler: why is this? Why aliased? Can we get away without *)
 let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let comonadic : Modality.t list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);

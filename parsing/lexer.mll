@@ -86,6 +86,7 @@ let keyword_table =
     "rec", REC;
     "sig", SIG;
     "stack_", STACK;
+    "malloc_", MALLOC;
     "struct", STRUCT;
     "then", THEN;
     "to", TO;

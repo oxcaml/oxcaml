@@ -1,22 +1,6 @@
 (* TEST
- include stdlib_upstream_compatible;
  expect;
 *)
-
-module Float_u = Stdlib_upstream_compatible.Float_u
-
-type t : float64 = float#
-[%%expect {|
-module Float_u = Stdlib_upstream_compatible.Float_u
-type t = float#
-|}]
-
-
-type t : bits64 = int64#
-[%%expect {|
-type t = int64#
-|}]
-
 
 let immediate_is_external () =
   let _x @ external_ = 3 in
@@ -27,15 +11,13 @@ val immediate_is_external : unit -> unit = <fun>
 |}]
 
 let immediate_is_external64 () =
-  let _x @ external64 = 'a' in
-  let _y @ external64 = 3 in
+  let _x @ external64 = 3 in
+  let _y @ external64 = 'a' in
   let _z @ external64 = None in
   ()
 [%%expect{|
 val immediate_is_external64 : unit -> unit = <fun>
 |}]
-
-
 
 let none_is_external () =
   let _x @ external_ = None in
@@ -111,7 +93,7 @@ Error: This value is "internal" but expected to be "external64".
 
 
 (*
-   The code below is the expected behavior. For future axes where
+   CR jcutler: The code below is the expected behavior. For future axes where
    the legacy mode is top, you are allowed to do this. Similarly you can write a
    nonportable thing into a portable record.  You're just prevented from
    creating a portable record with a mutable field not marked as @@ portable.
@@ -126,8 +108,7 @@ val foo : 'a t -> 'a -> unit = <fun>
 |}]
 
 (* CR jcutler: In the above type's case, creating an @external_ record of this type
-   should be disallowed. Because there is not currently a way to create external records
-(in this PR), we cannot test this. When malloc is introduced, add a test for this. *)
+   should be disallowed. *)
 
 let foo (t : 'a ref @ external_) (x : 'a @ internal) =
   t := x
@@ -153,7 +134,7 @@ Error: This value is "internal" but expected to be "external_".
 |}]
 
 
-(* In the above case, creating an @external_ record of this type
+(* CR jcutler: In the above case, creating an @external_ record of this type
    should be *allowed*. *)
 
 type 'a external_ = { ext : 'a @@ external_ }
@@ -168,75 +149,230 @@ Line 3, characters 40-46:
 Error: This value is "internal" but expected to be "external_".
 |}]
 
-let into_external () =
-  let _ : int external_ = {ext = 3} in
-  ()
+let foo () = malloc_ (1,2)
 [%%expect {|
-val into_external : unit -> unit = <fun>
+val foo : unit -> (int * int) mallocd = <fun>
 |}]
 
-
-let f (x : string @ internal) : #(string * string) @ external_ = #(x, x)
+let foo () = malloc_ (1,"Asdf")
 [%%expect {|
-Line 1, characters 67-68:
-1 | let f (x : string @ internal) : #(string * string) @ external_ = #(x, x)
-                                                                       ^
+val foo : unit -> (int * string) mallocd = <fun>
+|}]
+
+let foo (x @ external_) = malloc_ (x,1)
+[%%expect {|
+val foo : 'a -> ('a * int) mallocd = <fun>
+|}]
+
+let asdf (x @ internal) = malloc_ (x,2)
+[%%expect {|
+Line 1, characters 35-36:
+1 | let asdf (x @ internal) = malloc_ (x,2)
+                                       ^
 Error: This value is "internal" but expected to be "external_".
 |}]
 
-let f (x : string @ external_) : #(string * string) @ external_ = #(x, x)
-
-[%%expect {|
-val f : string -> #(string * string) = <fun>
+type t = {x : int; y : int}
+let f () = malloc_ {x = 3; y = 4}
+[%%expect{|
+type t = { x : int; y : int; }
+val f : unit -> t mallocd = <fun>
 |}]
 
-let f (x : int @ internal) : #(int * int) @ external_ = #(x, x)
-[%%expect {|
-val f : int -> #(int * int) = <fun>
+let f (x @ external_) = malloc_ {x = x; y = x}
+[%%expect{|
+val f : int -> t mallocd = <fun>
 |}]
 
-type t = #{x : int; y : string @@ external_}
-let f (x : int) (y : string @ internal) = #{x;y}
+type 'a t = {x : 'a ; y : 'a option mallocd }
+let f x =
+  let y = malloc_ (Some x) in
+  malloc_ {x;y}
 [%%expect {|
-type t = #{ x : int; y : string @@ external_; }
-Line 2, characters 46-47:
-2 | let f (x : int) (y : string @ internal) = #{x;y}
-                                                  ^
+type 'a t = { x : 'a; y : 'a option mallocd; }
+val f : 'a -> 'a t mallocd = <fun>
+|}]
+
+
+
+
+let foo () = malloc_ []
+[%%expect {|
+Line 1, characters 21-23:
+1 | let foo () = malloc_ []
+                         ^^
+Error: This expression is not an allocation site.
+|}]
+
+let foo () = malloc_ [1]
+[%%expect {|
+val foo : unit -> int list mallocd = <fun>
+|}]
+
+let foo () = malloc_ [1;2;3]
+[%%expect {|
+val foo : unit -> int list mallocd = <fun>
+|}]
+
+
+let foo1 () = malloc_ [|1|]
+[%%expect {|
+Line 1, characters 22-27:
+1 | let foo1 () = malloc_ [|1|]
+                          ^^^^^
 Error: This value is "internal" but expected to be "external_".
 |}]
 
-type t = #{x : int; y : string }
-let f (x : int) (y : string @ internal) : t @ external_ = #{x;y}
+
+let foo3 (x @ external_) (y @ external_ ) = malloc_ [|x;y|]
 [%%expect {|
-type t = #{ x : int; y : string; }
-Line 2, characters 62-63:
-2 | let f (x : int) (y : string @ internal) : t @ external_ = #{x;y}
-                                                                  ^
+Line 1, characters 52-59:
+1 | let foo3 (x @ external_) (y @ external_ ) = malloc_ [|x;y|]
+                                                        ^^^^^^^
+Error: This value is "internal" but expected to be "external_".
+|}]
+
+let foo5 () = malloc_ [|"Kerplink";"Kerplank";"Kerplunk"|]
+[%%expect {|
+Line 1, characters 22-58:
+1 | let foo5 () = malloc_ [|"Kerplink";"Kerplank";"Kerplunk"|]
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "internal" but expected to be "external_".
 |}]
 
 
-type t = #{x : int; y : string }
-let f (x : int) (y : string @ external_) : t @ external_ = #{x;y}
+(* CR external-mode: The following error correctly catches an error: to malloc a
+   record with mutable fields, all mutable fields must be marked @@ external_.
+   However, it doesn't really explain that this is *why*, and worse, it's
+   actively misleading. High priority to fix this. *)
+type t = {mutable x : string; y : bool}
+let bar1 x y = malloc_ {x;y}
 [%%expect {|
-type t = #{ x : int; y : string; }
-val f : int -> string -> t = <fun>
+type t = { mutable x : string; y : bool; }
+Line 2, characters 23-28:
+2 | let bar1 x y = malloc_ {x;y}
+                           ^^^^^
+Error: This value is "internal" but expected to be "external_".
 |}]
 
-(* CR jcutler: When we support externally allocating functions, write a test to show that
-You can only allocate functions that don't close over internals.
-*)
-
-(* Byte externality vs externality *)
-let add_three  (x : float# @ byte_external) : float# @ byte_external = Float_u.add #3.0 x
+type t = {mutable x : string @@ external_ ; y : bool}
+let bar2 x y = malloc_ {x;y}
 [%%expect {|
-Line 1, characters 71-89:
-1 | let add_three  (x : float# @ byte_external) : float# @ byte_external = Float_u.add #3.0 x
-                                                                           ^^^^^^^^^^^^^^^^^^
-Error: This value is "external_" but expected to be "external_".
+type t = { mutable x : string @@ external_; y : bool; }
+val bar2 : string -> bool -> t mallocd = <fun>
 |}]
 
-let add_three (x : int @ byte_external) : int @ byte_external = 3 + x
+
+
+type 'a t = Foo | Bar of 'a | Baz of 'a * string
+let baz1 () = malloc_ Foo
 [%%expect {|
-val add_three : int -> int = <fun>
+type 'a t = Foo | Bar of 'a | Baz of 'a * string
+Line 2, characters 22-25:
+2 | let baz1 () = malloc_ Foo
+                          ^^^
+Error: This expression is not an allocation site.
+|}]
+
+let baz2 () = malloc_ (Bar 1)
+[%%expect {|
+val baz2 : unit -> int t mallocd = <fun>
+|}]
+
+let baz3 () = malloc_ (Bar "asdf")
+[%%expect {|
+val baz3 : unit -> string t mallocd = <fun>
+|}]
+
+let baz4 (x @ external_) = malloc_ (Baz (1,x))
+[%%expect {|
+val baz4 : string -> int t mallocd = <fun>
+|}]
+
+type 'a t = FooBar of {mutable x : 'a @@ external_ ; mutable y : 'a @@ external_}
+let foobar (x @ external_) (y @ external_ ) = malloc_ (FooBar {x ; y})
+[%%expect {|
+type 'a t =
+    FooBar of { mutable x : 'a @@ external_; mutable y : 'a @@ external_; }
+val foobar : 'a -> 'a -> 'a t mallocd = <fun>
+|}]
+
+type 'a t = FooBar of {mutable x : 'a ; mutable y : 'a @@ external_}
+let foobar (x @ external_) (y @ external_ ) = malloc_ (FooBar {x ; y})
+[%%expect {|
+type 'a t = FooBar of { mutable x : 'a; mutable y : 'a @@ external_; }
+Line 2, characters 62-69:
+2 | let foobar (x @ external_) (y @ external_ ) = malloc_ (FooBar {x ; y})
+                                                                  ^^^^^^^
+Error: This value is "internal" but expected to be "external_".
+|}]
+
+let blah () = malloc_ (lazy (2 + 2))
+[%%expect {|
+Line 1, characters 22-36:
+1 | let blah () = malloc_ (lazy (2 + 2))
+                          ^^^^^^^^^^^^^^
+Error: Externally allocating lazy expressions is not supported yet.
+|}]
+
+let blargh () = malloc_ ((fun x -> x + 1) 2)
+[%%expect {|
+Line 1, characters 24-44:
+1 | let blargh () = malloc_ ((fun x -> x + 1) 2)
+                            ^^^^^^^^^^^^^^^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+let floop () = malloc_ (fun x -> x + 1)
+[%%expect {|
+Line 1, characters 23-39:
+1 | let floop () = malloc_ (fun x -> x + 1)
+                           ^^^^^^^^^^^^^^^^
+Error: Externally allocating functions is not supported yet.
+|}]
+
+let f () = malloc_ `Apple
+[%%expect {|
+Line 1, characters 19-25:
+1 | let f () = malloc_ `Apple
+                       ^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+let f () = malloc_ (`Apple 5)
+[%%expect {|
+val f : unit -> [> `Apple of int ] mallocd = <fun>
+|}]
+
+let f () = malloc_ (`Apple (1,2,3))
+[%%expect {|
+val f : unit -> [> `Apple of int * int * int ] mallocd = <fun>
+|}]
+
+let f () = malloc_ #(1,2)
+[%%expect {|
+Line 1, characters 19-25:
+1 | let f () = malloc_ #(1,2)
+                       ^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+type t = #{x : int; y : char}
+let f () = malloc_ #{x = 3; y = 'z'}
+[%%expect {|
+type t = #{ x : int; y : char; }
+Line 2, characters 19-36:
+2 | let f () = malloc_ #{x = 3; y = 'z'}
+                       ^^^^^^^^^^^^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+let flarb () =
+  malloc_ (1,
+    let f x = (x,x) in
+    let (a,b) = f 2 in
+    a
+  )
+[%%expect {|
+val flarb : unit -> (int * int) mallocd = <fun>
 |}]

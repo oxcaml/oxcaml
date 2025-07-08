@@ -679,6 +679,9 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
+  | Texp_alloc (e,_) -> (* CR jcutler: fixme *)
+      line i ppf "Texp_alloc";
+      expression i ppf e;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

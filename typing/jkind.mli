@@ -530,6 +530,9 @@ val for_float : Ident.t -> Types.jkind_l
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
 
+(** The jkind for [or_null] type arguments. *)
+val for_or_null_argument : Ident.t -> 'd Types.jkind
+
 (** The jkind for an abbreviation declaration. This implements the design
     in rule FIND_ABBREV in kind-inference.md, where we consider a definition
 
@@ -610,6 +613,8 @@ val get_mode_crossing :
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
+(* CR jcutler: these two functions should probably go away, since this
+   is now covered by the existing functiosn to get and set the axis.*)
 val get_externality_upper_bound :
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   'd Types.jkind ->
