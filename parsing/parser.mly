@@ -921,17 +921,24 @@ let mk_directive ~loc name arg =
    may also get re-inlined at that point *)
 let unboxed_literals_extension = Language_extension.Layouts
 
-let generic_optional_arguments_extension = Language_extension.Generic_optional_arguments
+let generic_optional label _loc =
+  Generic_optional label
+  (*
+  We want parsing to succeed even if extensions are disabled.
 
-let generic_optional label loc =
-  if Language_extension.is_enabled generic_optional_arguments_extension then
-    Generic_optional label
-  else
-    raise
-      Syntaxerr.(
-        Error
-          (Generic_optional_arguments_not_allowed
-             (make_loc loc)))
+  CR: move the following to type checking:
+  {v
+    let generic_optional_arguments_extension = Language_extension.Generic_optional_arguments
+    if Language_extension.is_enabled generic_optional_arguments_extension then
+      Generic_optional label
+    else
+      raise
+        Syntaxerr.(
+          Error
+            (Generic_optional_arguments_not_allowed
+              (make_loc loc)))
+  v}
+  *)
 
 type sign = Positive | Negative
 
