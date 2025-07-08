@@ -1329,7 +1329,6 @@ module Const = struct
        types that "cross everything" should cross at external or byte_external *)
     let mk_jkind ~mode_crossing ~nullability ~separability ~externality
         (layout : Layout.Const.t) =
-      let id x = x in
       let mod_bounds =
         (match mode_crossing with
         | true -> Mod_bounds.min
@@ -1517,7 +1516,6 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
-    (* CR jcutler: ensure all the kind/kind_of_unboxed pairs have this pattern.*)
     let float64 =
       { jkind =
           mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
@@ -2472,7 +2470,8 @@ let for_or_null_argument ident =
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
       ~visibility:Visibility.Const_op.max ~externality:Externality.Const.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }

@@ -6396,22 +6396,8 @@ and type_expect_
             mutable_mode m0 |> mode_default ~allocator:Allocator_heap
           in
           let mode = mode_modality label.lbl_modalities mode in
-<<<<<<< HEAD
           type_label_exp ~overwrite:No_overwrite_label ~create:false env mode
             loc ty_record (lid, label, snewval) Legacy
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-          type_label_exp ~overwrite:No_overwrite_label ~create:false env mode
-            loc ty_record (lid, label, snewval) Legacy
-=======
-          (* This is the mode of the field we're updating. Should be internal. *)
-=======
->>>>>>> 2db4608467 (somehow this got missed)
-          type_label_exp ~overwrite:No_overwrite_label ~create:false env mode loc ty_record
-            (lid, label, snewval) Legacy
->>>>>>> 6206867253 (add externality modal axis)
->>>>>>> fbe511e557 (somehow this got missed)
         | Immutable ->
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
@@ -11386,19 +11372,7 @@ let report_error ~loc env =
         | Error (Comonadic Portability, _ ) -> []
         | Error (Comonadic Yielding, _) -> []
         | Error (Comonadic Statefulness, _) -> []
-<<<<<<< HEAD
         | Error (Comonadic Externality, _) -> []
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-        | Error (Comonadic Externality, _) -> []
-=======
-        | Error (Comonadic Externality, _) -> [] (* CR jcutler: fixme *)
->>>>>>> 6206867253 (add externality modal axis)
-=======
-        | Error (Comonadic Externality, _) -> []
->>>>>>> 2db4608467 (somehow this got missed)
->>>>>>> fbe511e557 (somehow this got missed)
       in
       Location.errorf ~loc ~sub "@[%t@]" begin
         match fail_reason with
