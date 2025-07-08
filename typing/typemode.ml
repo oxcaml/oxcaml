@@ -55,10 +55,12 @@ module Axis_pair = struct
     | "maybe_null" ->
       Any_axis_pair (Nonmodal Nullability, Nullability.Maybe_null)
     | "non_null" -> Any_axis_pair (Nonmodal Nullability, Nullability.Non_null)
-    | "internal" -> Any_axis_pair (Nonmodal Externality, Externality.Internal)
+    | "internal" ->
+      Any_axis_pair (Nonmodal Externality, Jkind_axis.Externality.Internal)
     | "external64" ->
-      Any_axis_pair (Nonmodal Externality, Externality.External64)
-    | "external_" -> Any_axis_pair (Nonmodal Externality, Externality.External)
+      Any_axis_pair (Nonmodal Externality, Jkind_axis.Externality.External64)
+    | "external_" ->
+      Any_axis_pair (Nonmodal Externality, Jkind_axis.Externality.External)
     | "yielding" ->
       Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Yielding)
     | "unyielding" ->
@@ -116,6 +118,7 @@ module Transled_modifiers = struct
       yielding : Mode.Yielding.Const.t Location.loc option;
       statefulness : Mode.Statefulness.Const.t Location.loc option;
       visibility : Mode.Visibility.Const.t Location.loc option;
+      externality_mod : Mode.Externality.Const.t Location.loc option;
       externality : Jkind_axis.Externality.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
@@ -130,6 +133,7 @@ module Transled_modifiers = struct
       yielding = None;
       statefulness = None;
       visibility = None;
+      externality_mod = None;
       externality = None;
       nullability = None;
       separability = None
@@ -145,6 +149,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> t.yielding
     | Modal (Comonadic Statefulness) -> t.statefulness
     | Modal (Monadic Visibility) -> t.visibility
+    | Modal (Comonadic Externality) -> t.externality_mod
     | Nonmodal Externality -> t.externality
     | Nonmodal Nullability -> t.nullability
     | Nonmodal Separability -> t.separability
@@ -160,6 +165,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> { t with yielding = value }
     | Modal (Comonadic Statefulness) -> { t with statefulness = value }
     | Modal (Monadic Visibility) -> { t with visibility = value }
+    | Modal (Comonadic Externality) -> { t with externality_mod = value }
     | Nonmodal Externality -> { t with externality = value }
     | Nonmodal Nullability -> { t with nullability = value }
     | Nonmodal Separability -> { t with separability = value }
@@ -194,7 +200,8 @@ let transl_mod_bounds annots =
           portability = Some { txt = Portability.Const.min; loc };
           contention = Some { txt = Contention.Const_op.min; loc };
           yielding = Some { txt = Yielding.Const.min; loc };
-          externality = Some { txt = Externality.min; loc };
+          externality_mod = Some { txt = Mode.Externality.Const.min; loc };
+          externality = Some { txt = Jkind_axis.Externality.min; loc };
           statefulness = Some { txt = Statefulness.Const.min; loc };
           visibility = Some { txt = Visibility.Const_op.min; loc };
           nullability =
@@ -338,7 +345,8 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
       contention = Option.map get_txt modes.contention;
       yielding = Option.map get_txt modes.yielding;
       statefulness = Option.map get_txt modes.statefulness;
-      visibility = Option.map get_txt modes.visibility
+      visibility = Option.map get_txt modes.visibility;
+      externality = Option.map get_txt modes.externality_mod
     }
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
@@ -421,6 +429,8 @@ let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
       Modality.Atom (Comonadic Statefulness, Meet_with mode)
     | Modal_axis_pair (Monadic Visibility, mode) ->
       Modality.Atom (Monadic Visibility, Join_with mode)
+    | Modal_axis_pair (Comonadic Externality, mode) ->
+      Modality.Atom (Comonadic Externality, Join_with mode)
   in
   atom, loc
 
