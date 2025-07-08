@@ -35,7 +35,7 @@ let _ = [| [: :] |];;
 
 let arr = [: 1; 2; 3 :];;
 [%%expect {|
-(let (arr/381 = (makearray_imm[int] 1 2 3))
+(let (arr/381 =[intarray] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/381))
 val arr : int iarray = [:1; 2; 3:]
 |}];;
@@ -66,7 +66,7 @@ let arr : int alias = [: 1; 2; 3 :];;
 [%%expect {|
 0
 type 'a alias = 'a iarray
-(let (arr/383 = (makearray_imm[int] 1 2 3))
+(let (arr/383 =[intarray] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/383))
 val arr : int alias = [:1; 2; 3:]
 |}];;
@@ -100,7 +100,7 @@ let arr = of_array mut_arr;;
 val mut_arr : int array = [|1; 2; 3|]
 (let
   (mut_arr/384 = (apply (field_imm 0 (global Toploop!)) "mut_arr")
-   arr/385 =
+   arr/385 =[intarray]
      (apply (field_imm 13 (global Stdlib_stable__Iarray!)) mut_arr/384))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/385))
 val arr : int iarray = [:1; 2; 3:]
@@ -191,7 +191,7 @@ let _ = Array.unsafe_get mut_arr 1;;
 let arr = [: 1; 2; 3 :];;
 let mut_arr = to_array arr;;
 [%%expect {|
-(let (arr/439 = (makearray_imm[int] 1 2 3))
+(let (arr/439 =[intarray] (makearray_imm[int] 1 2 3))
   (apply (field_imm 1 (global Toploop!)) "arr" arr/439))
 val arr : int iarray = [:1; 2; 3:]
 (let
