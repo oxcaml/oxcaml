@@ -717,8 +717,6 @@ end = struct
       iv f t0 t1
 
   let rec diff_shared f t0 t1 =
-    (* Using [pattern_match_pair_merge_sharing] here is an optimisation, it is
-       not guaranteed by the interface of [diff_shared]. *)
     let iv = is_value_of t0 in
     pattern_match_pair_merge_sharing ~phys_eq_shortcut:phys_eq_shortcut_diff
       ~only_left:(fun t0 -> t0)
