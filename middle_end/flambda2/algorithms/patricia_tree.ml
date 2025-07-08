@@ -477,7 +477,10 @@ end = struct
      [bit] correspond to the highest position where at least one of the trees
      has a branch: it is guaranteed that [t0 = branch prefix bit t00 t01] and
      [t1 = branch prefix bit t10 t11], where the missing optional arguments are
-     treated as empty. *)
+     treated as empty.
+
+     {b Note}: The [join], [leaf], and [branch] functions are aggressively
+     inlined. *)
   (* CR-someday bclement (and lmaurer): We could turn this into a functor over
      three [Tree] instances and get arbitrary combinations of taking and
      returning sets and maps. *)
@@ -573,7 +576,12 @@ end = struct
      [both_sides] is called on pairs of sub-tree of [t0] and [t1] that may have
      a non-empty intersection (and will typically call into the same
      [pattern_match_pair_merge] recursively). It must return a tree whose keys
-     are present in at least one of its arguments. *)
+     are present in at least one of its arguments.
+
+     {b Note}: All functions that are named arguments are aggressively inlined,
+     as they are expected to be inline anonymous functions, but the [combine]
+     argument is not, as it is expected to be passed directly from the user in
+     most cases. *)
   let[@inline always] pattern_match_pair_merge
       ?(phys_eq_shortcut = no_phys_eq_shortcut)
       ?(phys_eq_check_branch_left = no_phys_eq_check_branch)
@@ -586,13 +594,21 @@ end = struct
     | None ->
       pattern_match_pair t0 t1
         ~leaf:(fun i d0 d1 ->
+          (* NB: [combine] does not have an [@inlined hint] annotation because
+             it is expected that this is the merge function passed from the user
+             (e.g. argument of [merge] or [union]). *)
           match combine i d0 d1 with
           | None -> empty iv
           | Some d -> (
-            match phys_eq_check_leaf_left ~orig_t:t0 ~orig_d:d0 d with
+            match
+              (phys_eq_check_leaf_left [@inlined hint]) ~orig_t:t0 ~orig_d:d0 d
+            with
             | Some t' -> t'
             | None -> (
-              match phys_eq_check_leaf_right ~orig_t:t1 ~orig_d:d1 d with
+              match
+                (phys_eq_check_leaf_right [@inlined hint]) ~orig_t:t1 ~orig_d:d1
+                  d
+              with
               | Some t' -> t'
               | None -> leaf iv i d)))
         ~join:(fun descr0 descr1 ->
@@ -600,8 +616,8 @@ end = struct
           (* Calling [only_right] even when both sides are empty is semantically
              correct and leads to slighly better code generation, see the note
              in [pattern_match_pair]. *)
-          | Empty, _ -> only_right t1
-          | _, Empty -> only_left t0
+          | Empty, _ -> (only_right [@inlined hint]) t1
+          | _, Empty -> (only_left [@inlined hint]) t0
           | ( (Leaf (prefix0, _) | Branch (prefix0, _, _, _)),
               (Leaf (prefix1, _) | Branch (prefix1, _, _, _)) ) ->
             join prefix0
