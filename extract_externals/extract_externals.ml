@@ -134,8 +134,8 @@ let extract_shapes_from_files ~verbose files =
     List.map
       (fun file ->
         match file with
-        | _ when String.ends_with file ~suffix:".cms" -> CMS file
-        | _ when String.ends_with file ~suffix:".cmt" -> CMT file
+        | _ when Filename.check_suffix file ".cms" -> CMS file
+        | _ when Filename.check_suffix file ".cmt" -> CMT file
         | _ ->
           Misc.fatal_errorf
             "File %s is neither a .cms nor a .cmt file; aborting\n" file)
