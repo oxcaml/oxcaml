@@ -168,10 +168,33 @@ module type Solver_mono = sig
       comments on [Lattices_mono.morph]. *)
   type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
+  (** Hints describing the reasons for morphisms *)
+  type hint_morph
+
+  (** Hints describing the reasons for constants *)
+  type hint_const
+
   (** The object type from the [Lattices_mono] we're working with *)
   type 'a obj
 
-  type 'a error
+  (** ['a hint] explains a bound of type ['a], but doesn't include the bound itself *)
+  type 'a hint =
+    | Morph : hint_morph * ('b, 'a, 'd) morph * 'b hint -> 'a hint
+        (** [Morph m f x_hint] says the current bound is derived by applying morphism [f] (explained by [m]) to another bound explained by [x_hint] *)
+    | Const : hint_const -> 'a hint
+        (** [Const c] says the current bound is explained by [c] *)
+    | Branch : 'a * 'a hint * 'a * 'a hint -> 'a hint
+        (** [Branch a0 a0_hint a1 a1_hint] says the current bound is jointly explained by either [a0] (explained by [a0_hint]) or [a1] (explaiend by [a1_hint]) (or both) *)
+
+  (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
+   can be, and [right] will be the highest mode [b] can be. And [left <= right]
+   will be false, which is why the submode failed. *)
+  type 'a error =
+    { left : 'a;
+      left_hint : 'a hint;
+      right : 'a;
+      right_hint : 'a hint
+    }
 
   (* Backtracking facilities used by [types.ml] *)
 
@@ -197,7 +220,7 @@ module type Solver_mono = sig
   include Allow_disallow with type ('a, _, 'd) sided = ('a, 'd) mode
 
   (** Returns the mode representing the given constant. *)
-  val of_const : 'a obj -> 'a -> ('a, 'l * 'r) mode
+  val of_const : 'a obj -> ?hint:hint_const -> 'a -> ('a, 'l * 'r) mode
 
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
@@ -271,20 +294,29 @@ module type Solver_mono = sig
   (** Apply a monotone morphism. *)
   val apply :
     'b obj ->
+    ?hint:hint_morph ->
     ('a, 'b, 'l * 'r) morph ->
     ('a, 'l * 'r) mode ->
     ('b, 'l * 'r) mode
 end
 
-module type S = sig
-  (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
-   can be, and [right] will be the highest mode [b] can be. And [left <= right]
-   will be false, which is why the submode failed. *)
-  type 'a error =
-    { left : 'a;
-      right : 'a
-    }
+module type Hint = sig
+  type const
 
+  val const_none : const
+
+  type morph
+
+  val morph_none : morph
+
+  val left_adjoint : morph -> morph
+
+  val right_adjoint : morph -> morph
+
+  val compose : morph -> morph -> morph
+end
+
+module type S = sig
   (** Takes a slow but type-correct [Equal] module and returns the
       magic version, which is faster.
       NOTE: for this to be sound, the function in the original module must be
@@ -293,9 +325,10 @@ module type S = sig
     Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t
 
   (** Solver that supports lattices with monotone morphisms between them. *)
-  module Solver_mono (C : Lattices_mono) :
+  module Solver_mono (C : Lattices_mono) (Hint : Hint) :
     Solver_mono
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj
-       and type 'a error = 'a error
+       and type hint_morph := Hint.morph
+       and type hint_const := Hint.const
 end

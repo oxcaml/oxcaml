@@ -1551,8 +1551,31 @@ module Lattices_mono = struct
 end
 
 module C = Lattices_mono
-module Solver = Solver_mono (C)
+
+module Hint = struct
+  (* This implementation is just temporary,
+     until we create a proper implementation which properly tracks hints *)
+
+  type const = CNone
+
+  let const_none = CNone
+
+  type morph = MNone
+
+  let morph_none = MNone
+
+  let left_adjoint MNone = MNone
+
+  let right_adjoint MNone = MNone
+
+  let compose MNone MNone = MNone
+end
+
+module Solver = Solver_mono (C) (Hint)
 module S = Solver
+
+let solver_error_to_serror : 'a S.error -> 'a serror =
+ fun { left; left_hint = _; right; right_hint = _ } -> { left; right }
 
 type monadic = C.monadic =
   { uniqueness : C.Uniqueness.t;
@@ -1637,7 +1660,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   type lr = (allowed * allowed) t
 
-  type nonrec error = const error
+  type nonrec error = const serror
 
   type equate_error = equate_step * error
 
@@ -1663,7 +1686,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_log a b ~log = Solver.submode obj a b ~log
 
-  let submode a b = try_with_log (submode_log a b)
+  let submode a b =
+    try_with_log (submode_log a b) |> Result.map_error solver_error_to_serror
 
   let join l = Solver.join obj l
 
@@ -1671,7 +1695,10 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
 
-  let equate a b = try_with_log (equate_from_submode submode_log a b)
+  let equate a b =
+    try_with_log (equate_from_submode submode_log a b)
+    |> Result.map_error (fun (eq_step, err) ->
+           eq_step, solver_error_to_serror err)
 
   let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
@@ -1711,15 +1738,23 @@ module Monadic_gen (Obj : Obj) = struct
 
   type lr = (allowed * allowed) t
 
-  type nonrec error = const error
+  type nonrec error = const serror
 
   type equate_error = equate_step * error
 
   type (_, _, 'd) sided = 'd t
 
-  let flip_error = function
+  let flip_error =
+    let open Solver in
+    function
     | Ok _ as r -> r
-    | Error { left; right } -> Error { left = right; right = left }
+    | Error { left; left_hint; right; right_hint } ->
+      Error
+        { left = right;
+          left_hint = right_hint;
+          right = left;
+          right_hint = left_hint
+        }
 
   let disallow_right m = Solver.disallow_left m
 
@@ -1741,7 +1776,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_log a b ~log = Solver.submode obj b a ~log |> flip_error
 
-  let submode a b = try_with_log (submode_log a b)
+  let submode a b =
+    try_with_log (submode_log a b) |> Result.map_error solver_error_to_serror
 
   let join l = Solver.meet obj l
 
@@ -1749,7 +1785,10 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
 
-  let equate a b = try_with_log (equate_from_submode submode_log a b)
+  let equate a b =
+    try_with_log (equate_from_submode submode_log a b)
+    |> Result.map_error (fun (eq_step, err) ->
+           eq_step, solver_error_to_serror err)
 
   let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
@@ -2024,7 +2063,7 @@ module Comonadic_with (Areality : Areality) = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
+  type error = Error : 'a Axis.t * 'a serror -> error
 
   type equate_error = equate_step * error
 
@@ -2075,7 +2114,7 @@ module Comonadic_with (Areality : Areality) = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : Obj.const Solver.error) : error =
+  let axis_of_error (err : Obj.const serror) : error =
     let { left =
             { areality = areality1;
               linearity = linearity1;
@@ -2127,7 +2166,7 @@ module Comonadic_with (Areality : Areality) = struct
   let submode_log m0 m1 ~log : _ result =
     match submode_log m0 m1 ~log with
     | Ok () -> Ok ()
-    | Error e -> Error (axis_of_error e)
+    | Error e -> Error (e |> solver_error_to_serror |> axis_of_error)
 
   let submode a b = try_with_log (submode_log a b)
 
@@ -2160,7 +2199,7 @@ module Monadic = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
+  type error = Error : 'a Axis.t * 'a serror -> error
 
   type equate_error = equate_step * error
 
@@ -2204,7 +2243,7 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : Obj.const Solver.error) : error =
+  let axis_of_error (err : Obj.const serror) : error =
     let { left =
             { uniqueness = uniqueness1;
               contention = contention1;
@@ -2241,7 +2280,7 @@ module Monadic = struct
   let submode_log m0 m1 ~log : _ result =
     match submode_log m0 m1 ~log with
     | Ok () -> Ok ()
-    | Error e -> Error (axis_of_error e)
+    | Error e -> Error (e |> solver_error_to_serror |> axis_of_error)
 
   let submode a b = try_with_log (submode_log a b)
 
@@ -2613,7 +2652,7 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
+  type error = Error : 'a Axis.t * 'a serror -> error
 
   type equate_error = equate_step * error
 
@@ -2915,7 +2954,7 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error = Error : 'a axis * 'a raw Solver.error -> error
+    type error = Error : 'a axis * 'a raw serror -> error
 
     module Const = struct
       type t = Join_const of Mode.Const.t
@@ -3047,7 +3086,7 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error = Error : 'a axis * 'a raw Solver.error -> error
+    type error = Error : 'a axis * 'a raw serror -> error
 
     module Const = struct
       type t = Meet_const of Mode.Const.t
@@ -3199,7 +3238,7 @@ module Modality = struct
   end
 
   module Value = struct
-    type error = Error : 'a Value.Axis.t * 'a raw Solver.error -> error
+    type error = Error : 'a Value.Axis.t * 'a raw serror -> error
 
     type equate_error = equate_step * error
 
