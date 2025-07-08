@@ -9556,26 +9556,26 @@ and type_let_def_wrap_warnings
                 let name = Ident.name id in
                 let used = ref false in
                 let mutable_ =
-                  (match vd.val_kind with Val_mut _ -> true | _ -> false)
+                  (match vd.val_kind with
+                   | Val_mut _ -> true
+                   | Val_reg | Val_prim _ | Val_ivar _
+                   | Val_self _ | Val_anc _ -> false)
                 in
-                let unused_mutable = ref mutable_ in
+                let mutated = ref false in
                 if not (name = "" || name.[0] = '_' || name.[0] = '#') then
                   add_delayed_check
                     (fun () ->
-                      if not !used || !unused_mutable then
-                        Location.prerr_warning vd.Subst.Lazy.val_loc
-                          (match !used, !some_used, !unused_mutable with
-                           | false, false, false -> check name mutable_
-                           | false, true, false -> check_strict name mutable_
-                           (* since [let mutable] can only appear with one
-                              binding, [used] and [some_used] are equivalent *)
-                           | true, _, true -> check_mutable name
-                           (* If a mutable variable is never used or mutated,
-                              emit a regular [var-unused] warning to
-                              reduce noise *)
-                           | false, _, true -> check name false
-                           | true, _, false  -> assert false
-                          )
+                      let warn w =
+                        Location.prerr_warning vd.Subst.Lazy.val_loc w
+                      in
+                      if not !used then
+                        warn
+                          ((if !some_used then check_strict else check)
+                            name !mutated)
+                      (* Don't issue an [unused-mutable] warning with
+                         [unused-var] to be less noisy *)
+                      else if mutable_ && not !mutated then
+                        warn (check_mutable name)
                     );
                 Env.set_value_used_callback
                   vd
@@ -9591,8 +9591,9 @@ and type_let_def_wrap_warnings
                 match vd.val_kind with
                 | Val_mut _->
                   Env.set_value_mutated_callback
-                    vd (fun () -> unused_mutable := false)
-                | _ -> ()
+                    vd (fun () -> mutated := true)
+                | Val_reg | Val_prim _ | Val_ivar _
+                | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);
             mode, expected_ty, Some slot
