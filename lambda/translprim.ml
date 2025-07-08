@@ -1225,6 +1225,16 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Pbottom ->
       raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
 
+let should_specialize_primitive p =
+  match p.prim_name with
+  | "%obj_size" | "%obj_field" | "%obj_set_field" ->
+    (* The obj primitives re-use the array primitives (see [lookup_primitive]),
+       but we shouldn't specialize their array kinds.
+       CR layouts v4: we should just make separate object primitives. *)
+    false
+  | _ ->
+    true
+
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
@@ -1258,7 +1268,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
          fixed. To do that, we will need more checking of primitives
          in the front end. *)
       let array_type =
-        glb_array_type loc t (array_type_kind ~elt_sort:None env loc p)
+        glb_array_type loc t
+          (array_type_kind ~elt_sort:None ~elt_ty:None env loc p)
       in
       if t = array_type then None
       else Some (Primitive (Parraylength array_type, arity))
@@ -1266,16 +1277,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Parrayrefu (rt, index_kind, mut), arity), p1 :: _ -> begin
       let loc = to_location loc in
       let array_ref_type =
-        glb_array_ref_type loc rt (array_type_kind ~elt_sort:None env loc p1)
+        glb_array_ref_type loc rt
+          (array_type_kind ~elt_sort:None ~elt_ty:(Some rest_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
       else Some (Primitive (Parrayrefu (array_ref_type, index_kind, array_mut), arity))
     end
-  | Primitive (Parraysetu (st, index_kind), arity), p1 :: _ -> begin
+  | Primitive (Parraysetu (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
       let loc = to_location loc in
       let array_set_type =
-        glb_array_set_type loc st (array_type_kind ~elt_sort:None env loc p1)
+        glb_array_set_type loc st
+          (array_type_kind ~elt_sort:None ~elt_ty:(Some p3) env loc p1)
       in
       if st = array_set_type then None
       else Some (Primitive (Parraysetu (array_set_type, index_kind), arity))
@@ -1283,16 +1296,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Parrayrefs (rt, index_kind, mut), arity), p1 :: _ -> begin
       let loc = to_location loc in
       let array_ref_type =
-        glb_array_ref_type loc rt (array_type_kind ~elt_sort:None env loc p1)
+        glb_array_ref_type loc rt
+          (array_type_kind ~elt_sort:None ~elt_ty:(Some rest_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
       else Some (Primitive (Parrayrefs (array_ref_type, index_kind, array_mut), arity))
     end
-  | Primitive (Parraysets (st, index_kind), arity), p1 :: _ -> begin
+  | Primitive (Parraysets (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
       let loc = to_location loc in
       let array_set_type =
-        glb_array_set_type loc st (array_type_kind ~elt_sort:None env loc p1)
+        glb_array_set_type loc st
+          (array_type_kind ~elt_sort:None ~elt_ty:(Some p3) env loc p1)
       in
       if st = array_set_type then None
       else Some (Primitive (Parraysets (array_set_type, index_kind), arity))
@@ -1315,7 +1330,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     _ :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_type_kind ~elt_sort:None env loc rest_ty
+        array_type_kind ~elt_sort:None ~elt_ty:None env loc rest_ty
         |> glb_array_type loc array_kind
       in
       let array_mut = array_type_mut env rest_ty in
@@ -1338,7 +1353,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
        kind.  If you haven't, then taking the glb of both would be just as
        likely to compound your error (e.g., by treating a Pgenarray as a
        Pfloatarray) as to help you. *)
-    let array_kind = array_type_kind ~elt_sort:None env loc p2 in
+    let array_kind = array_type_kind ~elt_sort:None ~elt_ty:None env loc p2 in
     let new_dst_array_set_kind =
       glb_array_set_type loc dst_array_set_kind array_kind
     in
@@ -1347,7 +1362,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       src_mutability; dst_array_set_kind = new_dst_array_set_kind }, arity))
   | Primitive (Parray_element_size_in_bytes _, arity), p1 :: _ -> (
       let array_kind =
-        array_type_kind ~elt_sort:None env (to_location loc) p1
+        array_type_kind ~elt_sort:None ~elt_ty:None env (to_location loc) p1
       in
       Some (Primitive (Parray_element_size_in_bytes array_kind, arity))
     )
@@ -1787,9 +1802,12 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   in
   let has_constant_constructor = false in
   let prim =
-    match specialize_primitive env loc ty ~has_constant_constructor prim with
-    | None -> prim
-    | Some prim -> prim
+    if should_specialize_primitive p then
+      match specialize_primitive env loc ty ~has_constant_constructor prim with
+      | None -> prim
+      | Some prim -> prim
+    else
+      prim
   in
   let to_locality = to_locality ~poly:poly_mode in
   let error_loc = to_location loc in
@@ -2016,9 +2034,12 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     | _ -> false
   in
   let prim =
-    match specialize_primitive env loc ty ~has_constant_constructor prim with
-    | None -> prim
-    | Some prim -> prim
+    if should_specialize_primitive p then
+      match specialize_primitive env loc ty ~has_constant_constructor prim with
+      | None -> prim
+      | Some prim -> prim
+    else
+      prim
   in
   let lam = lambda_of_prim p.prim_name prim loc args (Some arg_exps) in
   let lam =

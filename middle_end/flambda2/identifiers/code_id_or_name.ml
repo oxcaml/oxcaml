@@ -15,7 +15,7 @@
 
 include Int_ids.Code_id_or_name
 
-let pattern_match' t ~code_id ~name =
+let[@inline always] pattern_match' t ~code_id ~name =
   pattern_match t ~code_id
-    ~var:(fun var -> name (Name.var var))
-    ~symbol:(fun symbol -> name (Name.symbol symbol))
+    ~var:(fun var -> (name [@inlined hint]) (Name.var var))
+    ~symbol:(fun symbol -> (name [@inlined hint]) (Name.symbol symbol))

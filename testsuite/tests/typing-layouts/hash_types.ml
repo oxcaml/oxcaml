@@ -703,12 +703,19 @@ module type Bad = sig
   type t
 end with type t := float#
 [%%expect{|
-Line 3, characters 9-25:
+Lines 1-3, characters 18-25:
+1 | ..................sig
+2 |   type t
 3 | end with type t := float#
-             ^^^^^^^^^^^^^^^^
-Error: The layout of type "float#" is float64
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = float#
+       is not included in
+         type t
+       The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of type "float#" must be a sublayout of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-8.
 |}]
 

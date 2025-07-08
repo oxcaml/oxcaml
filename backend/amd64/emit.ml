@@ -822,11 +822,13 @@ let move (src : Reg.t) (dst : Reg.t) =
       src Printreg.reg dst
   | Float, Reg _, Float, Reg _
   | Float32, Reg _, Float32, Reg _
-  | ( (Vec128 | Valx2),
-      (Reg _ | Stack _),
-      (Vec128 | Valx2),
-      (Reg _ | Stack _ (* Vec128 stack slots are always aligned. *)) ) ->
-    if distinct then I.movapd (reg src) (reg dst)
+  | (Vec128 | Valx2), (Reg _ | Stack _), (Vec128 | Valx2), (Reg _ | Stack _) ->
+    if distinct
+    then
+      (* Vec128 stack slots are aligned, domainstate slots are not. *)
+      if Reg.is_domainstate src || Reg.is_domainstate dst
+      then I.movupd (reg src) (reg dst)
+      else I.movapd (reg src) (reg dst)
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
     if distinct then I.movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->

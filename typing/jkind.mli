@@ -497,20 +497,8 @@ val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
 
-(** Choose an appropriate jkind for a boxed variant type.
-
-    [decl_params] is the parameters in the head of the type declaration. [type_apply]
-    should be [Ctype.apply] partially applied to an [env]. *)
-val for_boxed_variant :
-  decl_params:Types.type_expr list ->
-  type_apply:
-    (Types.type_expr list ->
-    Types.type_expr ->
-    Types.type_expr list ->
-    Types.type_expr) ->
-  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
-  Types.constructor_declaration list ->
-  Types.jkind_l
+(** Choose an appropriate jkind for a boxed variant type. *)
+val for_boxed_variant : Types.constructor_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
@@ -524,11 +512,38 @@ val for_arrow : Types.jkind_l
 (** The jkind of an object type.  *)
 val for_object : Types.jkind_l
 
+(** The jkind for [exn] *)
+val for_exn : Ident.t -> Types.jkind_l
+
 (** The jkind of a float. *)
 val for_float : Ident.t -> Types.jkind_l
 
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
+
+(** The jkind for an abbreviation declaration. This implements the design
+    in rule FIND_ABBREV in kind-inference.md, where we consider a definition
+
+    {[
+      type ... = rhs
+    ]}
+
+    to have the kind [<<layout of rhs>> mod everything with rhs]. This is
+    important to allow code like this to type-check:
+
+    {[
+      module M : sig
+        type 'a t : value mod portable with 'a
+      end = struct
+        type 'a t = 'a
+      end
+    ]}
+*)
+val for_abbreviation :
+  type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
+  modality:Mode.Modality.Value.Const.t ->
+  Types.type_expr ->
+  Types.jkind_l
 
 (******************************)
 (* elimination and defaulting *)

@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  runtime5;
  multidomain;
  set OCAMLRUNPARAM = "Xmain_stack_size=1000";
@@ -11,9 +12,6 @@
 
 open Effect
 open Effect.Deep
-
-[@@@ocaml.alert "-unsafe_multidomain"]
-[@@@ocaml.alert "-unsafe_parallelism"]
 
 let num_domains = 2
 

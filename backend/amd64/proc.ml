@@ -151,6 +151,13 @@ let calling_conventions
   let int = ref first_int in
   let float = ref first_float in
   let ofs = ref first_stack in
+  (* A negative offset indicates a domainstate slot, which will
+     generate unaligned moves. *)
+  let align ofs size =
+    if ofs <= -size then ofs
+    else if ofs <= 0 then 0
+    else Misc.align ofs size
+  in
   for i = 0 to Array.length arg - 1 do
     match (arg.(i) : machtype_component) with
     | Val | Int | Addr as ty ->
@@ -175,7 +182,7 @@ let calling_conventions
         loc.(i) <- phys_reg Vec128 !float;
         incr float
       end else begin
-        ofs := Misc.align !ofs 16;
+        ofs := align !ofs size_vec128;
         loc.(i) <- stack_slot (make_stack !ofs) Vec128;
         ofs := !ofs + size_vec128
       end
