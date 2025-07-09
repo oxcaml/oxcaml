@@ -22,6 +22,7 @@ let set (r : 'a atomic) v =
    arch_amd64;
    flambda;
    no-tsan;
+   no-frame_pointers;
 
    setup-ocamlopt.byte-build-env;
    flags = "-c -dcmm -dno-locations -dno-unique-ids";
