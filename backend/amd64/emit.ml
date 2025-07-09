@@ -43,6 +43,14 @@ module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
 
+module I = struct
+  include I
+
+  let simd simd args =
+    Arch.Extension.require_simd simd;
+    I.simd simd args
+end
+
 (** Turn a Linear label into an assembly label. The section is checked against the
     section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
@@ -72,10 +80,10 @@ let register_name typ r : X86_ast.arg =
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    Arch.Extension.require AVX;
     Regf ymm_reg_name.(r - 100)
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    Arch.Extension.require AVX512F;
     Regf zmm_reg_name.(r - 100)
 
 let phys_rax = phys_reg Int 0
@@ -329,10 +337,10 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   | Float -> REAL8
   | Vec128 -> VEC128
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    Arch.Extension.require AVX;
     VEC256
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    Arch.Extension.require AVX512F;
     VEC512
   | Valx2 -> VEC128
   | Int | Addr | Val -> QWORD
@@ -436,11 +444,11 @@ let must_save_simd_regs live =
     live;
   if !v512
   then (
-    Arch.Extension.require_vec512 ();
+    Arch.Extension.require AVX512F;
     Save_zmm)
   else if !v256
   then (
-    Arch.Extension.require_vec256 ();
+    Arch.Extension.require AVX;
     Save_ymm)
   else Save_xmm
 
@@ -1473,7 +1481,9 @@ let assert_loc (loc : Simd.loc) arg =
   | None -> ()
 
 let check_simd_instr (simd : Simd.instr) imm instr =
-  assert (Bool.equal simd.imm (Option.is_some imm));
+  (match simd.imm with
+  | Imm_none | Imm_reg -> assert (Option.is_none imm)
+  | Imm_spec -> assert (Option.is_some imm));
   Array.iteri
     (fun j (arg : Simd.arg) -> assert_loc arg.loc instr.arg.(j))
     simd.args;
@@ -1509,7 +1519,7 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit; _ } -> args
+    | First_arg | Res { enc = Implicit | Immediate; _ } -> args
     | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
       match Simd.loc_is_pinned loc with
       | Some _ -> args
