@@ -9572,7 +9572,7 @@ and type_let_def_wrap_warnings
                         warn
                           ((if !some_used then check_strict else check)
                             name !mutated)
-                      (* To reduce noise, don't issue an [unused-mutable]
+                      (* To reduce noise, don't issue an [unmutated-mutable]
                          warning with [unused-var] *)
                       else if mutable_ && not !mutated then
                         warn (check_mutable name)

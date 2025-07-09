@@ -573,7 +573,7 @@ let descriptions = [
                    (struct end) rather than to ().";
     since = since 5 1 };
   { number = 186;
-    names = ["unused-mutable"];
+    names = ["unmutated-mutable"];
     description =
     "Mutable variable was never mutated: mutable variable that\n\
     \    doesn't start with an underscore (\"_\") character was never mutated.";
