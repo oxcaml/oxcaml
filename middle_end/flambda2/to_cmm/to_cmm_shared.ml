@@ -474,16 +474,6 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
       let addr = strided_field_address symbol ~stride ~index dbg in
       store ~dbg memory_chunk Initialization ~addr ~new_value:field_value
   in
-  (* We dont need the `return_unit` part of the assignment/initialization
-
-     CR gury: we could instead add this simplification in `Cmm_helpers.sequence`
-     to remove unnecessary unit returns in between expressions that are
-     sequenced. *)
-  let cmm =
-    match[@warning "-4"] cmm with
-    | Csequence (cmm, Cconst_int (1, _)) -> cmm
-    | _ -> cmm
-  in
   match[@warning "-4"] field_value with
   | Cvar v ->
     let env = To_cmm_env.add_symbol_init env v cmm in
