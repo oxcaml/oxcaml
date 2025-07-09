@@ -154,6 +154,10 @@ module Name : sig
 
   val var : Variable.t -> t
 
+  val var_set : Variable.Set.t -> Set.t
+
+  val var_map : 'a Variable.Map.t -> 'a Map.t
+
   val symbol : Symbol.t -> t
 
   val pattern_match :
