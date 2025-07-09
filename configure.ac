@@ -2848,11 +2848,15 @@ AS_IF([test x"$enable_multidomain" = "xyes"],
     [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
 poll insertion enabled.])])], [])
 
-AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
-  #pragma GCC target ("arch=haswell")
-  #ifndef __BMI__
-  #  error BMI is not supported
-  #endif
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("bmi")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
 ]])], AC_DEFINE([HAS_BMI]), [])
 
 oc_cflags="$common_cflags $internal_cflags"
