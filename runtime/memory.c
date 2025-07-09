@@ -328,6 +328,7 @@ CAMLprim value caml_atomic_load (value ref)
   return caml_atomic_load_field(ref, Val_long(0));
 }
 
+
 /* stores are implemented as exchanges */
 CAMLprim value caml_atomic_exchange_field (value obj, value vfield, value v)
 {
@@ -349,6 +350,18 @@ CAMLprim value caml_atomic_exchange_field (value obj, value vfield, value v)
 CAMLprim value caml_atomic_exchange (value ref, value v)
 {
   return caml_atomic_exchange_field(ref, Val_long(0), v);
+}
+
+
+CAMLprim value caml_atomic_set_field (value ref, value vfield, value v)
+{
+  caml_atomic_exchange(ref, v);
+  return Val_unit;
+}
+
+CAMLprim value caml_atomic_set(value ref, value v)
+{
+  return caml_atomic_set_field(ref, Val_long(0), v);
 }
 
 CAMLprim value caml_atomic_compare_exchange_field (

@@ -49,8 +49,9 @@ let simplify_or_variable dacc type_for_const (or_variable : _ Or_variable.t)
 let rebuild_naked_number_array dacc ~bind_result_sym kind type_creator creator
     ~fields =
   let fields, field_tys =
+    let kind = KS.kind kind in
     List.map
-      (fun field -> simplify_or_variable dacc type_creator field K.naked_float)
+      (fun field -> simplify_or_variable dacc type_creator field kind)
       fields
     |> List.split
   in

@@ -42,7 +42,7 @@ module Witness = struct
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
-    | Arch_specific
+    | Arch_specific of Arch.specific_operation
     | Probe of
         { name : string;
           handler_code_sym : string
@@ -72,7 +72,9 @@ module Witness = struct
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
     | Extcall { callee } -> fprintf ppf "external call to %s" callee
-    | Arch_specific -> fprintf ppf "arch specific operation"
+    | Arch_specific op ->
+      fprintf ppf "architecture specific operation: %s"
+        (Arch.specific_operation_name op)
     | Probe { name; handler_code_sym } ->
       fprintf ppf "probe \"%s\" handler %s" name handler_code_sym
     | Widen -> fprintf ppf "widen"
@@ -1712,7 +1714,7 @@ end = struct
           ( Format.dprintf "called function may allocate%s (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
-        | Arch_specific | Probe _ ->
+        | Arch_specific _ | Probe _ ->
           ( Format.dprintf "expression may allocate%s@ (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
@@ -2216,7 +2218,7 @@ end = struct
     report t next ~msg:"transform_specific next" ~desc dbg;
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect =
-      let w = create_witnesses t Arch_specific dbg in
+      let w = create_witnesses t (Arch_specific s) dbg in
       match Metadata.assume_value dbg ~can_raise:false w with
       | Some v -> v
       | None ->

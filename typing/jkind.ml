@@ -1444,7 +1444,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+            ~separability:Non_float;
         name = "immediate_or_null"
       }
 
@@ -2423,6 +2423,24 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
+let for_or_null_argument ident =
+  let why =
+    History.Type_argument
+      { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation why)
+
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of *)
   let jkind = type_jkind_purely ty in
@@ -2736,6 +2754,18 @@ let apply_modality_r modality jk =
       (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+let apply_or_null jkind =
+  match Mod_bounds.nullability jkind.jkind.mod_bounds with
+  | Maybe_null ->
+    let jkind = set_nullability_upper_bound jkind Non_null in
+    let jkind =
+      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      | Maybe_separable -> jkind
+      | Separable | Non_float -> set_separability_upper_bound jkind Non_float
+    in
+    Ok jkind
+  | Non_null -> Error ()
 
 let get_annotation jk = jk.annotation
 

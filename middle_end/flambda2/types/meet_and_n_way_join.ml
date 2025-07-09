@@ -19,13 +19,14 @@ module K = Flambda_kind
 module MTC = More_type_creators
 module TG = Type_grammar
 module TE = Typing_env
+module ME = Meet_env
 module TEE = Typing_env_extension
 module TEL = Typing_env_level
 module Vec128 = Vector_types.Vec128.Bit_pattern
 module Vec256 = Vector_types.Vec256.Bit_pattern
 module Vec512 = Vector_types.Vec512.Bit_pattern
 
-type 'a meet_return_value = 'a TE.meet_return_value =
+type 'a meet_return_value = 'a ME.meet_return_value =
   | Left_input
   | Right_input
   | Both_inputs
@@ -57,7 +58,7 @@ let add_equation (simple : Simple.t) ty_of_simple env ~meet_type :
     let ty_of_name =
       TG.apply_coercion ty_of_simple coercion_from_simple_to_name
     in
-    match TE.add_equation_strict env name ty_of_name ~meet_type with
+    match ME.add_equation_strict env name ty_of_name ~meet_type with
     | Ok env -> Ok (New_result (), env)
     | Bottom -> Bottom (New_result ())
   in
@@ -299,7 +300,7 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
         let level = TE.cut scoped_env ~cut_after:join_scope in
         let initial_env = add_defined_vars initial_env level in
         let ext = TEE.from_map (TEL.equations level) in
-        TE.add_env_extension_strict initial_env ext ~meet_type)
+        ME.add_env_extension_strict initial_env ext ~meet_type)
   in
   let env_a, env_b = Or_bottom.Ok env, Or_bottom.Ok env in
   let env_a, env_b =
@@ -307,18 +308,18 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     | No_extensions -> env_a, env_b
     | Ext { when_a; when_b } ->
       ( Or_bottom.bind env_a ~f:(fun env ->
-            TE.add_env_extension_strict env when_a ~meet_type),
+            ME.add_env_extension_strict env when_a ~meet_type),
         Or_bottom.bind env_b ~f:(fun env ->
-            TE.add_env_extension_strict env when_b ~meet_type) )
+            ME.add_env_extension_strict env when_b ~meet_type) )
   in
   let env_a, env_b =
     match extensions2 with
     | No_extensions -> env_a, env_b
     | Ext { when_a; when_b } ->
       ( Or_bottom.bind env_a ~f:(fun env ->
-            TE.add_env_extension_strict env when_a ~meet_type),
+            ME.add_env_extension_strict env when_a ~meet_type),
         Or_bottom.bind env_b ~f:(fun env ->
-            TE.add_env_extension_strict env when_b ~meet_type) )
+            ME.add_env_extension_strict env when_b ~meet_type) )
   in
   let a_result : _ meet_result =
     match env_a with
@@ -1368,11 +1369,11 @@ and meet_row_like :
       | Ok (maps_to_result, env) -> (
         let env : _ Or_bottom.t =
           match
-            TE.add_env_extension_strict env case1.env_extension ~meet_type
+            ME.add_env_extension_strict env case1.env_extension ~meet_type
           with
           | Bottom -> Bottom
           | Ok env ->
-            TE.add_env_extension_strict env case2.env_extension ~meet_type
+            ME.add_env_extension_strict env case2.env_extension ~meet_type
         in
         match env with
         | Bottom -> bottom_case (New_result ())
@@ -1423,7 +1424,7 @@ and meet_row_like :
         match case1 with
         | Unknown -> (
           match
-            TE.add_env_extension_strict base_env other_case.env_extension
+            ME.add_env_extension_strict base_env other_case.env_extension
               ~meet_type
           with
           | Bottom -> None
@@ -1442,7 +1443,7 @@ and meet_row_like :
         match case2 with
         | Unknown -> (
           match
-            TE.add_env_extension_strict base_env other_case.env_extension
+            ME.add_env_extension_strict base_env other_case.env_extension
               ~meet_type
           with
           | Bottom -> None
@@ -1459,7 +1460,7 @@ and meet_row_like :
         Some Unknown
       | Known case, Unknown -> (
         match
-          TE.add_env_extension_strict base_env case.env_extension ~meet_type
+          ME.add_env_extension_strict base_env case.env_extension ~meet_type
         with
         | Bottom -> None
         | Ok env ->
@@ -1468,7 +1469,7 @@ and meet_row_like :
           Some (Known case))
       | Unknown, Known case -> (
         match
-          TE.add_env_extension_strict base_env case.env_extension ~meet_type
+          ME.add_env_extension_strict base_env case.env_extension ~meet_type
         with
         | Bottom -> None
         | Ok env ->

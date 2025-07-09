@@ -553,7 +553,7 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         Continuation.print cont
   in
   let handler, uacc =
-    Variable.Map.fold
+    Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
         let bound_pattern =
           Bound_pattern.singleton (Bound_var.create var Name_mode.normal)

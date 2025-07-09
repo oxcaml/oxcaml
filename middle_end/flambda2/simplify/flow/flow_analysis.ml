@@ -187,7 +187,7 @@ let added_useful_alias_in_loop typing_env (acc : T.Acc.t)
           "[Flow Analysis]: Mismatch beetween continuation maps for source \
            info and continuation params alias result";
       continuation_info.recursive
-      && Variable.Map.exists
+      && Variable.Lmap.exists
            (fun _var bound_to ->
              Simple.pattern_match' bound_to
                ~const:(fun _ -> true)

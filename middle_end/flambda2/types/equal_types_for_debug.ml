@@ -17,6 +17,7 @@ module TE = Typing_env
 module TEE = Typing_env_extension
 module TG = Type_grammar
 module ET = Expand_head.Expanded_type
+module ME = Meet_env
 
 type renaming =
   { mutable left_renaming : Variable.t Variable.Map.t;
@@ -43,7 +44,7 @@ type env =
   { parent_env : TE.t;
     left_env : TE.t;
     right_env : TE.t;
-    meet_type : TE.meet_type;
+    meet_type : ME.meet_type;
     renaming : renaming
   }
 
@@ -54,12 +55,12 @@ let extension_env env left_env right_env = { env with left_env; right_env }
 
 let add_env_extension env ext1 ext2 =
   extension_env env
-    (TE.add_env_extension ~meet_type:env.meet_type env.left_env ext1)
-    (TE.add_env_extension ~meet_type:env.meet_type env.right_env ext2)
+    (ME.add_env_extension ~meet_type:env.meet_type env.left_env ext1)
+    (ME.add_env_extension ~meet_type:env.meet_type env.right_env ext2)
 
 let add_env_extension_strict env ext1 ext2 =
-  ( TE.add_env_extension_strict ~meet_type:env.meet_type env.left_env ext1,
-    TE.add_env_extension_strict ~meet_type:env.meet_type env.right_env ext2 )
+  ( ME.add_env_extension_strict ~meet_type:env.meet_type env.left_env ext1,
+    ME.add_env_extension_strict ~meet_type:env.meet_type env.right_env ext2 )
 
 let exists_in_parent_env env name =
   TE.mem ~min_name_mode:Name_mode.in_types env.parent_env name
@@ -127,9 +128,9 @@ let equal_env_extension ~equal_type env ext1 ext2 =
 let equal_row_like_case ~equal_type ~equal_maps_to ~equal_lattice ~equal_shape
     env (t1 : (_, _, _) TG.row_like_case) (t2 : (_, _, _) TG.row_like_case) =
   match
-    ( TE.add_env_extension_strict env.left_env t1.env_extension
+    ( ME.add_env_extension_strict env.left_env t1.env_extension
         ~meet_type:env.meet_type,
-      TE.add_env_extension_strict env.right_env t2.env_extension
+      ME.add_env_extension_strict env.right_env t2.env_extension
         ~meet_type:env.meet_type )
   with
   | Or_bottom.Bottom, Or_bottom.Bottom -> true

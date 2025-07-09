@@ -1681,7 +1681,7 @@ let binary_primitive_eligible_for_cse p =
        floating-point arithmetic operations. See also the comment in
        effects_and_coeffects of unary primitives. *)
     Flambda_features.float_const_prop ()
-  | Atomic_load_field _ | Poke _ -> false
+  | Atomic_load_field (Any_value | Immediate) | Poke _ -> false
 
 let compare_binary_primitive p1 p2 =
   let binary_primitive_numbering p =
@@ -1822,7 +1822,7 @@ let args_kind_of_binary_primitive p =
   | Float_arith (Float32, _) | Float_comp (Float32, _) ->
     K.naked_float32, K.naked_float32
   | Bigarray_get_alignment _ -> bigstring_kind, K.naked_immediate
-  | Atomic_load_field _ -> K.value, K.value
+  | Atomic_load_field (Any_value | Immediate) -> K.value, K.value
   | Poke kind -> K.naked_nativeint, K.Standard_int_or_float.to_kind kind
 
 let result_kind_of_binary_primitive p : result_kind =
@@ -1845,7 +1845,7 @@ let result_kind_of_binary_primitive p : result_kind =
   | Float_arith (Float32, _) -> Singleton K.naked_float32
   | Phys_equal _ | Int_comp _ | Float_comp _ -> Singleton K.naked_immediate
   | Bigarray_get_alignment _ -> Singleton K.naked_immediate
-  | Atomic_load_field _ -> Singleton K.value
+  | Atomic_load_field (Any_value | Immediate) -> Singleton K.value
   | Poke _ -> Unit
 
 let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
@@ -1874,7 +1874,8 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
     then No_effects, No_coeffects, Strict
     else No_effects, Has_coeffects, Strict
   | Bigarray_get_alignment _ -> No_effects, No_coeffects, Strict
-  | Atomic_load_field _ -> Arbitrary_effects, Has_coeffects, Strict
+  | Atomic_load_field (Any_value | Immediate) ->
+    Arbitrary_effects, Has_coeffects, Strict
   | Poke _ -> Arbitrary_effects, No_coeffects, Strict
 
 let binary_classify_for_printing p =
@@ -1945,12 +1946,18 @@ type quaternary_primitive =
 let ternary_primitive_eligible_for_cse p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _
+  | Atomic_set_field (Immediate | Any_value)
+  | Atomic_exchange_field (Immediate | Any_value) ->
     false
 
 let quaternary_primitive_eligible_for_cse p =
   match p with
-  | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ -> false
+  | Atomic_compare_and_set_field (Immediate | Any_value)
+  | Atomic_compare_exchange_field
+      { atomic_kind = Immediate | Any_value; args_kind = Immediate | Any_value }
+    ->
+    false
 
 let compare_ternary_primitive p1 p2 =
   let ternary_primitive_numbering p =
@@ -2084,12 +2091,17 @@ let args_kind_of_ternary_primitive p =
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_vec128
   | Bigarray_set (_, kind, _) ->
     bigarray_kind, bigarray_index_kind, Bigarray_kind.element_kind kind
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _
+  | Atomic_set_field (Immediate | Any_value)
+  | Atomic_exchange_field (Immediate | Any_value) ->
     K.value, K.value, K.value
 
 let args_kind_of_quaternary_primitive p =
   match p with
-  | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ ->
+  | Atomic_compare_and_set_field (Immediate | Any_value)
+  | Atomic_compare_exchange_field
+      { atomic_kind = Immediate | Any_value; args_kind = Immediate | Any_value }
+    ->
     K.value, K.value, K.value, K.value
 
 let result_kind_of_ternary_primitive p : result_kind =

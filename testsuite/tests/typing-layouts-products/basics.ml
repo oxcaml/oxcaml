@@ -799,12 +799,12 @@ class class_with_urecord_manipulating_method :
 (*******************************************)
 (* Test 6: Nested expansion in kind checks *)
 
-(* This test shows that the [check_coherence] check in Typedecl can look deeply
-   into a product kind. That check is reached in this case because the
-   algorithm in typedecl assumes the annotation is correct initially, and then
-   it is checked in [check_coherence]. This relies on [type_jkind] doing
-   deep expansion, as [check_coherence] calls it and then [Jkind.sub], rather
-   than using [check_type_jkind]. *)
+(* This test shows that the [narrow_to_manifest_jkind] check in Typedecl can
+   look deeply into a product kind. That check is reached in this case because
+   the algorithm in typedecl assumes the annotation is correct initially, and
+   then it is checked in [narrow_to_manifest_jkind]. This relies on [type_jkind]
+   doing deep expansion, as [narrow_to_manifest_jkind] calls it and then
+   [Jkind.sub], rather than using [check_type_jkind]. *)
 module type S_coherence_deep = sig
   type t1 : any
   type t2 = #(int * t1)

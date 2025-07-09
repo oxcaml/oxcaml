@@ -210,6 +210,11 @@ let mk_function_layout f =
   (Printf.sprintf " Order of functions in the generated assembly (default: %s)"
      default)
 
+let mk_disable_builtin_check f =
+  "-disable-builtin-check", Arg.Unit f,
+  " If an external annotated with [@@builtin] is not recognized, \
+    fall back to the corresponding C stub, instead of compilation error."
+
 let mk_disable_poll_insertion f =
   "-disable-poll-insertion", Arg.Unit f, " Do not insert poll points"
 
@@ -788,6 +793,7 @@ module type Oxcaml_options = sig
   val zero_alloc_checker_join : int -> unit
 
   val function_layout : string -> unit
+  val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
   val enable_poll_insertion : unit -> unit
 
@@ -927,6 +933,7 @@ struct
     mk_zero_alloc_checker_join F.zero_alloc_checker_join;
 
     mk_function_layout F.function_layout;
+    mk_disable_builtin_check F.disable_builtin_check;
     mk_disable_poll_insertion F.disable_poll_insertion;
     mk_enable_poll_insertion F.enable_poll_insertion;
 
@@ -1142,6 +1149,7 @@ module Oxcaml_options_impl = struct
     | Some layout ->
       Oxcaml_flags.function_layout := layout
 
+  let disable_builtin_check = set' Oxcaml_flags.disable_builtin_check
   let disable_poll_insertion = set' Oxcaml_flags.disable_poll_insertion
   let enable_poll_insertion = clear' Oxcaml_flags.disable_poll_insertion
 
@@ -1477,8 +1485,10 @@ module Extra_params = struct
          raise
            (Arg.Bad
               (Printf.sprintf "Unexpected value %s for %s" v name)))
+    | "builtin-check" -> set' Oxcaml_flags.disable_builtin_check
     | "poll-insertion" -> set' Oxcaml_flags.disable_poll_insertion
-    | "symbol-visibility-protected" -> set' Oxcaml_flags.disable_poll_insertion
+    | "symbol-visibility-protected" ->
+      set' Oxcaml_flags.symbol_visibility_protected
     | "long-frames" -> set' Oxcaml_flags.allow_long_frames
     | "debug-long-frames-threshold" ->
       begin match Compenv.check_int ppf name v with
