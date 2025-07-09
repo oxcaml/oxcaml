@@ -545,6 +545,10 @@ module Name = struct
 
   let var v = v
 
+  let var_set s = s
+
+  let var_map m = m
+
   let symbol s = s
 
   let[@inline always] pattern_match t ~var ~symbol =

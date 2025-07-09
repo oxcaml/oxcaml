@@ -121,6 +121,7 @@ let classify env ty : classification =
       else if Path.same p Predef.path_string
               || Path.same p Predef.path_bytes
               || Path.same p Predef.path_array
+              || Path.same p Predef.path_iarray
               || Path.same p Predef.path_nativeint
               || Path.same p Predef.path_int32
               || Path.same p Predef.path_int64
