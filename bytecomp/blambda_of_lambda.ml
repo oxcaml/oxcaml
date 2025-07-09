@@ -675,8 +675,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
-    | Patomic_set_field _ | Patomic_exchange_field _ ->
-      ternary (Ccall "caml_atomic_exchange_field")
+    | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
     | Patomic_compare_exchange_field _ ->
       n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
     | Patomic_compare_set_field _ ->

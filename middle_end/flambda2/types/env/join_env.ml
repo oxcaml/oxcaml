@@ -16,6 +16,7 @@
 module K = Flambda_kind
 module TG = Type_grammar
 module TE = Typing_env
+module ME = Meet_env
 module TEE = Typing_env_extension
 module TEL = Typing_env_level
 module ET = Expand_head.Expanded_type
@@ -1203,13 +1204,13 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
           let simple = (simple :> Simple.t) in
           let kind = TG.kind (TE.find target_env name None) in
           let ty = TG.alias_type_of kind simple in
-          TE.add_equation ~meet_type target_env name ty)
+          ME.add_equation ~meet_type target_env name ty)
         demoted_in_target_env target_env
     in
     let target_env =
       Name_in_target_env.Map.fold
         (fun name ty target_env ->
-          TE.add_equation ~meet_type target_env (name :> Name.t) ty)
+          ME.add_equation ~meet_type target_env (name :> Name.t) ty)
         equations target_env
     in
     let target_env =
@@ -1236,7 +1237,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
         assert (not (TE.is_bottom parent_env));
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
-        match TE.add_env_extension_strict ~meet_type typing_env extension with
+        match ME.add_env_extension_strict ~meet_type typing_env extension with
         | Bottom ->
           (* We can reach bottom here if the extension was created in a more
              generic context, but is added in a context where it is no longer

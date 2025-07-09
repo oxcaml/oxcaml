@@ -31,14 +31,14 @@ type n_way_join_type =
 
 val n_way_join_env_extension :
   n_way_join_type:n_way_join_type ->
-  meet_type:Typing_env.meet_type ->
+  meet_type:Meet_env.meet_type ->
   t ->
   Typing_env_extension.t join_arg list ->
   (Typing_env_extension.t * t) Or_bottom.t
 
 val cut_and_n_way_join :
   n_way_join_type:n_way_join_type ->
-  meet_type:Typing_env.meet_type ->
+  meet_type:Meet_env.meet_type ->
   cut_after:Scope.t ->
   Typing_env.t ->
   Typing_env.t list ->

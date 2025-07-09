@@ -60,10 +60,9 @@ val approx_type_decl:
 val check_recmod_typedecl:
     Env.t -> Location.t -> Ident.t list -> Path.t -> type_declaration -> unit
 
-(* Returns an updated decl that may include improved jkind estimates, but it's
-   sound to throw it away. *)
+(* Checks that constraints are respected in the [type_declaration] *)
 val check_coherence:
-    Env.t -> Location.t -> Path.t -> type_declaration -> type_declaration
+    Env.t -> Location.t -> Path.t -> type_declaration -> unit
 
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
