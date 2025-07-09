@@ -1082,6 +1082,7 @@ let maybe_pmod_constraint mode expr =
 %token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
+%token <string> GENOPTLABEL   ".?label:" (* just an example *)
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
@@ -2709,10 +2710,10 @@ labeled_simple_pattern:
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
-  | mkrhs(mod_longident) DOT OPTLABEL LPAREN let_pattern opt_default RPAREN
-      { (generic_optional $1 $3 $sloc, $6, $5) }
-  | mkrhs(mod_longident) DOT OPTLABEL pattern_var
-      { (generic_optional $1 $3 $sloc, None, $4) }
+  | mkrhs(mod_longident) GENOPTLABEL LPAREN let_pattern opt_default RPAREN
+      { (generic_optional $1 $2 $sloc, $5, $4) }
+  | mkrhs(mod_longident) GENOPTLABEL pattern_var
+      { (generic_optional $1 $2 $sloc, None, $3) }
   | TILDE LPAREN label_let_pattern RPAREN
       { (Labelled (fst $3), None, snd $3) }
   | TILDE label_var
@@ -3191,8 +3192,8 @@ labeled_simple_expr:
         (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
-  | mkrhs(mod_longident) DOT OPTLABEL simple_expr %prec below_HASH
-      { (generic_optional $1 $3 $sloc, $4) }
+  | mkrhs(mod_longident) GENOPTLABEL simple_expr %prec below_HASH
+      { (generic_optional $1 $2 $sloc, $3) }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -4533,6 +4534,8 @@ strict_function_or_labeled_tuple_type:
 %inline strict_arg_label:
   | label = optlabel
       { Optional label }
+  | mkrhs(mod_ext_longident) GENOPTLABEL
+      { generic_optional $1 $2 $sloc}
   | mkrhs(mod_ext_longident) DOT QUESTION LIDENT COLON
       { generic_optional $1 $4 $sloc}
 // (* CR-someday generic-optional: Somehow
