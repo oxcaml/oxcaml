@@ -4,7 +4,11 @@ export ARCH
 
 boot_ocamlc = main_native.exe
 boot_ocamlopt = boot_ocamlopt.exe
+<<<<<<< HEAD
 boot_ocamlj = boot_ocamlj.exe
+=======
+boot_ocamlj = jsmain_native.exe
+>>>>>>> db0a8b49d6 (Create ocamlj executable)
 boot_ocamlmklib = tools/ocamlmklib.exe
 boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe
