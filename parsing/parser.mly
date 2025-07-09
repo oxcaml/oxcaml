@@ -1093,6 +1093,7 @@ let maybe_pmod_constraint mode expr =
 %token <string> PREFIXOP      "!+" (* chosen with care; see above *)
 %token PRIVATE                "private"
 %token QUESTION               "?"
+%token DOTQUESTION            ".?"
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
@@ -2702,10 +2703,10 @@ labeled_simple_pattern:
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
-  | mkrhs(mod_longident) DOT QUESTION LPAREN label_let_pattern opt_default RPAREN
-      { (generic_optional $1 (fst $5) $sloc, $6, (snd $5)) }
-  | mkrhs(mod_longident) DOT QUESTION label_var
-      { (generic_optional $1 (fst $4) $sloc, None, snd $4) }
+  | mkrhs(mod_longident) DOTQUESTION LPAREN label_let_pattern opt_default RPAREN
+      { (generic_optional $1 (fst $4) $sloc, $5, (snd $4)) }
+  | mkrhs(mod_longident) DOTQUESTION label_var
+      { (generic_optional $1 (fst $3) $sloc, None, snd $3) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
@@ -3187,7 +3188,7 @@ labeled_simple_expr:
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
-  | mod_path = mkrhs(mod_longident) DOT QUESTION label = LIDENT
+  | mod_path = mkrhs(mod_longident) DOTQUESTION label = LIDENT
       { let loc = $loc(label) in
         (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
@@ -4536,8 +4537,8 @@ strict_function_or_labeled_tuple_type:
       { Optional label }
   | mkrhs(mod_ext_longident) GENOPTLABEL
       { generic_optional $1 $2 $sloc}
-  | mkrhs(mod_ext_longident) DOT QUESTION LIDENT COLON
-      { generic_optional $1 $4 $sloc}
+  | mkrhs(mod_ext_longident) DOTQUESTION LIDENT COLON
+      { generic_optional $1 $3 $sloc}
 // (* CR-someday generic-optional: Somehow
 //    I conjecture this is the ONLY RULE we need. TODO investigate. *)
   | label = LIDENT COLON

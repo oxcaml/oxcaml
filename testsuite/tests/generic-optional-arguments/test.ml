@@ -12,13 +12,13 @@ end
 
 (* Implementation *)
 module M : S = struct
-let concat Stdlib.Option.?(sep : string <- " ") xs =
+let concat Stdlib.Option.?(sep : string = " ") xs =
   String.concat sep xs
 end
 
 (* Usage *)
 let default_concat ys = M.concat ys
-let comma_concat zs = M.concat ~sep:(Some ",") zs
+let comma_concat zs = M.concat ~sep:"," zs
 let chain_call Stdlib.Option.?(sep : string option) arg = M.concat Stdlib.Option.?sep arg
 
 let () =

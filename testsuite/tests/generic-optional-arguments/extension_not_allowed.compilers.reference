@@ -1,5 +1,5 @@
-File "extension_not_allowed.ml", line 19, characters 39-42:
-19 |   let concat ?'(sep : string option <- " ") xs =
-                                            ^^^
-Error: This expression has type "string" but an expression was expected of type
-         "string option"
+File "extension_not_allowed.ml", line 12, characters 15-28:
+12 |   val concat : Stdlib.Option.?sep:string -> string list -> string
+                    ^^^^^^^^^^^^^
+Error: The generic_optional_arguments extension is disabled
+       To enable it, pass the '-extension generic_optional_arguments' flag

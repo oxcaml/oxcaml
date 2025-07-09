@@ -8,4 +8,5 @@
  check-ocamlc.byte-output;
 *)
 
-let chain_call Stdlib.Option.?(sep) arg = String.concat sep arg
+let chain_call Stdlib.Option.?(sep) arg =
+  String.concat (match sep with None -> " " | Some s -> s) arg

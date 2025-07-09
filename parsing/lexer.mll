@@ -589,6 +589,8 @@ rule token = parse
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf;
         OPTLABEL name }
+  | ".?"
+      { DOTQUESTION }
   | ".?" raw_ident_escape (lowercase identchar * as name) ':'
       { GENOPTLABEL name }
   | ".?" (lowercase identchar * as name) ':'
