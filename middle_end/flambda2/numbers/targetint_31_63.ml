@@ -37,7 +37,8 @@ module T0 = struct
 
   let max_value = Targetint_32_64.max_int
 
-  let bottom_byte_to_int t = Targetint_32_64.to_int (Targetint_32_64.logand t hex_ff)
+  let bottom_byte_to_int t =
+    Targetint_32_64.to_int (Targetint_32_64.logand t hex_ff)
 
   let xor = Targetint_32_64.logxor
 
@@ -85,7 +86,8 @@ module T0 = struct
     let least_significant_byte = Targetint_32_64.logand t hex_ff in
     let second_to_least_significant_byte =
       Targetint_32_64.shift_right_logical
-        (Targetint_32_64.logand t (Targetint_32_64.of_int 0xff00)) 8
+        (Targetint_32_64.logand t (Targetint_32_64.of_int 0xff00))
+        8
     in
     Targetint_32_64.logor second_to_least_significant_byte
       (Targetint_32_64.shift_left least_significant_byte 8)
