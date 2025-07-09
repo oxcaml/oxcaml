@@ -1644,7 +1644,7 @@ let report_error env ppf =
         | Labelled _ -> assert false )
   | Invalid_generic_optional_argument_module_path lid ->
       fprintf ppf
-        "Unsupported generic optional argument module path: %a"
+        "Invalid generic optional argument module path: %a"
         (Style.as_inline_code longident) lid
 
 

@@ -1,0 +1,13 @@
+(* TEST
+ flags = "-extension-universe alpha";
+
+ setup-ocamlc.byte-build-env;
+ ocamlc_byte_exit_status = "2";
+ ocamlc.byte;
+ check-ocamlc.byte-output;
+*)
+
+(* Interface *)
+module type S = sig
+  val concat : Non_existent.?sep:string -> string list -> string
+end
