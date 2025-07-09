@@ -415,7 +415,6 @@ let relevant_axes_of_modality ~relevant_for_shallow ~modality =
          mode-crossing. In the future, we may want to complexify the modal-kinds
          setup to allow for more mode-crossing in the presence of non-constant
          non-identity modalities. *)
-      | Nonmodal Externality -> true
       | Nonmodal Nullability -> (
         match relevant_for_shallow with
         | `Relevant -> true
@@ -552,7 +551,6 @@ module Mod_bounds = struct
     | Modal (Comonadic Statefulness) -> statefulness t
     | Modal (Monadic Visibility) -> visibility t
     | Modal (Comonadic Externality) -> externality_mod t
-    | Nonmodal Externality -> failwith "RM" (* CR jcutler fixme*)
     | Nonmodal Nullability -> nullability t
     | Nonmodal Separability -> separability t
 
@@ -2673,7 +2671,7 @@ let to_unsafe_mode_crossing jkind =
   }
 
 let all_except_externality =
-  Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
+  Axis_set.singleton (Modal (Comonadic Externality)) |> Axis_set.complement
 
 let get_externality_upper_bound ~jkind_of_type jk =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
