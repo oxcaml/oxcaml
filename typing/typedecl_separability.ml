@@ -485,13 +485,14 @@ let msig_of_external_type env decl =
     Result.is_error (Ctype.check_decl_jkind env decl
                         (Jkind.Builtin.value_or_null ~why:Separability_check))
   in
-  let jkind_of_type = Ctype.type_jkind_purely_if_principal env in
-  let is_external =
+  (* CR jcutler: this is now slightly more pessamistic. Unclaer if it's the right choice. *)
+  (* let jkind_of_type = Ctype.type_jkind_purely_if_principal env in *)
+  (* let is_external =
     match Jkind.get_externality_upper_bound ~jkind_of_type decl.type_jkind with
     | Internal -> false
     | External | External64 -> true
-  in
-  if is_not_value_or_null || is_external then best_msig decl else worst_msig decl
+  in *)
+  if is_not_value_or_null then best_msig decl else worst_msig decl
 
 (** [msig_of_context ~decl_loc constructor context] returns the
    separability signature of a single-constructor type whose

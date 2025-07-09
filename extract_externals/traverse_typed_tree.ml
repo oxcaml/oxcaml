@@ -71,7 +71,7 @@ let scrape_poly env ty =
 
 (* See [scrape_ty]; this returns the [type_desc] of a scraped [type_expr]. *)
 let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
+  let ext : Jkind_mod_bounds.Externality_mod.t =
     (* We check that we're compiling to (64-bit) native code before counting
        External64 types as gc_ignorable, because bytecode is intended to be
        platform independent. *)

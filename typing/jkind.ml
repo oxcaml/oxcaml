@@ -351,7 +351,7 @@ module Layout = struct
     pp_element ~nested:false ppf layout
 end
 
-module Externality = Jkind_axis.Externality
+(* module Externality = Jkind_axis.Externality *)
 module Nullability = Nullability
 module Separability = Jkind_axis.Separability
 
@@ -2682,7 +2682,7 @@ let get_externality_upper_bound ~jkind_of_type jk =
     Layout_and_axes.normalize ~mode:Ignore_best
       ~skip_axes:all_except_externality ~jkind_of_type jk.jkind
   in
-  Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
+  Mod_bounds.get mod_bounds ~axis:(Modal (Comonadic Externality))
 
 let set_externality_upper_bound jk externality_upper_bound =
   { jk with
