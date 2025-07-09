@@ -86,12 +86,8 @@ module T0 = struct
     let least_significant_byte = Targetint_32_64.logand t hex_ff in
     let second_to_least_significant_byte =
       Targetint_32_64.shift_right_logical
-<<<<<<< HEAD
         (Targetint_32_64.logand t (Targetint_32_64.of_int 0xff00))
         8
-=======
-        (Targetint_32_64.logand t (Targetint_32_64.of_int 0xff00)) 8
->>>>>>> 27140e0ad9 (Enable 32-bit support for Targetint_31_63)
     in
     Targetint_32_64.logor second_to_least_significant_byte
       (Targetint_32_64.shift_left least_significant_byte 8)
