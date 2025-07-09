@@ -575,8 +575,8 @@ let descriptions = [
   { number = 186;
     names = ["unused-mutable"];
     description =
-    "Variable does not need to be mutable: mutable variable that\n\
-    \    doesn't start with an underscore (\"_\") character.";
+    "Mutable variable was never mutated: mutable variable that\n\
+    \    doesn't start with an underscore (\"_\") character was never mutated.";
     since = since 5 2 };
   { number = 187;
     names = ["incompatible-with-upstream"];
@@ -1226,7 +1226,7 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
-  | Unused_mutable v -> "variable " ^ v ^ " does not need to be mutable."
+  | Unused_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
       "Usage of layout immediate/immediate64 in %s \n\
