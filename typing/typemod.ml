@@ -3322,7 +3322,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode sstr =
+and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
+  sstr =
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
   Option.iter (fun x -> Value.submode md_mode x |> ignore)
