@@ -155,13 +155,13 @@ Error: Signature mismatch:
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        is not included in
          sig
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        Values do not match:
          val x : 'a -> 'a (* in a structure at nonportable *)
        is not included in
@@ -176,13 +176,13 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* in a structure at nonportable *)
+         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at nonportable *)
        is not included in
          sig
            val y : int ref
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        Values do not match:
          val x : 'a -> 'a (* in a structure at nonportable *)
        is not included in
@@ -316,9 +316,9 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ stateless contended end (* in a structure at uncontended *)
+         sig val x : string ref @@ stateless contended end (* at uncontended *)
        is not included in
-         sig val x : string ref end (* in a structure at uncontended *)
+         sig val x : string ref end (* at uncontended *)
        Values do not match:
          val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
@@ -331,9 +331,9 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ contended end (* in a structure at uncontended *)
+         sig val x : string ref @@ contended end (* at uncontended *)
        is not included in
-         sig val x : string ref end (* in a structure at uncontended *)
+         sig val x : string ref end (* at uncontended *)
        Values do not match:
          val x : string ref @@ contended (* in a structure at uncontended *)
        is not included in
@@ -477,11 +477,11 @@ Error: Signature mismatch:
          sig
            val x : 'a -> 'a @@ stateless nonportable
            external length : string -> int = "%string_length"
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        is not included in
          sig
            external length : string -> int @@ portable = "%string_length"
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        Values do not match:
          external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
@@ -597,18 +597,18 @@ Error: Signature mismatch:
            module Plain : sig val f : int -> int end
            module type S_plain =
              sig module M : sig val f : int -> int end end
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        is not included in
          sig
            module Plain : sig val f : int -> int @@ portable end
            module type S_plain =
              sig module M : sig val f : int -> int @@ portable end end
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        In module "Plain":
        Modules do not match:
-         sig val f : int -> int end (* in a structure at nonportable *)
+         sig val f : int -> int end (* at nonportable *)
        is not included in
-         sig val f : int -> int @@ portable end (* in a structure at nonportable *)
+         sig val f : int -> int @@ portable end (* at nonportable *)
        In module "Plain":
        Values do not match:
          val f : int -> int (* in a structure at nonportable *)
@@ -694,12 +694,12 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val t : [> `Foo ] @@ stateless nonportable end (* in a structure at nonportable *)
+         sig val t : [> `Foo ] @@ stateless nonportable end (* at nonportable *)
        is not included in
          sig
            val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
              portable
-         end (* in a structure at nonportable *)
+         end (* at nonportable *)
        Values do not match:
          val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
@@ -1427,9 +1427,9 @@ Lines 8-10, characters 20-3:
 10 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ stateless nonportable end (* in a structure at nonportable *)
+         sig val f : 'a -> 'a @@ stateless nonportable end (* at nonportable *)
        is not included in
-         sig val f : 'a -> 'a @@ portable end (* in a structure at nonportable *)
+         sig val f : 'a -> 'a @@ portable end (* at nonportable *)
        Values do not match:
          val f : 'a -> 'a @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
@@ -1454,9 +1454,9 @@ Lines 3-5, characters 17-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ stateless nonportable end (* in a structure at nonportable *)
+         sig val f : 'a -> 'a @@ stateless nonportable end (* at nonportable *)
        is not included in
-         sig val f : 'a -> 'a end (* in a structure at portable *)
+         sig val f : 'a -> 'a end (* at portable *)
        Values do not match:
          val f : 'a -> 'a @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
@@ -1494,9 +1494,9 @@ Line 2, characters 12-13:
                 ^
 Error: Signature mismatch:
        Modules do not match:
-         sig class foo : object  end end (* in a structure at nonportable *)
+         sig class foo : object  end end (* at nonportable *)
        is not included in
-         sig class foo : object  end end (* in a structure at portable *)
+         sig class foo : object  end end (* at portable *)
        Class declarations foo do not match:
        First is "nonportable" but second is "portable".
 |}]

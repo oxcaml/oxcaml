@@ -46,6 +46,9 @@ module Error = struct
     got:'a;
     expected:'a;
     modes:Includecore.mmodes;
+    (** For module inclusion check, this is the mode of the modules. For
+    signature items, this is the mode of the enclosing structure. *)
+
     symptom:'b
   }
   type ('a,'b) diff = {got:'a; expected:'a; symptom:'b}

@@ -287,10 +287,13 @@ let zap_axis_to_ceil
       Mode.Visibility.zap_to_ceil (Mode.Value.proj (Monadic Visibility) m)
 
 let print_out_mode
-: type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> a -> _
-= fun ax mode ->
+: type a d0 d1. ?in_structure:_ -> (a, d0, d1) Mode.Value.Axis.t -> a -> _
+= fun ?(in_structure=true) ax mode ->
   let (module L) = Mode.Value.Const.lattice_of_axis ax in
-  Format.dprintf " (* in a structure at %a *)" L.print mode
+  if in_structure then
+    Format.dprintf " (* in a structure at %a *)" L.print mode
+  else
+    Format.dprintf " (* at %a *)" L.print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with
@@ -304,7 +307,7 @@ let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
       in
       print_out_mode ax mode
 
-let print_modes ax (modes : Includemod.modes) =
+let print_modes ?in_structure ax (modes : Includemod.modes) =
   let (P ax) : Mode.Value.Axis.packed = ax in
   let mode1, mode2 =
     match modes with
@@ -320,12 +323,12 @@ let print_modes ax (modes : Includemod.modes) =
     mode2
     |> zap_axis_to_ceil ax
   in
-  print_out_mode ax mode1, print_out_mode ax mode2
+  print_out_mode ?in_structure ax mode1, print_out_mode ?in_structure ax mode2
 
-let maybe_print_modes ~is_modal (modes : Includemod.modes) =
+let maybe_print_modes ?in_structure ~is_modal (modes : Includemod.modes) =
   match is_modal with
   | None -> (fun _ppf -> ()), (fun _ppf -> ())
-  | Some ax -> print_modes ax modes
+  | Some ax -> print_modes ?in_structure ax modes
 
 (**
    In order to display a list of functor arguments in a compact format,
@@ -833,7 +836,7 @@ let missing_field ppf item =
 
 let module_types {Err.got=mty1; expected=mty2; modes; symptom}=
   let is_modal = Is_modal.module_type_symptom symptom in
-  let mode1, mode2 = maybe_print_modes ~is_modal modes in
+  let mode1, mode2 = maybe_print_modes ~in_structure:false ~is_modal modes in
   Format.dprintf
     "@[<hv 2>Modules do not match:@ \
      %a%t@;<1 -2>is not included in@ %a%t@]"
