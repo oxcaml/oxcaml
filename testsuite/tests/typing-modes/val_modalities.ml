@@ -231,12 +231,12 @@ module Module_type_nested :
     module M :
       sig
         val x : 'a -> 'a @@ stateless
-        module N : sig val y : string ref end @@ stateless
+        module N : sig val y : string ref @@ stateless end
       end
     module M' :
       sig
         val x : 'a -> 'a @@ stateless
-        module N : sig val y : string ref end @@ stateless
+        module N : sig val y : string ref @@ stateless end
       end @@ stateless contended
   end
 |}, Principal{|

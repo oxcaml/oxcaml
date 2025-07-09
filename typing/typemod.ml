@@ -647,12 +647,12 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
         let desc = {desc with val_modalities; val_zero_alloc} in
         Sig_value (id, desc, vis)
     | Sig_module (id, pres, md, re, vis) ->
-        let md_modalities =
-          md.md_modalities |> zap_modality |> Mode.Modality.Value.of_const
-        in
         let md_type =
           remove_modality_and_zero_alloc_variables_mty env ~zap_modality
             md.md_type
+        in
+        let md_modalities =
+          md.md_modalities |> zap_modality |> Mode.Modality.Value.of_const
         in
         let md = {md with md_type; md_modalities} in
         Sig_module (id, pres, md, re, vis)
