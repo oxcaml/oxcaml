@@ -293,26 +293,29 @@ module Join_aliases : sig
     t ->
     Variable.t * t
 
-  type 'a add_result = private
-    { values_in_target_env : 'a Index.Map.t Name_in_target_env.Map.t;
-      touched_variables : Name_in_target_env.Set.t
-    }
+  (** [map_to_target_env t index joined_values] builds a map [target_values]
+      such that there is an entry [(name_in_target_env, value_in_target_env)]
+      in [target_values] iff there is a corresponding entry
+      [(name_in_joined_env, value_in_joined_env)] in [joined_values], where:
 
-  (** [add_in_target_env ~mem_name t values values_in_target_env] adds the values
-  in [values], keyed by their name in the corresponding environment, to the
-  [values_in_target_env], keyed with their name in the target environment.
+        - [name_in_target_env] is demoted in the [index]-th joined env;
+        - [name_in_joined_env] is the canonical of [name_in_target_env] in the
+          [index]-th joined env;
+        - [value_in_target_env] is [f value_in_joined_env]
 
-  More precisely, if there is an entry [index -> var -> value] in [values],
-  an entry [target_var -> index -> value] is added to [values_in_target_env]
-  for all variables [target_var] in the target environment that are equal to
-  [var] in the joined environment at [index]. *)
-  val add_in_target_env :
+      Further, this function ensures {b sharing} of the expanded values: for
+      each entry [(name_in_joined_env, value_in_joined_env)] in [joined_values],
+      [f value_in_joined_env] is only computed once and the
+      resulting [value_in_target_env] is shared across all the names of
+      [name_in_joined_env] in the target env. *)
+  val map_to_target_env :
+    f:('a -> 'b) ->
     exists_in_target_env:
       (Name_in_one_joined_env.t -> Name_in_target_env.t option) ->
     t ->
-    'a Name_in_one_joined_env.Map.t Index.Map.t ->
-    'a Index.Map.t Name_in_target_env.Map.t ->
-    'a add_result
+    Index.t ->
+    'a Name_in_one_joined_env.Map.t ->
+    'b Name_in_target_env.Map.t
 
   type join_result = private
     { demoted_in_target_env : Simple_in_target_env.t Name_in_target_env.Map.t;
@@ -367,13 +370,22 @@ end = struct
               be demoted to a shared variable with a later binding time). *)
       names_in_target_env :
         Name_in_target_env.Set.t Name_in_one_joined_env.Map.t Index.Map.t
-          (** Maps a variable in a joined environment to the set of
-              (other) variables it is equal to in the target environment.
+          (** Maps a canonical name in one of the joined environment to
+            the set of (other) names it is equal to in the target environment.
 
-              {b Note}: Although we use [Name_in_one_joined_env] and
-              [Name_in_target_env] here, we are only interested in {b
-              variables}; in particular, symbols are irrelevant (they are always
-              their own canonicals and can't be renamed during join). *)
+            This is an inverse of the [demoted_from_target_env] map: for any
+            entry [index -> simple -> name] in [names_in_target_env], [simple]
+            is canonical in the [index]-th joined environment and an entry
+            [name -> index -> simple] exists in [demoted_from_target_env].
+
+            In practice this means one of the following:
+
+              - [name] exists in the target environment and was demoted in
+                the [index]-th joined environment with canonical [simple].
+
+              - [name] is an existential variable created to represent a
+                path that is equal to [simple] in the [index]-th joined
+                environment. *)
     }
 
   let empty =
@@ -763,61 +775,34 @@ end = struct
         t.names_in_target_env,
         Name_in_target_env.Set.empty )
 
-  type 'a add_result =
-    { values_in_target_env : 'a Index.Map.t Name_in_target_env.Map.t;
-      touched_variables : Name_in_target_env.Set.t
-    }
-
-  (* Takes a map of values in joined envs (i.e. a map from canonical names in a
-     joined env to values of type ['a] for each joined env) and transforms it
-     into a map of values in the target env by adding the values on name [n] to
-     all the aliases of [n] that are canonical in the target env. *)
-  let add_in_target_env ~exists_in_target_env t values_in_joined_envs
-      values_in_target_env =
-    let values_in_target_env, touched_variables =
-      Index.Map.fold
-        (fun index values_in_joined_env (values_in_target_env, touched_vars) ->
-          let names_from_this_env_in_target_env =
-            Option.value ~default:Name_in_one_joined_env.Map.empty
-              (Index.Map.find_opt index t.names_in_target_env)
-          in
-          let values_in_target_env, touched_vars =
-            Name_in_one_joined_env.Map.fold
-              (fun var value (acc, touched_vars) ->
-                let vars_in_target_env =
-                  Option.value ~default:Name_in_target_env.Set.empty
-                    (Name_in_one_joined_env.Map.find_opt var
-                       names_from_this_env_in_target_env)
-                in
-                let vars_in_target_env =
-                  match exists_in_target_env var with
-                  | None -> vars_in_target_env
-                  | Some name_in_target_env ->
-                    Name_in_target_env.Set.add name_in_target_env
-                      vars_in_target_env
-                in
-                let values_in_target_env =
-                  Name_in_target_env.Set.fold
-                    (fun var_in_target_env values ->
-                      Name_in_target_env.Map.update var_in_target_env
-                        (function
-                          | None -> Some (Index.Map.singleton index value)
-                          | Some values_in_other_envs ->
-                            Some
-                              (Index.Map.add index value values_in_other_envs))
-                        values)
-                    vars_in_target_env acc
-                in
-                ( values_in_target_env,
-                  Name_in_target_env.Set.union vars_in_target_env touched_vars ))
-              values_in_joined_env
-              (values_in_target_env, touched_vars)
-          in
-          values_in_target_env, touched_vars)
-        values_in_joined_envs
-        (values_in_target_env, Name_in_target_env.Set.empty)
+  let map_to_target_env ~f ~exists_in_target_env t index values_in_joined_env =
+    let names_from_this_env_in_target_env =
+      Option.value ~default:Name_in_one_joined_env.Map.empty
+        (Index.Map.find_opt index t.names_in_target_env)
     in
-    { values_in_target_env; touched_variables }
+    let find_names_in_target_env var =
+      match
+        Name_in_one_joined_env.Map.find_opt var
+          names_from_this_env_in_target_env
+      with
+      | Some names -> names
+      | None -> Name_in_target_env.Set.empty
+    in
+    Name_in_one_joined_env.Map.fold
+      (fun var value values_in_target_env ->
+        let names_in_target_env = find_names_in_target_env var in
+        let names_in_target_env =
+          match exists_in_target_env var with
+          | None -> names_in_target_env
+          | Some var_in_target_env ->
+            Name_in_target_env.Set.add var_in_target_env names_in_target_env
+        in
+        let expanded_value = f value in
+        Name_in_target_env.Set.fold
+          (fun name_in_target_env values ->
+            Name_in_target_env.Map.add name_in_target_env expanded_value values)
+          names_in_target_env values_in_target_env)
+      values_in_joined_env Name_in_target_env.Map.empty
 
   type join_result =
     { demoted_in_target_env : Simple_in_target_env.t Name_in_target_env.Map.t;
@@ -1095,15 +1080,32 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
             name_in_target_env canonicals join_types)
         demoted_in_some_envs t.join_types
     in
-    let { Join_aliases.values_in_target_env = join_types;
-          touched_variables = touched_vars
-        } =
-      Join_aliases.add_in_target_env ~exists_in_target_env join_aliases
-        all_expanded_equations join_types
-    in
-    let touched_vars =
-      Name_in_target_env.Set.union touched_vars
-        (Name_in_target_env.Map.keys demoted_in_some_envs)
+    let join_types, touched_vars =
+      Index.Map.fold
+        (fun index expanded_equations (join_types, touched_vars) ->
+          let new_equations =
+            Join_aliases.map_to_target_env
+              ~f:(fun value -> Index.Map.singleton index value)
+              ~exists_in_target_env join_aliases index expanded_equations
+          in
+          let join_types =
+            Name_in_target_env.Map.union
+              (fun _ existing_equations new_equations ->
+                let equations =
+                  Index.Map.union
+                    (fun _ _ new_equation -> Some new_equation)
+                    existing_equations new_equations
+                in
+                Some equations)
+              join_types new_equations
+          in
+          let touched_vars =
+            Name_in_target_env.Set.union touched_vars
+              (Name_in_target_env.Map.keys new_equations)
+          in
+          join_types, touched_vars)
+        all_expanded_equations
+        (join_types, Name_in_target_env.Map.keys demoted_in_some_envs)
     in
     let t = { t with join_aliases; join_types } in
     let all_indices = Index.Map.keys t.joined_envs in
