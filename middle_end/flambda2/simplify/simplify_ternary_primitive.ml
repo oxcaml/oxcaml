@@ -69,8 +69,8 @@ let simplify_bigarray_set ~num_dimensions:_ _bigarray_kind _bigarray_layout dacc
   SPR.create_unit dacc ~result_var ~original_term
 
 let simplify_atomic_field_int_arith (_op : P.int_atomic_op) ~original_prim dacc
-    ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_
-    ~arg3:_ ~arg3_ty:_ ~result_var =
+    ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_
+    ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
