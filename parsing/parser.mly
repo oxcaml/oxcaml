@@ -4533,8 +4533,10 @@ strict_function_or_labeled_tuple_type:
 %inline strict_arg_label:
   | label = optlabel
       { Optional label }
-  // | label = genoptlabel
-  //     { generic_optional (fst label) (snd label) $sloc}
+  | mkrhs(mod_ext_longident) DOT QUESTION LIDENT COLON
+      { generic_optional $1 $4 $sloc}
+// (* CR-someday generic-optional: Somehow
+//    I conjecture this is the ONLY RULE we need. TODO investigate. *)
   | label = LIDENT COLON
       { Labelled label }
 ;
@@ -5206,10 +5208,6 @@ optlabel:
    | OPTLABEL                                   { $1 }
    | QUESTION LIDENT COLON                      { $2 }
 ;
-// CR generic-optional: this introduces a parsing conflict
-// genoptlabel:
-//    | mkrhs(mod_longident) DOT QUESTION LIDENT COLON                      { ($1, $4) }
-// ;
 
 /* Attributes and extensions */
 
