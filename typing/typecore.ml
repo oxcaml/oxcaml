@@ -9478,7 +9478,7 @@ and type_let_def_wrap_warnings
     ?(check = fun name mutated -> Warnings.Unused_var { name; mutated })
     ?(check_strict = fun name mutated ->
       Warnings.Unused_var_strict { name; mutated } )
-    ?(check_mutable = fun name -> Warnings.Unused_mutable name)
+    ?(check_mutable = fun name -> Warnings.Unmutated_mutable name)
     ~is_recursive ~entirely_functions ~exp_env ~new_env ~spat_sexp_list
     ~attrs_list ~mode_pat_typ_list ~pvs
     type_def =
