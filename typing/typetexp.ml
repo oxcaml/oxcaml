@@ -98,7 +98,7 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
-  | Unsupported_generic_optional_argument_module_path of Longident.t
+  | Invalid_generic_optional_argument_module_path of Longident.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -672,10 +672,14 @@ let transl_label (label : Parsetree.arg_label)
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
   | Generic_optional (mod_ident, l), _ -> (
+    match Language_extension.is_enabled Generic_optional_arguments with
+    | false ->
+      raise (Error (mod_ident.loc, Env.empty, Unsupported_extension Generic_optional_arguments));
+    | true ->
     match mod_ident with
     | {txt=Longident.Ldot(Longident.Lident "Stdlib", "Option"); _} -> Optional l
     | {loc;txt} ->  (
-      raise (Error (loc, Env.empty, Unsupported_generic_optional_argument_module_path txt))
+      raise (Error (loc, Env.empty, Invalid_generic_optional_argument_module_path txt))
     )
   )
   | Nolabel, _ -> Nolabel
@@ -1638,7 +1642,7 @@ let report_error env ppf =
         | Optional _ -> "optional"
         | Generic_optional _ -> "generic optional"
         | Labelled _ -> assert false )
-  | Unsupported_generic_optional_argument_module_path lid ->
+  | Invalid_generic_optional_argument_module_path lid ->
       fprintf ppf
         "Unsupported generic optional argument module path: %a"
         (Style.as_inline_code longident) lid
