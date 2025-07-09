@@ -667,17 +667,15 @@ let emit_jump_tables () =
 (* Names for instructions *)
 
 let sse_or_avx sse vex src dst =
-  if Arch.Extension.allow_vec256 ()
-  then I.simd vex [| src; dst |]
-  else sse src dst
+  if Arch.Extension.enabled AVX then I.simd vex [| src; dst |] else sse src dst
 
 let sse_or_avx_dst sse vex src dst =
-  if Arch.Extension.allow_vec256 ()
+  if Arch.Extension.enabled AVX
   then I.simd vex [| src; dst; dst |]
   else sse src dst
 
 let cmp_sse_or_avx sse vex cond src dst =
-  if Arch.Extension.allow_vec256 ()
+  if Arch.Extension.enabled AVX
   then I.simd vex [| imm_of_float_condition cond; src; dst; dst |]
   else sse cond src dst
 
@@ -958,7 +956,7 @@ let emit_global_label ~section s =
 
 let movd src dst =
   let open Amd64_simd_instrs in
-  match Arch.Extension.allow_vec256 () with
+  match Arch.Extension.enabled AVX with
   | false -> I.movd src dst
   | true -> (
     match X86_dsl.is_regf src with
@@ -967,7 +965,7 @@ let movd src dst =
 
 let movq src dst =
   let open Amd64_simd_instrs in
-  match Arch.Extension.allow_vec256 () with
+  match Arch.Extension.enabled AVX with
   | false -> I.movq src dst
   | true -> (
     match X86_dsl.is_regf src with
@@ -976,7 +974,7 @@ let movq src dst =
 
 let movss src dst =
   let open Amd64_simd_instrs in
-  match Arch.Extension.allow_vec256 () with
+  match Arch.Extension.enabled AVX with
   | false -> I.movss src dst
   | true -> (
     match X86_dsl.is_mem src, X86_dsl.is_mem dst with
@@ -987,7 +985,7 @@ let movss src dst =
 
 let movsd src dst =
   let open Amd64_simd_instrs in
-  match Arch.Extension.allow_vec256 () with
+  match Arch.Extension.enabled AVX with
   | false -> I.movsd src dst
   | true -> (
     match X86_dsl.is_mem src, X86_dsl.is_mem dst with
@@ -998,7 +996,7 @@ let movsd src dst =
 
 let movpd ~unaligned src dst =
   let open Amd64_simd_instrs in
-  match Arch.Extension.allow_vec256 (), unaligned with
+  match Arch.Extension.enabled AVX, unaligned with
   | false, true -> I.movupd src dst
   | false, false -> I.movapd src dst
   | true, true -> (
@@ -2125,7 +2123,7 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Specific Ipackf32) ->
     let arg0, arg1 = i.arg.(0), i.arg.(1) in
     assert (Reg.is_reg arg0 && Reg.is_reg arg1 && Reg.same_loc arg0 i.res.(0));
-    if Arch.Extension.allow_vec256 ()
+    if Arch.Extension.enabled AVX
     then I.simd vunpcklps_X_X_Xm128 [| arg i 1; res i 0; res i 0 |]
     else I.simd unpcklps [| arg i 1; res i 0 |]
   | Lop (Specific (Isimd op)) -> emit_simd op i

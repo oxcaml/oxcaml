@@ -90,8 +90,8 @@ module Extension = struct
 
   let enabled_by_default = function
     | SSE3 | SSSE3 | SSE4_1 | SSE4_2
-    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 -> true
-    | PREFETCHW | PREFETCHWT1 | AVX512F -> false
+    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX -> true
+    | AVX2 | PREFETCHW | PREFETCHWT1 | AVX512F -> false
 
   let all =
     Set.of_list
