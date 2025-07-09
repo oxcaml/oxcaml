@@ -918,9 +918,9 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let rm_only () =
     match args with
-    | [| src |] ->
-      (match enc 0  with
-      | RM_rm -> src
+    | [| dst |] ->
+      (match enc 0 with
+      | RM_rm -> dst
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in

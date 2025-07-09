@@ -91,6 +91,10 @@ val mem64 :
 
 val mem64_rip : data_type -> ?ofs:int -> string -> arg
 
+val is_mem : arg -> bool
+
+val is_regf : arg -> bool
+
 module I : sig
   (* Instructions *)
 
