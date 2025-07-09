@@ -27,9 +27,21 @@ exception Error of error
 
 module Seq = Simd.Seq
 
-let instr instr ?i args = Some (Simd.instruction instr i, args)
+let instr sse vex ?i args =
+  let instr = if Arch.Extension.allow_vec256 () then vex else sse in
+  Some (Simd.instruction instr i, args)
 
-let seq seq ?i args = Some (Simd.sequence seq i, args)
+let seq sse vex ?i args =
+  let seq = if Arch.Extension.allow_vec256 () then vex else sse in
+  Some (Simd.sequence seq i, args)
+
+let seq_or_zeroed ~dbg seq instr ?i args =
+  if Arch.Extension.allow_vec256 ()
+  then
+    Some
+      ( Simd.instruction instr i,
+        Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args )
+  else Some (Simd.sequence seq i, args)
 
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
@@ -77,390 +89,442 @@ let check_float_rounding = function
   | 0x8 | 0x9 | 0xA | 0xB | 0xC -> ()
   | i -> bad_immediate "Invalid float rounding immediate: %d" i
 
-let select_operation_clmul op args =
+let select_operation_clmul ~dbg:_ op args =
   if not (Arch.Extension.enabled CLMUL)
   then None
   else
     match op with
     | "caml_clmul_int64x2" ->
       let i, args = extract_constant args ~max:31 op in
-      instr pclmulqdq ~i args
+      instr pclmulqdq vpclmulqdq ~i args
     | _ -> None
 
-let select_operation_bmi2 op args =
+let select_operation_bmi2 ~dbg:_ op args =
   if not (Arch.Extension.enabled BMI2)
   then None
   else
     match op with
-    | "caml_bmi2_int64_extract_bits" -> instr pext_r64_r64_r64m64 args
-    | "caml_bmi2_int64_deposit_bits" -> instr pdep_r64_r64_r64m64 args
+    | "caml_bmi2_int64_extract_bits" ->
+      instr pext_r64_r64_r64m64 pext_r64_r64_r64m64 args
+    | "caml_bmi2_int64_deposit_bits" ->
+      instr pdep_r64_r64_r64m64 pdep_r64_r64_r64m64 args
     | _ -> None
 
-let select_operation_sse op args =
+let select_operation_sse ~dbg op args =
   match op with
-  | "caml_sse_float32_sqrt" | "sqrtf" -> instr sqrtss args
-  | "caml_simd_float32_max" | "caml_sse_float32_max" -> instr maxss args
-  | "caml_simd_float32_min" | "caml_sse_float32_min" -> instr minss args
+  | "caml_sse_float32_sqrt" | "sqrtf" ->
+    seq_or_zeroed ~dbg Seq.sqrtss vsqrtss args
+  | "caml_simd_float32_max" | "caml_sse_float32_max" -> instr maxss vmaxss args
+  | "caml_simd_float32_min" | "caml_sse_float32_min" -> instr minss vminss args
   | "caml_sse_cast_float32_int64" | "caml_simd_cast_float32_int64" ->
-    instr cvtss2si_r64_Xm32 args
+    instr cvtss2si_r64_Xm32 vcvtss2si_r64_Xm32 args
   | "caml_sse_float32x4_cmp" ->
     let i, args = extract_constant args ~max:7 op in
-    instr cmpps ~i args
-  | "caml_sse_float32x4_add" -> instr addps args
-  | "caml_sse_float32x4_sub" -> instr subps args
-  | "caml_sse_float32x4_mul" -> instr mulps args
-  | "caml_sse_float32x4_div" -> instr divps args
-  | "caml_sse_float32x4_max" -> instr maxps args
-  | "caml_sse_float32x4_min" -> instr minps args
-  | "caml_sse_float32x4_rcp" -> instr rcpps args
-  | "caml_sse_float32x4_rsqrt" -> instr rsqrtps args
-  | "caml_sse_float32x4_sqrt" -> instr sqrtps args
-  | "caml_sse_vec128_high_64_to_low_64" -> instr movhlps args
-  | "caml_sse_vec128_low_64_to_high_64" -> instr movlhps args
-  | "caml_sse_vec128_interleave_high_32" -> instr unpckhps args
+    instr cmpps vcmpps_X_X_Xm128 ~i args
+  | "caml_sse_float32x4_add" -> instr addps vaddps_X_X_Xm128 args
+  | "caml_sse_float32x4_sub" -> instr subps vsubps_X_X_Xm128 args
+  | "caml_sse_float32x4_mul" -> instr mulps vmulps_X_X_Xm128 args
+  | "caml_sse_float32x4_div" -> instr divps vdivps_X_X_Xm128 args
+  | "caml_sse_float32x4_max" -> instr maxps vmaxps_X_X_Xm128 args
+  | "caml_sse_float32x4_min" -> instr minps vminps_X_X_Xm128 args
+  | "caml_sse_float32x4_rcp" -> instr rcpps vrcpps_X_Xm128 args
+  | "caml_sse_float32x4_rsqrt" -> instr rsqrtps vrsqrtps_X_Xm128 args
+  | "caml_sse_float32x4_sqrt" -> instr sqrtps vsqrtps_X_Xm128 args
+  | "caml_sse_vec128_high_64_to_low_64" -> instr movhlps vmovhlps args
+  | "caml_sse_vec128_low_64_to_high_64" -> instr movlhps vmovlhps args
+  | "caml_sse_vec128_interleave_high_32" ->
+    instr unpckhps vunpckhps_X_X_Xm128 args
   | "caml_simd_vec128_interleave_low_32" | "caml_sse_vec128_interleave_low_32"
     ->
-    instr unpcklps args
-  | "caml_sse_vec128_movemask_32" -> instr movmskps args
+    instr unpcklps vunpcklps_X_X_Xm128 args
+  | "caml_sse_vec128_movemask_32" -> instr movmskps vmovmskps_r64_X args
   | "caml_sse_vec128_shuffle_32" ->
     let i, args = extract_constant args ~max:0xff op in
-    instr shufps ~i args
+    instr shufps vshufps_X_X_Xm128 ~i args
   | _ -> None
 
-let select_operation_sse2 op args =
+let select_operation_sse2 ~dbg op args =
   match op with
-  | "caml_sse2_float64_sqrt" | "sqrt" -> instr sqrtsd args
-  | "caml_simd_float64_max" | "caml_sse2_float64_max" -> instr maxsd args
-  | "caml_simd_float64_min" | "caml_sse2_float64_min" -> instr minsd args
-  | "caml_sse2_cast_float64_int64" -> instr cvtsd2si_r64_Xm64 args
-  | "caml_sse2_float64x2_sqrt" -> instr sqrtpd args
-  | "caml_sse2_int8x16_add" -> instr paddb args
-  | "caml_sse2_int16x8_add" -> instr paddw args
-  | "caml_sse2_int32x4_add" -> instr paddd args
-  | "caml_simd_int64x2_add" | "caml_sse2_int64x2_add" -> instr paddq args
-  | "caml_sse2_float64x2_add" -> instr addpd args
-  | "caml_sse2_int8x16_add_saturating" -> instr paddsb args
-  | "caml_sse2_int16x8_add_saturating" -> instr paddsw args
-  | "caml_sse2_int8x16_add_saturating_unsigned" -> instr paddusb args
-  | "caml_sse2_int16x8_add_saturating_unsigned" -> instr paddusw args
-  | "caml_sse2_int8x16_sub" -> instr psubb args
-  | "caml_sse2_int16x8_sub" -> instr psubw args
-  | "caml_sse2_int32x4_sub" -> instr psubd args
+  | "caml_sse2_float64_sqrt" | "sqrt" ->
+    seq_or_zeroed ~dbg Seq.sqrtsd vsqrtsd args
+  | "caml_simd_float64_max" | "caml_sse2_float64_max" -> instr maxsd vmaxsd args
+  | "caml_simd_float64_min" | "caml_sse2_float64_min" -> instr minsd vminsd args
+  | "caml_sse2_cast_float64_int64" ->
+    instr cvtsd2si_r64_Xm64 vcvtsd2si_r64_Xm64 args
+  | "caml_sse2_float64x2_sqrt" -> instr sqrtpd vsqrtpd_X_Xm128 args
+  | "caml_sse2_int8x16_add" -> instr paddb vpaddb_X_X_Xm128 args
+  | "caml_sse2_int16x8_add" -> instr paddw vpaddw_X_X_Xm128 args
+  | "caml_sse2_int32x4_add" -> instr paddd vpaddd_X_X_Xm128 args
+  | "caml_simd_int64x2_add" | "caml_sse2_int64x2_add" ->
+    instr paddq vpaddq_X_X_Xm128 args
+  | "caml_sse2_float64x2_add" -> instr addpd vaddpd_X_X_Xm128 args
+  | "caml_sse2_int8x16_add_saturating" -> instr paddsb vpaddsb_X_X_Xm128 args
+  | "caml_sse2_int16x8_add_saturating" -> instr paddsw vpaddsw_X_X_Xm128 args
+  | "caml_sse2_int8x16_add_saturating_unsigned" ->
+    instr paddusb vpaddusb_X_X_Xm128 args
+  | "caml_sse2_int16x8_add_saturating_unsigned" ->
+    instr paddusw vpaddusw_X_X_Xm128 args
+  | "caml_sse2_int8x16_sub" -> instr psubb vpsubb_X_X_Xm128 args
+  | "caml_sse2_int16x8_sub" -> instr psubw vpsubw_X_X_Xm128 args
+  | "caml_sse2_int32x4_sub" -> instr psubd vpsubd_X_X_Xm128 args
   | "caml_simd_int64x2_sub" | "caml_sse2_int64x2_sub" ->
-    instr psubq_X_Xm128 args
-  | "caml_sse2_float64x2_sub" -> instr subpd args
-  | "caml_sse2_int8x16_sub_saturating" -> instr psubsb args
-  | "caml_sse2_int16x8_sub_saturating" -> instr psubsw args
-  | "caml_sse2_int8x16_sub_saturating_unsigned" -> instr psubusb args
-  | "caml_sse2_int16x8_sub_saturating_unsigned" -> instr psubusw args
-  | "caml_sse2_int8x16_max_unsigned" -> instr pmaxub_X_Xm128 args
-  | "caml_sse2_int16x8_max" -> instr pmaxsw_X_Xm128 args
-  | "caml_sse2_float64x2_max" -> instr maxpd args
-  | "caml_sse2_int8x16_min_unsigned" -> instr pminub_X_Xm128 args
-  | "caml_sse2_int16x8_min" -> instr pminsw_X_Xm128 args
-  | "caml_sse2_float64x2_min" -> instr minpd args
-  | "caml_sse2_float64x2_mul" -> instr mulpd args
-  | "caml_sse2_float64x2_div" -> instr divpd args
-  | "caml_sse2_vec128_and" -> instr pand args
-  | "caml_sse2_vec128_andnot" -> instr pandn args
-  | "caml_sse2_vec128_or" -> instr por args
-  | "caml_sse2_vec128_xor" -> instr pxor args
-  | "caml_sse2_vec128_movemask_8" -> instr pmovmskb_r64_X args
-  | "caml_sse2_vec128_movemask_64" -> instr movmskpd args
+    instr psubq_X_Xm128 vpsubq_X_X_Xm128 args
+  | "caml_sse2_float64x2_sub" -> instr subpd vsubpd_X_X_Xm128 args
+  | "caml_sse2_int8x16_sub_saturating" -> instr psubsb vpsubsb_X_X_Xm128 args
+  | "caml_sse2_int16x8_sub_saturating" -> instr psubsw vpsubsw_X_X_Xm128 args
+  | "caml_sse2_int8x16_sub_saturating_unsigned" ->
+    instr psubusb vpsubusb_X_X_Xm128 args
+  | "caml_sse2_int16x8_sub_saturating_unsigned" ->
+    instr psubusw vpsubusw_X_X_Xm128 args
+  | "caml_sse2_int8x16_max_unsigned" ->
+    instr pmaxub_X_Xm128 vpmaxub_X_X_Xm128 args
+  | "caml_sse2_int16x8_max" -> instr pmaxsw_X_Xm128 vpmaxsw_X_X_Xm128 args
+  | "caml_sse2_float64x2_max" -> instr maxpd vmaxpd_X_X_Xm128 args
+  | "caml_sse2_int8x16_min_unsigned" ->
+    instr pminub_X_Xm128 vpminub_X_X_Xm128 args
+  | "caml_sse2_int16x8_min" -> instr pminsw_X_Xm128 vpminsw_X_X_Xm128 args
+  | "caml_sse2_float64x2_min" -> instr minpd vminpd_X_X_Xm128 args
+  | "caml_sse2_float64x2_mul" -> instr mulpd vmulpd_X_X_Xm128 args
+  | "caml_sse2_float64x2_div" -> instr divpd vdivpd_X_X_Xm128 args
+  | "caml_sse2_vec128_and" -> instr pand vpand_X_X_Xm128 args
+  | "caml_sse2_vec128_andnot" -> instr pandn vpandn_X_X_Xm128 args
+  | "caml_sse2_vec128_or" -> instr por vpor_X_X_Xm128 args
+  | "caml_sse2_vec128_xor" -> instr pxor vpxor_X_X_Xm128 args
+  | "caml_sse2_vec128_movemask_8" -> instr pmovmskb_r64_X vpmovmskb_r64_X args
+  | "caml_sse2_vec128_movemask_64" -> instr movmskpd vmovmskpd_r64_X args
   | "caml_sse2_vec128_shift_left_bytes" ->
     let i, args = extract_constant args ~max:15 op in
-    instr pslldq ~i args
+    instr pslldq vpslldq_X_X ~i args
   | "caml_sse2_vec128_shift_right_bytes" ->
     let i, args = extract_constant args ~max:15 op in
-    instr psrldq ~i args
-  | "caml_sse2_int8x16_cmpeq" -> instr pcmpeqb args
-  | "caml_sse2_int16x8_cmpeq" -> instr pcmpeqw args
-  | "caml_sse2_int32x4_cmpeq" -> instr pcmpeqd args
-  | "caml_sse2_int8x16_cmpgt" -> instr pcmpgtb args
-  | "caml_sse2_int16x8_cmpgt" -> instr pcmpgtw args
-  | "caml_sse2_int32x4_cmpgt" -> instr pcmpgtd args
+    instr psrldq vpsrldq_X_X ~i args
+  | "caml_sse2_int8x16_cmpeq" -> instr pcmpeqb vpcmpeqb_X_X_Xm128 args
+  | "caml_sse2_int16x8_cmpeq" -> instr pcmpeqw vpcmpeqw_X_X_Xm128 args
+  | "caml_sse2_int32x4_cmpeq" -> instr pcmpeqd vpcmpeqd_X_X_Xm128 args
+  | "caml_sse2_int8x16_cmpgt" -> instr pcmpgtb vpcmpgtb_X_X_Xm128 args
+  | "caml_sse2_int16x8_cmpgt" -> instr pcmpgtw vpcmpgtw_X_X_Xm128 args
+  | "caml_sse2_int32x4_cmpgt" -> instr pcmpgtd vpcmpgtd_X_X_Xm128 args
   | "caml_sse2_float64x2_cmp" ->
     let i, args = extract_constant args ~max:0x1f op in
-    instr cmppd ~i args
-  | "caml_sse2_cvt_int32x4_float64x2" -> instr cvtdq2pd args
-  | "caml_sse2_cvt_int32x4_float32x4" -> instr cvtdq2ps args
-  | "caml_sse2_cvt_float64x2_int32x2" -> instr cvtpd2dq args
-  | "caml_sse2_cvt_float64x2_float32x2" -> instr cvtpd2ps args
-  | "caml_sse2_cvt_float32x4_int32x4" -> instr cvtps2dq args
-  | "caml_sse2_cvt_float32x4_float64x2" -> instr cvtps2pd args
-  | "caml_sse2_cvt_int16x8_int8x16_saturating" -> instr packsswb args
-  | "caml_sse2_cvt_int32x4_int16x8_saturating" -> instr packssdw args
-  | "caml_sse2_cvt_int16x8_int8x16_saturating_unsigned" -> instr packuswb args
-  | "caml_sse2_cvt_int32x4_int16x8_saturating_unsigned" -> instr packusdw args
-  | "caml_sse2_int8x16_avg_unsigned" -> instr pavgb_X_Xm128 args
-  | "caml_sse2_int16x8_avg_unsigned" -> instr pavgw_X_Xm128 args
-  | "caml_sse2_int8x16_sad_unsigned" -> instr psadbw_X_Xm128 args
-  | "caml_sse2_int16x8_sll" -> instr psllw_X_Xm128 args
-  | "caml_sse2_int32x4_sll" -> instr pslld_X_Xm128 args
-  | "caml_sse2_int64x2_sll" -> instr psllq_X_Xm128 args
-  | "caml_sse2_int16x8_srl" -> instr psrlw_X_Xm128 args
-  | "caml_sse2_int32x4_srl" -> instr psrld_X_Xm128 args
-  | "caml_sse2_int64x2_srl" -> instr psrlq_X_Xm128 args
-  | "caml_sse2_int16x8_sra" -> instr psraw_X_Xm128 args
-  | "caml_sse2_int32x4_sra" -> instr psrad_X_Xm128 args
+    instr cmppd vcmppd_X_X_Xm128 ~i args
+  | "caml_sse2_cvt_int32x4_float64x2" -> instr cvtdq2pd vcvtdq2pd_X_Xm64 args
+  | "caml_sse2_cvt_int32x4_float32x4" -> instr cvtdq2ps vcvtdq2ps_X_Xm128 args
+  | "caml_sse2_cvt_float64x2_int32x2" -> instr cvtpd2dq vcvtpd2dq_X_Xm128 args
+  | "caml_sse2_cvt_float64x2_float32x2" -> instr cvtpd2ps vcvtpd2ps_X_Xm128 args
+  | "caml_sse2_cvt_float32x4_int32x4" -> instr cvtps2dq vcvtps2dq_X_Xm128 args
+  | "caml_sse2_cvt_float32x4_float64x2" -> instr cvtps2pd vcvtps2pd_X_Xm64 args
+  | "caml_sse2_cvt_int16x8_int8x16_saturating" ->
+    instr packsswb vpacksswb_X_X_Xm128 args
+  | "caml_sse2_cvt_int32x4_int16x8_saturating" ->
+    instr packssdw vpackssdw_X_X_Xm128 args
+  | "caml_sse2_cvt_int16x8_int8x16_saturating_unsigned" ->
+    instr packuswb vpackuswb_X_X_Xm128 args
+  | "caml_sse2_cvt_int32x4_int16x8_saturating_unsigned" ->
+    instr packusdw vpackusdw_X_X_Xm128 args
+  | "caml_sse2_int8x16_avg_unsigned" ->
+    instr pavgb_X_Xm128 vpavgb_X_X_Xm128 args
+  | "caml_sse2_int16x8_avg_unsigned" ->
+    instr pavgw_X_Xm128 vpavgw_X_X_Xm128 args
+  | "caml_sse2_int8x16_sad_unsigned" ->
+    instr psadbw_X_Xm128 vpsadbw_X_X_Xm128 args
+  | "caml_sse2_int16x8_sll" -> instr psllw_X_Xm128 vpsllw_X_X_Xm128 args
+  | "caml_sse2_int32x4_sll" -> instr pslld_X_Xm128 vpslld_X_X_Xm128 args
+  | "caml_sse2_int64x2_sll" -> instr psllq_X_Xm128 vpsllq_X_X_Xm128 args
+  | "caml_sse2_int16x8_srl" -> instr psrlw_X_Xm128 vpsrlw_X_X_Xm128 args
+  | "caml_sse2_int32x4_srl" -> instr psrld_X_Xm128 vpsrld_X_X_Xm128 args
+  | "caml_sse2_int64x2_srl" -> instr psrlq_X_Xm128 vpsrlq_X_X_Xm128 args
+  | "caml_sse2_int16x8_sra" -> instr psraw_X_Xm128 vpsraw_X_X_Xm128 args
+  | "caml_sse2_int32x4_sra" -> instr psrad_X_Xm128 vpsrad_X_X_Xm128 args
   | "caml_sse2_int16x8_slli" ->
     let i, args = extract_constant args ~max:15 op in
-    instr psllw_X ~i args
+    instr psllw_X vpsllw_X_X ~i args
   | "caml_sse2_int32x4_slli" ->
     let i, args = extract_constant args ~max:31 op in
-    instr pslld_X ~i args
+    instr pslld_X vpslld_X_X ~i args
   | "caml_sse2_int64x2_slli" ->
     let i, args = extract_constant args ~max:63 op in
-    instr psllq_X ~i args
+    instr psllq_X vpsllq_X_X ~i args
   | "caml_sse2_int16x8_srli" ->
     let i, args = extract_constant args ~max:15 op in
-    instr psrlw_X ~i args
+    instr psrlw_X vpsrlw_X_X ~i args
   | "caml_sse2_int32x4_srli" ->
     let i, args = extract_constant args ~max:31 op in
-    instr psrld_X ~i args
+    instr psrld_X vpsrld_X_X ~i args
   | "caml_sse2_int64x2_srli" ->
     let i, args = extract_constant args ~max:63 op in
-    instr psrlq_X ~i args
+    instr psrlq_X vpsrlq_X_X ~i args
   | "caml_sse2_int16x8_srai" ->
     let i, args = extract_constant args ~max:15 op in
-    instr psraw_X ~i args
+    instr psraw_X vpsraw_X_X ~i args
   | "caml_sse2_int32x4_srai" ->
     let i, args = extract_constant args ~max:31 op in
-    instr psrad_X ~i args
+    instr psrad_X vpsrad_X_X ~i args
   | "caml_sse2_vec128_shuffle_64" ->
     let i, args = extract_constant args ~max:3 op in
-    instr shufpd ~i args
+    instr shufpd vshufpd_X_X_Xm128 ~i args
   | "caml_sse2_vec128_shuffle_high_16" ->
     let i, args = extract_constant args ~max:255 op in
-    instr pshufhw ~i args
+    instr pshufhw vpshufhw_X_Xm128 ~i args
   | "caml_sse2_vec128_shuffle_low_16" ->
     let i, args = extract_constant args ~max:255 op in
-    instr pshuflw ~i args
-  | "caml_sse2_vec128_interleave_high_8" -> instr punpckhbw args
-  | "caml_sse2_vec128_interleave_low_8" -> instr punpcklbw args
-  | "caml_sse2_vec128_interleave_high_16" -> instr punpckhwd args
-  | "caml_sse2_vec128_interleave_low_16" -> instr punpcklwd args
+    instr pshuflw vpshuflw_X_Xm128 ~i args
+  | "caml_sse2_vec128_interleave_high_8" ->
+    instr punpckhbw vpunpckhbw_X_X_Xm128 args
+  | "caml_sse2_vec128_interleave_low_8" ->
+    instr punpcklbw vpunpcklbw_X_X_Xm128 args
+  | "caml_sse2_vec128_interleave_high_16" ->
+    instr punpckhwd vpunpckhwd_X_X_Xm128 args
+  | "caml_sse2_vec128_interleave_low_16" ->
+    instr punpcklwd vpunpcklwd_X_X_Xm128 args
   | "caml_simd_vec128_interleave_high_64"
   | "caml_sse2_vec128_interleave_high_64" ->
-    instr punpckhqdq args
+    instr punpckhqdq vpunpckhqdq_X_X_Xm128 args
   | "caml_simd_vec128_interleave_low_64" | "caml_sse2_vec128_interleave_low_64"
     ->
-    instr punpcklqdq args
-  | "caml_sse2_int16x8_mul_high" -> instr pmulhw args
-  | "caml_sse2_int16x8_mul_high_unsigned" -> instr pmulhuw_X_Xm128 args
-  | "caml_sse2_int16x8_mul_low" -> instr pmullw args
-  | "caml_sse2_int16x8_mul_hadd_int32x4" -> instr pmaddwd args
+    instr punpcklqdq vpunpcklqdq_X_X_Xm128 args
+  | "caml_sse2_int16x8_mul_high" -> instr pmulhw vpmulhw_X_X_Xm128 args
+  | "caml_sse2_int16x8_mul_high_unsigned" ->
+    instr pmulhuw_X_Xm128 vpmulhuw_X_X_Xm128 args
+  | "caml_sse2_int16x8_mul_low" -> instr pmullw vpmullw_X_X_Xm128 args
+  | "caml_sse2_int16x8_mul_hadd_int32x4" ->
+    instr pmaddwd vpmaddwd_X_X_Xm128 args
   | _ -> None
 
-let select_operation_sse3 op args =
+let select_operation_sse3 ~dbg:_ op args =
   if not (Arch.Extension.enabled SSE3)
   then None
   else
     match op with
-    | "caml_sse3_float32x4_addsub" -> instr addsubps args
-    | "caml_sse3_float64x2_addsub" -> instr addsubpd args
-    | "caml_sse3_float32x4_hadd" -> instr haddps args
-    | "caml_sse3_float64x2_hadd" -> instr haddpd args
-    | "caml_sse3_float32x4_hsub" -> instr hsubps args
-    | "caml_sse3_float64x2_hsub" -> instr hsubpd args
-    | "caml_sse3_vec128_dup_low_64" -> instr movddup args
-    | "caml_sse3_vec128_dup_odd_32" -> instr movshdup args
-    | "caml_sse3_vec128_dup_even_32" -> instr movsldup args
+    | "caml_sse3_float32x4_addsub" -> instr addsubps vaddsubps_X_X_Xm128 args
+    | "caml_sse3_float64x2_addsub" -> instr addsubpd vaddsubpd_X_X_Xm128 args
+    | "caml_sse3_float32x4_hadd" -> instr haddps vhaddps_X_X_Xm128 args
+    | "caml_sse3_float64x2_hadd" -> instr haddpd vhaddpd_X_X_Xm128 args
+    | "caml_sse3_float32x4_hsub" -> instr hsubps vhsubps_X_X_Xm128 args
+    | "caml_sse3_float64x2_hsub" -> instr hsubpd vhsubpd_X_X_Xm128 args
+    | "caml_sse3_vec128_dup_low_64" -> instr movddup vmovddup_X_Xm64 args
+    | "caml_sse3_vec128_dup_odd_32" -> instr movshdup vmovshdup_X_Xm128 args
+    | "caml_sse3_vec128_dup_even_32" -> instr movsldup vmovsldup_X_Xm128 args
     | _ -> None
 
-let select_operation_ssse3 op args =
+let select_operation_ssse3 ~dbg:_ op args =
   if not (Arch.Extension.enabled SSSE3)
   then None
   else
     match op with
-    | "caml_ssse3_int8x16_abs" -> instr pabsb_X_Xm128 args
-    | "caml_ssse3_int16x8_abs" -> instr pabsw_X_Xm128 args
-    | "caml_ssse3_int32x4_abs" -> instr pabsd_X_Xm128 args
-    | "caml_ssse3_int16x8_hadd" -> instr phaddw_X_Xm128 args
-    | "caml_ssse3_int32x4_hadd" -> instr phaddd_X_Xm128 args
-    | "caml_ssse3_int16x8_hadd_saturating" -> instr phaddsw_X_Xm128 args
-    | "caml_ssse3_int16x8_hsub" -> instr phsubw_X_Xm128 args
-    | "caml_ssse3_int32x4_hsub" -> instr phsubd_X_Xm128 args
-    | "caml_ssse3_int16x8_hsub_saturating" -> instr phsubsw_X_Xm128 args
-    | "caml_ssse3_int8x16_mulsign" -> instr psignb_X_Xm128 args
-    | "caml_ssse3_int16x8_mulsign" -> instr psignw_X_Xm128 args
-    | "caml_ssse3_int32x4_mulsign" -> instr psignd_X_Xm128 args
-    | "caml_ssse3_vec128_shuffle_8" -> instr pshufb_X_Xm128 args
+    | "caml_ssse3_int8x16_abs" -> instr pabsb_X_Xm128 vpabsb_X_Xm128 args
+    | "caml_ssse3_int16x8_abs" -> instr pabsw_X_Xm128 vpabsw_X_Xm128 args
+    | "caml_ssse3_int32x4_abs" -> instr pabsd_X_Xm128 vpabsd_X_Xm128 args
+    | "caml_ssse3_int16x8_hadd" -> instr phaddw_X_Xm128 vphaddw_X_X_Xm128 args
+    | "caml_ssse3_int32x4_hadd" -> instr phaddd_X_Xm128 vphaddd_X_X_Xm128 args
+    | "caml_ssse3_int16x8_hadd_saturating" ->
+      instr phaddsw_X_Xm128 vphaddsw_X_X_Xm128 args
+    | "caml_ssse3_int16x8_hsub" -> instr phsubw_X_Xm128 vphsubw_X_X_Xm128 args
+    | "caml_ssse3_int32x4_hsub" -> instr phsubd_X_Xm128 vphsubd_X_X_Xm128 args
+    | "caml_ssse3_int16x8_hsub_saturating" ->
+      instr phsubsw_X_Xm128 vphsubsw_X_X_Xm128 args
+    | "caml_ssse3_int8x16_mulsign" ->
+      instr psignb_X_Xm128 vpsignb_X_X_Xm128 args
+    | "caml_ssse3_int16x8_mulsign" ->
+      instr psignw_X_Xm128 vpsignw_X_X_Xm128 args
+    | "caml_ssse3_int32x4_mulsign" ->
+      instr psignd_X_Xm128 vpsignd_X_X_Xm128 args
+    | "caml_ssse3_vec128_shuffle_8" ->
+      instr pshufb_X_Xm128 vpshufb_X_X_Xm128 args
     | "caml_ssse3_vec128_align_right_bytes" ->
       let i, args = extract_constant args ~max:31 op in
-      instr palignr_X_Xm128 ~i args
+      instr palignr_X_Xm128 vpalignr_X_X_Xm128 ~i args
     | "caml_ssse3_int8x16_mul_unsigned_hadd_saturating_int16x8" ->
-      instr pmaddubsw_X_Xm128 args
+      instr pmaddubsw_X_Xm128 vpmaddubsw_X_X_Xm128 args
     | _ -> None
 
-let select_operation_sse41 op args =
+let select_operation_sse41 ~dbg op args =
   if not (Arch.Extension.enabled SSE4_1)
   then None
   else
     match op with
     | "caml_sse41_vec128_blend_16" ->
       let i, args = extract_constant args ~max:255 op in
-      instr pblendw ~i args
+      instr pblendw vpblendw_X_X_Xm128 ~i args
     | "caml_sse41_vec128_blend_32" ->
       let i, args = extract_constant args ~max:15 op in
-      instr blendps ~i args
+      instr blendps vblendps_X_X_Xm128 ~i args
     | "caml_sse41_vec128_blend_64" ->
       let i, args = extract_constant args ~max:3 op in
-      instr blendpd ~i args
-    | "caml_sse41_vec128_blendv_8" -> instr pblendvb args
-    | "caml_sse41_vec128_blendv_32" -> instr blendvps args
-    | "caml_sse41_vec128_blendv_64" -> instr blendvpd args
-    | "caml_sse41_int64x2_cmpeq" -> instr pcmpeqq args
-    | "caml_sse41_cvtsx_int8x16_int16x8" -> instr pmovsxbw args
-    | "caml_sse41_cvtsx_int8x16_int32x4" -> instr pmovsxbd args
-    | "caml_sse41_cvtsx_int8x16_int64x2" -> instr pmovsxbq args
-    | "caml_sse41_cvtsx_int16x8_int32x4" -> instr pmovsxwd args
-    | "caml_sse41_cvtsx_int16x8_int64x2" -> instr pmovsxwq args
-    | "caml_sse41_cvtsx_int32x4_int64x2" -> instr pmovsxdq args
-    | "caml_sse41_cvtzx_int8x16_int16x8" -> instr pmovzxbw args
-    | "caml_sse41_cvtzx_int8x16_int32x4" -> instr pmovzxbd args
-    | "caml_sse41_cvtzx_int8x16_int64x2" -> instr pmovzxbq args
-    | "caml_sse41_cvtzx_int16x8_int32x4" -> instr pmovzxwd args
-    | "caml_sse41_cvtzx_int16x8_int64x2" -> instr pmovzxwq args
-    | "caml_sse41_cvtzx_int32x4_int64x2" -> instr pmovzxdq args
+      instr blendpd vblendpd_X_X_Xm128 ~i args
+    | "caml_sse41_vec128_blendv_8" -> instr pblendvb vpblendvb_X_X_Xm128_X args
+    | "caml_sse41_vec128_blendv_32" -> instr blendvps vblendvps_X_X_Xm128_X args
+    | "caml_sse41_vec128_blendv_64" -> instr blendvpd vblendvpd_X_X_Xm128_X args
+    | "caml_sse41_int64x2_cmpeq" -> instr pcmpeqq vpcmpeqq_X_X_Xm128 args
+    | "caml_sse41_cvtsx_int8x16_int16x8" -> instr pmovsxbw vpmovsxbw_X_Xm64 args
+    | "caml_sse41_cvtsx_int8x16_int32x4" -> instr pmovsxbd vpmovsxbd_X_Xm32 args
+    | "caml_sse41_cvtsx_int8x16_int64x2" -> instr pmovsxbq vpmovsxbq_X_Xm16 args
+    | "caml_sse41_cvtsx_int16x8_int32x4" -> instr pmovsxwd vpmovsxwd_X_Xm64 args
+    | "caml_sse41_cvtsx_int16x8_int64x2" -> instr pmovsxwq vpmovsxwq_X_Xm32 args
+    | "caml_sse41_cvtsx_int32x4_int64x2" -> instr pmovsxdq vpmovsxdq_X_Xm64 args
+    | "caml_sse41_cvtzx_int8x16_int16x8" -> instr pmovzxbw vpmovzxbw_X_Xm64 args
+    | "caml_sse41_cvtzx_int8x16_int32x4" -> instr pmovzxbd vpmovzxbd_X_Xm32 args
+    | "caml_sse41_cvtzx_int8x16_int64x2" -> instr pmovzxbq vpmovzxbq_X_Xm16 args
+    | "caml_sse41_cvtzx_int16x8_int32x4" -> instr pmovzxwd vpmovzxwd_X_Xm64 args
+    | "caml_sse41_cvtzx_int16x8_int64x2" -> instr pmovzxwq vpmovzxwq_X_Xm32 args
+    | "caml_sse41_cvtzx_int32x4_int64x2" -> instr pmovzxdq vpmovzxdq_X_Xm64 args
     | "caml_sse41_float32x4_dp" ->
       let i, args = extract_constant args ~max:255 op in
-      instr dpps ~i args
+      instr dpps vdpps_X_X_Xm128 ~i args
     | "caml_sse41_float64x2_dp" ->
       let i, args = extract_constant args ~max:255 op in
-      instr dppd ~i args
+      instr dppd vdppd ~i args
     | "caml_sse41_int8x16_extract" ->
       let i, args = extract_constant args ~max:15 op in
-      instr pextrb ~i args
+      instr pextrb vpextrb ~i args
     | "caml_sse41_int16x8_extract" ->
       let i, args = extract_constant args ~max:7 op in
-      instr pextrw_r64m16_X ~i args
+      instr pextrw_r64m16_X vpextrw_r64m16_X ~i args
     | "caml_sse41_int32x4_extract" ->
       let i, args = extract_constant args ~max:3 op in
-      instr pextrd ~i args
+      instr pextrd vpextrd ~i args
     | "caml_sse41_int64x2_extract" ->
       let i, args = extract_constant args ~max:1 op in
-      instr pextrq ~i args
+      instr pextrq vpextrq ~i args
     | "caml_sse41_int8x16_insert" ->
       let i, args = extract_constant args ~max:15 op in
-      instr pinsrb ~i args
+      instr pinsrb vpinsrb ~i args
     | "caml_sse41_int16x8_insert" ->
       let i, args = extract_constant args ~max:7 op in
-      instr pinsrw_X_r32m16 ~i args
+      instr pinsrw_X_r32m16 vpinsrw ~i args
     | "caml_sse41_int32x4_insert" ->
       let i, args = extract_constant args ~max:3 op in
-      instr pinsrd ~i args
+      instr pinsrd vpinsrd ~i args
     | "caml_sse41_int64x2_insert" ->
       let i, args = extract_constant args ~max:1 op in
-      instr pinsrq ~i args
+      instr pinsrq vpinsrq ~i args
     | "caml_sse41_float32x4_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      instr roundps ~i args
+      instr roundps vroundps_X_Xm128 ~i args
     | "caml_sse41_float64x2_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      instr roundpd ~i args
+      instr roundpd vroundpd_X_Xm128 ~i args
     | "caml_sse41_float64_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      instr roundsd ~i args
+      seq_or_zeroed ~dbg Seq.roundsd vroundsd ~i args
     | "caml_simd_float64_round_current" | "caml_sse41_float64_round_current" ->
-      instr roundsd ~i:(int_of_float_rounding RoundCurrent) args
+      seq_or_zeroed ~dbg Seq.roundsd vroundsd
+        ~i:(int_of_float_rounding RoundCurrent)
+        args
     | "caml_simd_float64_round_neg_inf" | "caml_sse41_float64_round_neg_inf" ->
-      instr roundsd ~i:(int_of_float_rounding RoundDown) args
+      seq_or_zeroed ~dbg Seq.roundsd vroundsd
+        ~i:(int_of_float_rounding RoundDown)
+        args
     | "caml_simd_float64_round_pos_inf" | "caml_sse41_float64_round_pos_inf" ->
-      instr roundsd ~i:(int_of_float_rounding RoundUp) args
+      seq_or_zeroed ~dbg Seq.roundsd vroundsd
+        ~i:(int_of_float_rounding RoundUp)
+        args
     | "caml_simd_float64_round_towards_zero"
     | "caml_sse41_float64_round_towards_zero" ->
-      instr roundsd ~i:(int_of_float_rounding RoundTruncate) args
+      seq_or_zeroed ~dbg Seq.roundsd vroundsd
+        ~i:(int_of_float_rounding RoundTruncate)
+        args
     | "caml_simd_float64_round_near" | "caml_sse41_float64_round_near" ->
-      instr roundsd ~i:(int_of_float_rounding RoundNearest) args
+      seq_or_zeroed ~dbg Seq.roundsd vroundsd
+        ~i:(int_of_float_rounding RoundNearest)
+        args
     | "caml_sse41_float32_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      instr roundss ~i args
+      seq_or_zeroed ~dbg Seq.roundss vroundss ~i args
     | "caml_simd_float32_round_current" | "caml_sse41_float32_round_current" ->
-      instr roundss ~i:(int_of_float_rounding RoundCurrent) args
+      seq_or_zeroed ~dbg Seq.roundss vroundss
+        ~i:(int_of_float_rounding RoundCurrent)
+        args
     | "caml_simd_float32_round_neg_inf" | "caml_sse41_float32_round_neg_inf" ->
-      instr roundss ~i:(int_of_float_rounding RoundDown) args
+      seq_or_zeroed ~dbg Seq.roundss vroundss
+        ~i:(int_of_float_rounding RoundDown)
+        args
     | "caml_simd_float32_round_pos_inf" | "caml_sse41_float32_round_pos_inf" ->
-      instr roundss ~i:(int_of_float_rounding RoundUp) args
+      seq_or_zeroed ~dbg Seq.roundss vroundss
+        ~i:(int_of_float_rounding RoundUp)
+        args
     | "caml_simd_float32_round_towards_zero"
     | "caml_sse41_float32_round_towards_zero" ->
-      instr roundss ~i:(int_of_float_rounding RoundTruncate) args
+      seq_or_zeroed ~dbg Seq.roundss vroundss
+        ~i:(int_of_float_rounding RoundTruncate)
+        args
     | "caml_simd_float32_round_near" | "caml_sse41_float32_round_near" ->
-      instr roundss ~i:(int_of_float_rounding RoundNearest) args
-    | "caml_sse41_int8x16_max" -> instr pmaxsb args
-    | "caml_sse41_int32x4_max" -> instr pmaxsd args
-    | "caml_sse41_int16x8_max_unsigned" -> instr pmaxuw args
-    | "caml_sse41_int32x4_max_unsigned" -> instr pmaxud args
-    | "caml_sse41_int8x16_min" -> instr pminsb args
-    | "caml_sse41_int32x4_min" -> instr pminsd args
-    | "caml_sse41_int16x8_min_unsigned" -> instr pminuw args
-    | "caml_sse41_int32x4_min_unsigned" -> instr pminud args
+      seq_or_zeroed ~dbg Seq.roundss vroundss
+        ~i:(int_of_float_rounding RoundNearest)
+        args
+    | "caml_sse41_int8x16_max" -> instr pmaxsb vpmaxsb_X_X_Xm128 args
+    | "caml_sse41_int32x4_max" -> instr pmaxsd vpmaxsd_X_X_Xm128 args
+    | "caml_sse41_int16x8_max_unsigned" -> instr pmaxuw vpmaxuw_X_X_Xm128 args
+    | "caml_sse41_int32x4_max_unsigned" -> instr pmaxud vpmaxud_X_X_Xm128 args
+    | "caml_sse41_int8x16_min" -> instr pminsb vpminsb_X_X_Xm128 args
+    | "caml_sse41_int32x4_min" -> instr pminsd vpminsd_X_X_Xm128 args
+    | "caml_sse41_int16x8_min_unsigned" -> instr pminuw vpminuw_X_X_Xm128 args
+    | "caml_sse41_int32x4_min_unsigned" -> instr pminud vpminud_X_X_Xm128 args
     | "caml_sse41_int8x16_multi_sad_unsigned" ->
       let i, args = extract_constant args ~max:7 op in
-      instr mpsadbw ~i args
-    | "caml_sse41_int16x8_minpos_unsigned" -> instr phminposuw args
-    | "caml_sse41_int32x4_mul_low" -> instr pmulld args
+      instr mpsadbw vmpsadbw_X_X_Xm128 ~i args
+    | "caml_sse41_int16x8_minpos_unsigned" -> instr phminposuw vphminposuw args
+    | "caml_sse41_int32x4_mul_low" -> instr pmulld vpmulld_X_X_Xm128 args
     | _ -> None
 
-let select_operation_sse42 op args =
+let select_operation_sse42 ~dbg:_ op args =
   if not (Arch.Extension.enabled SSE4_2)
   then None
   else
     match op with
-    | "caml_sse42_int64x2_cmpgt" -> instr pcmpgtq args
+    | "caml_sse42_int64x2_cmpgt" -> instr pcmpgtq vpcmpgtq_X_X_Xm128 args
     | "caml_sse42_int64_crc" | "caml_sse42_int_untagged_crc" ->
-      instr crc32_r64_r64m64 args
+      instr crc32_r64_r64m64 crc32_r64_r64m64 args
     | "caml_sse42_vec128_cmpestrm" ->
       let i, args = extract_constant args ~max:127 op in
-      instr pcmpestrm ~i args
+      instr pcmpestrm vpcmpestrm ~i args
     | "caml_sse42_vec128_cmpestra" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpestra ~i args
+      seq Seq.pcmpestra Seq.vpcmpestra ~i args
     | "caml_sse42_vec128_cmpestrc" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpestrc ~i args
+      seq Seq.pcmpestrc Seq.vpcmpestrc ~i args
     | "caml_sse42_vec128_cmpestri" ->
       let i, args = extract_constant args ~max:127 op in
-      instr pcmpestri ~i args
+      instr pcmpestri vpcmpestri ~i args
     | "caml_sse42_vec128_cmpestro" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpestro ~i args
+      seq Seq.pcmpestro Seq.vpcmpestro ~i args
     | "caml_sse42_vec128_cmpestrs" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpestrs ~i args
+      seq Seq.pcmpestrs Seq.vpcmpestrs ~i args
     | "caml_sse42_vec128_cmpestrz" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpestrz ~i args
+      seq Seq.pcmpestrz Seq.vpcmpestrz ~i args
     | "caml_sse42_vec128_cmpistrm" ->
       let i, args = extract_constant args ~max:127 op in
-      instr pcmpistrm ~i args
+      instr pcmpistrm vpcmpistrm ~i args
     | "caml_sse42_vec128_cmpistra" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpistra ~i args
+      seq Seq.pcmpistra Seq.vpcmpistra ~i args
     | "caml_sse42_vec128_cmpistrc" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpistrc ~i args
+      seq Seq.pcmpistrc Seq.vpcmpistrc ~i args
     | "caml_sse42_vec128_cmpistri" ->
       let i, args = extract_constant args ~max:127 op in
-      instr pcmpistri ~i args
+      instr pcmpistri vpcmpistri ~i args
     | "caml_sse42_vec128_cmpistro" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpistro ~i args
+      seq Seq.pcmpistro Seq.vpcmpistro ~i args
     | "caml_sse42_vec128_cmpistrs" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpistrs ~i args
+      seq Seq.pcmpistrs Seq.vpcmpistrs ~i args
     | "caml_sse42_vec128_cmpistrz" ->
       let i, args = extract_constant args ~max:127 op in
-      seq Seq.pcmpistrz ~i args
+      seq Seq.pcmpistrz Seq.vpcmpistrz ~i args
     | _ -> None
 
-let select_simd_instr op args =
+let select_simd_instr ~dbg op args =
   let or_else try_ opt =
-    match opt with Some x -> Some x | None -> try_ op args
+    match opt with Some x -> Some x | None -> try_ ~dbg op args
   in
   None
   |> or_else select_operation_clmul
@@ -472,8 +536,8 @@ let select_simd_instr op args =
   |> or_else select_operation_sse41
   |> or_else select_operation_sse42
 
-let select_operation_cfg op args =
-  select_simd_instr op args
+let select_operation_cfg ~dbg op args =
+  select_simd_instr ~dbg op args
   |> Option.map (fun (op, args) -> Operation.Specific (Isimd op), args)
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
@@ -522,8 +586,11 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
     match simd.instr with
     | Instruction instr -> instr
     | Sequence
-        { id = Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _; instr }
-      ->
+        { id =
+            ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
+            | Vpcompare_string _ );
+          instr
+        } ->
       instr
   in
   pseudoregs_for_instr instr arg_regs res_regs

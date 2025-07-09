@@ -2,7 +2,7 @@
 
 open Amd64_simd_defs
 
-type id = 
+type id =
   | Vcvtpd2dq_X_Ym256
   | Vcvtpd2dq_X_Xm128
   | Paddsw
@@ -86,6 +86,7 @@ type id =
   | Vpmaxud_Y_Y_Ym256
   | Paddusw
   | Addss
+  | Vdppd
   | Vaddpd_Y_Y_Ym256
   | Vaddpd_X_X_Xm128
   | Vpsubusb_Y_Y_Ym256

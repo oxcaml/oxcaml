@@ -361,7 +361,7 @@ let select_operation
       let addr, eloc = select_addressing Word_int (one_arg "cldemote" args) in
       Rewritten (specific (Icldemote addr), [eloc])
     | _ -> (
-      match Simd_selection.select_operation_cfg func args with
+      match Simd_selection.select_operation_cfg ~dbg func args with
       | Some (op, args) -> Rewritten (Basic (Op op), args)
       | None -> Use_default))
   (* Recognize store instructions *)

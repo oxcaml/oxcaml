@@ -103,6 +103,8 @@ let i2_ss b s x y = bprintf b "\t%s%s%s\t%a, %a" s (suf x) (suf y) arg x arg y
 
 let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 
+let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
+
 let i1_call_jmp b s = function
   (* this is the encoding of jump labels: don't use * *)
   | Mem { arch = X86; idx = _; scale = 0; base = None; sym = Some _; _ } as x ->
@@ -233,6 +235,7 @@ let print_instr b = function
     (* All other simd instructions. *)
     | _, [| arg1; arg2 |] -> i2 b instr.mnemonic arg1 arg2
     | _, [| arg1; arg2; arg3 |] -> i3 b instr.mnemonic arg1 arg2 arg3
+    | _, [| arg1; arg2; arg3; arg4 |] -> i4 b instr.mnemonic arg1 arg2 arg3 arg4
     | _, _ ->
       Misc.fatal_errorf "unexpected instruction layout for %s (%d args)"
         instr.mnemonic (Array.length args))

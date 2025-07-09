@@ -162,7 +162,9 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       match op.instr with
       | Instruction instr -> instr
       | Sequence
-          { id = Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _;
+          { id =
+              ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
+              | Vpcompare_string _ );
             instr
           } ->
         instr

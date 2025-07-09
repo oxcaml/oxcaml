@@ -1543,7 +1543,7 @@ let emit_simd (op : Simd.operation) instr =
       if not (equal_arg (arg instr 0) (res instr 0))
       then I.xorpd (res instr 0) (res instr 0);
       emit_simd_instr seq.instr imm instr
-    | Pcompare_string p ->
+    | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
         match p with
         | Pcmpestra -> A
