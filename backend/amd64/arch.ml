@@ -90,8 +90,8 @@ module Extension = struct
 
   let enabled_by_default = function
     | SSE3 | SSSE3 | SSE4_1 | SSE4_2
-    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 -> true
-    | PREFETCHW | PREFETCHWT1 | AVX512F -> false
+    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX -> true
+    | AVX2 | PREFETCHW | PREFETCHWT1 | AVX512F -> false
 
   let all =
     Set.of_list
@@ -103,16 +103,21 @@ module Extension = struct
   let enabled t = Set.mem t !config
   let disabled t = not (enabled t)
 
-  let allow_vec256 () = List.exists enabled [AVX; AVX2; AVX512F]
-  let allow_vec512 () = List.exists enabled [AVX512F]
+  let implies t =
+    match t with
+    | SSE3 | SSSE3 | SSE4_1 | SSE4_2
+    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX
+    | PREFETCHW | PREFETCHWT1 -> [t]
+    | AVX2 -> [t; AVX]
+    | AVX512F -> [t; AVX; AVX2]
 
-  let require_vec256 () =
-    if not (allow_vec256 ())
-    then Misc.fatal_error "AVX or AVX512 is required for 256-bit vectors"
-
-  let require_vec512 () =
-    if not (allow_vec512 ())
-    then Misc.fatal_error "AVX512 is required for 512-bit vectors"
+  let implied_by t =
+    match t with
+    | SSE3 | SSSE3 | SSE4_1 | SSE4_2
+    | POPCNT | CLMUL | LZCNT | BMI | BMI2
+    | PREFETCHW | PREFETCHWT1 | AVX512F -> [t]
+    | AVX -> [t; AVX2; AVX512F]
+    | AVX2 -> [t; AVX512F]
 
   let args =
     let y t = "-f" ^ (name t |> String.lowercase_ascii) in
@@ -121,13 +126,34 @@ module Extension = struct
       let print_default b = if b then " (default)" else "" in
       let yd = print_default (enabled t) in
       let nd = print_default (disabled t) in
-      (y t, Arg.Unit (fun () -> config := Set.add t !config),
+      (y t, Arg.Unit (fun () ->
+        List.iter (fun t -> config := Set.add t !config) (implies t)),
         Printf.sprintf "Enable %s instructions (%s)%s" (name t) (generation t) yd) ::
-      (n t, Arg.Unit (fun () -> config := Set.remove t !config),
+      (n t, Arg.Unit (fun () ->
+        List.iter (fun t -> config := Set.remove t !config) (implied_by t)),
         Printf.sprintf "Disable %s instructions (%s)%s" (name t) (generation t) nd) :: acc)
     all []
 
-    let available () = Set.fold (fun t acc -> t :: acc) !config []
+  let available () = Set.fold (fun t acc -> t :: acc) !config []
+
+  let require t =
+    if not (enabled t)
+    then Misc.fatal_errorf "Requires %s, which is not enabled." (name t)
+
+  let require_simd (instr : Amd64_simd_instrs.instr) =
+    let enabled : Amd64_simd_defs.ext -> bool = function
+      | SSE | SSE2 -> true
+      | SSE3 -> enabled SSE3
+      | SSSE3 -> enabled SSSE3
+      | SSE4_1 -> enabled SSE4_1
+      | SSE4_2 -> enabled SSE4_2
+      | PCLMULQDQ -> enabled CLMUL
+      | BMI2 -> enabled BMI2
+      | AVX -> enabled AVX
+      | AVX2 -> enabled AVX2
+    in
+    if not (Array.for_all enabled instr.ext)
+    then Misc.fatal_errorf "Emitted %s, which is not enabled." instr.mnemonic
 end
 
 (* Emit elf notes with trap handling information. *)

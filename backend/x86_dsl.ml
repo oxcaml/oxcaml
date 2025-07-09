@@ -282,5 +282,7 @@ module I = struct
 
   let tzcnt x y = emit (TZCNT (x, y))
 
-  let simd instr args = emit (SIMD (instr, args))
+  let simd instr args =
+    Arch.Extension.require_simd instr;
+    emit (SIMD (instr, args))
 end

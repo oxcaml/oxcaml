@@ -72,10 +72,9 @@ let parse in_ =
   csv []
 
 let rec parse_args mnemonic acc encs args imm res =
-  let set_imm () =
-    if !imm then failwith mnemonic;
-    imm := true;
-    None
+  let set_imm i =
+    if !imm <> Imm_none then failwith mnemonic;
+    imm := i
   in
   let set_res loc enc =
     (* MULX has two results *)
@@ -92,7 +91,9 @@ let rec parse_args mnemonic acc encs args imm res =
       | "<RCX>" -> Some (Pin RCX)
       | "<RDX>" -> Some (Pin RDX)
       | "<XMM0>" -> Some (Pin XMM0)
-      | "imm8" -> set_imm ()
+      | "imm8" ->
+        set_imm Imm_spec;
+        None
       | "r8/m8" | "r/m8" -> Some (Temp [| R8; M8 |])
       | "r16/m16" | "r/m16" -> Some (Temp [| R16; M16 |])
       | "r32/m32" | "r/m32" -> Some (Temp [| R32; M32 |])
@@ -148,9 +149,12 @@ let rec parse_args mnemonic acc encs args imm res =
       | "ModRM:r/m" -> RM_rm
       | "VEX.vvvv" -> Vex_v
       | "NA" | "<XMM0>" | "<RAX>" | "<RCX>" | "<RDX>" | "implicit" -> Implicit
-      | enc when String.starts_with (String.lowercase_ascii enc) ~prefix:"imm"
-        ->
-        Implicit
+      | "Imm8" | "imm8" | "imm8[3:0]" | "imm8[7:4]" ->
+        if Option.is_some loc
+        then (
+          set_imm Imm_reg;
+          Immediate)
+        else Implicit
       | enc -> fail mnemonic enc
     in
     match loc with
@@ -164,7 +168,7 @@ let rec parse_args mnemonic acc encs args imm res =
   | _ -> failwith mnemonic
 
 let parse_args mnemonic enc args =
-  let imm = ref false in
+  let imm = ref Imm_none in
   let res = ref First_arg in
   let args = parse_args mnemonic [] enc args imm res in
   Array.of_list args, !imm, !res
@@ -313,6 +317,18 @@ let binding instr =
   else instr.mnemonic
 
 let print_one instr =
+  let print_ext : ext -> string = function
+    | SSE -> "SSE"
+    | SSE2 -> "SSE2"
+    | SSE3 -> "SSE3"
+    | SSSE3 -> "SSSE3"
+    | SSE4_1 -> "SSE4_1"
+    | SSE4_2 -> "SSE4_2"
+    | PCLMULQDQ -> "PCLMULQDQ"
+    | BMI2 -> "BMI2"
+    | AVX -> "AVX"
+    | AVX2 -> "AVX2"
+  in
   let print_temp : temp -> string = function
     | R8 -> "R8"
     | R16 -> "R16"
@@ -344,6 +360,12 @@ let print_one instr =
     | RM_rm -> "RM_rm"
     | Vex_v -> "Vex_v"
     | Implicit -> "Implicit"
+    | Immediate -> "Immediate"
+  in
+  let print_imm = function
+    | Imm_none -> "Imm_none"
+    | Imm_reg -> "Imm_reg"
+    | Imm_spec -> "Imm_spec"
   in
   let print_res : res -> string = function
     | First_arg -> "First_arg"
@@ -393,6 +415,9 @@ let print_one instr =
   in
   let binding = binding instr in
   let constructor = String.capitalize_ascii binding in
+  let ext =
+    Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
+  in
   let args =
     Array.map
       (fun (arg : arg) ->
@@ -402,18 +427,20 @@ let print_one instr =
     |> Array.to_list |> String.concat ";"
   in
   let res = print_res instr.res in
+  let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
   printf
     {|
 let %s = {
     id = %s
+  ; ext = [|%s|]
   ; args = [|%s|]
   ; res = %s
-  ; imm = %b
+  ; imm = %s
   ; mnemonic = "%s"
   ; enc = %s
 }|}
-    binding constructor args res instr.imm instr.mnemonic enc
+    binding constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
   print_endline "type id = ";
@@ -430,12 +457,19 @@ let print_all () =
   print_endline "\ntype nonrec instr = id instr";
   Hashtbl.iter (fun instr () -> print_one instr) all_instructions
 
-let relevant_ext = function
-  (* CR-soon mslater: AVX512 *)
-  | "SSE" | "SSE2" | "SSE3" | "SSSE3" | "SSE4_1" | "SSE4_2" | "PCLMULQDQ"
-  | "BMI2" | "AVX" | "AVX2" ->
-    true
-  | _ -> false
+let parse_ext = function
+  | "SSE" -> Some [| SSE |]
+  | "SSE2" -> Some [| SSE2 |]
+  | "SSE3" -> Some [| SSE3 |]
+  | "SSSE3" -> Some [| SSSE3 |]
+  | "SSE4_1" -> Some [| SSE4_1 |]
+  | "SSE4_2" -> Some [| SSE4_2 |]
+  | "PCLMULQDQ" -> Some [| PCLMULQDQ |]
+  | "PCLMULQDQ AVX" -> Some [| PCLMULQDQ; AVX |]
+  | "BMI2" -> Some [| BMI2 |]
+  | "AVX" -> Some [| AVX |]
+  | "AVX2" -> Some [| AVX2 |]
+  | _ -> None
 
 let amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
@@ -444,16 +478,16 @@ let amd64 () =
     |> List.filter_map (function
          | mnemonic :: enc :: ext :: encs -> (
            try
-             match relevant_ext ext with
-             | true ->
+             match parse_ext ext with
+             | Some ext ->
                let mnemonic, args = first_word mnemonic in
                let mnemonic = String.lowercase_ascii mnemonic in
                let args, imm, res =
                  String.split_on_char ',' args |> parse_args mnemonic encs
                in
                let enc = parse_enc mnemonic enc in
-               Some { id = Dummy; args; res; imm; mnemonic; enc }
-             | false -> None
+               Some { id = Dummy; ext; args; res; imm; mnemonic; enc }
+             | None -> None
            with Unsupported -> None)
          | _ -> None)
   in
