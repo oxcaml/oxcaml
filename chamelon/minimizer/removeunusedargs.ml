@@ -68,10 +68,16 @@ let rec fun_wrapper arg_list acc_id depth path_fun n =
              ];
          })
 
+let rec longident_label = function
+  | Longident.Lident s -> s
+  | Ldot (path, s) -> longident_label path ^ "." ^ s
+  | Lapply (s1, s2) -> longident_label s1 ^ "(" ^ longident_label s2 ^ ")"
+
 let string_label = function
   | Nolabel -> "Nolabel"
   | Optional s -> "Optional " ^ s
-  | Generic_optional s -> "Generic_optional " ^ s
+  | Generic_optional (module_path, s) ->
+      "Generic_optional " ^ longident_label module_path.txt ^ "." ^ s
   | Labelled s -> "Labelled " ^ s
 
 let replace_mapper id to_replace label =

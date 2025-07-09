@@ -215,7 +215,6 @@ type matched_expression_desc =
 let untype_label = function
   | Typedtree.Position l | Labelled l -> Asttypes.Labelled l
   | Optional l -> Optional l
-  | Generic_optional l -> Generic_optional l
   | Nolabel -> Nolabel
 
 let view_texp (e : expression_desc) =
