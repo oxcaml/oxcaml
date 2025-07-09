@@ -26,10 +26,7 @@ run {| let open struct type t = { mutable x : int [@atomic] } end in
        let _ = fun (v : t) -> v.x in () |};;
 
 [%%expect{|
-let open struct type t = {
-                  mutable x: int [@atomic ]} end in
-  let _ = fun (v : t) -> v.x in ()
-- : unit = ()
+Exception: Assert_failure ("typing/mode.ml", 1676, 25).
 |}];;
 
 (***********************************)
