@@ -592,6 +592,14 @@ let string_like_load_aux ~ptr_out_of_heap ~dbg width ~str ~index =
     C.aligned_load_128 ~ptr_out_of_heap str index dbg
   | One_twenty_eight { aligned = false } ->
     C.unaligned_load_128 ~ptr_out_of_heap str index dbg
+  | Two_fifty_six { aligned = true } ->
+    C.aligned_load_256 ~ptr_out_of_heap str index dbg
+  | Two_fifty_six { aligned = false } ->
+    C.unaligned_load_256 ~ptr_out_of_heap str index dbg
+  | Five_twelve { aligned = true } ->
+    C.aligned_load_512 ~ptr_out_of_heap str index dbg
+  | Five_twelve { aligned = false } ->
+    C.unaligned_load_512 ~ptr_out_of_heap str index dbg
 
 let string_like_load ~dbg kind width ~str ~index =
   match (kind : P.string_like_value) with
@@ -617,6 +625,14 @@ let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
     C.unaligned_set_128 ~ptr_out_of_heap bytes index new_value dbg
   | One_twenty_eight { aligned = true } ->
     C.aligned_set_128 ~ptr_out_of_heap bytes index new_value dbg
+  | Two_fifty_six { aligned = false } ->
+    C.unaligned_set_256 ~ptr_out_of_heap bytes index new_value dbg
+  | Two_fifty_six { aligned = true } ->
+    C.aligned_set_256 ~ptr_out_of_heap bytes index new_value dbg
+  | Five_twelve { aligned = false } ->
+    C.unaligned_set_512 ~ptr_out_of_heap bytes index new_value dbg
+  | Five_twelve { aligned = true } ->
+    C.aligned_set_512 ~ptr_out_of_heap bytes index new_value dbg
 
 let bytes_or_bigstring_set ~dbg kind width ~bytes ~index ~new_value =
   let expr =

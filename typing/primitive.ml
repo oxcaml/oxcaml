@@ -534,6 +534,10 @@ let prim_has_valid_reprs ~loc prim =
           ("64", "", C.value);
           ("a128", "", C.value);
           ("u128", "", C.value);
+          ("a256", "", C.value);
+          ("u256", "", C.value);
+          ("a512", "", C.value);
+          ("u512", "", C.value);
           ("32", "#", C.bits32);
           ("f32", "#", C.float32);
           ("64", "#", C.bits64);
@@ -592,6 +596,10 @@ let prim_has_valid_reprs ~loc prim =
       let vector_sizes = [
         ("128", "", C.value);
         ("128", "#", C.vec128);
+        ("256", "", C.value);
+        ("256", "#", C.vec256);
+        ("512", "", C.value);
+        ("512", "#", C.vec512);
       ] in
       let array_types = [
         "float_array";

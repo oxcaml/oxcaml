@@ -522,12 +522,18 @@ let string_accessor_width ppf saw =
     | Single -> "f32"
     | Sixty_four -> "64"
     | One_twenty_eight { aligned = false } -> "128u"
-    | One_twenty_eight { aligned = true } -> "128a")
+    | One_twenty_eight { aligned = true } -> "128a"
+    | Two_fifty_six { aligned = false } -> "256u"
+    | Two_fifty_six { aligned = true } -> "256a"
+    | Five_twelve { aligned = false } -> "512u"
+    | Five_twelve { aligned = true } -> "512a")
 
 let array_load_kind ~space ppf (load_kind : array_load_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] load_kind with
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | _ -> None
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -536,6 +542,8 @@ let array_set_kind ~space ppf (set_kind : array_set_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] set_kind with
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | _ -> None
   in
   pp_option ~space Format.pp_print_string ppf str

@@ -240,7 +240,7 @@ type primitive =
   | Pbigarrayset of bool * int * bigarray_kind * bigarray_layout
   (* size of the nth dimension of a Bigarray *)
   | Pbigarraydim of int
-  (* load/set 16,32,64,128 bits from a string: (unsafe)*)
+  (* load/set 16,32,64 bits from a string: (unsafe)*)
   | Pstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -248,9 +248,9 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
-  | Pstring_load_128 of
-      { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
+  | Pstring_load_vec of
+      { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
+        mode : locality_mode; boxed : bool }
   | Pbytes_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -258,9 +258,9 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbytes_load_64 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
-  | Pbytes_load_128 of
-      { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
+  | Pbytes_load_vec of
+      { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
+        mode : locality_mode; boxed : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
@@ -268,9 +268,9 @@ type primitive =
       boxed : bool }
   | Pbytes_set_64 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
-  | Pbytes_set_128 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  (* load/set 16,32,64,128 bits from a
+  | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
+                        index_kind : array_index_kind; boxed : bool }
+  (* load/set 16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   | Pbigstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
@@ -279,7 +279,7 @@ type primitive =
       mode : locality_mode; boxed : bool }
   | Pbigstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
-  | Pbigstring_load_128 of { aligned : bool; unsafe : bool;
+  | Pbigstring_load_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
       index_kind : array_index_kind; mode : locality_mode; boxed : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
@@ -288,52 +288,52 @@ type primitive =
       boxed : bool }
   | Pbigstring_set_64 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
-  | Pbigstring_set_128 of { aligned : bool; unsafe : bool;
+  | Pbigstring_set_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
       index_kind : array_index_kind; boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
-  | Pfloatarray_load_128 of { unsafe : bool;
+  | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
                               mode : locality_mode; boxed : bool }
-  | Pfloat_array_load_128 of { unsafe : bool;
+  | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
                                index_kind : array_index_kind;
                                mode : locality_mode; boxed : bool }
-  | Pint_array_load_128 of { unsafe : bool;
+  | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind;
                              mode : locality_mode; boxed : bool }
-  | Punboxed_float_array_load_128 of { unsafe : bool;
+  | Punboxed_float_array_load_vec of { size : boxed_vector; unsafe : bool;
                                        index_kind : array_index_kind;
                                        mode : locality_mode; boxed : bool }
-  | Punboxed_float32_array_load_128 of { unsafe : bool;
+  | Punboxed_float32_array_load_vec of { size : boxed_vector; unsafe : bool;
                                          index_kind : array_index_kind;
                                          mode : locality_mode; boxed : bool }
-  | Punboxed_int32_array_load_128 of { unsafe : bool;
+  | Punboxed_int32_array_load_vec of { size : boxed_vector; unsafe : bool;
                                        index_kind : array_index_kind;
                                        mode : locality_mode; boxed : bool }
-  | Punboxed_int64_array_load_128 of { unsafe : bool;
+  | Punboxed_int64_array_load_vec of { size : boxed_vector; unsafe : bool;
                                        index_kind : array_index_kind;
                                        mode : locality_mode; boxed : bool }
-  | Punboxed_nativeint_array_load_128 of { unsafe : bool;
+  | Punboxed_nativeint_array_load_vec of { size : boxed_vector; unsafe : bool;
                                            index_kind : array_index_kind;
                                            mode : locality_mode; boxed : bool }
-  | Pfloatarray_set_128 of { unsafe : bool;
+  | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
-  | Pfloat_array_set_128 of { unsafe : bool;
+  | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind; boxed : bool }
-  | Pint_array_set_128 of { unsafe : bool;
+  | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
                             index_kind : array_index_kind; boxed : bool }
-  | Punboxed_float_array_set_128 of { unsafe : bool;
+  | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
                                       index_kind : array_index_kind;
                                       boxed : bool }
-  | Punboxed_float32_array_set_128 of { unsafe : bool;
+  | Punboxed_float32_array_set_vec of { size : boxed_vector; unsafe : bool;
                                         index_kind : array_index_kind;
                                         boxed : bool }
-  | Punboxed_int32_array_set_128 of { unsafe : bool;
+  | Punboxed_int32_array_set_vec of { size : boxed_vector; unsafe : bool;
                                       index_kind : array_index_kind;
                                       boxed : bool }
-  | Punboxed_int64_array_set_128 of { unsafe : bool;
+  | Punboxed_int64_array_set_vec of { size : boxed_vector; unsafe : bool;
                                       index_kind : array_index_kind;
                                       boxed : bool }
-  | Punboxed_nativeint_array_set_128 of { unsafe : bool;
+  | Punboxed_nativeint_array_set_vec of { size : boxed_vector; unsafe : bool;
                                           index_kind : array_index_kind;
                                           boxed : bool }
   (* Compile time constants *)

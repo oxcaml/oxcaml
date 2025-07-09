@@ -192,6 +192,8 @@ let string_or_bigstring_load kind width =
     (* add, load (allow_unaligned_access) *)
     (* 37 (not allow_unaligned_access) *)
     | One_twenty_eight _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Two_fifty_six _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Five_twelve _ -> 2 (* add, load (alignment handled explicitly) *)
   in
   start_address_load + elt_load
 
