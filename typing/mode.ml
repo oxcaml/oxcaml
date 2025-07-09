@@ -766,9 +766,10 @@ module Lattices = struct
       { areality; linearity; portability; yielding; statefulness; externality }
 
     let print ppf m =
-      Format.fprintf ppf "%a,%a,%a,%a,%a" Areality.print m.areality
+      Format.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
         Linearity.print m.linearity Portability.print m.portability
         Yielding.print m.yielding Statefulness.print m.statefulness
+        Externality.print m.externality
   end
   [@@inline]
 
