@@ -921,8 +921,8 @@ let mk_directive ~loc name arg =
    may also get re-inlined at that point *)
 let unboxed_literals_extension = Language_extension.Layouts
 
-let generic_optional label _loc =
-  Generic_optional label
+let generic_optional mod_path label _loc =
+  Generic_optional(mod_path, label)
   (*
   We want parsing to succeed even if extensions are disabled.
 
@@ -1082,7 +1082,6 @@ let maybe_pmod_constraint mode expr =
 %token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
-%token <string> GENOPTLABEL   "?'label:" (* just an example *)
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
@@ -2702,18 +2701,18 @@ labeled_simple_pattern:
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
-  | QUESTION QUOTE LPAREN label_let_pattern generic_opt_default RPAREN
-      { (generic_optional (fst $4) $sloc, $5, snd $4) }
-  | QUESTION QUOTE label_var
-      { (generic_optional (fst $3) $sloc, None, snd $3) }
+  | mkrhs(mod_longident) DOT QUESTION LPAREN label_let_pattern opt_default RPAREN
+      { (generic_optional $1 (fst $5) $sloc, $6, (snd $5)) }
+  | mkrhs(mod_longident) DOT QUESTION label_var
+      { (generic_optional $1 (fst $4) $sloc, None, snd $4) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
-  | GENOPTLABEL LPAREN let_pattern generic_opt_default RPAREN
-      { (generic_optional $1 $sloc, $4, $3) }
-  | GENOPTLABEL pattern_var
-      { (generic_optional $1 $sloc, None, $2) }
+  | mkrhs(mod_longident) DOT OPTLABEL LPAREN let_pattern opt_default RPAREN
+      { (generic_optional $1 $3 $sloc, $6, $5) }
+  | mkrhs(mod_longident) DOT OPTLABEL pattern_var
+      { (generic_optional $1 $3 $sloc, None, $4) }
   | TILDE LPAREN label_let_pattern RPAREN
       { (Labelled (fst $3), None, snd $3) }
   | TILDE label_var
@@ -2733,11 +2732,6 @@ pattern_var:
 
 %inline opt_default:
   preceded(EQUAL, seq_expr)?
-    { $1 }
-;
-
-%inline generic_opt_default:
-  preceded(LESSMINUS, seq_expr)?
     { $1 }
 ;
 
@@ -3192,13 +3186,13 @@ labeled_simple_expr:
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
-  | QUESTION QUOTE label = LIDENT
+  | mod_path = mkrhs(mod_longident) DOT QUESTION label = LIDENT
       { let loc = $loc(label) in
-        (generic_optional label $sloc, mkexpvar ~loc label) }
+        (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
-  | GENOPTLABEL simple_expr %prec below_HASH
-      { (generic_optional $1 $sloc, $2) }
+  | mkrhs(mod_longident) DOT OPTLABEL simple_expr %prec below_HASH
+      { (generic_optional $1 $3 $sloc, $4) }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -4540,7 +4534,7 @@ strict_function_or_labeled_tuple_type:
   | label = optlabel
       { Optional label }
   | label = genoptlabel
-      { generic_optional label $sloc}
+      { generic_optional (fst label) (snd label) $sloc}
   | label = LIDENT COLON
       { Labelled label }
 ;
@@ -5213,8 +5207,7 @@ optlabel:
    | QUESTION LIDENT COLON                      { $2 }
 ;
 genoptlabel:
-   | GENOPTLABEL                                   { $1 }
-   | QUESTION QUOTE LIDENT COLON                      { $3 }
+   | mkrhs(mod_longident) DOT QUESTION LIDENT COLON                      { ($1, $4) }
 ;
 
 /* Attributes and extensions */

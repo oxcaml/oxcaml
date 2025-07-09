@@ -258,7 +258,6 @@ and arg_label =
   | Labelled of string (** [label:T -> ...] *)
   | Optional of string (** [?label:T -> ...] *)
   | Position of string (** [label:[%call_pos] -> ...] *)
-  | Generic_optional of string (** [?'label:T -> ...] *)
 
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
