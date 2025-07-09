@@ -43,6 +43,14 @@ module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
 
+module I = struct
+  include I
+
+  let simd simd args =
+    Arch.Extension.require_simd simd;
+    I.simd simd args
+end
+
 (** Turn a Linear label into an assembly label. The section is checked against the
     section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
