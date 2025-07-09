@@ -268,7 +268,7 @@ CAMLprim value caml_atomic_set_field(value ref, value vfield, value v)
 
 CAMLprim value caml_atomic_set(value ref, value v)
 {
-  return caml_atomic_set_field(ref, Val_long(0), v)
+  return caml_atomic_set_field(ref, Val_long(0), v);
 }
 
 CAMLprim value caml_atomic_compare_exchange_field(value ref, value vfield, value oldv, value newv)
