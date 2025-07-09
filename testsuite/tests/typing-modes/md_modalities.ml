@@ -111,7 +111,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module M : T @@ stateless nonportable
-module type S = sig module M' = M @@ portable end
+module type S = sig module M' = M end
 |}]
 
 (* works for Mty_strenthen, and type check keeps working *)

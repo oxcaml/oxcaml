@@ -1064,20 +1064,9 @@ let rec apply_modalities_signature ~recursive env modalities sg =
       let vd = {vd with val_modalities} in
       Sig_value (id, vd, vis)
   | Sig_module (id, pres, md, rec_, vis) when recursive ->
-      begin match apply_modalities_module_type env modalities md.md_type with
-      | Some md_type ->
-          let md = {md with md_type} in
-          Sig_module (id, pres, md, rec_, vis)
-      | None ->
-          let md_modalities =
-            md.md_modalities
-            |> Mode.Modality.Value.to_const_exn
-            |> (fun then_ -> Mode.Modality.Value.Const.concat ~then_ modalities)
-            |> Mode.Modality.Value.of_const
-          in
-          let md = {md with md_modalities} in
-          Sig_module (id, pres, md, rec_, vis)
-      end
+      let md_type = apply_modalities_module_type env modalities md.md_type in
+      let md = {md with md_type} in
+      Sig_module (id, pres, md, rec_, vis)
   | item -> item
   ) sg
 
@@ -1085,20 +1074,15 @@ and apply_modalities_module_type env modalities = function
   | Mty_ident p ->
       let mtd = Env.find_modtype p env in
       begin match mtd.mtd_type with
-      | None -> Some (Mty_ident p)
+      | None -> Mty_ident p
       | Some mty -> apply_modalities_module_type env modalities mty
       end
   | Mty_strengthen (mty, p, alias) ->
-      Option.map (fun mty -> Mty_strengthen (mty, p, alias))
-        (apply_modalities_module_type env modalities mty)
+      Mty_strengthen (apply_modalities_module_type env modalities mty, p, alias)
   | Mty_signature sg ->
       let sg = apply_modalities_signature ~recursive:true env modalities sg in
-      Some (Mty_signature sg)
-  | Mty_functor _ as mty ->
-      (* CR zqian: for backward compatibility, functors won't be affected by
-        modalities *)
-      Some mty
-  | Mty_alias _ -> None
+      Mty_signature sg
+  | (Mty_functor _ | Mty_alias _) as mty -> mty
 
 let loc_of_modes (modes : Parsetree.mode loc list) : Location.t option =
   (* CR zqian: [Parsetree.modes] should be a record with a field that is
@@ -1150,9 +1134,7 @@ let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   match Mode.Modality.Value.Const.is_id modalities with
   | true -> mty, Mode.Modality.Value.id
   | false ->
-      match apply_modalities_module_type env modalities mty with
-      | Some mty -> mty, Mode.Modality.Value.id
-      | None -> mty, Mode.Modality.Value.of_const modalities
+      apply_modalities_module_type env modalities mty, Mode.Modality.Value.id
 
 (* Auxiliary for translating recursively-defined module types.
    Return a module type that approximates the shape of the given module
