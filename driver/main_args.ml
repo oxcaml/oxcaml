@@ -874,9 +874,6 @@ let mk_debug_ocaml f =
   "-debug-ocaml", Arg.Unit f, " Debugging output for the compiler\n\
                                (internal use only)"
 
-let mk_error_size f =
-  "-error-size", Arg.Int f, " Omit error message context if longer than this"
-
 let mk_opaque f =
   "-opaque", Arg.Unit f,
   " Does not generate cross-module optimization information\n\
@@ -964,7 +961,6 @@ module type Common_options = sig
   val _vnum : unit -> unit
   val _w : string -> unit
   val _debug_ocaml : unit -> unit
-  val _error_size : int -> unit
 
   val anonymous : string -> unit
 end
@@ -1325,7 +1321,6 @@ struct
     mk_dump_into_csv F._dump_into_csv;
     mk_dump_dir F._dump_dir;
     mk_debug_ocaml F._debug_ocaml;
-    mk_error_size F._error_size;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1408,7 +1403,6 @@ struct
     mk_dletreclambda F._dletreclambda;
     mk_dinstr F._dinstr;
     mk_debug_ocaml F._debug_ocaml;
-    mk_error_size F._error_size;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1593,7 +1587,6 @@ struct
     mk_dump_dir F._dump_dir;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
-    mk_error_size F._error_size;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1705,7 +1698,6 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dstartup F._dstartup;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
-    mk_error_size F._error_size;
 
     mk_eval F._eval;
   ]
@@ -1768,8 +1760,6 @@ struct
     mk_w F._w;
     mk__ F.anonymous;
     mk_debug_ocaml F._debug_ocaml;
-    mk_error_size F._error_size;
-
   ]
 end;;
 
@@ -1866,7 +1856,6 @@ module Default = struct
     let _w s =
       Warnings.parse_options false s |> Option.iter Location.(prerr_alert none)
     let _debug_ocaml = set debug_ocaml
-    let _error_size s = error_size := s
 
     let anonymous = Compenv.anonymous
 
