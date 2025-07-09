@@ -389,13 +389,23 @@ module Hardware_register = struct
   type t =
     { location : location;
       interval : Interval.t;
-      mutable assigned : assigned list
+      assigned : assigned Reg.Tbl.t
     }
 
   let add_non_evictable t reg interval =
+    assert (not (Reg.Tbl.mem t.assigned reg));
     Interval.add_ranges t.interval ~from:interval;
-    t.assigned
-      <- { pseudo_reg = reg; interval; evictable = false } :: t.assigned
+    Reg.Tbl.replace t.assigned reg
+      { pseudo_reg = reg; interval; evictable = false }
+
+  let add_evictable t reg interval =
+    assert (not (Reg.Tbl.mem t.assigned reg));
+    Reg.Tbl.replace t.assigned reg
+      { pseudo_reg = reg; interval; evictable = true }
+
+  let remove_evictable t reg =
+    assert (Reg.Tbl.mem t.assigned reg);
+    Reg.Tbl.remove t.assigned reg
 end
 
 type available =
@@ -421,7 +431,7 @@ module Hardware_registers = struct
             in
             { Hardware_register.location;
               interval = Interval.make_empty ();
-              assigned = []
+              assigned = Reg.Tbl.create 17
             }))
 
   let of_reg (t : t) (reg : Reg.t) : Hardware_register.t option =
@@ -456,6 +466,15 @@ module Hardware_registers = struct
        a stack slot *)
     SpillCosts.for_reg costs reg
 
+  exception Found
+
+  let exists_assigned (tbl : Hardware_register.assigned Reg.Tbl.t)
+      ~(f : Hardware_register.assigned -> bool) =
+    try
+      Reg.Tbl.iter (fun _reg assigned -> if f assigned then raise Found) tbl;
+      false
+    with Found -> true
+
   let overlap (hardware_reg : Hardware_register.t) (interval : Interval.t) :
       bool =
     if debug
@@ -463,20 +482,14 @@ module Hardware_registers = struct
       log "considering %a" Hardware_register.print_location
         hardware_reg.location;
       indent ());
-    let overlap_hard : bool = Interval.overlap interval hardware_reg.interval in
-    let overlap_assigned =
-      List.exists hardware_reg.assigned
-        ~f:(fun
-             { Hardware_register.pseudo_reg = _; interval = itv; evictable = _ }
-           -> Interval.overlap itv interval)
-    in
-    let overlap = overlap_hard || overlap_assigned in
-    if debug
-    then (
-      log "overlap=%B (hard=%B, assigned=%B)" overlap overlap_hard
-        overlap_assigned;
-      dedent ());
-    overlap
+    Interval.overlap interval hardware_reg.interval
+    || exists_assigned hardware_reg.assigned
+         ~f:(fun
+              { Hardware_register.pseudo_reg = _;
+                interval = itv;
+                evictable = _
+              }
+            -> Interval.overlap itv interval)
 
   let find_first (t : t) (reg : Reg.t) (interval : Interval.t) :
       Hardware_register.t option =
@@ -506,26 +519,26 @@ module Hardware_registers = struct
           then
             log "considering %a (length=%d)" Hardware_register.print_location
               hardware_reg.location
-              (List.length hardware_reg.assigned);
+              (Reg.Tbl.length hardware_reg.assigned);
           let overlap_hard = Interval.overlap interval hardware_reg.interval in
           if overlap_hard
           then acc
           else (
             if debug then indent ();
             let overlaping : Hardware_register.assigned list =
-              List.filter hardware_reg.assigned
-                ~f:(fun
-                     { Hardware_register.pseudo_reg;
-                       interval = itv;
-                       evictable = _
-                     }
-                   ->
+              Reg.Tbl.fold
+                (fun _
+                     ({ Hardware_register.pseudo_reg;
+                        interval = itv;
+                        evictable = _
+                      } as assigned) acc ->
                   let overlap = Interval.overlap interval itv in
                   if debug
                   then
                     log "%a is assigned / overlap=%B" Printreg.reg pseudo_reg
                       overlap;
-                  overlap)
+                  if overlap then assigned :: acc else acc)
+                hardware_reg.assigned []
             in
             (match overlaping with
             | [] -> fatal "overlaping list should not be empty"
@@ -561,7 +574,8 @@ module Hardware_registers = struct
       For_eviction { hardware_reg; evicted_regs }
     | None -> Split_or_spill
 
-  let find_available : t -> SpillCosts.t -> Reg.t -> Interval.t -> available =
+  let find_available :
+      t -> SpillCosts.t Lazy.t -> Reg.t -> Interval.t -> available =
    fun t costs reg interval ->
     let with_no_overlap =
       let heuristic =
@@ -588,5 +602,5 @@ module Hardware_registers = struct
     | Some hardware_reg -> For_assignment { hardware_reg }
     | None ->
       if debug then log "trying to find an evictable register";
-      find_evictable t costs reg interval
+      find_evictable t (Lazy.force costs) reg interval
 end
