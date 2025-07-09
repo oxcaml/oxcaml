@@ -314,7 +314,8 @@ type primitive =
   | Pbbswap of boxed_integer * locality_mode
   (* Integer to external pointer *)
   | Pint_as_pointer of locality_mode
-  (* Atomic operations *)
+  (* Atomic operations. Note that these operations must not be used on fields of
+     all-float blocks. *)
   | Patomic_load_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
