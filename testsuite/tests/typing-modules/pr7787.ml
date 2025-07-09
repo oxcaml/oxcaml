@@ -37,7 +37,7 @@ end = struct
 end;;
 [%%expect{|
 module rec M : sig val go : unit -> int end
-and T2 : sig module N = T.N end
+and T2 : sig module N = T.N @@ portable end
 |}]
 
 let () = ignore (M.go ())
