@@ -466,7 +466,24 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
     | Atom (Monadic Visibility, Join_with Visibility.Const.Read) -> "read"
     | Atom (Monadic Visibility, Join_with Visibility.Const.Read_write) ->
       "read_write"
-    | _ -> failwith "BUG: impossible modality atom"
+    | Atom
+        (Comonadic Externality, Meet_with Mode.Externality.Const.Byte_external)
+      ->
+      "external_"
+    (* CR jcutler: think about correct printing of byte external, do we
+       actually want to ever show this to anyone? *)
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External) ->
+      "external_"
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External64)
+      ->
+      "external64"
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.Internal) ->
+      "internal"
+    | _ ->
+      let s =
+        Format.asprintf "BUG: impossible modality atom %a!\n" Modality.print a
+      in
+      failwith s
   in
   { txt = Modality s; loc = Location.none }
 
