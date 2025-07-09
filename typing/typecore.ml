@@ -692,7 +692,10 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_mode alloc_mode =
+let register_allocation_mode  alloc_mode =
+  (* CR jcutler do the proper error eporting here! *)
+  let externality = Alloc.proj (Comonadic Externality) alloc_mode in
+  Externality.submode_exn Externality.internal externality;
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
