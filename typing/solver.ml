@@ -305,62 +305,70 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
       (a, l * r) mode ->
       (b, l * r) mode =
    fun dst ?(hint = Hint.morph_none) morph m ->
-    let create_const_morph_hint h = Morph (hint, morph, h) in
     match m with
-    | Amode (a, h) -> Amode (C.apply dst morph a, create_const_morph_hint h)
+    | Amode (a, h) -> Amode (C.apply dst morph a, Morph (hint, morph, h))
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)
     | Amodejoin (a, h, vs) ->
       Amodejoin
         ( C.apply dst morph a,
-          create_const_morph_hint h,
+          Morph (hint, morph, h),
           VarMap.map (apply_morphvar dst morph hint) vs )
     | Amodemeet (a, h, vs) ->
       Amodemeet
         ( C.apply dst morph a,
-          create_const_morph_hint h,
+          Morph (hint, morph, h),
           VarMap.map (apply_morphvar dst morph hint) vs )
 
-  let choose_hint_for_join_cc obj a a_hint b b_hint =
+  let hint_biased_join_const obj a a_hint b b_hint =
+    (* A version of [hint_join_const] that assumes that a <= b is false,
+       so won't perform this check. *)
+    if C.le obj b a then a_hint else Branch (a, a_hint, b, b_hint)
+
+  let hint_join_const obj a a_hint b b_hint =
     (* This just provides a minor optimization to avoid having unnecessarily-nested Branch hints.
        When a join, [join a b], is performed, the hint we use for the result should be a [Branch]
-       if both arguments are relevant, but if we have that [a < b] in the lattice structure then
+       if both arguments are relevant, but if we have that [a <= b] in the lattice structure then
        we don't really need to consider the hint for [a], and vice versa for [b]'s hint. *)
     if C.le obj a b
     then b_hint
-    else if C.le obj b a
-    then a_hint
-    else Branch (a, a_hint, b, b_hint)
+    else hint_biased_join_const obj a a_hint b b_hint
 
-  let choose_hint_for_meet_cc obj a a_hint b b_hint =
-    (* Comments for [choose_hint_for_join_cc] apply here similarly but the other way round (since this is for meet, not join) *)
+  let hint_biased_meet_const obj a a_hint b b_hint =
+    (* A version of [hint_meet_const] that assumes that a <= b is false,
+       so won't perform this check. *)
+    if C.le obj b a then b_hint else Branch (a, a_hint, b, b_hint)
+
+  let hint_meet_const obj a a_hint b b_hint =
+    (* Comments for [hint_join_const] apply here similarly but the other way round
+       (since this is for meet, not join) *)
     if C.le obj a b
     then a_hint
-    else if C.le obj b a
-    then b_hint
-    else Branch (a, a_hint, b, b_hint)
+    else hint_biased_meet_const obj a a_hint b b_hint
 
-  (** Arguments are not checked and used directly. They must satisfy the
-      INVARIANT listed above. *)
+  (** Calling [update_lower ~log obj v a a_hint] assumes that [not (a <= v.lower)].
+      Arguments are not checked and used directly. They must satisfy the
+        INVARIANT listed above. *)
   let update_lower (type a) ~log (obj : a C.obj) v a a_hint =
     (match log with
     | None -> ()
     | Some log -> log := Clower (v, v.lower, v.lower_hint) :: !log);
     let new_lower = C.join obj v.lower a in
     let new_lower_hint =
-      choose_hint_for_join_cc obj v.lower v.lower_hint a a_hint
+      hint_biased_join_const obj a a_hint v.lower v.lower_hint
     in
     v.lower <- new_lower;
     v.lower_hint <- new_lower_hint
 
-  (** Arguments are not checked and used directly. They must satisfy the
-      INVARIANT listed above. *)
+  (** Calling [update_upper ~log obj v a a_hint] assumes that [not (v.upper <= a)].
+      Arguments are not checked and used directly. They must satisfy the
+        INVARIANT listed above. *)
   let update_upper (type a) ~log (obj : a C.obj) v a a_hint =
     (match log with
     | None -> ()
     | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
     let new_upper = C.meet obj v.upper a in
     let new_upper_hint =
-      choose_hint_for_meet_cc obj v.upper v.upper_hint a a_hint
+      hint_biased_meet_const obj v.upper v.upper_hint a a_hint
     in
     v.upper <- new_upper;
     v.upper_hint <- new_upper_hint
@@ -610,9 +618,7 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
         | mv :: xs -> (
           match disallow_right mv with
           | Amode (b, b_hint) ->
-            loop (C.join obj a b)
-              (choose_hint_for_join_cc obj a a_hint b b_hint)
-              mvs xs
+            loop (C.join obj a b) (hint_join_const obj a a_hint b b_hint) mvs xs
           (* some minor optimization: if [a] is lower than [mlower mv], we
               should keep the latter instead. This helps to fail early in
              [submode] *)
@@ -620,11 +626,11 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
             let b = mlower obj mv in
             let b_hint = mlower_hint mv in
             loop (C.join obj a b)
-              (choose_hint_for_join_cc obj a a_hint b b_hint)
+              (hint_join_const obj a a_hint b b_hint)
               (cons_dedup mv mvs) xs
           | Amodejoin (b, b_hint, mvs') ->
             loop (C.join obj a b)
-              (choose_hint_for_join_cc obj a a_hint b b_hint)
+              (hint_join_const obj a a_hint b b_hint)
               (union_prefer_left mvs' mvs)
               xs)
     in
@@ -646,19 +652,17 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
         | mv :: xs -> (
           match disallow_left mv with
           | Amode (b, b_hint) ->
-            loop (C.meet obj a b)
-              (choose_hint_for_meet_cc obj a a_hint b b_hint)
-              mvs xs
+            loop (C.meet obj a b) (hint_meet_const obj a a_hint b b_hint) mvs xs
             (* some minor optimization: if [a] is higher than [mupper mv], we should keep the latter instead. This helps to fail early in [submode_log] *)
           | Amodevar mv ->
             let b = mupper obj mv in
             let b_hint = mupper_hint mv in
             loop (C.meet obj a b)
-              (choose_hint_for_meet_cc obj a a_hint b b_hint)
+              (hint_meet_const obj a a_hint b b_hint)
               (cons_dedup mv mvs) xs
           | Amodemeet (b, b_hint, mvs') ->
             loop (C.meet obj a b)
-              (choose_hint_for_meet_cc obj a a_hint b b_hint)
+              (hint_meet_const obj a a_hint b b_hint)
               (union_prefer_left mvs' mvs)
               xs)
     in
@@ -729,11 +733,11 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
       let log = ref empty_changes in
       let r = submode_mvc ~log:(Some log) obj mv lower lower_hint in
       match r with
-      | Ok () -> !log, lower, lower_hint
+      | Ok () -> !log, lower
       | Error (a, a_hint) ->
         undo_changes !log;
         loop (C.join obj a lower)
-          (choose_hint_for_join_cc obj a a_hint lower lower_hint)
+          (hint_join_const obj a a_hint lower lower_hint)
     in
     let lower = mlower obj mv in
     let lower_hint = mlower_hint mv in
@@ -744,30 +748,30 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
       be [None], in which case the zapping is reverted. The latter is useful
       when the caller only wants to know the floor without zapping. *)
   let zap_to_floor_morphvar obj mv ~commit =
-    let log_, lower, lower_hint = zap_to_floor_morphvar_aux obj mv in
+    let log_, lower = zap_to_floor_morphvar_aux obj mv in
     (match commit with
     | None -> undo_changes log_
     | Some log -> log := append_changes !log log_);
-    lower, lower_hint
+    lower
 
   let zap_to_floor : type a r. a C.obj -> (a, allowed * r) mode -> log:_ -> a =
    fun obj m ~log ->
     match m with
     | Amode (a, _a_hint) -> a
-    | Amodevar mv -> zap_to_floor_morphvar obj mv ~commit:log |> fst
-    | Amodejoin (a, a_hint, mvs) ->
-      let floor, floor_hint =
+    | Amodevar mv -> zap_to_floor_morphvar obj mv ~commit:log
+    | Amodejoin (a, _a_hint, mvs) ->
+      let floor =
         VarMap.fold
-          (fun _ mv (acc, acc_hint) ->
-            let mv_floor, mv_floor_hint =
-              zap_to_floor_morphvar obj mv ~commit:None
-            in
-            ( C.join obj acc mv_floor,
-              choose_hint_for_join_cc obj acc acc_hint mv_floor mv_floor_hint ))
-          mvs (a, a_hint)
+          (fun _ mv acc ->
+            let mv_floor = zap_to_floor_morphvar obj mv ~commit:None in
+            C.join obj acc mv_floor)
+          mvs a
       in
       VarMap.iter
-        (fun _ mv -> submode_mvc obj mv floor floor_hint ~log |> Result.get_ok)
+        (fun _ mv ->
+          (* Since this call to [submode_mvc] should always succeed,
+             we provide a throwaway, arbitrary hint *)
+          submode_mvc obj mv floor (Const Hint.const_none) ~log |> Result.get_ok)
         mvs;
       floor
 
@@ -775,13 +779,11 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
    fun obj m ->
     match m with
     | Amode (a, _a_hint) -> a
-    | Amodevar mv -> zap_to_floor_morphvar obj mv ~commit:None |> fst
+    | Amodevar mv -> zap_to_floor_morphvar obj mv ~commit:None
     | Amodejoin (a, _a_hint, mvs) ->
       VarMap.fold
         (fun _ mv acc ->
-          let mv_floor, _mv_floor_hint =
-            zap_to_floor_morphvar obj mv ~commit:None
-          in
+          let mv_floor = zap_to_floor_morphvar obj mv ~commit:None in
           C.join obj acc mv_floor)
         mvs a
 
@@ -810,11 +812,9 @@ module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
     | Amodevar mv ->
       (* [~lower] is not precise (because [mlower mv] is not precise), but
          it doesn't need to be *)
-      let mv_lower = mlower obj mv in
-      let mv_lower_hint = mlower_hint mv in
       ( Amodevar
           (Amorphvar
-             ( fresh ~lower:mv_lower ~lower_hint:mv_lower_hint
+             ( fresh ~lower:(mlower obj mv) ~lower_hint:(mlower_hint mv)
                  ~vlower:(VarMap.singleton (get_key mv) mv)
                  obj,
                C.id,
