@@ -636,8 +636,8 @@ module M :
   end
 module type S =
   sig
-    module N : sig module I = Int end @@ portable
-    module P : sig module I = N.I end @@ portable
+    module N : sig module I = Int @@ portable end
+    module P : sig module I = N.I @@ portable end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(P.I).t) eq end
       @@ stateless
@@ -662,10 +662,12 @@ module M :
   end
 module type S =
   sig
-    module N : sig module I = Int end @@ portable
+    module N : sig module I = Int @@ portable end
     module P :
-      sig module I : sig type t = int val compare : 'a -> 'a -> int end end
-      @@ portable
+      sig
+        module I : sig type t = int val compare : 'a -> 'a -> int end @@
+          portable
+      end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(N.I).t) eq end
       @@ stateless
