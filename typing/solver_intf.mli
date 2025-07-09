@@ -301,18 +301,28 @@ module type Solver_mono = sig
 end
 
 module type Hint = sig
+  (** The type of hints for mode constants *)
   type const
 
+  (** The empty mode constant hint *)
   val const_none : const
 
+  (** The type of hints for mode variables with morphisms *)
   type morph
 
+  (** The empty mode morphism hint *)
   val morph_none : morph
 
+  (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : morph -> morph
 
+  (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
   val right_adjoint : morph -> morph
 
+  (** Given hints for two mode morphisms, return a hint for their composition.
+    If [h1] is a hint for [f1] and [h2] is a hint for [f2] then
+    [compose h2 h1] refers the hint for the composition [f2 . f1]
+    (i.e. first applying [f1] then applying [f2]) *)
   val compose : morph -> morph -> morph
 end
 
@@ -325,7 +335,7 @@ module type S = sig
     Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t
 
   (** Solver that supports lattices with monotone morphisms between them. *)
-  module Solver_mono (C : Lattices_mono) (Hint : Hint) :
+  module Solver_mono (Hint : Hint) (C : Lattices_mono) :
     Solver_mono
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj

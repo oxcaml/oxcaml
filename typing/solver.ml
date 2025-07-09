@@ -28,7 +28,7 @@ module Magic_equal (X : Equal) :
 end
 [@@inline]
 
-module Solver_mono (C : Lattices_mono) (Hint : Hint) = struct
+module Solver_mono (Hint : Hint) (C : Lattices_mono) = struct
   type 'a hint =
     | Morph : Hint.morph * ('b, 'a, 'd) C.morph * 'b hint -> 'a hint
     | Const : Hint.const -> 'a hint

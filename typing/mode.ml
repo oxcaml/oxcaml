@@ -1550,8 +1550,6 @@ module Lattices_mono = struct
       Map_comonadic f'
 end
 
-module C = Lattices_mono
-
 module Hint = struct
   (* This implementation is just temporary,
      until we create a proper implementation which properly tracks hints *)
@@ -1571,7 +1569,8 @@ module Hint = struct
   let compose MNone MNone = MNone
 end
 
-module Solver = Solver_mono (C) (Hint)
+module C = Lattices_mono
+module Solver = Solver_mono (Hint) (C)
 module S = Solver
 
 let solver_error_to_serror : 'a S.error -> 'a serror =
