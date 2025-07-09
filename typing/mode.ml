@@ -1495,6 +1495,55 @@ module Lattices_mono = struct
    fun dst f g ->
     match maybe_compose dst f g with Some m -> m | None -> Compose (f, g)
 
+  (*
+ (** [maybe_compose_with_proj a f] will consider the composition [proj_a . f]
+  (where [proj_a] is a projection to axis [a]) and run maybe_compose
+  on this. Due to the nature of this operation, the return type can be more specific,
+  it will return one of:
+  1. a single morphism that represents the composition,
+  2. a composition of the form [f' . proj'],
+    where [f'] is a new morphism, and [proj'] is a new projection,
+  3. TODO - continue *)
+  let rec maybe_compose_with_proj :
+      type a b c l r.
+      (a, b, l * r) morph ->
+      b obj ->
+      (b, c) Axis.t ->
+      [ `None
+      | `Single of (a, c, l * r) morph
+      | `ProjThen of (b2, c, l * r) morph * b2 obj * (a, b2) Axis.t ]
+
+*)
+
+  type (_, _, _, _, _) tmp_t =
+    | None : ('a, 'b, 'c, 'l, 'r) tmp_t
+    | Single : ('a, 'c, 'l * 'r) morph -> ('a, 'b, 'c, 'l, 'r) tmp_t
+    | ProjThenMorph :
+        ('b2, 'c, 'l * 'r) morph * 'b2 obj * ('a, 'b2) Axis.t
+        -> ('a, 'b, 'c, 'l, 'r) tmp_t
+
+  type (_, _, _, _) tmp_extracted =
+    | None : (_, _, _, _) tmp_extracted
+    | Extracted :
+        ('b, 'c, 'l * 'r) morph * 'b obj * ('a, 'b) Axis.t
+        -> ('a, 'c, 'l, 'r) tmp_extracted
+
+  let extract_trailing_proj_from_morph :
+      type a b l r.
+      (a, b, l * r) morph -> (_ * (a, b, l, r) tmp_extracted) option = function
+    | _ -> _
+
+  let rec maybe_compose_with_proj :
+      type a b c l r.
+      b obj ->
+      c obj ->
+      (b, c) Axis.t ->
+      (a, b, l * r) morph ->
+      (a, b, c, l, r) tmp_t =
+   fun b_obj c_obj ax f ->
+    let proj = Proj (b_obj, ax) in
+    match maybe_compose c_obj proj f with None -> None | Some f' -> _
+
   let rec left_adjoint :
       type a b l.
       b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
@@ -1573,8 +1622,20 @@ module C = Lattices_mono
 module Solver = Solver_mono (Hint) (C)
 module S = Solver
 
-let solver_error_to_serror : 'a S.error -> 'a axerror =
- fun { left; left_hint = _; right; right_hint = _ } -> { left; right }
+let solver_error_to_serror : 'a S.error -> ('a, Hint.morph, Hint.const) axerror
+    =
+  let rec construct_with_hint (m : 'a) :
+      'a S.hint -> ('a, Hint.morph, Hint.const) hint = function
+    | Morph (hint, morph, b_hint) ->
+      let b_hint' = _ in
+      Morph (m, hint, b_hint')
+    | Const hint -> Const (m, hint)
+    | Branch _ -> _
+  in
+  fun { left; left_hint; right; right_hint } ->
+    { left = construct_with_hint left left_hint;
+      right = construct_with_hint right right_hint
+    }
 
 let flip_and_solver_error_to_serror : 'a S.error -> 'a axerror =
  fun { left; left_hint = _; right; right_hint = _ } -> { right; left }
@@ -1594,6 +1655,35 @@ type 'a comonadic_with = 'a C.comonadic_with =
   }
 
 module Axis = C.Axis
+
+let project_solver_hint_to_axis_hint :
+    type r a.
+    r Lattices_mono.obj ->
+    r ->
+    r S.hint ->
+    (r, a) Axis.t ->
+    (a, Hint.morph, Hint.const) hint =
+  let open Lattices_mono in
+  fun r_obj r r_hint axis ->
+    match r_hint with
+    | Morph (morph_hint, morph, b_s_hint) -> (
+      let proj_morph = Proj (r_obj, axis) in
+      let a_obj = proj_obj axis r_obj in
+      let a = apply a_obj proj_morph r in
+      match maybe_compose a_obj proj_morph morph with
+      | None ->
+        failwith
+          "TODO - just stop the hinting there, don't try continue down it"
+      | Some morph_with_proj ->
+        let b_hint : ('b, Hint.morph, Hint.const) hint = _ in
+        Morph (a, failwith "TODO", b_hint))
+    | Const a_hint -> _
+    | Branch (a, a_hint, b, b_hint) -> _
+
+let project_error_to_axis_error :
+    type r a. (r, a) Axis.t -> r S.error -> (a, Hint.morph, Hint.const) axerror
+    =
+ fun axis err -> _
 
 type changes = S.changes
 
@@ -2134,7 +2224,9 @@ module Comonadic_with (Areality : Areality) = struct
               Error
                 ( Statefulness,
                   { left = err.left.statefulness;
-                    right = err.right.statefulness
+                    left_hint = _;
+                    right = err.right.statefulness;
+                    right_hint = _
                   } )
           else
             Error
@@ -2148,7 +2240,13 @@ module Comonadic_with (Areality : Areality) = struct
         Error
           (Linearity, { left = err.left.linearity; right = err.right.linearity })
     else
-      Error (Areality, { left = err.left.areality; right = err.right.areality })
+      Error
+        ( Areality,
+          { left = err.left.areality;
+            left_hint = _;
+            right = err.right.areality;
+            right_hint = _
+          } )
 
   (* overriding to report the offending axis *)
   let submode_log m0 m1 ~log : _ result =

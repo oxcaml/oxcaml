@@ -14,9 +14,13 @@
 
 open Allowance
 
-type 'a axerror =
-  { left : 'a;
-    right : 'a
+type ('a, 'morph, 'const) hint =
+  | Morph : 'a * 'morph * ('b, 'morph, 'const) hint -> ('a, 'morph, 'const) hint
+  | Const : 'a * 'const -> ('a, 'morph, 'const) hint
+
+type ('a, 'morph, 'const) axerror =
+  { left : ('a, 'morph, 'const) hint;
+    right : ('a, 'morph, 'const) hint
   }
 
 (* While all our lattices are bi-Heyting algebras (see [mode.ml]), the extra
@@ -129,9 +133,16 @@ module type Common = sig
 end
 
 module type Common_axis = sig
+  type hint_morph
+
+  type hint_const
+
   module Const : Lattice
 
-  include Common with module Const := Const and type error = Const.t axerror
+  include
+    Common
+      with module Const := Const
+       and type error = (Const.t, hint_morph, hint_const) axerror
 end
 
 module type Axis = sig
@@ -155,12 +166,22 @@ module type Common_product = sig
 
   module Const : Lattice_product with type 'a axis := 'a Axis.t
 
-  type error = Error : 'a Axis.t * 'a axerror -> error
+  type error = Error : 'a Axis.t * ('a, 'morph, 'const) axerror -> error
 
   include Common with type error := error and module Const := Const
 end
 
 module type S = sig
+  module Hint : sig
+    type const
+
+    val const_none : const
+
+    type morph
+
+    val morph_none : morph
+  end
+
   type changes
 
   val undo_changes : changes -> unit
@@ -508,7 +529,7 @@ module type S = sig
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
-    type error = Error : 'a Axis.t * 'a axerror -> error
+    type error = Error : 'a Axis.t * ('a, 'morph, 'const) axerror -> error
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
@@ -625,7 +646,8 @@ module type S = sig
     module Value : sig
       type atom := t
 
-      type error = Error : 'a Value.Axis.t * 'a raw axerror -> error
+      type error =
+        | Error : 'a Value.Axis.t * ('a raw, 'morph, 'const) axerror -> error
 
       type nonrec equate_error = equate_step * error
 
