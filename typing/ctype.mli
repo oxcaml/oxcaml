@@ -783,3 +783,18 @@ val zap_modalities_to_floor_if_modes_enabled_at :
   Language_extension.maturity ->
   Mode.Modality.Value.t ->
   Mode.Modality.Value.Const.t
+
+(** The mode crossing of the memory block of a structure. *)
+val mode_crossing_structure_memaddr : Mode.Crossing.t
+
+(** The mode crossing of a functor. *)
+val mode_crossing_functor : Mode.Crossing.t
+
+(** The mode crossing of any module. *)
+val mode_crossing_module : Mode.Crossing.t
+
+(** Zap a modality to floor if maturity allows, zap to id otherwise. *)
+val zap_modalities_to_floor_if_at_least :
+  Language_extension.maturity ->
+  Mode.Modality.Value.t ->
+  Mode.Modality.Value.Const.t
