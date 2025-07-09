@@ -2726,9 +2726,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             _,
             _ )
       | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
-      | Patomic_exchange_field _ | Patomic_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Ppoke _ | Patomic_load_field _
+      | Patomic_load_field _ | Ppoke _
         ),
       ( []
       | [_]
