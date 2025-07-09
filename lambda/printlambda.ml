@@ -47,6 +47,11 @@ let boxed_vector = function
   | Boxed_vec256 -> "vec256"
   | Boxed_vec512 -> "vec512"
 
+let vector_width = function
+  | Boxed_vec128 -> "128"
+  | Boxed_vec256 -> "256"
+  | Boxed_vec512 -> "512"
+
 let rec scannable_product_element_kinds kinds =
   "[" ^ String.concat "; " (List.map scannable_product_element_kind kinds) ^ "]"
 
@@ -749,7 +754,7 @@ let primitive ppf = function
        (locality_kind mode) array_index_kind index_kind
   | Pstring_load_vec {size; unsafe; index_kind; mode; boxed} ->
      fprintf ppf "string.%sunaligned_get%s%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "") (boxed_vector size)
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_load_16 {unsafe; index_kind} ->
@@ -769,7 +774,7 @@ let primitive ppf = function
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_load_vec {size; unsafe; index_kind; mode; boxed} ->
      fprintf ppf "bytes.%sunaligned_get%s%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "") (boxed_vector size)
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_set_16 {unsafe; index_kind} ->
@@ -789,7 +794,7 @@ let primitive ppf = function
        array_index_kind index_kind
   | Pbytes_set_vec { size; unsafe; boxed; index_kind } ->
      fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "") (boxed_vector size)
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
   | Pbigstring_load_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sget16[indexed by %a]"
@@ -810,7 +815,7 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%s%sget%s%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
-       (boxed_vector size)
+       (vector_width size)
        (if boxed then "" else "#") (locality_kind mode) array_index_kind index_kind
   | Pbigstring_set_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset16[indexed by %a]"
@@ -831,71 +836,71 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%s%sset%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
-       (boxed_vector size)
+       (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
   | Pfloatarray_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "floatarray.%sget%s%s%s"
-       (if unsafe then "unsafe_" else "") (boxed_vector size)
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
   | Pfloat_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "float_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Pint_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "int_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_float_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_float32_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float32_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_int32_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int32_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_int64_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int64_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_nativeint_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_nativeint_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Pfloatarray_set_vec {size; unsafe; boxed} ->
      fprintf ppf "floatarray.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Pfloat_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "float_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Pint_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "int_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_float_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_float_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_float32_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_float32_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_int32_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_int32_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_int64_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_int64_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_nativeint_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_nativeint_array.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (boxed_vector size)
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Pbswap16 -> fprintf ppf "bswap16"
   | Pbbswap(bi,m) -> print_boxed_integer "bswap" ppf bi m
