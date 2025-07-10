@@ -692,25 +692,34 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_mode  alloc_mode =
-  (* CR jcutler do the proper error eporting here! *)
+let register_allocation_mode ~loc ~env alloc_mode =
   let externality = Alloc.proj (Comonadic Externality) alloc_mode in
-  Externality.submode_exn Externality.internal externality;
+  let res = Externality.submode Externality.internal externality in
+  (match res with
+  | Ok () -> ()
+  | Error failure_reason ->
+    (* CR jcutler: do we need to pass values for these contexts? I don't think
+       they have anything to do with the type error we're raising here... *)
+      let error =
+        Submode_failed(Value.Error (Comonadic Externality,failure_reason), Other, None,
+          None, None, None)
+      in
+      raise (Error(loc, env, error)));
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
-let register_allocation_value_mode mode =
+let register_allocation_value_mode ~loc ~env mode =
   let alloc_mode = value_to_alloc_r2g mode in
-  register_allocation_mode alloc_mode;
+  register_allocation_mode ~loc ~env alloc_mode;
   let mode = alloc_as_value alloc_mode in
   alloc_mode, mode
 
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
     of potential subcomponents. *)
-let register_allocation (expected_mode : expected_mode) =
+let register_allocation ~loc ~env (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    register_allocation_value_mode (as_single_mode expected_mode)
+    register_allocation_value_mode ~loc ~env (as_single_mode expected_mode)
   in
   let alloc_mode : alloc_mode =
     { mode = alloc_mode;
@@ -4248,7 +4257,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                Alloc.newvar_above (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
-             register_allocation_mode mode_closure;
+             register_allocation_mode ~loc ~env mode_closure;
              let arg =
               Omitted {
                 mode_closure = Alloc.disallow_left mode_closure;
@@ -5237,7 +5246,7 @@ let split_function_ty
          function deserves a separate allocation mode.
       *)
       let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
-      fst (register_allocation_value_mode mode)
+      fst (register_allocation_value_mode ~loc ~env mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn Locality.local (Alloc.proj (Comonadic Areality) alloc_mode);
@@ -5630,7 +5639,7 @@ and type_expect_
       end;
       let alloc_mode, record_mode =
         if is_boxed then
-          let alloc_mode, record_mode = register_allocation expected_mode in
+          let alloc_mode, record_mode = register_allocation ~loc ~env expected_mode in
           Some alloc_mode, record_mode
         else
           None, expected_mode
@@ -6178,7 +6187,7 @@ and type_expect_
             row_field_repr (get_row_field l row0)
           with
             Rpresent (Some ty), Rpresent (Some ty0) ->
-              let alloc_mode, argument_mode = register_allocation expected_mode in
+              let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
               let arg =
                 type_argument ~overwrite:No_overwrite env argument_mode sarg ty ty0
               in
@@ -6197,7 +6206,7 @@ and type_expect_
             let ty_expected =
               newvar (Jkind.Builtin.value_or_null ~why:Polymorphic_variant_field)
             in
-            let alloc_mode, argument_mode = register_allocation expected_mode in
+            let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
             let arg =
               type_expect env argument_mode sarg (mk_expected ty_expected)
             in
@@ -6256,7 +6265,7 @@ and type_expect_
         in
         match is_float_boxing with
         | true ->
-          let alloc_mode, argument_mode = register_allocation expected_mode in
+          let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
           let mode = cross_left env Predef.type_unboxed_float mode in
           submode ~loc ~env mode argument_mode;
           let uu =
@@ -7291,6 +7300,7 @@ and type_ident env ?(recarg=Rejected) lid =
   where [m] is the mode of a closure lock. Since join is commutative and
   associative, the order of which we apply those join does not matter.
   *)
+  (* CR jcutler: ensure this argument holds *)
   (* CR modes: codify the above per-axis argument. *)
   let actual_mode =
     Env.walk_locks ~env ~item:Value mode (Some desc.val_type)
@@ -7325,7 +7335,7 @@ and type_ident env ?(recarg=Rejected) lid =
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_allocation_mode (Alloc.max_with (Comonadic Areality) mode)
+           register_allocation_mode ~loc:lid.loc ~env (Alloc.max_with (Comonadic Areality) mode)
        | _ -> ()
        end;
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
@@ -7996,7 +8006,7 @@ and type_format loc str env =
 and type_option_some env expected_mode sarg ty ty0 =
   let ty' = extract_option_type env ty in
   let ty0' = extract_option_type env ty0 in
-  let alloc_mode, argument_mode = register_allocation expected_mode in
+  let alloc_mode, argument_mode = register_allocation ~loc:sarg.pexp_loc ~env expected_mode in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
@@ -8207,7 +8217,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       unify_exp env {texp with exp_type = ty_fun} ty_expected;
       if args = [] then texp else begin
-      let alloc_mode, mode_subcomponent = register_allocation mode in
+      let alloc_mode, mode_subcomponent = register_allocation ~loc:sarg.pexp_loc ~env mode in
       submode ~loc:sarg.pexp_loc ~env ~reason:Other
         exp_mode mode_subcomponent;
       (* eta-expand to avoid side effects *)
@@ -8502,7 +8512,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
-  let alloc_mode, argument_mode = register_allocation_value_mode expected_mode.mode in
+  let alloc_mode, argument_mode = register_allocation_value_mode ~loc ~env expected_mode.mode in
   let alloc_mode =
     { mode = alloc_mode;
       locality_context = expected_mode.locality_context }
@@ -8530,7 +8540,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         (* If the pattern and the expression have different tuple length, it
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
-          List.map (fun mode -> snd (register_allocation_value_mode mode)) tuple_modes
+          List.map (fun mode -> snd (register_allocation_value_mode ~loc ~env mode)) tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
@@ -8721,7 +8731,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     | Variant_unboxed | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
     | Variant_boxed _ | Variant_extensible ->
-       let alloc_mode, argument_mode = register_allocation expected_mode in
+       let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
        argument_mode, Some alloc_mode
   in
   begin match overwrite, constr.cstr_repr with
@@ -9669,7 +9679,7 @@ and type_generic_array
       ~attributes
       sargl
   =
-  let alloc_mode, array_mode = register_allocation expected_mode in
+  let alloc_mode, array_mode = register_allocation ~loc ~env expected_mode in
   let type_ =
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
