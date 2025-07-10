@@ -27,14 +27,16 @@
 
     @since 5.0 *)
 
-type !'a t
+type !'a t : value mod portable contended with 'a
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
 val spawn : (unit -> 'a) -> 'a t @@ nonportable
-[@@alert unsafe_parallelism
-           "This function is unsafe and should not be used in production \
-            code.\nA safe interface for parallelism is forthcoming."]
+[@@alert do_not_spawn_domains
+   "User programs should never spawn domains. To execute a function on a \
+    domain, use [Multicore] from the threading library. This is because \
+    spawning more than [recommended_domain_count] domains (the CPU core count) \
+    will significantly degrade GC performance."]
 [@@alert unsafe_multidomain "Use [Domain.Safe.spawn]."]
 (** [spawn f] creates a new domain that runs in parallel with the
     current domain.
@@ -56,7 +58,7 @@ val get_id : 'a t -> id @@ portable
 val self : unit -> id @@ portable
 (** [self ()] is the identifier of the currently running domain *)
 
-val cpu_relax : unit -> unit @@ portable
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)
 
@@ -183,7 +185,7 @@ module Safe : sig
       val for_initial_domain : t @@ nonportable
       (** [for_initial_domain] is a permanently available [t] that can be used by any
           top-level [nonportable] function safely, as such functions can only ever be
-          executed on the primary domain. *)
+          executed on the initial domain. *)
     end
 
     type 'a key : value mod portable contended = 'a DLS.key
@@ -249,20 +251,14 @@ module Safe : sig
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t @@ portable
-  [@@alert unsafe_parallelism
-             "This function is unsafe and should not be used in production \
-              code.\nA safe interface for parallelism is forthcoming."]
+  [@@alert do_not_spawn_domains
+     "User programs should never spawn domains. To execute a function on a \
+      domain, use [Multicore] from the threading library. This is because \
+      spawning more than [recommended_domain_count] domains (the CPU core \
+      count) will significantly degrade GC performance."]
   (** Like {!spawn}, but enforces thread-safety via modes. In particular, the provided
       computation must be [portable], and so cannot close over and interact with any
       unsynchronized mutable data in the current domain. *)
-
-  val spawn' : (DLS.Access.t -> 'a) @ portable once -> 'a t @@ portable
-  [@@alert unsafe_parallelism
-             "This function is unsafe and should not be used in production \
-              code.\nA safe interface for parallelism is forthcoming."]
-  (** Like {!spawn}, but additionally provides the user with a witness that the provided
-      computation is running in the new domain's capsule, and so may {!Access.t} the DLS.
-  *)
 
   val at_exit : (unit -> unit) @ portable -> unit @@ portable
   (** Like {!at_exit}, but can be called from any domain.

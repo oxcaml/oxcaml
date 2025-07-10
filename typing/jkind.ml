@@ -125,6 +125,10 @@ module Layout = struct
 
       let vec128 = Base Sort.Vec128
 
+      let vec256 = Base Sort.Vec256
+
+      let vec512 = Base Sort.Vec512
+
       let of_base : Sort.base -> t = function
         | Value -> value
         | Void -> void
@@ -134,6 +138,8 @@ module Layout = struct
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
     end
 
     include Static
@@ -339,7 +345,7 @@ module Layout = struct
       | Any -> fprintf ppf "any"
       | Sort s -> Sort.format ppf s
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf " & " in
+        let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
@@ -1591,11 +1597,47 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
+    let vec256 =
+      { jkind =
+          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec256"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let vec512 =
+      { jkind =
+          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec512"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
           mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_256bit_vectors =
+      { jkind =
+          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec256 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_512bit_vectors =
+      { jkind =
+          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec512 mod everything"
       }
 
     let all =
@@ -1624,7 +1666,11 @@ module Const = struct
         bits64;
         kind_of_unboxed_int64;
         vec128;
-        kind_of_unboxed_128bit_vectors ]
+        kind_of_unboxed_128bit_vectors;
+        vec256;
+        kind_of_unboxed_256bit_vectors;
+        vec512;
+        kind_of_unboxed_512bit_vectors ]
 
     let of_attribute : Builtin_attributes.jkind_attribute -> t = function
       | Immediate -> immediate
@@ -1889,6 +1935,8 @@ module Const = struct
       | "bits32" -> Builtin.bits32.jkind
       | "bits64" -> Builtin.bits64.jkind
       | "vec128" -> Builtin.vec128.jkind
+      | "vec256" -> Builtin.vec256.jkind
+      | "vec512" -> Builtin.vec512.jkind
       | "immutable_data" -> Builtin.immutable_data.jkind
       | "sync_data" -> Builtin.sync_data.jkind
       | "mutable_data" -> Builtin.mutable_data.jkind
@@ -1933,7 +1981,11 @@ module Const = struct
       (jkind : 'd t) =
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
       match l, Mod_bounds.nullability jkind.mod_bounds with
-      | (Base (Float64 | Float32 | Word | Bits32 | Bits64 | Vec128) | Any), _
+      | ( ( Base
+              ( Float64 | Float32 | Word | Bits32 | Bits64 | Vec128 | Vec256
+              | Vec512 )
+          | Any ),
+          _ )
       | Base Value, Non_null
       | Base Value, Maybe_null ->
         Stable
@@ -1979,7 +2031,7 @@ module Desc = struct
         | Some c -> Const.format ppf c
         | None -> assert false (* handled above *))
     in
-    format_desc ~nested:false ppf t
+    format_desc ppf ~nested:false t
 end
 
 module Jkind_desc = struct
@@ -2371,120 +2423,23 @@ let for_non_float ~(why : History.value_creation_reason) =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation why)
 
-(* Note [With-bounds for GADTs]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+let for_abbreviation ~type_jkind_purely ~modality ty =
+  (* CR layouts v2.8: This should really use layout_of *)
+  let jkind = type_jkind_purely ty in
+  let with_bounds_types =
+    let relevant_axes =
+      relevant_axes_of_modality ~relevant_for_shallow:`Relevant ~modality
+    in
+    With_bounds_types.singleton ty { relevant_axes }
+  in
+  fresh_jkind_poly
+    { layout = jkind.jkind.layout;
+      mod_bounds = Mod_bounds.min;
+      with_bounds = With_bounds with_bounds_types
+    }
+    ~annotation:None ~why:Abbreviation
 
-   Inferring the with-bounds for a variant requires gathering bounds from each
-   constructor. We thus loop over each constructor:
-
-   A. If a constructor is not a GADT constructor, just add its fields and their
-   modalities as with-bounds.
-
-   B. If a constructor uses GADT syntax:
-
-   GADT constructors introduce their own local scope. That is, when we see
-
-   {[
-     type 'a t = K : 'b option -> 'b t
-   ]}
-
-   the ['b] in the constructor is distinct from the ['a] in the type header.
-   This would be true even if we wrote ['a] in the constructor: the variables
-   introduced in the type head never scope over GADT constructors.
-
-   So in order to get properly-scoped with-bounds, we must substitute.  But
-   what, exactly, do we substitute? The domain is the bare variables that appear
-   as arguments in the return type. The range is the corresponding variables in
-   the type head (even if those are written as [_]s; which are turned into
-   proper type variables by now).
-
-   We use [Ctype.apply] (passed in as [type_apply]) to perform the substitution.
-
-   We thus have
-
-   * STEP B1. Gather such variables from the result type, matching them with
-   their corresponding variables in the type head. We'll call these B1
-   variables.
-
-   We do not actually substitute quite yet.
-
-   There may still be other free type variables in the constructor type. Here
-   are some examples:
-
-   {[
-     type 'a t =
-       | K1 : 'o -> int t
-       | K2 : 'o -> 'o option t
-       | K3 : 'o -> 'b t
-   ]}
-
-   In each constructor, the type variable ['o] is not a B1 variable.  (The ['b]
-   in [K3] /is/ a B1 variable.) We call these variables /orphaned/. All
-   existential variables are orphans (as we see in [K1] and [K3]), but even
-   non-existential variables can be orphan (as we see in [K2]; note that ['o]
-   appears in the result).
-
-   We wish to replace each orphaned type variable with a [Tof_kind], holding
-   just its kind. Since [Tof_kind] has a *best* kind, they'll just get
-   normalized away during normalization, except in the case that they show up as
-   an argument to a type constructor representing an abstract type - in which
-   case, they still end up in the (fully normalized) with-bounds. For example,
-   the following type:
-
-   {[
-     type t : A : ('a : value mod portable). 'a abstract -> t
-   ]}
-
-   has kind:
-
-   {[
-     immutable_data with (type : value mod portable) abstract
-   ]}
-
-   This use of the [(type : <<kind>>)] construct is the reason we have
-   [Tof_kind] in the first place.
-
-   We thus have
-
-   * STEP B2. Gather the orphaned variables
-   * STEP B3. Build the [Tof_kind] types to use in the substitution
-   * STEP B4. Perform the substitution
-
-   There are wrinkles:
-
-   BW1. For repeated types on arguments, e.g. in the following type:
-
-   {[
-     type ('x, 'y) t = A : 'a -> ('a, 'a) t
-   ]}
-
-   we substitute only the *first* time we see an argument.  That means that in
-   the above type, we'll map all instances of ['a] to ['x] and infer a kind of
-   [immutable_data with 'x]. This is sound, but somewhat restrictive; in a
-   perfect world, we'd infer a kind of [immutable_data with ('x OR 'y)], but
-   that goes beyond what with-bounds can describe (which, if we implemented it,
-   would introduce a disjunction in type inference, requiring backtracking). At
-   some point in the future, we should at least change the subsumption algorithm
-   to accept either [immutable_data with 'x] or [immutable_data with 'y]
-   (* CR layouts v2.8: do that *)
-
-   BW2. All of the above applies for row variables. Here is an example:
-
-   {[
-     type t = K : [> `A] -> t
-   ]}
-
-   The row variable in the [ [> `A] ] is existential, and thus gets transformed
-   into a [(type : value)] when computing the kind of [t].
-
-   This fact has a few consequences:
-
-   * [Tof_kind] can appear as a [row_more].
-   * When [Tof_kind] is a [row_more], that row is considered fixed; it thus
-     needs a [fixed_explanation]. The [fixed_explanation] is [Existential], used
-     only for this purpose.
-*)
-let for_boxed_variant ~decl_params ~type_apply ~free_vars cstrs =
+let for_boxed_variant cstrs =
   let open Types in
   if List.for_all
        (* CR layouts v12: This code assumes that all voids mode-cross. I
@@ -2505,96 +2460,29 @@ let for_boxed_variant ~decl_params ~type_apply ~free_vars cstrs =
           | Cstr_record lbls -> has_mutable_label lbls)
         cstrs
     in
-    let base =
-      (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-        ~why:Boxed_variant
-      |> mark_best
+    let has_gadt_constructor =
+      List.exists
+        (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
+        cstrs
     in
-    let add_with_bounds_for_cstr jkind_so_far cstr =
-      let cstr_arg_tys, cstr_arg_modalities =
+    if has_gadt_constructor
+    then for_non_float ~why:Boxed_variant
+    else
+      let base =
+        (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
+          ~why:Boxed_variant
+        |> mark_best
+      in
+      let add_cstr_args cstr jkind =
         match cstr.cd_args with
         | Cstr_tuple args ->
-          List.fold_left
-            (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-            ([], []) args
-        | Cstr_record lbls ->
-          List.fold_left
-            (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-            ([], []) lbls
+          List.fold_right
+            (fun arg ->
+              add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
+            args jkind
+        | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
       in
-      let cstr_arg_tys =
-        match cstr.cd_res with
-        | None -> cstr_arg_tys
-        | Some res ->
-          (* See Note [With-bounds for GADTs] for an overview *)
-          let apply_subst domain range tys =
-            if Misc.Stdlib.List.is_empty domain
-            then tys
-            else List.map (fun ty -> type_apply domain ty range) tys
-          in
-          (* STEP B1 from Note [With-bounds for GADTs]: *)
-          let res_args =
-            match Types.get_desc res with
-            | Tconstr (_, args, _) -> args
-            | _ -> Misc.fatal_error "cd_res must be Tconstr"
-          in
-          let domain, range, seen =
-            List.fold_left2
-              (fun ((domain, range, seen) as acc) arg param ->
-                if Btype.TypeSet.mem arg seen
-                then
-                  (* We've already seen this type parameter, so don't add it
-                     again.  See wrinkle BW1 from Note [With-bounds for GADTs]
-                  *)
-                  acc
-                else
-                  match Types.get_desc arg with
-                  | Tvar _ ->
-                    (* Only add types which are direct variables. Note that
-                       types which aren't variables might themselves /contain/
-                       variables; if those variables don't show up on another
-                       parameter, they're treated as orphaned. See example K2
-                       from Note [With-bounds for GADTs] *)
-                    arg :: domain, param :: range, Btype.TypeSet.add arg seen
-                  | _ -> acc)
-              ([], [], Btype.TypeSet.empty)
-              res_args decl_params
-          in
-          (* STEP B2 from Note [With-bounds for GADTs]: *)
-          let free_var_set = free_vars cstr_arg_tys in
-          let orphaned_type_var_set = Btype.TypeSet.diff free_var_set seen in
-          let orphaned_type_var_list =
-            Btype.TypeSet.elements orphaned_type_var_set
-          in
-          (* STEP B3 from Note [With-bounds for GADTs]: *)
-          let mk_type_of_kind ty =
-            match Types.get_desc ty with
-            (* use [newgenty] not [newty] here because we've already
-               generalized the decl and want to keep things at
-               generic_level *)
-            | Tvar { jkind; name = _ } -> Btype.newgenty (Tof_kind jkind)
-            | _ ->
-              Misc.fatal_error
-                "post-condition of [free_variable_set_of_list] violated"
-          in
-          let type_of_kind_list =
-            List.map mk_type_of_kind orphaned_type_var_list
-          in
-          (* STEP B4 from Note [With-bounds for GADTs]: *)
-          let cstr_arg_tys =
-            apply_subst
-              (orphaned_type_var_list @ domain)
-              (type_of_kind_list @ range)
-              cstr_arg_tys
-          in
-          cstr_arg_tys
-      in
-      List.fold_left2
-        (fun jkind type_expr modality ->
-          add_with_bounds ~modality ~type_expr jkind)
-        jkind_so_far cstr_arg_tys cstr_arg_modalities
-    in
-    List.fold_left add_with_bounds_for_cstr base cstrs
+      List.fold_right add_cstr_args cstrs base
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2989,6 +2877,9 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
+    | Mutable_var_assignment ->
+      fprintf ppf "it's the type of a mutable variable used in an assignment"
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -2998,7 +2889,6 @@ module Format_history = struct
     | Wildcard -> fprintf ppf "it's a _ in the type"
     | Unification_var -> fprintf ppf "it's a fresh unification variable"
     | Array_element -> fprintf ppf "it's the type of an array element"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let rec format_annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =
@@ -3149,6 +3039,10 @@ module Format_history = struct
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
          compilers team with this message: %s)@]" s
+    | Array_type_kind ->
+      fprintf ppf
+        "it's the element type for an array operation with an opaque@ array \
+         type"
 
   let format_product_creation_reason ppf : History.product_creation_reason -> _
       = function
@@ -3193,6 +3087,7 @@ module Format_history = struct
       in
       fprintf ppf "of the definition%a at %a" format_id id
         Location.print_loc_in_lowercase loc
+    | Abbreviation -> fprintf ppf "it is the expansion of a type abbreviation"
 
   let format_interact_reason ppf : History.interact_reason -> _ = function
     | Gadt_equation name ->
@@ -3412,15 +3307,18 @@ module Violation = struct
       | Sort (Base _) | Any -> false
     in
     let format_layout_or_kind ppf jkind =
+      let indent =
+        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
+      in
       match mismatch_type with
-      | Mode -> Format.fprintf ppf "@,%a" format jkind
-      | Layout -> Layout.format ppf jkind.jkind.layout
+      | Mode -> fprintf ppf "%t%a" indent format jkind
+      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
       then dprintf "%s representable" verb
       else
-        dprintf "%s a sub%s of %a" verb layout_or_kind format_layout_or_kind k2
+        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_layout_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmi_option =
       match t with
@@ -3438,7 +3336,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
             subjkind_format "is not" k2,
             None )
         | Some p ->
@@ -3451,8 +3349,8 @@ module Violation = struct
         assert (Option.is_none missing_cmi);
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
-          dprintf "does not overlap with %a" format_layout_or_kind k2,
+          dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+          dprintf "does not overlap with@ %a" format_layout_or_kind k2,
           None )
     in
     if display_histories
@@ -3460,15 +3358,15 @@ module Violation = struct
       let connective =
         match t.violation, has_sort_var (get k2).layout with
         | Not_a_subjkind _, false ->
-          dprintf "be a sub%s of %a" layout_or_kind format_layout_or_kind k2
+          dprintf "be a sub%s of@ %a" layout_or_kind format_layout_or_kind k2
         | No_intersection _, false ->
-          dprintf "overlap with %a" format_layout_or_kind k2
+          dprintf "overlap with@ %a" format_layout_or_kind k2
         | _, true -> dprintf "be representable"
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
-             (dprintf "@[<hov 2>The %s of %a is %a@]" layout_or_kind pp_former
+             (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
                 former format_layout_or_kind k1)
            ~layout_or_kind)
         k1
@@ -3788,6 +3686,8 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
+    | Mutable_var_assignment -> fprintf ppf "Mutable_var_assignment"
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3796,7 +3696,6 @@ module Debug_printers = struct
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
     | Array_element -> fprintf ppf "Array_element"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let rec annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =
@@ -3890,6 +3789,7 @@ module Debug_printers = struct
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Unknown s -> fprintf ppf "Unknown %s" s
+    | Array_type_kind -> fprintf ppf "Array_type_kind"
 
   let product_creation_reason ppf : History.product_creation_reason -> _ =
     function
@@ -3930,6 +3830,7 @@ module Debug_printers = struct
       fprintf ppf "Generalized (%s, %a)"
         (match id with Some id -> Ident.unique_name id | None -> "")
         Location.print_loc loc
+    | Abbreviation -> fprintf ppf "Abbreviation"
 
   let interact_reason ppf : History.interact_reason -> _ = function
     | Gadt_equation p -> fprintf ppf "Gadt_equation %a" Path.print p

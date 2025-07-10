@@ -75,7 +75,17 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     type t = O.t
 
-    external is_null : O.t -> bool = "%is_null"
+    (* Normally, [Obj.t] has layout [value], but we need to handle nullable
+       values at toplevel. flambda2 is allowed to optimise calls to [is_null]
+       on an argument with [value] layout to [false], so first convert
+       (opaquely!) to a type with [value_or_null] layout. *)
+    type obj_or_null : value_or_null
+
+    external obj_or_null : t -> obj_or_null = "%opaque"
+
+    external is_null : obj_or_null -> bool = "%is_null"
+
+    let[@inline] is_null obj = is_null (obj_or_null obj)
 
     (* Normally, [Obj.is_block] can't be called on [value_or_null]s.
        But here we need to handle nullable values at toplevel. *)
@@ -266,7 +276,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Value -> Print_as_value
       | Base Void -> Print_as "<void>"
-      | Base (Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word) -> Print_as "<abstr>"
+      | Base (Float64 | Float32 | Bits32 | Bits64 |
+              Vec128 | Vec256 | Vec512 | Word) -> Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
 
     let outval_of_value max_steps max_depth check_depth env obj ty =
@@ -622,8 +633,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Value -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
-                        | Float32 | Bits32 | Bits64 | Vec128 | Word
-                        | Product _ ->
+                        | Float32 | Bits32 | Bits64
+                        | Vec128 | Vec256 | Vec512 | Word | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
                       in
                       match fld with

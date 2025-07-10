@@ -44,6 +44,7 @@ let word_addressed = false
     d0 - d7               general purpose (caller-save)
     d8 - d15              general purpose (callee-save)
     d16 - d31             general purpose (caller-save)
+   Vector register map:   general purpose (caller-save)
 *)
 
 let types_are_compatible left right =
@@ -53,6 +54,8 @@ let types_are_compatible left right =
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
+  | (Vec256 | Vec512), _ | _, (Vec256 | Vec512) ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
   | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
@@ -86,7 +89,7 @@ let phys_reg ty n =
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
-
+  | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 let reg_x8 = phys_reg Int 8
 
 let stack_slot slot ty =
@@ -145,6 +148,8 @@ let calling_conventions
         loc.(i) <- loc_float last_float make_stack float ofs
     | Vec128 ->
         loc.(i) <- loc_vec128 last_float make_stack float ofs
+    | Vec256 | Vec512 ->
+        Misc.fatal_error "arm64: got 256/512 bit vector"
     | Float32 ->
         loc.(i) <- loc_float32 last_float make_stack float ofs
     | Valx2 ->
@@ -214,11 +219,13 @@ let external_calling_conventions
         loc.(i) <- [| loc_float last_float make_stack float ofs |]
     | XVec128 ->
         loc.(i) <- [| loc_vec128 last_float make_stack float ofs |]
+    | XVec256 | XVec512 ->
+        Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
     | XFloat32 ->
         loc.(i) <- [| loc_float32 last_float make_stack float ofs |]
     end)
     ty_args;
-  (loc, Misc.align !ofs 16)  (* keep stack 16-aligned *)
+  (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 
 let loc_external_arguments ty_args =
   external_calling_conventions 0 7 100 107 outgoing ty_args
@@ -244,16 +251,31 @@ let destroyed_at_c_noalloc_call =
       116;117;118;119;120;121;122;123;
       124;125;126;127;128;129;130;131|]
   in
+  let vec128_regs_destroyed_at_c_noalloc_call =
+    (* Registers v8-v15 must be preserved by a callee across
+       subroutine calls; the remaining registers (v0-v7, v16-v31) do
+       not need to be preserved (or should be preserved by the
+       caller). Additionally, only the bottom 64 bits of each value
+       stored in v8-v15 need to be preserved [8]; it is the
+       responsibility of the caller to preserve larger values.
+
+       https://github.com/ARM-software/abi-aa/blob/
+       3952cfbfd2404c442bb6bb6f59ff7b923ab0c148/
+       aapcs64/aapcs64.rst?plain=1#L837
+    *)
+    hard_vec128_reg
+  in
   Array.concat [
     Array.map (phys_reg Int) int_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float) float_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float32) float_regs_destroyed_at_c_noalloc_call;
-    Array.map (phys_reg Vec128) float_regs_destroyed_at_c_noalloc_call;
+    vec128_regs_destroyed_at_c_noalloc_call;
   ]
 
 (* CSE needs to know that all versions of neon are destroyed. *)
 let destroy_neon_reg n =
-  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n); phys_reg Vec128 (100 + n); |]
+  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n);
+     phys_reg Vec128 (100 + n); |]
 
 let destroy_neon_reg7 = destroy_neon_reg 7
 
@@ -313,11 +335,21 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Const_symbol _ | Const_vec128 _
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
-        | Name_for_debugger _ | Probe_is_enabled _ | Opaque
+        | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Dls_get)
   | Poptrap _ | Prologue
     -> [||]
   | Stack_check _ -> assert false (* not supported *)
+  | Op (Const_vec256 _ | Const_vec512 _)
+  | Op (Load
+          {memory_chunk=(Twofiftysix_aligned|Twofiftysix_unaligned|
+                         Fivetwelve_aligned|Fivetwelve_unaligned);
+           _ })
+  | Op (Store
+          ((Twofiftysix_aligned|Twofiftysix_unaligned|
+            Fivetwelve_aligned|Fivetwelve_unaligned),
+            _, _))
+    -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
@@ -434,7 +466,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Ccmpf _
   | Ccsel _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Cpoll

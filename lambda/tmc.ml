@@ -906,6 +906,7 @@ let rec choice ctx t =
     | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
+    | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
     | Prunstack | Pperform | Presume | Preperform | Pdls_get
@@ -915,6 +916,7 @@ let rec choice ctx t =
     | Patomic_compare_set _ | Patomic_fetch_add
     | Patomic_add | Patomic_sub | Patomic_land
     | Patomic_lor | Patomic_lxor | Patomic_load _ | Patomic_set _
+    | Pcpu_relax
     | Punbox_float _ | Pbox_float (_, _)
     | Punbox_int _ | Pbox_int _
     | Punbox_vector _ | Pbox_vector (_, _)

@@ -257,7 +257,8 @@ let subst_func_decl env
     Function_declarations.code_id_in_function_declaration =
   match code_id with
   | Deleted _ -> code_id
-  | Code_id code_id -> Code_id (subst_code_id env code_id)
+  | Code_id { code_id; only_full_applications } ->
+    Code_id { code_id = subst_code_id env code_id; only_full_applications }
 
 let subst_func_decls env decls =
   Function_declarations.funs_in_order decls
@@ -626,6 +627,21 @@ let simple_exprs env simple1 simple2 : Simple.t Comparison.t =
           then Equivalent
           else Different { approximant = simple1 }))
 
+let simples_with_debuginfo env simple_with_dbg1 simple_with_dbg2 :
+    Simple.With_debuginfo.t Comparison.t =
+  let simple1 = Simple.With_debuginfo.simple simple_with_dbg1 in
+  let simple2 = Simple.With_debuginfo.simple simple_with_dbg2 in
+  let dbg1 = Simple.With_debuginfo.dbg simple_with_dbg1 in
+  let dbg2 = Simple.With_debuginfo.dbg simple_with_dbg2 in
+  Comparison.map
+    ~f:(fun (simple, dbg) -> Simple.With_debuginfo.create simple dbg)
+    (pairs ~f1:simple_exprs
+       ~f2:
+         (Comparator.of_predicate (fun dbg1 dbg2 ->
+              Debuginfo.compare dbg1 dbg2 = 0))
+       ~subst2:(fun _ dbg -> dbg)
+       env (simple1, dbg1) (simple2, dbg2))
+
 let print_list f ppf l =
   let pp_sep ppf () = Format.fprintf ppf ";@;<1 2>" in
   Format.fprintf ppf "@[<hv>[@ %a@ ]@]" (Format.pp_print_list ~pp_sep f) l
@@ -724,8 +740,13 @@ let function_decls env
   | ( Deleted { function_slot_size = size1; dbg = _ },
       Deleted { function_slot_size = size2; dbg = _ } ) ->
     if Int.equal size1 size2 then Equivalent else Different { approximant = () }
-  | Code_id code_id1, Code_id code_id2 ->
+  | ( Code_id
+        { code_id = code_id1; only_full_applications = only_full_applications1 },
+      Code_id
+        { code_id = code_id2; only_full_applications = only_full_applications2 }
+    ) ->
     if code_ids env code_id1 code_id2 |> Comparison.is_equivalent
+       && Bool.equal only_full_applications1 only_full_applications2
     then Equivalent
     else Different { approximant = () }
   | Deleted _, Code_id _ | Code_id _, Deleted _ ->
@@ -800,7 +821,7 @@ let sets_of_closures env set1 set2 : Set_of_closures.t Comparison.t =
            ->
              match code_id with
              | Deleted _ -> Right function_slot
-             | Code_id code_id0 ->
+             | Code_id { code_id = code_id0; _ } ->
                Left (subst_code_id env code_id0, (function_slot, code_id)))
     in
     ( Code_id.Map.of_list function_slot_map,
@@ -913,7 +934,7 @@ let bound_static env bound_static1 bound_static2 : Bound_static.t Comparison.t =
 
 let fields env (field1 : Simple.With_debuginfo.t)
     (field2 : Simple.With_debuginfo.t) : Simple.With_debuginfo.t Comparison.t =
-  Comparator.of_predicate Simple.With_debuginfo.equal env field1 field2
+  simples_with_debuginfo env field1 field2
 
 let blocks env block1 block2 =
   triples

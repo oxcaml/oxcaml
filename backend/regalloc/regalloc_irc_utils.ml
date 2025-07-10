@@ -153,6 +153,8 @@ let is_move_basic : Cfg.basic -> bool =
     | Const_float _ -> false
     | Const_symbol _ -> false
     | Const_vec128 _ -> false
+    | Const_vec256 _ -> false
+    | Const_vec512 _ -> false
     | Stackoffset _ -> false
     | Load _ -> false
     | Store _ -> false
@@ -169,6 +171,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Name_for_debugger _ -> false
     | Dls_get -> false
     | Poll -> false
+    | Pause -> false
     | Alloc _ -> false)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> false
 

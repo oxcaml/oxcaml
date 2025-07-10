@@ -567,7 +567,7 @@ Line 1, characters 13-26:
 Error: This type "float or_null" should be an instance of type
          "('a : any mod separable)"
        The kind of float or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of float or_null must be a subkind of any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -643,7 +643,7 @@ Line 1, characters 22-36:
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of string or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -670,7 +670,7 @@ Line 1, characters 13-26:
 Error: This type "float or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of float or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of float or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -697,7 +697,7 @@ Line 1, characters 22-36:
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
        The kind of string or_null is
-         value_or_null mod many unyielding stateless immutable
+           value_or_null mod many unyielding stateless immutable
          because it is the primitive immediate_or_null type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
@@ -788,32 +788,14 @@ type test = float t req_non_float
 
 type unbx = { unbx : t_maybesep_val } [@@unboxed]
 
-(* CR layouts v3.4: non-separable unboxed records should be allowed. *)
-
 [%%expect{|
-Line 1, characters 0-49:
-1 | type unbx = { unbx : t_maybesep_val } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "unbx" is value_or_null mod non_null
-         because of the definition of t_maybesep_val at line 1, characters 0-48.
-       But the kind of type "unbx" must be a subkind of value
-         because it's an [@@unboxed] type,
-         chosen to have kind value.
+type unbx = { unbx : t_maybesep_val; } [@@unboxed]
 |}]
-
-(* CR layouts v3.4: non-separable unboxed variants should be allowed. *)
 
 type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 
 [%%expect{|
-Line 1, characters 0-69:
-1 | type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "unbx'" is value_or_null mod non_null
-         because of the annotation on 'a in the declaration of the type unbx'.
-       But the kind of type "unbx'" must be a subkind of value
-         because it's an [@@unboxed] type,
-         chosen to have kind value.
+type ('a : value_or_null mod non_null) unbx' = Unbx of 'a [@@unboxed]
 |}]
 
 (* Separability and unboxed records. *)

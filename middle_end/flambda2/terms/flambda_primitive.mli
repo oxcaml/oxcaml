@@ -63,6 +63,8 @@ module Array_kind : sig
     | Naked_int64s
     | Naked_nativeints
     | Naked_vec128s
+    | Naked_vec256s
+    | Naked_vec512s
     | Unboxed_product of t list
         (** Accesses to arrays of unboxed products are unarized on the way into
             Flambda 2.  The float array optimization never applies for these
@@ -111,6 +113,8 @@ module Array_load_kind : sig
     | Naked_int64s
     | Naked_nativeints
     | Naked_vec128s
+    | Naked_vec256s
+    | Naked_vec512s
 
   val print : Format.formatter -> t -> unit
 
@@ -131,6 +135,8 @@ module Array_set_kind : sig
     | Naked_int64s
     | Naked_nativeints
     | Naked_vec128s
+    | Naked_vec256s
+    | Naked_vec512s
 
   val print : Format.formatter -> t -> unit
 
@@ -165,6 +171,8 @@ module Duplicate_array_kind : sig
     | Naked_int64s of { length : Targetint_31_63.t option }
     | Naked_nativeints of { length : Targetint_31_63.t option }
     | Naked_vec128s of { length : Targetint_31_63.t option }
+    | Naked_vec256s of { length : Targetint_31_63.t option }
+    | Naked_vec512s of { length : Targetint_31_63.t option }
 
   val print : Format.formatter -> t -> unit
 
@@ -313,6 +321,8 @@ type signed_or_unsigned =
 
 (** Primitives taking exactly zero arguments. *)
 type nullary_primitive =
+  (* CR mshinwell: try to remove [Invalid]; we probably shouldn't have two
+     mechanisms for propagating this. *)
   | Invalid of Flambda_kind.t
       (** Used when rebuilding a primitive that turns out to be invalid. This is
           easier to use than turning a whole let-binding into Invalid (which
@@ -332,6 +342,9 @@ type nullary_primitive =
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and
           GC slices, so should not be moved or optimised away. *)
+  | Cpu_relax
+      (** Arch-specific pause. If poll insertion is disabled, also acts
+          as a polling point. *)
 
 (** Untagged binary integer arithmetic operations.
 
@@ -694,5 +707,7 @@ val equal_ternary_primitive : ternary_primitive -> ternary_primitive -> bool
 val equal_variadic_primitive : variadic_primitive -> variadic_primitive -> bool
 
 val is_begin_or_end_region : t -> bool
+
+val is_begin_region : t -> bool
 
 val is_end_region : t -> Variable.t option

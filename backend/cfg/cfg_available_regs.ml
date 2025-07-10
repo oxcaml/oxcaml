@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module R = Reg
 module RAS = Reg_availability_set
 module RD = Reg_with_debug_info
@@ -173,7 +173,9 @@ module Transfer = struct
             let reg_is_of_type_addr =
               match (RD.reg reg).typ with
               | Addr -> true
-              | Val | Int | Float | Vec128 | Float32 | Valx2 -> false
+              | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2
+                ->
+                false
             in
             if remains_available
                || (not (extend_live ()))
@@ -301,11 +303,11 @@ module Transfer = struct
           Some (ok avail_across), ok avail_after
         | Op
             ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-            | Const_vec128 _ | Stackoffset _ | Load _ | Store _ | Intop _
-            | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
-            | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-            | Begin_region | End_region | Specific _ | Dls_get | Poll | Alloc _
-              )
+            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+            | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
+            | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+            | Probe_is_enabled _ | Opaque | Begin_region | End_region
+            | Specific _ | Dls_get | Poll | Alloc _ | Pause )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in
           common ~avail_before ~destroyed_at:Proc.destroyed_at_basic
@@ -376,8 +378,9 @@ let get_name_for_debugger_regs (b : Cfg.basic) =
   | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-      | Poll | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Stackoffset _ | Load _
+      | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)

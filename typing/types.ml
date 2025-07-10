@@ -20,11 +20,18 @@ open Asttypes
 
 type mutability =
   | Immutable
-  | Mutable of Mode.Alloc.Comonadic.Const.t
+  | Mutable of Mode.Value.Comonadic.lr
 
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
+
+(** Takes [m0] which is the parameter of [let mutable], returns the
+    mode of new values in future writes. *)
+let mutable_mode m0 : _ Mode.Value.t =
+  { comonadic = m0
+  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  }
 
 (* Type expressions for the core language *)
 
@@ -474,6 +481,8 @@ module Vars = Misc.Stdlib.String.Map
 
 type value_kind =
     Val_reg                             (* Regular value *)
+  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+                                        (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
   | Val_self of
@@ -646,6 +655,8 @@ and mixed_block_element =
   | Bits32
   | Bits64
   | Vec128
+  | Vec256
+  | Vec512
   | Word
   | Product of mixed_product_shape
 
@@ -967,18 +978,21 @@ let compare_tag t1 t2 =
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
-  | Word, Word | Bits32, Bits32 | Bits64, Bits64 | Vec128, Vec128
+  | Word, Word | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits32 | Bits64 | Vec128
-    | Product _ ), _
+  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Product _ ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float_boxed, Float_boxed | Float64, Float64 | Float32, Float32
-  | Word, Word | Bits32, Bits32 | Bits64, Bits64 | Vec128, Vec128
+  | Value, Value | Float_boxed, Float_boxed
+  | Float64, Float64 | Float32, Float32
+  | Word, Word | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
@@ -996,6 +1010,10 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Bits32 -> 1
   | Vec128, _ -> -1
   | _, Vec128 -> 1
+  | Vec256, _ -> -1
+  | _, Vec256 -> 1
+  | Vec512, _ -> -1
+  | _, Vec512 -> 1
   | Product _, _ -> -1
   | _, Product _ -> 1
 
@@ -1063,8 +1081,7 @@ type 'a gen_label_description =
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Value.Const.t;(* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_num: int;                       (* Position in type *)
+    lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;                     (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1118,8 +1135,6 @@ let item_visibility = function
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
 
-let lbl_pos_void = -1
-
 let rec bound_value_identifiers = function
     [] -> []
   | Sig_value(id, {val_kind = Val_reg}, _) :: rem ->
@@ -1148,6 +1163,8 @@ let rec mixed_block_element_to_string = function
   | Bits32 -> "Bits32"
   | Bits64 -> "Bits64"
   | Vec128 -> "Vec128"
+  | Vec256 -> "Vec256"
+  | Vec512 -> "Vec512"
   | Word -> "Word"
   | Product es ->
     "Product ["
@@ -1163,6 +1180,8 @@ let mixed_block_element_to_lowercase_string = function
   | Bits32 -> "bits32"
   | Bits64 -> "bits64"
   | Vec128 -> "vec128"
+  | Vec256 -> "vec256"
+  | Vec512 -> "vec512"
   | Word -> "word"
   | Product es ->
     "product ["

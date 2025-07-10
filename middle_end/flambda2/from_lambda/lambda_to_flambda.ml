@@ -456,11 +456,13 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       let fields = List.map (fun id -> IR.Var id) fields in
       apply_cps_cont_simple k acc env ccenv fields before_unarization)
   | Lmutvar id ->
-    (* CR mshinwell: note: mutable variables of non-singleton layouts are not
-       supported *)
-    let return_id, kind = Env.get_mutable_variable_with_kind env id in
-    apply_cps_cont k acc env ccenv return_id
-      (Flambda_arity.Component_for_creation.Singleton kind)
+    let new_ids_with_kinds, before_unarization =
+      Env.get_mutable_variable_with_kinds env id
+    in
+    let fields =
+      List.map (fun id -> IR.Var id) (List.map fst new_ids_with_kinds)
+    in
+    apply_cps_cont_simple k acc env ccenv fields before_unarization
   | Lconst const ->
     apply_cps_cont_simple k acc env ccenv [IR.Const const]
       (Singleton
@@ -497,24 +499,32 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     CC.close_let_rec acc ccenv ~function_declarations:[func] ~body
       ~current_region:
         (Env.current_region env |> Option.map Env.Region_stack_element.region)
-  | Lmutlet (value_kind, id, _duid, defining_expr, body) ->
+  | Lmutlet (layout, id, _duid, defining_expr, body) ->
     (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
     (* CR mshinwell: user-visibleness needs thinking about here *)
     let temp_id = Ident.create_local "let_mutable" in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
-      ~params:[temp_id, IR.Not_user_visible, value_kind]
+      ~params:[temp_id, IR.Not_user_visible, layout]
       ~body:(fun acc env ccenv after_defining_expr ->
         cps_tail acc env ccenv defining_expr after_defining_expr k_exn)
       ~handler:(fun acc env ccenv ->
-        let kind =
-          Flambda_kind.With_subkind.from_lambda_values_and_unboxed_numbers_only
-            value_kind
+        let before_unarization =
+          Flambda_arity.Component_for_creation.from_lambda layout
         in
-        let env, new_id = Env.register_mutable_variable env id kind in
+        let env, new_ids_with_kinds =
+          Env.register_mutable_variable env id ~before_unarization
+        in
         let body acc ccenv = cps acc env ccenv body k k_exn in
-        CC.close_let acc ccenv
-          [new_id, kind]
-          User_visible (Simple (Var temp_id)) ~body)
+        let temp_id_unarized : Ident.t list =
+          match Env.get_unboxed_product_fields env temp_id with
+          | None -> [temp_id]
+          | Some (_, temp_id_unarized) -> temp_id_unarized
+        in
+        List.fold_left2
+          (fun body new_id_with_kind temp_id acc ccenv ->
+            CC.close_let acc ccenv [new_id_with_kind] User_visible
+              (Simple (Var temp_id)) ~body)
+          body new_ids_with_kinds temp_id_unarized acc ccenv)
   | Llet ((Strict | Alias | StrictOpt), _, fun_id, duid, Lfunction func, body)
     ->
     (* This case is here to get function names right. *)
@@ -623,21 +633,22 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       Misc.fatal_errorf "Lassign on non-mutable variable %a" Ident.print
         being_assigned;
     cps_non_tail_simple acc env ccenv new_value
-      (fun acc env ccenv new_value _arity ->
-        let new_value = must_be_singleton_simple new_value in
-        let env, new_id = Env.update_mutable_variable env being_assigned in
+      (fun acc env ccenv new_values _arity ->
+        let env = Env.update_mutable_variable env being_assigned in
         let body acc ccenv =
           let body acc ccenv = cps acc env ccenv body k k_exn in
           CC.close_let acc ccenv
             [id, Flambda_kind.With_subkind.tagged_immediate]
             Not_user_visible (Simple (Const L.const_unit)) ~body
         in
-        let value_kind =
-          snd (Env.get_mutable_variable_with_kind env being_assigned)
+        let new_ids_with_kinds, _before_unarization =
+          Env.get_mutable_variable_with_kinds env being_assigned
         in
-        CC.close_let acc ccenv
-          [new_id, value_kind]
-          User_visible (Simple new_value) ~body)
+        List.fold_left2
+          (fun body new_id_with_kind new_value acc ccenv ->
+            CC.close_let acc ccenv [new_id_with_kind] User_visible
+              (Simple new_value) ~body)
+          body new_ids_with_kinds new_values acc ccenv)
       k_exn
   | Llet
       ((Strict | Alias | StrictOpt), _layout, id, _duid, defining_expr, Lvar id')
@@ -763,9 +774,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               (fun handler_env ((arg, _duid, layout), kinds) ->
                 (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
                 match kinds with
-                | [] -> handler_env, []
                 | [kind] -> handler_env, [arg, kind]
-                | _ :: _ ->
+                | [] | _ :: _ ->
                   let fields =
                     List.mapi
                       (fun n kind ->
@@ -932,9 +942,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                       (get_unarized_vars body_result env)))
               ~handler:(handler k)))
   | Lifthenelse (cond, ifso, ifnot, kind) ->
+    let loc = L.try_to_find_location cond in
     let lam =
-      Lambda_to_lambda_transforms.switch_for_if_then_else ~cond ~ifso ~ifnot
-        ~kind
+      Lambda_to_lambda_transforms.switch_for_if_then_else ~loc ~cond ~ifso
+        ~ifnot ~kind
     in
     cps acc env ccenv lam k k_exn
   | Lsequence (lam1, lam2) ->
@@ -966,19 +977,20 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       Misc.fatal_errorf "Lassign on non-mutable variable %a" Ident.print
         being_assigned;
     cps_non_tail_simple acc env ccenv new_value
-      (fun acc env ccenv new_value _arity ->
-        let new_value = must_be_singleton_simple new_value in
-        let env, new_id = Env.update_mutable_variable env being_assigned in
+      (fun acc env ccenv new_values _arity ->
+        let env = Env.update_mutable_variable env being_assigned in
         let body acc ccenv =
           apply_cps_cont_simple k acc env ccenv [Const L.const_unit]
             (Singleton Flambda_kind.With_subkind.tagged_immediate)
         in
-        let _, value_kind =
-          Env.get_mutable_variable_with_kind env being_assigned
+        let new_ids_with_kinds, _before_unarization =
+          Env.get_mutable_variable_with_kinds env being_assigned
         in
-        CC.close_let acc ccenv
-          [new_id, value_kind]
-          User_visible (Simple new_value) ~body)
+        List.fold_left2
+          (fun body new_id_with_kind new_value acc ccenv ->
+            CC.close_let acc ccenv [new_id_with_kind] User_visible
+              (Simple new_value) ~body)
+          body new_ids_with_kinds new_values acc ccenv)
       k_exn
   | Levent (body, _event) -> cps acc env ccenv body k k_exn
   | Lifused _ ->
@@ -1344,7 +1356,10 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
       Some (Unboxed_number bn)
     | Pvalue { nullable = Non_nullable; raw_kind = Pboxedvectorval bv } ->
       let bn : Flambda_kind.Boxable_number.t =
-        match bv with Boxed_vec128 -> Naked_vec128
+        match bv with
+        | Boxed_vec128 -> Naked_vec128
+        | Boxed_vec256 -> Naked_vec256
+        | Boxed_vec512 -> Naked_vec512
       in
       Some (Unboxed_number bn)
     | Pvalue
@@ -1432,17 +1447,6 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
       ~return_continuation:body_cont ~exn_continuation:body_exn_cont
       ~my_region:my_region_stack_elt
   in
-  let new_env, free_idents_of_body =
-    Ident.Set.fold
-      (fun id (new_env, free_idents_of_body) ->
-        match Env.get_unboxed_product_fields env id with
-        | None -> new_env, Ident.Set.add id free_idents_of_body
-        | Some (before_unarization, fields) ->
-          ( Env.register_unboxed_product new_env ~unboxed_product:id
-              ~before_unarization ~fields,
-            Ident.Set.union free_idents_of_body (Ident.Set.of_list fields) ))
-      free_idents_of_body (new_env, Ident.Set.empty)
-  in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
   in
@@ -1458,9 +1462,8 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
              kinds ) : Function_decl.param list ->
         (* CR sspies: dropping [debug_uid]; address in subsequent PR. *)
         match kinds with
-        | [] -> []
         | [kind] -> [{ name; kind; mode; attributes }]
-        | _ :: _ ->
+        | [] | _ :: _ ->
           let fields =
             List.mapi
               (fun n kind ->
@@ -1489,16 +1492,29 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
       (Flambda_arity.create
          [Flambda_arity.Component_for_creation.from_lambda return])
   in
+  (* CR ncourant: now that the following two statements are in this order, I
+     believe we can remove [removed_params]. *)
+  let new_env =
+    Ident.Map.fold
+      (fun unboxed_product (before_unarization, fields) new_env ->
+        Env.register_unboxed_product_with_kinds new_env ~unboxed_product
+          ~before_unarization ~fields)
+      unboxed_products new_env
+  in
+  let new_env, free_idents_of_body =
+    Ident.Set.fold
+      (fun id (new_env, free_idents_of_body) ->
+        match Env.get_unboxed_product_fields env id with
+        | None -> new_env, Ident.Set.add id free_idents_of_body
+        | Some (before_unarization, fields) ->
+          ( Env.register_unboxed_product new_env ~unboxed_product:id
+              ~before_unarization ~fields,
+            Ident.Set.union free_idents_of_body (Ident.Set.of_list fields) ))
+      free_idents_of_body (new_env, Ident.Set.empty)
+  in
   let body acc ccenv =
     let ccenv = CCenv.set_path_to_root ccenv loc in
     let ccenv = CCenv.set_not_at_toplevel ccenv in
-    let new_env =
-      Ident.Map.fold
-        (fun unboxed_product (before_unarization, fields) new_env ->
-          Env.register_unboxed_product_with_kinds new_env ~unboxed_product
-            ~before_unarization ~fields)
-        unboxed_products new_env
-    in
     cps_tail acc new_env ccenv body body_cont body_exn_cont
   in
   Function_decl.create ~let_rec_ident:(Some fid) ~function_slot ~kind ~params

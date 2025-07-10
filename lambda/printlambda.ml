@@ -30,6 +30,8 @@ let unboxed_float = function
 
 let unboxed_vector = function
   | Unboxed_vec128 -> "unboxed_vec128"
+  | Unboxed_vec256 -> "unboxed_vec256"
+  | Unboxed_vec512 -> "unboxed_vec512"
 
 let boxed_integer = function
   | Boxed_nativeint -> "nativeint"
@@ -42,6 +44,8 @@ let boxed_float = function
 
 let boxed_vector = function
   | Boxed_vec128 -> "vec128"
+  | Boxed_vec256 -> "vec256"
+  | Boxed_vec512 -> "vec512"
 
 let rec scannable_product_element_kinds kinds =
   "[" ^ String.concat "; " (List.map scannable_product_element_kind kinds) ^ "]"
@@ -93,6 +97,8 @@ let array_ref_kind ppf k =
   | Punboxedintarray_ref Unboxed_int64 -> fprintf ppf "unboxed_int64"
   | Punboxedintarray_ref Unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
   | Punboxedvectorarray_ref Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
+  | Punboxedvectorarray_ref Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
+  | Punboxedvectorarray_ref Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
   | Pgcscannableproductarray_ref kinds ->
     fprintf ppf "scannableproduct %s" (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_ref kinds ->
@@ -121,6 +127,8 @@ let array_set_kind ppf k =
   | Punboxedintarray_set Unboxed_int64 -> fprintf ppf "unboxed_int64"
   | Punboxedintarray_set Unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
   | Punboxedvectorarray_set Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
+  | Punboxedvectorarray_set Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
+  | Punboxedvectorarray_set Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
   | Pgcscannableproductarray_set (mode, kinds) ->
     fprintf ppf "scannableproduct%a %s" pp_mode mode
       (scannable_product_element_kinds kinds)
@@ -144,6 +152,8 @@ let rec mixed_block_element print_value_kind ppf el =
   | Bits32 -> fprintf ppf "bits32"
   | Bits64 -> fprintf ppf "bits64"
   | Vec128 -> fprintf ppf "vec128"
+  | Vec256 -> fprintf ppf "vec256"
+  | Vec512 -> fprintf ppf "vec512"
   | Word -> fprintf ppf "word"
   | Product shape ->
     fprintf ppf "product %a"
@@ -382,6 +392,8 @@ let rec mixed_block_element
   | Bits32 -> fprintf ppf "bits32"
   | Bits64 -> fprintf ppf "bits64"
   | Vec128 -> fprintf ppf "vec128"
+  | Vec256 -> fprintf ppf "vec256"
+  | Vec512 -> fprintf ppf "vec512"
   | Word -> fprintf ppf "word"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
@@ -897,6 +909,7 @@ let primitive ppf = function
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ppoll -> fprintf ppf "poll"
+  | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
   | Pobj_magic _ -> fprintf ppf "obj_magic"
@@ -906,6 +919,7 @@ let primitive ppf = function
   | Punbox_int bi -> fprintf ppf "unbox_%s" (boxed_integer bi)
   | Pbox_int (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_integer bi) (locality_kind m)
+  | Punbox_unit -> fprintf ppf "unbox_unit"
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
@@ -1095,6 +1109,7 @@ let name_of_primitive = function
   | Patomic_land -> "Patomic_land"
   | Patomic_lor -> "Patomic_lor"
   | Patomic_lxor -> "Patomic_lxor"
+  | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Prunstack -> "Prunstack"
   | Presume -> "Presume"
@@ -1109,6 +1124,7 @@ let name_of_primitive = function
   | Pbox_float (_, _) -> "Pbox_float"
   | Punbox_int _ -> "Punbox_int"
   | Pbox_int _ -> "Pbox_int"
+  | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
   | Parray_of_iarray -> "Parray_of_iarray"

@@ -157,6 +157,14 @@ val box_vec128 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
 
 val unbox_vec128 : Debuginfo.t -> expression -> expression
 
+val box_vec256 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec256 : Debuginfo.t -> expression -> expression
+
+val box_vec512 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec512 : Debuginfo.t -> expression -> expression
+
 (** Make the given expression return a unit value *)
 val return_unit : Debuginfo.t -> expression -> expression
 
@@ -276,6 +284,8 @@ module Extended_machtype_component : sig
     | Any_int
     | Float
     | Vec128
+    | Vec256
+    | Vec512
     | Float32
 end
 
@@ -295,6 +305,10 @@ module Extended_machtype : sig
   val typ_void : t
 
   val typ_vec128 : t
+
+  val typ_vec256 : t
+
+  val typ_vec512 : t
 
   (** Conversion from a normal Cmm machtype. *)
   val of_machtype : machtype -> t
@@ -369,6 +383,8 @@ val machtype_identifier : machtype -> string
     arguments, and ensure its presence in the set of defined symbols. *)
 val curry_function_sym :
   Lambda.function_kind -> machtype list -> machtype -> Cmm.symbol
+
+val fail_if_called_indirectly_sym : Cmm.symbol
 
 (** Bigarrays *)
 
@@ -471,6 +487,50 @@ val aligned_load_128 :
   ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
 
 val aligned_set_128 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_256 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_256 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_256 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_256 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_512 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_512 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_512 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_512 :
   ptr_out_of_heap:bool ->
   expression ->
   expression ->
@@ -620,6 +680,12 @@ val emit_nativeint_constant :
 val emit_vec128_constant :
   symbol -> Cmm.vec128_bits -> data_item list -> data_item list
 
+val emit_vec256_constant :
+  symbol -> Cmm.vec256_bits -> data_item list -> data_item list
+
+val emit_vec512_constant :
+  symbol -> Cmm.vec512_bits -> data_item list -> data_item list
+
 val emit_float_array_constant :
   symbol -> float list -> data_item list -> data_item list
 
@@ -656,6 +722,12 @@ val int64 : dbg:Debuginfo.t -> int64 -> expression
 
 (** Create a constant vec128 expression from two int64s. *)
 val vec128 : dbg:Debuginfo.t -> Cmm.vec128_bits -> expression
+
+(** Create a constant vec256 expression from four int64s. *)
+val vec256 : dbg:Debuginfo.t -> Cmm.vec256_bits -> expression
+
+(** Create a constant vec512 expression from eight int64s. *)
+val vec512 : dbg:Debuginfo.t -> Cmm.vec512_bits -> expression
 
 (** Create a constant int expression from a nativeint. *)
 val nativeint : dbg:Debuginfo.t -> Nativeint.t -> expression
@@ -945,6 +1017,12 @@ val cfloat : float -> data_item
 (** Static 128-bit vector. *)
 val cvec128 : Cmm.vec128_bits -> data_item
 
+(** Static 256-bit vector. *)
+val cvec256 : Cmm.vec256_bits -> data_item
+
+(** Static 512-bit vector. *)
+val cvec512 : Cmm.vec512_bits -> data_item
+
 (** Static symbol. *)
 val symbol_address : symbol -> data_item
 
@@ -1005,6 +1083,8 @@ val send_function :
 
 val apply_function :
   Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode -> Cmm.phrase
+
+val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
 (* Atomics *)
 
@@ -1101,6 +1181,16 @@ val allocate_unboxed_nativeint_array :
 val allocate_unboxed_vec128_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** Allocate a block to hold an unboxed vec256 array for the given number of
+    elements. *)
+val allocate_unboxed_vec256_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed vec512 array for the given number of
+    elements. *)
+val allocate_unboxed_vec512_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
 (** Compute the length of an unboxed float32 array. *)
 val unboxed_float32_array_length : expression -> Debuginfo.t -> expression
 
@@ -1113,6 +1203,12 @@ val unboxed_int64_or_nativeint_array_length :
 
 (** Compute the length of an unboxed vec128 array. *)
 val unboxed_vec128_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec256 array. *)
+val unboxed_vec256_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec512 array. *)
+val unboxed_vec512_array_length : expression -> Debuginfo.t -> expression
 
 (** Read from an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_ref :
@@ -1253,6 +1349,8 @@ val set_field_unboxed :
   expression
 
 val dls_get : dbg:Debuginfo.t -> expression
+
+val cpu_relax : dbg:Debuginfo.t -> expression
 
 val poll : dbg:Debuginfo.t -> expression
 

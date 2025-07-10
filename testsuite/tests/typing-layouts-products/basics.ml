@@ -89,7 +89,7 @@ Line 1, characters 0-63:
 Error: The layout of type "#(string option * t1)" is value & (float64 & value)
          because it is an unboxed tuple.
        But the layout of type "#(string option * t1)" must be a sublayout of
-         value & float64 & value
+           value & float64 & value
          because of the definition of t2_wrong at line 1, characters 0-63.
 |}]
 
@@ -100,7 +100,8 @@ Line 1, characters 0-74:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t2_wrong" is value & (float64 & value)
          because it is an unboxed record.
-       But the layout of type "t2_wrong" must be a sublayout of value & float64 & value
+       But the layout of type "t2_wrong" must be a sublayout of
+           value & float64 & value
          because of the annotation on the declaration of the type t2_wrong.
 |}]
 
@@ -228,7 +229,7 @@ Error:
        The kind of t6_wrong_inner_record is value_or_null & bits64
          because it is an unboxed record.
        But the kind of t6_wrong_inner_record must be a subkind of
-         value & bits64
+           value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
 |}]
@@ -459,7 +460,8 @@ Line 1, characters 25-31:
                              ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_1 & '_representable_layout_2
+       The layout of #('a * 'b) is
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of the field of a polymorphic variant.
@@ -484,7 +486,8 @@ Line 1, characters 24-31:
                             ^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_3 & '_representable_layout_4
+       The layout of #('a * 'b) is
+           '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a tuple element.
@@ -564,7 +567,8 @@ Line 3, characters 15-21:
                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is '_representable_layout_5 & '_representable_layout_6
+       The layout of #('a * 'b) is
+           '_representable_layout_5 & '_representable_layout_6
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of an object field.
@@ -581,7 +585,8 @@ Line 3, characters 17-21:
                      ^^^^
 Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
-       The layout of #('a * 'b) is '_representable_layout_7 & '_representable_layout_8
+       The layout of #('a * 'b) is
+           '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a variable captured in an object.
@@ -1451,7 +1456,8 @@ Line 2, characters 37-44:
                                          ^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_9 & '_representable_layout_10
+       The layout of #('a * 'b) is
+           '_representable_layout_9 & '_representable_layout_10
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of the recursive variable x.
@@ -1496,7 +1502,8 @@ Line 1, characters 21-29:
                          ^^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_11 & '_representable_layout_12
+       The layout of #('a * 'b) is
+           '_representable_layout_11 & '_representable_layout_12
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of the recursive variable _x.
@@ -1601,7 +1608,8 @@ Line 1, characters 31-37:
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is '_representable_layout_13 & '_representable_layout_14
+       The layout of #('a * 'b) is
+           '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value.
 |}]
@@ -1716,7 +1724,8 @@ Line 2, characters 25-26:
                              ^
 Error: This expression has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
-       The layout of #('a * 'b) is '_representable_layout_15 & '_representable_layout_16
+       The layout of #('a * 'b) is
+           '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a term-level argument to a class constructor.
@@ -1765,7 +1774,8 @@ Line 1, characters 13-19:
                  ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is '_representable_layout_17 & '_representable_layout_18
+       The layout of #('a * 'b) is
+           '_representable_layout_17 & '_representable_layout_18
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a lazy expression.
@@ -1877,7 +1887,8 @@ Line 1, characters 28-34:
                                 ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_19 & '_representable_layout_20
+       The layout of #('a * 'b) is
+           '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because the type argument of option has layout value_or_null.
@@ -1934,7 +1945,7 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-         immediate with string u & immediate with string u
+           immediate with string u & immediate with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -1952,10 +1963,10 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-         immutable_data & immutable_data & immutable_data
+           immutable_data & immutable_data & immutable_data
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
-         any mod external_
+           any mod external_
          because of the definition of t at line 1, characters 0-31.
 |}, Principal{|
 type ('a : any mod external_) t
@@ -1965,11 +1976,12 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-         immediate with int with string & immediate with int with string
-         & immediate with int with string
+           immediate with int with string
+           & immediate with int with string
+           & immediate with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
-         any mod external_
+           any mod external_
          because of the definition of t at line 1, characters 0-31.
 |}]
 (* CR layouts v7.1: The appearance of [immediate] above is regrettable. *)
@@ -2003,7 +2015,7 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-         immediate with string u & immediate with string u
+           immediate with string u & immediate with string u
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2022,7 +2034,7 @@ Line 4, characters 9-17:
 Error: This type "s_record" should be an instance of type
          "('a : any mod external_)"
        The kind of s_record is
-         immutable_data & immutable_data & immutable_data
+           immutable_data & immutable_data & immutable_data
          because of the definition of s_record at line 3, characters 0-51.
        But the kind of s_record must be a subkind of any mod external_
          because of the definition of t at line 1, characters 0-31.

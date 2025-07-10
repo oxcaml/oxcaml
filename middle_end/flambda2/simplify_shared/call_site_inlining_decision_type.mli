@@ -20,7 +20,8 @@
 type t =
   | Missing_code
   | Definition_says_not_to_inline
-  | Environment_says_never_inline
+  | In_a_stub
+  | Doing_speculative_inlining
   | Argument_types_not_useful
   | Unrolling_depth_exceeded
   | Max_inlining_depth_exceeded

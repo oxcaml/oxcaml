@@ -341,6 +341,7 @@ type primitive =
   | Pbox_float of boxed_float * locality_mode
   | Punbox_int of boxed_integer
   | Pbox_int of boxed_integer * locality_mode
+  | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
   | Preinterpret_unboxed_int64_as_tagged_int63
@@ -355,6 +356,7 @@ type primitive =
   | Pdls_get
   (* Poll for runtime actions *)
   | Ppoll
+  | Pcpu_relax
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -413,6 +415,8 @@ and 'a mixed_block_element =
   | Bits32
   | Bits64
   | Vec128
+  | Vec256
+  | Vec512
   | Word
   | Product of 'a mixed_block_element array
 
@@ -482,6 +486,8 @@ and unboxed_integer = Primitive.unboxed_integer =
 
 and unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec128
+  | Unboxed_vec256
+  | Unboxed_vec512
 
 and boxed_float = Primitive.boxed_float =
   | Boxed_float64
@@ -494,6 +500,8 @@ and boxed_integer = Primitive.boxed_integer =
 
 and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
+  | Boxed_vec256
+  | Boxed_vec512
 
 and peek_or_poke =
   | Ppp_tagged_immediate
@@ -532,6 +540,8 @@ let generic_value =
 let print_boxed_vector ppf t =
   match t with
   | Boxed_vec128 -> Format.pp_print_string ppf "Vec128"
+  | Boxed_vec256 -> Format.pp_print_string ppf "Vec256"
+  | Boxed_vec512 -> Format.pp_print_string ppf "Vec512"
 
 let equal_nullable x y =
   match x, y with
@@ -580,12 +590,14 @@ and equal_mixed_block_element :
   | Bits32, Bits32
   | Bits64, Bits64
   | Vec128, Vec128
+  | Vec256, Vec256
+  | Vec512, Vec512
   | Word, Word -> true
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
-  | (Value _ | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128
-     | Word | Product _), _ -> false
+  | (Value _ | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 |
+     Vec256 | Vec512 | Word | Product _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
@@ -1002,6 +1014,7 @@ let nullable_value raw_kind =
   Pvalue { raw_kind; nullable = Nullable }
 
 let layout_unit = non_null_value Pintval
+let layout_unboxed_unit = Punboxed_product []
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
 let layout_array kind = non_null_value (Parrayval kind)
@@ -1424,6 +1437,8 @@ let rec transl_mixed_product_shape ~get_value_kind shape =
     | Bits32 -> Bits32
     | Bits64 -> Bits64
     | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
     | Word -> Word
     | Product shapes ->
       (* CR mshinwell: This [get_value_kind] override is a bit odd, maybe this
@@ -1442,6 +1457,8 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Bits32 -> Bits32
     | Bits64 -> Bits64
     | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
     | Word -> Word
     | Product shapes ->
       let get_value_kind _ = generic_value in
@@ -1884,7 +1901,8 @@ let project_from_mixed_block_shape
           project_from_mixed_block_element_by_path shape.(field) path
         | Value _
         | Float_boxed _
-        | Float64 | Float32 | Bits32 | Bits64 | Word | Vec128 ->
+        | Float64 | Float32 | Bits32 | Bits64 | Word
+        | Vec128 | Vec256 | Vec512 ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -1894,7 +1912,8 @@ let mixed_block_projection_may_allocate shape ~path =
   let rec allocates element =
     match element with
     | Float_boxed mode -> Some mode
-    | Value _ | Float64 | Float32 | Bits32 | Bits64 | Word | Vec128 -> None
+    | Value _ | Float64 | Float32 | Bits32 | Bits64 | Word
+    | Vec128 | Vec256 | Vec512 -> None
     | Product shape ->
       Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
@@ -2049,11 +2068,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pobj_dup -> Some alloc_heap
   | Pobj_magic _ -> None
   | Punbox_float _ | Punbox_int _ | Punbox_vector _ -> None
+  | Punbox_unit -> None
   | Pbox_float (_, m) | Pbox_int (_, m) | Pbox_vector (_, m) -> Some m
   | Prunstack | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
-  | Ppoll ->
-    Some alloc_heap
+  | Ppoll -> Some alloc_heap
+  | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load _
   | Patomic_set _
   | Patomic_exchange _
@@ -2227,14 +2247,17 @@ let primitive_can_raise prim =
   | Punbox_float _
   | Pbox_vector (_, _)
   | Punbox_vector _ | Punbox_int _ | Pbox_int _ | Pmake_unboxed_product _
+  | Punbox_unit
   | Punboxed_product_field _ | Pget_header _ ->
     false
   | Patomic_exchange _ | Patomic_compare_exchange _
   | Patomic_compare_set _ | Patomic_fetch_add | Patomic_add
   | Patomic_sub | Patomic_land | Patomic_lor
-  | Patomic_lxor | Patomic_load _ | Patomic_set _ -> false
+  | Patomic_lxor | Patomic_load _ | Patomic_set _->
+    false
   | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
-  | Pdls_get | Ppoll | Preinterpret_tagged_int63_as_unboxed_int64
+  | Pdls_get | Ppoll | Pcpu_relax
+  | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _ | Ppeek _ | Ppoke _ ->
     false
@@ -2270,7 +2293,9 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Bits32 -> layout_unboxed_int32
   | Base Bits64 -> layout_unboxed_int64
   | Base Vec128 -> layout_unboxed_vector Unboxed_vec128
-  | Base Void -> assert false
+  | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
 
@@ -2321,6 +2346,8 @@ let layout_of_mixed_block_shape
     | Bits64 -> layout_unboxed_int64
     | Word -> layout_unboxed_nativeint
     | Vec128 -> layout_unboxed_vector Unboxed_vec128
+    | Vec256 -> layout_unboxed_vector Unboxed_vec256
+    | Vec512 -> layout_unboxed_vector Unboxed_vec512
     | Product shape ->
       Punboxed_product
         (Array.to_list (Array.map layout_of_mixed_block_element shape))
@@ -2391,6 +2418,7 @@ let primitive_result_layout (p : primitive) =
   | Pbbswap (bi, _) | Pbox_int (bi, _) ->
       layout_boxed_int bi
   | Punbox_int bi -> Punboxed_int (Primitive.unboxed_integer bi)
+  | Punbox_unit -> layout_unboxed_unit
   | Pstring_load_32 { boxed = true; _ } | Pbytes_load_32 { boxed = true; _ }
   | Pbigstring_load_32 { boxed = true; _ } ->
       layout_boxed_int Boxed_int32
@@ -2485,7 +2513,8 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land
   | Patomic_lor
   | Patomic_lxor
-  | Ppoll -> layout_unit
+  | Ppoll
+  | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63 -> layout_int
   | Ppeek layout -> (
