@@ -178,12 +178,12 @@ module type Solver_mono = sig
   type 'a obj
 
   (** ['a hint] explains a bound of type ['a], but doesn't include the bound itself *)
-  type 'a hint =
-    | Morph : hint_morph * ('b, 'a, 'd) morph * 'b hint -> 'a hint
+  type ('a, 'd) hint =
+    | Morph : hint_morph * ('b, 'a, 'd) morph * ('b, 'd) hint -> ('a, 'd) hint
         (** [Morph m f x_hint] says the current bound is derived by applying morphism [f] (explained by [m]) to another bound explained by [x_hint] *)
-    | Const : hint_const -> 'a hint
+    | Const : hint_const -> ('a, 'd) hint
         (** [Const c] says the current bound is explained by [c] *)
-    | Branch : 'a * 'a hint * 'a * 'a hint -> 'a hint
+    | Branch : 'a * ('a, 'd) hint * 'a * ('a, 'd) hint -> ('a, 'd) hint
         (** [Branch a0 a0_hint a1 a1_hint] says the current bound is jointly explained by either [a0] (explained by [a0_hint]) or [a1] (explaiend by [a1_hint]) (or both) *)
 
   (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
@@ -191,9 +191,9 @@ module type Solver_mono = sig
    will be false, which is why the submode failed. *)
   type 'a error =
     { left : 'a;
-      left_hint : 'a hint;
+      left_hint : ('a, left_only) hint;
       right : 'a;
-      right_hint : 'a hint
+      right_hint : ('a, right_only) hint
     }
 
   (* Backtracking facilities used by [types.ml] *)
