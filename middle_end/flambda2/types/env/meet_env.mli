@@ -30,10 +30,17 @@ type meet_type =
 
 val create : Typing_env.t -> t
 
+(** [use_meet_env] is a convenience function that can be used to start
+    performing a meet or adding equations to a typing environment.
+
+    It returns the modified typing environment with all new equations added. *)
 val use_meet_env : Typing_env.t -> f:(t -> t) -> Typing_env.t
 
-val use_meet_env_strict :
-  Typing_env.t -> f:(t -> t Or_bottom.t) -> Typing_env.t Or_bottom.t
+(** [use_meet_env_strict] is similar to [use_meet_env], except that it detects
+    inconsistencies and returns [Bottom] if the input typing env is inconsistent
+    (in which case [f] is not applied), or if it becomes inconsistent while
+    applying [f]. *)
+val use_meet_env_strict : Typing_env.t -> f:(t -> t) -> Typing_env.t Or_bottom.t
 
 val typing_env : t -> Typing_env.t
 
