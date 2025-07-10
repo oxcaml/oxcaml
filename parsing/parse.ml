@@ -193,10 +193,6 @@ let prepare_error err =
          use the de-sugared syntax:\n  %a"
          Style.inline_code "let mutable f = fun x -> .."
 
-
-
-
-
 let () =
   Location.register_error_of_exn
     (function
