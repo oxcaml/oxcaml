@@ -880,7 +880,7 @@ let primitive ppf = function
   | Pbswap16 -> fprintf ppf "bswap16"
   | Pbbswap(bi,m) -> print_boxed_integer "bswap" ppf bi m
   | Pint_as_pointer m -> fprintf ppf "int_as_pointer%s" (locality_kind m)
-  | Patomic_load_field {immediate_or_pointer } ->
+  | Patomic_load_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_load_field_imm"
         | Pointer -> fprintf ppf "atomic_load_field_ptr")
