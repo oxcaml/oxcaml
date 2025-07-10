@@ -166,51 +166,44 @@ end
 
 type non_poison_uses =
   { known_uses : Reg_width_const.t Index.Map.t;
-    unknown_uses : unit Index.Map.t
+    unknown_uses : Simple.t Index.Map.t
   }
 
 module Join_info = struct
   (* In any other use site, the value is [Poison] -- it is not defined in that
      use. *)
-  type 'a known_values_at_uses =
-    { known_at_uses : ('a * Reg_width_const.t) list;
-      unknown_at_uses : 'a list
+  type known_values_at_uses =
+    { known_at_uses : Reg_width_const.t Apply_cont_rewrite_id.Map.t;
+      unknown_at_uses : Simple.t Apply_cont_rewrite_id.Map.t
     }
 
-  let print_known_values_at_uses pp ppf { known_at_uses; unknown_at_uses } =
+  let print_known_values_at_uses ppf { known_at_uses; unknown_at_uses } =
     Format.fprintf ppf "@[<hov 1>(";
-    Format.pp_print_list ~pp_sep:Format.pp_print_space
-      (fun ppf (use_id, const) ->
-        Format.fprintf ppf "@[<hov 1>(%a@ %a)@]" pp use_id
-          (Or_unknown.print Reg_width_const.print)
-          (Or_unknown.Known const))
-      ppf known_at_uses;
-    (match known_at_uses, unknown_at_uses with
-    | [], [] -> ()
-    | _, _ -> Format.pp_print_space ppf ());
-    Format.pp_print_list ~pp_sep:Format.pp_print_space
-      (fun ppf use_id ->
-        Format.fprintf ppf "@[<hov 1>(%a@ %a)@]" pp use_id
-          (Or_unknown.print Reg_width_const.print)
-          Or_unknown.Unknown)
+    Apply_cont_rewrite_id.Map.print Reg_width_const.print ppf known_at_uses;
+    if not
+         (Apply_cont_rewrite_id.Map.is_empty known_at_uses
+         && Apply_cont_rewrite_id.Map.is_empty unknown_at_uses)
+    then Format.pp_print_space ppf ();
+    Apply_cont_rewrite_id.Map.print
+      (fun ppf simple -> Simple.print ppf simple)
       ppf unknown_at_uses;
     Format.fprintf ppf "@]"
 
-  type 'a t = { known_values_at_uses : 'a known_values_at_uses Name.Map.t }
+  type t = { known_values_at_uses : known_values_at_uses Name.Map.t }
 
-  let print pp ppf { known_values_at_uses } =
+  let print ppf { known_values_at_uses } =
     let print_field name pp ppf value =
       Format.fprintf ppf "@[<hov 1>(%s@ %a)@]" name pp value
     in
     Format.fprintf ppf "@[<hov 1>(%a)@]"
       (print_field "non_poison_values"
-         (Name.Map.print (print_known_values_at_uses pp)))
+         (Name.Map.print print_known_values_at_uses))
       known_values_at_uses
 
-  let create (type a)
-      (known_values_at_uses : a known_values_at_uses Name_in_target_env.Map.t) =
+  let create
+      (known_values_at_uses : known_values_at_uses Name_in_target_env.Map.t) =
     { known_values_at_uses =
-        (known_values_at_uses :> a known_values_at_uses Name.Map.t)
+        (known_values_at_uses :> known_values_at_uses Name.Map.t)
     }
 
   let empty = { known_values_at_uses = Name.Map.empty }
@@ -1072,10 +1065,10 @@ end = struct
         let unknown_uses =
           (* CR bclement: Use [diff] instead. *)
           Index.Map.merge
-            (fun _ known simple ->
+            (fun _ known (simple : Simple_in_one_joined_env.t option) ->
               match known, simple with
               | None, None | Some _, _ -> None
-              | None, Some _ -> Some ())
+              | None, Some simple -> Some (simple :> Simple.t))
             known_uses
             (canonicals
               : Simples_in_joined_envs.t
@@ -1182,7 +1175,7 @@ let add_known_use name_in_target_env known_uses_of_name known_uses =
     Name_in_target_env.Map.disjoint_union known_uses
       (Name_in_target_env.Map.singleton name_in_target_env known_uses_of_name)
 
-let n_way_join_levels ~join_id:_ ~n_way_join_type t all_levels : _ Or_bottom.t =
+let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
   let all_demotions, all_expanded_equations, all_symbol_projections =
     Index.Map.fold
       (fun index level
@@ -1376,27 +1369,10 @@ let n_way_join_levels ~join_id:_ ~n_way_join_type t all_levels : _ Or_bottom.t =
     in
     loop equations_to_join Name_in_target_env.Map.empty t
 
-let cut_and_n_way_join ?join_id ~n_way_join_type ~meet_type ~cut_after
-    target_env joined_envs =
-  let _, joined_uses, joined_envs, joined_levels =
-    List.fold_left
-      (fun (discriminant, joined_uses, joined_envs, joined_levels)
-           (use_id, typing_env) ->
-        let level = TE.cut typing_env ~cut_after in
-        if Flambda_features.debug_flambda2 ()
-        then (
-          Format.eprintf "====== LEVEL %a ======@." Index.print discriminant;
-          Format.eprintf "%a@." TEL.print level;
-          Format.eprintf "====================================@.");
-        ( Index.succ discriminant,
-          Index.Map.add discriminant use_id joined_uses,
-          Index.Map.add discriminant typing_env joined_envs,
-          Index.Map.add discriminant level joined_levels ))
-      (Index.zero, Index.Map.empty, Index.Map.empty, Index.Map.empty)
-      joined_envs
-  in
+let cut_and_n_way_join0 ?joined_uses ~n_way_join_type ~meet_type target_env
+    ~joined_envs ~joined_levels =
   match
-    n_way_join_levels ~join_id ~n_way_join_type
+    n_way_join_levels ~n_way_join_type
       { join_aliases = Join_aliases.empty;
         join_types = Join_equations.empty;
         non_poison_uses = Name_in_target_env.Map.empty;
@@ -1418,22 +1394,27 @@ let cut_and_n_way_join ?join_id ~n_way_join_type ~meet_type ~cut_after
         symbol_projections
       } ->
     let known_values_at_uses =
-      Name_in_target_env.Map.map
-        (fun { known_uses; unknown_uses } ->
-          let known_at_uses =
-            Index.Map.data
-              (Index.Map.inter
-                 (fun _ use_id known_use -> use_id, known_use)
-                 joined_uses known_uses)
-          in
-          let unknown_at_uses =
-            Index.Map.data
-              (Index.Map.inter
-                 (fun _ use_id _unknown_use -> use_id)
-                 joined_uses unknown_uses)
-          in
-          { Join_info.known_at_uses; unknown_at_uses })
-        known_at_uses
+      match joined_uses with
+      | None -> Name_in_target_env.Map.empty
+      | Some joined_uses ->
+        Name_in_target_env.Map.map
+          (fun { known_uses; unknown_uses } ->
+            let known_at_uses =
+              Apply_cont_rewrite_id.Map.of_list
+                (Index.Map.data
+                   (Index.Map.inter
+                      (fun _ use_id known_use -> use_id, known_use)
+                      joined_uses known_uses))
+            in
+            let unknown_at_uses =
+              Apply_cont_rewrite_id.Map.of_list
+                (Index.Map.data
+                   (Index.Map.inter
+                      (fun _ use_id simple -> use_id, simple)
+                      joined_uses unknown_uses))
+            in
+            { Join_info.known_at_uses; unknown_at_uses })
+          known_at_uses
     in
     let join_info = Join_info.create known_values_at_uses in
     let target_env =
@@ -1473,6 +1454,41 @@ let cut_and_n_way_join ?join_id ~n_way_join_type ~meet_type ~cut_after
     in
     target_env, join_info
 
+let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
+    joined_envs =
+  let _, joined_envs, joined_levels =
+    List.fold_left
+      (fun (discriminant, joined_envs, joined_levels) typing_env ->
+        let level = TE.cut typing_env ~cut_after in
+        ( Index.succ discriminant,
+          Index.Map.add discriminant typing_env joined_envs,
+          Index.Map.add discriminant level joined_levels ))
+      (Index.zero, Index.Map.empty, Index.Map.empty)
+      joined_envs
+  in
+  let target_env, _join_info =
+    cut_and_n_way_join0 ~n_way_join_type ~meet_type target_env ~joined_envs
+      ~joined_levels
+  in
+  target_env
+
+let cut_and_n_way_join_with_use_ids ~n_way_join_type ~meet_type ~cut_after
+    target_env joined_envs =
+  let _, joined_uses, joined_envs, joined_levels =
+    List.fold_left
+      (fun (discriminant, joined_uses, joined_envs, joined_levels)
+           (use_id, typing_env) ->
+        let level = TE.cut typing_env ~cut_after in
+        ( Index.succ discriminant,
+          Index.Map.add discriminant use_id joined_uses,
+          Index.Map.add discriminant typing_env joined_envs,
+          Index.Map.add discriminant level joined_levels ))
+      (Index.zero, Index.Map.empty, Index.Map.empty, Index.Map.empty)
+      joined_envs
+  in
+  cut_and_n_way_join0 ~joined_uses ~n_way_join_type ~meet_type target_env
+    ~joined_envs ~joined_levels
+
 let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
     =
   let joined_levels, joined_envs =
@@ -1506,7 +1522,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
       envs_with_extensions
   in
   match
-    n_way_join_levels ~join_id:None ~n_way_join_type
+    n_way_join_levels ~n_way_join_type
       { join_aliases = t.join_aliases;
         join_types = t.join_types;
         non_poison_uses = Name_in_target_env.Map.empty;

@@ -26,6 +26,8 @@ module Vec128 = Vector_types.Vec128.Bit_pattern
 module Vec256 = Vector_types.Vec256.Bit_pattern
 module Vec512 = Vector_types.Vec512.Bit_pattern
 
+let do_it = true
+
 type 'a meet_return_value = 'a ME.meet_return_value =
   | Left_input
   | Right_input
@@ -340,7 +342,7 @@ let meet_and_reduce_discriminant env ~meet_type ~is_bottom_a ~is_bottom_b
     match extract_value equation None None with
     | None -> Ok (is_b_var_rv, env)
     | Some (is_b_name, is_b_bool) -> (
-      if true
+      if not do_it
       then Ok (is_b_var_rv, env)
       else
         match
@@ -446,12 +448,12 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~is_bottom_a
       in
       direct_return (Ok (result, env)))
   | Ok (a_result, env_a), Ok (b_result, env_b) -> (
-    let result_env, _join_info =
+    let result_env =
       (* Not strict, as we don't expect to be able to get bottom equations from
          joining non-bottom ones *)
       Join_env.cut_and_n_way_join ~meet_type ~n_way_join_type:n_way_join
         ~cut_after:join_scope initial_env
-        [(), ME.typing_env env_a; (), ME.typing_env env_b]
+        [ME.typing_env env_a; ME.typing_env env_b]
     in
     let when_a_level = TE.cut (ME.typing_env env_a) ~cut_after:join_scope in
     let when_b_level = TE.cut (ME.typing_env env_b) ~cut_after:join_scope in
@@ -616,7 +618,7 @@ let meet_and_reduce_get_tag_var env ~meet_type ~blocks1 ~get_tag_var1 ~blocks2
         | Known all_tags -> (
           match Tag.Set.get_singleton all_tags with
           | Some tag -> (
-            if true
+            if not do_it
             then Ok (get_tag_var_rv, env)
             else
               match
@@ -634,7 +636,7 @@ let meet_and_reduce_get_tag_var env ~meet_type ~blocks1 ~get_tag_var1 ~blocks2
                   Targetint_31_63.Set.add (Tag.to_targetint_31_63 tag) imms)
                 all_tags Targetint_31_63.Set.empty
             in
-            if true
+            if not do_it
             then Ok (get_tag_var_rv, env)
             else
               match
@@ -1539,7 +1541,7 @@ and meet_row_like :
        variables could appear in one of the [scoped_envs] and the join expects
        that variables defined in the central env are defined in all the joined
        envs. *)
-    let result_env, _join_info =
+    let result_env =
       Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join ~meet_type
         ~cut_after:common_scope initial_env scoped_envs
     in
@@ -1554,7 +1556,7 @@ and meet_row_like :
   let open struct
     type result_env =
       | No_result
-      | Extension of (unit * TE.t) list
+      | Extension of TE.t list
   end in
   let result_env = ref No_result in
   let need_join =
@@ -1600,10 +1602,10 @@ and meet_row_like :
   let join_result_env scoped_env =
     let new_result_env =
       match !result_env with
-      | No_result -> Extension [(), scoped_env]
+      | No_result -> Extension [scoped_env]
       | Extension other_envs ->
         assert need_join;
-        Extension (((), scoped_env) :: other_envs)
+        Extension (scoped_env :: other_envs)
     in
     result_env := new_result_env
   in

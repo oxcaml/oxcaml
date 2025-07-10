@@ -43,7 +43,7 @@ let check_join_inputs ~env_at_fork _envs_with_levels ~params
           Symbol.print symbol)
     extra_lifted_consts_in_use_envs
 
-let cut_and_n_way_join ?join_id definition_typing_env ts_and_use_ids ~params
+let cut_and_n_way_join ?join_id:_ definition_typing_env ts_and_use_ids ~params
     ~cut_after ~extra_lifted_consts_in_use_envs =
   let params = Bound_parameters.to_list params in
   check_join_inputs ~env_at_fork:definition_typing_env ts_and_use_ids ~params
@@ -51,7 +51,7 @@ let cut_and_n_way_join ?join_id definition_typing_env ts_and_use_ids ~params
   let ts = List.rev_map (fun (t, use_id, _) -> use_id, t) ts_and_use_ids in
   Meet_env.use_meet_env_with_data definition_typing_env ~f:(fun target_env ->
       let t, join_info =
-        Join_env.cut_and_n_way_join ?join_id
+        Join_env.cut_and_n_way_join_with_use_ids
           ~meet_type:Meet_and_n_way_join.meet_type
           ~n_way_join_type:Meet_and_n_way_join.n_way_join target_env ~cut_after
           ts

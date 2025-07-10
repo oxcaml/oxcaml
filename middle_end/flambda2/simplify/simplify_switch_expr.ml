@@ -660,9 +660,7 @@ let simplify_switch0 dacc switch ~down_to_up =
             Option.iter
               (fun join_info ->
                 Format.eprintf "Scrutinee: %a@." Simple.print scrutinee;
-                Format.eprintf "%a@."
-                  (Join_info.print Apply_cont_rewrite_id.print)
-                  join_info)
+                Format.eprintf "%a@." Join_info.print join_info)
               join_info;
           let is_known_at_all_uses =
             match join_info with
@@ -678,7 +676,9 @@ let simplify_switch0 dacc switch ~down_to_up =
                 ~name:(fun name ~coercion:_ ->
                   match Join_info.known_values_at_uses name join_info with
                   | Unknown -> false
-                  | Known { unknown_at_uses = []; _ } -> true
+                  | Known { unknown_at_uses; _ }
+                    when Apply_cont_rewrite_id.Map.is_empty unknown_at_uses ->
+                    true
                   | Known _ -> false)
                 ~const:(fun _ -> true)
           in

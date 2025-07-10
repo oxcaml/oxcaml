@@ -41,29 +41,34 @@ val n_way_join_env_extension :
 
 module Join_info : sig
   (* At any other use, the value is not defined (i.e. [Poison]). *)
-  type 'a known_values_at_uses =
-    { known_at_uses : ('a * Reg_width_const.t) list;
-      unknown_at_uses : 'a list
+  type known_values_at_uses =
+    { known_at_uses : Reg_width_const.t Apply_cont_rewrite_id.Map.t;
+      unknown_at_uses : Simple.t Apply_cont_rewrite_id.Map.t
     }
 
-  type 'a t
+  type t
 
-  val empty : 'a t
+  val empty : t
 
-  val reduce : 'a t -> Typing_env.t -> 'a t
+  val reduce : t -> Typing_env.t -> t
 
-  val print :
-    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+  val print : Format.formatter -> t -> unit
 
-  val known_values_at_uses :
-    Name.t -> 'a t -> 'a known_values_at_uses Or_unknown.t
+  val known_values_at_uses : Name.t -> t -> known_values_at_uses Or_unknown.t
 end
 
 val cut_and_n_way_join :
-  ?join_id:Join_id.t ->
   n_way_join_type:n_way_join_type ->
   meet_type:Meet_env.meet_type ->
   cut_after:Scope.t ->
   Meet_env.t ->
-  ('a * Typing_env.t) list ->
-  Meet_env.t * 'a Join_info.t
+  Typing_env.t list ->
+  Meet_env.t
+
+val cut_and_n_way_join_with_use_ids :
+  n_way_join_type:n_way_join_type ->
+  meet_type:Meet_env.meet_type ->
+  cut_after:Scope.t ->
+  Meet_env.t ->
+  (Apply_cont_rewrite_id.t * Typing_env.t) list ->
+  Meet_env.t * Join_info.t

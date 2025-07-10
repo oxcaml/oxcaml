@@ -25,4 +25,4 @@ val cut_and_n_way_join :
   cut_after:Scope.t ->
   extra_lifted_consts_in_use_envs:Symbol.Set.t ->
   extra_allowed_names:Name_occurrences.t ->
-  Typing_env.t * Apply_cont_rewrite_id.t Join_env.Join_info.t
+  Typing_env.t * Join_env.Join_info.t

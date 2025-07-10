@@ -92,10 +92,7 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    join_info :
-      (Flambda2_types.Join_id.t
-      * Apply_cont_rewrite_id.t Flambda2_types.Join_info.t)
-      option
+    join_info : (Flambda2_types.Join_id.t * Flambda2_types.Join_info.t) option
   }
 
 let set_join_info join_id join_info denv =

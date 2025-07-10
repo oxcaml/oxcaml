@@ -277,20 +277,18 @@ end
 
 module Join_info : sig
   (* At any other use, the value is not defined (i.e. [Poison]). *)
-  type 'a known_values_at_uses =
-    { known_at_uses : ('a * Reg_width_const.t) list;
-      unknown_at_uses : 'a list
+  type known_values_at_uses =
+    { known_at_uses : Reg_width_const.t Apply_cont_rewrite_id.Map.t;
+      unknown_at_uses : Simple.t Apply_cont_rewrite_id.Map.t
     }
 
-  type 'a t
+  type t
 
-  val reduce : 'a t -> Typing_env.t -> 'a t
+  val reduce : t -> Typing_env.t -> t
 
-  val print :
-    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+  val print : Format.formatter -> t -> unit
 
-  val known_values_at_uses :
-    Name.t -> 'a t -> 'a known_values_at_uses Or_unknown.t
+  val known_values_at_uses : Name.t -> t -> known_values_at_uses Or_unknown.t
 end
 
 val cut_and_n_way_join :
@@ -301,7 +299,7 @@ val cut_and_n_way_join :
   cut_after:Scope.t ->
   extra_lifted_consts_in_use_envs:Symbol.Set.t ->
   extra_allowed_names:Name_occurrences.t ->
-  Typing_env.t * Apply_cont_rewrite_id.t Join_info.t
+  Typing_env.t * Join_info.t
 
 module Function_type : sig
   type t
