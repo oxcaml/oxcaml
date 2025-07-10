@@ -19,7 +19,10 @@ module TG = Type_grammar
 module TE = Typing_env
 module TEL = Typing_env_level
 
-type t = { typing_env : TE.t } [@@unboxed]
+type t =
+  { typing_env : TE.t;
+    adding_equations_for_names : Name.Set.t
+  }
 
 type 'a meet_return_value =
   | Left_input
@@ -33,11 +36,12 @@ type meet_type =
   Type_grammar.t ->
   (Type_grammar.t meet_return_value * t) Or_bottom.t
 
-let create typing_env = { typing_env }
+let create typing_env =
+  { typing_env; adding_equations_for_names = Name.Set.empty }
 
-let typing_env { typing_env } = typing_env
+let typing_env { typing_env; _ } = typing_env
 
-let with_typing_env { typing_env = _ } typing_env = { typing_env }
+let with_typing_env t typing_env = { t with typing_env }
 
 let use_meet_env t ~f = typing_env (f (create t))
 
@@ -50,6 +54,27 @@ let use_meet_env_strict t ~f : _ Or_bottom.t =
     if TE.is_bottom tenv then Bottom else Ok tenv
 
 let map_typing_env t ~f = with_typing_env t (f (typing_env t))
+
+let adding_equation_for_name t name ~f =
+  (* If we were to add an equation on [x] while already adding an equation on
+     [x], either the inner equation would get overriden by the outer equation
+     and would not be visible, or it would get captured in an env extension.
+
+     That env extension would then likely end up stored on [x] itself, which
+     currently would cause an infinite loop next time we try to add an equation
+     on [x].
+
+     Instead, we simply ignore such recursive equations. *)
+  (* CR bclement: Implement support for recursive extensions (i.e. extensions
+     stored on [x] that can contain equations on [x]), then get rid of this. *)
+  if Name.Set.mem name t.adding_equations_for_names
+  then t
+  else
+    let adding_equations_for_names =
+      Name.Set.add name t.adding_equations_for_names
+    in
+    let t' = f { t with adding_equations_for_names } in
+    { t' with adding_equations_for_names = t.adding_equations_for_names }
 
 let replace_concrete_equation t name ty =
   match TG.must_be_singleton ty ~machine_width:(TE.machine_width t) with
@@ -108,24 +133,27 @@ let add_concrete_equation_on_canonical ~raise_on_bottom t simple ty
       | Ok (_, env) -> env
       | Bottom -> if raise_on_bottom then raise Bottom_equation else t)
     ~name:(fun name ~coercion ->
-      (* If [(coerce name coercion)] has type [ty], then [name] has type
-         [(coerce ty coercion^-1)]. *)
-      let ty = TG.apply_coercion ty (Coercion.inverse coercion) in
-      (* Note: this will check that the [existing_ty] has the expected kind. *)
-      let existing_ty = TE.find (typing_env t) name (Some (TG.kind ty)) in
-      match meet_type t ty existing_ty with
-      | Bottom ->
-        if raise_on_bottom
-        then raise Bottom_equation
-        else
-          map_typing_env t ~f:(fun t ->
-              TE.replace_equation t name (MTC.bottom (TG.kind ty)))
-      | Ok ((Right_input | Both_inputs), env) -> env
-      | Ok (Left_input, env) ->
-        map_typing_env env ~f:(fun env -> replace_concrete_equation env name ty)
-      | Ok (New_result ty', env) ->
-        map_typing_env env ~f:(fun env ->
-            replace_concrete_equation env name ty'))
+      adding_equation_for_name t name ~f:(fun t ->
+          (* If [(coerce name coercion)] has type [ty], then [name] has type
+             [(coerce ty coercion^-1)]. *)
+          let ty = TG.apply_coercion ty (Coercion.inverse coercion) in
+          (* Note: this will check that the [existing_ty] has the expected
+             kind. *)
+          let existing_ty = TE.find (typing_env t) name (Some (TG.kind ty)) in
+          match meet_type t ty existing_ty with
+          | Bottom ->
+            if raise_on_bottom
+            then raise Bottom_equation
+            else
+              map_typing_env t ~f:(fun t ->
+                  TE.replace_equation t name (MTC.bottom (TG.kind ty)))
+          | Ok ((Right_input | Both_inputs), env) -> env
+          | Ok (Left_input, env) ->
+            map_typing_env env ~f:(fun env ->
+                replace_concrete_equation env name ty)
+          | Ok (New_result ty', env) ->
+            map_typing_env env ~f:(fun env ->
+                replace_concrete_equation env name ty')))
 
 let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
   (* We have demoted [demoted], which used to be canonical, to [canonical] in
