@@ -74,9 +74,9 @@ let add_env_extension env ext1 ext2 =
 
 let add_env_extension_strict env ext1 ext2 =
   ( ME.use_meet_env_strict env.left_env ~f:(fun left_env ->
-        ME.add_env_extension_strict ~meet_type:env.meet_type left_env ext1),
+        ME.add_env_extension ~meet_type:env.meet_type left_env ext1),
     ME.use_meet_env_strict env.right_env ~f:(fun right_env ->
-        ME.add_env_extension_strict ~meet_type:env.meet_type right_env ext2) )
+        ME.add_env_extension ~meet_type:env.meet_type right_env ext2) )
 
 let exists_in_parent_env env name =
   TE.mem ~min_name_mode:Name_mode.in_types env.parent_env name

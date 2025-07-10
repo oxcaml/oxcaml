@@ -1296,7 +1296,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
         let typing_env = TE.increment_scope parent_env in
         match
           ME.use_meet_env_strict typing_env ~f:(fun meet_env ->
-              ME.add_env_extension_strict ~meet_type meet_env extension)
+              ME.add_env_extension ~meet_type meet_env extension)
         with
         | Bottom ->
           (* We can reach bottom here if the extension was created in a more
