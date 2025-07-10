@@ -923,23 +923,6 @@ let unboxed_literals_extension = Language_extension.Layouts
 
 let generic_optional mod_path label _loc =
   Generic_optional(mod_path, label)
-  (*
-  We want parsing to succeed even if extensions are disabled.
-
-  CR: move the following to type checking:
-  {v
-    let generic_optional_arguments_extension =
-      Language_extension.Generic_optional_arguments
-    if Language_extension.is_enabled generic_optional_arguments_extension then
-      Generic_optional label
-    else
-      raise
-        Syntaxerr.(
-          Error
-            (Generic_optional_arguments_not_allowed
-              (make_loc loc)))
-  v}
-  *)
 
 type sign = Positive | Negative
 
@@ -1082,7 +1065,7 @@ let maybe_pmod_constraint mode expr =
 %token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
-%token <string> GENOPTLABEL   ".?label:" (* just an example *)
+%token <string> GENOPTLABEL   ".?'label:" (* just an example *)
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
@@ -4537,9 +4520,9 @@ strict_function_or_labeled_tuple_type:
   | label = optlabel
       { Optional label }
   | mkrhs(mod_ext_longident) GENOPTLABEL
-      { generic_optional $1 $2 $sloc}
+      { generic_optional $1 $2 $sloc }
   | mkrhs(mod_ext_longident) DOTQUESTIONQUOTE LIDENT COLON
-      { generic_optional $1 $3 $sloc}
+      { generic_optional $1 $3 $sloc }
   | label = LIDENT COLON
       { Labelled label }
 ;
