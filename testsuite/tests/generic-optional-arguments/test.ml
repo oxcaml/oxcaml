@@ -29,5 +29,7 @@ let chain_call_2 Stdlib.Option.?'(sep) arg =
 let () =
   print_endline (default_concat ["x"; "y"; "z"]);
   print_endline (comma_concat ["x"; "y"; "z"]);
-  print_endline (chain_call ?sep:(Some "+" @ local) ["x"; "y"; "z"]);
+  print_endline (chain_call ~sep:"+" ["x"; "y"; "z"]);
+  print_endline (chain_call ?sep:(Some "+") ["x"; "y"; "z"]);
+  print_endline (chain_call_2 ?sep:(Some "+") ["x"; "y"; "z"]);
   ()
