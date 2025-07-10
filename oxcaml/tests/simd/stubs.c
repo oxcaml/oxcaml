@@ -20,7 +20,6 @@ value vec128_run_callback_stack_args(value i0, value i1, value i2, value i3, val
 #ifdef __ARM_NEON
 #include <arm_neon.h>
 
-
 typedef poly128_t simd_poly128_t;
 typedef float32x4_t simd_float32x4_t;
 typedef float32x2_t simd_float32x2_t;

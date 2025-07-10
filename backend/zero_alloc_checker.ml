@@ -2493,7 +2493,7 @@ end = struct
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
-            | V128_of_v128 )
+            | V128_of_v128 | V256_of_v256 | V512_of_v512 )
         | Static_cast _ | Csel _ ->
           if not (Operation.is_pure op)
           then
