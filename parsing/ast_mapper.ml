@@ -150,6 +150,13 @@ module T = struct
 
   let map_labeled_tuple sub tl = List.map (map_snd (sub.typ sub)) tl
 
+  let map_arg_label sub = function
+  | Nolabel -> Nolabel
+  | Labelled s -> Labelled s
+  | Optional s -> Optional s
+  | Generic_optional (module_path, s) ->
+      Generic_optional (map_loc sub module_path, s)
+
   let map sub {ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs} =
     let open Typ in
     let loc = sub.location sub loc in
@@ -162,7 +169,8 @@ module T = struct
         let jkind = map_opt (sub.jkind_annotation sub) jkind in
         var ~loc ~attrs s jkind
     | Ptyp_arrow (lab, t1, t2, m1, m2) ->
-        arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2) (sub.modes sub m1) (sub.modes sub m2)
+        arrow ~loc ~attrs (map_arg_label sub lab) (sub.typ sub t1)
+          (sub.typ sub t2) (sub.modes sub m1) (sub.modes sub m2)
     | Ptyp_tuple tyl -> tuple ~loc ~attrs (map_labeled_tuple sub tyl)
     | Ptyp_unboxed_tuple tyl ->
         unboxed_tuple ~loc ~attrs (map_labeled_tuple sub tyl)

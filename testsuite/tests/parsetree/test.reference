@@ -1,13 +1,134 @@
-source_jane_street.ml: FAIL, CANNOT PARSE (test.ml 123:2)
-File "source_jane_street.ml", line 1502, characters 14-15:
-1502 | val concat : ?'sep:string option -> string Stdlib.List.t -> string
-                     ^
-Error: Syntax error
+source_jane_street.ml:  FAIL, REPARSED AST IS DIFFERENT (test.ml 123:2)
+--- /tmp/ocamlparse1026f7.txt	2025-07-10 12:31:30.034808175 -0400
++++ /tmp/ocamlparse69e42f.txt	2025-07-10 12:31:30.116807951 -0400
+@@ -10249,7 +10249,7 @@
+                     [
+                       Pparam_val (_none_[0,0+-1]..[0,0+-1]) ghost
+                         Generic_optional
+-                        "Stdlib.Option" (source_jane_street.ml[1513,39981+17]..[1513,39981+30])
++                        "Stdlib.Option" (<str>[1145,36206+19]..[1145,36206+32])
+                         "sep"
+                         Some
+                           expression (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10496,7 +10496,7 @@
+               [
+                 <arg>
+                 Generic_optional
+-                "Stdlib.Option" (source_jane_street.ml[1539,40476+33]..[1539,40476+46])
++                "Stdlib.Option" (<str>[1165,36698+33]..[1165,36698+46])
+                 "sep"
+                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                     Pexp_construct "Some" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10574,7 +10574,7 @@
+           [
+             Pparam_val (_none_[0,0+-1]..[0,0+-1]) ghost
+               Generic_optional
+-              "Stdlib.Option" (source_jane_street.ml[1547,40671+15]..[1547,40671+28])
++              "Stdlib.Option" (<str>[1172,36890+15]..[1172,36890+28])
+               "sep"
+               None
+               pattern (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10603,7 +10603,7 @@
+               [
+                 <arg>
+                 Generic_optional
+-                "Stdlib.Option" (source_jane_street.ml[1548,40729+11]..[1548,40729+24])
++                "Stdlib.Option" (<str>[1173,36953+11]..[1173,36953+24])
+                 "sep"
+                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                     Pexp_ident "sep" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10678,7 +10678,7 @@
+           [
+             Pparam_val (_none_[0,0+-1]..[0,0+-1]) ghost
+               Generic_optional
+-              "Stdlib.Option" (source_jane_street.ml[1556,40899+15]..[1556,40899+28])
++              "Stdlib.Option" (<str>[1180,37120+15]..[1180,37120+28])
+               "sep"
+               None
+               pattern (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10707,7 +10707,7 @@
+               [
+                 <arg>
+                 Generic_optional
+-                "Stdlib.Option" (source_jane_street.ml[1557,40961+11]..[1557,40961+24])
++                "Stdlib.Option" (<str>[1181,37183+11]..[1181,37183+24])
+                 "sep"
+                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                     Pexp_ident "sep" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10726,7 +10726,7 @@
+       [
+         <arg>
+         Generic_optional
+-        "Stdlib.Option" (source_jane_street.ml[1558,40998+11]..[1558,40998+24])
++        "Stdlib.Option" (<str>[1182,37217+13]..[1182,37217+26])
+         "sep"
+           expression (_none_[0,0+-1]..[0,0+-1]) ghost
+             Pexp_construct "Some" (_none_[0,0+-1]..[0,0+-1]) ghost
 =====================================================
-source_jane_street.ml: FAIL, CANNOT PARSE (test.ml 131:2)
-
-File "source_jane_street.ml", line 1502, characters 14-15:
-1502 | val concat : ?'sep:string option -> string Stdlib.List.t -> string
-                     ^
-Error: Syntax error
+source_jane_street.ml:  FAIL, REPARSED AST IS DIFFERENT (test.ml 131:2)
+--- /tmp/ocamlparseb6b72b.txt	2025-07-10 12:31:30.283807493 -0400
++++ /tmp/ocamlparse83072f.txt	2025-07-10 12:31:30.364807271 -0400
+@@ -10249,7 +10249,7 @@
+                     [
+                       Pparam_val (_none_[0,0+-1]..[0,0+-1]) ghost
+                         Generic_optional
+-                        "Stdlib.Option" (source_jane_street.ml[1513,39981+17]..[1513,39981+30])
++                        "Stdlib.Option" (<str>[1145,36206+19]..[1145,36206+32])
+                         "sep"
+                         Some
+                           expression (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10496,7 +10496,7 @@
+               [
+                 <arg>
+                 Generic_optional
+-                "Stdlib.Option" (source_jane_street.ml[1539,40476+33]..[1539,40476+46])
++                "Stdlib.Option" (<str>[1165,36698+33]..[1165,36698+46])
+                 "sep"
+                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                     Pexp_construct "Some" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10574,7 +10574,7 @@
+           [
+             Pparam_val (_none_[0,0+-1]..[0,0+-1]) ghost
+               Generic_optional
+-              "Stdlib.Option" (source_jane_street.ml[1547,40671+15]..[1547,40671+28])
++              "Stdlib.Option" (<str>[1172,36890+15]..[1172,36890+28])
+               "sep"
+               None
+               pattern (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10603,7 +10603,7 @@
+               [
+                 <arg>
+                 Generic_optional
+-                "Stdlib.Option" (source_jane_street.ml[1548,40729+11]..[1548,40729+24])
++                "Stdlib.Option" (<str>[1173,36953+11]..[1173,36953+24])
+                 "sep"
+                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                     Pexp_ident "sep" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10678,7 +10678,7 @@
+           [
+             Pparam_val (_none_[0,0+-1]..[0,0+-1]) ghost
+               Generic_optional
+-              "Stdlib.Option" (source_jane_street.ml[1556,40899+15]..[1556,40899+28])
++              "Stdlib.Option" (<str>[1180,37120+15]..[1180,37120+28])
+               "sep"
+               None
+               pattern (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10707,7 +10707,7 @@
+               [
+                 <arg>
+                 Generic_optional
+-                "Stdlib.Option" (source_jane_street.ml[1557,40961+11]..[1557,40961+24])
++                "Stdlib.Option" (<str>[1181,37183+11]..[1181,37183+24])
+                 "sep"
+                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                     Pexp_ident "sep" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -10726,7 +10726,7 @@
+       [
+         <arg>
+         Generic_optional
+-        "Stdlib.Option" (source_jane_street.ml[1558,40998+11]..[1558,40998+24])
++        "Stdlib.Option" (<str>[1182,37217+13]..[1182,37217+26])
+         "sep"
+           expression (_none_[0,0+-1]..[0,0+-1]) ghost
+             Pexp_construct "Some" (_none_[0,0+-1]..[0,0+-1]) ghost
 =====================================================
