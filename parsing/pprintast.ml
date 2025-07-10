@@ -867,7 +867,6 @@ and label_exp ctxt f (l,opt,p) =
           | None -> pp f "?%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
       end
   | Generic_optional(module_path, rest) -> (
-    (*= CR generic-optional : Change *)
       begin match p with
       | {ppat_desc = Ppat_var {txt;_}; ppat_attributes = []}
         when txt = rest ->
