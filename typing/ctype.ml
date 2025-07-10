@@ -822,6 +822,12 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
+let rec lower_all ty =
+  if get_level ty > !current_level then begin
+    set_level ty !current_level;
+    iter_type_expr lower_all ty
+  end
+
 (*
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
@@ -837,10 +843,10 @@ let rec generalize stage_offset ty =
     begin match get_desc ty with
     | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
     | Tvariant row ->
-        let ty' = row_more row in
-        if stage_offset <> 0 then
-          set_level ty' !current_level;
-        iter_type_expr (generalize stage_offset) ty
+        if stage_offset <> 0 && is_Tvar (row_more row) then
+          lower_all ty
+        else
+          iter_type_expr (generalize stage_offset) ty
     | Tquote ty' -> generalize (stage_offset + 1) ty'
     | Tsplice ty' -> generalize (stage_offset - 1) ty'
     | Tconstr (_, _, abbrev) ->
@@ -2095,11 +2101,11 @@ let rec quote_splice_cancel ty =
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
-let try_expand_once env ty =
+let rec try_expand_once env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
-  | Tsplice _ -> quote_splice_cancel ty
-  | Tquote _ -> quote_splice_cancel ty
+  | Tsplice t -> ignore (try_expand_once env t); quote_splice_cancel ty
+  | Tquote t -> ignore (try_expand_once env t); quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2185,11 +2191,11 @@ let safe_abbrev_opt env ty =
     Btype.backtrack snap;
     false
 
-let try_expand_once_opt env ty =
+let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
-  | Tsplice _ -> quote_splice_cancel ty
-  | Tquote _ -> quote_splice_cancel ty
+  | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
