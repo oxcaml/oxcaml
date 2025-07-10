@@ -449,7 +449,7 @@ and type_with_label ctxt f (label, c, mode) =
     pp f "?%a:%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
   | Generic_optional (module_path, s) ->
-    pp f "%a.?%a:%a" longident_loc module_path
+    pp f "%a.?'%a:%a" longident_loc module_path
       ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
@@ -2231,9 +2231,9 @@ and label_x_expression_param ctxt f (l,e) =
         pp f "?%a:%a" ident_of_name str (simple_expr ctxt) e
   | Generic_optional (module_path, str) ->
       if Some str = simple_name then
-        pp f "%a.?%a" longident_loc module_path ident_of_name str
+        pp f "%a.?'%a" longident_loc module_path ident_of_name str
       else
-        pp f "%a.?%a:%a"
+        pp f "%a.?'%a:%a"
           longident_loc module_path ident_of_name str (simple_expr ctxt) e
   | Labelled lbl ->
       if Some lbl = simple_name then
