@@ -1491,11 +1491,11 @@ val triangle_10 : int = 55
 (*
 The following syntaxes are tested
 
-1. in type declaration [?'lbl:tp -> ...]
-2. function parameter with default argument [?'(lbl: tp <- val)]
-3. function declaration without default argument [?'(lbl : tp)]
-4. function call with expression [?'lbl:(<expr>)]
-5. function call without expression [?'lbl]
+1. in type declaration [Stdlib.Option.?'lbl:tp -> ...]
+2. function parameter with default argument [Stdlib.Option.?'(lbl: tp <- val)]
+3. function declaration without default argument [Stdlib.Option.?'(lbl : tp)]
+4. function call with expression [Stdlib.Option.?'lbl:(<expr>)]
+5. function call without expression [Stdlib.Option.?'lbl]
 *)
 
 module type S = sig

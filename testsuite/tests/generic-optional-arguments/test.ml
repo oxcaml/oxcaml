@@ -1,9 +1,6 @@
 (* TEST
  flags = "-extension-universe alpha";
-
-
 *)
-
 
 (* Interface *)
 module type S = sig
@@ -32,5 +29,5 @@ let chain_call_2 Stdlib.Option.?'(sep) arg =
 let () =
   print_endline (default_concat ["x"; "y"; "z"]);
   print_endline (comma_concat ["x"; "y"; "z"]);
-  print_endline (chain_call ["x"; "y"; "z"]);
+  print_endline (chain_call ?sep:(Some "+" @ local) ["x"; "y"; "z"]);
   ()
