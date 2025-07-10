@@ -1,5 +1,5 @@
 File "extension_not_allowed.ml", line 12, characters 15-28:
-12 |   val concat : Stdlib.Option.?'sep:string -> string list -> string
+12 |   val concat : Stdlib.Option?sep:string -> string list -> string
                     ^^^^^^^^^^^^^
 Error: The generic_optional_arguments extension is disabled
        To enable it, pass the '-extension generic_optional_arguments' flag

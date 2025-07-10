@@ -1491,18 +1491,18 @@ val triangle_10 : int = 55
 (*
 The following syntaxes are tested
 
-1. in type declaration [Stdlib.Option.?'lbl:tp -> ...]
-2. function parameter with default argument [Stdlib.Option.?'(lbl: tp = val)]
-3. function declaration without default argument [Stdlib.Option.?'(lbl : tp)]
+1. in type declaration [Stdlib.Option?lbl:tp -> ...]
+2. function parameter with default argument [Stdlib.Option?(lbl: tp = val)]
+3. function declaration without default argument [Stdlib.Option?(lbl : tp)]
 3. function declaration without type annotation
-    [Stdlib.Option.?'(lbl)] and [Stdlib.Option.?'(lbl : tp)]
-4. function call with expression [Stdlib.Option.?'lbl:(<expr>)]
-5. function call without expression [Stdlib.Option.?'lbl]
+    [Stdlib.Option?(lbl)] and [Stdlib.Option?(lbl : tp)]
+4. function call with expression [Stdlib.Option?lbl:(<expr>)]
+5. function call without expression [Stdlib.Option?lbl]
 *)
 
 module type S = sig
   val concat :
-    Stdlib.Option.?'sep:string -> string Stdlib.List.t -> string
+    Stdlib.Option?sep:string -> string Stdlib.List.t -> string
   val concat_2 : ?sep:string -> string Stdlib.List.t -> string
 end
 
@@ -1517,11 +1517,11 @@ module type S =
 
 (* Implementation *)
 module M : S = struct
-  let rec concat Stdlib.Option.?'(sep : string = " ")
+  let rec concat Stdlib.Option?(sep : string = " ")
     (xs : string Stdlib.List.t) =
       String.concat sep xs
   (* okay to omit type annotations *)
-  let concat_2 Stdlib.Option.?'(sep=" ") (xs : string Stdlib.List.t) =
+  let concat_2 Stdlib.Option?(sep=" ") (xs : string Stdlib.List.t) =
     String.concat sep xs
 end
 
@@ -1546,7 +1546,7 @@ val comma_concat : string List.t -> string = <fun>
 - : string = "x,y,z"
 |}]
 
-let comma_concat_2 zs = M.concat Stdlib.Option.?'sep:(Some ",") zs ;;
+let comma_concat_2 zs = M.concat Stdlib.Option?sep:(Some ",") zs ;;
 comma_concat_2 ["x"; "y"; "z"] ;;
 
 [%%expect{|
@@ -1554,8 +1554,8 @@ val comma_concat_2 : string List.t -> string = <fun>
 - : string = "x,y,z"
 |}]
 
-let chain_call Stdlib.Option.?'(sep : string option) arg =
-  M.concat Stdlib.Option.?'sep arg ;;
+let chain_call Stdlib.Option?(sep : string option) arg =
+  M.concat Stdlib.Option?sep arg ;;
 chain_call ["x"; "y"; "z"] ;;
 
 [%%expect{|
@@ -1563,9 +1563,9 @@ val chain_call : ?sep:string -> string List.t -> string = <fun>
 - : string = "x y z"
 |}]
 
-let chain_call Stdlib.Option.?'sep:(sep : string option) arg =
-  M.concat Stdlib.Option.?'sep arg ;;
-chain_call Stdlib.Option.?'sep:(Some ",") ["x"; "y"; "z"] ;;
+let chain_call Stdlib.Option?sep:(sep : string option) arg =
+  M.concat Stdlib.Option?sep arg ;;
+chain_call Stdlib.Option?sep:(Some ",") ["x"; "y"; "z"] ;;
 
 [%%expect{|
 val chain_call : ?sep:string -> string List.t -> string = <fun>
@@ -1573,7 +1573,7 @@ val chain_call : ?sep:string -> string List.t -> string = <fun>
 |}]
 
 (* okay to omit type annotations *)
-let chain_call_2 Stdlib.Option.?'(sep) arg =
+let chain_call_2 Stdlib.Option?(sep) arg =
   M.concat ?sep arg ;;
 chain_call_2 ?sep:(Some ",") ["x"; "y"; "z"] ;;
 

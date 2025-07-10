@@ -1065,7 +1065,6 @@ let maybe_pmod_constraint mode expr =
 %token ONCE                   "once_"
 %token OPEN                   "open"
 %token <string> OPTLABEL      "?label:" (* just an example *)
-%token <string> GENOPTLABEL   ".?'label:" (* just an example *)
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
@@ -1076,7 +1075,6 @@ let maybe_pmod_constraint mode expr =
 %token <string> PREFIXOP      "!+" (* chosen with care; see above *)
 %token PRIVATE                "private"
 %token QUESTION               "?"
-%token DOTQUESTIONQUOTE       ".?'"
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
@@ -1171,6 +1169,7 @@ The precedences must be listed from low to high.
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
 %nonassoc prec_unary_minus prec_unary_plus /* unary - */
+%nonassoc prec_generic_optional     /* C?(x:t) vs C ?(x:t) */
 %nonassoc prec_constant_constructor     /* cf. simple_expr (C versus C x) */
 %nonassoc prec_constr_appl              /* above AS BAR COLONCOLON COMMA */
 %nonassoc below_HASH
@@ -2686,19 +2685,18 @@ labeled_simple_pattern:
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
-  | mkrhs(mod_longident) DOTQUESTIONQUOTE
-      LPAREN label_let_pattern opt_default RPAREN
-        { (generic_optional $1 (fst $4) $sloc, $5, (snd $4)) }
-  | mkrhs(mod_longident) DOTQUESTIONQUOTE label_var
-      { (generic_optional $1 (fst $3) $sloc, None, snd $3) }
+  | mkrhs(mod_longident) QUESTION LPAREN label_let_pattern opt_default RPAREN %prec prec_generic_optional
+      { (generic_optional $1 (fst $4) $sloc, $5, (snd $4)) }
+  // | mkrhs(mod_longident) QUESTION label_var
+  //     { (generic_optional $1 (fst $3) $sloc, None, snd $3) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
       { (Optional $1, None, $2) }
-  | mkrhs(mod_longident) GENOPTLABEL LPAREN let_pattern opt_default RPAREN
-      { (generic_optional $1 $2 $sloc, $5, $4) }
-  | mkrhs(mod_longident) GENOPTLABEL pattern_var
-      { (generic_optional $1 $2 $sloc, None, $3) }
+  // | mkrhs(mod_longident) OPTLABEL LPAREN let_pattern opt_default RPAREN
+  //     { (generic_optional $1 $2 $sloc, $5, $4) }
+  // | mkrhs(mod_longident) OPTLABEL pattern_var
+  //     { (generic_optional $1 $2 $sloc, None, $3) }
   | TILDE LPAREN label_let_pattern RPAREN
       { (Labelled (fst $3), None, snd $3) }
   | TILDE label_var
@@ -3172,13 +3170,13 @@ labeled_simple_expr:
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
-  | mod_path = mkrhs(mod_longident) DOTQUESTIONQUOTE label = LIDENT
-      { let loc = $loc(label) in
-        (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
+  // | mod_path = mkrhs(mod_longident) QUESTION label = LIDENT
+  //     { let loc = $loc(label) in
+  //       (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
-  | mkrhs(mod_longident) GENOPTLABEL simple_expr %prec below_HASH
-      { (generic_optional $1 $2 $sloc, $3) }
+  // | mkrhs(mod_longident) OPTLABEL simple_expr %prec below_HASH
+  //     { (generic_optional $1 $2 $sloc, $3) }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }
@@ -4519,9 +4517,9 @@ strict_function_or_labeled_tuple_type:
 %inline strict_arg_label:
   | label = optlabel
       { Optional label }
-  | mkrhs(mod_ext_longident) GENOPTLABEL
+  | mkrhs(mod_ext_longident) OPTLABEL
       { generic_optional $1 $2 $sloc }
-  | mkrhs(mod_ext_longident) DOTQUESTIONQUOTE LIDENT COLON
+  | mkrhs(mod_ext_longident) QUESTION LIDENT COLON
       { generic_optional $1 $3 $sloc }
   | label = LIDENT COLON
       { Labelled label }
