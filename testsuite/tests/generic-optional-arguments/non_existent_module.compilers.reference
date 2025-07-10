@@ -1,4 +1,4 @@
 File "non_existent_module.ml", line 12, characters 15-27:
-12 |   val concat : Non_existent.?'sep:string -> string list -> string
+12 |   val concat : Non_existent??sep:string -> string list -> string
                     ^^^^^^^^^^^^
 Error: Invalid generic optional argument module path: "Non_existent"
