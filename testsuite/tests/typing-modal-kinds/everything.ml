@@ -11,7 +11,7 @@ type t_float64 : float64
 type t_float64_mod_e : float64 mod everything
 [%%expect{|
 type t_value
-type t_value_mod_e : value_or_null mod everything mod non_null separable
+type t_value_mod_e : immediate_or_null mod non_null separable
 type t_float64 : float64
 type t_float64_mod_e : float64 mod everything
 |}]
@@ -257,11 +257,11 @@ type t : value_or_null mod everything
 type bad : value = t
 
 [%%expect{|
-type t : value_or_null mod everything
+type t : immediate_or_null
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value_or_null mod everything
+Error: The kind of type "t" is immediate_or_null
          because of the definition of t at line 1, characters 0-37.
        But the kind of type "t" must be a subkind of value
          because of the definition of bad at line 2, characters 0-20.
@@ -295,15 +295,15 @@ type t : immediate & immediate
 type t : value & float64 mod everything
 [%%expect{|
 type t
-  : value_or_null mod everything mod non_null separable
+  : immediate_or_null mod non_null separable
     & float64 mod global aliased many stateless immutable external_
 |}]
 
 type t : value & (immediate & bits64) & float32 mod everything
 [%%expect{|
 type t
-  : value_or_null mod everything mod non_null separable
-    & (value_or_null mod everything mod non_null separable
+  : immediate_or_null mod non_null separable
+    & (immediate_or_null mod non_null separable
       & bits64 mod global aliased many stateless immutable external_)
     & float32 mod global aliased many stateless immutable external_
 |}]

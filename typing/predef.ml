@@ -678,8 +678,12 @@ let or_null_kind tvar =
   in
   Type_variant (cstrs, Variant_with_null, None)
 
-let or_null_jkind _ =
-  Jkind.Builtin.value_or_null ~why:(Primitive ident_or_null)
+let or_null_jkind param =
+  Jkind.Builtin.immediate_or_null ~why:(Primitive ident_or_null) |>
+  Jkind.add_with_bounds
+    ~modality:Mode.Modality.Value.Const.id
+    ~type_expr:param |>
+  Jkind.mark_best
 
 let add_or_null add_type env =
   let add_type1 = mk_add_type1 add_type in
@@ -695,7 +699,6 @@ let add_or_null add_type env =
      the most argument types, and forbid arrays from accepting [or_null]s.
      In the future, we will track separability in the jkind system. *)
   ~kind:or_null_kind
-  ~param_jkind:(Jkind.for_or_null_argument ident_or_null)
   ~jkind:or_null_jkind
 
 let builtin_values =
