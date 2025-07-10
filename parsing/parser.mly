@@ -4539,8 +4539,6 @@ strict_function_or_labeled_tuple_type:
       { generic_optional $1 $2 $sloc}
   | mkrhs(mod_ext_longident) DOTQUESTION LIDENT COLON
       { generic_optional $1 $3 $sloc}
-// (* CR-someday generic-optional: Somehow
-//    I conjecture this is the ONLY RULE we need. TODO investigate. *)
   | label = LIDENT COLON
       { Labelled label }
 ;
