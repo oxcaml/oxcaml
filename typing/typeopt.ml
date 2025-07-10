@@ -89,7 +89,7 @@ let is_base_type env ty base_ty_path =
   | _ -> false
 
 let is_always_gc_ignorable env ty =
-  let ext : Jkind_mod_bounds.Externality_mod.t =
+  let ext : Jkind_mod_bounds.Externality.t =
     (* We check that we're compiling to (64-bit) native code before counting
        External64 types as gc_ignorable, because bytecode is intended to be
        platform independent. *)
