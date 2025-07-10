@@ -55,13 +55,6 @@ Line 50, characters 15-17:
 Error: Type variable "a" is used at Line 50, characters 15-17
        in a context with one layer of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
-|}, Principal{|
-Line 57, characters 15-17:
-57 | type 'a t2 = <['a]> expr;;
-                    ^^
-Error: Type variable "a" is used at Line 57, characters 15-17
-       in a context with one layer of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
 |}];;
 
 type 'a t3 = $'a -> $'a -> 'a expr;;
@@ -91,17 +84,10 @@ Error: Type variable "a" is used at Line 1, characters 26-28
 
 fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 92, characters 28-30:
-92 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
+Line 85, characters 28-30:
+85 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
                                  ^^
-Error: Type variable "a" is used at Line 92, characters 28-30
-       in a context with 2 layers of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
-|}, Principal{|
-Line 99, characters 28-30:
-99 | fun (x: 'a) -> <[fun (y : <['a]>) -> 1]>;;
-                                 ^^
-Error: Type variable "a" is used at Line 99, characters 28-30
+Error: Type variable "a" is used at Line 85, characters 28-30
        in a context with 2 layers of quotation (<[ ... ]>);
        it should only be used in a context with no quotations or splices.
 |}];;
@@ -211,48 +197,56 @@ val mk_pair : <[ $ ('a) ]> expr -> <[ $ ('a) * $ ('a) ]> expr = <fun>
 
 mk_pair <[123]>;;
 [%%expect {|
-- : <[ int * int ]> expr = <[ (123, 123) ]>
-|}, Principal{|
 - : <[ $ (<[ int ]>) * $ (<[ int ]>) ]> expr = <[ (123, 123) ]>
 |}];;
 
 mk_pair <[[]]>;;
 [%%expect {|
-- : <[ $ ('a) list * $ ('a) list ]> expr = <[ ([], []) ]>
-|}, Principal{|
 - : <[ $ (<[ $ ('a) list ]>) * $ (<[ $ ('a) list ]>) ]> expr = <[ ([], []) ]>
 |}];;
 
 mk_pair <[None]>;;
 [%%expect {|
-- : <[ $ ('a) option * $ ('a) option ]> expr = <[ (None, None) ]>
-|}, Principal{|
 - : <[ $ (<[ $ ('a) option ]>) * $ (<[ $ ('a) option ]>) ]> expr =
 <[ (None, None) ]>
 |}];;
 
 mk_pair <[Some 123]>;;
 [%%expect {|
-- : <[ int option * int option ]> expr = <[ ((Some 123), (Some 123)) ]>
-|}, Principal{|
 - : <[ $ (<[ int option ]>) * $ (<[ int option ]>) ]> expr =
 <[ ((Some 123), (Some 123)) ]>
 |}];;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[ (unit -> int) * (unit -> int) ]> expr =
-<[ ((fun () -> 42), (fun () -> 42)) ]>
-|}, Principal{|
-- : <[ $ (unit -> int) * $ (unit -> int) ]> expr =
+- : <[ $ (<[ unit -> int ]>) * $ (<[ unit -> int ]>) ]> expr =
 <[ ((fun () -> 42), (fun () -> 42)) ]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <[ ('_weak1 -> '_weak1) * ('_weak1 -> '_weak1) ]> expr =
+- : <[ $ (<[ '_weak1 -> '_weak1 ]>) * $ (<[ '_weak1 -> '_weak1 ]>) ]> expr =
 <[ ((fun x -> x), (fun x -> x)) ]>
-|}, Principal{|
-- : <[ $ ('_weak1 -> '_weak1) * $ ('_weak1 -> '_weak1) ]> expr =
-<[ ((fun x -> x), (fun x -> x)) ]>
+|}];;
+
+(* Type algebra checks. *)
+
+fun (x: 'a) -> (x: <[<[<[$($($'a))]>]>]>);;
+[%%expect {|
+- : 'a -> <[ <[ <[ $ ($ ($ ('a))) ]> ]> ]> = <fun>
+|}];;
+
+fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
+[%%expect {|
+- : <[ <[ <[ $ ($ ($ ('a))) ]> ]> ]> -> 'a = <fun>
+|}];;
+
+fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
+[%%expect {|
+Line 1, characters 32-33:
+1 | fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
+                                    ^
+Error: This expression has type "<[ 'a ]>"
+       but an expression was expected of type "'a"
+       The type variable "'a" occurs inside "<[ 'a ]>"
 |}];;

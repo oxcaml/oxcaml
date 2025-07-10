@@ -2074,12 +2074,32 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+(* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
+   This ensures type unification works correctly. *)
+let rec quote_splice_cancel ty =
+  match get_desc ty with
+  | Tquote t -> begin
+      match get_desc t with
+      | Tsplice t' -> t'
+      | Tquote _ -> set_type_desc ty (Tquote (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | Tsplice t -> begin
+      match get_desc t with
+      | Tquote t' -> t'
+      | Tsplice _ -> set_type_desc t (Tsplice (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | _ -> raise Cannot_expand
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
 let try_expand_once env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
+  | Tsplice _ -> quote_splice_cancel ty
+  | Tquote _ -> quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2168,6 +2188,8 @@ let safe_abbrev_opt env ty =
 let try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
+  | Tsplice _ -> quote_splice_cancel ty
+  | Tquote _ -> quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -3866,7 +3888,15 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
-      (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tquote _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
@@ -4133,12 +4163,6 @@ and unify3 uenv t1 t1' t2 t2' =
             newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
           in
           unify uenv s2 t
-      | (Tquote s1, _) ->
-          set_type_desc t2' d2;
-          unify uenv s1 t2
-      | (_, Tquote s2) ->
-          set_type_desc t1' d1;
-          unify uenv s2 t1
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
