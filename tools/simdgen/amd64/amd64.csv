@@ -1073,12 +1073,12 @@ MONITOR,0F 01 C8,,NA,NA,NA,NA
 "MOVBE m64, r64",REX.W + 0F 38 F1 /r,,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "MOVD mm,r/m32",NP 0F 6E /r,MMX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "MOVQ mm,r/m64",NP REX.W + 0F 6E /r,MMX,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"MOVD r/m32,mm",NP 0F 7E /r,MMX,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"MOVQ r/m64,mm",NP REX.W + 0F 7E /r,MMX,ModRM:r/m (r),ModRM:reg (w),NA,NA
+"MOVD r/m32,mm",NP 0F 7E /r,MMX,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"MOVQ r/m64,mm",NP REX.W + 0F 7E /r,MMX,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "MOVD xmm,r/m32",66 0F 6E /r,SSE2,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "MOVQ xmm,r/m64",66 REX.W 0F 6E /r,SSE2,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"MOVD r/m32,xmm",66 0F 7E /r,SSE2,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"MOVQ r/m64,xmm",66 REX.W 0F 7E /r,SSE2,ModRM:r/m (r),ModRM:reg (w),NA,NA
+"MOVD r/m32,xmm",66 0F 7E /r,SSE2,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"MOVQ r/m64,xmm",66 REX.W 0F 7E /r,SSE2,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VMOVD xmm1,r32/m32",VEX.128.66.0F.W0 6E /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVQ xmm1,r64/m64",VEX.128.66.0F.W1 6E /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVD r32/m32,xmm1",VEX.128.66.0F.W0 7E /r,AVX,ModRM:r/m (w),ModRM:reg (r),NA,NA

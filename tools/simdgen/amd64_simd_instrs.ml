@@ -10,6 +10,7 @@ type id =
   | Pslld_X_Xm128
   | Pmulhw
   | Pcmpeqd
+  | Movq_r64m64_X
   | Vpsubq_Y_Y_Ym256
   | Vphsubsw_Y_Y_Ym256
   | Vdivss
@@ -175,6 +176,7 @@ type id =
   | Vcvtpd2ps_X_Xm128
   | Vpsubusb_X_X_Xm128
   | Vpmuludq_X_X_Xm128
+  | Movd_r32m32_X
   | Cvtss2si_r32_Xm32
   | Vmaxsd
   | Pextrb
@@ -545,7 +547,6 @@ type id =
   | Vpminub_Y_Y_Ym256
   | Pcmpeqb
   | Movups_X_Xm128
-  | Movd_X_r32m32
   | Pmovmskb_r64_X
   | Pminsd
   | Vmovd_r32m32_X
@@ -824,6 +825,7 @@ type id =
   | Psubb
   | Vpabsw_X_Xm128
   | Vpsubusw_Y_Y_Ym256
+  | Movd_X_r32m32
   | Pmuludq_X_Xm128
   | Pmulld
   | Haddpd
@@ -913,6 +915,15 @@ let pcmpeqd = {
   ; imm = Imm_none
   ; mnemonic = "pcmpeqd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 118 }
+}
+let movq_r64m64_X = {
+    id = Movq_r64m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res { loc = Temp [|R64;M64|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
 }
 let vpsubq_Y_Y_Ym256 = {
     id = Vpsubq_Y_Y_Ym256
@@ -2398,6 +2409,15 @@ let vpmuludq_X_X_Xm128 = {
   ; imm = Imm_none
   ; mnemonic = "vpmuludq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 244 }
+}
+let movd_r32m32_X = {
+    id = Movd_r32m32_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res { loc = Temp [|R32;M32|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
 }
 let cvtss2si_r32_Xm32 = {
     id = Cvtss2si_r32_Xm32
@@ -5774,15 +5794,6 @@ let movups_X_Xm128 = {
   ; mnemonic = "movups"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
 }
-let movd_X_r32m32 = {
-    id = Movd_X_r32m32
-  ; ext = [|SSE2|]
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = Imm_none
-  ; mnemonic = "movd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
-}
 let pmovmskb_r64_X = {
     id = Pmovmskb_r64_X
   ; ext = [|SSE2|]
@@ -7204,15 +7215,6 @@ let vpandn_X_X_Xm128 = {
   ; imm = Imm_none
   ; mnemonic = "vpandn"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 223 }
-}
-let movq_X_r64m64 = {
-    id = Movq_X_r64m64
-  ; ext = [|SSE2|]
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = Imm_none
-  ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
 }
 let vpabsd_Y_Ym256 = {
     id = Vpabsd_Y_Ym256
