@@ -42,20 +42,19 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
   raw_lambda
   |> Profile.(record ~accumulate:true generate)
-    (fun { Lambda.code = lambda; required_globals; main_module_block_format;
+    (fun { Lambda.code = lambda; required_globals = _; main_module_block_format = _;
            arg_block_idx } ->
        Builtin_attributes.warn_unused ();
        lambda
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
        |> Simplif.simplify_lambda
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
-       |> Blambda_of_lambda.blambda_of_lambda
-       |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
-       |> Bytegen.compile_implementation i.module_name
-       |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
-       |> fun bytecode ->
+       |> fun _ ->
+          (* CR selee: we don't need it at this point, but this seems important
+            so I'll keep it around *)
           let arg_descr = make_arg_descr ~param:as_arg_for ~arg_block_idx in
-          bytecode, required_globals, main_module_block_format, arg_descr
+          ignore arg_descr
+       |> fun _ -> failwith "unimplemented"
     )
 
 let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =

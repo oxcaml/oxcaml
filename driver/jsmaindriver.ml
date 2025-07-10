@@ -27,8 +27,8 @@ let main argv ppf =
     begin try
       Compenv.process_deferred_actions
         (ppf,
-         Compile.implementation,
-         Compile.interface,
+         Jscompile.implementation,
+         Jscompile.interface,
          ".cmo",
          ".cma");
     with Arg.Bad msg ->
@@ -37,8 +37,7 @@ let main argv ppf =
         Clflags.print_arguments program;
         exit 2
       end
-    end;
-    failwith "unimplemented"
+    end
   with
   | exception (Compenv.Exit_with_status n) ->
     n
