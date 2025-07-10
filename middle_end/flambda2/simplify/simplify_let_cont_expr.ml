@@ -558,11 +558,10 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         let bound_pattern =
           Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
         in
-        let named = Named.create_simple (Simple.var bound_to) in
+        let named = Named.create_simple bound_to in
         let handler, uacc =
           Expr_builder.create_let_binding uacc bound_pattern named
-            ~free_names_of_defining_expr:
-              (Name_occurrences.singleton_variable bound_to Name_mode.normal)
+            ~free_names_of_defining_expr:(Simple.free_names bound_to)
             ~cost_metrics_of_defining_expr:Cost_metrics.zero ~body:handler
         in
         handler, uacc)
@@ -1446,9 +1445,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
     (* CR-someday ncourant: this makes the order in which continuations are
        processed dependant on things like the name of the compilation unit
        (because it affects the order on [Continuation.t], and thus the element
-       returned by [min_elt_opt]). However, recursive continuations are
-       specified using a [Continuation.Map.t], whose order already depends on
-       the name of the compilation unit. *)
+       returned by [min_elt_opt]). *)
     match Continuation.Set.min_elt_opt reachable_handlers_to_simplify with
     | None ->
       (* all remaining_handlers are unreachable *)

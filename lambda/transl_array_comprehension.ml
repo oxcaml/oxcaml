@@ -478,8 +478,8 @@ let iterator ~transl_exp ~scopes ~loc :
       (* CR layouts v4: [~elt_sort:None] here is not ideal and
          should be fixed. To do that, we will need to store a sort
          on [Texp_comp_in]. *)
-      Typeopt.array_type_kind ~elt_sort:None iter_arr_exp.exp_env
-        iter_arr_exp.exp_loc iter_arr_exp.exp_type
+      Typeopt.array_type_kind ~elt_sort:None ~elt_ty:(Some pattern.pat_type)
+        iter_arr_exp.exp_env iter_arr_exp.exp_loc iter_arr_exp.exp_type
     in
     let iter_arr_mut =
       Typeopt.array_type_mut iter_arr_exp.exp_env iter_arr_exp.exp_type
@@ -515,7 +515,7 @@ let iterator ~transl_exp ~scopes ~loc :
                        iter_arr_mut ),
                    [iter_arr.var; Lvar iter_ix],
                    loc ))
-              pattern body
+              Immutable pattern body
         }
     in
     mk_iterator, Array { iter_arr; iter_len }
@@ -724,6 +724,10 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Immutable StrictOpt, make_unboxed_nativeint_vect ~loc array_size.var
     | Fixed_size, Punboxedvectorarray Unboxed_vec128 ->
       Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
+    | Fixed_size, Punboxedvectorarray Unboxed_vec256 ->
+      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
+    | Fixed_size, Punboxedvectorarray Unboxed_vec512 ->
+      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
     (* Case 3: Unknown size, known array kind *)
     | Dynamic_size, (Pintarray | Paddrarray) ->
       Mutable, Resizable_array.make ~loc array_kind (int 0)
@@ -741,7 +745,9 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       ( Mutable,
         Resizable_array.make ~loc array_kind (unboxed_nativeint Targetint.zero)
       )
-    | Dynamic_size, Punboxedvectorarray Unboxed_vec128 ->
+    | Dynamic_size, Punboxedvectorarray Unboxed_vec128
+    | Dynamic_size, Punboxedvectorarray Unboxed_vec256
+    | Dynamic_size, Punboxedvectorarray Unboxed_vec512 ->
       (* The above cases are not actually allowed/tested yet. *)
       Misc.fatal_error
         "Comprehensions on arrays of unboxed types are not yet supported."

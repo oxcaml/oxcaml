@@ -221,7 +221,8 @@ let compute_static_size lam =
     | Patomic_sub
     | Patomic_land
     | Patomic_lor
-    | Patomic_lxor ->
+    | Patomic_lxor
+    | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
            but it doesn't hurt to be consistent. *)
@@ -360,7 +361,7 @@ let compute_static_size lam =
     | Ppoke _ ->
         dynamic_size lam
 
-    (* Primitives specific to flambda-backend *)
+    (* Primitives specific to oxcaml *)
     | Pmakefloatblock (_, _) ->
         let size = List.length args in
         Block (Float_record size)
@@ -376,7 +377,8 @@ let compute_static_size lam =
     | Punboxed_int32_array_set_128 _
     | Punboxed_int64_array_set_128 _
     | Punboxed_nativeint_array_set_128 _
-    | Parray_element_size_in_bytes _ ->
+    | Parray_element_size_in_bytes _
+    | Punbox_unit ->
         Constant
 
     | Pmakeufloatblock (_, _)

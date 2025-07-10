@@ -728,7 +728,7 @@ end = struct
       let size =
         match code_id with
         | Deleted { function_slot_size; _ } -> function_slot_size
-        | Code_id code_id ->
+        | Code_id { code_id; only_full_applications = _ } ->
           let code_metadata = get_code_metadata code_id in
           Code_metadata.function_slot_size code_metadata
       in
@@ -891,6 +891,8 @@ end = struct
           (* flambda2 only supports 64-bit targets for now, so naked numbers can
              only be of size 1 *)
           | Naked_number Naked_vec128 -> 2, true
+          | Naked_number Naked_vec256 -> 4, true
+          | Naked_number Naked_vec512 -> 8, true
           | Value -> 1, Value_slot.is_always_immediate value_slot
         in
         if is_unboxed

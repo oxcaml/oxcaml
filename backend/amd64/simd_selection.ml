@@ -49,6 +49,8 @@ let extract_constant args name ~max =
       | Cconst_natint (_, _)
       | Cconst_float32 (_, _)
       | Cconst_vec128 (_, _)
+      | Cconst_vec256 (_, _)
+      | Cconst_vec512 (_, _)
       | Cconst_symbol (_, _)
       | Cvar _
       | Clet (_, _, _)
@@ -128,8 +130,8 @@ let select_operation_sse op args =
 let select_operation_sse2 op args =
   match op with
   | "caml_sse2_float64_sqrt" | "sqrt" -> instr sqrtsd args
-  | "caml_sse2_float64_max" -> instr maxsd args
-  | "caml_sse2_float64_min" -> instr minsd args
+  | "caml_simd_float64_max" | "caml_sse2_float64_max" -> instr maxsd args
+  | "caml_simd_float64_min" | "caml_sse2_float64_min" -> instr minsd args
   | "caml_sse2_cast_float64_int64" -> instr cvtsd2si_r64_Xm64 args
   | "caml_sse2_float64x2_sqrt" -> instr sqrtpd args
   | "caml_sse2_int8x16_add" -> instr paddb args
@@ -182,8 +184,8 @@ let select_operation_sse2 op args =
     instr cmppd ~i args
   | "caml_sse2_cvt_int32x4_float64x2" -> instr cvtdq2pd args
   | "caml_sse2_cvt_int32x4_float32x4" -> instr cvtdq2ps args
-  | "caml_sse2_cvt_float64x2_int32x4" -> instr cvtpd2dq args
-  | "caml_sse2_cvt_float64x2_float32x4" -> instr cvtpd2ps args
+  | "caml_sse2_cvt_float64x2_int32x2" -> instr cvtpd2dq args
+  | "caml_sse2_cvt_float64x2_float32x2" -> instr cvtpd2ps args
   | "caml_sse2_cvt_float32x4_int32x4" -> instr cvtps2dq args
   | "caml_sse2_cvt_float32x4_float64x2" -> instr cvtps2pd args
   | "caml_sse2_cvt_int16x8_int8x16_saturating" -> instr packsswb args
@@ -363,18 +365,32 @@ let select_operation_sse41 op args =
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
       instr roundsd ~i args
+    | "caml_simd_float64_round_current" | "caml_sse41_float64_round_current" ->
+      instr roundsd ~i:(int_of_float_rounding RoundCurrent) args
+    | "caml_simd_float64_round_neg_inf" | "caml_sse41_float64_round_neg_inf" ->
+      instr roundsd ~i:(int_of_float_rounding RoundDown) args
+    | "caml_simd_float64_round_pos_inf" | "caml_sse41_float64_round_pos_inf" ->
+      instr roundsd ~i:(int_of_float_rounding RoundUp) args
+    | "caml_simd_float64_round_towards_zero"
+    | "caml_sse41_float64_round_towards_zero" ->
+      instr roundsd ~i:(int_of_float_rounding RoundTruncate) args
+    | "caml_simd_float64_round_near" | "caml_sse41_float64_round_near" ->
+      instr roundsd ~i:(int_of_float_rounding RoundNearest) args
     | "caml_sse41_float32_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
       instr roundss ~i args
-    | "caml_simd_float32_round_current" ->
+    | "caml_simd_float32_round_current" | "caml_sse41_float32_round_current" ->
       instr roundss ~i:(int_of_float_rounding RoundCurrent) args
-    | "caml_simd_float32_round_neg_inf" ->
+    | "caml_simd_float32_round_neg_inf" | "caml_sse41_float32_round_neg_inf" ->
       instr roundss ~i:(int_of_float_rounding RoundDown) args
-    | "caml_simd_float32_round_pos_inf" ->
+    | "caml_simd_float32_round_pos_inf" | "caml_sse41_float32_round_pos_inf" ->
       instr roundss ~i:(int_of_float_rounding RoundUp) args
-    | "caml_simd_float32_round_towards_zero" ->
+    | "caml_simd_float32_round_towards_zero"
+    | "caml_sse41_float32_round_towards_zero" ->
       instr roundss ~i:(int_of_float_rounding RoundTruncate) args
+    | "caml_simd_float32_round_near" | "caml_sse41_float32_round_near" ->
+      instr roundss ~i:(int_of_float_rounding RoundNearest) args
     | "caml_sse41_int8x16_max" -> instr pmaxsb args
     | "caml_sse41_int32x4_max" -> instr pmaxsd args
     | "caml_sse41_int16x8_max_unsigned" -> instr pmaxuw args
@@ -571,12 +587,14 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             (Int64.logand num mask))
         0L nums
     in
-    Operation.Const_vec128 { high = pack_int64 highs; low = pack_int64 lows }
+    Operation.Const_vec128 { word0 = pack_int64 highs; word1 = pack_int64 lows }
     |> make_default ~arg_count:0 ~res_count:1
   in
   let add_op =
     let op =
       match width_type with
+      | W512 -> assert false
+      | W256 -> assert false
       | W128 -> assert false
       | W64 -> paddq
       | W32 -> paddd
@@ -587,6 +605,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
   in
   let mul_op =
     match width_type with
+    | W512 -> None
+    | W256 -> None
     | W128 -> None
     | W64 -> None
     | W32 -> Some (instr pmulld)
@@ -598,6 +618,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Iadd -> Option.bind add_op (make_default ~arg_count ~res_count)
     | Isub ->
       (match width_type with
+      | W512 -> assert false
+      | W256 -> assert false
       | W128 -> assert false
       | W64 -> psubq_X_Xm128
       | W32 -> psubd
@@ -608,6 +630,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Imul -> Option.bind mul_op (make_default ~arg_count ~res_count)
     | Imulh { signed } -> (
       match width_type with
+      | W512 -> None
+      | W256 -> None
       | W128 -> None
       | W64 -> None
       | W32 -> None
@@ -622,6 +646,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Ilsl ->
       let op =
         match width_type with
+        | W512 -> assert false
+        | W256 -> assert false
         | W128 -> assert false
         | W64 -> psllq_X_Xm128
         | W32 -> pslld_X_Xm128
@@ -632,6 +658,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Ilsr ->
       let op =
         match width_type with
+        | W512 -> assert false
+        | W256 -> assert false
         | W128 -> assert false
         | W64 -> psrlq_X_Xm128
         | W32 -> psrld_X_Xm128
@@ -642,6 +670,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | Iasr ->
       let op =
         match width_type with
+        | W512 -> assert false
+        | W256 -> assert false
         | W128 -> assert false
         | W64 -> None
         | W32 -> Some psrad_X_Xm128
@@ -654,6 +684,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Ceq ->
         let op =
           match width_type with
+          | W512 -> assert false
+          | W256 -> assert false
           | W128 -> assert false
           | W64 -> pcmpeqq
           | W32 -> pcmpeqd
@@ -664,6 +696,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Cgt ->
         let op =
           match width_type with
+          | W512 -> assert false
+          | W256 -> assert false
           | W128 -> assert false
           | W64 -> pcmpgtq
           | W32 -> pcmpgtd
@@ -686,9 +720,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Const_int n -> Int64.of_nativeint n
       | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-      | Begin_region | End_region | Name_for_debugger _ | Dls_get | Poll ->
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
+      | Name_for_debugger _ | Dls_get | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -741,9 +776,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
-      | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
-      | Poll ->
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
+      | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
+      | End_region | Name_for_debugger _ | Dls_get | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -782,9 +817,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region
-        | Name_for_debugger _ | Dls_get | Poll ->
+        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
+        | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Name_for_debugger _ | Dls_get | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -875,6 +910,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Ibased _ -> None)
     | Isextend32 -> (
       match width_type with
+      | W512 -> None
+      | W256 -> None
       | W128 -> None
       | W64 -> instr pmovsxdq |> make_default ~arg_count ~res_count
       | W32 ->
@@ -886,6 +923,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | W8 -> None)
     | Izextend32 -> (
       match width_type with
+      | W512 -> None
+      | W256 -> None
       | W128 -> None
       | W64 -> instr pmovzxdq |> make_default ~arg_count ~res_count
       | W32 -> None (* See previous comment *)
@@ -906,9 +945,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Alloc _
           | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
-          | Probe_is_enabled _ | Opaque | Begin_region | End_region
-          | Name_for_debugger _ | Dls_get | Poll ->
+          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
+          | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
+          | End_region | Name_for_debugger _ | Dls_get | Poll | Pause ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1013,6 +1052,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       None)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-  | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
-  | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get | Poll ->
+  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _
+  | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region | End_region
+  | Name_for_debugger _ | Dls_get | Poll ->
     None

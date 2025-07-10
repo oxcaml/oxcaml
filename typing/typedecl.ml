@@ -486,7 +486,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           | Immutable -> Immutable
           | Mutable ->
               match record_form with
-              | Legacy -> Mutable Mode.Alloc.Comonadic.Const.legacy
+              | Legacy -> Mutable Mode.Value.Comonadic.legacy
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
          let modalities =
@@ -935,7 +935,7 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed, Jkind.of_new_legacy_sort ~why:Old_style_unboxed_type
+            Variant_unboxed, Jkind.of_new_sort ~why:Old_style_unboxed_type
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -965,7 +965,7 @@ let transl_declaration env sdecl (id, uid) =
           let rep, jkind =
             if unbox then
               Record_unboxed,
-              Jkind.of_new_legacy_sort ~why:Old_style_unboxed_type
+              Jkind.of_new_sort ~why:Old_style_unboxed_type
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or
@@ -1018,7 +1018,7 @@ let transl_declaration env sdecl (id, uid) =
          This allows [estimate_type_jkind] to give an estimate that's
          just barely good enough, such that [constain_type_jkind] can always
          decompose the product of [any]s and recurse on the labels.
-         See https://github.com/ocaml-flambda/flambda-backend/pull/3399. *)
+         See https://github.com/oxcaml/oxcaml/pull/3399. *)
       match kind with
       | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout jkind with
@@ -1131,7 +1131,8 @@ let record_gets_unboxed_version = function
       Array.exists
         (fun (kind : mixed_block_element) ->
           match kind with
-          | Value | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word -> false
+          | Value | Float64 | Float32 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Word -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
         shape
@@ -1309,7 +1310,7 @@ let rec check_constraints_rec env loc visited ty =
       end;
       List.iter (check_constraints_rec env loc visited) args
   | Tpoly (ty, tl) ->
-      let _, ty = Ctype.instance_poly ~fixed:false tl ty in
+      let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
   | _ ->
       Btype.iter_type_expr (check_constraints_rec env loc visited) ty
@@ -1640,6 +1641,8 @@ module Element_repr = struct
     | Bits32
     | Bits64
     | Vec128
+    | Vec256
+    | Vec512
     | Word
     | Product of t array
 
@@ -1672,6 +1675,8 @@ module Element_repr = struct
       | Base Bits32 -> Unboxed_element Bits32
       | Base Bits64 -> Unboxed_element Bits64
       | Base Vec128 -> Unboxed_element Vec128
+      | Base Vec256 -> Unboxed_element Vec256
+      | Base Vec512 -> Unboxed_element Vec512
       | Base Void -> Element_without_runtime_component { loc; ty }
       | Product l ->
         Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
@@ -1696,6 +1701,8 @@ module Element_repr = struct
         | Bits32 -> Bits32
         | Bits64 -> Bits64
         | Vec128 -> Vec128
+        | Vec256 -> Vec256
+        | Vec512 -> Vec512
         | Word -> Word
         | Product l -> Product (Array.map of_t l)
       in
@@ -1708,7 +1715,8 @@ module Element_repr = struct
         | Float_element | Value_element -> acc + 1
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
-        | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word -> acc
+        | Float64 | Float32 | Bits32 | Bits64
+        | Vec128 | Vec256 | Vec512 | Word -> acc
         | Product l -> Array.fold_left count_boxed_in_t acc l
       in
       List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
@@ -1826,8 +1834,8 @@ let rec update_decl_jkind env dpath decl =
            match repr with
            | Float_element -> repr_summary.floats <- true
            | Unboxed_element Float64 -> repr_summary.float64s <- true
-           | Unboxed_element ( Float32 | Bits32 | Bits64 | Vec128 | Word
-                             | Product _ ) ->
+           | Unboxed_element ( Float32 | Bits32 | Bits64
+                             | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
            | Value_element -> repr_summary.values <- true
            | Element_without_runtime_component _ -> ())
@@ -1955,13 +1963,7 @@ let rec update_decl_jkind env dpath decl =
           (idx+1,cstr::cstrs)
         ) (0,[]) cstrs
       in
-      let jkind =
-        Jkind.for_boxed_variant
-          ~decl_params:decl.type_params
-          ~type_apply:(Ctype.apply env)
-          ~free_vars:(Ctype.free_variable_set_of_list env)
-          cstrs
-      in
+      let jkind = Jkind.for_boxed_variant cstrs in
       List.rev cstrs, rep, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
@@ -2405,7 +2407,7 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
    e.g. [type 'a t = #{ a : 'a } and x = int t t], either by using layouts
    variables or the algorithm from "Unboxed data constructors - or, how cpp
    decides a halting problem."
-   See https://github.com/ocaml-flambda/flambda-backend/pull/3407.
+   See https://github.com/oxcaml/oxcaml/pull/3407.
 *)
 type step_result =
   | Contained of type_expr list
@@ -2527,8 +2529,7 @@ let check_regularity ~abs_env env loc path decl to_check =
           end;
           List.iter (check_subtype cpath args prev_exp trace ty) args'
       | Tpoly (ty, tl) ->
-          let (_, ty) =
-            Ctype.instance_poly ~keep_names:true ~fixed:false tl ty in
+          let ty = Ctype.instance_poly ~keep_names:true tl ty in
           check_regular cpath args prev_exp trace ty
       | _ ->
           Btype.iter_type_expr
@@ -3346,6 +3347,30 @@ let native_repr_of_type env kind ty sort_or_poly =
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x2 ->
     Some (Unboxed_vector Boxed_vec128)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int8x32 ->
+    Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int16x16 ->
+    Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int32x8 ->
+    Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x4 ->
+    Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x8 ->
+    Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x4 ->
+    Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int8x64 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int16x32 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int32x16 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x8 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x16 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x8 ->
+    Some (Unboxed_vector Boxed_vec512)
   | _ ->
     None
 

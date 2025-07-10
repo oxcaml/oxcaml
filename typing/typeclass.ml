@@ -831,7 +831,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                    Ctype.unify val_env (Ctype.newmono ty') ty;
                    Typecore.type_approx val_env sbody ty'
                | Tpoly (ty1, tl) ->
-                   let _, ty1' = Ctype.instance_poly ~fixed:false tl ty1 in
+                   let ty1' = Ctype.instance_poly tl ty1 in
                    Typecore.type_approx val_env sbody ty1'
                | _ -> assert false
              with Ctype.Unify err ->
@@ -1434,7 +1434,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
          }
   | Pcl_let (rec_flag, sdefs, scl') ->
       let (defs, val_env) =
-        Typecore.type_let In_class_def val_env rec_flag sdefs in
+        Typecore.type_let In_class_def val_env Immutable rec_flag sdefs in
       let (vals, met_env) =
         List.fold_right
           (fun (id, modes_and_sorts, _) (vals, met_env) ->

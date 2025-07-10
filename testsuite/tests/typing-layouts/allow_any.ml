@@ -355,8 +355,7 @@ end
 module B :
   sig
     type 'a t_reexported
-      : immutable_data
-      with 'a =
+      : immutable_data with 'a =
       'a t =
         P : ('a, 'k) imm -> 'a t_reexported
     [@@unsafe_allow_any_mode_crossing]

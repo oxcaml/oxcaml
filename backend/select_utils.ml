@@ -21,7 +21,7 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-40-41-42"]
 
 open Cmm
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -172,6 +172,8 @@ let oper_result_type = function
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
+    | Twofiftysix_aligned | Twofiftysix_unaligned -> typ_vec256
+    | Fivetwelve_aligned | Fivetwelve_unaligned -> typ_vec512
     | _ -> typ_int)
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
@@ -221,7 +223,7 @@ let oper_result_type = function
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
   | Copaque -> typ_val
-  | Cpoll -> typ_void
+  | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
        pointer into the local allocation stack. *)
@@ -248,6 +250,12 @@ let size_component : machtype_component -> int = function
   | Valx2 ->
     assert (Int.equal (Arch.size_addr * 2) Arch.size_vec128);
     Arch.size_vec128
+  | Vec256 ->
+    assert (Int.equal (Arch.size_addr * 4) Arch.size_vec256);
+    Arch.size_vec256
+  | Vec512 ->
+    assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
+    Arch.size_vec512
 
 let size_machtype mty =
   let size = ref 0 in
@@ -266,6 +274,8 @@ let size_expr env exp =
          Note that packed float32# arrays are handled via a separate path. *)
       Arch.size_float
     | Cconst_vec128 _ -> Arch.size_vec128
+    | Cconst_vec256 _ -> Arch.size_vec256
+    | Cconst_vec512 _ -> Arch.size_vec512
     | Cvar id -> (
       try V.Map.find id localenv
       with Not_found -> (
@@ -518,11 +528,11 @@ module Stack_offset_and_exn = struct
     | Op (Stackoffset n) -> stack_offset + n, traps
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
-        | Const_symbol _ | Const_vec128 _ | Load _ | Store _ | Intop _
-        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
-        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll
-        | Alloc _ )
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
+        | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
+        | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
+        | Dls_get | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -589,6 +599,10 @@ let make_const_float32 x = Operation.Const_float32 x
 let make_const_float x = Operation.Const_float x
 
 let make_const_vec128 x = Operation.Const_vec128 x
+
+let make_const_vec256 x = Operation.Const_vec256 x
+
+let make_const_vec512 x = Operation.Const_vec512 x
 
 let make_const_symbol x = Operation.Const_symbol x
 

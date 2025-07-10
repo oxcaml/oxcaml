@@ -132,7 +132,7 @@ end = struct
 
   let join t1 t2 =
     let res = union t1 t2 in
-    match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+    match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
     | Keep_all -> res
     | No_details ->
       if not (is_empty res)
@@ -539,7 +539,7 @@ end = struct
     exception Widen of Witnesses.t
 
     let maybe_widen t =
-      match !Flambda_backend_flags.zero_alloc_checker_join with
+      match !Oxcaml_flags.zero_alloc_checker_join with
       | Keep_all -> t
       | Widen n ->
         if M.cardinal t > n
@@ -827,7 +827,7 @@ end = struct
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
           args;
-      match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+      match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
       | Keep_all -> Args_with_top { w; args }
       | No_details ->
         Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
@@ -1640,6 +1640,8 @@ end = struct
       | Alloc_block_kind_float -> pp "float"
       | Alloc_block_kind_float32 -> pp "float32"
       | Alloc_block_kind_vec128 -> pp "vec128"
+      | Alloc_block_kind_vec256 -> pp "vec256"
+      | Alloc_block_kind_vec512 -> pp "vec512"
       | Alloc_block_kind_boxed_int bi ->
         pp
           (match bi with
@@ -1651,6 +1653,8 @@ end = struct
       | Alloc_block_kind_int32_u_array -> pp "unboxed_int32_array"
       | Alloc_block_kind_int64_u_array -> pp "unboxed_int64_array"
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
+      | Alloc_block_kind_vec256_u_array -> pp "unboxed_vec256_array"
+      | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let pp_alloc ppf =
@@ -1729,7 +1733,7 @@ end = struct
       List.concat [f div "diverge"; f nor ""; f exn "exceptional return"]
     in
     let details =
-      match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+      match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
       | No_details ->
         (* do not print witnesses. *)
         []
@@ -2023,7 +2027,7 @@ end = struct
     }
 
   let should_keep_witnesses keep =
-    match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+    match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
     | Keep_all -> true
     | No_details -> false
     | At_most _ -> keep
@@ -2045,7 +2049,7 @@ end = struct
     | Check_opt_only -> true
 
   let report' ppf v ~current_fun_name ~msg ~desc dbg =
-    if !Flambda_backend_flags.dump_zero_alloc
+    if !Oxcaml_flags.dump_zero_alloc
     then
       Format.fprintf ppf "*** check %s %s in %s: %s with %a (%a)\n"
         analysis_name msg current_fun_name desc
@@ -2058,13 +2062,13 @@ end = struct
   let is_future_funcname t callee = String.Set.mem callee t.future_funcnames
 
   let report_unit_info ppf unit_info ~msg =
-    if !Flambda_backend_flags.dump_zero_alloc
+    if !Oxcaml_flags.dump_zero_alloc
     then
       let msg = Printf.sprintf "%s %s:" analysis_name msg in
       Unit_info.iter unit_info ~f:(Func_info.print ~witnesses:true ppf ~msg)
 
   let report_func_info ~msg ppf func_info =
-    if !Flambda_backend_flags.dump_zero_alloc
+    if !Oxcaml_flags.dump_zero_alloc
     then
       let msg = Printf.sprintf "%s %s:" analysis_name msg in
       Func_info.print ~witnesses:true ppf ~msg func_info
@@ -2127,7 +2131,7 @@ end = struct
     in
     if is_future_funcname t callee
     then
-      if !Flambda_backend_flags.disable_precise_zero_alloc_checker
+      if !Oxcaml_flags.disable_precise_zero_alloc_checker
       then
         (* Conservatively return Top. Won't be able to prove any recursive
            functions as non-allocating. *)
@@ -2278,7 +2282,7 @@ end = struct
     let iter t ~f = String.Map.iter (fun _name d -> f d.func_info d.approx) t
 
     let print ~msg ppf t =
-      if !Flambda_backend_flags.dump_zero_alloc
+      if !Oxcaml_flags.dump_zero_alloc
       then
         iter t ~f:(fun func_info approx ->
             Format.fprintf ppf "Env %s: %s: %a@." msg func_info.name
@@ -2303,7 +2307,7 @@ end = struct
         Env.map
           ~f:(fun func_info v ->
             let v' = Value.apply func_info.value (lookup env) in
-            if !Flambda_backend_flags.dump_zero_alloc
+            if !Oxcaml_flags.dump_zero_alloc
             then
               Format.fprintf ppf "fixpoint after apply: %s %a@." func_info.name
                 (Value.print ~witnesses:true)
@@ -2312,7 +2316,7 @@ end = struct
             if not (Value.lessequal v' v)
             then (
               changed := true;
-              if !Flambda_backend_flags.dump_zero_alloc
+              if !Oxcaml_flags.dump_zero_alloc
               then
                 Format.fprintf ppf "fixpoint update: %s %a@." func_info.name
                   (Value.print ~witnesses:true)
@@ -2428,7 +2432,7 @@ end = struct
         report_unit_info ppf unit_info ~msg:"after record"
       in
       let really_check () =
-        if !Flambda_backend_flags.disable_zero_alloc_checker
+        if !Oxcaml_flags.disable_zero_alloc_checker
         then
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
@@ -2475,7 +2479,8 @@ end = struct
       let operation t ~next (op : Operation.t) dbg =
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Load _ | Floatop _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Load _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
               | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ ),
@@ -2495,7 +2500,7 @@ end = struct
           next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Intop_atomic _ | Store _ ->
+        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
           next
         | Poll ->
           (* Ignore poll points even though they may trigger an allocations,

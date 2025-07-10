@@ -16,10 +16,11 @@ let precondition : Cfg_with_layout.t -> unit =
       | Spill -> fatal "instruction %a is a spill" InstructionId.format id
       | Reload -> fatal "instruction %a is a reload" InstructionId.format id
       | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Stackoffset _ | Load _ | Store _ | Intop _
-      | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
-      | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
-      | Specific _ | Name_for_debugger _ | Dls_get | Poll | Alloc _ ->
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+      | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
+      | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+      | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
+      | Dls_get | Poll | Pause | Alloc _ ->
         ())
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> ()
   in
@@ -98,9 +99,10 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
             InstructionId.format id num_locals
       | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
       | Op
-          ( Move | Opaque | Begin_region | End_region | Dls_get | Poll
+          ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Stackoffset _ | Load _
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+          | Load _
           | Store (_, _, _)
           | Intop _
           | Intop_imm (_, _)

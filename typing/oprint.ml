@@ -621,19 +621,31 @@ and print_out_label ppf (name, mut, arg, gbl) =
 
 and print_out_jkind_const ppf ojkind =
   let rec pp_element ~nested ppf (ojkind : Outcometree.out_jkind_const) =
-    (* HACK: we strip off the [Ojkind_const_with]s and convert them to a [string string
-       list] so we can sort them lexicographically, because otherwise the order of printed
-       [with]s is nondeterministic. This is sad, but we'd need deterministic sorting of
-       types to work around it.
+    (* HACK: we strip off the [Ojkind_const_with]s and convert them to a [string
+       list list] so we can sort them lexicographically, because otherwise the
+       order of printed [with]s is nondeterministic. This is sad, but we'd need
+       deterministic sorting of types to work around it.
 
        CR aspsmith: remove this if we ever add deterministic, semantic type comparison
     *)
     let rec strip_withs ojkind =
       match ojkind with
       | Ojkind_const_with (base, ty, modalities) ->
+        let fix_indentation ppf =
+          let { out_newline; out_indent } as out_functions =
+            pp_get_formatter_out_functions ppf ()
+          in
+          let out_newline () =
+            out_newline ();
+            out_indent 18  (* this works well in practice: the string produced
+                              here gets included in a larger message, indented
+                              by 18 *)
+          in
+          pp_set_formatter_out_functions ppf { out_functions with out_newline }
+        in
         let base, withs = strip_withs base in
         let with_ =
-          Format.asprintf "%a" print_out_type ty
+          Format.asprintf "%t%a" fix_indentation print_out_type ty
           :: (match modalities with
             | [] -> []
             | modalities -> "@@" :: modalities)
@@ -648,14 +660,12 @@ and print_out_jkind_const ppf ojkind =
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
-        | Some base -> fprintf ppf "%a " (pp_element ~nested:true) base
+        | Some base -> fprintf ppf "%a@ " (pp_element ~nested:true) base
         | None -> ()
       in
       Misc.pp_parens_if nested (fun ppf (base, modes) ->
-        fprintf ppf "%amod @[%a@]" pp_base base
-          (pp_print_list
-              ~pp_sep:(fun ppf () -> fprintf ppf "@ ")
-              (fun ppf -> fprintf ppf "%s"))
+        fprintf ppf "%amod @[<hv>%a@]" pp_base base
+          (pp_print_list ~pp_sep:pp_print_space pp_print_string)
           modes
       ) ppf (base, modes)
     | Ojkind_const_product ts ->
@@ -670,14 +680,12 @@ and print_out_jkind_const ppf ojkind =
     | withs ->
       pp_print_list
         (fun ppf ->
-           Format.fprintf ppf "@ @[with %a@]"
-             (pp_print_list
-                ~pp_sep:(fun ppf () -> fprintf ppf " ")
-                (fun ppf -> Format.fprintf ppf "%s")))
+           Format.fprintf ppf "@ with @[<hv 2>%a@]"
+             (pp_print_list ~pp_sep:pp_print_space pp_print_string))
         ppf
-        withs
+        withs;
   in
-  pp_element ~nested:false ppf ojkind
+  fprintf ppf "@[<hv 2>%a@]" (pp_element ~nested:false) ojkind
 
 and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =

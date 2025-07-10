@@ -225,6 +225,13 @@ val f3 : packed2 -> unit = <fun>
 val f4 : packed2 -> unit = <fun>
 |}]
 
+(* This needs to be printed with a space after "float#" because of how
+   identifiers ending in "#" are parsed. *)
+let f () = fun () : float# -> #0.
+[%%expect{|
+val f : unit -> unit -> float# = <fun>
+|}]
+
 (******************)
 (* Comprehensions *)
 
@@ -1258,10 +1265,17 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
+(* CR layouts v2.8: This should be accepted *)
 [%%expect{|
 type 'a abstract
-type existential_abstract =
-    Mk : ('a : value mod portable). 'a abstract -> existential_abstract
+Lines 2-3, characters 0-67:
+2 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
+3 |   | Mk : ('a : value mod portable) abstract -> existential_abstract
+Error: The kind of type "existential_abstract" is value mod non_float
+         because it's a boxed variant type.
+       But the kind of type "existential_abstract" must be a subkind of
+           immutable_data with (type : value mod portable) abstract
+         because of the annotation on the declaration of the type existential_abstract.
 |}]
 
 (* not yet supported *)
@@ -1480,4 +1494,18 @@ let f g here = g ~(here : [%call_pos])
 
 [%%expect{|
 val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
+|}]
+
+(***************)
+(* let mutable *)
+
+let triangle_10 = let mutable x = 0 in
+  for i = 1 to 10 do
+    x <- x + i
+  done;
+  (x : int)
+;;
+
+[%%expect{|
+val triangle_10 : int = 55
 |}]

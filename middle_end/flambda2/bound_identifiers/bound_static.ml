@@ -132,6 +132,10 @@ let check_pattern_list_invariant pattern_list =
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Pattern.print)
       pattern_list
 
+let [@ocamlformat "disable"] print ppf t =
+  Format.fprintf ppf "@[<hov 1>(%a)@]"
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space Pattern.print) t
+
 let create pattern_list =
   if Flambda_features.check_invariants ()
   then check_pattern_list_invariant pattern_list;
@@ -140,10 +144,6 @@ let create pattern_list =
 let singleton pattern = [pattern]
 
 let to_list t = t
-
-let [@ocamlformat "disable"] print ppf t =
-  Format.fprintf ppf "@[<hov 1>(%a)@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space Pattern.print) t
 
 let symbols_being_defined t =
   List.map Pattern.symbols_being_defined t |> Symbol.Set.union_list
@@ -158,6 +158,9 @@ let binds_symbols t = List.exists Pattern.binds_symbols t
 let everything_being_defined t =
   List.map Pattern.everything_being_defined t
   |> Code_id_or_symbol.Set.union_list
+
+let everything_being_defined_as_list t =
+  List.concat_map Pattern.everything_being_defined_as_list t
 
 let apply_renaming t renaming =
   List.map (fun pattern -> Pattern.apply_renaming pattern renaming) t

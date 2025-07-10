@@ -22,7 +22,7 @@ type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
 
-let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
+let mk_switch ~cond ~ifso ~ifnot ~kind =
   let switch : L.lambda_switch =
     { sw_numconsts = 2;
       sw_consts = [0, ifnot; 1, ifso];
@@ -32,6 +32,73 @@ let switch_for_if_then_else ~cond ~ifso ~ifnot ~kind =
     }
   in
   L.Lswitch (cond, switch, L.try_to_find_location cond, kind)
+
+(* This function helps bind expression to avoid duplicating them in the
+   generated code. Currently, this is only used for if-then-else optimization,
+   which guarantees that even if expressions are duplicated, they are still only
+   evaluated once (but could have been duplicated among multiple code paths), so
+   this is for code size optimization mainly. *)
+let share_expr ~kind ~expr k =
+  let is_simple_duplicable expr =
+    match[@warning "-4"] (expr : L.lambda) with
+    | Lvar _ | Lconst _ -> true
+    | _ -> false
+  in
+  match[@warning "-4"] (expr : L.lambda) with
+  | _ when is_simple_duplicable expr -> k expr
+  | Lstaticraise (_, args) when List.for_all is_simple_duplicable args -> k expr
+  | _ ->
+    let cont = L.next_raise_count () in
+    let jump = L.Lstaticraise (cont, []) in
+    L.Lstaticcatch (k jump, (cont, []), expr, Same_region, kind)
+
+let switch_for_if_then_else ~loc ~cond ~ifso ~ifnot ~kind =
+  let rec aux ~loc ~kind ~cond ~ifso ~ifnot =
+    match[@warning "-4"] cond with
+    | L.Lconst (Const_base (Const_int 1)) -> ifso
+    | L.Lconst (Const_base (Const_int 0)) -> ifnot
+    (* CR gbury: should we try to use the locs here, or is it better to keep
+       using the locs from each individual condition ? *)
+    | L.Lprim (Psequand, [a; b], loc) ->
+      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
+          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+    | L.Lifthenelse (a, b, Lconst (Const_base (Const_int 0)), _) ->
+      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifso ->
+          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+    | L.Lprim (Psequor, [a; b], loc) ->
+      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
+          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+    | L.Lifthenelse (a, Lconst (Const_base (Const_int 1)), b, _) ->
+      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:b ~ifso ~ifnot) (fun ifnot ->
+          aux ~loc ~kind ~cond:a ~ifso ~ifnot)
+    | L.Lprim (Pnot, [c], loc) -> aux ~loc ~kind ~cond:c ~ifso:ifnot ~ifnot:ifso
+    | L.Lifthenelse (cond, inner_ifso, inner_ifnot, _) ->
+      share_expr ~kind ~expr:(aux ~loc ~kind ~cond:inner_ifso ~ifso ~ifnot)
+        (fun new_ifso ->
+          share_expr ~kind ~expr:(aux ~loc ~kind ~cond:inner_ifnot ~ifso ~ifnot)
+            (fun new_ifnot ->
+              aux ~loc ~kind ~cond ~ifso:new_ifso ~ifnot:new_ifnot))
+    | _ -> (
+      match[@warning "-4"] ifso, ifnot with
+      | L.Lconst (Const_base (Const_int 1)), L.Lconst (Const_base (Const_int 0))
+        ->
+        cond
+      | L.Lconst (Const_base (Const_int 0)), L.Lconst (Const_base (Const_int 1))
+        ->
+        L.Lprim (Pnot, [cond], loc)
+      | _ -> mk_switch ~cond ~ifso ~ifnot ~kind)
+  in
+  let res =
+    share_expr ~kind ~expr:ifso (fun ifso ->
+        share_expr ~kind ~expr:ifnot (fun ifnot ->
+            aux ~loc ~kind ~cond ~ifso ~ifnot))
+  in
+  if Flambda_features.debug_flambda2 ()
+  then
+    Format.eprintf "SWITCH:@\n%a@\n->@\n%a@\n@." Printlambda.lambda
+      (L.Lifthenelse (cond, ifso, ifnot, kind))
+      Printlambda.lambda res;
+  res
 
 let rec_catch_for_while_loop env cond body =
   let cont = L.next_raise_count () in
@@ -452,6 +519,14 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     makearray_dynamic_singleton_uninitialized "unboxed_vec128" ~length mode loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec128)
          Sixty_four_or_more ~init
+  | Punboxedvectorarray Unboxed_vec256 ->
+    makearray_dynamic_singleton_uninitialized "unboxed_vec256" ~length mode loc
+    |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec256)
+         Sixty_four_or_more ~init
+  | Punboxedvectorarray Unboxed_vec512 ->
+    makearray_dynamic_singleton_uninitialized "unboxed_vec512" ~length mode loc
+    |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec512)
+         Sixty_four_or_more ~init
   | Pgcscannableproductarray _ ->
     let init = must_have_initializer () in
     makearray_dynamic_scannable_unboxed_product env lambda_array_kind mode
@@ -610,46 +685,18 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
 
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
-  | Psequor, [arg1; arg2] ->
-    let const_true = Ident.create_local "const_true" in
-    let const_true_duid = Lambda.debug_uid_none in
-    let cond = Ident.create_local "cond_sequor" in
-    let cond_duid = Lambda.debug_uid_none in
+  (* For Psequor and Psequand, earlier passes (notably for region handling)
+     assume that [b] is in tail-position, so we must keep it so. *)
+  | Psequor, [a; b] ->
+    let const_true = L.Lconst (Const_base (Const_int 1)) in
     Transformed
-      (L.Llet
-         ( Strict,
-           L.layout_int,
-           const_true,
-           const_true_duid,
-           Lconst (Const_base (Const_int 1)),
-           L.Llet
-             ( Strict,
-               L.layout_int,
-               cond,
-               cond_duid,
-               arg1,
-               switch_for_if_then_else ~cond:(L.Lvar cond)
-                 ~ifso:(L.Lvar const_true) ~ifnot:arg2 ~kind:L.layout_int ) ))
-  | Psequand, [arg1; arg2] ->
-    let const_false = Ident.create_local "const_false" in
-    let const_false_duid = Lambda.debug_uid_none in
-    let cond = Ident.create_local "cond_sequand" in
-    let cond_duid = Lambda.debug_uid_none in
+      (switch_for_if_then_else ~loc ~cond:a ~ifso:const_true ~ifnot:b
+         ~kind:Lambda.layout_int)
+  | Psequand, [a; b] ->
+    let const_false = L.Lconst (Const_base (Const_int 0)) in
     Transformed
-      (L.Llet
-         ( Strict,
-           L.layout_int,
-           const_false,
-           const_false_duid,
-           Lconst (Const_base (Const_int 0)),
-           L.Llet
-             ( Strict,
-               L.layout_int,
-               cond,
-               cond_duid,
-               arg1,
-               switch_for_if_then_else ~cond:(L.Lvar cond) ~ifso:arg2
-                 ~ifnot:(L.Lvar const_false) ~kind:L.layout_int ) ))
+      (switch_for_if_then_else ~loc ~cond:a ~ifso:b ~ifnot:const_false
+         ~kind:Lambda.layout_int)
   | (Psequand | Psequor), _ ->
     Misc.fatal_error "Psequand / Psequor must have exactly two arguments"
   | ( (Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray),

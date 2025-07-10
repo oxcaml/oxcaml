@@ -18,8 +18,7 @@
 (* Emission of ARM assembly code, 64-bit mode *)
 
 (* Correctness: carefully consider any use of [Config], [Clflags],
-   [Flambda_backend_flags] and shared variables. For details, see
-   [asmgen.mli]. *)
+   [Oxcaml_flags] and shared variables. For details, see [asmgen.mli]. *)
 
 (* CR-soon mshinwell/mslater: needs updating for locals + effects *)
 
@@ -186,12 +185,6 @@ module DSL : sig
     S.t ->
     Arm64_ast.Operand.t
 
-  val emit_immediate_symbol :
-    ?offset:int ->
-    ?reloc:Arm64_ast.Symbol.reloc_directive ->
-    S.t ->
-    Arm64_ast.Operand.t
-
   val ins : I.t -> Arm64_ast.Operand.t array -> unit
 
   val labeled_ins : L.t -> I.t -> Arm64_ast.Operand.t array -> unit
@@ -239,6 +232,18 @@ end = struct
     | Float -> Arm64_ast.Reg.reg_d index
     | Float32 -> Arm64_ast.Reg.reg_s index
     | Vec128 | Valx2 -> Arm64_ast.Reg.reg_q index
+    | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
+
+  (* [emit_reglane_*]: Clang 17 assembler does not accept optional number of
+     lanes notation of the form Vn.4S[lane], even though it is required to do so
+     in ARMARM. Emit Vn.S[lane]. *)
+  let emit_reglane_b reg ~lane = reglane_b (reg_index reg) ~lane
+
+  let emit_reglane_h reg ~lane = reglane_h (reg_index reg) ~lane
+
+  let emit_reglane_s reg ~lane = reglane_s (reg_index reg) ~lane
+
+  let emit_reglane_d reg ~lane = reglane_d (reg_index reg) ~lane
 
   let emit_reg_v2s reg = reg_v2s (reg_index reg)
 
@@ -247,6 +252,12 @@ end = struct
   let emit_reg_v2d reg = reg_v2d (reg_index reg)
 
   let emit_reg_v16b reg = reg_v16b (reg_index reg)
+
+  let emit_reg_v8h reg = reg_v8h (reg_index reg)
+
+  let emit_reg_v8b reg = reg_v8b (reg_index reg)
+
+  let emit_reg_v4h reg = reg_v4h (reg_index reg)
 
   let emit_reg_w reg = reg_w (reg_index reg)
 
@@ -262,6 +273,7 @@ end = struct
     | Float -> reg_d index
     | Float32 -> reg_s index
     | Vec128 | Valx2 -> reg_q index
+    | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
   let reg_x_30 = reg_x 30
 
@@ -274,10 +286,6 @@ end = struct
     symbol (Arm64_ast.Symbol.create ?offset ?reloc sym)
 
   let emit_symbol ?offset ?reloc s =
-    let sym = S.encode s in
-    symbol (Arm64_ast.Symbol.create ?offset ?reloc sym)
-
-  let emit_immediate_symbol ?offset ?reloc s =
     let sym = S.encode s in
     symbol (Arm64_ast.Symbol.create ?offset ?reloc sym)
 
@@ -335,13 +343,21 @@ end = struct
       check_reg Float i.arg.(0);
       check_reg Float i.arg.(1);
       check_reg Float i.res.(0)
-    | Rf32x4_Rf32x4_to_Ri32x4 | Rf32x4_Rf32x4_to_Rf32x4
-    | Rf64x2_Rf64x2_to_Rf64x2 | Ri64x2_Ri64x2_to_Ri64x2 ->
+    | Rs8x16_Rs8x16_to_Rs8x16 | Rf32x4_Rf32x4_to_Rs32x4
+    | Rs32x4_Rs32x4_to_Rs32x4 | Rf32x4_Rf32x4_to_Rf32x4
+    | Rf64x2_Rf64x2_to_Rf64x2 | Rs64x2_Rs64x2_to_Rs64x2
+    | Rf64x2_Rf64x2_to_Rs64x2 | Rs16x8_Rs16x8_to_Rs16x8
+    | Rs16x8_Rs16x8_to_Rs32x4 | Rs16x4_Rs16x4_to_Rs32x4 ->
       check_reg Vec128 i.arg.(0);
       check_reg Vec128 i.arg.(1);
       check_reg Vec128 i.res.(0)
-    | Ri32x4_to_Ri32x4 | Rf32x2_to_Rf64x2 | Rf32x4_to_Rf32x4 | Rf32x4_to_Ri32x4
-    | Ri32x4_to_Rf32x4 ->
+    | Rs32x4_to_Rs32x4 | Rf32x2_to_Rf64x2 | Rf32x4_to_Rf32x4 | Rf32x4_to_Rs32x4
+    | Rs32x4_to_Rf32x4 | Rf64x2_to_Rf32x2 | Rs8x16_to_Rs8x16 | Rs64x2_to_Rs64x2
+    | Rf64x2_to_Rs64x2 | Rs32x4lane_to_Rs32x4 _ | Rs64x2lane_to_Rs64x2 _
+    | Rs16x8lane_to_Rs16x8 _ | Rf64x2_to_Rf64x2 | Rs64x2_to_Rf64x2
+    | Rs32x2_to_Rs64x2 | Rs16x8_to_Rs16x8 | Rs64x2_to_Rs32x2
+    | Rs8x16lane_to_Rs8x16 _ | Rs32x4_to_Rs16x4 | Rs16x8_to_Rs8x8
+    | Rs16x4_to_Rs32x4 | Rs8x8_to_Rs16x8 ->
       check_reg Vec128 i.arg.(0);
       check_reg Vec128 i.res.(0)
     | Rf32_Rf32_to_Rf32 ->
@@ -358,9 +374,23 @@ end = struct
     | Rf64_to_Rf64 ->
       check_reg Float i.arg.(0);
       check_reg Float i.res.(0)
-    | Rf32_to_Ri64 ->
+    | Rf32_to_Rs64 ->
       check_reg Float32 i.arg.(0);
       check_reg Int i.res.(0)
+    | Rs32x4_to_Rs32 _ | Rs64x2_to_Rs64 _ | Rs16x8_to_Rs16 _ | Rs8x16_to_Rs8 _
+      ->
+      check_reg Vec128 i.arg.(0);
+      check_reg Int i.res.(0)
+    | Rs64x2_Rs64x2_to_First _ | Rs16x8_Rs32x4_to_First | Rs8x16_Rs16x8_to_First
+    | Rs32x4_Rs64x2_to_First ->
+      check_reg Vec128 i.arg.(0);
+      check_reg Vec128 i.arg.(1);
+      assert (Reg.same_loc i.res.(0) i.arg.(0))
+    | Rs32x4_Rs32_to_First _ | Rs64x2_Rs64_to_First _ | Rs16x8_Rs16_to_First _
+    | Rs8x16_Rs8_to_First _ ->
+      check_reg Vec128 i.arg.(0);
+      check_reg Int i.arg.(1);
+      assert (Reg.same_loc i.res.(0) i.arg.(0))
 
   let src_operands ops =
     (* returns a copy of [ops] without the first operand, which is assumed to be
@@ -391,37 +421,130 @@ end = struct
          emit_reg_v2s i.arg.(0);
          emit_reg_v2s i.arg.(1)
       |]
-    | Rf32x4_Rf32x4_to_Rf32x4 ->
+    | Rf32x4_Rf32x4_to_Rf32x4 | Rs32x4_Rs32x4_to_Rs32x4 ->
       [| emit_reg_v4s i.res.(0);
          emit_reg_v4s i.arg.(0);
          emit_reg_v4s i.arg.(1)
       |]
-    | Ri64x2_Ri64x2_to_Ri64x2 | Rf64x2_Rf64x2_to_Rf64x2 ->
+    | Rs64x2_Rs64x2_to_Rs64x2 | Rf64x2_Rf64x2_to_Rf64x2
+    | Rf64x2_Rf64x2_to_Rs64x2 ->
       [| emit_reg_v2d i.res.(0);
          emit_reg_v2d i.arg.(0);
          emit_reg_v2d i.arg.(1)
       |]
-    | Rf32x4_Rf32x4_to_Ri32x4 ->
+    | Rf64x2_to_Rf64x2 -> [| emit_reg_v2d i.res.(0); emit_reg_v2d i.arg.(0) |]
+    | Rf32x4_Rf32x4_to_Rs32x4 ->
       [| emit_reg_v4s i.res.(0);
          emit_reg_v4s i.arg.(0);
          emit_reg_v4s i.arg.(1)
       |]
-    | Ri32x4_to_Ri32x4 | Rf32x4_to_Rf32x4 | Rf32x4_to_Ri32x4 | Ri32x4_to_Rf32x4
+    | Rs32x4_to_Rs32x4 | Rf32x4_to_Rf32x4 | Rf32x4_to_Rs32x4 | Rs32x4_to_Rf32x4
       ->
       [| emit_reg_v4s i.res.(0); emit_reg_v4s i.arg.(0) |]
-    | Rf32x2_to_Rf64x2 -> [| emit_reg_v2d i.res.(0); emit_reg_v2s i.arg.(0) |]
+    | Rf32x2_to_Rf64x2 | Rs32x2_to_Rs64x2 ->
+      [| emit_reg_v2d i.res.(0); emit_reg_v2s i.arg.(0) |]
+    | Rf64x2_to_Rf32x2 | Rs64x2_to_Rs32x2 ->
+      [| emit_reg_v2s i.res.(0); emit_reg_v2d i.arg.(0) |]
+    | Rs64x2_to_Rs64x2 | Rf64x2_to_Rs64x2 | Rs64x2_to_Rf64x2 ->
+      [| emit_reg_v2d i.res.(0); emit_reg_v2d i.arg.(0) |]
+    | Rs8x16_to_Rs8x16 -> [| emit_reg_v16b i.res.(0); emit_reg_v16b i.arg.(0) |]
+    | Rs8x16_Rs8x16_to_Rs8x16 ->
+      [| emit_reg_v16b i.res.(0);
+         emit_reg_v16b i.arg.(0);
+         emit_reg_v16b i.arg.(1)
+      |]
+    | Rs16x8_Rs16x8_to_Rs16x8 ->
+      [| emit_reg_v8h i.res.(0);
+         emit_reg_v8h i.arg.(0);
+         emit_reg_v8h i.arg.(1)
+      |]
+    | Rs16x8_Rs16x8_to_Rs32x4 ->
+      [| emit_reg_v4s i.res.(0);
+         emit_reg_v8h i.arg.(0);
+         emit_reg_v8h i.arg.(1)
+      |]
+    | Rs16x4_Rs16x4_to_Rs32x4 ->
+      [| emit_reg_v4s i.res.(0);
+         emit_reg_v4h i.arg.(0);
+         emit_reg_v4h i.arg.(1)
+      |]
+    | Rs16x8_to_Rs16x8 -> [| emit_reg_v8h i.res.(0); emit_reg_v8h i.arg.(0) |]
     | Rf32_Rf32_to_Rf32 | Rf64_Rf64_to_Rf64 -> emit_regs_binary i
-    | Rf64_to_Rf64 | Rf32_to_Rf32 | Rf32_to_Ri64 -> emit_regs_unary i
+    | Rf64_to_Rf64 | Rf32_to_Rf32 | Rf32_to_Rs64 -> emit_regs_unary i
+    | Rs8x16_to_Rs8 { lane : int } ->
+      [| emit_reg i.res.(0); emit_reglane_b i.arg.(0) ~lane |]
+    | Rs16x8_to_Rs16 { lane : int } ->
+      [| emit_reg i.res.(0); emit_reglane_h i.arg.(0) ~lane |]
+    | Rs32x4_to_Rs32 { lane : int } ->
+      [| emit_reg i.res.(0); emit_reglane_s i.arg.(0) ~lane |]
+    | Rs64x2_to_Rs64 { lane : int } ->
+      [| emit_reg i.res.(0); emit_reglane_d i.arg.(0) ~lane |]
+    | Rs8x16_Rs8_to_First { lane } ->
+      [| emit_reglane_b i.res.(0) ~lane; emit_reg_w i.arg.(1) |]
+    | Rs16x8_Rs16_to_First { lane } ->
+      [| emit_reglane_h i.res.(0) ~lane; emit_reg_w i.arg.(1) |]
+    | Rs32x4_Rs32_to_First { lane } ->
+      [| emit_reglane_s i.res.(0) ~lane; emit_reg_w i.arg.(1) |]
+    | Rs64x2_Rs64_to_First { lane } ->
+      [| emit_reglane_d i.res.(0) ~lane; emit_reg i.arg.(1) |]
+    | Rs64x2_Rs64x2_to_First { src_lane; dst_lane } ->
+      [| emit_reglane_d i.res.(0) ~lane:dst_lane;
+         emit_reglane_d i.arg.(1) ~lane:src_lane
+      |]
+    | Rs32x4_Rs64x2_to_First ->
+      [| emit_reg_v4s i.res.(0); emit_reg_v2d i.arg.(1) |]
+    | Rs16x8_Rs32x4_to_First ->
+      [| emit_reg_v8h i.res.(0); emit_reg_v4s i.arg.(1) |]
+    | Rs8x16_Rs16x8_to_First ->
+      [| emit_reg_v16b i.res.(0); emit_reg_v8h i.arg.(1) |]
+    | Rs32x4_to_Rs16x4 -> [| emit_reg_v4h i.res.(0); emit_reg_v4s i.arg.(0) |]
+    | Rs16x8_to_Rs8x8 -> [| emit_reg_v8b i.res.(0); emit_reg_v8h i.arg.(0) |]
+    | Rs16x4_to_Rs32x4 -> [| emit_reg_v4s i.res.(0); emit_reg_v4h i.arg.(0) |]
+    | Rs8x8_to_Rs16x8 -> [| emit_reg_v8h i.res.(0); emit_reg_v8b i.arg.(0) |]
+    | Rs8x16lane_to_Rs8x16 { lane } ->
+      [| emit_reg_v16b i.res.(0); emit_reglane_b i.arg.(0) ~lane |]
+    | Rs16x8lane_to_Rs16x8 { lane } ->
+      [| emit_reg_v8h i.res.(0); emit_reglane_h i.arg.(0) ~lane |]
+    | Rs32x4lane_to_Rs32x4 { lane } ->
+      [| emit_reg_v4s i.res.(0); emit_reglane_s i.arg.(0) ~lane |]
+    | Rs64x2lane_to_Rs64x2 { lane } ->
+      [| emit_reg_v2d i.res.(0); emit_reglane_d i.arg.(0) ~lane |]
 
   let simd_instr_size (op : Simd.operation) =
     match op with
     | Min_scalar_f64 | Max_scalar_f64 -> 2
     | Min_scalar_f32 | Max_scalar_f32 -> 2
-    | Round_f32 _ | Round_f64 _ | Round_f32x4 _ | Round_f32_i64 | Zip1_f32
-    | Zip1q_f32 | Zip1q_f64 | Zip2q_f64 | Addq_f32 | Subq_f32 | Mulq_f32
-    | Divq_f32 | Minq_f32 | Maxq_f32 | Recpeq_f32 | Sqrtq_f32 | Rsqrteq_f32
-    | Cvtq_s32_of_f32 | Cvtq_f32_of_s32 | Cvt_f64_f32 | Paddq_f32 | Fmin_f32
-    | Fmax_f32 | Addq_i64 | Subq_i64 | Cmp_f32 _ | Cmpz_s32 _ ->
+    | Round_f32 _ | Round_f64 _ | Roundq_f32 _ | Roundq_f64 _ | Round_f32_s64
+    | Zip1q_s8 | Zip2q_s8 | Zip1q_s16 | Zip2q_s16 | Zip1_f32 | Zip1q_f32
+    | Zip2q_f32 | Zip1q_f64 | Zip2q_f64 | Addq_f32 | Subq_f32 | Mulq_f32
+    | Divq_f32 | Minq_f32 | Maxq_f32 | Addq_f64 | Subq_f64 | Mulq_f64 | Divq_f64
+    | Minq_f64 | Maxq_f64 | Recpeq_f32 | Sqrtq_f32 | Rsqrteq_f32 | Sqrtq_f64
+    | Rsqrteq_f64 | Cvtq_s32_f32 | Cvtq_f32_s32 | Cvt_f64_f32 | Cvt_f32_f64
+    | Paddq_f32 | Fmin_f32 | Fmax_f32 | Fmin_f64 | Fmax_f64 | Addq_s64
+    | Subq_s64 | Cmp_f32 _ | Cmpz_f32 _ | Cmpz_s32 _ | Cmp_f64 _ | Cmpz_f64 _
+    | Cmp_s32 _ | Cmp_s64 _ | Cmpz_s64 _ | Mvnq_s32 | Orrq_s32 | Andq_s32
+    | Eorq_s32 | Negq_s32 | Getq_lane_s32 _ | Getq_lane_s64 _ | Mulq_s32
+    | Mulq_s16 | Addq_s32 | Subq_s32 | Minq_s32 | Maxq_s32 | Minq_u32 | Maxq_u32
+    | Absq_s32 | Absq_s64 | Paddq_f64 | Paddq_s32 | Paddq_s64 | Mvnq_s64
+    | Orrq_s64 | Andq_s64 | Eorq_s64 | Negq_s64 | Shlq_u32 | Shlq_u64 | Shlq_s32
+    | Shlq_s64 | Shlq_n_u32 _ | Shlq_n_u64 _ | Shrq_n_u32 _ | Shrq_n_u64 _
+    | Shrq_n_s32 _ | Shrq_n_s64 _ | Setq_lane_s32 _ | Setq_lane_s64 _
+    | Dupq_lane_s32 _ | Dupq_lane_s64 _ | Cvtq_f64_s64 | Cvtq_s64_f64 | Movl_s32
+    | Movl_u32 | Addq_s16 | Paddq_s16 | Qaddq_s16 | Qaddq_u16 | Subq_s16
+    | Qsubq_s16 | Qsubq_u16 | Absq_s16 | Minq_s16 | Maxq_s16 | Minq_u16
+    | Maxq_u16 | Mvnq_s16 | Orrq_s16 | Andq_s16 | Eorq_s16 | Negq_s16 | Cntq_u16
+    | Shlq_u16 | Shlq_s16 | Cmp_s16 _ | Cmpz_s16 _ | Shlq_n_u16 _ | Shrq_n_u16 _
+    | Shrq_n_s16 _ | Getq_lane_s16 _ | Setq_lane_s16 _ | Dupq_lane_s16 _
+    | Movn_s64 | Copyq_laneq_s64 _ | Addq_s8 | Paddq_s8 | Qaddq_s8 | Qaddq_u8
+    | Subq_s8 | Qsubq_s8 | Qsubq_u8 | Absq_s8 | Minq_s8 | Maxq_s8 | Minq_u8
+    | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8 | Eorq_s8 | Negq_s8 | Cntq_u8
+    | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _ | Shlq_n_u8 _ | Shrq_n_u8 _
+    | Shrq_n_s8 _ | Getq_lane_s8 _ | Setq_lane_s8 _ | Dupq_lane_s8 _ | Extq_u8 _
+    | Qmovn_high_s64 | Qmovn_s64 | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32
+    | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16
+    | Movn_high_s64 | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16
+    | Mullq_s16 | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 | Movl_s16
+    | Movl_u16 | Movl_s8 | Movl_u8 ->
       1
 
   let emit_rounding_mode (rm : Simd.Rounding_mode.t) : I.Rounding_mode.t =
@@ -445,6 +568,12 @@ end = struct
     | LS -> LS
     | HI -> HI
 
+  let swap_args operands =
+    let tmp = operands.(1) in
+    operands.(1) <- operands.(2);
+    operands.(2) <- tmp;
+    operands
+
   let emit_cond (cond : Simd.Cond.t) : I.Cond.t =
     match cond with EQ -> EQ | GT -> GT | GE -> GE | LE -> LE | LT -> LT
 
@@ -462,30 +591,101 @@ end = struct
     | Max_scalar_f32 | Max_scalar_f64 ->
       ins I.FCMP (src_operands operands);
       ins_cond I.FCSEL I.Cond.GT operands
-    | Round_f32 rm | Round_f64 rm | Round_f32x4 rm ->
+    | Round_f32 rm | Round_f64 rm | Roundq_f32 rm | Roundq_f64 rm ->
       ins (I.FRINT (emit_rounding_mode rm)) operands
-    | Round_f32_i64 -> ins I.FCVTNS operands
+    | Round_f32_s64 -> ins I.FCVTNS operands
     | Fmin_f32 -> ins I.FMIN operands
     | Fmax_f32 -> ins I.FMAX operands
-    | Zip1_f32 | Zip1q_f32 | Zip1q_f64 -> ins I.ZIP1 operands
-    | Zip2q_f64 -> ins I.ZIP2 operands
-    | Addq_i64 -> ins I.ADD operands
-    | Subq_i64 -> ins I.SUB operands
-    | Addq_f32 -> ins I.FADD operands
-    | Subq_f32 -> ins I.FSUB operands
-    | Mulq_f32 -> ins I.FMUL operands
-    | Divq_f32 -> ins I.FDIV operands
+    | Fmin_f64 -> ins I.FMIN operands
+    | Fmax_f64 -> ins I.FMAX operands
+    | Zip1q_s8 | Zip1q_s16 | Zip1_f32 | Zip1q_f32 | Zip1q_f64 ->
+      ins I.ZIP1 operands
+    | Zip2q_s8 | Zip2q_s16 | Zip2q_f32 | Zip2q_f64 -> ins I.ZIP2 operands
+    | Addq_s64 | Addq_s32 | Addq_s16 | Addq_s8 -> ins I.ADD operands
+    | Subq_s64 | Subq_s32 | Subq_s16 | Subq_s8 -> ins I.SUB operands
+    | Mulq_s32 | Mulq_s16 -> ins I.MUL operands
+    | Addq_f32 | Addq_f64 -> ins I.FADD operands
+    | Subq_f32 | Subq_f64 -> ins I.FSUB operands
+    | Mulq_f32 | Mulq_f64 -> ins I.FMUL operands
+    | Divq_f32 | Divq_f64 -> ins I.FDIV operands
     | Minq_f32 -> ins I.FMIN operands
     | Maxq_f32 -> ins I.FMAX operands
+    | Minq_f64 -> ins I.FMIN operands
+    | Maxq_f64 -> ins I.FMAX operands
+    | Minq_s32 | Minq_s16 | Minq_s8 -> ins I.SMIN operands
+    | Maxq_s32 | Maxq_s16 | Maxq_s8 -> ins I.SMAX operands
+    | Minq_u32 | Minq_u16 | Minq_u8 -> ins I.UMIN operands
+    | Maxq_u32 | Maxq_u16 | Maxq_u8 -> ins I.UMAX operands
+    | Absq_s32 | Absq_s64 | Absq_s16 | Absq_s8 -> ins I.ABS operands
     | Recpeq_f32 -> ins I.FRECPE operands
-    | Sqrtq_f32 -> ins I.FSQRT operands
-    | Rsqrteq_f32 -> ins I.FRSQRTE operands
-    | Cvtq_s32_of_f32 -> ins I.FCVT operands
-    | Cvtq_f32_of_s32 -> ins I.FCVT operands
+    | Sqrtq_f32 | Sqrtq_f64 -> ins I.FSQRT operands
+    | Rsqrteq_f32 | Rsqrteq_f64 -> ins I.FRSQRTE operands
+    | Cvtq_s32_f32 | Cvtq_s64_f64 -> ins I.FCVTNS operands
+    | Cvtq_f32_s32 | Cvtq_f64_s64 -> ins I.SCVTF operands
     | Cvt_f64_f32 -> ins I.FCVTL operands
-    | Paddq_f32 -> ins I.FADDP operands
-    | Cmp_f32 c -> ins (I.FCM (emit_float_cond c)) operands
-    | Cmpz_s32 c -> ins (I.CM (emit_cond c)) (Array.append operands [| imm 0 |])
+    | Cvt_f32_f64 -> ins I.FCVTN operands
+    | Movl_s32 | Movl_s16 | Movl_s8 -> ins I.SXTL operands
+    | Movl_u32 | Movl_u16 | Movl_u8 -> ins I.UXTL operands
+    | Paddq_f32 | Paddq_f64 -> ins I.FADDP operands
+    | Paddq_s32 | Paddq_s64 | Paddq_s16 | Paddq_s8 -> ins I.ADDP operands
+    | Cmp_f32 LT | Cmp_f64 LT ->
+      (* FCMLT is only supported with ZERO. *)
+      (* CR gyorsh: [LT] and [GT] have different behavior w.r.t NaN arguments:
+         [LT] holds for unordered, [GT] does not, according to floating-point
+         column in Table C1-1 (Condition codes) in ARMARM. It doesn't seem to
+         apply to FCMLT/FCMGT according to a note in section C3.7.14 (SIMD
+         compare). *)
+      ins (I.FCM I.Float_cond.GT) (swap_args operands)
+    | Cmp_f32 LE | Cmp_f64 LE ->
+      (* FCMLE is only supported with ZERO *)
+      (* CR gyorsh: same as LT/GT above. *)
+      ins (I.FCM I.Float_cond.GE) (swap_args operands)
+    | Cmp_f32 ((EQ | GT | GE | NE | CC | CS | LS | HI) as c)
+    | Cmp_f64 ((EQ | GT | GE | NE | CC | CS | LS | HI) as c) ->
+      ins (I.FCM (emit_float_cond c)) operands
+    | Cmp_s32 c | Cmp_s64 c | Cmp_s16 c | Cmp_s8 c ->
+      ins (I.CM (emit_cond c)) operands
+    | Cmpz_f32 c | Cmpz_f64 c ->
+      ins (I.FCM (emit_float_cond c)) (Array.append operands [| imm_float 0. |])
+    | Cmpz_s32 c | Cmpz_s64 c | Cmpz_s16 c | Cmpz_s8 c ->
+      ins (I.CM (emit_cond c)) (Array.append operands [| imm 0 |])
+    | Mvnq_s32 | Mvnq_s64 | Mvnq_s16 | Mvnq_s8 -> ins I.MVN operands
+    | Orrq_s32 | Orrq_s64 | Orrq_s16 | Orrq_s8 -> ins I.ORR operands
+    | Andq_s32 | Andq_s64 | Andq_s16 | Andq_s8 -> ins I.AND operands
+    | Eorq_s32 | Eorq_s64 | Eorq_s16 | Eorq_s8 -> ins I.EOR operands
+    | Negq_s32 | Negq_s64 | Negq_s16 | Negq_s8 -> ins I.NEG operands
+    | Shlq_u32 | Shlq_u64 | Shlq_u16 | Shlq_u8 -> ins I.USHL operands
+    | Shlq_s32 | Shlq_s64 | Shlq_s16 | Shlq_s8 -> ins I.SSHL operands
+    | Shlq_n_u32 n | Shlq_n_u64 n | Shlq_n_u16 n | Shlq_n_u8 n ->
+      ins I.SHL (Array.append operands [| imm n |])
+    | Shrq_n_u32 n | Shrq_n_u64 n | Shrq_n_u16 n | Shrq_n_u8 n ->
+      ins I.USHR (Array.append operands [| imm n |])
+    | Shrq_n_s32 n | Shrq_n_s64 n | Shrq_n_s16 n | Shrq_n_s8 n ->
+      ins I.SSHR (Array.append operands [| imm n |])
+    | Setq_lane_s32 _ | Setq_lane_s64 _ | Setq_lane_s16 _ | Setq_lane_s8 _
+    | Getq_lane_s64 _ | Copyq_laneq_s64 _ ->
+      ins I.MOV operands
+    | Getq_lane_s32 _ | Getq_lane_s16 _ | Getq_lane_s8 _ ->
+      (* sign-extend the result to 64-bit and place in Xn *)
+      ins I.SMOV operands
+    | Dupq_lane_s32 _ | Dupq_lane_s64 _ | Dupq_lane_s16 _ | Dupq_lane_s8 _ ->
+      ins I.DUP operands
+    | Qaddq_s16 | Qaddq_s8 -> ins I.SQADD operands
+    | Qaddq_u16 | Qaddq_u8 -> ins I.UQADD operands
+    | Qsubq_s16 | Qsubq_s8 -> ins I.SQSUB operands
+    | Qsubq_u16 | Qsubq_u8 -> ins I.UQSUB operands
+    | Cntq_u16 | Cntq_u8 -> ins I.CNT operands
+    | Extq_u8 n -> ins I.EXT (Array.append operands [| imm n |])
+    | Qmovn_high_s64 | Qmovn_high_s32 | Qmovn_high_s16 -> ins I.SQXTN2 operands
+    | Qmovn_s64 | Qmovn_s32 | Qmovn_s16 -> ins I.SQXTN operands
+    | Qmovn_high_u32 | Qmovn_high_u16 -> ins I.UQXTN2 operands
+    | Qmovn_u32 | Qmovn_u16 -> ins I.UQXTN operands
+    | Movn_s64 | Movn_s32 | Movn_s16 -> ins I.XTN operands
+    | Movn_high_s64 | Movn_high_s32 | Movn_high_s16 -> ins I.XTN2 operands
+    | Mullq_s16 -> ins I.SMULL operands
+    | Mullq_u16 -> ins I.UMULL operands
+    | Mullq_high_s16 -> ins I.SMULL2 operands
+    | Mullq_high_u16 -> ins I.UMULL2 operands
 end
 
 (* Record live pointers at call points *)
@@ -507,7 +707,9 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "Unexpected Valx2 type of reg %a" Printreg.reg r
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128; _ } -> ())
+      | { typ = Int | Float | Float32 | Vec128; _ } -> ()
+      | { typ = Vec256 | Vec512; _ } ->
+        Misc.fatal_error "arm64: got 256/512 bit vector")
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
@@ -746,6 +948,8 @@ let function_name = ref ""
 let tailrec_entry_point = ref None
 
 (* Pending floating-point literals *)
+let float32_literals = ref ([] : (int32 * L.t) list)
+
 let float_literals = ref ([] : (int64 * L.t) list)
 
 let vec128_literals = ref ([] : (Cmm.vec128_bits * L.t) list)
@@ -763,6 +967,8 @@ let add_literal p f =
     p := (f, lbl) :: !p;
     lbl
 
+let float32_literal f = add_literal float32_literals f
+
 let float_literal f = add_literal float_literals f
 
 let vec128_literal f = add_literal vec128_literals f
@@ -772,29 +978,44 @@ let emit_literals p align emit_literal =
   if not (Misc.Stdlib.List.is_empty !p)
   then (
     if macosx
-    then (
+    then
       D.switch_to_section_raw
-        ~names:["__TEXT,__literal" ^ Int.to_string align]
+        ~names:["__TEXT"; "__literal" ^ Int.to_string align]
         ~flags:None
         ~args:[Int.to_string align ^ "byte_literals"]
+        ~is_delayed:false
+    else
+      D.switch_to_section_raw
+        ~names:[".rodata.cst" ^ Int.to_string align]
+        ~flags:(Some "aM")
+        ~args:["@progbits"; Int.to_string align]
         ~is_delayed:false;
-      (* CR sspies: The following section is incorrect. We are in a data section
-         here. Fix this when cleaning up the section mechanism. *)
-      D.unsafe_set_internal_section_ref Text);
+    (* CR sspies: We set the internal section ref to Text here, because section
+       ref does not support named text sections yet. Fix this when cleaning up
+       the section mechanism. *)
+    D.unsafe_set_internal_section_ref Text;
     D.align ~fill_x86_bin_emitter:Nop ~bytes:align;
     List.iter emit_literal !p;
     p := [])
+
+let emit_float32_literal (f, lbl) =
+  D.define_label lbl;
+  D.float32_from_bits f;
+  (* padding to 8 bytes *)
+  D.int32 0xDEAD_BEEFl
 
 let emit_float_literal (f, lbl) =
   D.define_label lbl;
   D.float64_from_bits f
 
-let emit_vec128_literal (({ high; low } : Cmm.vec128_bits), lbl) =
+let emit_vec128_literal (({ word0; word1 } : Cmm.vec128_bits), lbl) =
   D.define_label lbl;
-  D.float64_from_bits low;
-  D.float64_from_bits high
+  D.float64_from_bits word0;
+  D.float64_from_bits word1
 
 let emit_literals () =
+  (* Align float32 literals to [size_float]=8 bytes, not 4. *)
+  emit_literals float32_literals size_float emit_float32_literal;
   emit_literals float_literals size_float emit_float_literal;
   emit_literals vec128_literals size_vec128 emit_vec128_literal
 
@@ -812,7 +1033,7 @@ let emit_load_symbol_addr dst s =
     DSL.ins I.ADD
       [| DSL.emit_reg dst;
          DSL.emit_reg dst;
-         DSL.emit_immediate_symbol ~reloc:LOWER_TWELVE s
+         DSL.emit_symbol ~reloc:LOWER_TWELVE s
       |])
   else (
     DSL.ins I.ADRP [| DSL.emit_reg dst; DSL.emit_symbol ~reloc:GOT s |];
@@ -841,9 +1062,9 @@ let num_call_gc_points instr =
           | Ishiftarith (_, _)
           | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
-        ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Stackoffset _ | Load _
+        ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
+        | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _
         | Intop_imm (_, _)
@@ -858,6 +1079,8 @@ let num_call_gc_points instr =
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
     | Lstackcheck _ ->
       loop instr.next call_gc
+    | Lop (Const_vec256 _ | Const_vec512 _) ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
   in
   loop instr 0
 
@@ -908,7 +1131,7 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
       | Lcondbranch3 _ -> Some Bcc
       | Lop
-          ( Specific _ | Move | Spill | Reload | Opaque | Begin_region
+          ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
           | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
           | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
           | Store (_, _, _)
@@ -922,6 +1145,8 @@ module BR = Branch_relaxation.Make (struct
       | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _ | Ladjust_stack_offset _
       | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
         None
+      | Lop (Const_vec256 _ | Const_vec512 _) ->
+        Misc.fatal_error "arm64: got 256/512 bit vector"
   end
 
   let offset_pc_at_branch = 0
@@ -940,6 +1165,9 @@ module BR = Branch_relaxation.Make (struct
     | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned ->
       1
+    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+    | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
 
   let instr_size = function
     | Lend -> 0
@@ -949,6 +1177,8 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Const_float32 _) -> 2
     | Lop (Const_float _) -> 2
     | Lop (Const_vec128 _) -> 2
+    | Lop (Const_vec256 _ | Const_vec512 _) ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Const_symbol _) -> 2
     | Lop (Intop_atomic _) ->
       (* Never generated; builtins are not yet translated to atomics *)
@@ -960,8 +1190,14 @@ module BR = Branch_relaxation.Make (struct
       if String.equal func.sym_name !function_name then 1 else epilogue_size ()
     | Lcall_op
         (Lextcall
-          { alloc; stack_ofs; func = _; ty_res = _; ty_args = _; returns = _ })
-      ->
+          { alloc;
+            stack_ofs;
+            stack_align = _;
+            func = _;
+            ty_res = _;
+            ty_args = _;
+            returns = _
+          }) ->
       if Config.runtime5 && stack_ofs > 0 then 5 else if alloc then 3 else 5
     | Lop (Stackoffset _) -> 2
     | Lop (Load { memory_chunk; addressing_mode; is_atomic; mutability = _ }) ->
@@ -980,12 +1216,17 @@ module BR = Branch_relaxation.Make (struct
             | Onetwentyeight_unaligned | Onetwentyeight_aligned ),
             _ ) ->
           0
+        | ( ( Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+            | Fivetwelve_unaligned ),
+            _ ) ->
+          Misc.fatal_error "arm64: got 256/512 bit vector"
       and single = memory_access_size memory_chunk in
       based + barrier + single
     | Lop (Alloc { mode = Local; _ }) -> 9
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> 5
     | Lop (Specific (Ifar_alloc _)) when !fastcode_flag -> 6
     | Lop Poll -> 3
+    | Lop Pause -> 1
     | Lop (Specific Ifar_poll) -> 4
     | Lop (Alloc { mode = Heap; bytes = num_bytes; _ })
     | Lop (Specific (Ifar_alloc { bytes = num_bytes; _ })) -> (
@@ -1269,6 +1510,8 @@ let move (src : Reg.t) (dst : Reg.t) =
       DSL.ins I.FMOV [| DSL.emit_reg dst; DSL.emit_reg src |]
     | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
       DSL.ins I.MOV [| DSL.emit_reg_v16b dst; DSL.emit_reg_v16b src |]
+    | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
     | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
       DSL.ins I.MOV [| DSL.emit_reg dst; DSL.emit_reg src |]
     | _, Reg _, _, Stack _ ->
@@ -1310,19 +1553,19 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
     then (
       DSL.check_reg Float src;
       DSL.check_reg Float32 dst;
-      DSL.ins I.MOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
+      DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
   | Float_of_float32 ->
     if distinct
     then (
       DSL.check_reg Float32 src;
       DSL.check_reg Float dst;
-      DSL.ins I.MOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
+      DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
   | V128_of_v128 ->
     if distinct
     then (
       DSL.check_reg Vec128 src;
       DSL.check_reg Vec128 dst;
-      DSL.ins I.FMOV [| DSL.emit_reg dst; DSL.emit_reg src |])
+      DSL.ins I.MOV [| DSL.emit_reg_v16b dst; DSL.emit_reg_v16b src |])
   | Int_of_value | Value_of_int -> move src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
@@ -1435,7 +1678,7 @@ let emit_instr i =
          [float_literal] (see the conversion from int32 to int64 below). Thus,
          we load the lower half. Note that this is different from Cmm 32-bit
          floats ([Csingle]), which are emitted as 4-byte constants. *)
-      let lbl = float_literal (Int64.of_int32 f) in
+      let lbl = float32_literal f in
       emit_load_literal i.res.(0) lbl
   | Lop (Const_float f) ->
     if Int64.equal f 0L
@@ -1447,9 +1690,11 @@ let emit_instr i =
     else
       let lbl = float_literal f in
       emit_load_literal i.res.(0) lbl
-  | Lop (Const_vec128 ({ high; low } as l)) -> (
+  | Lop (Const_vec256 _ | Const_vec512 _) ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | Lop (Const_vec128 ({ word0; word1 } as l)) -> (
     DSL.check_reg Vec128 i.res.(0);
-    match high, low with
+    match word0, word1 with
     | 0x0000_0000_0000_0000L, 0x0000_0000_0000_0000L ->
       let dst = DSL.emit_reg_v2d i.res.(0) in
       DSL.ins I.MOVI [| dst; DSL.imm 0 |]
@@ -1570,11 +1815,30 @@ let emit_instr i =
       DSL.check_reg Float32 dst;
       DSL.ins I.LDR
         [| DSL.emit_reg dst; DSL.emit_addressing addressing_mode base |]
-    | Onetwentyeight_aligned | Onetwentyeight_unaligned ->
-      (* CR gyorsh: check alignment *)
+    | Onetwentyeight_aligned ->
       DSL.check_reg Vec128 dst;
       DSL.ins I.LDR
-        [| DSL.emit_reg dst; DSL.emit_addressing addressing_mode base |])
+        [| DSL.emit_reg dst; DSL.emit_addressing addressing_mode base |]
+    | Onetwentyeight_unaligned ->
+      DSL.check_reg Vec128 dst;
+      (match addressing_mode with
+      | Iindexed n ->
+        DSL.ins I.ADD
+          [| DSL.emit_reg reg_tmp1; DSL.emit_reg i.arg.(0); DSL.imm n |]
+      | Ibased (s, offset) ->
+        assert (not !Clflags.dlcode);
+        (* see selection_utils.ml *)
+        let s = S.create s in
+        DSL.ins I.ADRP [| DSL.emit_reg reg_tmp1; DSL.emit_symbol ~offset s |];
+        DSL.ins I.ADD
+          [| DSL.emit_reg reg_tmp1;
+             DSL.emit_reg reg_tmp1;
+             DSL.emit_symbol ~reloc:LOWER_TWELVE ~offset s
+          |]);
+      DSL.ins I.LDR [| DSL.emit_reg dst; DSL.emit_mem reg_tmp1 |]
+    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+    | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector")
   | Lop (Store (size, addr, assignment)) -> (
     (* NB: assignments other than Word_int and Word_val do not follow the
        Multicore OCaml memory model and so do not emit a barrier *)
@@ -1608,10 +1872,29 @@ let emit_instr i =
     | Single { reg = Float32 } ->
       DSL.check_reg Float32 src;
       DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_addressing addr base |]
-    | Onetwentyeight_aligned | Onetwentyeight_unaligned ->
-      (* CR gyorsh: check alignment *)
+    | Onetwentyeight_aligned ->
       DSL.check_reg Vec128 src;
-      DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_addressing addr base |])
+      DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_addressing addr base |]
+    | Onetwentyeight_unaligned ->
+      DSL.check_reg Vec128 src;
+      (match addr with
+      | Iindexed n ->
+        DSL.ins I.ADD
+          [| DSL.emit_reg reg_tmp1; DSL.emit_reg i.arg.(1); DSL.imm n |]
+      | Ibased (s, offset) ->
+        assert (not !Clflags.dlcode);
+        (* see selection_utils.ml *)
+        let s = S.create s in
+        DSL.ins I.ADRP [| DSL.emit_reg reg_tmp1; DSL.emit_symbol ~offset s |];
+        DSL.ins I.ADD
+          [| DSL.emit_reg reg_tmp1;
+             DSL.emit_reg reg_tmp1;
+             DSL.emit_symbol ~reloc:LOWER_TWELVE ~offset s
+          |]);
+      DSL.ins I.STR [| DSL.emit_reg src; DSL.emit_mem reg_tmp1 |]
+    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+    | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->
@@ -1631,6 +1914,7 @@ let emit_instr i =
          DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
       |]
   | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
+  | Lop Pause -> DSL.ins I.YIELD [||]
   | Lop (Specific Ifar_poll) ->
     assembly_code_for_poll i ~far:true ~return_label:None
   | Lop (Intop_imm (Iadd, n)) -> emit_addimm i.res.(0) i.arg.(0) n
@@ -1688,7 +1972,7 @@ let emit_instr i =
       DSL.ins I.FMOV [| Arm64_ast.DSL.reg_d tmp; DSL.emit_reg i.arg.(0) |];
       DSL.ins I.CNT [| tmp_v8b; tmp_v8b |];
       DSL.ins I.ADDV [| Arm64_ast.DSL.reg_b tmp; tmp_v8b |];
-      DSL.ins I.FMOV [| DSL.emit_reg i.res.(0); Arm64_ast.DSL.reg_s tmp |]
+      DSL.ins I.FMOV [| DSL.emit_reg i.res.(0); Arm64_ast.DSL.reg_d tmp |]
   | Lop (Intop (Ictz _)) ->
     (* [ctz Rd, Rn] is optionally supported from Armv8.7, but rbit and clz are
        supported in all ARMv8 CPUs. *)
@@ -2135,9 +2419,10 @@ let emit_item (d : Cmm.data_item) =
   | Cint n -> D.targetint (Targetint.of_int64 (Int64.of_nativeint n))
   | Csingle f -> D.float32 f
   | Cdouble f -> D.float64 f
-  | Cvec128 { high; low } ->
-    D.float64_from_bits low;
-    D.float64_from_bits high
+  | Cvec128 { word0; word1 } ->
+    D.float64_from_bits word1;
+    D.float64_from_bits word0
+  | Cvec256 _ | Cvec512 _ -> Misc.fatal_error "arm64: got 256/512 bit vector"
   | Csymbol_address s ->
     let sym = S.create s.sym_name in
     D.symbol sym
@@ -2164,7 +2449,7 @@ let begin_assembly _unix =
       Cmm.new_label () |> Label.to_int);
   let asm_line_buffer = Buffer.create 200 in
   D.initialize ~big_endian:Arch.big_endian
-    ~emit_assembly_comments:!Flambda_backend_flags.dasm_comments ~emit:(fun d ->
+    ~emit_assembly_comments:!Oxcaml_flags.dasm_comments ~emit:(fun d ->
       Buffer.clear asm_line_buffer;
       D.Directive.print asm_line_buffer d;
       Buffer.add_string asm_line_buffer "\n";
@@ -2248,6 +2533,6 @@ let end_assembly () =
     };
   D.type_symbol ~ty:Object frametable_sym;
   D.size frametable_sym;
-  if not !Flambda_backend_flags.internal_assembler
+  if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   D.mark_stack_non_executable ()
