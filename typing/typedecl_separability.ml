@@ -486,7 +486,6 @@ let msig_of_external_type env decl =
                         (Jkind.Builtin.value_or_null ~why:Separability_check))
   in
   (* CR jcutler: this is now slightly more pessamistic. Unclaer if it's the right choice. *)
-  (* let jkind_of_type = Ctype.type_jkind_purely_if_principal env in *)
   (* let is_external =
     match Jkind.get_externality_upper_bound ~jkind_of_type decl.type_jkind with
     | Internal -> false

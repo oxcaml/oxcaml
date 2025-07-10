@@ -542,7 +542,8 @@ module Lattices = struct
         | External, _ -> b
         | External64, (Byte_external | External) -> External64
         | External64, _ -> b
-        | Internal, _ -> Internal
+        | Internal, (Byte_external | External | External64 | Internal) ->
+          Internal
 
       let meet a b =
         match a, b with
@@ -550,13 +551,14 @@ module Lattices = struct
           Byte_external
         | External, Byte_external -> Byte_external
         | External, (External | External64 | Internal) -> External
-        | External64, (Byte_external | External64) -> External64
-        | External64, (External | Internal) -> b
+        | External64, (External | Byte_external | External64) -> b
+        | External64, Internal -> External64
         | Internal, (Byte_external | External | External64) -> b
         | Internal, Internal -> Internal
 
       let print ppf = function
-        | Byte_external -> Format.fprintf ppf "byte_external"
+        | Byte_external ->
+          Format.fprintf ppf "external_" (* CR jcutler: do we want this??*)
         | External -> Format.fprintf ppf "external_"
         | External64 -> Format.fprintf ppf "external64"
         | Internal -> Format.fprintf ppf "internal"

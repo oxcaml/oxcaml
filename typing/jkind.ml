@@ -351,7 +351,6 @@ module Layout = struct
     pp_element ~nested:false ppf layout
 end
 
-(* module Externality = Jkind_axis.Externality *)
 module Nullability = Nullability
 module Separability = Jkind_axis.Separability
 
@@ -599,8 +598,8 @@ module Mod_bounds = struct
       ~uniqueness:Uniqueness.min ~portability:Portability.max
       ~contention:Contention.min ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.min
-      ~externality_mod:Externality_mod.max (* CR jcutler: is this right? *)
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+      ~externality_mod:Externality_mod.max ~nullability:Nullability.Non_null
+      ~separability:Separability.Non_float
 
   let to_mode_crossing t =
     Mode.Crossing.of_bounds
@@ -1386,7 +1385,6 @@ module Const = struct
                 ~statefulness:Statefulness.Const.min
                 ~visibility:Visibility.Const_op.min
                 ~externality_mod:Mod_bounds.Externality_mod.max
-                  (* CR jcutler: is this right? *)
                 ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
@@ -1406,7 +1404,6 @@ module Const = struct
                 ~statefulness:Statefulness.Const.min
                 ~visibility:Visibility.Const_op.max
                 ~externality_mod:Mod_bounds.Externality_mod.max
-                  (* CR jcutler: is this right? *)
                 ~nullability:Nullability.Non_null
                 ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
@@ -2510,7 +2507,6 @@ let for_open_boxed_row =
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
       ~visibility:Visibility.Const_op.max
       ~externality_mod:Mod_bounds.Externality_mod.max
-        (* CR jcutler: is this right? *)
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
@@ -2552,7 +2548,7 @@ let for_object =
          portability;
          yielding;
          statefulness;
-         externality = _externality (* CR jcutler: fixme *)
+         externality
        }
         : Mode.Alloc.Comonadic.Const.t) =
     Alloc.Comonadic.Const.legacy
@@ -2565,7 +2561,7 @@ let for_object =
       mod_bounds =
         Mod_bounds.create ~linearity ~locality ~uniqueness ~portability
           ~contention ~yielding ~statefulness ~visibility
-          ~externality_mod:Mod_bounds.Externality_mod.max ~nullability:Non_null
+          ~externality_mod:externality ~nullability:Non_null
           ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
     }
@@ -2579,7 +2575,6 @@ let for_float ident =
       ~contention:Contention.Const_op.min ~statefulness:Statefulness.Const.min
       ~visibility:Visibility.Const_op.min
       ~externality_mod:Mod_bounds.Externality_mod.max
-        (* CR jcutler: is this right? *)
       ~nullability:Nullability.Non_null ~separability:Separability.Separable
   in
   fresh_jkind
@@ -2652,7 +2647,7 @@ let get_modal_bounds (type l r) ~jkind_of_type (jk : (l * r) jkind) =
           portability = portability mod_bounds;
           yielding = yielding mod_bounds;
           statefulness = statefulness mod_bounds;
-          externality = Mode.Externality.Const.Internal (* CR jcutler: fixme *)
+          externality = externality_mod mod_bounds
         };
       monadic =
         { uniqueness = uniqueness mod_bounds;

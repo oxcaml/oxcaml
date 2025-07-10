@@ -293,7 +293,7 @@ module Jkind_mod_bounds = struct
         yielding = Yielding;
         statefulness = Stateful;
         visibility = Read_write;
-        externality_mod = External;
+        externality_mod = Internal;
         nullability = Maybe_null;
         separability = Maybe_separable } -> true
     | _ -> false
