@@ -520,16 +520,12 @@ let identchar_latin1 =
 
 let symbolchar =
   ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '?' '@' '^' '|' '~']
-let symbolchar_not_less =
-  ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '=' '>' '?' '@' '^' '|' '~']
 let dotsymbolchar =
   ['!' '$' '%' '&' '*' '+' '-' '/' ':' '=' '>' '?' '@' '^' '|']
 let symbolchar_or_hash =
   symbolchar | '#'
 let kwdopchar =
   ['$' '&' '*' '+' '-' '/' '<' '=' '>' '@' '^' '|']
-let opchar =
-  ['%' '&' '*' '.' '/' '<' '=' '?' '@' '^' '|' '~']
 
 let ident = (lowercase | uppercase) identchar*
 let extattrident = ident ('.' ident)*

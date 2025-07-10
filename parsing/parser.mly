@@ -4747,24 +4747,24 @@ atomic_type:
 
 
 (* This is the syntax of the actual type parameters in an application of
-a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
-We allow one of the following:
-- zero parameters;
-- one parameter:
-an atomic type;
-among other things, this can be an arbitrary type between parentheses;
-- two or more parameters:
-arbitrary types, between parentheses, separated with commas.
-*)
+  a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
+  We allow one of the following:
+  - zero parameters;
+  - one parameter:
+    an atomic type;
+    among other things, this can be an arbitrary type between parentheses;
+  - two or more parameters:
+    arbitrary types, between parentheses, separated with commas.
+  *)
 %inline actual_type_parameters:
   | /* empty */
-    { [] }
+      { [] }
   | ty = atomic_type
-    { [ ty ] }
+      { [ ty ] }
   | LPAREN
-tys = separated_nontrivial_llist(COMMA, one_type_parameter_of_several)
-RPAREN
-    { tys }
+    tys = separated_nontrivial_llist(COMMA, one_type_parameter_of_several)
+    RPAREN
+      { tys }
 
 (* Layout annotations on type expressions typically require parens, as in [('a :
    float64)].  But this is unnecessary when the type expression is used as the
