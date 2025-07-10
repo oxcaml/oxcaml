@@ -643,6 +643,45 @@ let simplify_switch0 dacc switch ~down_to_up =
              report, but for other optimizations at one point ? *)
           dacc
         | Can_specialize { size_of_primitives = _ } ->
+          let join_info =
+            match DA.get_join_id_for_continuation dacc continuation with
+            | Some join_id -> DE.get_join_info denv join_id
+            | None -> None
+          in
+          let join_info =
+            match join_info with
+            | None -> None
+            | Some join_info ->
+              Some
+                (Flambda2_types.Join_info.reduce join_info (DE.typing_env denv))
+          in
+          if Flambda_features.debug_flambda2 ()
+          then
+            Option.iter
+              (fun join_info ->
+                Format.eprintf "Scrutinee: %a@." Simple.print scrutinee;
+                Format.eprintf "%a@."
+                  (Join_info.print Apply_cont_rewrite_id.print)
+                  join_info)
+              join_info;
+          let is_known_at_all_uses =
+            match join_info with
+            | None -> false
+            | Some join_info ->
+              let scrutinee =
+                TE.get_canonical_simple_exn (DE.typing_env denv)
+                  ~min_name_mode:Name_mode.in_types scrutinee
+              in
+              if Flambda_features.debug_flambda2 ()
+              then Format.eprintf "Real scrutinee: %a@." Simple.print scrutinee;
+              Simple.pattern_match scrutinee
+                ~name:(fun name ~coercion:_ ->
+                  match Join_info.known_values_at_uses name join_info with
+                  | Unknown -> false
+                  | Known { unknown_at_uses = []; _ } -> true
+                  | Known _ -> false)
+                ~const:(fun _ -> true)
+          in
           (* Estimate the cost of lifting: this mainly comes from adding new
              parameters, which increase the work done by the typing env, as well
              as the flow analysis. We then only do the lifting if the cost is
@@ -667,8 +706,9 @@ let simplify_switch0 dacc switch ~down_to_up =
             specialization_budget > 0
             && specialization_cost <= specialization_budget
           in
-          if (not is_lifting_allowed_by_budget)
-             || not is_specialization_allowed_by_budget
+          if (not is_known_at_all_uses)
+             && ((not is_lifting_allowed_by_budget)
+                || not is_specialization_allowed_by_budget)
           then dacc
           else
             (* TODO/FIXME: implement an actual criterion for when to lift

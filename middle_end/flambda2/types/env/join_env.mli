@@ -39,10 +39,31 @@ val n_way_join_env_extension :
   Typing_env_extension.t join_arg list ->
   (Typing_env_extension.t * t) Or_bottom.t
 
+module Join_info : sig
+  (* At any other use, the value is not defined (i.e. [Poison]). *)
+  type 'a known_values_at_uses =
+    { known_at_uses : ('a * Reg_width_const.t) list;
+      unknown_at_uses : 'a list
+    }
+
+  type 'a t
+
+  val empty : 'a t
+
+  val reduce : 'a t -> Typing_env.t -> 'a t
+
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
+  val known_values_at_uses :
+    Name.t -> 'a t -> 'a known_values_at_uses Or_unknown.t
+end
+
 val cut_and_n_way_join :
+  ?join_id:Join_id.t ->
   n_way_join_type:n_way_join_type ->
   meet_type:Meet_env.meet_type ->
   cut_after:Scope.t ->
   Meet_env.t ->
-  Typing_env.t list ->
-  Meet_env.t
+  ('a * Typing_env.t) list ->
+  Meet_env.t * 'a Join_info.t

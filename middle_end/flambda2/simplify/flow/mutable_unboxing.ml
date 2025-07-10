@@ -36,6 +36,13 @@ type t =
     rewrites : Named_rewrite.t Named_rewrite_id.Map.t
   }
 
+let empty =
+  { blocks_to_unbox = Simple.Map.empty;
+    continuations_with_live_block = Continuation.Map.empty;
+    extra_params_and_args = Continuation.Map.empty;
+    rewrites = Named_rewrite_id.Map.empty
+  }
+
 (* Escaping analysis *)
 
 let free_names_of_apply_cont_args

@@ -14,6 +14,8 @@
 
 type t
 
+val empty : t
+
 val create :
   dom:Dominator_graph.alias_map ->
   dom_graph:Dominator_graph.t ->

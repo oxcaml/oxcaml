@@ -88,11 +88,24 @@ type t =
            generate a fresh [Lifted_cont_param] when we execute
            [define_variable]. Note that this set will always be a subset of the
            head of the defined_variables_by_scope field. *)
-    cost_of_lifting_continuations_out_of_current_one : int
+    cost_of_lifting_continuations_out_of_current_one : int;
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
+    join_info :
+      (Flambda2_types.Join_id.t
+      * Apply_cont_rewrite_id.t Flambda2_types.Join_info.t)
+      option
   }
+
+let set_join_info join_id join_info denv =
+  { denv with join_info = Some (join_id, join_info) }
+
+let get_join_info denv join_id =
+  match denv.join_info with
+  | Some (join_id', join_info) when Join_id.equal join_id join_id' ->
+    Some join_info
+  | Some _ | None -> None
 
 let [@ocamlformat "disable"] print ppf { round; typing_env;
                 inlined_debuginfo; disable_inlining;
@@ -104,6 +117,7 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
                 get_imported_code = _; inlining_history_tracker = _;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
+                join_info = _;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
@@ -227,7 +241,8 @@ let create ~round ~(resolver : resolver)
       specialization_cost = Specialization_cost.can_specialize;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
-      cost_of_lifting_continuations_out_of_current_one = 0
+      cost_of_lifting_continuations_out_of_current_one = 0;
+      join_info = None
     }
   in
   define_variable
@@ -305,7 +320,8 @@ let enter_set_of_closures
       specialization_cost = _;
       defined_variables_by_scope = _;
       lifted = _;
-      cost_of_lifting_continuations_out_of_current_one = _
+      cost_of_lifting_continuations_out_of_current_one = _;
+      join_info = _
     } disable_inlining =
   { round;
     typing_env = TE.closure_env typing_env;
@@ -329,7 +345,8 @@ let enter_set_of_closures
     specialization_cost = Specialization_cost.can_specialize;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
-    cost_of_lifting_continuations_out_of_current_one = 0
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    join_info = None
   }
 
 let define_symbol t sym kind =
@@ -720,5 +737,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     are_rebuilding_terms = denv.are_rebuilding_terms;
     closure_info = denv.closure_info;
     get_imported_code = denv.get_imported_code;
-    loopify_state = denv.loopify_state
+    loopify_state = denv.loopify_state;
+    (* I don't know what to do with this one, so just reset it. *)
+    join_info = None
   }

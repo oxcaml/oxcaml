@@ -3837,7 +3837,9 @@ let tag_int8 (t : t) : t =
            { is_unique = false;
              immediates = Unknown;
              blocks = Known Row_like_for_blocks.bottom;
-             extensions = No_extensions
+             extensions = No_extensions;
+             is_int_var = None;
+             get_tag_var = None
            })
     | Ok (No_alias ints) ->
       let ints =
@@ -3850,7 +3852,9 @@ let tag_int8 (t : t) : t =
            { is_unique = false;
              immediates = Known (these_naked_immediates ints);
              blocks = Known Row_like_for_blocks.bottom;
-             extensions = No_extensions
+             extensions = No_extensions;
+             is_int_var = None;
+             get_tag_var = None
            }))
   | Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
@@ -3868,7 +3872,9 @@ let tag_int16 (t : t) : t =
            { is_unique = false;
              immediates = Unknown;
              blocks = Known Row_like_for_blocks.bottom;
-             extensions = No_extensions
+             extensions = No_extensions;
+             is_int_var = None;
+             get_tag_var = None
            })
     | Ok (No_alias ints) ->
       let ints =
@@ -3882,7 +3888,9 @@ let tag_int16 (t : t) : t =
            { is_unique = false;
              immediates = Known (these_naked_immediates ints);
              blocks = Known Row_like_for_blocks.bottom;
-             extensions = No_extensions
+             extensions = No_extensions;
+             is_int_var = None;
+             get_tag_var = None
            }))
   | Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
   | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _

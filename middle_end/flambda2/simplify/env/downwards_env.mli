@@ -241,3 +241,14 @@ val map_specialization_cost :
 val specialization_cost : t -> Specialization_cost.t
 
 val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
+
+val set_join_info :
+  Flambda2_types.Join_id.t ->
+  Apply_cont_rewrite_id.t Flambda2_types.Join_info.t ->
+  t ->
+  t
+
+val get_join_info :
+  t ->
+  Flambda2_types.Join_id.t ->
+  Apply_cont_rewrite_id.t Flambda2_types.Join_info.t option

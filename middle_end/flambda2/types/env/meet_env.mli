@@ -37,6 +37,9 @@ val use_meet_env : Typing_env.t -> f:(t -> t) -> Typing_env.t
 val use_meet_env_strict :
   Typing_env.t -> f:(t -> t Or_bottom.t) -> Typing_env.t Or_bottom.t
 
+val use_meet_env_with_data :
+  Typing_env.t -> f:(t -> t * 'a) -> Typing_env.t * 'a
+
 val typing_env : t -> Typing_env.t
 
 val with_typing_env : t -> Typing_env.t -> t

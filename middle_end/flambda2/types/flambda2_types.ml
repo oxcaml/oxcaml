@@ -47,15 +47,41 @@ module Typing_env = struct
           Format.eprintf "====================================@.");
         t)
 
+  let add_get_tag_relation t name ~scrutinee =
+    use_meet_env t ~f:(fun t ->
+        let t =
+          add_equation ~meet_type:(Meet.meet_type ()) t name
+            (Type_grammar.get_tag_for_block ~block:scrutinee)
+        in
+        let scrutinee_head_of_kind_value_non_null =
+          Type_grammar.Head_of_kind_value_non_null.create_variant
+            ~is_unique:false ~blocks:Unknown ~immediates:Unknown
+            ~extensions:No_extensions ~is_int_var:None ~get_tag_var:(Some name)
+        in
+        let scrutinee_ty =
+          Type_grammar.create_from_head_value
+            { is_null = Not_null;
+              non_null = Ok scrutinee_head_of_kind_value_non_null
+            }
+        in
+        let t =
+          add_equation_on_simple ~meet_type:(Meet.meet_type ()) t scrutinee
+            scrutinee_ty
+        in
+        if Flambda_features.debug_flambda2 ()
+        then (
+          Format.eprintf "====== Adding %a = Is_int(%a) ======@." Name.print
+            name Simple.print scrutinee;
+          Format.eprintf "%a@." print (Meet_env.typing_env t);
+          Format.eprintf "====================================@.");
+        t)
+
   let add_equation t name ty =
     use_meet_env t ~f:(fun t ->
         add_equation t name ty ~meet_type:(Meet.meet_type ()))
 
   let add_is_null_relation t name ~scrutinee =
     add_equation t name (Type_grammar.is_null ~scrutinee)
-
-  let add_get_tag_relation t name ~scrutinee =
-    add_equation t name (Type_grammar.get_tag_for_block ~block:scrutinee)
 
   let add_equations_on_params t ~params ~param_types =
     use_meet_env t ~f:(fun t ->
@@ -102,6 +128,7 @@ include Reify
 include Join_levels
 module Code_age_relation = Code_age_relation
 module Join_id = Join_id
+module Join_info = Join_env.Join_info
 
 let remove_outermost_alias env ty =
   Expand_head.expand_head env ty |> Expand_head.Expanded_type.to_type

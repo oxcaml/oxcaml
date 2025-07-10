@@ -108,7 +108,7 @@ let join ?join_id ?cut_after denv params ~consts_lifted_after_fork
     | Some cse_join_result -> cse_join_result.extra_allowed_names
   in
   let cut_after = Option.value cut_after ~default:definition_scope in
-  let handler_env =
+  let handler_env, join_info =
     T.cut_and_n_way_join ?join_id (DE.typing_env denv) use_envs_with_ids'
       ~params:
         (Bound_parameters.append params
@@ -126,6 +126,11 @@ let join ?join_id ?cut_after denv params ~consts_lifted_after_fork
     match cse_join_result with
     | None -> denv
     | Some cse_join_result -> DE.with_cse denv cse_join_result.cse_at_join_point
+  in
+  let denv =
+    match join_id with
+    | None -> denv
+    | Some join_id -> DE.set_join_info join_id join_info denv
   in
   denv, extra_params_and_args
 

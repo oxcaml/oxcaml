@@ -164,6 +164,80 @@ end = struct
       ~const
 end
 
+type non_poison_uses =
+  { known_uses : Reg_width_const.t Index.Map.t;
+    unknown_uses : unit Index.Map.t
+  }
+
+module Join_info = struct
+  (* In any other use site, the value is [Poison] -- it is not defined in that
+     use. *)
+  type 'a known_values_at_uses =
+    { known_at_uses : ('a * Reg_width_const.t) list;
+      unknown_at_uses : 'a list
+    }
+
+  let print_known_values_at_uses pp ppf { known_at_uses; unknown_at_uses } =
+    Format.fprintf ppf "@[<hov 1>(";
+    Format.pp_print_list ~pp_sep:Format.pp_print_space
+      (fun ppf (use_id, const) ->
+        Format.fprintf ppf "@[<hov 1>(%a@ %a)@]" pp use_id
+          (Or_unknown.print Reg_width_const.print)
+          (Or_unknown.Known const))
+      ppf known_at_uses;
+    (match known_at_uses, unknown_at_uses with
+    | [], [] -> ()
+    | _, _ -> Format.pp_print_space ppf ());
+    Format.pp_print_list ~pp_sep:Format.pp_print_space
+      (fun ppf use_id ->
+        Format.fprintf ppf "@[<hov 1>(%a@ %a)@]" pp use_id
+          (Or_unknown.print Reg_width_const.print)
+          Or_unknown.Unknown)
+      ppf unknown_at_uses;
+    Format.fprintf ppf "@]"
+
+  type 'a t = { known_values_at_uses : 'a known_values_at_uses Name.Map.t }
+
+  let print pp ppf { known_values_at_uses } =
+    let print_field name pp ppf value =
+      Format.fprintf ppf "@[<hov 1>(%s@ %a)@]" name pp value
+    in
+    Format.fprintf ppf "@[<hov 1>(%a)@]"
+      (print_field "non_poison_values"
+         (Name.Map.print (print_known_values_at_uses pp)))
+      known_values_at_uses
+
+  let create (type a)
+      (known_values_at_uses : a known_values_at_uses Name_in_target_env.Map.t) =
+    { known_values_at_uses =
+        (known_values_at_uses :> a known_values_at_uses Name.Map.t)
+    }
+
+  let empty = { known_values_at_uses = Name.Map.empty }
+
+  let known_values_at_uses name t : _ Or_unknown.t =
+    match Name.Map.find_opt name t.known_values_at_uses with
+    | None -> Unknown
+    | Some known_value_at_uses -> Known known_value_at_uses
+
+  let reduce t env =
+    let known_values_at_uses =
+      Name.Map.fold
+        (fun name non_poison_uses reduced ->
+          let simple = Simple.name name in
+          let canonical =
+            TE.get_canonical_simple_ignoring_name_mode env simple
+          in
+          Simple.pattern_match canonical
+            ~const:(fun _ -> reduced)
+            ~name:(fun name ~coercion ->
+              assert (Coercion.is_id coercion);
+              Name.Map.add name non_poison_uses reduced))
+        t.known_values_at_uses Name.Map.empty
+    in
+    { known_values_at_uses }
+end
+
 module Simples_in_joined_envs : sig
   include
     Container_types.S
@@ -897,7 +971,37 @@ end = struct
            all_demotions)
 end
 
-module Join_equations = struct
+module Join_equations : sig
+  type t
+
+  val empty : t
+
+  val from_equations : ET.t Index.Map.t Name_in_target_env.Map.t -> t
+
+  val find : Name_in_target_env.t -> t -> ET.t Index.Map.t
+
+  val n_way_join :
+    n_way_join_type:('a -> (Index.t * TG.t) list -> 'b Or_unknown.t * 'a) ->
+    t ->
+    'b Name_in_target_env.Map.t ->
+    'a ->
+    'b Name_in_target_env.Map.t * 'a
+
+  type add_joined_simple_result = private
+    { non_poison_uses : non_poison_uses Or_unknown.t;
+      t : t
+    }
+
+  val add_joined_simple :
+    joined_envs:TE.typing_env Index.Map.t ->
+    Name_in_target_env.t ->
+    Simples_in_joined_envs.t ->
+    K.t ->
+    t ->
+    add_joined_simple_result
+
+  val add_equations : t -> ET.t Index.Map.t Name_in_target_env.Map.t -> t
+end = struct
   (** Maps a variable in the target environment to its {b updated} types in the
   joined environments.
 
@@ -906,15 +1010,17 @@ module Join_equations = struct
 
   {b Note}: A variable can have a more precise joined type if, and only if,
   it has been given a new type in {b all} the joined environments. *)
-  type t = ET.t Index.Map.t Name_in_target_env.Map.t
+  type t = { types : ET.t Index.Map.t Name_in_target_env.Map.t } [@@unboxed]
 
-  let empty = Name_in_target_env.Map.empty
+  let from_equations types = { types }
+
+  let empty = { types = Name_in_target_env.Map.empty }
 
   let find var t =
     Option.value ~default:Index.Map.empty
-      (Name_in_target_env.Map.find_opt var t)
+      (Name_in_target_env.Map.find_opt var t.types)
 
-  let n_way_join ~n_way_join_type vars equations st =
+  let n_way_join ~n_way_join_type { types } equations st =
     Name_in_target_env.Map.fold
       (fun var types (equations, st) ->
         let types =
@@ -925,35 +1031,76 @@ module Join_equations = struct
         match (n_way_join_type st types : _ Or_unknown.t * _) with
         | Unknown, st -> equations, st
         | Known ty, st -> Name_in_target_env.Map.add var ty equations, st)
-      vars (equations, st)
+      types (equations, st)
 
-  let add_joined_simple ~joined_envs demoted_var canonicals kind joined_types =
-    Name_in_target_env.Map.update demoted_var
-      (fun types_of_demoted_var ->
-        let types_of_demoted_var =
-          Option.value ~default:Index.Map.empty types_of_demoted_var
+  type add_joined_simple_result =
+    { non_poison_uses : non_poison_uses Or_unknown.t;
+      t : t
+    }
+
+  let add_joined_simple ~joined_envs demoted_var canonicals kind { types } =
+    let types_of_demoted_var, known_uses =
+      Simples_in_joined_envs.fold
+        (fun index canonical (types_of_demoted_var, known_uses) ->
+          let env = get_nth_joined_env index joined_envs in
+          let canonical_simple = (canonical :> Simple.t) in
+          (* CR bclement: in const case, we are also known at current join. *)
+          let ty, known_uses =
+            Simple.pattern_match canonical_simple
+              ~const:(fun const ->
+                let ty = More_type_creators.type_for_const const in
+                let known_uses = Index.Map.add index const known_uses in
+                ty, known_uses)
+              ~name:(fun name ~coercion ->
+                let ty =
+                  TG.apply_coercion (TE.find env name (Some kind)) coercion
+                in
+                ty, known_uses)
+          in
+          let expanded =
+            Expand_head.expand_head0 env ty
+              ~known_canonical_simple_at_in_types_mode:(Some canonical_simple)
+          in
+          Index.Map.add index expanded types_of_demoted_var, known_uses)
+        canonicals
+        (Index.Map.empty, Index.Map.empty)
+    in
+    let non_poison_uses : _ Or_unknown.t =
+      if Index.Map.is_empty known_uses
+      then Unknown
+      else
+        let unknown_uses =
+          (* CR bclement: Use [diff] instead. *)
+          Index.Map.merge
+            (fun _ known simple ->
+              match known, simple with
+              | None, None | Some _, _ -> None
+              | None, Some _ -> Some ())
+            known_uses
+            (canonicals
+              : Simples_in_joined_envs.t
+              :> Simple_in_one_joined_env.t Index.Map.t)
         in
-        let types_of_demoted_var =
-          Simples_in_joined_envs.fold
-            (fun index canonical types_of_demoted_var ->
-              let env = get_nth_joined_env index joined_envs in
-              let canonical_simple = (canonical :> Simple.t) in
-              let ty =
-                Simple.pattern_match canonical_simple
-                  ~const:More_type_creators.type_for_const
-                  ~name:(fun name ~coercion ->
-                    TG.apply_coercion (TE.find env name (Some kind)) coercion)
-              in
-              let expanded =
-                Expand_head.expand_head0 env ty
-                  ~known_canonical_simple_at_in_types_mode:
-                    (Some canonical_simple)
-              in
-              Index.Map.add index expanded types_of_demoted_var)
-            canonicals types_of_demoted_var
-        in
-        Some types_of_demoted_var)
-      joined_types
+        Known { known_uses; unknown_uses }
+    in
+    let types =
+      Name_in_target_env.Map.add demoted_var types_of_demoted_var types
+    in
+    { t = { types }; non_poison_uses }
+
+  let add_equations { types } equations =
+    let types =
+      Name_in_target_env.Map.union
+        (fun _ existing_equations new_equations ->
+          let equations =
+            Index.Map.union
+              (fun _ _ new_equation -> Some new_equation)
+              existing_equations new_equations
+          in
+          Some equations)
+        types equations
+    in
+    { types }
 end
 
 module Symbol_projection = struct
@@ -1007,6 +1154,7 @@ let n_way_join_symbol_projections ~exists_in_target_env
 type t =
   { join_aliases : Join_aliases.t;
     join_types : Join_equations.t;
+    non_poison_uses : non_poison_uses Name_in_target_env.Map.t Join_id.Map.t;
     existential_vars : K.t Variable.Map.t;
     pending_vars : Simples_in_joined_envs.t Variable_in_target_env.Map.t;
     (* Existential variables that have been defined by their names in all the
@@ -1023,10 +1171,25 @@ type join_result =
   { demoted_in_target_env : Simple_in_target_env.t Name_in_target_env.Map.t;
     extra_variables : K.t Variable.Map.t;
     equations : TG.t Name_in_target_env.Map.t;
+    known_at_uses : non_poison_uses Name_in_target_env.Map.t;
     symbol_projections : Symbol_projection.t Variable.Map.t
   }
 
-let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
+let join_id_map_union f m1 m2 =
+  Join_id.Map.union (fun [@inline] key v1 v2 -> Some (f key v1 v2)) m1 m2
+
+let add_known_use join_id name_in_target_env known_uses_of_name known_uses =
+  match join_id, (known_uses_of_name : _ Or_unknown.t) with
+  | None, _ | _, Unknown -> known_uses
+  | Some join_id, Known known_uses_of_name ->
+    join_id_map_union
+      (fun _join_id known_uses1 known_uses2 ->
+        Name_in_target_env.Map.disjoint_union known_uses1 known_uses2)
+      known_uses
+      (Join_id.Map.singleton join_id
+         (Name_in_target_env.Map.singleton name_in_target_env known_uses_of_name))
+
+let n_way_join_levels ~join_id ~n_way_join_type t all_levels : _ Or_bottom.t =
   let all_demotions, all_expanded_equations, all_symbol_projections =
     Index.Map.fold
       (fun index level
@@ -1094,21 +1257,31 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
   with
   | Bottom -> Bottom
   | Ok { demoted_in_target_env; demoted_in_some_envs; t = join_aliases } ->
-    let join_types =
+    let join_types, non_poison_uses =
       Name_in_target_env.Map.fold
-        (fun name_in_target_env canonicals join_types ->
+        (fun name_in_target_env canonicals (join_types, all_non_poison_uses) ->
           let canonicals =
             Simples_in_joined_envs.in_envs all_levels canonicals
           in
           (* Passing [None] to [TE.find] here is OK, because [name] has been
              demoted in at least one environment thus cannot be imported. *)
           let ty_in_target_env =
-            TE.find target_env (name_in_target_env :> Name.t) None
+            TE.find (ME.typing_env target_env)
+              (name_in_target_env :> Name.t)
+              None
           in
           let kind = TG.kind ty_in_target_env in
-          Join_equations.add_joined_simple ~joined_envs:t.joined_envs
-            name_in_target_env canonicals kind join_types)
-        demoted_in_some_envs t.join_types
+          let { Join_equations.t = join_types; non_poison_uses } =
+            Join_equations.add_joined_simple ~joined_envs:t.joined_envs
+              name_in_target_env canonicals kind join_types
+          in
+          let all_non_poison_uses =
+            add_known_use join_id name_in_target_env non_poison_uses
+              all_non_poison_uses
+          in
+          join_types, all_non_poison_uses)
+        demoted_in_some_envs
+        (t.join_types, t.non_poison_uses)
     in
     let join_types, touched_vars =
       Index.Map.fold
@@ -1119,15 +1292,7 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
               ~exists_in_target_env join_aliases index expanded_equations
           in
           let join_types =
-            Name_in_target_env.Map.union
-              (fun _ existing_equations new_equations ->
-                let equations =
-                  Index.Map.union
-                    (fun _ _ new_equation -> Some new_equation)
-                    existing_equations new_equations
-                in
-                Some equations)
-              join_types new_equations
+            Join_equations.add_equations join_types new_equations
           in
           let touched_vars =
             Name_in_target_env.Set.union touched_vars
@@ -1137,7 +1302,7 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
         all_expanded_equations
         (join_types, Name_in_target_env.Map.keys demoted_in_some_envs)
     in
-    let t = { t with join_aliases; join_types } in
+    let t = { t with join_aliases; join_types; non_poison_uses } in
     let all_indices = Index.Map.keys t.joined_envs in
     let equations_to_join =
       Name_in_target_env.Set.fold
@@ -1156,7 +1321,8 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
     in
     let rec loop equations_to_join joined_equations t =
       let equations, t =
-        Join_equations.n_way_join ~n_way_join_type equations_to_join
+        Join_equations.n_way_join ~n_way_join_type
+          (Join_equations.from_equations equations_to_join)
           joined_equations t
       in
       if Variable_in_target_env.Map.is_empty t.pending_vars
@@ -1166,16 +1332,25 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
             ~is_bound_strictly_earlier t.join_aliases t.joined_envs
             all_symbol_projections
         in
+        let known_at_uses =
+          match join_id with
+          | None -> Name_in_target_env.Map.empty
+          | Some join_id -> (
+            match Join_id.Map.find_opt join_id t.non_poison_uses with
+            | None -> Name_in_target_env.Map.empty
+            | Some known_at_uses -> known_at_uses)
+        in
         Or_bottom.Ok
           { demoted_in_target_env;
             extra_variables = t.existential_vars;
             equations;
+            known_at_uses;
             symbol_projections
           }
       else
-        let join_types =
+        let join_types, non_poison_uses =
           Variable_in_target_env.Map.fold
-            (fun var_in_target_env canonicals join_types ->
+            (fun var_in_target_env canonicals (join_types, known_uses) ->
               let canonicals =
                 Simples_in_joined_envs.in_envs all_levels canonicals
               in
@@ -1190,10 +1365,19 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
                      variables, which %a is not."
                     Variable_in_target_env.print var_in_target_env
               in
-              Join_equations.add_joined_simple ~joined_envs:t.joined_envs
-                (Name_in_target_env.var var_in_target_env)
-                canonicals kind join_types)
-            t.pending_vars t.join_types
+              let { Join_equations.t = join_types; non_poison_uses } =
+                Join_equations.add_joined_simple ~joined_envs:t.joined_envs
+                  (Name_in_target_env.var var_in_target_env)
+                  canonicals kind join_types
+              in
+              let known_uses =
+                add_known_use join_id
+                  (Name_in_target_env.var var_in_target_env)
+                  non_poison_uses known_uses
+              in
+              join_types, known_uses)
+            t.pending_vars
+            (t.join_types, t.non_poison_uses)
         in
         let equations_to_join =
           Variable_in_target_env.Map.mapi
@@ -1202,18 +1386,18 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
             t.pending_vars
         in
         let pending_vars = Variable_in_target_env.Map.empty in
-        loop
-          (Name_in_target_env.var_map equations_to_join)
-          equations
-          { t with pending_vars; join_types }
+        let equations_to_join = Name_in_target_env.var_map equations_to_join in
+        loop equations_to_join equations
+          { t with pending_vars; join_types; non_poison_uses }
     in
     loop equations_to_join Name_in_target_env.Map.empty t
 
-let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
-    joined_envs =
-  let _, joined_envs, joined_levels =
+let cut_and_n_way_join ?join_id ~n_way_join_type ~meet_type ~cut_after
+    target_env joined_envs =
+  let _, joined_uses, joined_envs, joined_levels =
     List.fold_left
-      (fun (discriminant, joined_envs, joined_levels) typing_env ->
+      (fun (discriminant, joined_uses, joined_envs, joined_levels)
+           (use_id, typing_env) ->
         let level = TE.cut typing_env ~cut_after in
         if Flambda_features.debug_flambda2 ()
         then (
@@ -1221,15 +1405,17 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
           Format.eprintf "%a@." TEL.print level;
           Format.eprintf "====================================@.");
         ( Index.succ discriminant,
+          Index.Map.add discriminant use_id joined_uses,
           Index.Map.add discriminant typing_env joined_envs,
           Index.Map.add discriminant level joined_levels ))
-      (Index.zero, Index.Map.empty, Index.Map.empty)
+      (Index.zero, Index.Map.empty, Index.Map.empty, Index.Map.empty)
       joined_envs
   in
   match
-    n_way_join_levels ~n_way_join_type
+    n_way_join_levels ~join_id ~n_way_join_type
       { join_aliases = Join_aliases.empty;
         join_types = Join_equations.empty;
+        non_poison_uses = Join_id.Map.empty;
         existential_vars = Variable.Map.empty;
         pending_vars = Variable_in_target_env.Map.empty;
         joined_envs;
@@ -1239,9 +1425,33 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
   with
   | Bottom ->
     (* Join of zero envs -- should possibly return bottom? *)
-    target_env
-  | Ok { demoted_in_target_env; extra_variables; equations; symbol_projections }
-    ->
+    target_env, Join_info.empty
+  | Ok
+      { demoted_in_target_env;
+        extra_variables;
+        equations;
+        known_at_uses;
+        symbol_projections
+      } ->
+    let known_values_at_uses =
+      Name_in_target_env.Map.map
+        (fun { known_uses; unknown_uses } ->
+          let known_at_uses =
+            Index.Map.data
+              (Index.Map.inter
+                 (fun _ use_id known_use -> use_id, known_use)
+                 joined_uses known_uses)
+          in
+          let unknown_at_uses =
+            Index.Map.data
+              (Index.Map.inter
+                 (fun _ use_id _unknown_use -> use_id)
+                 joined_uses unknown_uses)
+          in
+          { Join_info.known_at_uses; unknown_at_uses })
+        known_at_uses
+    in
+    let join_info = Join_info.create known_values_at_uses in
     let target_env =
       ME.map_typing_env target_env ~f:(fun target_env ->
           Variable.Map.fold
@@ -1277,7 +1487,7 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
               TE.add_symbol_projection target_env var symbol_projection)
             symbol_projections target_env)
     in
-    target_env
+    target_env, join_info
 
 let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
     =
@@ -1312,9 +1522,10 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
       envs_with_extensions
   in
   match
-    n_way_join_levels ~n_way_join_type
+    n_way_join_levels ~join_id:None ~n_way_join_type
       { join_aliases = t.join_aliases;
         join_types = t.join_types;
+        non_poison_uses = Join_id.Map.empty;
         existential_vars = t.existential_vars;
         pending_vars = Variable_in_target_env.Map.empty;
         joined_envs;
@@ -1323,8 +1534,13 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
       joined_levels
   with
   | Bottom -> Or_bottom.Bottom
-  | Ok { demoted_in_target_env; extra_variables; equations; symbol_projections }
-    ->
+  | Ok
+      { demoted_in_target_env;
+        extra_variables;
+        equations;
+        known_at_uses = _;
+        symbol_projections
+      } ->
     if not (Variable.Map.is_empty symbol_projections)
     then Misc.fatal_error "Unexpected symbol projections in env extension.";
     let joined_equations =
@@ -1397,7 +1613,7 @@ type env_id = Index.t
 type 'a join_arg = env_id * 'a
 
 let code_age_relation { target_env; _ } =
-    TE.code_age_relation (ME.typing_env target_env)
+  TE.code_age_relation (ME.typing_env target_env)
 
 let code_age_relation_resolver { target_env; _ } =
   TE.code_age_relation_resolver (ME.typing_env target_env)
