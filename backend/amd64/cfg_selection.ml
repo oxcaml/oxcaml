@@ -207,7 +207,7 @@ let pseudoregs_for_operation op arg res =
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
-      | Ipause | Ilfence | Isfence | Imfence
+      | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
@@ -353,7 +353,6 @@ let select_operation
     match func with
     | "caml_rdtsc_unboxed" -> Rewritten (specific Irdtsc, args)
     | "caml_rdpmc_unboxed" -> Rewritten (specific Irdpmc, args)
-    | "caml_pause_hint" -> Rewritten (specific Ipause, args)
     | "caml_load_fence" -> Rewritten (specific Ilfence, args)
     | "caml_store_fence" -> Rewritten (specific Isfence, args)
     | "caml_memory_fence" -> Rewritten (specific Imfence, args)

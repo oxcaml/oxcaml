@@ -205,7 +205,6 @@ type specific_operation =
   | Ilfence                            (* load fence *)
   | Isfence                            (* store fence *)
   | Imfence                            (* memory fence *)
-  | Ipause                             (* hint for spin-wait loops *)
   | Ipackf32                           (* UNPCKLPS on registers; see Cpackf32 *)
   | Isimd of Simd.operation            (* SIMD instruction set operations *)
   | Isimd_mem of Simd.Mem.operation * addressing_mode
@@ -340,8 +339,6 @@ let print_specific_operation printreg op ppf arg =
       Simd.print_operation printreg simd ppf arg
   | Isimd_mem (simd, addr) ->
       Simd.Mem.print_operation printreg (print_addressing printreg addr) simd ppf arg
-  | Ipause ->
-      fprintf ppf "pause"
   | Icldemote _ ->
       fprintf ppf "cldemote %a" printreg arg.(0)
   | Iprefetch { is_write; locality; _ } ->
@@ -367,7 +364,6 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Ipackf32 -> "packf32"
   | Isimd _simd -> "simd"
   | Isimd_mem (_simd,_addr) -> "simd_mem"
-  | Ipause -> "pause"
   | Icldemote _ -> "cldemote"
   | Iprefetch _ -> "prefetch"
 
@@ -383,7 +379,7 @@ let win64 =
 let operation_is_pure = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
   | Ifloatarithmem _  -> true
-  | Irdtsc | Irdpmc | Ipause
+  | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
   | Icldemote _ | Iprefetch _ -> false
@@ -395,7 +391,7 @@ let operation_is_pure = function
 let operation_allocates = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
   | Ifloatarithmem _
-  | Irdtsc | Irdpmc | Ipause | Ipackf32
+  | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
@@ -478,8 +474,6 @@ let equal_specific_operation left right =
     true
   | Imfence, Imfence ->
     true
-  | Ipause, Ipause ->
-    true
   | Ipackf32, Ipackf32 ->
     true
   | Icldemote x, Icldemote x' -> equal_addressing_mode x x'
@@ -494,7 +488,7 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
      Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-     Ipause | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
     false
 
 (* addressing mode functions *)
@@ -590,8 +584,6 @@ let isomorphic_specific_operation op1 op2 =
     true
   | Imfence, Imfence ->
     true
-  | Ipause, Ipause ->
-    true
   | Ipackf32, Ipackf32 ->
     true
   | Icldemote x, Icldemote x' -> equal_addressing_mode_without_displ x x'
@@ -605,6 +597,6 @@ let isomorphic_specific_operation op1 op2 =
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
-     Ipause | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
+     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
+    | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _), _ ->
     false

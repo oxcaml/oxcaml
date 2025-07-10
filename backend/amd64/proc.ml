@@ -592,7 +592,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32 | Ipause
+                  | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Pause)
   | Poptrap _ | Prologue ->
