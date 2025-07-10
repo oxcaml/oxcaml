@@ -1650,6 +1650,9 @@ let report_error env ppf =
         | Generic_optional _ -> "generic optional"
         | Labelled _ -> assert false )
   | Invalid_generic_optional_argument_module_path lid ->
+      (* CR generic-optional : Add Hint.
+        Hint: the specified module path should contain a submodule named <NAME>.
+      *)
       fprintf ppf
         "Invalid generic optional argument module path: %a"
         (Style.as_inline_code longident) lid

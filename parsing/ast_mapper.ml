@@ -157,7 +157,6 @@ module T = struct
 
   let map_labeled_tuple sub tl = List.map (map_snd (sub.typ sub)) tl
 
-
   let map sub {ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs} =
     let open Typ in
     let loc = sub.location sub loc in
