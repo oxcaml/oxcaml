@@ -1154,7 +1154,7 @@ let n_way_join_symbol_projections ~exists_in_target_env
 type t =
   { join_aliases : Join_aliases.t;
     join_types : Join_equations.t;
-    non_poison_uses : non_poison_uses Name_in_target_env.Map.t Join_id.Map.t;
+    non_poison_uses : non_poison_uses Name_in_target_env.Map.t;
     existential_vars : K.t Variable.Map.t;
     pending_vars : Simples_in_joined_envs.t Variable_in_target_env.Map.t;
     (* Existential variables that have been defined by their names in all the
@@ -1175,21 +1175,14 @@ type join_result =
     symbol_projections : Symbol_projection.t Variable.Map.t
   }
 
-let join_id_map_union f m1 m2 =
-  Join_id.Map.union (fun [@inline] key v1 v2 -> Some (f key v1 v2)) m1 m2
+let add_known_use name_in_target_env known_uses_of_name known_uses =
+  match (known_uses_of_name : _ Or_unknown.t) with
+  | Unknown -> known_uses
+  | Known known_uses_of_name ->
+    Name_in_target_env.Map.disjoint_union known_uses
+      (Name_in_target_env.Map.singleton name_in_target_env known_uses_of_name)
 
-let add_known_use join_id name_in_target_env known_uses_of_name known_uses =
-  match join_id, (known_uses_of_name : _ Or_unknown.t) with
-  | None, _ | _, Unknown -> known_uses
-  | Some join_id, Known known_uses_of_name ->
-    join_id_map_union
-      (fun _join_id known_uses1 known_uses2 ->
-        Name_in_target_env.Map.disjoint_union known_uses1 known_uses2)
-      known_uses
-      (Join_id.Map.singleton join_id
-         (Name_in_target_env.Map.singleton name_in_target_env known_uses_of_name))
-
-let n_way_join_levels ~join_id ~n_way_join_type t all_levels : _ Or_bottom.t =
+let n_way_join_levels ~join_id:_ ~n_way_join_type t all_levels : _ Or_bottom.t =
   let all_demotions, all_expanded_equations, all_symbol_projections =
     Index.Map.fold
       (fun index level
@@ -1276,8 +1269,7 @@ let n_way_join_levels ~join_id ~n_way_join_type t all_levels : _ Or_bottom.t =
               name_in_target_env canonicals kind join_types
           in
           let all_non_poison_uses =
-            add_known_use join_id name_in_target_env non_poison_uses
-              all_non_poison_uses
+            add_known_use name_in_target_env non_poison_uses all_non_poison_uses
           in
           join_types, all_non_poison_uses)
         demoted_in_some_envs
@@ -1332,19 +1324,11 @@ let n_way_join_levels ~join_id ~n_way_join_type t all_levels : _ Or_bottom.t =
             ~is_bound_strictly_earlier t.join_aliases t.joined_envs
             all_symbol_projections
         in
-        let known_at_uses =
-          match join_id with
-          | None -> Name_in_target_env.Map.empty
-          | Some join_id -> (
-            match Join_id.Map.find_opt join_id t.non_poison_uses with
-            | None -> Name_in_target_env.Map.empty
-            | Some known_at_uses -> known_at_uses)
-        in
         Or_bottom.Ok
           { demoted_in_target_env;
             extra_variables = t.existential_vars;
             equations;
-            known_at_uses;
+            known_at_uses = t.non_poison_uses;
             symbol_projections
           }
       else
@@ -1371,7 +1355,7 @@ let n_way_join_levels ~join_id ~n_way_join_type t all_levels : _ Or_bottom.t =
                   canonicals kind join_types
               in
               let known_uses =
-                add_known_use join_id
+                add_known_use
                   (Name_in_target_env.var var_in_target_env)
                   non_poison_uses known_uses
               in
@@ -1415,7 +1399,7 @@ let cut_and_n_way_join ?join_id ~n_way_join_type ~meet_type ~cut_after
     n_way_join_levels ~join_id ~n_way_join_type
       { join_aliases = Join_aliases.empty;
         join_types = Join_equations.empty;
-        non_poison_uses = Join_id.Map.empty;
+        non_poison_uses = Name_in_target_env.Map.empty;
         existential_vars = Variable.Map.empty;
         pending_vars = Variable_in_target_env.Map.empty;
         joined_envs;
@@ -1525,7 +1509,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
     n_way_join_levels ~join_id:None ~n_way_join_type
       { join_aliases = t.join_aliases;
         join_types = t.join_types;
-        non_poison_uses = Join_id.Map.empty;
+        non_poison_uses = Name_in_target_env.Map.empty;
         existential_vars = t.existential_vars;
         pending_vars = Variable_in_target_env.Map.empty;
         joined_envs;
