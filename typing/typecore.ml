@@ -10702,7 +10702,7 @@ let report_error ~loc env =
   | Apply_wrong_label (l, ty, extra_info) ->
       let print_label ppf = function
         | Nolabel -> fprintf ppf "without label"
-        |(Labelled _ | Optional _ ) as l ->
+        |(Labelled _ | Optional _) as l ->
             fprintf ppf "with label %a"
               Style.inline_code (prefixed_label_name l)
         | Position _ -> assert false
@@ -10865,7 +10865,7 @@ let report_error ~loc env =
       let label ~long ppf = function
         | Nolabel -> fprintf ppf "unlabeled"
         | Position l -> Style.inline_code ppf (sprintf "~(%s:[%%call_pos])" l)
-        | (Labelled _ | Optional _ ) as l ->
+        | (Labelled _ | Optional _) as l ->
             if long then
               fprintf ppf "labeled %a" Style.inline_code (prefixed_label_name l)
             else

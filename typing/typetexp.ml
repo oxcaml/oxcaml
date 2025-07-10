@@ -674,12 +674,18 @@ let transl_label (label : Parsetree.arg_label)
   | Generic_optional (mod_ident, l), _ -> (
     match Language_extension.is_enabled Generic_optional_arguments with
     | false ->
-      raise (Error (mod_ident.loc, Env.empty, Unsupported_extension Generic_optional_arguments));
+      raise
+        (Error (mod_ident.loc,
+                Env.empty,
+                Unsupported_extension Generic_optional_arguments));
     | true ->
     match mod_ident with
     | {txt=Longident.Ldot(Longident.Lident "Stdlib", "Option"); _} -> Optional l
     | {loc;txt} ->  (
-      raise (Error (loc, Env.empty, Invalid_generic_optional_argument_module_path txt))
+      raise
+        (Error (loc,
+                Env.empty,
+                Invalid_generic_optional_argument_module_path txt))
     )
   )
   | Nolabel, _ -> Nolabel
@@ -1634,7 +1640,8 @@ let report_error env ppf =
     fprintf ppf "@[%a isn't a class type.@ \
                  Did you mean the unboxed type %a?@]"
       (Style.as_inline_code longident) lid
-      (Style.as_inline_code (fun ppf lid -> fprintf ppf "%a#" longident lid)) lid
+      (Style.as_inline_code
+        (fun ppf lid -> fprintf ppf "%a#" longident lid)) lid
   | Invalid_label_for_call_pos arg_label ->
       fprintf ppf "A position argument must not be %s."
         (match arg_label with
