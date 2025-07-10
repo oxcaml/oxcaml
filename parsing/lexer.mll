@@ -622,6 +622,8 @@ rule token = parse
       { warn_latin1 lexbuf; LIDENT name }
   | uppercase identchar * as name
       { UIDENT name } (* No capitalized keywords *)
+  | uppercase identchar * as name "?"
+      { UIDENTQUESTION name }
   | uppercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; UIDENT name }
   (* This matches either an integer literal or a directive. If the text "#2"

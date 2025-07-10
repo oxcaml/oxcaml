@@ -1102,6 +1102,8 @@ let maybe_pmod_constraint mode expr =
 %token TRY                    "try"
 %token TYPE                   "type"
 %token <string> UIDENT        "UIdent" (* just an example *)
+%token <string>
+       UIDENTQUESTION         "UIdent?" (* just an example *)
 %token UNDERSCORE             "_"
 %token UNIQUE                 "unique_"
 %token VAL                    "val"
@@ -1169,7 +1171,6 @@ The precedences must be listed from low to high.
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
 %nonassoc prec_unary_minus prec_unary_plus /* unary - */
-%nonassoc prec_generic_optional     /* C?(x:t) vs C ?(x:t) */
 %nonassoc prec_constant_constructor     /* cf. simple_expr (C versus C x) */
 %nonassoc prec_constr_appl              /* above AS BAR COLONCOLON COMMA */
 %nonassoc below_HASH
@@ -2685,10 +2686,10 @@ labeled_simple_pattern:
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
       { (Optional (fst $2), None, snd $2) }
-  | mkrhs(mod_longident) QUESTION LPAREN label_let_pattern opt_default RPAREN %prec prec_generic_optional
-      { (generic_optional $1 (fst $4) $sloc, $5, (snd $4)) }
-  // | mkrhs(mod_longident) QUESTION label_var
-  //     { (generic_optional $1 (fst $3) $sloc, None, snd $3) }
+  | mkrhs(mod_longident_with_trailing_question) LPAREN label_let_pattern opt_default RPAREN
+      { (generic_optional $1 (fst $3) $sloc, $4, (snd $3)) }
+  | mkrhs(mod_longident_with_trailing_question) label_var
+      { (generic_optional $1 (fst $2) $sloc, None, snd $2) }
   | OPTLABEL LPAREN let_pattern opt_default RPAREN
       { (Optional $1, $4, $3) }
   | OPTLABEL pattern_var
@@ -3170,9 +3171,9 @@ labeled_simple_expr:
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
-  // | mod_path = mkrhs(mod_longident) QUESTION label = LIDENT
-  //     { let loc = $loc(label) in
-  //       (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
+  | mod_path = mkrhs(mod_longident_with_trailing_question) label = LIDENT
+      { let loc = $loc(label) in
+        (generic_optional mod_path label $sloc, mkexpvar ~loc label) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
   // | mkrhs(mod_longident) OPTLABEL simple_expr %prec below_HASH
@@ -5032,6 +5033,10 @@ type_unboxed_longident:
 
 mod_longident:
     mk_longident(mod_longident, UIDENT)  { $1 }
+;
+
+mod_longident_with_trailing_question:
+    mk_longident(mod_longident, UIDENTQUESTION)  { $1 }
 ;
 mod_ext_longident:
     mk_longident(mod_ext_longident, UIDENT) { $1 }
