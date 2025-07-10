@@ -1500,7 +1500,7 @@ The following syntaxes are tested
 
 module type S = sig
   val concat :
-    Stdlib.Option.?sep:string -> string Stdlib.List.t -> string
+    Stdlib.Option.?'sep:string -> string Stdlib.List.t -> string
 end
 
 [%%expect{|
@@ -1510,7 +1510,7 @@ module type S = sig val concat : ?sep:string -> string List.t -> string end
 
 (* Implementation *)
 module M : S = struct
-  let rec concat Stdlib.Option.?(sep : string = " ")
+  let rec concat Stdlib.Option.?'(sep : string = " ")
     (xs : string Stdlib.List.t) =
       String.concat sep xs
 end
@@ -1536,7 +1536,7 @@ val comma_concat : string List.t -> string = <fun>
 - : string = "x,y,z"
 |}]
 
-let comma_concat_2 zs = M.concat Stdlib.Option.?sep:(Some ",") zs ;;
+let comma_concat_2 zs = M.concat Stdlib.Option.?'sep:(Some ",") zs ;;
 comma_concat_2 ["x"; "y"; "z"] ;;
 
 [%%expect{|
@@ -1544,8 +1544,8 @@ val comma_concat_2 : string List.t -> string = <fun>
 - : string = "x,y,z"
 |}]
 
-let chain_call Stdlib.Option.?(sep : string option) arg =
-  M.concat Stdlib.Option.?sep arg ;;
+let chain_call Stdlib.Option.?'(sep : string option) arg =
+  M.concat Stdlib.Option.?'sep arg ;;
 chain_call ["x"; "y"; "z"] ;;
 
 [%%expect{|
@@ -1553,9 +1553,9 @@ val chain_call : ?sep:string -> string List.t -> string = <fun>
 - : string = "x y z"
 |}]
 
-let chain_call Stdlib.Option.?sep:(sep : string option) arg =
-  M.concat Stdlib.Option.?sep arg ;;
-chain_call Stdlib.Option.?sep:(Some ",") ["x"; "y"; "z"] ;;
+let chain_call Stdlib.Option.?'sep:(sep : string option) arg =
+  M.concat Stdlib.Option.?'sep arg ;;
+chain_call Stdlib.Option.?'sep:(Some ",") ["x"; "y"; "z"] ;;
 
 [%%expect{|
 val chain_call : ?sep:string -> string List.t -> string = <fun>

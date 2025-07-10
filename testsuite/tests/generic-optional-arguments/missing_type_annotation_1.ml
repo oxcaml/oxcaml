@@ -10,11 +10,11 @@
 
 (* Interface *)
 module type S = sig
-  val concat : Stdlib.Option.?sep:string -> string list -> string
+  val concat : Stdlib.Option.?'sep:string -> string list -> string
 end
 
 (* Implementation *)
 module M : S = struct
-let concat Stdlib.Option.?(sep=" ") xs =
+let concat Stdlib.Option.?'(sep=" ") xs =
   String.concat sep xs
 end
