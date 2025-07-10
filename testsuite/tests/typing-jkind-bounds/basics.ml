@@ -216,7 +216,7 @@ Error: The layout of type "a" is value
 type a : value mod global aliased many immutable stateless external_ unyielding non_float
 type b : value mod local unique once contended nonportable internal = a
 [%%expect{|
-type a : immediate
+type a : immediate64 mod external_
 type b = a
 |}]
 
@@ -279,8 +279,14 @@ type d : immediate = c
 [%%expect{|
 type a : immediate
 type b = a
-type c : immediate
-type d = c
+type c : immediate64 mod external_
+Line 4, characters 0-22:
+4 | type d : immediate = c
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immediate64 mod external_
+         because of the definition of c at line 3, characters 0-89.
+       But the kind of type "c" must be a subkind of immediate
+         because of the definition of d at line 4, characters 0-22.
 |}]
 
 type a : immediate64
@@ -301,7 +307,7 @@ type d : float64 = c
 [%%expect{|
 type a = float#
 type b = a
-type c : float64 mod everything
+type c : float64 mod global aliased many stateless immutable external_
 type d = c
 |}]
 
@@ -312,7 +318,7 @@ type d : float32 = c
 [%%expect{|
 type a = float32#
 type b = a
-type c : float32 mod everything
+type c : float32 mod global aliased many stateless immutable external_
 type d = c
 |}]
 
@@ -482,13 +488,7 @@ Error: The kind of type "t_value" is value
 
 type t : any mod portable = t_value
 [%%expect{|
-Line 1, characters 0-35:
-1 | type t : any mod portable = t_value
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t_value" is value
-         because of the definition of t_value at line 1, characters 0-20.
-       But the kind of type "t_value" must be a subkind of any mod portable
-         because of the definition of t at line 1, characters 0-35.
+type t = t_value
 |}]
 
 type t : any mod external_ = t_value
@@ -1279,7 +1279,7 @@ type ('a : bits32 mod aliased) t = ('a : any mod global)
 type ('a : value mod global aliased) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
-type ('a : immediate) t = 'a
+type ('a : immediate64 mod external_) t = 'a
 type 'a t = 'a
 type 'a t = 'a
 type ('a : bits32 mod global aliased) t = 'a

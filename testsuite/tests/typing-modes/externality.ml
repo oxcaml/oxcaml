@@ -2,6 +2,7 @@
  expect;
 *)
 
+
 let immediate_is_external () =
   let _x @ external_ = 3 in
   let _y @ external_ = 'a' in

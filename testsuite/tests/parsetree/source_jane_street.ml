@@ -983,9 +983,9 @@ let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
    (~x: 1, ~s: "a", ~y: 2, "ignore me")
 
 [%%expect{|
-val x0 : int @@ stateless = 1
+val x0 : int @@ stateless external_ = 1
 val s : string @@ stateless = "a"
-val y : int @@ stateless = 2
+val y : int @@ stateless external_ = 2
 |}]
 
 module M : sig
@@ -1021,9 +1021,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
-val x : int @@ stateless = 1
+val x : int @@ stateless external_ = 1
 val y : int = 2
-val x : int @@ stateless = 1
+val x : int @@ stateless external_ = 1
 val y : int = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
