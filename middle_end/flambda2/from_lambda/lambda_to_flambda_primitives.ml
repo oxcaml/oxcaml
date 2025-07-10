@@ -2726,8 +2726,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             _,
             _ )
       | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
-      | Patomic_load_field _ | Ppoke _
-        ),
+      | Patomic_load_field _ | Ppoke _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
