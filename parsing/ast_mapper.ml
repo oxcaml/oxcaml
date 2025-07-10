@@ -95,6 +95,13 @@ let map_opt f = function None -> None | Some x -> Some (f x)
 
 let map_loc sub {loc; txt} = {loc = sub.location sub loc; txt}
 
+let map_arg_label sub = function
+| Nolabel -> Nolabel
+| Labelled s -> Labelled s
+| Optional s -> Optional s
+| Generic_optional (module_path, s) ->
+    Generic_optional (map_loc sub module_path, s)
+
 module C = struct
   (* Constants *)
 
@@ -150,12 +157,6 @@ module T = struct
 
   let map_labeled_tuple sub tl = List.map (map_snd (sub.typ sub)) tl
 
-  let map_arg_label sub = function
-  | Nolabel -> Nolabel
-  | Labelled s -> Labelled s
-  | Optional s -> Optional s
-  | Generic_optional (module_path, s) ->
-      Generic_optional (map_loc sub module_path, s)
 
   let map sub {ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs} =
     let open Typ in
@@ -303,7 +304,8 @@ module CT = struct
         constr ~loc ~attrs (map_loc sub lid) (List.map (sub.typ sub) tys)
     | Pcty_signature x -> signature ~loc ~attrs (sub.class_signature sub x)
     | Pcty_arrow (lab, t, ct) ->
-        arrow ~loc ~attrs lab (sub.typ sub t) (sub.class_type sub ct)
+        arrow ~loc ~attrs (map_arg_label sub lab)
+          (sub.typ sub t) (sub.class_type sub ct)
     | Pcty_extension x -> extension ~loc ~attrs (sub.extension sub x)
     | Pcty_open (o, ct) ->
         open_ ~loc ~attrs (sub.open_description sub o) (sub.class_type sub ct)
@@ -475,7 +477,10 @@ module E = struct
     let desc =
       match desc with
       | Pparam_val (label, def, pat) ->
-          Pparam_val (label, Option.map (sub.expr sub) def, sub.pat sub pat)
+          Pparam_val (map_arg_label sub label
+                     , Option.map (sub.expr sub) def
+                     , sub.pat sub pat
+                     )
       | Pparam_newtype (newtype, jkind) ->
           Pparam_newtype
             ( map_loc sub newtype
@@ -548,7 +553,8 @@ module E = struct
         (map_function_constraint sub c)
         (map_function_body sub b)
     | Pexp_apply (e, l) ->
-        apply ~loc ~attrs (sub.expr sub e) (List.map (map_snd (sub.expr sub)) l)
+        apply ~loc ~attrs (sub.expr sub e)
+          (List.map (fun (lab, e) -> (map_arg_label sub lab, sub.expr sub e)) l)
     | Pexp_match (e, pel) ->
         match_ ~loc ~attrs (sub.expr sub e) (sub.cases sub pel)
     | Pexp_try (e, pel) -> try_ ~loc ~attrs (sub.expr sub e) (sub.cases sub pel)
@@ -698,13 +704,13 @@ module CE = struct
     | Pcl_structure s ->
         structure ~loc ~attrs (sub.class_structure sub s)
     | Pcl_fun (lab, e, p, ce) ->
-        fun_ ~loc ~attrs lab
+        fun_ ~loc ~attrs (map_arg_label sub lab)
           (map_opt (sub.expr sub) e)
           (sub.pat sub p)
           (sub.class_expr sub ce)
     | Pcl_apply (ce, l) ->
         apply ~loc ~attrs (sub.class_expr sub ce)
-          (List.map (map_snd (sub.expr sub)) l)
+          (List.map (fun (lab, e) -> (map_arg_label sub lab, sub.expr sub e)) l)
     | Pcl_let (r, vbs, ce) ->
         let_ ~loc ~attrs r (List.map (sub.value_binding sub) vbs)
           (sub.class_expr sub ce)
