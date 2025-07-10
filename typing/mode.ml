@@ -1576,6 +1576,9 @@ module S = Solver
 let solver_error_to_serror : 'a S.error -> 'a serror =
  fun { left; left_hint = _; right; right_hint = _ } -> { left; right }
 
+let flip_and_solver_error_to_serror : 'a S.error -> 'a serror =
+ fun { left; left_hint = _; right; right_hint = _ } -> { right; left }
+
 type monadic = C.monadic =
   { uniqueness : C.Uniqueness.t;
     contention : C.Contention.t;
@@ -1743,18 +1746,6 @@ module Monadic_gen (Obj : Obj) = struct
 
   type (_, _, 'd) sided = 'd t
 
-  let flip_error =
-    let open Solver in
-    function
-    | Ok _ as r -> r
-    | Error { left; left_hint; right; right_hint } ->
-      Error
-        { left = right;
-          left_hint = right_hint;
-          right = left;
-          right_hint = left_hint
-        }
-
   let disallow_right m = Solver.disallow_left m
 
   let disallow_left m = Solver.disallow_right m
@@ -1773,10 +1764,11 @@ module Monadic_gen (Obj : Obj) = struct
 
   let newvar_below m = Solver.newvar_above obj m
 
-  let submode_log a b ~log = Solver.submode obj b a ~log |> flip_error
+  let submode_log a b ~log =
+    Solver.submode obj b a ~log
+    |> Result.map_error flip_and_solver_error_to_serror
 
-  let submode a b =
-    try_with_log (submode_log a b) |> Result.map_error solver_error_to_serror
+  let submode a b = try_with_log (submode_log a b)
 
   let join l = Solver.meet obj l
 
@@ -1784,10 +1776,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
 
-  let equate a b =
-    try_with_log (equate_from_submode submode_log a b)
-    |> Result.map_error (fun (eq_step, err) ->
-           eq_step, solver_error_to_serror err)
+  let equate a b = try_with_log (equate_from_submode submode_log a b)
 
   let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
@@ -2279,7 +2268,7 @@ module Monadic = struct
   let submode_log m0 m1 ~log : _ result =
     match submode_log m0 m1 ~log with
     | Ok () -> Ok ()
-    | Error e -> Error (e |> solver_error_to_serror |> axis_of_error)
+    | Error e -> Error (e |> axis_of_error)
 
   let submode a b = try_with_log (submode_log a b)
 
