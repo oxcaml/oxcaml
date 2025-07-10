@@ -1013,7 +1013,6 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKETPERCENTPERCENT "[%%"
 %token LESS                   "<"
 %token LESSLBRACKET           "<["
-%token LESSLBRACKETCOLON      "<[:"
 %token LESSMINUS              "<-"
 %token LET                    "let"
 %token <string> LIDENT        "lident" (* just an example *)
@@ -1050,6 +1049,7 @@ let maybe_pmod_constraint mode expr =
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
+%token RBRACKETGREATER        "]>"
 %token REC                    "rec"
 %token RPAREN                 ")"
 %token SEMI                   ";"
@@ -1151,7 +1151,7 @@ The precedences must be listed from low to high.
 /* Finally, the first tokens of simple_expr are above everything else. */
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT HASH_FLOAT INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET LESSLBRACKETCOLON DOLLAR
+          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
 
 
@@ -3113,10 +3113,10 @@ comprehension_clause:
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
         Pexp_open(od, modexp) }
-  | LESSLBRACKET error
-      { quotation_reserved "<<" $loc($1) }
-  | LESSLBRACKETCOLON error
-      { quotation_reserved "<<:" $loc($1) }
+  | LESSLBRACKET expr_semi_list RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  | LESSLBRACKET expr_semi_list error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
   | DOLLAR error
       { quotation_reserved "$" $loc($1) }
   | mod_longident DOT
@@ -4738,27 +4738,33 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
+  | LESSLBRACKET atomic_type RBRACKETGREATER
+      { quotation_reserved "<[" $loc($1) }
+  | LESSLBRACKET atomic_type error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
+  | DOLLAR error
+      { quotation_reserved "$" $loc($1) }
 
 
 (* This is the syntax of the actual type parameters in an application of
-   a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
-   We allow one of the following:
-   - zero parameters;
-   - one parameter:
-     an atomic type;
-     among other things, this can be an arbitrary type between parentheses;
-   - two or more parameters:
-     arbitrary types, between parentheses, separated with commas.
- *)
+a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
+We allow one of the following:
+- zero parameters;
+- one parameter:
+an atomic type;
+among other things, this can be an arbitrary type between parentheses;
+- two or more parameters:
+arbitrary types, between parentheses, separated with commas.
+*)
 %inline actual_type_parameters:
   | /* empty */
-      { [] }
+    { [] }
   | ty = atomic_type
-      { [ ty ] }
+    { [ ty ] }
   | LPAREN
-    tys = separated_nontrivial_llist(COMMA, one_type_parameter_of_several)
-    RPAREN
-      { tys }
+tys = separated_nontrivial_llist(COMMA, one_type_parameter_of_several)
+RPAREN
+    { tys }
 
 (* Layout annotations on type expressions typically require parens, as in [('a :
    float64)].  But this is unnecessary when the type expression is used as the

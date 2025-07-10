@@ -762,7 +762,6 @@ rule token = parse
   | ";;" { SEMISEMI }
   | "<"  { LESS }
   | "<[" { LESSLBRACKET }
-  | "<[:" { LESSLBRACKETCOLON }
   | "<-" { LESSMINUS }
   | "="  { EQUAL }
   | "["  { LBRACKET }
@@ -771,6 +770,7 @@ rule token = parse
   | "[<" { LBRACKETLESS }
   | "[>" { LBRACKETGREATER }
   | "]"  { RBRACKET }
+  | "]>" { RBRACKETGREATER }
   | "{"  { LBRACE }
   | "{<" { LBRACELESS }
   | "|"  { BAR }
