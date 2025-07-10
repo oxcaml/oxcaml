@@ -11204,7 +11204,7 @@ let report_error ~loc env =
           let lbl =
             match lbl with
             | Nolabel -> "_"
-            | Labelled s | Optional s | Position s  -> s
+            | Labelled s | Optional s | Position s -> s
           in
           [Location.msg
              "@[Hint: Try splitting the application in two. The arguments that come@ \
