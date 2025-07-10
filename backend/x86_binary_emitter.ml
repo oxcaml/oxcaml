@@ -918,9 +918,9 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let rm_only () =
     match args with
-    | [| src |] ->
-      (match enc 0  with
-      | RM_rm -> src
+    | [| dst |] ->
+      (match enc 0 with
+      | RM_rm -> dst
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
@@ -933,8 +933,16 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
+  let rm_vexv () =
+    match args with
+    | [| src; dst |] ->
+      (match enc 1, enc 0 with
+      | RM_rm, Vex_v -> src, rd_of_reg dst
+      | Vex_v, RM_rm -> dst, rd_of_reg src
+      | _ -> failwith instr.mnemonic)
+    | _ -> failwith instr.mnemonic
+  in
   let rm_vexv_reg () =
-    (* CR-soon mslater: more configs for AVX *)
     match args with
     | [| src; dst |] ->
       (match enc 1, enc 0 with
@@ -944,6 +952,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | [| src2; src1; dst |] ->
       (match enc 2, enc 1, enc 0 with
       | RM_rm, Vex_v, RM_r -> src2, rd_of_reg src1, rd_of_reg dst
+      | RM_r, Vex_v, RM_rm -> dst, rd_of_reg src1, rd_of_reg src2
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
@@ -988,10 +997,13 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     let rm, vex_v, reg = rm_vexv_reg () in
     emit_vex_rm_reg b [instr.enc.opcode] rm reg
       ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p)
-  (* CR-soon mslater: more configs for AVX *)
-  | _ -> failwith instr.mnemonic);
+  | Spec rmod, Vex { vex_m; vex_w; vex_l; vex_p } ->
+    let rm, vex_v = rm_vexv () in
+    emit_vex_rm_reg b [instr.enc.opcode] rm rmod
+      ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p));
   match imm with
   | Some (Imm imm) -> buf_int8 b (Int64.to_int imm)
+  | Some (Regf (XMM n | YMM n | ZMM n)) -> buf_int8 b (n lsl 4)
   | Some _ -> failwith instr.mnemonic
   | None -> ()
 

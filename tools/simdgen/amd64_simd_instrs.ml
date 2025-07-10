@@ -10,9 +10,10 @@ type id =
   | Pslld_X_Xm128
   | Pmulhw
   | Pcmpeqd
+  | Movq_r64m64_X
   | Vpsubq_Y_Y_Ym256
+  | Vphsubsw_Y_Y_Ym256
   | Vdivss
-  | Vmovq_X_r64m64
   | Subpd
   | Psignb_M_Mm64
   | Vpcmpgtb_X_X_Xm128
@@ -130,6 +131,7 @@ type id =
   | Phaddw_X_Xm128
   | Vpmuldq_X_X_Xm128
   | Pmaxsw_X_Xm128
+  | Vpinsrb
   | Movdqa_X_Xm128
   | Vpsrlq_Y_Y
   | Psignd_M_Mm64
@@ -174,16 +176,15 @@ type id =
   | Vcvtpd2ps_X_Xm128
   | Vpsubusb_X_X_Xm128
   | Vpmuludq_X_X_Xm128
+  | Movd_r32m32_X
   | Cvtss2si_r32_Xm32
   | Vmaxsd
   | Pextrb
-  | Vpinsrw
   | Vblendvps_Y_Y_Ym256_Y
   | Vblendvps_X_X_Xm128_X
   | Pmovsxbd
   | Mpsadbw
   | Vpmovsxbq_X_Xm16
-  | Vpinsrd
   | Cvtdq2pd
   | Vphaddsw_Y_Y_Ym256
   | Vpsrlq_X_X
@@ -196,7 +197,6 @@ type id =
   | Movupd_Xm128_X
   | Vpmaxsw_X_X_Xm128
   | Pcmpistrm
-  | Vmovd_X_r32m32
   | Movdqu_X_Xm128
   | Blendvpd
   | Vmovsldup_Y_Ym256
@@ -210,15 +210,17 @@ type id =
   | Vcvtsi2ss_X_X_r64m64
   | Vcvtsi2ss_X_X_r32m32
   | Psignb_X_Xm128
+  | Vmovq_X_r64m64
+  | Vphsubd_X_X_Xm128
   | Mulss
   | Vpunpckhdq_Y_Y_Ym256
   | Vtestps_Y_Ym256
   | Vtestps_X_Xm128
-  | Vpinsrq
   | Vmaskmovps_Y_Y_m256
   | Vmaskmovps_X_X_m128
   | Pmaddubsw_X_Xm128
   | Vzeroupper
+  | Vpinsrq
   | Pminsw_M_Mm64
   | Vpackssdw_Y_Y_Ym256
   | Vmovlps_X_X_m64
@@ -293,18 +295,17 @@ type id =
   | Vpaddb_X_X_Xm128
   | Vpunpcklbw_X_X_Xm128
   | Sqrtpd
-  | Vmovhlps
   | Vmovaps_Ym256_Y
   | Vmovaps_Xm128_X
   | Pavgb_M_Mm64
   | Vpmovzxwq_X_Xm32
-  | Vphsubsw_Y_Y_Ym256
   | Vucomiss
   | Vminss
   | Vcvtdq2pd_Y_Xm128
   | Vcvtdq2pd_X_Xm64
   | Vmovhps_m64_X
   | Psrad_X_Xm128
+  | Vphsubsw_X_X_Xm128
   | Vpslldq_X_X
   | Pmovzxbw
   | Vpextrw_r64_X
@@ -420,6 +421,7 @@ type id =
   | Vpsubsw_X_X_Xm128
   | Vcmpsd
   | Pavgb_X_Xm128
+  | Vmovhlps
   | Vorps_Y_Y_Ym256
   | Vorps_X_X_Xm128
   | Pmaddubsw_M_Mm64
@@ -519,7 +521,6 @@ type id =
   | Vperm2f128
   | Unpckhpd
   | Orps
-  | Vpinsrb
   | Vpaddusw_X_X_Xm128
   | Phsubw_M_Mm64
   | Vpcmpeqq_X_X_Xm128
@@ -536,17 +537,19 @@ type id =
   | Vpshufd_X_Xm128
   | Pinsrd
   | Pcmpestrm
+  | Vmovd_X_r32m32
   | Pmuldq
   | Paddq
   | Vmovlpd_m64_X
   | Blendvps
   | Vpminsw_X_X_Xm128
+  | Vpinsrw
   | Vpminub_Y_Y_Ym256
   | Pcmpeqb
   | Movups_X_Xm128
-  | Movd_X_r32m32
   | Pmovmskb_r64_X
   | Pminsd
+  | Vmovd_r32m32_X
   | Packssdw
   | Vperm2i128
   | Vpmaddubsw_Y_Y_Ym256
@@ -574,6 +577,7 @@ type id =
   | Vpsrlvd_X_X_Xm128
   | Unpckhps
   | Pminub_M_Mm64
+  | Vmovq_r64m64_X
   | Vaddsd
   | Shufpd
   | Vmovss_X_X_X
@@ -584,7 +588,6 @@ type id =
   | Vpsrldq_Y_Y
   | Vpunpckhqdq_X_X_Xm128
   | Cvtsi2sd_X_r64m64
-  | Vphsubw_Y_Y_Ym256
   | Vxorpd_Y_Y_Ym256
   | Vxorpd_X_X_Xm128
   | Vcomiss
@@ -597,6 +600,7 @@ type id =
   | Vpmaddwd_X_X_Xm128
   | Vpsrlw_X_X_Xm128
   | Rorx_r64_r64m64
+  | Vmovlhps
   | Vpmullw_Y_Y_Ym256
   | Vpaddw_Y_Y_Ym256
   | Pxor
@@ -637,10 +641,11 @@ type id =
   | Vpmovsxwd_X_Xm64
   | Cvttss2si_r64_Xm32
   | Movlpd_m64_X
-  | Vphsubd_X_X_Xm128
   | Vpxor_X_X_Xm128
   | Pmovzxbd
+  | Vphsubd_Y_Y_Ym256
   | Mulps
+  | Vphsubw_Y_Y_Ym256
   | Pabsd_M_Mm64
   | Movsldup
   | Movaps_X_Xm128
@@ -669,6 +674,7 @@ type id =
   | Movhpd_m64_X
   | Psllq_X_Xm128
   | Vpclmulqdq
+  | Vphsubw_X_X_Xm128
   | Vpsllq_Y_Y_Xm128
   | Vpblendvb_Y_Y_Ym256_Y
   | Pminub_X_Xm128
@@ -685,7 +691,6 @@ type id =
   | Vpmaskmovq_m128_X_X
   | Vpcmpistri
   | Vpshufb_Y_Y_Ym256
-  | Vphsubw_X_X_Xm128
   | Pmovsxwq
   | Movupd_X_Xm128
   | Vpackuswb_X_X_Xm128
@@ -715,6 +720,7 @@ type id =
   | Vsqrtpd_X_Xm128
   | Vpsubb_Y_Y_Ym256
   | Pextrq
+  | Vpinsrd
   | Vpmulld_X_X_Xm128
   | Pinsrq
   | Haddps
@@ -736,7 +742,6 @@ type id =
   | Cvtpd2ps
   | Pshufb_X_Xm128
   | Vpcmpeqb_X_X_Xm128
-  | Vmovlhps
   | Vcvtps2dq_Y_Ym256
   | Vcvtps2dq_X_Xm128
   | Sqrtps
@@ -783,7 +788,6 @@ type id =
   | Pcmpgtw
   | Paddusb
   | Packuswb
-  | Vphsubd_Y_Y_Ym256
   | Vpmaxub_Y_Y_Ym256
   | Cmpps
   | Cvttsd2si_r32_Xm64
@@ -791,7 +795,6 @@ type id =
   | Vpcmpgtb_Y_Y_Ym256
   | Vhsubpd_Y_Y_Ym256
   | Vhsubpd_X_X_Xm128
-  | Vphsubsw_X_X_Xm128
   | Pextrw_r64_X
   | Por
   | Pext_r64_r64_r64m64
@@ -822,6 +825,7 @@ type id =
   | Psubb
   | Vpabsw_X_Xm128
   | Vpsubusw_Y_Y_Ym256
+  | Movd_X_r32m32
   | Pmuludq_X_Xm128
   | Pmulld
   | Haddpd
@@ -912,6 +916,15 @@ let pcmpeqd = {
   ; mnemonic = "pcmpeqd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 118 }
 }
+let movq_r64m64_X = {
+    id = Movq_r64m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res { loc = Temp [|R64;M64|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movq"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+}
 let vpsubq_Y_Y_Ym256 = {
     id = Vpsubq_Y_Y_Ym256
   ; ext = [|AVX2|]
@@ -921,6 +934,15 @@ let vpsubq_Y_Y_Ym256 = {
   ; mnemonic = "vpsubq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 251 }
 }
+let vphsubsw_Y_Y_Ym256 = {
+    id = Vphsubsw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|YMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vphsubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 7 }
+}
 let vdivss = {
     id = Vdivss
   ; ext = [|AVX|]
@@ -929,15 +951,6 @@ let vdivss = {
   ; imm = Imm_none
   ; mnemonic = "vdivss"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_F3 }; rm_reg = Reg; opcode = 94 }
-}
-let vmovq_X_r64m64 = {
-    id = Vmovq_X_r64m64
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = Imm_none
-  ; mnemonic = "vmovq"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 126 }
 }
 let subpd = {
     id = Subpd
@@ -1992,6 +2005,15 @@ let pmaxsw_X_Xm128 = {
   ; mnemonic = "pmaxsw"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
 }
+let vpinsrb = {
+    id = Vpinsrb
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M8|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrb"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 32 }
+}
 let movdqa_X_Xm128 = {
     id = Movdqa_X_Xm128
   ; ext = [|SSE2|]
@@ -2388,6 +2410,15 @@ let vpmuludq_X_X_Xm128 = {
   ; mnemonic = "vpmuludq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 244 }
 }
+let movd_r32m32_X = {
+    id = Movd_r32m32_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res { loc = Temp [|R32;M32|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+}
 let cvtss2si_r32_Xm32 = {
     id = Cvtss2si_r32_Xm32
   ; ext = [|SSE2|]
@@ -2414,15 +2445,6 @@ let pextrb = {
   ; imm = Imm_spec
   ; mnemonic = "pextrb"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 20 }
-}
-let vpinsrw = {
-    id = Vpinsrw
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_spec
-  ; mnemonic = "vpinsrw"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 196 }
 }
 let vblendvps_Y_Y_Ym256_Y = {
     id = Vblendvps_Y_Y_Ym256_Y
@@ -2468,15 +2490,6 @@ let vpmovsxbq_X_Xm16 = {
   ; imm = Imm_none
   ; mnemonic = "vpmovsxbq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
-}
-let vpinsrd = {
-    id = Vpinsrd
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_spec
-  ; mnemonic = "vpinsrd"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
 }
 let cvtdq2pd = {
     id = Cvtdq2pd
@@ -2585,15 +2598,6 @@ let pcmpistrm = {
   ; imm = Imm_spec
   ; mnemonic = "pcmpistrm"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 98 }
-}
-let vmovd_X_r32m32 = {
-    id = Vmovd_X_r32m32
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = Imm_none
-  ; mnemonic = "vmovd"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 126 }
 }
 let movdqu_X_Xm128 = {
     id = Movdqu_X_Xm128
@@ -2721,6 +2725,15 @@ let vmovq_X_r64m64 = {
   ; mnemonic = "vmovq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 110 }
 }
+let vphsubd_X_X_Xm128 = {
+    id = Vphsubd_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vphsubd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
+}
 let mulss = {
     id = Mulss
   ; ext = [|SSE|]
@@ -2757,15 +2770,6 @@ let vtestps_X_Xm128 = {
   ; mnemonic = "vtestps"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
 }
-let vpinsrq = {
-    id = Vpinsrq
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_spec
-  ; mnemonic = "vpinsrq"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
-}
 let vmaskmovps_Y_Y_m256 = {
     id = Vmaskmovps_Y_Y_m256
   ; ext = [|AVX|]
@@ -2801,6 +2805,15 @@ let vzeroupper = {
   ; imm = Imm_none
   ; mnemonic = "vzeroupper"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 119 }
+}
+let vpinsrq = {
+    id = Vpinsrq
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
 }
 let pminsw_M_Mm64 = {
     id = Pminsw_M_Mm64
@@ -3477,15 +3490,6 @@ let sqrtpd = {
   ; mnemonic = "sqrtpd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
 }
-let vmovhlps = {
-    id = Vmovhlps
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vmovhlps"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 18 }
-}
 let vmovaps_Ym256_Y = {
     id = Vmovaps_Ym256_Y
   ; ext = [|AVX|]
@@ -3521,15 +3525,6 @@ let vpmovzxwq_X_Xm32 = {
   ; imm = Imm_none
   ; mnemonic = "vpmovzxwq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 52 }
-}
-let vphsubsw_Y_Y_Ym256 = {
-    id = Vphsubsw_Y_Y_Ym256
-  ; ext = [|AVX2|]
-  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vphsubsw"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 7 }
 }
 let vucomiss = {
     id = Vucomiss
@@ -3584,6 +3579,15 @@ let psrad_X_Xm128 = {
   ; imm = Imm_none
   ; mnemonic = "psrad"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 226 }
+}
+let vphsubsw_X_X_Xm128 = {
+    id = Vphsubsw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vphsubsw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 7 }
 }
 let vpslldq_X_X = {
     id = Vpslldq_X_X
@@ -4620,6 +4624,15 @@ let pavgb_X_Xm128 = {
   ; mnemonic = "pavgb"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
 }
+let vmovhlps = {
+    id = Vmovhlps
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vmovhlps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 18 }
+}
 let vorps_Y_Y_Ym256 = {
     id = Vorps_Y_Y_Ym256
   ; ext = [|AVX|]
@@ -5547,15 +5560,6 @@ let orps = {
   ; mnemonic = "orps"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
 }
-let vpinsrb = {
-    id = Vpinsrb
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M8|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_spec
-  ; mnemonic = "vpinsrb"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 32 }
-}
 let vpaddusw_X_X_Xm128 = {
     id = Vpaddusw_X_X_Xm128
   ; ext = [|AVX|]
@@ -5754,6 +5758,15 @@ let vpminsw_X_X_Xm128 = {
   ; mnemonic = "vpminsw"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 234 }
 }
+let vpinsrw = {
+    id = Vpinsrw
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M16|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 196 }
+}
 let vpminub_Y_Y_Ym256 = {
     id = Vpminub_Y_Y_Ym256
   ; ext = [|AVX2|]
@@ -5781,15 +5794,6 @@ let movups_X_Xm128 = {
   ; mnemonic = "movups"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
 }
-let movd_X_r32m32 = {
-    id = Movd_X_r32m32
-  ; ext = [|SSE2|]
-  ; args = [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = Imm_none
-  ; mnemonic = "movd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
-}
 let pmovmskb_r64_X = {
     id = Pmovmskb_r64_X
   ; ext = [|SSE2|]
@@ -5807,6 +5811,15 @@ let pminsd = {
   ; imm = Imm_none
   ; mnemonic = "pminsd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 57 }
+}
+let vmovd_r32m32_X = {
+    id = Vmovd_r32m32_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res { loc = Temp [|R32;M32|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "vmovd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 126 }
 }
 let packssdw = {
     id = Packssdw
@@ -6051,6 +6064,15 @@ let pminub_M_Mm64 = {
   ; mnemonic = "pminub"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
 }
+let vmovq_r64m64_X = {
+    id = Vmovq_r64m64_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res { loc = Temp [|R64;M64|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "vmovq"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = true; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 126 }
+}
 let vaddsd = {
     id = Vaddsd
   ; ext = [|AVX|]
@@ -6140,15 +6162,6 @@ let cvtsi2sd_X_r64m64 = {
   ; imm = Imm_none
   ; mnemonic = "cvtsi2sd"
   ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
-}
-let vphsubw_Y_Y_Ym256 = {
-    id = Vphsubw_Y_Y_Ym256
-  ; ext = [|AVX2|]
-  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vphsubw"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
 }
 let vxorpd_Y_Y_Ym256 = {
     id = Vxorpd_Y_Y_Ym256
@@ -6257,6 +6270,15 @@ let rorx_r64_r64m64 = {
   ; imm = Imm_spec
   ; mnemonic = "rorx"
   ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = true; vex_l = false; vex_p = Prx_F2 }; rm_reg = Reg; opcode = 240 }
+}
+let vmovlhps = {
+    id = Vmovlhps
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vmovlhps"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 22 }
 }
 let vpmullw_Y_Y_Ym256 = {
     id = Vpmullw_Y_Y_Ym256
@@ -6618,15 +6640,6 @@ let movlpd_m64_X = {
   ; mnemonic = "movlpd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
 }
-let vphsubd_X_X_Xm128 = {
-    id = Vphsubd_X_X_Xm128
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vphsubd"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
-}
 let vpxor_X_X_Xm128 = {
     id = Vpxor_X_X_Xm128
   ; ext = [|AVX|]
@@ -6645,6 +6658,15 @@ let pmovzxbd = {
   ; mnemonic = "pmovzxbd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 49 }
 }
+let vphsubd_Y_Y_Ym256 = {
+    id = Vphsubd_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|YMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vphsubd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
+}
 let mulps = {
     id = Mulps
   ; ext = [|SSE|]
@@ -6653,6 +6675,15 @@ let mulps = {
   ; imm = Imm_none
   ; mnemonic = "mulps"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+}
+let vphsubw_Y_Y_Ym256 = {
+    id = Vphsubw_Y_Y_Ym256
+  ; ext = [|AVX2|]
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|YMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vphsubw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
 }
 let pabsd_M_Mm64 = {
     id = Pabsd_M_Mm64
@@ -6906,6 +6937,15 @@ let vpclmulqdq = {
   ; mnemonic = "vpclmulqdq"
   ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 68 }
 }
+let vphsubw_X_X_Xm128 = {
+    id = Vphsubw_X_X_Xm128
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_none
+  ; mnemonic = "vphsubw"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
+}
 let vpsllq_Y_Y_Xm128 = {
     id = Vpsllq_Y_Y_Xm128
   ; ext = [|AVX2|]
@@ -7050,15 +7090,6 @@ let vpshufb_Y_Y_Ym256 = {
   ; mnemonic = "vpshufb"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 0 }
 }
-let vphsubw_X_X_Xm128 = {
-    id = Vphsubw_X_X_Xm128
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vphsubw"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 5 }
-}
 let pmovsxwq = {
     id = Pmovsxwq
   ; ext = [|SSE4_1|]
@@ -7184,15 +7215,6 @@ let vpandn_X_X_Xm128 = {
   ; imm = Imm_none
   ; mnemonic = "vpandn"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 223 }
-}
-let movq_X_r64m64 = {
-    id = Movq_X_r64m64
-  ; ext = [|SSE2|]
-  ; args = [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
-  ; imm = Imm_none
-  ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
 }
 let vpabsd_Y_Ym256 = {
     id = Vpabsd_Y_Ym256
@@ -7337,6 +7359,15 @@ let pextrq = {
   ; imm = Imm_spec
   ; mnemonic = "pextrq"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
+}
+let vpinsrd = {
+    id = Vpinsrd
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
+  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; imm = Imm_spec
+  ; mnemonic = "vpinsrd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F3A; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 34 }
 }
 let vpmulld_X_X_Xm128 = {
     id = Vpmulld_X_X_Xm128
@@ -7526,15 +7557,6 @@ let vpcmpeqb_X_X_Xm128 = {
   ; imm = Imm_none
   ; mnemonic = "vpcmpeqb"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 116 }
-}
-let vmovlhps = {
-    id = Vmovlhps
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vmovlhps"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 22 }
 }
 let vcvtps2dq_Y_Ym256 = {
     id = Vcvtps2dq_Y_Ym256
@@ -7950,15 +7972,6 @@ let packuswb = {
   ; mnemonic = "packuswb"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 103 }
 }
-let vphsubd_Y_Y_Ym256 = {
-    id = Vphsubd_Y_Y_Ym256
-  ; ext = [|AVX2|]
-  ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vphsubd"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 6 }
-}
 let vpmaxub_Y_Y_Ym256 = {
     id = Vpmaxub_Y_Y_Ym256
   ; ext = [|AVX2|]
@@ -8021,15 +8034,6 @@ let vhsubpd_X_X_Xm128 = {
   ; imm = Imm_none
   ; mnemonic = "vhsubpd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 125 }
-}
-let vphsubsw_X_X_Xm128 = {
-    id = Vphsubsw_X_X_Xm128
-  ; ext = [|AVX|]
-  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
-  ; imm = Imm_none
-  ; mnemonic = "vphsubsw"
-  ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 7 }
 }
 let pextrw_r64_X = {
     id = Pextrw_r64_X

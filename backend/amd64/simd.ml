@@ -78,6 +78,7 @@ module Seq = struct
     | Roundss
     | Roundsd
     | Pcompare_string of Pcompare_string.t
+    | Vpcompare_string of Pcompare_string.t
 
   type nonrec t =
     { id : id;
@@ -122,6 +123,36 @@ module Seq = struct
   let pcmpistrz =
     { id = Pcompare_string Pcmpistrz; instr = Amd64_simd_instrs.pcmpistri }
 
+  let vpcmpestra =
+    { id = Vpcompare_string Pcmpestra; instr = Amd64_simd_instrs.vpcmpestri }
+
+  let vpcmpestrc =
+    { id = Vpcompare_string Pcmpestrc; instr = Amd64_simd_instrs.vpcmpestri }
+
+  let vpcmpestro =
+    { id = Vpcompare_string Pcmpestro; instr = Amd64_simd_instrs.vpcmpestri }
+
+  let vpcmpestrs =
+    { id = Vpcompare_string Pcmpestrs; instr = Amd64_simd_instrs.vpcmpestri }
+
+  let vpcmpestrz =
+    { id = Vpcompare_string Pcmpestrz; instr = Amd64_simd_instrs.vpcmpestri }
+
+  let vpcmpistra =
+    { id = Vpcompare_string Pcmpistra; instr = Amd64_simd_instrs.vpcmpistri }
+
+  let vpcmpistrc =
+    { id = Vpcompare_string Pcmpistrc; instr = Amd64_simd_instrs.vpcmpistri }
+
+  let vpcmpistro =
+    { id = Vpcompare_string Pcmpistro; instr = Amd64_simd_instrs.vpcmpistri }
+
+  let vpcmpistrs =
+    { id = Vpcompare_string Pcmpistrs; instr = Amd64_simd_instrs.vpcmpistri }
+
+  let vpcmpistrz =
+    { id = Vpcompare_string Pcmpistrz; instr = Amd64_simd_instrs.vpcmpistri }
+
   let mnemonic ({ id; _ } : t) =
     match id with
     | Sqrtss -> "sqrtss"
@@ -129,6 +160,7 @@ module Seq = struct
     | Roundss -> "roundss"
     | Roundsd -> "roundsd"
     | Pcompare_string p -> Pcompare_string.mnemonic p
+    | Vpcompare_string p -> "v" ^ Pcompare_string.mnemonic p
 
   let equal { id = id0; instr = instr0 } { id = id1; instr = instr1 } =
     let return_true () =
@@ -138,9 +170,13 @@ module Seq = struct
     match id0, id1 with
     | Sqrtss, Sqrtss | Sqrtsd, Sqrtsd | Roundss, Roundss | Roundsd, Roundsd ->
       return_true ()
-    | Pcompare_string p1, Pcompare_string p2 ->
+    | Pcompare_string p1, Pcompare_string p2
+    | Vpcompare_string p1, Vpcompare_string p2 ->
       if Pcompare_string.equal p1 p2 then return_true () else false
-    | (Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _), _ -> false
+    | ( ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
+        | Vpcompare_string _ ),
+        _ ) ->
+      false
 end
 
 module Pseudo_instr = struct
