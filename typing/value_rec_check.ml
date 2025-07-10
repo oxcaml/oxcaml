@@ -150,6 +150,9 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_let (rec_flag, vb, e) ->
         let env = classify_value_bindings rec_flag env vb in
         classify_expression env e
+    | Texp_letmutable (vb, e) ->
+        let env = classify_value_bindings Nonrecursive env [vb] in
+        classify_expression env e
     | Texp_letmodule (Some mid, _, _, mexp, e) ->
         (* Note on module presence:
            For absent modules (i.e. module aliases), the module being bound
@@ -208,6 +211,10 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_while _
     | Texp_setinstvar _ ->
         (* Unit-returning expressions *)
+        Static
+
+    | Texp_mutvar _
+    | Texp_setmutvar _ ->
         Static
 
     | Texp_unreachable ->
@@ -637,6 +644,14 @@ let rec expression : Typedtree.expression -> term_judg =
          G |- let <bindings> in body : m
       *)
       value_bindings rec_flag bindings >> expression body
+    | Texp_letmutable (binding,body) ->
+      (*
+         G  |- <bindings> : m -| G'
+         G' |- body : m
+         --------------------------------
+         G |- let mutable <bindings> in body : m
+      *)
+      value_bindings Nonrecursive [binding] >> expression body
     | Texp_letmodule (x, _, _, mexp, e) ->
       module_binding (x, mexp) >> expression e
     | Texp_match (e, _, cases, _) ->
@@ -675,6 +690,8 @@ let rec expression : Typedtree.expression -> term_judg =
       path pth << Dereference
     | Texp_instvar (self_path, pth, _inst_var) ->
         join [path self_path << Dereference; path pth]
+    | Texp_mutvar id ->
+        single id.txt << Dereference
     | Texp_apply
         ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _)}, [_, Arg (arg, _)], _,
          _, _)
@@ -741,9 +758,11 @@ let rec expression : Typedtree.expression -> term_judg =
            (match desc.cstr_shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
-                (match get_mixed_product_element mixed_shape i with
-                 | Value_prefix -> Guard
-                 | Flat_suffix _ -> Dereference))
+                (match mixed_shape.(i) with
+                 | Value | Float_boxed -> Guard
+                 | Float64 | Float32 | Bits32 | Bits64
+                 | Vec128 | Vec256 | Vec512 | Word | Product _ ->
+                   Dereference))
       in
       let arg i e = expression e << arg_mode i in
       join [
@@ -766,9 +785,11 @@ let rec expression : Typedtree.expression -> term_judg =
               Guard
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
-              (match get_mixed_product_element mixed_shape i with
-               | Value_prefix -> Guard
-               | Flat_suffix _ -> Dereference)
+            (match mixed_shape.(i) with
+             | Value | Float_boxed -> Guard
+             | Float64 | Float32 | Bits32 | Bits64
+             | Vec128 | Vec256 | Vec512 | Word | Product _ ->
+               Dereference)
         in
         let field (label, field_def) =
           let env =
@@ -776,11 +797,11 @@ let rec expression : Typedtree.expression -> term_judg =
             | Kept _ -> empty
             | Overridden (_, e) -> expression e
           in
-          env << field_mode label.lbl_num
+          env << field_mode label.lbl_pos
         in
         join [
           array field es;
-          option expression (Option.map fst eo) << Dereference
+          option expression (Option.map Misc.fst3 eo) << Dereference
         ]
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->
@@ -863,7 +884,7 @@ let rec expression : Typedtree.expression -> term_judg =
       join [
         expression e1 << Dereference
       ]
-    | Texp_field (e, _, _, _, _) ->
+    | Texp_field (e, _, _, _, _, _) ->
       (*
         G |- e: m[Dereference]
         -----------------------
@@ -882,6 +903,13 @@ let rec expression : Typedtree.expression -> term_judg =
         path pth << Dereference;
         expression e << Dereference;
       ]
+    | Texp_setmutvar (_id,_sort,e) ->
+      (*
+        G |- e: m[Dereference]
+        ----------------------
+        G |- x <- e: m
+      *)
+        expression e << Dereference
     | Texp_letexception ({ext_id}, e) ->
       (* G |- e: m
          ----------------------------
