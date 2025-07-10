@@ -872,19 +872,19 @@ and label_exp ctxt f (l,opt,p) =
         when txt = rest ->
           (match opt with
            | Some o ->
-              pp f "%a.?(%a=@;%a)"
+              pp f "%a.?'(%a=@;%a)"
                 longident_loc module_path
                 ident_of_name rest (expression ctxt) o
            | None ->
-              pp f "%a.?%a" longident_loc module_path ident_of_name rest)
+              pp f "%a.?'%a" longident_loc module_path ident_of_name rest)
       | _ ->
           (match opt with
           | Some o ->
-              pp f "%a.?%a:(%a=@;%a)@;"
+              pp f "%a.?'%a:(%a=@;%a)@;"
                 longident_loc module_path
                 ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
           | None ->
-              pp f "%a.?%a:%a@;"
+              pp f "%a.?'%a:%a@;"
                 longident_loc module_path
                 ident_of_name rest (simple_pattern1 ctxt) p)
       end
