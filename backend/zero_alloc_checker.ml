@@ -1700,7 +1700,7 @@ end = struct
            location that directly contains the witness instruction before
            inlining. *)
         let items = List.rev items in
-        if !Flambda_backend_flags.zero_alloc_checker_details_extra
+        if !Oxcaml_flags.zero_alloc_checker_details_extra
         then
           Format.fprintf ppf "\ninlined from\n%a"
             (print_debuginfo ~sep:"\n" ~include_fs:true ~include_scope:true)
