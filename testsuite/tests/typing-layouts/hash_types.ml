@@ -308,7 +308,7 @@ Error: The type constructor "t#" expects 1 argument(s),
 (* Type recursion through unboxed versions *)
 
 type t = int
-and bad = t#
+and ok = t#
 [%%expect{|
 type t = int
 and bad = t#

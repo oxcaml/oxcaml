@@ -388,7 +388,7 @@ let unrestricted tvar ca_sort =
 
 (* CR layouts: Changes will be needed here as we add support for the built-ins
    to work with non-values, and as we relax the mixed block restriction. *)
-let build_initial_env  add_type add_extension empty_env =
+let build_initial_env add_type add_extension empty_env =
   let add_type_with_jkind, add_type = mk_add_type add_type
   and add_type1 = mk_add_type1 add_type
   and add_extension = mk_add_extension add_extension in
@@ -557,6 +557,8 @@ let add_small_number_beta_extension_types add_type env =
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8
   |> add_type ident_int16 ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int16
+
+
 
 let or_null_argument_sort = Jkind.Sort.Const.value
 
