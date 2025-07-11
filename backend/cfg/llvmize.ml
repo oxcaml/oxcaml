@@ -46,7 +46,7 @@ end = struct
   module Gen = struct
     type ident = t
 
-    type nonrec t = { mutable next : ident }
+    type t = { mutable next : ident }
 
     (* Local identifiers are only valid within function scope, so we can reset
        it to 0 every time *)
