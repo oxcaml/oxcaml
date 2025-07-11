@@ -7469,8 +7469,6 @@ and type_function
             let arg_label =
               match arg_label with
               | Optional arg_label -> arg_label
-              (* CR generic-optional : CHECK THIS *)
-              | Generic_optional (_, arg_label) -> arg_label
               | Nolabel | Labelled _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
