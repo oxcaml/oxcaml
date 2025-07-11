@@ -117,24 +117,13 @@ let () =
 [%%expect{|
 |}]
 
-(* CR dklainichenko: [immediate_or_null] should be [non_float]: *)
-
 type ('a : value_or_null mod non_float) accepts_nonfloat
 
 type succeeds = t_immediate_or_null accepts_nonfloat
 
 [%%expect{|
 type ('a : value_or_null mod non_float) accepts_nonfloat
-Line 3, characters 16-35:
-3 | type succeeds = t_immediate_or_null accepts_nonfloat
-                    ^^^^^^^^^^^^^^^^^^^
-Error: This type "t_immediate_or_null" should be an instance of type
-         "('a : value_or_null mod non_float)"
-       The kind of t_immediate_or_null is immediate_or_null
-         because of the definition of t_immediate_or_null at line 1, characters 0-44.
-       But the kind of t_immediate_or_null must be a subkind of
-           value_or_null mod non_float
-         because of the definition of accepts_nonfloat at line 1, characters 0-56.
+type succeeds = t_immediate_or_null accepts_nonfloat
 |}]
 
 (* Values of [int or_null] mode-cross: *)

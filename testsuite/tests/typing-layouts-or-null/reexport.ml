@@ -71,8 +71,8 @@ Line 1, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a Or_null.t is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
        But the kind of 'a Or_null.t must be a subkind of value
          because of the definition of t at line 2, characters 2-79.
 |}]
@@ -92,8 +92,8 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a Or_null.t is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
        But the kind of 'a Or_null.t must be a subkind of value
          because of the definition of t at line 2, characters 2-45.
 |}]
@@ -106,8 +106,8 @@ type 'a t : value = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-51:
 1 | type 'a t : value = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a or_null" is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+Error: The kind of type "'a or_null" is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
        But the kind of type "'a or_null" must be a subkind of value
          because of the definition of t at line 1, characters 0-51.
 |}]
@@ -119,7 +119,7 @@ Line 1, characters 0-53:
 1 | type 'a t : float64 = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a or_null" is value
-         because it is the primitive immediate_or_null type or_null.
+         because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of float64
          because of the definition of t at line 1, characters 0-53.
 |}]
@@ -157,8 +157,8 @@ Line 4, characters 24-40:
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type
          "('b : value_or_null mod non_null)"
-       The kind of 'a Or_null.t is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
        But the kind of 'a Or_null.t must be a subkind of
            value_or_null mod non_null
          because of the definition of t at line 2, characters 2-63.
