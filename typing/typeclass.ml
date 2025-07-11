@@ -1569,6 +1569,7 @@ let rec approx_declaration cl =
       let arg =
         match l with
         | Optional _ -> Ctype.instance var_option
+        (* CR generic-optional : change from var_option *)
         | Generic_optional _ -> Ctype.instance var_option
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
