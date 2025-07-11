@@ -69,6 +69,7 @@ programs.
 * [Modes for moving between threads (portability and
   contention)](#portability-contention)
 * [Modes for aliasing (uniqueness and linearity)](#uniqueness-linearity)
+* [Modes ] (#externality)
 
 # Modes for scope {#locality}
 
@@ -277,3 +278,43 @@ while observing closures capture all values at visibility *read*.
 Statefulness is irrelevant for types that do not contain functions, and values of such
 types *mode cross* on the statefulness axis; they may be used as stateless
 even when they are stateful.
+
+
+# Modes for garbage collection {#externality}
+
+## Future modes: Externality
+
+|--------------|
+| **internal** |
+| `|`          |
+| external64   |
+| `|`          |
+| external_    |
+{: .table}
+
+Externality is a future axis wich records whether a value may safely be ignored
+by the GC.  This may be because they are OCaml "immediates" (values represented
+by a tagged integer), because they are unboxed types like `float#` or `int32#`,
+or because they are allocated elsewhere.
+
+The compiler uses the externality axis for certain runtime optimizations. In
+particular, updating a mutable reference to a value that is `external_` can skip
+the write barrier (i.e., it does not need a call to `caml_modify`).
+
+The axis has three possible values, with `external_ < external64 < internal`.
+* `external_` means that the value may safely ignored by the
+  GC. Examples of external values include values of type `int` , values of unboxed
+  types like `float#`, or other values represented by a tagged integer like `None`
+  or `[]`.
+* `external64` means the value can be safely ignored by the GC
+  _on 64-bit systems_. The only 32-bit target currently supported by the OxCaml
+  compiler is bytecode. Note that, although JavaScript and WASM are 32-bit
+  platforms and the compiler goes through bytecode to reach them, they still
+  count as 64-bit systems for the purpose of this axis because of their unique
+  data models.
+* `internal` means values of the type may need to be scanned. Examples of internal
+  values include those that
+
+Like locality, externality is irrelevant for types like `int` or `char` that
+*never* cause allocations on the OCaml heap, and so these types mode-cross on
+the externality axis.
