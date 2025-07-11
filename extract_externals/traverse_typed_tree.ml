@@ -71,13 +71,20 @@ let scrape_poly env ty =
 
 (* See [scrape_ty]; this returns the [type_desc] of a scraped [type_expr]. *)
 let is_always_gc_ignorable env ty =
-  let ext : Jkind_mod_bounds.Externality.t =
+  let externality : Jkind_mod_bounds.Externality.t =
     (* We check that we're compiling to (64-bit) native code before counting
        External64 types as gc_ignorable, because bytecode is intended to be
        platform independent. *)
     if !Clflags.native_code && Sys.word_size = 64 then External64 else External
   in
-  Ctype.check_type_externality env ty ext
+  let upper_bound =
+    Jkind.set_externality_upper_bound
+      (Jkind.Builtin.any ~why:Dummy_jkind)
+      externality
+  in
+  match Ctype.check_type_jkind env ty upper_bound with
+  | Ok () -> true
+  | Error _ -> false
 
 type classification =
   | Int (* any immediate type *)

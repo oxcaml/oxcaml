@@ -89,7 +89,7 @@ let is_base_type env ty base_ty_path =
   | _ -> false
 
 let is_always_gc_ignorable env ty =
-  let ext : Jkind_mod_bounds.Externality.t =
+  let externality : Jkind_mod_bounds.Externality.t =
     (* We check that we're compiling to (64-bit) native code before counting
        External64 types as gc_ignorable, because bytecode is intended to be
        platform independent. *)
@@ -97,7 +97,12 @@ let is_always_gc_ignorable env ty =
     then External64
     else External
   in
-  Ctype.check_type_externality env ty ext
+  let upper_bound =
+    Jkind.set_externality_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) externality
+  in
+  match Ctype.check_type_jkind env ty upper_bound with
+  | Ok () -> true
+  | Error _ -> false
 
 let maybe_pointer_type env ty =
   let ty = scrape_ty env ty in
