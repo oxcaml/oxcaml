@@ -3,6 +3,6 @@
 *)
 
 (* Test case to trigger Generic_optional code path in filter_arrow *)
-let test_fn Stdlib.Option.?'(value : int = 42) () = value
+let test_fn Stdlib.Or_null.?'(value : int = 42) () = value
 
 let () = Printf.printf "%d\n" (test_fn ())

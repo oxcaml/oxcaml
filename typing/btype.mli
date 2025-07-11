@@ -265,6 +265,10 @@ val is_position : arg_label -> bool
 val is_omittable : arg_label -> bool
 val label_name : arg_label -> label
 
+(* CR generic-optional: temporary function, to remove *)
+type module_path = Stdlib_option | Stdlib_or_null
+val classify_module_path : Longident.t -> module_path
+
 (* Returns the label name with first character '?' or '~' as appropriate. *)
 val prefixed_label_name : arg_label -> label
 

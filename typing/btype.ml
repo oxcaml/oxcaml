@@ -641,6 +641,13 @@ let label_name = function
   | Position s -> s
   | Generic_optional (_, s) -> s
 
+(* CR generic-optional: temporary function, to remove *)
+type module_path = Stdlib_option | Stdlib_or_null
+let classify_module_path : Longident.t -> module_path = function
+  | Ldot(Lident "Stdlib", "Option") -> Stdlib_option
+  | Ldot(Lident "Stdlib", "Or_null") -> Stdlib_or_null
+  | _ -> failwith "Only expected Stdlib.Option and Stdlib.Or_null"
+
 let prefixed_label_name = function
     Nolabel -> ""
   | Labelled s | Position s -> "~" ^ s

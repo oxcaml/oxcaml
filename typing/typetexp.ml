@@ -678,16 +678,7 @@ let transl_label (label : Parsetree.arg_label)
         (Error (mod_ident.loc,
                 Env.empty,
                 Unsupported_extension Generic_optional_arguments));
-    | true ->
-      match mod_ident with
-      | { txt = Longident.Ldot (Longident.Lident "Stdlib", "Option")
-        ; _ } -> Optional l
-      | { loc ; txt } ->  (
-        raise
-          (Error (loc,
-                  Env.empty,
-                  Invalid_generic_optional_argument_module_path txt))
-      )
+    | true -> Generic_optional(mod_ident, l)
   )
   | Nolabel, _ -> Nolabel
 
