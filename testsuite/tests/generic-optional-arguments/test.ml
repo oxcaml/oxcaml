@@ -6,7 +6,7 @@
 module type S = sig
 val concat : Stdlib.Option.?'sep:string -> string list -> string
 
-val concat_2 : Stdlib.Or_null.?sep:string -> string list -> string
+val concat_2 : Stdlib.Or_null.?'sep:string -> string list -> string
 end
 
 (* Implementation *)
