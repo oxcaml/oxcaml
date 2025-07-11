@@ -364,95 +364,66 @@ let available_regs ~stack_slots ~f x =
 let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   let register_allocator = register_allocator fd_cmm in
   let module CSE = Cfg_cse.Cse_generic (CSE) in
-  match !Oxcaml_flags.llvm_backend with
-  | true ->
-    (* missing pass: stack checks *)
-    cfg_with_layout
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
-         (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
-         (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc"
-         Cfg_comballoc.run
-    ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
-    ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After comballoc"
-    ++ Profile.record ~accumulate:true "save_cfg" save_cfg
-    ++ Profile.record ~accumulate:true "llvmize" Llvmize.cfg
-  | false ->
-    cfg_with_layout
-    ++ (fun cfg_with_layout ->
-         match should_vectorize () with
-         | false -> cfg_with_layout
-         | true ->
-           cfg_with_layout
-           ++ cfg_with_layout_profile ~accumulate:true "vectorize"
-                (Vectorize.cfg ppf_dump)
-           ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
-         (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
-         (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc"
-         Cfg_comballoc.run
-    ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_cse" CSE.cfg_with_layout
-    ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
-    ++ Cfg_with_infos.make
-    ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
-    ++ save_cfg_before_regalloc
-    ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
-           let cfg_description =
-             Regalloc_validate.Description.create
-               (Cfg_with_infos.cfg_with_layout cfg_with_infos)
-           in
-           cfg_with_infos
-           ++ (match register_allocator with
-              | GI ->
-                cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
-              | IRC ->
-                cfg_with_infos_profile ~accumulate:true "cfg_irc"
-                  Regalloc_irc.run
-              | LS ->
-                cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run)
-           ++ Cfg_with_infos.cfg_with_layout
-           ++ cfg_with_layout_profile ~accumulate:true
-                "cfg_validate_description"
-                (Regalloc_validate.run cfg_description))
-    ++ Profile.record ~accumulate:true "cfg_available_regs"
-         (available_regs
-            ~stack_slots:(fun x ->
-              (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
-            ~f:Cfg_available_regs.run)
-    ++ Profile.record ~accumulate:true "cfg_invariants"
-         (cfg_invariants ppf_dump)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
-         Regalloc_utils.simplify_cfg
-    ++ Profile.record ~accumulate:true "cfg_invariants"
-         (cfg_invariants ppf_dump)
-    (* CR-someday gtulbalecu: The peephole optimizations must not affect
-       liveness, otherwise we would have to recompute it here. Recomputing it
-       here breaks the CI because the liveness_analysis algorithm does not work
-       properly after register allocation. *)
-    ++ cfg_with_layout_profile ~accumulate:true "peephole_optimize_cfg"
-         Peephole_optimize.peephole_optimize_cfg
-    ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
-         match !Oxcaml_flags.cfg_stack_checks with
-         | false -> cfg_with_layout
-         | true -> Cfg_stack_checks.cfg cfg_with_layout)
-    ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
-         (reorder_blocks_random ppf_dump)
-    ++ Profile.record ~accumulate:true "cfg_invariants"
-         (cfg_invariants ppf_dump)
-    ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
-    ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
-    ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
-    ++ Profile.record ~accumulate:true "save_linear" save_linear
-    ++ (fun (fd : Linear.fundecl) ->
-         match !Oxcaml_flags.cfg_stack_checks with
-         | false -> Stack_check.linear fd
-         | true -> fd)
-    ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
+  cfg_with_layout
+  ++ (fun cfg_with_layout ->
+       match should_vectorize () with
+       | false -> cfg_with_layout
+       | true ->
+         cfg_with_layout
+         ++ cfg_with_layout_profile ~accumulate:true "vectorize"
+              (Vectorize.cfg ppf_dump)
+         ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+       (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
+       (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_cse" CSE.cfg_with_layout
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
+  ++ Cfg_with_infos.make
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+  ++ save_cfg_before_regalloc
+  ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
+         let cfg_description =
+           Regalloc_validate.Description.create
+             (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+         in
+         cfg_with_infos
+         ++ (match register_allocator with
+            | GI ->
+              cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
+            | IRC ->
+              cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
+            | LS ->
+              cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run)
+         ++ Cfg_with_infos.cfg_with_layout
+         ++ cfg_with_layout_profile ~accumulate:true "cfg_validate_description"
+              (Regalloc_validate.run cfg_description))
+  ++ Profile.record ~accumulate:true "cfg_available_regs"
+       (available_regs
+          ~stack_slots:(fun x ->
+            (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
+          ~f:Cfg_available_regs.run)
+  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
+       Regalloc_utils.simplify_cfg
+  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  (* CR-someday gtulbalecu: The peephole optimizations must not affect liveness,
+     otherwise we would have to recompute it here. Recomputing it here breaks
+     the CI because the liveness_analysis algorithm does not work properly after
+     register allocation. *)
+  ++ cfg_with_layout_profile ~accumulate:true "peephole_optimize_cfg"
+       Peephole_optimize.peephole_optimize_cfg
+  ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
+       match !Oxcaml_flags.cfg_stack_checks with
+       | false -> cfg_with_layout
+       | true -> Cfg_stack_checks.cfg cfg_with_layout)
+  ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
+       (reorder_blocks_random ppf_dump)
+  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
@@ -464,7 +435,31 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
        ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-         compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout)
+         if !Oxcaml_flags.llvm_backend
+         then
+           (* missing pass: stack checks *)
+           cfg_with_layout
+           ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+                (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+           ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
+                (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
+           ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc"
+                Cfg_comballoc.run
+           ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
+           ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After comballoc"
+           ++ Profile.record ~accumulate:true "save_cfg" save_cfg
+           ++ Profile.record ~accumulate:true "llvmize" Llvmize.cfg
+         else
+           cfg_with_layout
+           ++ compile_cfg ppf_dump ~funcnames fd_cmm
+           ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
+           ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
+           ++ Profile.record ~accumulate:true "save_linear" save_linear
+           ++ (fun (fd : Linear.fundecl) ->
+                match !Oxcaml_flags.cfg_stack_checks with
+                | false -> Stack_check.linear fd
+                | true -> fd)
+           ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 

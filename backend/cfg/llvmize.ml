@@ -50,7 +50,6 @@ end = struct
 
     (* Local identifiers are only valid within function scope, so we can reset
        it to 0 every time *)
-    (* let create () = { next = Label.to_int (Cmm.new_label ()) } *)
     let create () = { next = 0 }
 
     let get_fresh t =
@@ -63,7 +62,7 @@ end
 module Llvm_typ = struct
   (** Type representing LLVM types *)
   type t =
-    | Int of int  (** Arbitrary-sized (in bits) integer *)
+    | Int of int  (** Argument is the bitwidth of the integer *)
     | Ptr
     | Struct of t list
 
@@ -71,7 +70,7 @@ module Llvm_typ = struct
     match c with
     | Val | Addr | Int ->
       Int 64
-      (* CFG allows vals to be assigned to ints and vice versa, so we do this to
+      (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
          make LLVM happy for now. *)
     | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 ->
       Misc.fatal_error "Not implemented [Llvm_typ.of_machtyp_component]"
@@ -256,12 +255,12 @@ module F = struct
     ins t "store %a %a, ptr %a" pp_machtyp_component reg.typ pp_ident ident
       (pp_reg_ident t) reg
 
-  let ins_store' t s (reg : Reg.t) =
-    ins t "store %a %s, ptr %a" pp_machtyp_component reg.typ s (pp_reg_ident t)
-      reg
-
   let ins_store_global t sym (reg : Reg.t) =
     ins t "store ptr %a, ptr %a" pp_global sym (pp_reg_ident t) reg
+
+  let ins_store_nativeint t n (reg : Reg.t) =
+    ins t "store %a %s, ptr %a" pp_machtyp_component reg.typ
+      (Nativeint.to_string n) (pp_reg_ident t) reg
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
@@ -320,7 +319,7 @@ module F = struct
     | Move ->
       let temp = load_reg_to_temp t i.arg.(0) in
       ins_store t temp i.res.(0)
-    | Const_int n -> ins_store' t (Nativeint.to_string n) i.res.(0)
+    | Const_int n -> ins_store_nativeint t n i.res.(0)
     | Const_symbol { sym_name; sym_global = _ } ->
       ins_store_global t sym_name i.res.(0)
     | Intop op -> int_op t i op
@@ -373,6 +372,13 @@ module F = struct
       (Llvm_typ.Struct (List.map typ_of_data_item ds))
       (pp_print_list ~pp_sep:pp_comma pp_typ_and_const)
       ds
+
+  let symbol_decl t sym =
+    line t.ppf "%a = global i64 0" pp_global (Cmm_helpers.make_symbol sym)
+
+  let empty_fun_decl t sym =
+    line t.ppf "define void %a() { ret void }" pp_global
+      (Cmm_helpers.make_symbol sym)
 end
 
 let current_compilation_unit = ref None
@@ -381,19 +387,17 @@ let llvmir_to_assembly t =
   (* CR-someday gyorsh: add other optimization flags and control which passes to
      perform. *)
   let cmd =
-    match !Oxcaml_flags.llvm_path with
-    | Set path -> [path]
-    | Default -> Config.asm :: Misc.debug_prefix_map_flags ()
+    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
   Ccomp.command
     (String.concat " "
        (cmd
-       @ [ "-o";
-           Filename.quote t.asm_filename;
-           "-O3";
-           "-S";
-           "-x ir";
-           Filename.quote t.llvmir_filename ]))
+       :: [ "-o";
+            Filename.quote t.asm_filename;
+            "-O3";
+            "-S";
+            "-x ir";
+            Filename.quote t.llvmir_filename ]))
 
 let close_out () =
   match !current_compilation_unit with
@@ -420,7 +424,9 @@ let collect_regs t (cfg : Cfg.t) =
         let body_regs =
           DLL.fold_left block.body
             ~f:(fun regs (instr : Cfg.basic Cfg.instruction) ->
-              Reg.Set.add_seq (Array.to_seq instr.res) regs)
+              Reg.Set.add_seq
+                (Seq.append (Array.to_seq instr.res) (Array.to_seq instr.arg))
+                regs)
             ~init:Reg.Set.empty
         in
         let terminator_regs = Array.to_seq block.terminator.res in
@@ -496,6 +502,9 @@ let data ds =
   let t = Option.get !current_compilation_unit in
   t.data := List.append !(t.data) ds
 
+(* CR yusumez: We do this cumbersome list wrangling since we receive data
+   declarations as a flat list. Ideally, [data_item]s would be represented in a
+   more structured manner which we can directly pass on to [declare]. *)
 let collect_data t ~declare =
   let cur_sym, ds =
     List.fold_left
@@ -504,10 +513,11 @@ let collect_data t ~declare =
         | Cdefine_symbol { sym_name; sym_global = _ } ->
           Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
           Some sym_name, []
-        | Cint _ | Csymbol_address _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _
-        | Cdouble _ | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _
-        | Cstring _ | Cskip _ | Calign _ ->
-          cur_sym, ds @ [d])
+        | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
+        | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
+        | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
+        | Calign _ ->
+          Misc.fatal_error "Unimplemented data item")
       (None, []) !(t.data)
   in
   Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym
@@ -522,13 +532,8 @@ let begin_assembly () =
      end), but we don't have access to it here. It isn't required for now. *)
   (* Option.iter (F.source_filename t) sourcefile; *)
   F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
-  (* CR yusumez: We need to emit these since the linker expects them to exist.
-     Remove once properly implemented. *)
-  F.line t.ppf "@camlA__data_begin = global i64 37";
-  F.line t.ppf "@camlA__data_end = global i64 37";
-  F.line t.ppf "@camlA__code_begin = global i64 37";
-  F.line t.ppf "@camlA__code_end = global i64 37";
-  F.line t.ppf "@camlA__frametable = global i64 37";
+  F.symbol_decl t "data_begin";
+  F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
 let end_assembly ~sourcefile =
@@ -536,6 +541,9 @@ let end_assembly ~sourcefile =
   (* Emit source_file *)
   (* Emit data declarations *)
   collect_data t ~declare:(F.data_decl t);
+  F.symbol_decl t "data_end";
+  F.empty_fun_decl t "code_end";
+  F.symbol_decl t "frametable";
   (* Close channel to .ll file *)
   Out_channel.close t.oc;
   (* Call clang to compile .ll to .s *)
@@ -560,7 +568,8 @@ let end_assembly ~sourcefile =
    currently too tightly coupled with the [internal_assembler], especially in
    [asmlink] for shared libraries. *)
 (* CR gyorsh: how to emit data_begin/end and code_begin/end symbol? Do we still
-   need both of them with ocaml ? *)
+   need both of them with ocaml ? yusumez: For now, we are just emitting them as
+   global constants. *)
 (* CR gyorsh: assume 64-bit architecture *)
 (* Error report *)
 
