@@ -448,7 +448,7 @@ and class_type_aux env virt self_scope scty =
       let cty =
         match l with
         | Position _ -> ctyp Ttyp_call_pos (Ctype.newconstr Predef.path_lexing_position [])
-        | Optional _ | Labelled _ | Nolabel ->
+        | Optional _ | Generic_optional _ | Labelled _ | Nolabel ->
           transl_simple_type ~new_var_jkind:Any env ~closed:false Alloc.Const.legacy sty
       in
       let ty = cty.ctyp_type in
@@ -1284,6 +1284,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         | Optional _ ->
           Location.prerr_warning pat.pat_loc
             Warnings.Unerasable_optional_argument;
+        | Generic_optional _ ->
+          Location.prerr_warning pat.pat_loc
+            Warnings.Unerasable_optional_argument;
         | Position _ ->
           Location.prerr_warning pat.pat_loc
             Warnings.Unerasable_position_argument;
@@ -1566,6 +1569,7 @@ let rec approx_declaration cl =
       let arg =
         match l with
         | Optional _ -> Ctype.instance var_option
+        | Generic_optional _ -> Ctype.instance var_option
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)

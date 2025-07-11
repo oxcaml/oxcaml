@@ -640,6 +640,7 @@ let string_of_label : Types.arg_label -> string = function
     Nolabel -> ""
   | Labelled s | Position s -> s
   | Optional s -> "?"^s
+  | Generic_optional (_, s) -> "?"^s
 
 let visited = ref []
 let rec raw_type ppf ty =
@@ -1406,6 +1407,7 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Labelled l -> Labelled l
   | Optional l -> Optional l
   | Position l -> Position l
+  | Generic_optional (path, l) -> Generic_optional (path.txt, l)
 
 let rec all_or_none f = function
   | [] -> Some []
