@@ -1711,8 +1711,8 @@ end;;
 module Make_jscomp_options (F : Jscomp_options) =
 struct
   let list = [
-    (* CR selee: A lot of these are probability useless in our setting. Go through and
-       prune *)
+    (* CR selee: A lot of these are probability useless in our
+       setting. Go through and prune *)
     mk_a F._a;
     mk_alert F._alert;
     mk_absname F._absname;

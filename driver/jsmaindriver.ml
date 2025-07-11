@@ -22,32 +22,25 @@ let main argv ppf =
     Compenv.readenv ppf Before_args;
     Compenv.parse_arguments (ref argv) Compenv.anonymous program;
     Compmisc.read_clflags_from_env ();
-    if !Clflags.plugin then
-      Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
-    begin try
+    if !Clflags.plugin
+    then Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
+    try
       Compenv.process_deferred_actions
-        (ppf,
-         Jscompile.implementation,
-         Jscompile.interface,
-         ".cmo",
-         ".cma");
+        (ppf, Jscompile.implementation, Jscompile.interface, ".cmo", ".cma")
     with Arg.Bad msg ->
-      begin
-        prerr_endline msg;
-        Clflags.print_arguments program;
-        exit 2
-      end
-    end
+      prerr_endline msg;
+      Clflags.print_arguments program;
+      exit 2
   with
-  | exception (Compenv.Exit_with_status n) ->
-    n
+  | exception Compenv.Exit_with_status n -> n
   | () ->
     (* Prevents outputting when using make install to dump CSVs for whole compiler.
        Example use case: scripts/profile-compiler-build.sh *)
-    if not !Clflags.dump_into_csv then
-      Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile"
-        (fun ppf -> Profile.print ppf !Clflags.profile_columns
-          ~timings_precision:!Clflags.timings_precision);
+    if not !Clflags.dump_into_csv
+    then
+      Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile" (fun ppf ->
+          Profile.print ppf !Clflags.profile_columns
+            ~timings_precision:!Clflags.timings_precision);
     0
   | exception x ->
     Location.report_exception ppf x;

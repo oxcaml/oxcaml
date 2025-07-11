@@ -1,2 +1,1 @@
-let () =
-  exit (Jsmaindriver.main Sys.argv Format.err_formatter)
+let () = exit (Jsmaindriver.main Sys.argv Format.err_formatter)
