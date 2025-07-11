@@ -270,6 +270,9 @@ module Const : sig
     (** This is the jkind of normal ocaml values or null pointers *)
     val value_or_null : t
 
+    (** Same kind mod everything. *)
+    val value_or_null_mod_everything : t
+
     (** This is the jkind of normal ocaml values *)
     val value : t
 
