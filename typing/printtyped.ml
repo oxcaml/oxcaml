@@ -164,6 +164,8 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
+  | Generic_optional (path, s) ->
+      line i ppf "Generic_optional (%a, \"%s\")\n" fmt_longident_aux path.txt s
 
 let typevar_jkind ~print_quote ppf (v, l) =
   let pptv =

@@ -295,6 +295,7 @@ and arg_label = Types.arg_label =
   | Labelled of string
   | Optional of string
   | Position of string
+  | Generic_optional of Longident.t Location.loc * string
 
 (** Jkinds in the typed tree: Compilation of the typed tree to lambda
     sometimes requires jkind information.  Our approach is to
