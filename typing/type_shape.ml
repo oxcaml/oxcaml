@@ -64,7 +64,7 @@ module Type_shape = struct
      seems low). *)
   let rec of_type_expr_go ~visited ~depth (expr : Types.type_expr) uid_of_path =
     let[@inline] cannot_proceed () =
-      Numbers.Int.Set.mem (Types.get_id expr) visited || depth >= 10
+      Numbers.Int.Set.mem (Types.get_id expr) visited || depth > 10
     in
     if cannot_proceed ()
     then Ts_other
@@ -72,31 +72,33 @@ module Type_shape = struct
       let visited = Numbers.Int.Set.add (Types.get_id expr) visited in
       let depth = depth + 1 in
       let desc = Types.get_desc expr in
-      let map_expr_list (exprs : Types.type_expr list) =
+      let of_expr_list (exprs : Types.type_expr list) =
         List.map
           (fun expr -> of_type_expr_go ~depth ~visited expr uid_of_path)
           exprs
       in
-      match[@warning "-4"] desc with
+      match[@warning "-fragile-match"] desc with
       (* CR sspies: Extend this match to handle more type constructor cases in
          subsequent PRs. *)
       | Tconstr (path, constrs, _abbrev_memo) -> (
         match Predef.of_string (Path.name path) with
-        | Some predef -> Ts_predef (predef, map_expr_list constrs)
+        | Some predef -> Ts_predef (predef, of_expr_list constrs)
         | None -> (
           match uid_of_path path with
-          | Some uid -> Ts_constr ((uid, path), map_expr_list constrs)
+          | Some uid -> Ts_constr ((uid, path), of_expr_list constrs)
           | None -> Ts_other))
-      | Ttuple exprs -> Ts_tuple (map_expr_list (List.map snd exprs))
+      | Ttuple exprs -> Ts_tuple (of_expr_list (List.map snd exprs))
       | Tvar { name; _ } -> Ts_var name
       | Tpoly (type_expr, []) ->
         of_type_expr_go ~depth ~visited type_expr uid_of_path
       | _ -> Ts_other
 
   let of_type_expr (expr : Types.type_expr) uid_of_path =
-    of_type_expr_go ~visited:Numbers.Int.Set.empty ~depth:(-1) expr uid_of_path
+    of_type_expr_go ~visited:Numbers.Int.Set.empty ~depth:0 expr uid_of_path
 
   let rec print ppf = function
+    (* CR sspies: We should figure out pretty printing for shapes. For now, this
+       verbose non-boxed version should be fine. *)
     | Ts_predef (predef, shapes) ->
       Format.fprintf ppf "%s (%a)" (Predef.to_string predef)
         (Format.pp_print_list
@@ -127,20 +129,18 @@ module Type_shape = struct
      use the shape mechanism instead. *)
   let rec replace_tvar t ~(pairs : (t * t) list) =
     match
-      List.filter_map
-        (fun (from, to_) -> if t = from then Some to_ else None)
+      List.find_map
+        (fun (from, to_) -> if t == from then Some to_ else None)
         pairs
     with
-    | new_type :: _ -> new_type
-    | [] -> (
+    | Some new_type -> new_type
+    | None -> (
       match t with
       | Ts_constr (uid, shape_list) ->
         Ts_constr (uid, List.map (replace_tvar ~pairs) shape_list)
       | Ts_tuple shape_list ->
         Ts_tuple (List.map (replace_tvar ~pairs) shape_list)
-      | Ts_var name -> Ts_var name
-      | Ts_predef (predef, shape_list) -> Ts_predef (predef, shape_list)
-      | Ts_other -> Ts_other)
+      | Ts_var _ | Ts_predef _ | Ts_other -> t)
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -153,17 +153,17 @@ module Type_shape = struct
 
     let equal (x : t) y = x = y
 
-    let output _oc _t = Misc.fatal_error "unimplemented"
+    let output = Misc.output_of_print print
   end)
 end
 
 module Type_decl_shape = struct
   type 'a complex_constructor =
     { name : string;
-      args : 'a complex_constructor_arguments list
+      args : 'a complex_constructor_argument list
     }
 
-  and 'a complex_constructor_arguments =
+  and 'a complex_constructor_argument =
     { field_name : string option;
       field_value : 'a
     }
@@ -171,6 +171,8 @@ module Type_decl_shape = struct
   type tds =
     | Tds_variant of
         { simple_constructors : string list;
+          (* CR sspies: Deduplicate these cases once type shapes have reached
+             a more stable form. *)
           complex_constructors : Type_shape.t complex_constructor list
         }
     | Tds_record of (string * Type_shape.t) list
@@ -211,12 +213,12 @@ module Type_decl_shape = struct
         list
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
-    let length =
-      match cstr_args.cd_args with
-      | Cstr_tuple list -> List.length list
-      | Cstr_record list -> List.length list
-    in
-    length = 0
+    match cstr_args.cd_args with
+    | Cstr_tuple [] -> true
+    | Cstr_tuple (_ :: _)
+    | Cstr_record _
+    (* Records are not allowed to have an empty list of fields.*) ->
+      false
 
   let of_type_declaration path (type_declaration : Types.type_declaration)
       uid_of_path =
@@ -289,6 +291,8 @@ module Type_decl_shape = struct
       shape
 
   let print_tds ppf = function
+    (* CR sspies: We should figure out pretty printing for shapes. For now, this
+       verbose non-boxed version should be fine. *)
     | Tds_variant { simple_constructors; complex_constructors } ->
       Format.fprintf ppf
         "Tds_variant simple_constructors=%a complex_constructors=%a"
@@ -369,7 +373,7 @@ let tuple_to_string (strings : string list) =
   | hd :: [] -> hd
   | _ :: _ :: _ -> "(" ^ String.concat " * " strings ^ ")"
 
-let shapes_to_string (strings : string list) =
+let type_arg_list_to_string (strings : string list) =
   match strings with
   | [] -> ""
   | hd :: [] -> hd ^ " "
@@ -381,13 +385,13 @@ let find_in_type_decls (type_uid : Uid.t) =
 let rec type_name (type_shape : Type_shape.t) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
-    shapes_to_string (List.map type_name shapes)
+    type_arg_list_to_string (List.map type_name shapes)
     ^ Type_shape.Predef.to_string predef
   | Ts_other -> "unknown"
   | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
   | Ts_constr ((type_uid, _type_path), shapes) -> (
-    match[@warning "-4"] find_in_type_decls type_uid with
+    match[@warning "-fragile-match"] find_in_type_decls type_uid with
     | None -> "unknown"
     | Some { definition = Tds_other; _ } -> "unknown"
     | Some type_decl_shape ->
@@ -396,6 +400,6 @@ let rec type_name (type_shape : Type_shape.t) =
       let type_decl_shape =
         Type_decl_shape.replace_tvar type_decl_shape shapes
       in
-      let args = shapes_to_string (List.map type_name shapes) in
+      let args = type_arg_list_to_string (List.map type_name shapes) in
       let name = Path.name type_decl_shape.path in
       args ^ name)

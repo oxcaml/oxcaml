@@ -1693,7 +1693,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same id env.cltypes).cltda_shape
 
 let find_uid_of_path env path =
-  (* We currently only support lookup up debugging uids in the current
+  (* We currently only support looking up debugging uids in the current
      environment. Future versions will support looking up declarations in other
      files via the shape mechanism in [shape.ml]. *)
   match find_type path env with
@@ -2998,15 +2998,13 @@ let initial =
     Ident.Tbl.add added_types type_ident decl;
     add_type type_ident decl env ~check:false
   in
-  let initial_env = Predef.build_initial_env
-                      add_type_and_remember_decl
-                      (add_extension ~check:false ~rebind:false)
-                      empty
+  let initial_env =
+    Predef.build_initial_env add_type_and_remember_decl
+      (add_extension ~check:false ~rebind:false) empty
   in
   (* We record the type declarations for the type shapes. *)
   Ident.Tbl.iter (fun type_ident decl ->
-    Type_shape.add_to_type_decls
-      (Pident type_ident) decl
+    Type_shape.add_to_type_decls (Pident type_ident) decl
       (find_uid_of_path initial_env)
   ) added_types;
   initial_env
