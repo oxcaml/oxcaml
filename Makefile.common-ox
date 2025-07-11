@@ -86,6 +86,9 @@ runtime-stdlib: boot-compiler
 	$(cpl) -R _build/install/runtime_stdlib _build/runtime_stdlib_install
 # Dune does not believe the compiler can make .cmxs unless the following file exists.
 	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink.cmxa
+# Dune will look here if the system compiler is OCaml 5 instead.
+	@mkdir -p _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/
+	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/dynlink.cmxa
 
 # This target is a polling version of "make runtime-stdlib"
 .PHONY: runtime-stdlib-hacking
