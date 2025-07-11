@@ -494,7 +494,9 @@ let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
       Atom (Comonadic Portability, Meet_with Portability.Const.legacy);
       Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-      Atom (Comonadic Statefulness, Meet_with Statefulness.Const.legacy) ]
+      Atom (Comonadic Statefulness, Meet_with Statefulness.Const.legacy);
+      Atom (Comonadic Externality, Meet_with Externality.Const.legacy)
+    ]
   in
   let monadic : Modality.t list =
     [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
