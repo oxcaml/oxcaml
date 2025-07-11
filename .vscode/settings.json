@@ -1,7 +1,7 @@
 {
         "ocaml.sandbox": {
-                "kind": "custom",
-                "template": "OPAMROOT=/usr/local/home/$USER/.opam opam exec --switch=4.14.2 --set-switch -- $prog $args"
+                "kind": "opam",
+                "switch": "4.14.1"
         },
         "files.associations": {
                 "smmintrin.h": "c",
