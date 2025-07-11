@@ -26,3 +26,4 @@ let with_bounds ppf w = Jkind.With_bounds.debug_print ppf w
 let with_bounds_types ppf w = Jkind.With_bounds.debug_print_types ppf w
 let modalities = Mode.Modality.Value.Const.print
 let mode ppf m = Mode.Value.print ~verbose:true () ppf m
+let mode_alloc ppf m = Mode.Alloc.print ~verbose:true () ppf m

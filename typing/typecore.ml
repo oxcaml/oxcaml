@@ -5648,7 +5648,7 @@ and type_expect_
         check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
           ~modalities:label.lbl_modalities record_mode;
         let argument_mode = mode_modality label.lbl_modalities record_mode in
-        type_label_exp ~overwrite true env argument_mode loc ty_record x record_form
+        type_label_exp ~overwrite ~create:true env argument_mode loc ty_record x record_form
       in
       let overwrites =
         assign_label_children (List.length lbl_a_list)
@@ -6315,6 +6315,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
+     (* rmode is the mode of the record. *)
       let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -6328,7 +6329,8 @@ and type_expect_
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
-          type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
+          (* This is the mode of the field we're updating. Should be internal. *)
+          type_label_exp ~overwrite:No_overwrite_label ~create:false env mode loc ty_record
             (lid, label, snewval) Legacy
         | Immutable ->
           raise(Error(loc, env, Label_not_mutable lid.txt))
@@ -8017,16 +8019,17 @@ and type_option_some env expected_mode sarg ty ty0 =
    allocation, mutation and modalities. *)
 and type_label_exp
   : type rep.
-    overwrite:_ -> _ -> _ -> _ -> _ -> _ ->
+    overwrite:_ -> create:_ -> _ -> _ -> _ -> _ ->
     _ * rep gen_label_description * _ -> rep record_form ->
     _ * rep gen_label_description * _
-  = fun ~overwrite create env arg_mode loc ty_expected (lid, label, sarg) record_form ->
+  = fun ~overwrite ~create env arg_mode loc ty_expected (lid, label, sarg) record_form ->
   (* Here also ty_expected may be at generic_level *)
   let separate = !Clflags.principal || Env.has_local_constraints env in
   (* #4682: we try two type-checking approaches for [arg] using backtracking:
      - first try: we try with [ty_arg] as expected type;
      - second try; if that fails, we backtrack and try without
   *)
+    (* CR jcutler: ty_Arg is the expected? real? type of the argument *)
   let (vars, ty_arg, snap, arg) =
     (* try the first approach *)
     with_local_level begin fun () ->
