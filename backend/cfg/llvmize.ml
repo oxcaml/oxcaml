@@ -91,12 +91,8 @@ end
 type fun_info =
   { ident_gen : Ident.Gen.t;
     reg2ident : Ident.t Reg.Tbl.t;  (** Map register's stamp to identifier  *)
-    label2ident : Ident.t Label.Tbl.t;
+    label2ident : Ident.t Label.Tbl.t
         (** Map label to identifier. Avoid clashes between pre-existing Cfg labels and unnamed identifiers. *)
-    mutable arg_regs : Reg.Set.t;
-        (** Registers mentioned in the argument list of the function. *)
-    mutable temp_regs : Reg.Set.t
-        (** Temporary registers mentioned in the body of the function. *)
   }
 
 type t =
@@ -112,9 +108,7 @@ let create_fun_info () =
   { ident_gen = Ident.Gen.create ();
     reg2ident =
       Reg.Tbl.create 37 (* CR yusumez: change this to be more reasonable *);
-    label2ident = Label.Tbl.create 37;
-    arg_regs = Reg.Set.empty;
-    temp_regs = Reg.Set.empty
+    label2ident = Label.Tbl.create 37
   }
 
 let create ~llvmir_filename ~asm_filename =
@@ -144,6 +138,8 @@ let get_ident_for_reg t reg =
     Reg.Tbl.add fun_info.reg2ident reg ident;
     ident
 
+let fresh_ident t = Ident.Gen.get_fresh !(t.current_fun_info).ident_gen
+
 module F = struct
   open Format
 
@@ -160,18 +156,15 @@ module F = struct
     (* CR yusumez: Multiline comments don't work...? *)
     fprintf ppf "  ; !dbg <id> %a" Debuginfo.print_compact dbg
 
-  let pp_dbg_instr ppf instr =
-    let dbg =
-      match instr with
-      | `Basic (i : Cfg.basic Cfg.instruction) -> i.dbg
-      | `Terminator (i : Cfg.terminator Cfg.instruction) -> i.dbg
-    in
-    fprintf ppf "  ; !dbg <id> %a [ %a ]" Debuginfo.print_compact dbg
-      Cfg.print_instruction instr
+  let pp_dbg_instr_basic ppf instr =
+    fprintf ppf "  ; !dbg <id> %a [ %a ]" Debuginfo.print_compact instr.Cfg.dbg
+      Cfg.print_basic instr
+
+  let pp_dbg_instr_terminator ppf instr =
+    fprintf ppf "  ; !dbg <id> %a [ %a ]" Debuginfo.print_compact instr.Cfg.dbg
+      Cfg.print_terminator instr
 
   (* let pp_dbg_newline ppf dbg = line ppf "%a" pp_dbg dbg *)
-
-  let pp_dbg_instr_newline ppf dbg = line ppf "%a" pp_dbg_instr dbg
 
   let ins t =
     pp_indent t.ppf ();
@@ -221,12 +214,11 @@ module F = struct
     let ident = get_ident_for_reg t reg in
     pp_ident ppf ident
 
-  let pp_reg_typ_and_ident t ppf (reg : Reg.t) =
-    fprintf ppf "%a %a" pp_machtyp_component reg.typ (pp_reg_ident t) reg
+  let pp_fun_arg ppf (reg, ident) =
+    fprintf ppf "%a %a" pp_machtyp_component reg.Reg.typ pp_ident ident
 
-  let pp_fun_args t ppf fun_args =
-    Array.to_seq fun_args
-    |> pp_print_seq ~pp_sep:pp_comma (pp_reg_typ_and_ident t) ppf
+  let pp_fun_args ppf fun_args =
+    pp_print_list ~pp_sep:pp_comma pp_fun_arg ppf fun_args
 
   let pp_attrs ppf attrs =
     fprintf ppf "%a" (pp_print_list ~pp_sep:pp_comma pp_print_string) attrs
@@ -234,17 +226,11 @@ module F = struct
   let define t ~fun_name ~fun_args ~fun_res_type ~fun_dbg ~fun_attrs pp_body =
     line t.ppf "%a" pp_dbg fun_dbg;
     line t.ppf "define %a @%s(%a) %a {" pp_machtyp fun_res_type fun_name
-      (pp_fun_args t) fun_args pp_attrs fun_attrs;
+      pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}"
 
-  let alloca t (reg : Reg.t) =
-    ins t "%a = alloca %a" (pp_reg_ident t) reg pp_machtyp_component reg.typ
-
-  (* CR-soon yusumez: Add implementations for missing basic and terminator
-     instructions *)
-
-  let fresh_ident t = Ident.Gen.get_fresh !(t.current_fun_info).ident_gen
+  (* == LLVM instructions == *)
 
   (* CR yusumez: loads/stores might be of different sizes *)
   let ins_load t ident (reg : Reg.t) =
@@ -262,16 +248,28 @@ module F = struct
     ins t "store %a %s, ptr %a" pp_machtyp_component reg.typ
       (Nativeint.to_string n) (pp_reg_ident t) reg
 
+  let ins_branch t label = ins t "br %a" (pp_label t) label
+
+  let ins_alloca t (reg : Reg.t) =
+    ins t "%a = alloca %a" (pp_reg_ident t) reg pp_machtyp_component reg.typ
+
+  let ins_branch_cond t cond ifso ifnot =
+    ins t "br i1 %a, %a, %a" pp_ident cond (pp_label t) ifso (pp_label t) ifnot
+
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
     ins_load t temp reg;
     temp
 
+  (* == Cfg instructions == *)
+  (* CR-soon yusumez: Add implementations for missing basic and terminator
+     instructions *)
+
   let terminator t (i : Cfg.terminator Cfg.instruction) =
-    pp_dbg_instr_newline t.ppf (`Terminator i);
+    line t.ppf "%a" pp_dbg_instr_terminator i;
     match i.desc with
     | Never -> assert false
-    | Always lbl -> ins t "br %a" (pp_label t) lbl
+    | Always lbl -> ins_branch t lbl
     | Parity_test b ->
       (* Check if the argument is even *)
       let arg_temp = load_reg_to_temp t i.arg.(0) in
@@ -279,16 +277,14 @@ module F = struct
       ins t "%a = trunc %a %a to i1" pp_ident is_odd pp_machtyp_component
         i.arg.(0).typ pp_ident arg_temp;
       (* reverse the branches *)
-      ins t "br i1 %a, %a, %a" pp_ident is_odd (pp_label t) b.ifnot (pp_label t)
-        b.ifso
+      ins_branch_cond t is_odd b.ifnot b.ifso
     | Truth_test b ->
       (* Check if the argument is true. *)
       let arg_temp = load_reg_to_temp t i.arg.(0) in
       let is_true = fresh_ident t in
       ins t "%a = trunc %a %a to i1" pp_ident is_true pp_machtyp_component
         i.arg.(0).typ pp_ident arg_temp;
-      ins t "br i1 %a, %a, %a" pp_ident is_true (pp_label t) b.ifso (pp_label t)
-        b.ifnot
+      ins_branch_cond t is_true b.ifso b.ifnot
     | Return ->
       let temp = load_reg_to_temp t i.arg.(0) in
       ins t "ret %a %a" pp_machtyp_component i.arg.(0).typ pp_ident temp
@@ -333,7 +329,7 @@ module F = struct
            (`Basic i))
 
   let basic t (i : Cfg.basic Cfg.instruction) =
-    pp_dbg_instr_newline t.ppf (`Basic i);
+    line t.ppf "%a" pp_dbg_instr_basic i;
     match i.desc with
     | Op op -> basic_op t i op
     | Prologue | Reloadretaddr -> ()
@@ -342,6 +338,10 @@ module F = struct
         (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
            (`Basic i))
 
+  (* == Cfg data items == *)
+
+  (* CR yusumez: don't do these matches once we have the structured type for
+     [data_item] *)
   let typ_of_data_item (d : Cmm.data_item) =
     match d with
     | Cdefine_symbol _ -> assert false (* cannot happen *)
@@ -416,41 +416,30 @@ let fun_attrs _t _codegen_options : string list =
   (* CR gyorsh: translate and communicate to llvm backend *)
   []
 
-(* Mark regs we need to allocate *)
-let collect_regs t (cfg : Cfg.t) =
-  let body_regs =
-    Cfg.fold_blocks cfg
-      ~f:(fun _ block regs ->
-        let body_regs =
-          DLL.fold_left block.body
-            ~f:(fun regs (instr : Cfg.basic Cfg.instruction) ->
-              Reg.Set.add_seq
-                (Seq.append (Array.to_seq instr.res) (Array.to_seq instr.arg))
-                regs)
-            ~init:Reg.Set.empty
-        in
-        let terminator_regs = Array.to_seq block.terminator.res in
-        Reg.Set.add_seq terminator_regs body_regs |> Reg.Set.union regs)
-      ~init:Reg.Set.empty
-  in
-  let arg_regs = Array.to_seq cfg.fun_args |> Reg.Set.of_seq in
-  let temp_regs = Reg.Set.diff body_regs arg_regs in
-  !(t.current_fun_info).arg_regs <- arg_regs;
-  !(t.current_fun_info).temp_regs <- temp_regs
+let collect_body_regs cfg =
+  Cfg.fold_blocks cfg
+    ~f:(fun _ block regs ->
+      let body_regs =
+        DLL.fold_left block.body
+          ~f:(fun regs (instr : Cfg.basic Cfg.instruction) ->
+            Reg.Set.add_seq
+              (Seq.append (Array.to_seq instr.res) (Array.to_seq instr.arg))
+              regs)
+          ~init:Reg.Set.empty
+      in
+      let terminator_regs = Array.to_seq block.terminator.res in
+      Reg.Set.add_seq terminator_regs body_regs |> Reg.Set.union regs)
+    ~init:Reg.Set.empty
 
-let alloca_regs t =
-  let arg_regs = !(t.current_fun_info).arg_regs in
-  let temp_regs = !(t.current_fun_info).temp_regs in
-  (* At this point, [t] will have mapped the args to idents. We will be using
-     the alloca'd idents instead, so we save them and make [t] forget about the
-     old ones. *)
-  let old_arg_idents =
-    Reg.Set.to_seq arg_regs |> List.of_seq
-    |> List.map (fun reg -> reg, get_ident_for_reg t reg)
-  in
-  Reg.Tbl.clear !(t.current_fun_info).reg2ident;
-  Reg.Set.iter (F.alloca t) arg_regs;
-  Reg.Set.iter (F.alloca t) temp_regs;
+(* Allocates every reg in [cfg] on the stack and fills up the [reg2ident] table
+   in [t]. Note that args are assigned an identifier in the argument list but
+   the body will use the alloca'd idents instead. *)
+let alloca_regs t cfg old_arg_idents =
+  let arg_regs = List.map fst old_arg_idents |> Reg.Set.of_list in
+  let body_regs = collect_body_regs cfg in
+  let temp_regs = Reg.Set.diff body_regs arg_regs in
+  Reg.Set.iter (F.ins_alloca t) arg_regs;
+  Reg.Set.iter (F.ins_alloca t) temp_regs;
   List.iter (fun (reg, old_ident) -> F.ins_store t old_ident reg) old_arg_idents
 
 let cfg (cl : CL.t) =
@@ -474,6 +463,11 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
+  (* Make fresh idents for argument regs since these will be different from
+     idents assigned to them later on *)
+  let fun_args_with_idents =
+    Array.to_list fun_args |> List.map (fun arg -> arg, fresh_ident t)
+  in
   let pp_block label =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in
@@ -484,18 +478,16 @@ let cfg (cl : CL.t) =
     F.terminator t block.terminator
   in
   let pp_body () =
-    (* last argument id + 1 is reserved, so we cannot use it. we explicitly skip
+    (* Last argument id + 1 is reserved, so we cannot use it. we explicitly skip
        it here *)
     let (_ : Ident.t) = Ident.Gen.get_fresh !(t.current_fun_info).ident_gen in
-    alloca_regs t;
+    alloca_regs t cfg fun_args_with_idents;
     F.ins t "br %a" (F.pp_label t) entry_label;
     DLL.iter ~f:pp_block layout
   in
   let fun_attrs = fun_attrs t fun_codegen_options in
-  (* fill fields in [t] before emitting *)
-  collect_regs t cfg;
-  F.define t ~fun_name ~fun_args ~fun_res_type:Cmm.typ_val ~fun_dbg ~fun_attrs
-    pp_body
+  F.define t ~fun_name ~fun_args:fun_args_with_idents ~fun_res_type:Cmm.typ_val
+    ~fun_dbg ~fun_attrs pp_body
 
 (* CR yusumez: Implement this *)
 let data ds =
@@ -505,7 +497,8 @@ let data ds =
 (* CR yusumez: We do this cumbersome list wrangling since we receive data
    declarations as a flat list. Ideally, [data_item]s would be represented in a
    more structured manner which we can directly pass on to [declare]. *)
-let collect_data t ~declare =
+let emit_data t =
+  let declare = F.data_decl t in
   let cur_sym, ds =
     List.fold_left
       (fun (cur_sym, ds) (d : Cmm.data_item) ->
@@ -538,9 +531,8 @@ let begin_assembly () =
 
 let end_assembly ~sourcefile =
   let t = Option.get !current_compilation_unit in
-  (* Emit source_file *)
   (* Emit data declarations *)
-  collect_data t ~declare:(F.data_decl t);
+  emit_data t;
   F.symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
   F.symbol_decl t "frametable";
@@ -555,6 +547,7 @@ let end_assembly ~sourcefile =
          (Asm_generation
             ( Option.value ~default:"(no source file specified)" sourcefile,
               ret_code )));
+  (* CR yusumez: This should be a separate flag (like save_llvmir). *)
   if not !Oxcaml_flags.dump_llvmir then remove_file t.llvmir_filename;
   current_compilation_unit := None
 
@@ -568,9 +561,14 @@ let end_assembly ~sourcefile =
    currently too tightly coupled with the [internal_assembler], especially in
    [asmlink] for shared libraries. *)
 (* CR gyorsh: how to emit data_begin/end and code_begin/end symbol? Do we still
-   need both of them with ocaml ? yusumez: For now, we are just emitting them as
-   global constants. *)
+   need both of them with ocaml ?
+
+   yusumez: For now, we are just emitting them as global constants.
+   code_begin/end are empty function decl's so that they end up in the proper
+   section. However, we currently don't have control over where they end up in
+   the asm file. *)
 (* CR gyorsh: assume 64-bit architecture *)
+
 (* Error report *)
 
 let report_error ppf = function
