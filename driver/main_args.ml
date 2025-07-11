@@ -1734,6 +1734,7 @@ struct
     mk_c F._c;
     mk_cc F._cc;
     mk_cclib F._cclib;
+>>>>>>> 551bdbcd39 (add lambda->flambda2 pass)
     mk_ccopt F._ccopt;
     mk_cmi_file F._cmi_file;
     mk_color F._color;
