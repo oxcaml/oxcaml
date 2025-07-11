@@ -53,7 +53,6 @@ Line 2, characters 30-40:
 2 |   let u : float @ external_ = (3.0 +. x) in
                                   ^^^^^^^^^^
 Error: This value is "internal" but expected to be "external_".
-
 |}]
 
 
@@ -92,8 +91,61 @@ Line 3, characters 36-37:
 Error: This value is "internal" but expected to be "external64".
 |}]
 
-type 'a t = { mutable f : 'a }
-let cannot_store_internal_in_external (t : 'a t @ external_) (x : 'a @ internal)=
+
+
+(*
+   CR jcutler: The code below is the expected behavior. For future axes where
+   the legacy mode is top, you are allowed to do this. Similarly you can write a
+   nonportable thing into a portable record.  You're just prevented from
+   creating a portable record with a mutable field not marked as @@ portable.
+ *)
+
+type 'a t = {mutable f : 'a}
+let foo (t : 'a t @ external_) (x : 'a @ internal) =
   t.f <- x
 [%%expect{|
+type 'a t = { mutable f : 'a; }
+val foo : 'a t -> 'a -> unit = <fun>
+|}]
+
+(* CR jcutler: In the above type's case, creating an @external_ record of this type
+   should be disallowed. *)
+
+let foo (t : 'a ref @ external_) (x : 'a @ internal) =
+  t := x
+[%%expect{|
+val foo : 'a ref -> 'a -> unit = <fun>
+|}]
+
+let foo (t : 'a array @ external_) (x : 'a @ internal) =
+  t.(0) <- x
+[%%expect{|
+val foo : 'a array -> 'a -> unit = <fun>
+|}]
+
+type 'a t = {mutable f : 'a @@ external_}
+let bar (t : 'a t @ external_) (x : 'a @ internal) =
+  t.f <- x
+[%%expect{|
+type 'a t = { mutable f : 'a @@ external_; }
+Line 3, characters 9-10:
+3 |   t.f <- x
+             ^
+Error: This value is "internal" but expected to be "external_".
+|}]
+
+
+(* CR jcutler: In the above case, creating an @external_ record of this type
+   should be *allowed*. *)
+
+type 'a external_ = { ext : 'a @@ external_ }
+let into_external () =
+  let _ : int option external_ = {ext = Some 3} in
+  ()
+[%%expect {|
+type 'a external_ = { ext : 'a @@ external_; }
+Line 3, characters 40-46:
+3 |   let _ : int option external_ = {ext = Some 3} in
+                                            ^^^^^^
+Error: This value is "internal" but expected to be "external_".
 |}]
