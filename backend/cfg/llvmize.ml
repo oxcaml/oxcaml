@@ -316,8 +316,11 @@ module F = struct
       let temp = load_reg_to_temp t i.arg.(0) in
       ins_store t temp i.res.(0)
     | Const_int n -> ins_store_nativeint t n i.res.(0)
-    | Const_symbol { sym_name; sym_global = _ } ->
-      ins_store_global t sym_name i.res.(0)
+    | Const_symbol { sym_name; sym_global } -> (
+      match sym_global with
+      | Global -> ins_store_global t sym_name i.res.(0)
+      | Local ->
+        Misc.fatal_error "Unimplemented instruction: local const symbol")
     | Intop op -> int_op t i op
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
     | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
