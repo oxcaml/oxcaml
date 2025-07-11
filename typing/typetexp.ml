@@ -594,9 +594,14 @@ let transl_type_param_var env loc attrs name_opt
 let transl_type_param env path jkind_default styp =
   let loc = styp.ptyp_loc in
   let transl_jkind_and_annot_opt jkind_annot name =
-    match jkind_annot with
-    | None -> jkind_default, None
-    | Some jkind_annot ->
+    match jkind_annot, name with
+    | None, None -> jkind_default, None
+    | None, Some var_name ->
+        begin match Env.find_variable_default var_name env with
+        | Some jkind -> jkind, None
+        | None -> jkind_default, None
+        end
+    | Some jkind_annot, _ ->
       Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot,
       Some jkind_annot
   in
@@ -1096,7 +1101,10 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
       let jkind =
         (* See Note [Global type variables] *)
         try TyVarEnv.lookup_global_jkind name
-        with Not_found -> TyVarEnv.new_jkind ~is_named:true policy
+        with Not_found ->
+          match Env.find_variable_default name env with
+          | Some jkind -> jkind
+          | None -> TyVarEnv.new_jkind ~is_named:true policy
       in
       let ty = TyVarEnv.new_var ~name jkind policy in
       TyVarEnv.remember_used name ty loc;
