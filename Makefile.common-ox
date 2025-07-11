@@ -200,7 +200,7 @@ _install: compiler
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa}
+	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}
 	$(cpl) -R _build/install/main/lib/ocaml/* _install/lib/ocaml/
 	if [ "x$(legacy_layout)" == "xyes" ] ; \
 	then \
@@ -466,7 +466,7 @@ boot-_install: runtime-stdlib
 	$(cpl) _build/_bootinstall/bin/* _install/bin/
 	$(cpl) -R _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/* \
     _install/lib/ocaml/
-	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa}
+	rm -f _install/lib/ocaml/{META,dune-package,Makefile.config,dynlink.cmxa,dynlink/dynlink.cmxa}
 	$(cpl) -R _build/_bootinstall/lib/ocaml/* _install/lib/ocaml/
 	rm -f _install/lib/ocaml/{META,dune-package}
 	rm -f _install/lib/ocaml/compiler-libs/*.cmo
