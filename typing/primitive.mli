@@ -23,7 +23,7 @@ type unboxed_integer =
   | Unboxed_int8
   | Unboxed_int
   (** We don't support an [int#] type in the stdlib. However, for consistency, it's
-      important that we have unboxed types corresponding to all of our integral types.
+      important that we have naked types corresponding to all of our integral types.
       This is also used when you write [int[@untagged]] in [external] functions. *)
 
 type unboxed_float = Unboxed_float64 | Unboxed_float32
