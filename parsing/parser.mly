@@ -4779,15 +4779,15 @@ atomic_type:
 
 
 (* This is the syntax of the actual type parameters in an application of
-  a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
-  We allow one of the following:
-  - zero parameters;
-  - one parameter:
-    an atomic type;
-    among other things, this can be an arbitrary type between parentheses;
-  - two or more parameters:
-    arbitrary types, between parentheses, separated with commas.
-  *)
+   a type constructor, such as int, int list, or (int, bool) Hashtbl.t.
+   We allow one of the following:
+   - zero parameters;
+   - one parameter:
+     an atomic type;
+     among other things, this can be an arbitrary type between parentheses;
+   - two or more parameters:
+     arbitrary types, between parentheses, separated with commas.
+ *)
 %inline actual_type_parameters:
   | /* empty */
       { [] }
@@ -4951,33 +4951,33 @@ operator:
   | infix_operator                              { $1 }
 ;
 %inline infixop3:
-  | op = INFIXOP3  { op }
-  | MOD            { "mod" }
+  | op = INFIXOP3 { op }
+  | MOD           { "mod" }
 ;
 %inline infix_operator:
-  | op = INFIXOP0  { op }
+  | op = INFIXOP0 { op }
   /* Still support the two symbols as infix operators */
-  | AT              {"@"}
+  | AT             {"@"}
   | ATAT           {"@@"}
-  | op = INFIXOP1  { op }
-  | op = INFIXOP2  { op }
-  | op = infixop3  { op }
-  | op = INFIXOP4  { op }
-  | PLUS            {"+"}
-  | PLUSDOT        {"+."}
-  | PLUSEQ         {"+="}
-  | MINUS           {"-"}
-  | MINUSDOT       {"-."}
-  | STAR            {"*"}
-  | PERCENT         {"%"}
-  | EQUAL           {"="}
-  | LESS            {"<"}
-  | GREATER         {">"}
-  | OR             {"or"}
-  | BARBAR         {"||"}
-  | AMPERSAND       {"&"}
-  | AMPERAMPER     {"&&"}
-  | COLONEQUAL     {":="}
+  | op = INFIXOP1 { op }
+  | op = INFIXOP2 { op }
+  | op = infixop3 { op }
+  | op = INFIXOP4 { op }
+  | PLUS           {"+"}
+  | PLUSDOT       {"+."}
+  | PLUSEQ        {"+="}
+  | MINUS          {"-"}
+  | MINUSDOT      {"-."}
+  | STAR           {"*"}
+  | PERCENT        {"%"}
+  | EQUAL          {"="}
+  | LESS           {"<"}
+  | GREATER        {">"}
+  | OR            {"or"}
+  | BARBAR        {"||"}
+  | AMPERSAND      {"&"}
+  | AMPERAMPER    {"&&"}
+  | COLONEQUAL    {":="}
 ;
 index_mod:
 | { "" }
