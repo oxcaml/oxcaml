@@ -21,6 +21,7 @@ end
 let default_concat ys = M.concat ys
 let comma_concat zs = M.concat ~sep:"," zs
 let chain_call Stdlib.Option.?'(sep : string option) arg =
+  (* CR generic-optional : also need to parse without the Module_name. prefix *)
   M.concat Stdlib.Option.?'sep arg
 
 let chain_call_2 Stdlib.Option.?'(sep) arg =
