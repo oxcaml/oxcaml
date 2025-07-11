@@ -1,8 +1,8 @@
-val ( = )   : int -> int -> bool
-val ( <> )  : int -> int -> bool
-val ( < )   : int -> int -> bool
-val ( > )   : int -> int -> bool
-val ( <= )  : int -> int -> bool
-val ( >= )  : int -> int -> bool
+external ( = ) : int -> int -> bool = "%equal"
+external ( <> ) : int -> int -> bool = "%notequal"
+external ( < ) : int -> int -> bool = "%lessthan"
+external ( > ) : int -> int -> bool = "%greaterthan"
+external ( <= ) : int -> int -> bool = "%lessequal"
+external ( >= ) : int -> int -> bool = "%greaterequal"
 
-val compare : int -> int -> int
+external compare : int -> int -> int = "%compare"
