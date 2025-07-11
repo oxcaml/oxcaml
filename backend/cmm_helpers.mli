@@ -1042,6 +1042,7 @@ val fundecl :
   codegen_option list ->
   Debuginfo.t ->
   Lambda.poll_attribute ->
+  machtype ->
   fundecl
 
 (** Create a cmm phrase for a function declaration. *)

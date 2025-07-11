@@ -132,7 +132,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       then fun_codegen
       else Cmm.No_CSE :: fun_codegen
     in
-    C.cfunction (C.fundecl entry_sym [] body fun_codegen dbg Default_poll)
+    C.cfunction
+      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in
