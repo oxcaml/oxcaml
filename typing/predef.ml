@@ -473,7 +473,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_array
        ~variance:Variance.full
        ~separability:Separability.Ind
-       ~param_jkind:(Jkind.Builtin.any_non_null ~why:Array_type_argument)
+       ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
@@ -482,7 +482,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_iarray
        ~variance:Variance.covariant
        ~separability:Separability.Ind
-       ~param_jkind:(Jkind.Builtin.any_non_null ~why:Array_type_argument)
+       ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds

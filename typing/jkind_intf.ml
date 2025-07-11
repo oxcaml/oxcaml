@@ -224,16 +224,14 @@ module History = struct
     | Peek_or_poke
     | Mutable_var_assignment
     | Old_style_unboxed_type
+    | Array_element
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
-  (* CR layouts v3: after implementing separability, [Array_element]
-     should instead accept representable separable jkinds. *)
   type concrete_legacy_creation_reason =
     | Unannotated_type_parameter of Path.t
     | Wildcard
     | Unification_var
-    | Array_element
 
   open Allowance
 

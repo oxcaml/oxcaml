@@ -2654,11 +2654,6 @@ let constrain_type_jkind_exn env texn ty jkind =
   | Ok _ -> ()
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 
-let type_legacy_sort ~why env ty =
-  let jkind, sort = Jkind.of_new_legacy_sort_var ~why in
-  match constrain_type_jkind env ty jkind with
-  | Ok _ -> Ok sort
-  | Error _ as e -> e
 
 (* Note: Because [estimate_type_jkind] actually returns an upper bound, this
    function computes an inaccurate intersection in some cases.

@@ -1335,24 +1335,6 @@ module Const = struct
         name = "any mod everything"
       }
 
-    (* CR layouts v3: replace with [any_separable] when
-       [or_null array]s are implemented. *)
-    let any_non_null =
-      { jkind =
-          mk_jkind Any ~mode_crossing:false ~nullability:Non_null
-            ~separability:Separable;
-        name = "any_non_null"
-      }
-
-    (* CR layouts v3: replace with [any_separable] when
-       [or_null array]s are implemented. *)
-    let any_non_null_mod_everything =
-      { jkind =
-          mk_jkind Any ~mode_crossing:true ~nullability:Non_null
-            ~separability:Separable;
-        name = "any_non_null mod everything"
-      }
-
     let value_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:false ~nullability:Maybe_null
@@ -1428,8 +1410,6 @@ module Const = struct
         name = "mutable_data"
       }
 
-    (* CR layouts v3: replace with [any_separable] when
-       [or_null array]s are implemented. *)
     let void =
       { jkind =
           mk_jkind (Base Void) ~mode_crossing:false ~nullability:Non_null
@@ -1451,8 +1431,6 @@ module Const = struct
         name = "immediate"
       }
 
-    (* CR layouts v3: replace with [any_separable] when
-       [or_null array]s are implemented. *)
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
@@ -1500,8 +1478,8 @@ module Const = struct
         name = "immediate64"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let float64 =
       { jkind =
           mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
@@ -1511,8 +1489,8 @@ module Const = struct
         name = "float64"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float =
       { jkind =
           mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
@@ -1522,8 +1500,8 @@ module Const = struct
         name = "float64 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let float32 =
       { jkind =
           mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null
@@ -1533,8 +1511,8 @@ module Const = struct
         name = "float32"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float32 =
       { jkind =
           mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null
@@ -1544,8 +1522,8 @@ module Const = struct
         name = "float32 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let word =
       { jkind =
           mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null
@@ -1553,8 +1531,8 @@ module Const = struct
         name = "word"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_nativeint =
       { jkind =
           mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null
@@ -1562,8 +1540,8 @@ module Const = struct
         name = "word mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let bits8 =
       { jkind =
           mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
@@ -1571,8 +1549,8 @@ module Const = struct
         name = "bits8"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int8 =
       { jkind =
           mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
@@ -1580,8 +1558,8 @@ module Const = struct
         name = "bits8 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let bits16 =
       { jkind =
           mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
@@ -1589,8 +1567,8 @@ module Const = struct
         name = "bits16"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int16 =
       { jkind =
           mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
@@ -1598,8 +1576,8 @@ module Const = struct
         name = "bits16 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let bits32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
@@ -1607,8 +1585,8 @@ module Const = struct
         name = "bits32"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null
@@ -1616,8 +1594,8 @@ module Const = struct
         name = "bits32 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let bits64 =
       { jkind =
           mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null
@@ -1625,8 +1603,8 @@ module Const = struct
         name = "bits64"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int64 =
       { jkind =
           mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
@@ -1634,8 +1612,8 @@ module Const = struct
         name = "bits64 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let vec128 =
       { jkind =
           mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null
@@ -1643,8 +1621,8 @@ module Const = struct
         name = "vec128"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let vec256 =
       { jkind =
           mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
@@ -1652,8 +1630,8 @@ module Const = struct
         name = "vec256"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let vec512 =
       { jkind =
           mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
@@ -1661,8 +1639,8 @@ module Const = struct
         name = "vec512"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
           mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
@@ -1670,8 +1648,8 @@ module Const = struct
         name = "vec128 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_256bit_vectors =
       { jkind =
           mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
@@ -1679,8 +1657,8 @@ module Const = struct
         name = "vec256 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when
-       [or_null array]s are implemented. *)
+    (* CR or_null: nullability here should be [Maybe_null], but is set
+       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_512bit_vectors =
       { jkind =
           mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
@@ -1691,8 +1669,6 @@ module Const = struct
     let all =
       [ any;
         any_mod_everything;
-        any_non_null;
-        any_non_null_mod_everything;
         value_or_null;
         value_or_null_mod_everything;
         value;
@@ -1974,7 +1950,6 @@ module Const = struct
       (* CR layouts v2.8: move this to predef *)
       (match name with
       | "any" -> Builtin.any.jkind
-      | "any_non_null" -> Builtin.any_non_null.jkind
       | "value_or_null" -> Builtin.value_or_null.jkind
       | "value" -> Builtin.value.jkind
       | "void" -> Builtin.void.jkind
@@ -2167,8 +2142,6 @@ module Jkind_desc = struct
   module Builtin = struct
     let any = max
 
-    let any_non_null = of_const Const.Builtin.any_non_null.jkind
-
     let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
     let value = of_const Const.Builtin.value.jkind
@@ -2247,10 +2220,6 @@ module Builtin = struct
     | _ ->
       fresh_jkind Jkind_desc.Builtin.any ~annotation:(mk_annot "any")
         ~why:(Any_creation why)
-
-  let any_non_null ~why =
-    fresh_jkind Jkind_desc.Builtin.any_non_null
-      ~annotation:(mk_annot "any_non_null") ~why:(Any_creation why)
 
   let value_v1_safety_check =
     { jkind = Jkind_desc.Builtin.value_or_null;
@@ -2665,6 +2634,25 @@ let for_float ident =
     ~annotation:None ~why:(Primitive ident)
   |> mark_best
 
+let for_array_argument =
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Maybe_null ~separability:Separability.Separable
+  in
+  fresh_jkind
+    { layout = Any; mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Any_creation Array_type_argument)
+
+let for_array_element_sort () =
+  let jkind_desc, sort = Jkind_desc.of_new_sort_var Maybe_null Separable in
+  let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
+  ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
+    sort )
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -2991,6 +2979,7 @@ module Format_history = struct
     | Mutable_var_assignment ->
       fprintf ppf "it's the type of a mutable variable used in an assignment"
     | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
+    | Array_element -> fprintf ppf "it's the type of an array element"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -2999,7 +2988,6 @@ module Format_history = struct
         !printtyp_path path
     | Wildcard -> fprintf ppf "it's a _ in the type"
     | Unification_var -> fprintf ppf "it's a fresh unification variable"
-    | Array_element -> fprintf ppf "it's the type of an array element"
 
   let rec format_annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =
@@ -3799,6 +3787,7 @@ module Debug_printers = struct
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Mutable_var_assignment -> fprintf ppf "Mutable_var_assignment"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
+    | Array_element -> fprintf ppf "Array_element"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3806,7 +3795,6 @@ module Debug_printers = struct
       fprintf ppf "Unannotated_type_parameter %a" !printtyp_path path
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
-    | Array_element -> fprintf ppf "Array_element"
 
   let rec annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =

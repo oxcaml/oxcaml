@@ -1955,7 +1955,7 @@ let rec update_decl_jkind env dpath decl =
     | _, Variant_with_null ->
       (* CR layouts v3.5: this case only happens with [or_null_reexport].
          Change when we allow users to write their own null constructors. *)
-      (* CR layouts v3.3: use [any_non_null]. *)
+      (* CR layouts v3.3: use the kind of the argument + [maybe_null]. *)
       cstrs, rep, Jkind.Builtin.value_or_null ~why:(Primitive Predef.ident_or_null)
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
