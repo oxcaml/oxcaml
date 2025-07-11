@@ -36,7 +36,7 @@ val meet_shape :
 (* This function has a slightly different interface; it is meant to be used only
    by functions in Typing_env *)
 val meet_type :
-  Typing_env.t ->
+  Meet_env.t ->
   Type_grammar.t ->
   Type_grammar.t ->
-  (Type_grammar.t Meet_env.meet_return_value * Typing_env.t) Or_bottom.t
+  (Type_grammar.t Meet_env.meet_return_value * Meet_env.t) Or_bottom.t
