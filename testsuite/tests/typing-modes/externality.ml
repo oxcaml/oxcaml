@@ -45,6 +45,17 @@ Line 2, characters 23-29:
 Error: This value is "internal" but expected to be "external_".
 |}]
 
+let float_is_not_external x =
+  let u : float @ external_ = (3.0 +. x) in
+  u
+[%%expect{|
+Line 2, characters 30-40:
+2 |   let u : float @ external_ = (3.0 +. x) in
+                                  ^^^^^^^^^^
+Error: This value is "internal" but expected to be "external_".
+
+|}]
+
 
 type t = {a : int; b : float}
 let record_is_not_external () =
@@ -81,8 +92,8 @@ Line 3, characters 36-37:
 Error: This value is "internal" but expected to be "external64".
 |}]
 
-type t = { mutable f : int option }
-let cannot_store_internal_in_external (t : t @ external_) =
-  t.f <- Some 3
+type 'a t = { mutable f : 'a }
+let cannot_store_internal_in_external (t : 'a t @ external_) (x : 'a @ internal)=
+  t.f <- x
 [%%expect{|
 |}]
