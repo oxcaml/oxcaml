@@ -8377,7 +8377,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
                   (type_option lbl (newvar Predef.option_argument_jkind))
             | Stdlib_or_null ->
                 unify_exp env arg
-                  (type_option lbl (newvar (Jkind.for_or_null_argument Predef.ident_or_null)))
+                  (type_option lbl
+                    (newvar (Jkind.for_or_null_argument Predef.ident_or_null)))
            )
        | Position _ ->
            unify_exp env arg (instance Predef.type_lexing_position));
