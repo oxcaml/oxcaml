@@ -2,7 +2,7 @@
  expect;
 *)
 
-type ('a : value) t : immediate_or_null with 'a = 'a or_null [@@or_null_reexport]
+type ('a : value) t : value_or_null = 'a or_null [@@or_null_reexport]
 
 [%%expect{|
 type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport]
@@ -97,19 +97,23 @@ type nested = int or_null or_null
 Line 1, characters 14-25:
 1 | type nested = int or_null or_null
                   ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
+Error: This type "int or_null" should be an instance of type
+         "('a : value_or_null mod non_null)"
        The kind of int or_null is immediate_or_null
          because it is the primitive immediate_or_null type or_null.
-       But the kind of int or_null must be a subkind of value
+       But the kind of int or_null must be a subkind of
+           value_or_null mod non_null
          because the type argument of or_null has kind value.
 |}, Principal{|
 Line 1, characters 14-25:
 1 | type nested = int or_null or_null
                   ^^^^^^^^^^^
-Error: This type "int or_null" should be an instance of type "('a : value)"
+Error: This type "int or_null" should be an instance of type
+         "('a : value_or_null mod non_null)"
        The kind of int or_null is immediate_or_null with int
          because it is the primitive immediate_or_null type or_null.
-       But the kind of int or_null must be a subkind of value
+       But the kind of int or_null must be a subkind of
+           value_or_null mod non_null
          because the type argument of or_null has kind value.
 |}]
 
@@ -124,7 +128,7 @@ Error: This expression has type "'a t" = "'a or_null"
        The kind of 'a t is immediate_or_null with 'a
          because it is the primitive immediate_or_null type or_null.
        But the kind of 'a t must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
 
 let should_also_fail = This Null
@@ -138,7 +142,7 @@ Error: This expression has type "'a t" = "'a or_null"
        The kind of 'a t is immediate_or_null with 'a
          because it is the primitive immediate_or_null type or_null.
        But the kind of 'a t must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
 
 let mk' n = `Foo (This n)
@@ -433,7 +437,7 @@ Error: This expression has type "unboxed_rec"
        The kind of unboxed_rec is immediate_or_null
          because it is the primitive immediate_or_null type or_null.
        But the kind of unboxed_rec must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
 
 let should_fail_unboxed_var = This (Wrap Null)
@@ -447,7 +451,7 @@ Error: This expression has type "unboxed_var"
        The kind of unboxed_var is immediate_or_null
          because it is the primitive immediate_or_null type or_null.
        But the kind of unboxed_var must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]
 
 let should_fail_unboxed_gadt = This (Gadt Null)
@@ -461,5 +465,5 @@ Error: This expression has type "('a, 'a or_null) gadt"
        The kind of ('a, 'a or_null) gadt is immediate_or_null with 'a
          because it is the primitive immediate_or_null type or_null.
        But the kind of ('a, 'a or_null) gadt must be a subkind of value
-         because of the definition of t at line 1, characters 0-81.
+         because of the definition of t at line 1, characters 0-69.
 |}]

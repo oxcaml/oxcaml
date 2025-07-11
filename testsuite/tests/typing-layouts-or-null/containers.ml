@@ -260,7 +260,8 @@ let should_work_option3 = None
 
 [%%expect{|
 val should_work_option1 : float or_null option = Some (This 3.4)
-val should_work_option2 : 'a or_null option = Some Null
+val should_work_option2 :
+  ('a : value_or_null mod non_null). 'a or_null option = Some Null
 val should_work_option3 : 'a option = None
 |}]
 
