@@ -1213,6 +1213,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let param_suffix =
         match l with
         | Optional name -> name
+        | Generic_optional (_, name) -> name
         | Nolabel | Labelled _ ->
           Misc.fatal_error "[default] allowed only with optional argument"
       in

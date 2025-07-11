@@ -589,6 +589,16 @@ rule token = parse
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf;
         OPTLABEL name }
+  | ".?'"
+      { DOTQUESTIONQUOTE }
+  | ".?'" raw_ident_escape (lowercase identchar * as name) ':'
+      { GENOPTLABEL name }
+  | ".?'" (lowercase identchar * as name) ':'
+      { check_label_name lexbuf name;
+        GENOPTLABEL name }
+  | ".?'" (lowercase_latin1 identchar_latin1 * as name) ':'
+      { warn_latin1 lexbuf;
+        GENOPTLABEL name }
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)

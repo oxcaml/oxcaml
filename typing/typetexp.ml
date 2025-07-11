@@ -98,6 +98,7 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
+  | Invalid_generic_optional_argument_module_path of Longident.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -670,6 +671,24 @@ let transl_label (label : Parsetree.arg_label)
       -> raise (Error (arg.ptyp_loc, Env.empty, Invalid_label_for_call_pos label))
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
+  | Generic_optional (mod_ident, l), _ -> (
+    match Language_extension.is_enabled Generic_optional_arguments with
+    | false ->
+      raise
+        (Error (mod_ident.loc,
+                Env.empty,
+                Unsupported_extension Generic_optional_arguments));
+    | true ->
+      match mod_ident with
+      | { txt = Longident.Ldot (Longident.Lident "Stdlib", "Option")
+        ; _ } -> Optional l
+      | { loc ; txt } ->  (
+        raise
+          (Error (loc,
+                  Env.empty,
+                  Invalid_generic_optional_argument_module_path txt))
+      )
+  )
   | Nolabel, _ -> Nolabel
 
 (* Parallel to [transl_label_from_expr]. *)
@@ -1628,7 +1647,16 @@ let report_error env ppf =
         (match arg_label with
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
+        | Generic_optional _ -> "generic optional"
         | Labelled _ -> assert false )
+  | Invalid_generic_optional_argument_module_path lid ->
+      (* CR generic-optional : Add Hint.
+        Hint: the specified module path should contain a submodule named <NAME>.
+      *)
+      fprintf ppf
+        "Invalid generic optional argument module path: %a"
+        (Style.as_inline_code longident) lid
+
 
 let () =
   Location.register_error_of_exn
