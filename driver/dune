@@ -11,11 +11,6 @@
  (action
   (copy optmain.ml %{targets})))
 
-(rule
- (targets jsmain_native.ml)
- (action
-   (copy jsmain.ml %{targets})))
-
 (library
  (name oxcaml_driver)
  (modes byte native)

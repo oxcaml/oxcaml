@@ -351,20 +351,12 @@
    jscompile))
 
 (executable
- (name jsmain)
- (modes byte)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlcommon flambda2)
- (modules jsmain))
-
-(executable
- (name jsmain_native)
+ (name boot_ocamlj)
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamljcomp ocamlcommon flambda2)
- (modules jsmain_native))
+ (modules boot_ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
@@ -412,8 +404,7 @@
 
 (install
  (files
-  (main.bc as ocamlj.byte)
-  (jsmain_native.exe as ocamlj.opt))
+  (boot_ocamlj.exe as ocamlj.opt))
  (section bin)
  (package ocaml))
 
