@@ -1508,7 +1508,7 @@ module Lattices_mono = struct
     | Extracted :
         ('b, 'c, 'l * 'r) morph * 'b obj * ('a, 'b) Axis.t
         -> ('a, 'c, 'l, 'r) extracted_trailing_proj
-
+  (*
   (** Given a morphism, [f], expected (but not required) to be a composition morphism,
    if it can find that the final morphism of the composition is a projection, [proj],
    it returns the axis for this, along with the previous composition morphism, [f'],
@@ -1523,8 +1523,8 @@ module Lattices_mono = struct
         (fun (Extracted (g', mid, ax)) -> Extracted (Compose (f, g'), mid, ax))
         (extract_trailing_proj_from_morph g)
     | _ -> None
-    [@@ocaml.warning "-4"]
-
+    [@@ocaml.warning "-4"] *)
+  (*
   (** [maybe_compose_with_proj ax f] will consider the composition [proj . f]
    (where [proj] is a projection to axis [ax]) and run maybe_compose
    on this. Due to the nature of this operation, the return type can be more specific,
@@ -1550,7 +1550,7 @@ module Lattices_mono = struct
       | None -> None
       | Some (Extracted (f', b2_obj, ax2)) -> ProjThenMorph (f', b2_obj, ax2))
     | Some f' -> Single f'
-   [@@ocaml.warning "-4"]
+   [@@ocaml.warning "-4"] *)
 
   let rec left_adjoint :
       type a b l.
@@ -1659,13 +1659,16 @@ type 'a responsible_axis =
      from a product object to a single axis, this function
      is used to find the axis in the source that is responsible for the
      output axis object.
+
      If the source object is a single axis, this function should end up
      returning [SourceIsSingle], otherwise the source object is a product, and the
      function should return [Axis ax] where [ax] is the single axis in the
      source object that is responsible for the output.
+
      NOTE: there is also a rare special case where none of the axes of the source object
       (whether it is a product or a single axis) are responsible, in which
       case [NoneResponsible] is returned.
+
      NOTE: given the morphisms defined, there should only ever be a single source
      axis responsible for the output axis, otherwise this function wouldn't be properly
      definable. *)
@@ -1705,7 +1708,6 @@ and find_responsible_axis_prod :
       | Portability -> Axis Contention
       | Yielding -> NoneResponsible
       | Statefulness -> Axis Visibility
-      [@@inline]
     in
     match m, ax with
     | Compose (g, f), ax -> (
@@ -1738,48 +1740,111 @@ and find_responsible_axis_prod :
     | Global_to_regional, _ ->
       .
 
+module Shint_to_hint_inp = struct
+  open Lattices_mono
+
+  type ('a, 'd) t =
+    | Upper : ('a, left_only) S.hint -> ('a, left_only) t
+    | Lower : ('a, right_only) S.hint -> ('a, right_only) t
+
+  let rec compose_shint_with_proj :
+      type a b l r.
+      b obj -> (a, b, l * r) morph -> (a, l * r) S.hint -> (b, l * r) S.hint =
+    fun (type a b l r) (b_obj : b obj) (proj : (a, b, l * r) morph)
+        (shint : (a, l * r) S.hint) ->
+     match shint with
+     | S.Morph (morph_hint, morph, b_shint) ->
+       S.Morph (morph_hint, compose b_obj proj morph, b_shint)
+     | S.Const r_const_hint -> S.Const r_const_hint
+     | S.Branch (x, x_hint, y, y_hint) ->
+       S.Branch
+         ( apply b_obj proj x,
+           compose_shint_with_proj b_obj proj x_hint,
+           apply b_obj proj y,
+           compose_shint_with_proj b_obj proj y_hint )
+
+  let rec compose_shint_inp_with_proj :
+      type a b l r. b obj -> (a, b, l * r) morph -> (a, l * r) t -> (b, l * r) t
+      =
+   fun b_obj proj shint_inp ->
+    match shint_inp with
+    | Upper shint -> Upper (compose_shint_with_proj b_obj proj shint)
+    | Lower shint -> Lower (compose_shint_with_proj b_obj proj shint)
+
+  let adjoint :
+      type a b l r.
+      (a, l * r) t -> b obj -> (a, b, l * r) morph -> (b, a, r * l) morph =
+    fun (type a b l r) (hint_inp : (a, l * r) t) (b_obj : b obj)
+        (m : (a, b, l * r) morph) ->
+     match hint_inp with Upper _ -> _ | Lower _ -> _
+end
+
 let rec project_solver_hint_to_axis_hint :
-    type r a.
+    type r a left right.
     r Lattices_mono.obj ->
     r ->
-    (r, 'd) S.hint ->
+    (r, left * right) Shint_to_hint_inp.t ->
     (r, a) Axis.t ->
     (a, Hint.morph, Hint.const) hint =
   let open Lattices_mono in
-  fun (type r a) (r_obj : r obj) (r : r) (r_s_hint : (r, 'd) S.hint)
-      (ax : (r, a) Axis.t) ->
-    (* This function is for when we have a hint for a product lattice and
+  fun (type r a left right) (r_obj : r obj) (r : r)
+      (r_shint_inp : (r, left * right) Shint_to_hint_inp.t) (ax : (r, a) Axis.t) ->
+    (* This function is for when we have a solver hint (aka "shint") for a product lattice and
        wish to project the hint to be for a single axis and convert it to a mode hint. *)
     let a_obj = proj_obj ax r_obj in
     let proj = Proj (r_obj, ax) in
     let a = apply a_obj proj r in
-    let a_s_hint : (a, 'd) S.hint =
-      let rec compose_s_hint_with_proj = function
-        | S.Morph (morph_hint, morph, b_s_hint) ->
-          S.Morph (morph_hint, compose a_obj proj morph, b_s_hint)
-        | S.Const r_const_hint -> S.Const r_const_hint
-        | S.Branch (x, x_hint, y, y_hint) ->
-          S.Branch
-            ( apply a_obj proj x,
-              compose_s_hint_with_proj x_hint,
-              apply a_obj proj y,
-              compose_s_hint_with_proj y_hint )
-      in
-      compose_s_hint_with_proj r_s_hint
+    let a_shint_inp : (a, _) Shint_to_hint_inp.t =
+      Shint_to_hint_inp.compose_shint_inp_with_proj a_obj proj r_shint_inp
     in
-    single_axis_solver_hint_to_hint a_obj a a_s_hint
+    single_axis_solver_hint_to_hint a_obj a a_shint_inp
 
 and single_axis_solver_hint_to_hint :
-    type a r.
+    type r a l r.
     a Lattices_mono.obj ->
     a ->
-    (a, 'd) S.hint ->
+    (a, l * r) Shint_to_hint_inp.t ->
     (a, Hint.morph, Hint.const) hint =
   let open Lattices_mono in
-  fun (type a r) (a_obj : a obj) (a : a) (a_s_hint : (a, 'd) S.hint) ->
-    (* This function is for when we have a hint for a single axis and
-       wish to convert it to a mode hint. *)
-    _
+  fun (type r a l r) (a_obj : a obj) (a : a)
+      (a_shint_inp : (a, l * r) Shint_to_hint_inp.t) ->
+    (* This function is for when we have a solver hint (aka "shint") for a
+       single axis and wish to convert it to a mode hint. *)
+    (* TODO - this is starting to get complicated.
+       Review whether this is really the approach I want to take! *)
+    let handle_with_allowance :
+        type l r. (a, l * r) S.hint -> (a, Hint.morph, Hint.const) hint =
+      function
+      | Morph (morph_hint, morph, b_shint) -> (
+        let b_obj = src a_obj morph in
+        let morph_inv = Shint_to_hint_inp.adjoint a_shint_inp a_obj morph in
+        (* TODO - this is only implementing using left-adjoint. Need to implement
+           using either left or right adjoint, but this will require notable changes to the function signature. *)
+        let b = apply b_obj morph_inv a in
+        match find_responsible_axis_single morph with
+        | NoneResponsible -> Empty
+        | SourceIsSingle ->
+          let b_hint = single_axis_solver_hint_to_hint b_obj b b_shint in
+          Morph (a, morph_hint, b_hint)
+        | Axis b_ax ->
+          let b_hint = project_solver_hint_to_axis_hint b_obj b b_shint b_ax in
+          Morph (a, morph_hint, b_hint))
+      | Const a_const_hint -> Const (a, a_const_hint)
+      | Branch (x, x_hint, y, y_hint) ->
+        (* TODO - this is only designed for handling upper bounds,
+           finish this when fixing for left-/right-adjoints too *)
+        let chosen, chosen_hint =
+          if C.le a_obj x y
+          then x, x_hint
+          else if C.le a_obj y x
+          then y, y_hint
+          else
+            (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
+            assert false
+        in
+        single_axis_solver_hint_to_hint a_obj chosen chosen_hint
+    in
+    match a_shint_inp with _ -> _
 
 (* let rec project_solver_hint_to_axis_hint :
        type r a.
