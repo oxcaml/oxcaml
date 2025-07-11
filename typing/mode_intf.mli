@@ -14,6 +14,11 @@
 
 open Allowance
 
+type 'a serror =
+  { left : 'a;
+    right : 'a
+  }
+
 (* While all our lattices are bi-Heyting algebras (see [mode.ml]), the extra
    structure is not directly useful to the user, so we only expose the basic
    lattice structure. *)
@@ -126,8 +131,7 @@ end
 module type Common_axis = sig
   module Const : Lattice
 
-  include
-    Common with module Const := Const and type error = Const.t Solver.error
+  include Common with module Const := Const and type error = Const.t serror
 end
 
 module type Common_product = sig
@@ -135,7 +139,7 @@ module type Common_product = sig
 
   module Const : Lattice_product with type 'a axis = 'a axis
 
-  type error = Error : 'a axis * 'a Solver.error -> error
+  type error = Error : 'a axis * 'a serror -> error
 
   include Common with type error := error and module Const := Const
 end
@@ -499,7 +503,7 @@ module type S = sig
       val print_axis : ('a, _, _) Axis.t -> Format.formatter -> 'a -> unit
     end
 
-    type error = Error : ('a, _, _) Axis.t * 'a Solver.error -> error
+    type error = Error : ('a, _, _) Axis.t * 'a serror -> error
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
@@ -620,8 +624,7 @@ module type S = sig
     module Value : sig
       type atom := t
 
-      type error =
-        | Error : ('a, _, _) Value.Axis.t * 'a raw Solver.error -> error
+      type error = Error : ('a, _, _) Value.Axis.t * 'a raw serror -> error
 
       type nonrec equate_error = equate_step * error
 
