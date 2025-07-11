@@ -4770,9 +4770,9 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
-  | LESSLBRACKET atomic_type RBRACKETGREATER
+  | LESSLBRACKET core_type RBRACKETGREATER
       { quotation_reserved "<[" $loc($1) }
-  | LESSLBRACKET atomic_type error
+  | LESSLBRACKET core_type error
       { unclosed "<[" $loc($1) "]>" $loc($3) }
   | DOLLAR error
       { quotation_reserved "$" $loc($1) }

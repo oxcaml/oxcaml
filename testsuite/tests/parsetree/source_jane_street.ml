@@ -1509,3 +1509,24 @@ let triangle_10 = let mutable x = 0 in
 [%%expect{|
 val triangle_10 : int = 55
 |}]
+
+(**********************)
+(* runtime quotations *)
+
+let quoted_expr = <[123]>;;
+
+[%%expect{|
+Error: Syntax error: `<[` is reserved for use in runtime metaprogramming.
+|}]
+
+let splices = <[42 + $quoted_expr]>;;
+
+[%%expect{|
+Error: Syntax error: `$` is reserved for use in runtime metaprogramming.
+|}]
+
+type 'a t = <[int * $'a]>
+
+[%%expect{|
+Error: Syntax error: `$` is reserved for use in runtime metaprogramming.
+|}]
