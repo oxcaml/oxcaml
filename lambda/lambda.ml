@@ -2355,7 +2355,10 @@ let layout_of_mixed_block_shape
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
 let primitive_result_layout (p : primitive) =
-  assert !Clflags.native_code;
+  (* This assertion is no longer true, as we also use Flambda2 to generate Js_of_ocaml IR.
+     CR selee: Come back and check this is okay
+
+     assert !Clflags.native_code; *)
   match p with
   | Popaque layout | Pobj_magic layout -> layout
   | Pbytes_to_string | Pbytes_of_string -> layout_string

@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Bytecode compilation for .ml and .mli files. *)
+(** Js_of_ocaml IR compilation for .ml and .mli files. *)
 
 val interface : source_file:string -> output_prefix:string -> unit
 
@@ -36,26 +36,12 @@ val instance :
 
 (** {2 Internal functions} **)
 
-(* CR selee: Leaving these here for now - they'll be modified later to emit
-   jsir instead. *)
-
-(** [to_bytecode info typed] takes a typechecked implementation
-    and returns its bytecode.
+(** [to_jsir info typed] takes a typechecked implementation
+    and returns its Js_of_ocaml IR representation.
 *)
-val to_bytecode :
+val to_jsir :
   Compile_common.info ->
   Typedtree.implementation ->
   as_arg_for:Global_module.Parameter_name.t option ->
-  Instruct.instruction list
-  * Compilation_unit.Set.t
-  * Lambda.main_module_block_format
-  * Lambda.arg_descr option
-
-(** [emit_bytecode bytecode] output the bytecode executable. *)
-val emit_bytecode :
-  Compile_common.info ->
-  Instruct.instruction list
-  * Compilation_unit.Set.t
-  * Lambda.main_module_block_format
-  * Lambda.arg_descr option ->
+  (* CR selee: replace return type with JSIR type *)
   unit

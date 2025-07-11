@@ -345,7 +345,7 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
- (libraries ocamlcommon ocamlbytecomp)
+ (libraries ocamlcommon ocamlbytecomp flambda2)
  (modules
    jsmaindriver
    jscompile))
