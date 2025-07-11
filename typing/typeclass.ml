@@ -1339,7 +1339,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
                   arg, Jkind.Sort.value
                 else
-                  Typecore.type_option_some val_env sarg ty ty0,
+                  Typecore.type_option_some val_env l sarg ty ty0,
                   (* CR layouts v5: Change the sort when options can hold
                      non-values. *)
                   Jkind.Sort.value
