@@ -232,9 +232,9 @@ module F = struct
   let pp_attrs ppf attrs =
     fprintf ppf "%a" (pp_print_list ~pp_sep:pp_comma pp_print_string) attrs
 
-  let define t ~fun_name ~fun_args ~fun_res_type ~fun_dbg ~fun_attrs pp_body =
+  let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
     line t.ppf "%a" pp_dbg fun_dbg;
-    line t.ppf "define %a @%s(%a) %a {" pp_machtyp fun_res_type fun_name
+    line t.ppf "define %a @%s(%a) %a {" pp_machtyp fun_ret_type fun_name
       (pp_fun_args t) fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}"
@@ -464,7 +464,8 @@ let cfg (cl : CL.t) =
         fun_contains_calls = _ (* not used at this point *);
         fun_num_stack_slots = _ (* only available after regalloc *);
         fun_poll = _ (* not needed after poll insertion *);
-        next_instruction_id = _
+        next_instruction_id = _;
+        fun_ret_type
       } =
     cfg
   in
@@ -488,8 +489,7 @@ let cfg (cl : CL.t) =
   let fun_attrs = fun_attrs t fun_codegen_options in
   (* fill fields in [t] before emitting *)
   collect_regs t cfg;
-  F.define t ~fun_name ~fun_args ~fun_res_type:Cmm.typ_val ~fun_dbg ~fun_attrs
-    pp_body
+  F.define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body
 
 (* CR yusumez: Implement this *)
 let data ds =
