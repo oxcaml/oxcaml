@@ -1363,7 +1363,6 @@ struct
     mk_no_extension F._no_extension;
     mk_extension_universe F._extension_universe;
     mk_noassert F._noassert;
-
     mk_noinit F._noinit;
     mk_nolabels F._nolabels;
     mk_prompt F._prompt;
