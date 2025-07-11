@@ -8342,7 +8342,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
            unify_exp env arg
              (type_option(newvar Predef.option_argument_jkind))
        | Generic_optional _ ->
-           (* CR layouts v5: relax value requirement *)
+           (* CR generic-optional: need to not use Predef.option *)
            unify_exp env arg
              (type_option(newvar Predef.option_argument_jkind))
        | Position _ ->
@@ -8410,6 +8410,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
           let arg = type_option_none env (instance ty_arg) Location.none in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
       | Generic_optional _ ->
+           (* CR generic-optional: need to not use Predef.option *)
           let arg = type_option_none env (instance ty_arg) Location.none in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
       | Position _ ->
