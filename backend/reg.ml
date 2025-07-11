@@ -63,7 +63,7 @@ module For_testing = struct
   let get_stamp () = !currstamp
   let set_state ~stamp ~relocatable_regs =
     currstamp := stamp;
-    all_relocatable_regs := relocatable_regs  
+    all_relocatable_regs := relocatable_regs
 end
 
 let create_gen ~name ~typ ~loc =
@@ -148,13 +148,15 @@ let reinit_relocatable_regs () = List.iter (fun r -> r.loc <- Unknown) !all_relo
 
 let all_relocatable_regs () = !all_relocatable_regs
 
+external rank_machtype_component : machtype_component -> int = "%identity"
+
 let compare r1 r2 =
-  let c = Int.compare r1.stamp r2.stamp in
+  let c = r1.stamp - r2.stamp in
   if c <> 0 then c
-  else Cmm.compare_machtype_component r1.typ r2.typ
+  else (rank_machtype_component r1.typ) - (rank_machtype_component r2.typ)
 
 let same r1 r2 =
-  r1.stamp = r2.stamp && Cmm.equal_machtype_component r1.typ r2.typ
+  r1.stamp = r2.stamp && (rank_machtype_component r1.typ) = (rank_machtype_component r2.typ)
 
 module RegOrder = struct
   type t = reg
