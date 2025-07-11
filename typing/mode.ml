@@ -1495,54 +1495,62 @@ module Lattices_mono = struct
    fun dst f g ->
     match maybe_compose dst f g with Some m -> m | None -> Compose (f, g)
 
-  (*
- (** [maybe_compose_with_proj a f] will consider the composition [proj_a . f]
-  (where [proj_a] is a projection to axis [a]) and run maybe_compose
-  on this. Due to the nature of this operation, the return type can be more specific,
-  it will return one of:
-  1. a single morphism that represents the composition,
-  2. a composition of the form [f' . proj'],
-    where [f'] is a new morphism, and [proj'] is a new projection,
-  3. TODO - continue *)
-  let rec maybe_compose_with_proj :
-      type a b c l r.
-      (a, b, l * r) morph ->
-      b obj ->
-      (b, c) Axis.t ->
-      [ `None
-      | `Single of (a, c, l * r) morph
-      | `ProjThen of (b2, c, l * r) morph * b2 obj * (a, b2) Axis.t ]
-
-*)
-
-  type (_, _, _, _, _) tmp_t =
-    | None : ('a, 'b, 'c, 'l, 'r) tmp_t
-    | Single : ('a, 'c, 'l * 'r) morph -> ('a, 'b, 'c, 'l, 'r) tmp_t
+  type (_, _, _, _) maybe_compose_with_proj_result =
+    | None : ('a, 'c, 'l, 'r) maybe_compose_with_proj_result
+    | Single :
+        ('a, 'c, 'l * 'r) morph
+        -> ('a, 'c, 'l, 'r) maybe_compose_with_proj_result
     | ProjThenMorph :
         ('b2, 'c, 'l * 'r) morph * 'b2 obj * ('a, 'b2) Axis.t
-        -> ('a, 'b, 'c, 'l, 'r) tmp_t
+        -> ('a, 'c, 'l, 'r) maybe_compose_with_proj_result
 
-  type (_, _, _, _) tmp_extracted =
-    | None : (_, _, _, _) tmp_extracted
+  type (_, _, _, _) extracted_trailing_proj =
     | Extracted :
         ('b, 'c, 'l * 'r) morph * 'b obj * ('a, 'b) Axis.t
-        -> ('a, 'c, 'l, 'r) tmp_extracted
+        -> ('a, 'c, 'l, 'r) extracted_trailing_proj
 
-  let extract_trailing_proj_from_morph :
+  (** Given a morphism, [f], expected (but not required) to be a composition morphism,
+   if it can find that the final morphism of the composition is a projection, [proj],
+   it returns the axis for this, along with the previous composition morphism, [f'],
+   such that [f = f' . proj]. *)
+  let rec extract_trailing_proj_from_morph :
       type a b l r.
-      (a, b, l * r) morph -> (_ * (a, b, l, r) tmp_extracted) option = function
-    | _ -> _
+      (a, b, l * r) morph -> (a, b, l, r) extracted_trailing_proj option =
+    function
+    | Compose (f, Proj (mid, ax)) -> Some (Extracted (f, mid, ax))
+    | Compose (f, g) ->
+      Option.map
+        (fun (Extracted (g', mid, ax)) -> Extracted (Compose (f, g'), mid, ax))
+        (extract_trailing_proj_from_morph g)
+    | _ -> None
+    [@@ocaml.warning "-4"]
 
+  (** [maybe_compose_with_proj ax f] will consider the composition [proj . f]
+   (where [proj] is a projection to axis [ax]) and run maybe_compose
+   on this. Due to the nature of this operation, the return type can be more specific,
+   returning one of:
+   1. [Single f'] - when a single, non-compositional morphism, [f'],
+        can represents the composition,
+   2. [ProjThenMorph] - when the composition is simplified to a composition of the
+        form [f' . proj'], where [f'] is a new morphism, and [proj'] is a new projection,
+   3. [None] - when the other cases don't apply. This should be a rare case. *)
   let rec maybe_compose_with_proj :
       type a b c l r.
       b obj ->
       c obj ->
       (b, c) Axis.t ->
       (a, b, l * r) morph ->
-      (a, b, c, l, r) tmp_t =
+      (a, c, l, r) maybe_compose_with_proj_result =
    fun b_obj c_obj ax f ->
     let proj = Proj (b_obj, ax) in
-    match maybe_compose c_obj proj f with None -> None | Some f' -> _
+    match maybe_compose c_obj proj f with
+    | None -> None
+    | Some (Compose _ as f_comp) -> (
+      match extract_trailing_proj_from_morph f_comp with
+      | None -> None
+      | Some (Extracted (f', b2_obj, ax2)) -> ProjThenMorph (f', b2_obj, ax2))
+    | Some f' -> Single f'
+   [@@ocaml.warning "-4"]
 
   let rec left_adjoint :
       type a b l.
@@ -1622,24 +1630,6 @@ module C = Lattices_mono
 module Solver = Solver_mono (Hint) (C)
 module S = Solver
 
-let solver_error_to_serror : 'a S.error -> ('a, Hint.morph, Hint.const) axerror
-    =
-  let rec construct_with_hint (m : 'a) :
-      'a S.hint -> ('a, Hint.morph, Hint.const) hint = function
-    | Morph (hint, morph, b_hint) ->
-      let b_hint' = _ in
-      Morph (m, hint, b_hint')
-    | Const hint -> Const (m, hint)
-    | Branch _ -> _
-  in
-  fun { left; left_hint; right; right_hint } ->
-    { left = construct_with_hint left left_hint;
-      right = construct_with_hint right right_hint
-    }
-
-let flip_and_solver_error_to_serror : 'a S.error -> 'a axerror =
- fun { left; left_hint = _; right; right_hint = _ } -> { right; left }
-
 type monadic = C.monadic =
   { uniqueness : C.Uniqueness.t;
     contention : C.Contention.t;
@@ -1656,34 +1646,118 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
-let project_solver_hint_to_axis_hint :
+type ('a, 'd) tmp_extract_res =
+  | EMorph :
+      (Hint.morph * ('b, 'a, 'd) C.morph * ('b, 'd) S.hint)
+      -> ('a, 'd) tmp_extract_res
+  | EConst : Hint.const -> ('a, 'd) tmp_extract_res
+
+let extract : type a d. a -> (a, d) S.hint -> (a, d) tmp_extract_res =
+  fun (type a d) a a_hint -> _
+
+let rec project_solver_hint_to_axis_hint :
     type r a.
     r Lattices_mono.obj ->
     r ->
-    r S.hint ->
+    (r, 'd) S.hint ->
     (r, a) Axis.t ->
     (a, Hint.morph, Hint.const) hint =
   let open Lattices_mono in
-  fun r_obj r r_hint axis ->
-    match r_hint with
+  fun r_obj r r_s_hint ax ->
+    (* This function is for when we have a hint for a product lattice and
+       wish to project the hint to be for a single axis and convert it to a mode hint. *)
+    let proj = Proj (r_obj, ax) in
+    let a_obj = proj_obj ax r_obj in
+    let a = apply a_obj proj r in
+    (* We currently have a hint, [r_hint], for [r], and we project [r] to axis [ax] using
+       the projection morphism [proj] to get [a = proj r].  Next, we need to decide what
+       the next value to consider is, depending on [r]'s hint *)
+    match r_s_hint with
     | Morph (morph_hint, morph, b_s_hint) -> (
-      let proj_morph = Proj (r_obj, axis) in
-      let a_obj = proj_obj axis r_obj in
-      let a = apply a_obj proj_morph r in
-      match maybe_compose a_obj proj_morph morph with
-      | None ->
-        failwith
-          "TODO - just stop the hinting there, don't try continue down it"
-      | Some morph_with_proj ->
-        let b_hint : ('b, Hint.morph, Hint.const) hint = _ in
-        Morph (a, failwith "TODO", b_hint))
-    | Const a_hint -> _
-    | Branch (a, a_hint, b, b_hint) -> _
+      (* In this case, we have that [r = f b]. Since we are looking to find [proj r],
+         we apply [proj] to both sides of this to get, [a = (proj . f) b]
+         (noting that [a = proj r]).
+         We use [maybe_compose_with_proj] to simplify this. *)
+      match maybe_compose_with_proj r_obj a_obj ax morph with
+      | None -> Morph (a, morph_hint, Empty)
+      | Single f' ->
+        (* In this case, we have that [proj . f = f'], where [f'] is a function on a single axis.
+           Therefore, we have that [a = f' b]. We are now looking to find [b], so we need to invert
+           [f'] in some way to get [f'_inv], such that [f'_inv a = b].
+           Note that this function will be chosen to either be a left adjoint or a right adjoint,
+           as the form we are looking to solve will actually be an inequality, [a <= f' b], or
+           [a >= f' b], and depending on the caller, we must therefore use either the left-
+           or right-adjoint of [f'], respectively. *)
+        let b_obj = src a_obj f' in
+        let f'_inv = left_adjoint a_obj f' in
+        (* TODO - this is only implementing using left-adjoint. Need to implement
+           usign either left or right adjoint, but this will require notable changes to the function signature. *)
+        let b = apply b_obj f'_inv a in
+        let b_hint = single_axis_solver_hint_to_hint b_obj _ b b_s_hint in
+        Morph (a, morph_hint, b_hint)
+      | ProjThenMorph (f', b2_obj, b2_ax) ->
+        (* In this case, we have that [proj . f = f' . proj'], for some new morphism, [f'],
+           and a new projection, [proj']. Similarly to above, we are looking to find [b] in
+           [a = (f' . proj') b]. So, we again find [f'_inv] and then we get [f'_inv a = proj' b].
+           We let [b2 = f'_inv a], so therefore, [b2 = proj' b].  Now we can recurse onto
+           the [proj' b] term to continue the analysis, as it is in the required form. *)
+        let f'_inv = left_adjoint a_obj f' in
+        (* TODO - as above, need to make this more general *)
+        let b2 = apply b2_obj f'_inv a in
+        let b2_hint =
+          single_axis_solver_hint_to_hint b2_obj b2_ax b2 b_s_hint
+        in
+        Morph (a, morph_hint, b2_hint))
+    | Const r_const_hint -> Const (a, r_const_hint)
+    | Branch (x, x_hint, y, y_hint) ->
+      (* TODO - this case will require choosing between two parts of the branch.
+         This should be possible after projection, as single axes are totally-ordered. *)
+      _
+
+and single_axis_solver_hint_to_hint :
+    type a r.
+    a Lattices_mono.obj ->
+    (r, a) Axis.t ->
+    a ->
+    (a, 'd) S.hint ->
+    (a, Hint.morph, Hint.const) hint =
+  let open Lattices_mono in
+  fun a_obj _a_ax a a_s_hint ->
+    (* This function is for when we have a hint for a single axis and
+       wish to convert it to a mode hint. *)
+    match a_s_hint with
+    | Morph (morph_hint, morph, b_s_hint) ->
+      let b_obj = src a_obj morph in
+      let morph_inv = left_adjoint a_obj morph in
+      (* TODO - as above, need to make this more general *)
+      let b = apply b_obj morph_inv a in
+      let b_hint = single_axis_solver_hint_to_hint b_obj _ b b_s_hint in
+      Morph (a, morph_hint, b_hint)
+    | Const a_const_hint -> Const (a, a_const_hint)
+    | Branch (x, x_s_hint, y, y_s_hint) -> _
 
 let project_error_to_axis_error :
     type r a. (r, a) Axis.t -> r S.error -> (a, Hint.morph, Hint.const) axerror
     =
  fun axis err -> _
+
+let solver_error_to_serror : 'a S.error -> ('a, Hint.morph, Hint.const) serror =
+  let rec construct_with_hint (m : 'a) :
+      ('a, 'd) S.hint -> ('a, Hint.morph, Hint.const) hint = function
+    | Morph (hint, morph, b_hint) ->
+      let b_hint' = _ in
+      Morph (m, hint, b_hint')
+    | Const hint -> Const (m, hint)
+    | Branch _ -> _
+  in
+  fun { left; left_hint; right; right_hint } ->
+    { left = construct_with_hint left left_hint;
+      right = construct_with_hint right right_hint
+    }
+
+let flip_and_solver_error_to_serror :
+    'a S.error -> ('a, Hint.morph, Hint.const) serror =
+ fun { left; left_hint = _; right; right_hint = _ } -> { right; left }
 
 type changes = S.changes
 
