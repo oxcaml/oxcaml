@@ -1646,14 +1646,97 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
-type ('a, 'd) tmp_extract_res =
-  | EMorph :
-      (Hint.morph * ('b, 'a, 'd) C.morph * ('b, 'd) S.hint)
-      -> ('a, 'd) tmp_extract_res
-  | EConst : Hint.const -> ('a, 'd) tmp_extract_res
+(** Description of an input axis responsible for an output axis of a morphism *)
+type 'a responsible_axis =
+  | NoneResponsible : 'a responsible_axis
+      (** None of the input axes are responsible for the output axis *)
+  | SourceIsSingle : 'a responsible_axis
+      (** The input of the morphism is a single axis object that is responsible for the output axis *)
+  | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
+      (** The specified axis of the input object is responsible for the output axis *)
 
-let extract : type a d. a -> (a, d) S.hint -> (a, d) tmp_extract_res =
-  fun (type a d) a a_hint -> _
+(** Given a morphism either from a product object to a single axis, or
+     from a product object to a single axis, this function
+     is used to find the axis in the source that is responsible for the
+     output axis object.
+     If the source object is a single axis, this function should end up
+     returning [SourceIsSingle], otherwise the source object is a product, and the
+     function should return [Axis ax] where [ax] is the single axis in the
+     source object that is responsible for the output.
+     NOTE: there is also a rare special case where none of the axes of the source object
+      (whether it is a product or a single axis) are responsible, in which
+      case [NoneResponsible] is returned.
+     NOTE: given the morphisms defined, there should only ever be a single source
+     axis responsible for the output axis, otherwise this function wouldn't be properly
+     definable. *)
+let rec find_responsible_axis_single :
+    type a b l r. (a, b, l * r) C.morph -> a responsible_axis =
+  let open Lattices_mono in
+  fun (type a b l r) (m : (a, b, l * r) morph) ->
+    match m with
+    | Proj (_a_obj, ax) -> Axis ax
+    | Compose (g, f) -> (
+      match find_responsible_axis_single g with
+      | NoneResponsible -> NoneResponsible
+      | SourceIsSingle -> find_responsible_axis_single f
+      | Axis c_ax -> find_responsible_axis_prod f c_ax)
+    | Id | Meet_with _ | Imply _ -> SourceIsSingle
+    | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
+    | Comonadic_to_monadic _ | Monadic_to_comonadic_max ->
+      assert false
+    | Local_to_regional | Regional_to_local | Locality_as_regionality
+    | Regional_to_global | Global_to_regional ->
+      SourceIsSingle
+
+(** This function is similar to [find_responsible_axis_single] but assumes that the
+output object of the morphism is a product object. *)
+and find_responsible_axis_prod :
+    type a b b_ax l r.
+    (a, b, l * r) C.morph -> (b, b_ax) Axis.t -> a responsible_axis =
+  let open Lattices_mono in
+  (* fun (type a b b_ax l r) (m : (a, b, l * r) morph) (ax : (b, b_ax) Axis.t) -> *)
+  fun m ax ->
+    let handle_monadic_to_comonadic (type x y)
+        (ax : (x comonadic_with, y) Axis.t) =
+      (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
+      match ax with
+      | Areality -> NoneResponsible
+      | Linearity -> Axis Uniqueness
+      | Portability -> Axis Contention
+      | Yielding -> NoneResponsible
+      | Statefulness -> Axis Visibility
+      [@@inline]
+    in
+    match m, ax with
+    | Compose (g, f), ax -> (
+      (* Operates similarly to the equivalent branch in [find_responsible_axis_single] *)
+      match find_responsible_axis_prod g ax with
+      | NoneResponsible -> NoneResponsible
+      | SourceIsSingle -> find_responsible_axis_single f
+      | Axis c_ax -> find_responsible_axis_prod f c_ax)
+    | Id, _ | Meet_with _, _ | Imply _, _ | Map_comonadic _, _ -> SourceIsSingle
+    | Max_with m_ax, ax | Min_with m_ax, ax -> (
+      match Axis.eq m_ax ax with
+      | None -> NoneResponsible
+      | Some Refl -> SourceIsSingle)
+    | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
+    | Monadic_to_comonadic_max, ax ->
+      (* Can't use an "or" pattern here due to GADT matching limitations,
+         so I've just made a separate function for code neatness, then inlined it *)
+      handle_monadic_to_comonadic ax
+    | Comonadic_to_monadic _, ax -> (
+      (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
+      match ax with
+      | Uniqueness -> Axis Linearity
+      | Contention -> Axis Portability
+      | Visibility -> Axis Statefulness)
+    | Proj _, _
+    | Local_to_regional, _
+    | Regional_to_local, _
+    | Locality_as_regionality, _
+    | Regional_to_global, _
+    | Global_to_regional, _ ->
+      .
 
 let rec project_solver_hint_to_axis_hint :
     type r a.
@@ -1663,78 +1746,121 @@ let rec project_solver_hint_to_axis_hint :
     (r, a) Axis.t ->
     (a, Hint.morph, Hint.const) hint =
   let open Lattices_mono in
-  fun r_obj r r_s_hint ax ->
+  fun (type r a) (r_obj : r obj) (r : r) (r_s_hint : (r, 'd) S.hint)
+      (ax : (r, a) Axis.t) ->
     (* This function is for when we have a hint for a product lattice and
        wish to project the hint to be for a single axis and convert it to a mode hint. *)
-    let proj = Proj (r_obj, ax) in
     let a_obj = proj_obj ax r_obj in
+    let proj = Proj (r_obj, ax) in
     let a = apply a_obj proj r in
-    (* We currently have a hint, [r_hint], for [r], and we project [r] to axis [ax] using
-       the projection morphism [proj] to get [a = proj r].  Next, we need to decide what
-       the next value to consider is, depending on [r]'s hint *)
-    match r_s_hint with
-    | Morph (morph_hint, morph, b_s_hint) -> (
-      (* In this case, we have that [r = f b]. Since we are looking to find [proj r],
-         we apply [proj] to both sides of this to get, [a = (proj . f) b]
-         (noting that [a = proj r]).
-         We use [maybe_compose_with_proj] to simplify this. *)
-      match maybe_compose_with_proj r_obj a_obj ax morph with
-      | None -> Morph (a, morph_hint, Empty)
-      | Single f' ->
-        (* In this case, we have that [proj . f = f'], where [f'] is a function on a single axis.
-           Therefore, we have that [a = f' b]. We are now looking to find [b], so we need to invert
-           [f'] in some way to get [f'_inv], such that [f'_inv a = b].
-           Note that this function will be chosen to either be a left adjoint or a right adjoint,
-           as the form we are looking to solve will actually be an inequality, [a <= f' b], or
-           [a >= f' b], and depending on the caller, we must therefore use either the left-
-           or right-adjoint of [f'], respectively. *)
-        let b_obj = src a_obj f' in
-        let f'_inv = left_adjoint a_obj f' in
-        (* TODO - this is only implementing using left-adjoint. Need to implement
-           usign either left or right adjoint, but this will require notable changes to the function signature. *)
-        let b = apply b_obj f'_inv a in
-        let b_hint = single_axis_solver_hint_to_hint b_obj _ b b_s_hint in
-        Morph (a, morph_hint, b_hint)
-      | ProjThenMorph (f', b2_obj, b2_ax) ->
-        (* In this case, we have that [proj . f = f' . proj'], for some new morphism, [f'],
-           and a new projection, [proj']. Similarly to above, we are looking to find [b] in
-           [a = (f' . proj') b]. So, we again find [f'_inv] and then we get [f'_inv a = proj' b].
-           We let [b2 = f'_inv a], so therefore, [b2 = proj' b].  Now we can recurse onto
-           the [proj' b] term to continue the analysis, as it is in the required form. *)
-        let f'_inv = left_adjoint a_obj f' in
-        (* TODO - as above, need to make this more general *)
-        let b2 = apply b2_obj f'_inv a in
-        let b2_hint =
-          single_axis_solver_hint_to_hint b2_obj b2_ax b2 b_s_hint
-        in
-        Morph (a, morph_hint, b2_hint))
-    | Const r_const_hint -> Const (a, r_const_hint)
-    | Branch (x, x_hint, y, y_hint) ->
-      (* TODO - this case will require choosing between two parts of the branch.
-         This should be possible after projection, as single axes are totally-ordered. *)
-      _
+    let a_s_hint : (a, 'd) S.hint =
+      let rec compose_s_hint_with_proj = function
+        | S.Morph (morph_hint, morph, b_s_hint) ->
+          S.Morph (morph_hint, compose a_obj proj morph, b_s_hint)
+        | S.Const r_const_hint -> S.Const r_const_hint
+        | S.Branch (x, x_hint, y, y_hint) ->
+          S.Branch
+            ( apply a_obj proj x,
+              compose_s_hint_with_proj x_hint,
+              apply a_obj proj y,
+              compose_s_hint_with_proj y_hint )
+      in
+      compose_s_hint_with_proj r_s_hint
+    in
+    single_axis_solver_hint_to_hint a_obj a a_s_hint
 
 and single_axis_solver_hint_to_hint :
     type a r.
     a Lattices_mono.obj ->
-    (r, a) Axis.t ->
     a ->
     (a, 'd) S.hint ->
     (a, Hint.morph, Hint.const) hint =
   let open Lattices_mono in
-  fun a_obj _a_ax a a_s_hint ->
+  fun (type a r) (a_obj : a obj) (a : a) (a_s_hint : (a, 'd) S.hint) ->
     (* This function is for when we have a hint for a single axis and
        wish to convert it to a mode hint. *)
-    match a_s_hint with
-    | Morph (morph_hint, morph, b_s_hint) ->
-      let b_obj = src a_obj morph in
-      let morph_inv = left_adjoint a_obj morph in
-      (* TODO - as above, need to make this more general *)
-      let b = apply b_obj morph_inv a in
-      let b_hint = single_axis_solver_hint_to_hint b_obj _ b b_s_hint in
-      Morph (a, morph_hint, b_hint)
-    | Const a_const_hint -> Const (a, a_const_hint)
-    | Branch (x, x_s_hint, y, y_s_hint) -> _
+    _
+
+(* let rec project_solver_hint_to_axis_hint :
+       type r a.
+       r Lattices_mono.obj ->
+       r ->
+       (r, 'd) S.hint ->
+       (r, a) Axis.t ->
+       (a, Hint.morph, Hint.const) hint =
+     let open Lattices_mono in
+     fun r_obj r r_s_hint ax ->
+       (* This function is for when we have a hint for a product lattice and
+          wish to project the hint to be for a single axis and convert it to a mode hint. *)
+       let proj = Proj (r_obj, ax) in
+       let a_obj = proj_obj ax r_obj in
+       let a = apply a_obj proj r in
+       (* We currently have a hint, [r_hint], for [r], and we project [r] to axis [ax] using
+          the projection morphism [proj] to get [a = proj r].  Next, we need to decide what
+          the next value to consider is, depending on [r]'s hint *)
+       match r_s_hint with
+       | Morph (morph_hint, morph, b_s_hint) -> (
+         (* In this case, we have that [r = f b]. Since we are looking to find [proj r],
+            we apply [proj] to both sides of this to get, [a = (proj . f) b]
+            (noting that [a = proj r]).
+            We use [maybe_compose_with_proj] to simplify this. *)
+         match maybe_compose_with_proj r_obj a_obj ax morph with
+         | None -> Morph (a, morph_hint, Empty)
+         | Single f' ->
+           (* In this case, we have that [proj . f = f'], where [f'] is a function on a single axis.
+              Therefore, we have that [a = f' b]. We are now looking to find [b], so we need to invert
+              [f'] in some way to get [f'_inv], such that [f'_inv a = b].
+              Note that this function will be chosen to either be a left adjoint or a right adjoint,
+              as the form we are looking to solve will actually be an inequality, [a <= f' b], or
+              [a >= f' b], and depending on the caller, we must therefore use either the left-
+              or right-adjoint of [f'], respectively. *)
+           let b_obj = src a_obj f' in
+           let f'_inv = left_adjoint a_obj f' in
+           (* TODO - this is only implementing using left-adjoint. Need to implement
+              usign either left or right adjoint, but this will require notable changes to the function signature. *)
+           let b = apply b_obj f'_inv a in
+           let b_hint = single_axis_solver_hint_to_hint b_obj _ b b_s_hint in
+           Morph (a, morph_hint, b_hint)
+         | ProjThenMorph (f', b2_obj, b2_ax) ->
+           (* In this case, we have that [proj . f = f' . proj'], for some new morphism, [f'],
+              and a new projection, [proj']. Similarly to above, we are looking to find [b] in
+              [a = (f' . proj') b]. So, we again find [f'_inv] and then we get [f'_inv a = proj' b].
+              We let [b2 = f'_inv a], so therefore, [b2 = proj' b].  Now we can recurse onto
+              the [proj' b] term to continue the analysis, as it is in the required form. *)
+           let f'_inv = left_adjoint a_obj f' in
+           (* TODO - as above, need to make this more general *)
+           let b2 = apply b2_obj f'_inv a in
+           let b2_hint =
+             single_axis_solver_hint_to_hint b2_obj b2_ax b2 b_s_hint
+           in
+           Morph (a, morph_hint, b2_hint))
+       | Const r_const_hint -> Const (a, r_const_hint)
+       | Branch (x, x_hint, y, y_hint) ->
+         (* TODO - this case will require choosing between two parts of the branch.
+            This should be possible after projection, as single axes are totally-ordered. *)
+         _
+
+   and single_axis_solver_hint_to_hint :
+       type a r.
+       a Lattices_mono.obj ->
+       (r, a) Axis.t ->
+       a ->
+       (a, 'd) S.hint ->
+       (a, Hint.morph, Hint.const) hint =
+     let open Lattices_mono in
+     fun a_obj _a_ax a a_s_hint ->
+       (* This function is for when we have a hint for a single axis and
+          wish to convert it to a mode hint. *)
+       match a_s_hint with
+       | Morph (morph_hint, morph, b_s_hint) ->
+         let b_obj = src a_obj morph in
+         let morph_inv = left_adjoint a_obj morph in
+         (* TODO - as above, need to make this more general *)
+         let b = apply b_obj morph_inv a in
+         let b_hint = single_axis_solver_hint_to_hint b_obj _ b b_s_hint in
+         Morph (a, morph_hint, b_hint)
+       | Const a_const_hint -> Const (a, a_const_hint)
+       | Branch (x, x_s_hint, y, y_s_hint) -> _ *)
 
 let project_error_to_axis_error :
     type r a. (r, a) Axis.t -> r S.error -> (a, Hint.morph, Hint.const) axerror
