@@ -31,10 +31,10 @@ end
 module Type_decl_shape : sig
   type 'a complex_constructor =
     { name : string;
-      args : 'a complex_constructor_arguments list
+      args : 'a complex_constructor_argument list
     }
 
-  and 'a complex_constructor_arguments =
+  and 'a complex_constructor_argument =
     { field_name : string option;
       field_value : 'a
     }

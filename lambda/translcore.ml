@@ -1612,16 +1612,19 @@ and transl_tupled_function
    expression.
 *)
 
+and add_type_shapes_of_pattern ~env sort pattern =
+  let var_list = Typedtree.pat_bound_idents_full sort pattern in
+  List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+    Type_shape.add_to_type_shapes var_uid type_expr var_sort
+      (Env.find_uid_of_path env))
+  var_list
+
 (** [add_type_shapes_of_cases] iterates through a given list of cases and
     associates for each case, the debugging UID of the variable with the type
     expression of the variable and its sort. *)
 and add_type_shapes_of_cases sort cases =
   let add_case (case : Typedtree.value Typedtree.case) =
-    let var_list = Typedtree.pat_bound_idents_full sort case.c_lhs in
-    List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-      Type_shape.add_to_type_shapes var_uid type_expr var_sort
-        (Env.find_uid_of_path case.c_lhs.pat_env))
-      var_list
+    add_type_shapes_of_pattern ~env:case.c_lhs.pat_env sort case.c_lhs
   in
   List.iter add_case cases
 
@@ -1635,11 +1638,7 @@ and add_type_shapes_of_params params =
                     | Tparam_optional_default (p, _, _) -> p
       in
       let sort = Jkind.Sort.default_for_transl_and_get param.fp_sort in
-      let var_list = Typedtree.pat_bound_idents_full sort pattern in
-      List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-        Type_shape.add_to_type_shapes var_uid type_expr var_sort
-          (Env.find_uid_of_path pattern.pat_env))
-        var_list
+      add_type_shapes_of_pattern ~env:pattern.pat_env sort pattern
     in
     List.iter add_param params
 
@@ -1649,11 +1648,8 @@ and add_type_shapes_of_params params =
 and add_type_shapes_of_patterns patterns =
   let add_case (value_binding : Typedtree.value_binding) =
     let sort = Jkind.Sort.default_for_transl_and_get value_binding.vb_sort in
-    let var_list = Typedtree.pat_bound_idents_full sort value_binding.vb_pat in
-    List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-      Type_shape.add_to_type_shapes var_uid type_expr var_sort
-        (Env.find_uid_of_path value_binding.vb_expr.exp_env))
-      var_list
+    add_type_shapes_of_pattern ~env:value_binding.vb_expr.exp_env sort
+      value_binding.vb_pat
   in
   List.iter add_case patterns
 
