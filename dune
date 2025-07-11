@@ -838,7 +838,7 @@
    compiler-libs/libgc_timings_stubs.a)
   (external/gc-timings/libgc_timings_stubs.a
    as
-   rompiler-libs/libgc_timings_stubs_native.a)
+   compiler-libs/libgc_timings_stubs_native.a)
   (middle_end/flambda2/numbers/floats/libflambda2_floats_stubs.a
    as
    compiler-libs/libflambda2_floats_stubs.a)
