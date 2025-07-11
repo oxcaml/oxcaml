@@ -251,6 +251,15 @@ let mk_internal_assembler f =
 let mk_gc_timings f =
   "-dgc-timings", Arg.Unit f, "Output information about time spent in the GC"
 
+let mk_llvm_backend f =
+  "-llvm-backend", Arg.Unit f, " Enable LLVM backend (...does nothing for now)"
+
+let mk_dllvmir f =
+  "-dllvmir", Arg.Unit f, " (undocumented)"
+
+let mk_llvm_path f =
+  "-llvm-path", Arg.String f, " Specify which LLVM compiler to use"
+
 module Flambda2 = Oxcaml_flags.Flambda2
 
 let mk_flambda2_result_types_functors_only f =
@@ -811,6 +820,10 @@ module type Oxcaml_options = sig
 
   val no_mach_ir : unit -> unit
 
+  val llvm_backend : unit -> unit
+  val dllvmir : unit -> unit
+  val llvm_path : string -> unit
+
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit
@@ -951,6 +964,10 @@ struct
     mk_gc_timings F.gc_timings;
 
     mk_no_mach_ir F.no_mach_ir;
+
+    mk_llvm_backend F.llvm_backend;
+    mk_dllvmir F.dllvmir;
+    mk_llvm_path F.llvm_path;
 
     mk_flambda2_debug F.flambda2_debug;
     mk_no_flambda2_debug F.no_flambda2_debug;
@@ -1168,6 +1185,10 @@ module Oxcaml_options_impl = struct
   let gc_timings = set' Oxcaml_flags.gc_timings
 
   let no_mach_ir () = ()
+
+  let llvm_backend () = set' Oxcaml_flags.llvm_backend ()
+  let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
+  let llvm_path s = Oxcaml_flags.llvm_path := Some s
 
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
@@ -1507,6 +1528,8 @@ module Extra_params = struct
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-max-function-complexity" ->
       set_int' Debugging.dwarf_max_function_complexity
+    | "llvm-backend" -> set' Oxcaml_flags.llvm_backend
+    | "llvm-path" -> Oxcaml_flags.llvm_path := Some v; true
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->

@@ -525,6 +525,7 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  llvmize
   ;; backend/regalloc
   regalloc_gi
   regalloc_gi_state
