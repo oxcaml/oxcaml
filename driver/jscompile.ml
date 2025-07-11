@@ -71,7 +71,6 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   in
   (structure, coercion, argument_coercion)
   |> Profile.(record transl)
-       (Translmod.transl_implementation i.module_name ~style:Plain_block)
   |> raw_lambda_to_jsir i
 
 type starting_point =
