@@ -1,7 +1,4 @@
 {
-        "ocaml.sandbox": {
-                "kind": "global"
-        },
         "files.associations": {
                 "smmintrin.h": "c",
                 "tmmintrin.h": "c",
@@ -16,4 +13,8 @@
                 "editor.defaultFormatter": "ocamllabs.ocaml-platform",
         },
         "makefile.configureOnOpen": false,
+        "ocaml.sandbox": {
+                "kind": "custom",
+                "template": "OPAMROOT=/usr/local/home/$USER/.opam opam exec --switch=4.14.2 --set-switch -- $prog $args"
+        },
 }
