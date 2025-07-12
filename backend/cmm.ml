@@ -724,16 +724,7 @@ let map_shallow f = function
     | Cvar _ ) as c ->
     c
 
-let rank_machtype_component : machtype_component -> int = function
-  | Val -> 0
-  | Addr -> 1
-  | Int -> 2
-  | Float -> 3
-  | Vec128 -> 4
-  | Vec256 -> 5
-  | Vec512 -> 6
-  | Float32 -> 7
-  | Valx2 -> 8
+external rank_machtype_component : machtype_component -> int = "%identity"
 
 let compare_machtype_component
     ((Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2) as

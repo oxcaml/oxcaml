@@ -1,8 +1,8 @@
-let ( = )   : int -> int -> bool = Stdlib.( = )
-let ( <> )  : int -> int -> bool = Stdlib.( <> )
-let ( < )   : int -> int -> bool = Stdlib.( < )
-let ( > )   : int -> int -> bool = Stdlib.( > )
-let ( <= )  : int -> int -> bool = Stdlib.( <= )
-let ( >= )  : int -> int -> bool = Stdlib.( >= )
+external ( = ) : int -> int -> bool = "%equal"
+external ( <> ) : int -> int -> bool = "%notequal"
+external ( < ) : int -> int -> bool = "%lessthan"
+external ( > ) : int -> int -> bool = "%greaterthan"
+external ( <= ) : int -> int -> bool = "%lessequal"
+external ( >= ) : int -> int -> bool = "%greaterequal"
 
-let compare : int -> int -> int  = Stdlib.compare
+external compare : int -> int -> int = "%compare"
