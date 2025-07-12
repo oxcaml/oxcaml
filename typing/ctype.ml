@@ -4543,12 +4543,34 @@ let filter_arrow env t l ~force_tpoly =
       end else begin
         let t1 =
           if is_optional l then
-            newty2 ~level
-              (* CR layouts v5: Change the Jkind.Builtin.value when option can
-                 hold non-values. *)
-              (Tconstr(Predef.path_option,
-                       [newvar2 level Predef.option_argument_jkind],
-                       ref Mnil))
+          begin match l with
+            | Optional _ ->
+                newty2 ~level
+                  (* CR layouts v5: Change the Jkind.Builtin.value when option
+                     can hold non-values. *)
+                  (Tconstr(Predef.path_option,
+                           [newvar2 level Predef.option_argument_jkind],
+                           ref Mnil))
+            | Generic_optional (path, _) ->
+              (* CR: For generic optional arguments, we need to construct the
+                  appropriate type based on the module path. e.g.
+
+                {v
+                let type_ident : Longident.t
+                  = Ldot (Ldot (path.txt, "Opt_syntax"), "t") in
+                let (path, _) = Env.lookup_type ~loc:path.loc type_ident env in
+                v}
+
+              *)
+              let t_cons =
+                match classify_module_path path.txt with
+                | Stdlib_option -> Predef.path_option
+                | Stdlib_or_null -> Predef.path_or_null
+              in
+              newty2 ~level (Tconstr(t_cons,
+                [newvar2 level Predef.option_argument_jkind], ref Mnil))
+            | _ -> assert false
+            end
           else if is_position l then
             newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))
           else

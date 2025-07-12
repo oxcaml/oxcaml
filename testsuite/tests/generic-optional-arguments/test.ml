@@ -6,14 +6,14 @@
 module type S = sig
 val concat : Stdlib.Option.?'sep:string -> string list -> string
 
-val concat_2 : ?sep:string -> string list -> string
+val concat_2 : Stdlib.Or_null.?'sep:string -> string list -> string
 end
 
 (* Implementation *)
 module M : S = struct
 let concat Stdlib.Option.?'(sep : string = " ") xs =
   String.concat sep xs
-let concat_2 Stdlib.Option.?'(sep=" ") xs =
+let concat_2 Stdlib.Or_null.?'(sep=" ") xs =
   String.concat sep xs
 end
 
