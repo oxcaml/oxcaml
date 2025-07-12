@@ -524,8 +524,8 @@ let destroyed_by_simd_op (op : Simd.operation) =
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
-  | SSE Add_f32 | SSE Sub_f32 | SSE Mul_f32 | SSE Div_f32
-  | SSE2 Add_f64 | SSE2 Sub_f64 | SSE2 Mul_f64 | SSE2 Div_f64 -> [||]
+  | Add_f32 | Sub_f32 | Mul_f32 | Div_f32
+  | Add_f64 | Sub_f64 | Mul_f64 | Div_f64 -> [||]
 
 let destroyed_at_raise = all_phys_regs
 
@@ -707,6 +707,8 @@ let assemble_file infile outfile =
 let precolored_regs () =
   let phys_regs = Reg.set_of_array all_phys_regs in
   if fp then Reg.Set.remove rbp phys_regs else phys_regs
+
+let has_three_operand_float_ops () = Arch.Extension.enabled AVX
 
 let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT

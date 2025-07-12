@@ -587,86 +587,6 @@ let emit_mod_rm_reg b rex_always opcodes rm reg =
   emit_prefix_modrm b opcodes rm reg ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
     emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
 
-let emit_movlpd b dst src =
-  match (dst, src) with
-  | Regf reg, ((Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x12 ] rm (rd_of_regf reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Regf reg ->
-      buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x13 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_movapd b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x28 ] rm (rd_of_regf reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Regf reg ->
-      buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x29 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_movupd b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x10 ] rm (rd_of_regf reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Regf reg ->
-      buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x11 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_movd b ~dst ~src =
-  match (dst, src) with
-  | Regf reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
-    buf_int8 b 0x66;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0x6E ] rm (rd_of_regf reg)
-  | ((Reg32 _ | Mem _ | Mem64_RIP _) as rm), Regf reg ->
-    buf_int8 b 0x66;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0x7E ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_movq b ~dst ~src =
-  (* It seems there is a choice to make on how we encode instructions here
-     as there are different encoding possible for the same operation.
-     See https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf,
-     pages 707 and 755.  *)
-  match (dst, src) with
-  | Regf reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
-    buf_int8 b 0x66;
-    emit_mod_rm_reg b rexw [ 0x0F; 0x6E ] rm (rd_of_regf reg)
-  | ((Reg64 _ | Mem _ | Mem64_RIP _) as rm), Regf reg ->
-    buf_int8 b 0x66;
-    emit_mod_rm_reg b rexw [ 0x0F; 0x7E ] rm (rd_of_regf reg)
-  | Regf reg, ((Regf _) as rm) ->
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0x7E ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_mov_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-       | Cmm.Float64 -> buf_int8 b 0xF2
-       | Cmm.Float32 -> buf_int8 b 0xF3);
-      emit_mod_rm_reg b 0 [ 0x0f; 0x10 ] rm (rd_of_regf reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Regf reg ->
-      buf_int8 b 0xF2;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x11 ] rm (rd_of_regf reg)
-  | _ ->
-      Format.eprintf "src=%a dst=%a@." print_old_arg src print_old_arg dst;
-      assert false
-
-let emit_and_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-       | Cmm.Float64 -> buf_int8 b 0x66
-       | Cmm.Float32 -> ());
-      emit_mod_rm_reg b 0 [ 0x0f; 0x54 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
 let emit_bsf b ~dst ~src =
   match (dst, src) with
   | Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm)
@@ -687,123 +607,6 @@ let emit_bsr b ~dst ~src =
   | Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
     (* BSR r64, r/m64 *)
     emit_mod_rm_reg b rexw [ 0x0F; 0xBD ] rm (rd_of_reg64 reg)
-  | _ -> assert false
-
-let emit_add_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0xF2
-      | Cmm.Float32 -> buf_int8 b 0xF3);
-      emit_mod_rm_reg b 0 [ 0x0f; 0x58 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_mul_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0xF2
-      | Cmm.Float32 -> buf_int8 b 0xF3);
-      emit_mod_rm_reg b 0 [ 0x0f; 0x59 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_div_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0xF2
-      | Cmm.Float32 -> buf_int8 b 0xF3);
-      emit_mod_rm_reg b 0 [ 0x0f; 0x5E ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_sub_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0xF2
-      | Cmm.Float32 -> buf_int8 b 0xF3);
-      emit_mod_rm_reg b 0 [ 0x0f; 0x5C ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_xor_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0x66
-      | Cmm.Float32 -> ());
-      emit_mod_rm_reg b 0 [ 0x0f; 0x57 ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_CVTSI2SS b dst src =
-  match (dst, src) with
-  | Regf reg, ((Reg64 _ | Mem { typ = QWORD }) as rm) ->
-      buf_int8 b 0xF3;
-      emit_mod_rm_reg b rexw [ 0x0f; 0x2A ] rm (rd_of_regf reg)
-  | Regf reg, ((Reg32 _ | Mem { typ = DWORD }) as rm) ->
-      buf_int8 b 0xF3;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x2A ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_CVTSI2SD b dst src =
-  match (dst, src) with
-  | Regf reg, ((Reg64 _ | Mem { typ = QWORD }) as rm) ->
-      buf_int8 b 0xF2;
-      emit_mod_rm_reg b rexw [ 0x0f; 0x2A ] rm (rd_of_regf reg)
-  | Regf reg, ((Reg32 _ | Mem { typ = DWORD }) as rm) ->
-      buf_int8 b 0xF2;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x2A ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_CVTTSS2SI b dst src =
-  match (dst, src) with
-  | Reg64 reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0xF3;
-      emit_mod_rm_reg b rexw [ 0x0f; 0x2C ] rm (rd_of_reg64 reg)
-  | Reg32 reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0xF3;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x2C ] rm (rd_of_reg64 reg)
-  | _ -> assert false
-
-let emit_CVTTSD2SI b dst src =
-  match (dst, src) with
-  | Reg64 reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0xF2;
-      emit_mod_rm_reg b rexw [ 0x0f; 0x2C ] rm (rd_of_reg64 reg)
-  | Reg32 reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0xF2;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x2C ] rm (rd_of_reg64 reg)
-  | _ -> assert false
-
-let emit_CVTSD2SS b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0xF2;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x5A ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_CVTSS2SD b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      buf_int8 b 0xF3;
-      emit_mod_rm_reg b 0 [ 0x0f; 0x5A ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_comi_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0x66
-      | Cmm.Float32 -> ());
-      emit_mod_rm_reg b 0 [ 0x0f; 0x2F ] rm (rd_of_regf reg)
-  | _ -> assert false
-
-let emit_ucomi_float ~(width : Cmm.float_width) b dst src =
-  match (dst, src) with
-  | Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm) ->
-      (match width with
-      | Cmm.Float64 -> buf_int8 b 0x66
-      | Cmm.Float32 -> ());
-      emit_mod_rm_reg b 0 [ 0x0f; 0x2E ] rm (rd_of_regf reg)
   | _ -> assert false
 
 let emit_MOV b dst src =
@@ -1298,28 +1101,6 @@ let emit_j b loc condition dst =
         b loc symbol
   | _ -> assert false
 
-let imm8_of_float_condition = function
-  | EQf -> 0x00
-  | LTf -> 0x01
-  | LEf -> 0x02
-  | UNORDf -> 0x03
-  | NEQf -> 0x04
-  | NLTf -> 0x05
-  | NLEf -> 0x06
-  | ORDf -> 0x07
-
-let emit_cmp_float ~(width : Cmm.float_width) b ~condition ~dst ~src =
-  match (dst, src) with
-  | (Regf reg, ((Regf _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* CMP{SS,SD} xmm1, xmm2/m{32,64}, imm8 *)
-    let condition = imm8_of_float_condition condition in
-    (match width with
-    | Cmm.Float64 -> buf_int8 b 0xF2
-    | Cmm.Float32 -> buf_int8 b 0xF3);
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xC2 ] rm (rd_of_regf reg);
-    buf_int8 b condition
-  | _ -> assert false
-
 let emit_cmov b condition dst src =
   match (dst, src) with
   | (Reg64 reg | Reg32 reg), ((Reg64 _ | Reg32 _ | Mem _ | Mem64_RIP _) as rm)
@@ -1577,27 +1358,16 @@ let emit_XCHG b src dst =
 
 let assemble_instr b loc = function
   | ADD (src, dst) -> emit_ADD b dst src
-  | ADDSD (src, dst) -> emit_add_float ~width:Cmm.Float64 b dst src
   | AND (src, dst) -> emit_AND b dst src
-  | ANDPD (src, dst) -> emit_and_float ~width:Cmm.Float64 b dst src
   | BSF (src, dst) -> emit_bsf b ~dst ~src
   | BSR (src, dst) -> emit_bsr b ~dst ~src
   | BSWAP arg -> emit_BSWAP b arg
   | CALL dst -> emit_call b dst
   | CLDEMOTE rm -> emit_cldemote b rm
-  | CVTSI2SS (src, dst) -> emit_CVTSI2SS b dst src
-  | CVTSI2SD (src, dst) -> emit_CVTSI2SD b dst src
-  | CVTTSS2SI (src, dst) -> emit_CVTTSS2SI b dst src
-  | CVTTSD2SI (src, dst) -> emit_CVTTSD2SI b dst src
-  | CVTSD2SS (src, dst) -> emit_CVTSD2SS b dst src
-  | CVTSS2SD (src, dst) -> emit_CVTSS2SD b dst src
-  | COMISD (src, dst) -> emit_comi_float ~width:Cmm.Float64 b dst src
   | CQO -> emit_cqto b
   | CMP (src, dst) -> emit_CMP b dst src
-  | CMPSD (condition, src, dst) -> emit_cmp_float ~width:Cmm.Float64 b ~condition ~dst ~src
   | CMOV (condition, src, dst) -> emit_cmov b condition dst src
   | CDQ -> buf_int8 b 0x99
-  | DIVSD (src, dst) -> emit_div_float ~width:Cmm.Float64 b dst src
   | DEC dst -> emit_DEC b [ dst ]
   | HLT -> buf_int8 b 0xF4
   | INC dst -> emit_inc b dst
@@ -1616,14 +1386,6 @@ let assemble_instr b loc = function
   | LOCK_OR (src, dst) -> emit_lock_or b dst src
   | LOCK_XOR (src, dst) -> emit_lock_xor b dst src
   | MOV (src, dst) -> emit_MOV b dst src
-  | MOVAPD (src, dst) -> emit_movapd b dst src
-  | MOVUPD (src, dst) -> emit_movupd b dst src
-  | MOVD (src, dst) -> emit_movd b ~dst ~src
-  | MOVQ (src, dst) -> emit_movq b ~dst ~src
-  | MOVLPD (src, dst) -> emit_movlpd b dst src
-  | MOVSD (src, dst) -> emit_mov_float ~width:Cmm.Float64 b dst src
-  | MOVSS (src, dst) -> emit_mov_float ~width:Cmm.Float32 b dst src
-  | MULSD (src, dst) -> emit_mul_float ~width:Cmm.Float64 b dst src
   | MOVSX (src, dst) -> emit_movsx b dst src
   | MOVZX (src, dst) -> emit_MOVZX b dst src
   | MOVSXD (src, dst) -> emit_movsxd b dst src
@@ -1644,23 +1406,11 @@ let assemble_instr b loc = function
   | SAL (src, dst) -> emit_SAL b dst src
   | SAR (src, dst) -> emit_SAR b dst src
   | SHR (src, dst) -> emit_SHR b dst src
-  | SUBSD (src, dst) -> emit_sub_float ~width:Cmm.Float64 b dst src
   | SUB (src, dst) -> emit_SUB b dst src
   | SET (condition, dst) -> emit_set b condition dst
   | TEST (src, dst) -> emit_test b dst src
-  | UCOMISD (src, dst) -> emit_ucomi_float ~width:Cmm.Float64 b dst src
   | XCHG (src, dst) -> emit_XCHG b dst src
   | XOR (src, dst) -> emit_XOR b dst src
-  | XORPD (src, dst) -> emit_xor_float ~width:Cmm.Float64 b dst src
-  | ADDSS (src, dst) -> emit_add_float ~width:Cmm.Float32 b dst src
-  | SUBSS (src, dst) -> emit_sub_float ~width:Cmm.Float32 b dst src
-  | MULSS (src, dst) -> emit_mul_float ~width:Cmm.Float32 b dst src
-  | DIVSS (src, dst) -> emit_div_float ~width:Cmm.Float32 b dst src
-  | COMISS (src, dst) -> emit_comi_float ~width:Cmm.Float32 b dst src
-  | UCOMISS (src, dst) -> emit_ucomi_float ~width:Cmm.Float32 b dst src
-  | XORPS (src, dst) -> emit_xor_float ~width:Cmm.Float32 b dst src
-  | ANDPS (src, dst) -> emit_and_float ~width:Cmm.Float32 b dst src
-  | CMPSS (condition, src, dst) -> emit_cmp_float ~width:Cmm.Float32 b ~condition ~dst ~src
   | TZCNT (src, dst) -> emit_tzcnt b ~dst ~src
   | LZCNT (src, dst) -> emit_lzcnt b ~dst ~src
   | SIMD (instr, args) -> emit_simd b instr args
