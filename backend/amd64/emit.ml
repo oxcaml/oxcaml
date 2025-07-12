@@ -681,10 +681,10 @@ let sse_or_avx_dst sse vex src dst =
   then I.simd vex [| src; dst; dst |]
   else I.simd sse [| src; dst |]
 
-let cmp_sse_or_avx sse vex cond src dst =
+let cmp_sse_or_avx sse vex cond src1 src2 dst =
   if Arch.Extension.enabled AVX
-  then I.simd vex [| imm_of_float_condition cond; src; dst; dst |]
-  else I.simd sse [| imm_of_float_condition cond; src; dst |]
+  then I.simd vex [| imm_of_float_condition cond; src1; src2; dst |]
+  else I.simd sse [| imm_of_float_condition cond; src1; src2 |]
 
 let instr_for_intop = function
   | Iadd -> I.add
@@ -1985,19 +1985,21 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop_atomic { op; size; addr }) -> emit_atomic i op size addr
   | Lop (Floatop (Float64, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0;
-    movq a0 (res i 0);
-    I.neg (res i 0)
+    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    movq r1 r0;
+    I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpss vcmpss cond a1 a0;
-    movd a0 (res32 i 0);
+    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
-    I.movsxd (res32 i 0) (res i 0);
-    I.neg (res i 0)
+    I.movsxd r0_32 r0;
+    I.neg r0
   | Lop (Floatop (Float64, Inegf)) ->
     sse_or_avx_dst xorpd vxorpd_X_X_Xm128
       (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
