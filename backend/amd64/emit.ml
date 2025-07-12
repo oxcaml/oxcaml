@@ -667,17 +667,24 @@ let emit_jump_tables () =
 (* Names for instructions *)
 
 let sse_or_avx sse vex src dst =
-  if Arch.Extension.enabled AVX then I.simd vex [| src; dst |] else sse src dst
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src; dst |]
+  else I.simd sse [| src; dst |]
+
+let sse_or_avx3 sse vex src1 src2 dst =
+  if Arch.Extension.enabled AVX
+  then I.simd vex [| src2; src1; dst |]
+  else I.simd sse [| src2; dst |]
 
 let sse_or_avx_dst sse vex src dst =
   if Arch.Extension.enabled AVX
   then I.simd vex [| src; dst; dst |]
-  else sse src dst
+  else I.simd sse [| src; dst |]
 
 let cmp_sse_or_avx sse vex cond src dst =
   if Arch.Extension.enabled AVX
   then I.simd vex [| imm_of_float_condition cond; src; dst; dst |]
-  else sse cond src dst
+  else I.simd sse [| imm_of_float_condition cond; src; dst |]
 
 let instr_for_intop = function
   | Iadd -> I.add
@@ -692,29 +699,29 @@ let instr_for_intop = function
   | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> sse_or_avx_dst I.addsd vaddsd
-  | Float64, Isubf -> sse_or_avx_dst I.subsd vsubsd
-  | Float64, Imulf -> sse_or_avx_dst I.mulsd vmulsd
-  | Float64, Idivf -> sse_or_avx_dst I.divsd vdivsd
-  | Float32, Iaddf -> sse_or_avx_dst I.addss vaddss
-  | Float32, Isubf -> sse_or_avx_dst I.subss vsubss
-  | Float32, Imulf -> sse_or_avx_dst I.mulss vmulss
-  | Float32, Idivf -> sse_or_avx_dst I.divss vdivss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss
+  | Float32, Isubf -> sse_or_avx3 subss vsubss
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss
+  | Float32, Idivf -> sse_or_avx3 divss vdivss
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> sse_or_avx_dst I.addsd vaddsd
-  | Float64, Ifloatsub -> sse_or_avx_dst I.subsd vsubsd
-  | Float64, Ifloatmul -> sse_or_avx_dst I.mulsd vmulsd
-  | Float64, Ifloatdiv -> sse_or_avx_dst I.divsd vdivsd
-  | Float32, Ifloatadd -> sse_or_avx_dst I.addss vaddss
-  | Float32, Ifloatsub -> sse_or_avx_dst I.subss vsubss
-  | Float32, Ifloatmul -> sse_or_avx_dst I.mulss vmulss
-  | Float32, Ifloatdiv -> sse_or_avx_dst I.divss vdivss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
   | Isigned Ceq -> E
@@ -753,11 +760,11 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
      If FP traps are on (they are off by default),
      comisd traps on QNaN and SNaN but ucomisd traps on SNaN only.
   *)
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> sse_or_avx I.ucomisd vucomisd, sse_or_avx I.comisd vcomisd
-    | Float32 -> sse_or_avx I.ucomiss vucomiss, sse_or_avx I.comiss vcomiss
+    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
+    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
@@ -955,61 +962,55 @@ let emit_global_label ~section s =
   emit_global_label_for_symbol ~section lbl
 
 let movd src dst =
-  let open Amd64_simd_instrs in
-  match Arch.Extension.enabled AVX with
-  | false -> I.movd src dst
-  | true -> (
-    match X86_dsl.is_regf src with
-    | false -> I.simd vmovd_X_r32m32 [| src; dst |]
-    | true -> I.simd vmovd_r32m32_X [| src; dst |])
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, X86_dsl.is_regf src with
+  | false, false -> I.simd movd_X_r32m32 [| src; dst |]
+  | false, true -> I.simd movd_r32m32_X [| src; dst |]
+  | true, false -> I.simd vmovd_X_r32m32 [| src; dst |]
+  | true, true -> I.simd vmovd_r32m32_X [| src; dst |]
 
 let movq src dst =
-  let open Amd64_simd_instrs in
-  match Arch.Extension.enabled AVX with
-  | false -> I.movq src dst
-  | true -> (
-    match X86_dsl.is_regf src with
-    | false -> I.simd vmovq_X_r64m64 [| src; dst |]
-    | true -> I.simd vmovq_r64m64_X [| src; dst |])
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, X86_dsl.is_regf src with
+  | false, false -> I.simd movq_X_r64m64 [| src; dst |]
+  | false, true -> I.simd movq_r64m64_X [| src; dst |]
+  | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
+  | true, true -> I.simd vmovq_r64m64_X [| src; dst |]
 
 let movss src dst =
-  let open Amd64_simd_instrs in
-  match Arch.Extension.enabled AVX with
-  | false -> I.movss src dst
-  | true -> (
-    match X86_dsl.is_mem src, X86_dsl.is_mem dst with
-    | false, false -> I.simd vmovss_X_X_X [| src; dst; dst |]
-    | false, true -> I.simd vmovss_m32_X [| src; dst |]
-    | true, false -> I.simd vmovss_X_m32 [| src; dst |]
-    | true, true -> assert false)
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, X86_dsl.is_mem src, X86_dsl.is_mem dst with
+  | _, true, true -> assert false
+  | false, false, _ -> I.simd movss_Xm32_X [| src; dst |]
+  | false, true, _ -> I.simd movss_X_m32 [| src; dst |]
+  | true, false, false -> I.simd vmovss_X_X_X [| src; dst; dst |]
+  | true, false, true -> I.simd vmovss_m32_X [| src; dst |]
+  | true, true, false -> I.simd vmovss_X_m32 [| src; dst |]
 
 let movsd src dst =
-  let open Amd64_simd_instrs in
-  match Arch.Extension.enabled AVX with
-  | false -> I.movsd src dst
-  | true -> (
-    match X86_dsl.is_mem src, X86_dsl.is_mem dst with
-    | false, false -> I.simd vmovsd_X_X_X [| src; dst; dst |]
-    | false, true -> I.simd vmovsd_m64_X [| src; dst |]
-    | true, false -> I.simd vmovsd_X_m64 [| src; dst |]
-    | true, true -> assert false)
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, X86_dsl.is_mem src, X86_dsl.is_mem dst with
+  | _, true, true -> assert false
+  | false, false, _ -> I.simd movsd_Xm64_X [| src; dst |]
+  | false, true, _ -> I.simd movsd_X_m64 [| src; dst |]
+  | true, false, false -> I.simd vmovsd_X_X_X [| src; dst; dst |]
+  | true, false, true -> I.simd vmovsd_m64_X [| src; dst |]
+  | true, true, false -> I.simd vmovsd_X_m64 [| src; dst |]
 
 let movpd ~unaligned src dst =
-  let open Amd64_simd_instrs in
-  match Arch.Extension.enabled AVX, unaligned with
-  | false, true -> I.movupd src dst
-  | false, false -> I.movapd src dst
-  | true, true -> (
-    match X86_dsl.is_mem src with
-    | false -> I.simd vmovupd_Xm128_X [| src; dst |]
-    | true -> I.simd vmovupd_X_Xm128 [| src; dst |])
-  | true, false -> (
-    match X86_dsl.is_mem src with
-    | false -> I.simd vmovapd_Xm128_X [| src; dst |]
-    | true -> I.simd vmovapd_X_Xm128 [| src; dst |])
+  let open Simd_instrs in
+  match Arch.Extension.enabled AVX, X86_dsl.is_mem src, unaligned with
+  | false, true, false -> I.simd movapd_X_Xm128 [| src; dst |]
+  | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
+  | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
+  | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
+  | true, false, false -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, true, false -> I.simd vmovupd_X_Xm128 [| src; dst |]
+  | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
 let move (src : Reg.t) (dst : Reg.t) =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc src dst) in
   match src.typ, src.loc, dst.typ, dst.loc with
   | _, Stack _, _, Stack _ ->
@@ -1465,7 +1466,7 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     I.xchg src dst
 
 let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
@@ -1487,19 +1488,19 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
 
 let emit_static_cast (cast : Cmm.static_cast) i =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
   | Float_of_int Float64 ->
-    sse_or_avx_dst I.cvtsi2sd vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
+    sse_or_avx_dst cvtsi2sd_X_r64m64 vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
   | Int_of_float Float64 ->
-    sse_or_avx I.cvttsd2si vcvttsd2si_r64_Xm64 (arg i 0) (res i 0)
+    sse_or_avx cvttsd2si_r64_Xm64 vcvttsd2si_r64_Xm64 (arg i 0) (res i 0)
   | Float_of_int Float32 ->
-    sse_or_avx_dst I.cvtsi2ss vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
+    sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
   | Int_of_float Float32 ->
-    sse_or_avx I.cvttss2si vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
-  | Float_of_float32 -> sse_or_avx_dst I.cvtss2sd vcvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> sse_or_avx_dst I.cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+    sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
+  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
+  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
   | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
     if distinct then movsd (argX i 0) (res i 0)
   | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
@@ -1603,7 +1604,7 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   I.simd simd (Array.of_list args)
 
 let emit_simd (op : Simd.operation) instr =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   let imm = op.imm in
   match op.instr with
   | Instruction simd -> emit_simd_instr simd imm instr
@@ -1612,7 +1613,7 @@ let emit_simd (op : Simd.operation) instr =
     | Sqrtss | Sqrtsd | Roundss | Roundsd ->
       (* Avoids partial register stall *)
       if not (equal_arg (arg instr 0) (res instr 0))
-      then sse_or_avx_dst I.xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
+      then sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
       emit_simd_instr seq.instr imm instr
     | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
@@ -1636,20 +1637,19 @@ let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
   let open Simd_instrs in
   assert (Reg.is_reg i.arg.(0));
   assert (not (Reg.is_reg i.arg.(1)));
-  assert (Reg.same_loc i.arg.(0) i.res.(0));
   match simd with
-  | SSE2 Add_f64 -> I.simd addpd [| addr; res i 0 |]
-  | SSE2 Sub_f64 -> I.simd subpd [| addr; res i 0 |]
-  | SSE2 Mul_f64 -> I.simd mulpd [| addr; res i 0 |]
-  | SSE2 Div_f64 -> I.simd divpd [| addr; res i 0 |]
-  | SSE Add_f32 -> I.simd addps [| addr; res i 0 |]
-  | SSE Sub_f32 -> I.simd subps [| addr; res i 0 |]
-  | SSE Mul_f32 -> I.simd mulps [| addr; res i 0 |]
-  | SSE Div_f32 -> I.simd divps [| addr; res i 0 |]
+  | Add_f64 -> sse_or_avx3 addpd vaddpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Sub_f64 -> sse_or_avx3 subpd vsubpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Mul_f64 -> sse_or_avx3 mulpd vmulpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Div_f64 -> sse_or_avx3 divpd vdivpd_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Add_f32 -> sse_or_avx3 addps vaddps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Sub_f32 -> sse_or_avx3 subps vsubps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
 
 (* Emit an instruction *)
 let emit_instr ~first ~fallthrough i =
-  let open Amd64_simd_instrs in
+  let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
   | Lend -> ()
@@ -1696,7 +1696,7 @@ let emit_instr ~first ~fallthrough i =
     match f with
     | 0x0000_0000l ->
       (* +0.0 *)
-      sse_or_avx_dst I.xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       (* float32 constants take up 8 bytes when we emit them with
          [float_literal] (see the conversion from int32 to int64 below). Thus,
@@ -1708,14 +1708,14 @@ let emit_instr ~first ~fallthrough i =
     match f with
     | 0x0000_0000_0000_0000L ->
       (* +0.0 *)
-      sse_or_avx_dst I.xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       let lbl = add_float_constant f in
       movsd (mem64_rip REAL8 (L.encode lbl)) (res i 0))
   | Lop (Const_vec128 { word0; word1 }) -> (
     match word1, word0 with
     | 0x0000_0000_0000_0000L, 0x0000_0000_0000_0000L ->
-      sse_or_avx_dst I.xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
+      sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res i 0) (res i 0)
     | _ ->
       let lbl = add_vec128_constant { word0; word1 } in
       movpd ~unaligned:false (mem64_rip VEC128 (L.encode lbl)) (res i 0))
@@ -1826,7 +1826,7 @@ let emit_instr ~first ~fallthrough i =
       (* CR-soon mslater: avx512 *)
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
-      load ~dest:(res i 0) REAL4 (sse_or_avx_dst I.cvtss2sd vcvtss2sd)
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
     | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
     | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
@@ -1856,7 +1856,7 @@ let emit_instr ~first ~fallthrough i =
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      sse_or_avx_dst I.cvtsd2ss vcvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
       let address = addressing addr REAL4 i 1 in
       Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~address
         chunk memory_access;
@@ -1986,36 +1986,36 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Floatop (Float64, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx I.cmpsd vcmpsd cond a1 a0;
+    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0;
     movq a0 (res i 0);
     I.neg (res i 0)
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx I.cmpss vcmpss cond a1 a0;
+    cmp_sse_or_avx cmpss vcmpss cond a1 a0;
     movd a0 (res32 i 0);
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
     I.movsxd (res32 i 0) (res i 0);
     I.neg (res i 0)
   | Lop (Floatop (Float64, Inegf)) ->
-    sse_or_avx_dst I.xorpd vxorpd_X_X_Xm128
+    sse_or_avx_dst xorpd vxorpd_X_X_Xm128
       (mem64_rip VEC128 (emit_symbol "caml_negf_mask"))
       (res i 0)
   | Lop (Floatop (Float64, Iabsf)) ->
-    sse_or_avx_dst I.andpd vandpd_X_X_Xm128
+    sse_or_avx_dst andpd vandpd_X_X_Xm128
       (mem64_rip VEC128 (emit_symbol "caml_absf_mask"))
       (res i 0)
   | Lop (Floatop (Float32, Inegf)) ->
-    sse_or_avx_dst I.xorps vxorps_X_X_Xm128
+    sse_or_avx_dst xorps vxorps_X_X_Xm128
       (mem64_rip VEC128 (emit_symbol "caml_negf32_mask"))
       (res i 0)
   | Lop (Floatop (Float32, Iabsf)) ->
-    sse_or_avx_dst I.andps vandps_X_X_Xm128
+    sse_or_avx_dst andps vandps_X_X_Xm128
       (mem64_rip VEC128 (emit_symbol "caml_absf32_mask"))
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
-    instr_for_floatop width floatop (arg i 1) (res i 0)
+    instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
   | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
@@ -2025,14 +2025,14 @@ let emit_instr ~first ~fallthrough i =
     let dest = res i 0 in
     Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address Double
       Load;
-    instr_for_floatarithmem Float64 op address dest
+    instr_for_floatarithmem Float64 op (arg i 0) address dest
   | Lop (Specific (Ifloatarithmem (Float32, op, addr))) ->
     let address = addressing addr REAL4 i 1 in
     let dest = res i 0 in
     Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address
       (Single { reg = Float32 })
       Load;
-    instr_for_floatarithmem Float32 op address dest
+    instr_for_floatarithmem Float32 op (arg i 0) address dest
   | Lop (Specific (Ibswap { bitwidth = Sixteen })) ->
     I.xchg ah al;
     I.movzx (res16 i 0) (res i 0)

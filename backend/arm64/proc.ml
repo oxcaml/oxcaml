@@ -447,6 +447,8 @@ let assemble_file infile outfile =
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
+let has_three_operand_float_ops () = false
+
 let operation_supported : Cmm.operation -> bool = function
   | Cprefetch _ | Catomic _
   | Creinterpret_cast (V256_of_v256 | V512_of_v512)

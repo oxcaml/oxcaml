@@ -128,10 +128,13 @@ let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor)
-  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
-  | Specific Ipackf32 ->
+  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
+  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
+  | Specific (Ifloatarithmem (_, _, _)) ->
+    if Proc.has_three_operand_float_ops ()
+    then raise Use_default_exn
+    else [| res.(0); arg.(1) |], res
   | Intop_atomic { op = Compare_set; size = _; addr = _ } ->
     (* first arg must be rax *)
     let arg = Array.copy arg in
@@ -158,10 +161,6 @@ let pseudoregs_for_operation op arg res =
   (* For imulh, first arg must be in rax, rax is clobbered, and result is in
      rdx. *)
   | Intop (Imulh _) -> [| rax; arg.(1) |], [| rdx |]
-  | Specific (Ifloatarithmem (_, _, _)) ->
-    let arg' = Array.copy arg in
-    arg'.(0) <- res.(0);
-    arg', res
   (* For shifts with variable shift count, second arg must be in rcx *)
   | Intop (Ilsl | Ilsr | Iasr) -> [| res.(0); rcx |], res
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
@@ -192,8 +191,10 @@ let pseudoregs_for_operation op arg res =
        and rax and rdx clobbered *)
     [| rcx |], res
   | Specific (Isimd op) -> Simd_selection.pseudoregs_for_operation op arg res
-  | Specific (Isimd_mem (op, _addr)) ->
-    Simd_selection.pseudoregs_for_mem_operation op arg res
+  | Specific (Isimd_mem (op, _addr)) -> (
+    match Simd_selection.pseudoregs_for_mem_operation op arg res with
+    | None -> raise Use_default_exn
+    | Some (arg, res) -> arg, res)
   | Csel _ ->
     (* last arg must be the same as res.(0) *)
     let len = Array.length arg in

@@ -116,9 +116,7 @@ let i1_call_jmp b s = function
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2_s b "add" arg1 arg2
-  | ADDSD (arg1, arg2) -> i2 b "addsd" arg1 arg2
   | AND (arg1, arg2) -> i2_s b "and" arg1 arg2
-  | ANDPD (arg1, arg2) -> i2 b "andpd" arg1 arg2
   | BSF (arg1, arg2) -> i2_s b "bsf" arg1 arg2
   | BSR (arg1, arg2) -> i2_s b "bsr" arg1 arg2
   | BSWAP arg -> i1 b "bswap" arg
@@ -127,18 +125,8 @@ let print_instr b = function
   | CLDEMOTE arg -> i1 b "cldemote" arg
   | CMOV (c, arg1, arg2) -> i2 b ("cmov" ^ string_of_condition c) arg1 arg2
   | CMP (arg1, arg2) -> i2_s b "cmp" arg1 arg2
-  | CMPSD (c, arg1, arg2) ->
-    i2 b ("cmp" ^ string_of_float_condition c ^ "sd") arg1 arg2
-  | COMISD (arg1, arg2) -> i2 b "comisd" arg1 arg2
   | CQO -> i0 b "cqto"
-  | CVTSI2SS (arg1, arg2) -> i2 b ("cvtsi2ss" ^ suf arg1) arg1 arg2
-  | CVTSD2SS (arg1, arg2) -> i2 b "cvtsd2ss" arg1 arg2
-  | CVTSI2SD (arg1, arg2) -> i2 b ("cvtsi2sd" ^ suf arg1) arg1 arg2
-  | CVTSS2SD (arg1, arg2) -> i2 b "cvtss2sd" arg1 arg2
-  | CVTTSS2SI (arg1, arg2) -> i2_s b "cvttss2si" arg1 arg2
-  | CVTTSD2SI (arg1, arg2) -> i2_s b "cvttsd2si" arg1 arg2
   | DEC arg -> i1_s b "dec" arg
-  | DIVSD (arg1, arg2) -> i2 b "divsd" arg1 arg2
   | HLT -> i0 b "hlt"
   | IDIV arg -> i1_s b "idiv" arg
   | IMUL (arg, None) -> i1_s b "imul" arg
@@ -171,17 +159,9 @@ let print_instr b = function
          | Regf _ | Mem _
          | Mem64_RIP (_, _, _) ) as arg2) ) ->
     i2_s b "mov" arg1 arg2
-  | MOVAPD (arg1, arg2) -> i2 b "movapd" arg1 arg2
-  | MOVUPD (arg1, arg2) -> i2 b "movupd" arg1 arg2
-  | MOVD (arg1, arg2) -> i2 b "movd" arg1 arg2
-  | MOVQ (arg1, arg2) -> i2 b "movq" arg1 arg2
-  | MOVLPD (arg1, arg2) -> i2 b "movlpd" arg1 arg2
-  | MOVSD (arg1, arg2) -> i2 b "movsd" arg1 arg2
-  | MOVSS (arg1, arg2) -> i2 b "movss" arg1 arg2
   | MOVSX (arg1, arg2) -> i2_ss b "movs" arg1 arg2
   | MOVSXD (arg1, arg2) -> i2 b "movslq" arg1 arg2
   | MOVZX (arg1, arg2) -> i2_ss b "movz" arg1 arg2
-  | MULSD (arg1, arg2) -> i2 b "mulsd" arg1 arg2
   | NEG arg -> i1 b "neg" arg
   | NOP -> i0 b "nop"
   | OR (arg1, arg2) -> i2_s b "or" arg1 arg2
@@ -206,22 +186,9 @@ let print_instr b = function
   | SET (c, arg) -> i1 b ("set" ^ string_of_condition c) arg
   | SHR (arg1, arg2) -> i2_s b "shr" arg1 arg2
   | SUB (arg1, arg2) -> i2_s b "sub" arg1 arg2
-  | SUBSD (arg1, arg2) -> i2 b "subsd" arg1 arg2
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
-  | UCOMISD (arg1, arg2) -> i2 b "ucomisd" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
-  | XORPD (arg1, arg2) -> i2 b "xorpd" arg1 arg2
-  | ADDSS (arg1, arg2) -> i2 b "addss" arg1 arg2
-  | SUBSS (arg1, arg2) -> i2 b "subss" arg1 arg2
-  | MULSS (arg1, arg2) -> i2 b "mulss" arg1 arg2
-  | DIVSS (arg1, arg2) -> i2 b "divss" arg1 arg2
-  | COMISS (arg1, arg2) -> i2 b "comiss" arg1 arg2
-  | UCOMISS (arg1, arg2) -> i2 b "ucomiss" arg1 arg2
-  | XORPS (arg1, arg2) -> i2 b "xorps" arg1 arg2
-  | ANDPS (arg1, arg2) -> i2 b "andps" arg1 arg2
-  | CMPSS (cmp, arg1, arg2) ->
-    i2 b ("cmp" ^ string_of_float_condition cmp ^ "ss") arg1 arg2
   | LZCNT (arg1, arg2) -> i2_s b "lzcnt" arg1 arg2
   | TZCNT (arg1, arg2) -> i2_s b "tzcnt" arg1 arg2
   | SIMD (instr, args) -> (
@@ -231,8 +198,14 @@ let print_instr b = function
       i2 b ("cmp" ^ string_of_float_condition_imm imm ^ "ps") arg1 arg2
     | Cmppd, [| imm; arg1; arg2 |] ->
       i2 b ("cmp" ^ string_of_float_condition_imm imm ^ "pd") arg1 arg2
+    | Cmpss, [| imm; arg1; arg2 |] ->
+      i2 b ("cmp" ^ string_of_float_condition_imm imm ^ "ss") arg1 arg2
+    | Cmpsd, [| imm; arg1; arg2 |] ->
+      i2 b ("cmp" ^ string_of_float_condition_imm imm ^ "sd") arg1 arg2
     (* The assembler needs a suffix to disambiguate the memory argument. *)
     | Crc32_r64_r64m64, [| arg1; arg2 |] -> i2 b "crc32q" arg1 arg2
+    | Cvtsi2sd_X_r64m64, [| arg1; arg2 |] -> i2 b "cvtsi2sdq" arg1 arg2
+    | Cvtsi2ss_X_r64m64, [| arg1; arg2 |] -> i2 b "cvtsi2ssq" arg1 arg2
     | Vcvtsi2sd_X_X_r64m64, [| arg1; arg2; arg3 |] ->
       i3 b "vcvtsi2sdq" arg1 arg2 arg3
     | Vcvtsi2ss_X_X_r64m64, [| arg1; arg2; arg3 |] ->

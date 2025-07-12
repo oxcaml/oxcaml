@@ -155,7 +155,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   match instr.desc with
   | Op (Floatop (_, (Iaddf | Isubf | Imulf | Idivf))) ->
     may_use_stack_operand_for_second_argument map instr ~num_args:2
-      ~res_is_fst:true
+      ~res_is_fst:(not (Proc.has_three_operand_float_ops ()))
   | Op (Specific Ipackf32) -> May_still_have_spilled_registers
   | Op (Specific (Isimd op)) -> (
     let simd =
@@ -200,14 +200,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op
       (Specific
         (Isimd_mem
-          ( ( SSE2 Add_f64
-            | SSE2 Sub_f64
-            | SSE2 Mul_f64
-            | SSE2 Div_f64
-            | SSE Add_f32
-            | SSE Sub_f32
-            | SSE Mul_f32
-            | SSE Div_f32 ),
+          ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
+            | Mul_f32 | Div_f32 ),
             _ ))) ->
     May_still_have_spilled_registers
   | Op

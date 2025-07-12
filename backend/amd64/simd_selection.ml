@@ -585,15 +585,11 @@ let select_operation_cfg ~dbg op args =
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
   match op with
-  | SSE2 Add_f64
-  | SSE2 Sub_f64
-  | SSE2 Mul_f64
-  | SSE2 Div_f64
-  | SSE Add_f32
-  | SSE Sub_f32
-  | SSE Mul_f32
-  | SSE Div_f32 ->
-    [| res.(0); arg.(1) |], res
+  | Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
+  | Div_f32 ->
+    if Proc.has_three_operand_float_ops ()
+    then None
+    else Some ([| res.(0); arg.(1) |], res)
 
 let rax = Proc.phys_reg Int 0
 
@@ -625,7 +621,7 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
   let arg_regs = Array.copy arg in
   let res_regs = Array.copy res in
-  let sse_or_avx =
+  let instr =
     match simd.instr with
     | Instruction instr -> instr
     | Sequence
@@ -636,7 +632,7 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
         } ->
       instr
   in
-  pseudoregs_for_instr sse_or_avx arg_regs res_regs
+  pseudoregs_for_instr instr arg_regs res_regs
 
 (* Error report *)
 
@@ -1115,24 +1111,27 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             Vectorize_utils.Vectorized_instruction.Original (i + 1))
       in
       if is_aligned_to_vector_width ()
-      then
+      then (
         let sse_op : Simd.Mem.operation =
           match float_width, float_op with
-          | Float64, Ifloatadd -> SSE2 Add_f64
-          | Float64, Ifloatsub -> SSE2 Sub_f64
-          | Float64, Ifloatmul -> SSE2 Mul_f64
-          | Float64, Ifloatdiv -> SSE2 Div_f64
-          | Float32, Ifloatadd -> SSE Add_f32
-          | Float32, Ifloatsub -> SSE Sub_f32
-          | Float32, Ifloatmul -> SSE Mul_f32
-          | Float32, Ifloatdiv -> SSE Div_f32
+          | Float64, Ifloatadd -> Add_f64
+          | Float64, Ifloatsub -> Sub_f64
+          | Float64, Ifloatmul -> Mul_f64
+          | Float64, Ifloatdiv -> Div_f64
+          | Float32, Ifloatadd -> Add_f32
+          | Float32, Ifloatsub -> Sub_f32
+          | Float32, Ifloatmul -> Mul_f32
+          | Float32, Ifloatdiv -> Div_f32
         in
+        let arguments = Array.append results address_args in
+        if Proc.has_three_operand_float_ops ()
+        then arguments.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
         Some
           [ { operation =
                 Operation.Specific (Isimd_mem (sse_op, addressing_mode));
-              arguments = Array.append results address_args;
+              arguments;
               results
-            } ]
+            } ])
       else
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be
@@ -1163,11 +1162,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             results = new_reg
           }
         in
+        let arguments = Array.append results new_reg in
+        if Proc.has_three_operand_float_ops ()
+        then arguments.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
         let arith : Vectorize_utils.Vectorized_instruction.t =
-          { operation = sse_or_avx sse avx;
-            arguments = Array.append results new_reg;
-            results
-          }
+          { operation = sse_or_avx sse avx; arguments; results }
         in
         Some [load; arith]
     | Isimd_mem _ ->
