@@ -1,0 +1,5 @@
+(library
+ (name sexplib0)
+ (preprocess no_preprocessing)
+ (flags :standard -w -18)
+ (ocamlopt_flags :standard -O3))

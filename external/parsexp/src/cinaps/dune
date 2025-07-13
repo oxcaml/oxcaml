@@ -1,0 +1,5 @@
+(library
+ (name parsexp_cinaps_helpers)
+ (libraries base parsexp_symbolic_automaton stdio)
+ (preprocess
+  (pps ppx_jane)))
