@@ -127,6 +127,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         ~main_module_block_size ~arg_block_idx ~style:Plain_block
     in
     let jsir = raw_lambda_to_jsir info impl ~as_arg_for in
+    (* CR selee: emit JSIR *)
     ignore jsir
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =

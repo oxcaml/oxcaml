@@ -336,8 +336,6 @@
  (libraries ocamlbytecomp ocamlcommon)
  (modules main_native))
 
-; CR selee: it's a bit weird that we depend on ocamlbytecomp. Come back and clean
-; this up later
 (library
  (name ocamljcomp)
  (wrapped false)
@@ -345,7 +343,7 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
- (libraries ocamlcommon ocamlbytecomp flambda2)
+ (libraries ocamlcommon flambda2)
  (modules
    jsmaindriver
    jscompile))
