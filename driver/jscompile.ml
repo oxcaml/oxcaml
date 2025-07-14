@@ -29,6 +29,8 @@ let interface ~source_file ~output_prefix =
     ~hook_typed_tree:(fun _ -> ())
     info
 
+(** Js_of_ocaml IR compilation backend for .ml files. *)
+
 let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   match param, arg_block_idx with
   | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
