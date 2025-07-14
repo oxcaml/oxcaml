@@ -7107,6 +7107,8 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
+  | Pexp_as (_exp, _ty) ->
+    failwith "admitted"
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->

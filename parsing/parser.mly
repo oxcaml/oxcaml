@@ -3143,6 +3143,8 @@ comprehension_clause:
       { unclosed "(" $loc($3) ")" $loc($8) }
   | HASHLPAREN labeled_tuple RPAREN
       { Pexp_unboxed_tuple $2 }
+  | LPAREN simple_expr AS core_type RPAREN
+      { Pexp_as ($2, $4) }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH

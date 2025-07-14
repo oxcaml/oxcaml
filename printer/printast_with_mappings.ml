@@ -482,6 +482,10 @@ and expression i ppf x =
       line i ppf "Pexp_overwrite\n";
       expression i ppf e1;
       expression i ppf e2
+  | Pexp_as (e, ct) ->
+      line i ppf "Pexp_as\n";
+      expression i ppf e;
+      core_type i ppf ct;
   | Pexp_hole ->
       line i ppf "Pexp_hole"
   )

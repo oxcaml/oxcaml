@@ -522,6 +522,7 @@ and expression_desc =
           - [CLAUSES] is a series of [comprehension_clause].
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
+  | Pexp_as of expression * core_type (** e.g. List.sum xs as float# *)
   | Pexp_hole (** _ *)
 
 and case =
