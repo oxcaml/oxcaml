@@ -95,6 +95,7 @@ module Cfg_desc = struct
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
         ~fun_poll:Lambda.Default_poll
         ~next_instruction_id:(InstructionId.make_sequence ())
+        ~fun_ret_type:Cmm.typ_val
     in
     List.iter
       (fun (block : Block.t) ->
