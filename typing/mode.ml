@@ -1823,6 +1823,9 @@ and single_axis_shint_to_axhint :
       in
       single_axis_shint_to_axhint a_obj chosen chosen_hint adj
 
+let flip_axerror ({ left; right } : _ axerror) : _ axerror =
+  { left = right; right = left }
+
 (** Take a solver error for a product object, and an axis to project to, and
 convert the error to an [axerror] *)
 let solver_error_to_axerror :
@@ -1842,6 +1845,9 @@ let solver_error_to_axerror :
   in
   { left = left_projected; right = right_projected }
 
+let flipped_solver_error_to_axerror r_obj axis err =
+  solver_error_to_axerror r_obj axis err |> flip_axerror
+
 (** Take a solver error for a single axis object and convert it to an [axerror] *)
 let single_axis_solver_error_to_axerror :
     type r a.
@@ -1856,6 +1862,9 @@ let single_axis_solver_error_to_axerror :
       { fn = Lattices_mono.left_adjoint }
   in
   { left = left_projected; right = right_projected }
+
+let flipped_single_axis_solver_error_to_axerror r_obj err =
+  single_axis_solver_error_to_axerror r_obj err |> flip_axerror
 
 type changes = S.changes
 
@@ -2062,12 +2071,12 @@ module Monadic_axis_gen (Obj : Obj) = struct
 
   type equate_error = equate_step * error
 
-  (* TODO - we're going to have problems here, as the flipping isn't as easy to do
-     as it will no longer type-check. Solve this another time *)
+  let[@inline] flipped_solver_error_to_axerror =
+    flipped_single_axis_solver_error_to_axerror Obj.obj
 
   let submode_log a b ~log =
     Solver.submode obj b a ~log
-    |> Result.map_error flip_and_solver_error_to_axerror
+    |> Result.map_error flipped_solver_error_to_axerror
 
   let submode a b = try_with_log (submode_log a b)
 
@@ -2512,6 +2521,9 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
+  (** Take a solver error and determine the problematic axis then return an
+  [axerror] in that axis, as well as the axis itself. Before returning, since
+  the monadic fragment is flipped, this function will flip the error sides *)
   let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
     let left = err.left in
     let { uniqueness = uniqueness1;
