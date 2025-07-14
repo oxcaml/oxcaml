@@ -14,7 +14,7 @@
 
 open Allowance
 
-type 'a serror =
+type 'a axerror =
   { left : 'a;
     right : 'a
   }
@@ -131,7 +131,7 @@ end
 module type Common_axis = sig
   module Const : Lattice
 
-  include Common with module Const := Const and type error = Const.t serror
+  include Common with module Const := Const and type error = Const.t axerror
 end
 
 module type Axis = sig
@@ -155,7 +155,7 @@ module type Common_product = sig
 
   module Const : Lattice_product with type 'a axis := 'a Axis.t
 
-  type error = Error : 'a Axis.t * 'a serror -> error
+  type error = Error : 'a Axis.t * 'a axerror -> error
 
   include Common with type error := error and module Const := Const
 end
@@ -508,7 +508,7 @@ module type S = sig
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
-    type error = Error : 'a Axis.t * 'a serror -> error
+    type error = Error : 'a Axis.t * 'a axerror -> error
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
@@ -625,7 +625,7 @@ module type S = sig
     module Value : sig
       type atom := t
 
-      type error = Error : 'a Value.Axis.t * 'a raw serror -> error
+      type error = Error : 'a Value.Axis.t * 'a raw axerror -> error
 
       type nonrec equate_error = equate_step * error
 
