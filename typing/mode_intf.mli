@@ -14,11 +14,16 @@
 
 open Allowance
 
+(** Hints for the mode solvers. These are axis-specific hints that contain a trace
+of the values in a single axis from an error. *)
 type ('a, 'morph, 'const) hint =
   | Morph : 'a * 'morph * ('b, 'morph, 'const) hint -> ('a, 'morph, 'const) hint
   | Const : 'a * 'const -> ('a, 'morph, 'const) hint
   | Empty : 'a -> ('a, 'morph, 'const) hint
 
+(** Errors for the mode solvers. These are axis-specific processed versions of
+the errors returned by the solver, as the solver errors consider axis products.
+The hints in this error type are [hint] values. *)
 type ('a, 'morph, 'const) axerror =
   { left : ('a, 'morph, 'const) hint;
     right : ('a, 'morph, 'const) hint
