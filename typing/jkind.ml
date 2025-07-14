@@ -2437,7 +2437,7 @@ let for_or_null_argument ident =
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
-      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.Const.max
       ~nullability:Nullability.Non_null
       ~separability:Separability.Maybe_separable
   in

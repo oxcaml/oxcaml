@@ -5070,6 +5070,7 @@ let mode_crossing_structure_memaddr =
       portability = Portable;
       yielding = Unyielding;
       statefulness = Stateless;
+      externality = Internal;
   }}
 
 (** The mode crossing of a functor. *)
@@ -5086,6 +5087,7 @@ let mode_crossing_functor =
       portability = Nonportable;
       yielding = Yielding;
       statefulness = Stateful;
+      externality = Internal;
   }}
 
 (** The mode crossing of any module. *)

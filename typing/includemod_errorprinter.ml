@@ -258,6 +258,9 @@ let zap_axis_to_floor
   | Comonadic Statefulness ->
       Mode.Statefulness.zap_to_floor
         (Mode.Value.proj (Comonadic Statefulness) m)
+  | Comonadic Externality ->
+      Mode.Externality.zap_to_floor
+        (Mode.Value.proj (Comonadic Externality) m)
   | Monadic Uniqueness ->
       Mode.Uniqueness.zap_to_floor (Mode.Value.proj (Monadic Uniqueness) m)
   | Monadic Contention ->
@@ -279,6 +282,8 @@ let zap_axis_to_ceil
       Mode.Yielding.zap_to_ceil (Mode.Value.proj (Comonadic Yielding) m)
   | Comonadic Statefulness ->
       Mode.Statefulness.zap_to_ceil (Mode.Value.proj (Comonadic Statefulness) m)
+  | Comonadic Externality->
+      Mode.Externality.zap_to_ceil (Mode.Value.proj (Comonadic Externality) m)
   | Monadic Uniqueness ->
       Mode.Uniqueness.zap_to_ceil (Mode.Value.proj (Monadic Uniqueness) m)
   | Monadic Contention ->
