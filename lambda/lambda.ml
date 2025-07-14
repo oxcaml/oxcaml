@@ -2355,7 +2355,8 @@ let layout_of_mixed_block_shape
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
 let primitive_result_layout (p : primitive) =
-  (* This assertion is no longer true, as we also use Flambda2 to generate Js_of_ocaml IR.
+  (* This assertion is no longer true, as we also use Flambda2 to
+     generate Js_of_ocaml IR.
      CR selee: Come back and check this is okay
 
      assert !Clflags.native_code; *)
