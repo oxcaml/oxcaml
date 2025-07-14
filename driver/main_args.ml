@@ -1163,6 +1163,14 @@ end;;
 module type Jscomp_options = sig
   include Core_options
   include Compiler_options
+  (* CR selee: should we include more things from [Native]? Review *)
+  val _dflambda : unit -> unit
+  val _dflambda_heavy_invariants : unit -> unit
+  val _dflambda_invariants : unit -> unit
+  val _dflambda_let : int -> unit
+  val _dflambda_no_invariants : unit -> unit
+  val _dflambda_verbose : unit -> unit
+  val _drawflambda : unit -> unit
 end
 
 module type Opttop_options = sig
@@ -1836,6 +1844,14 @@ struct
 
     mk_args F._args;
     mk_args0 F._args0;
+
+    mk_dflambda F._dflambda;
+    mk_drawflambda F._drawflambda;
+    mk_dflambda_invariants F._dflambda_invariants;
+    mk_dflambda_heavy_invariants F._dflambda_heavy_invariants;
+    mk_dflambda_no_invariants F._dflambda_no_invariants;
+    mk_dflambda_let F._dflambda_let;
+    mk_dflambda_verbose F._dflambda_verbose;
   ]
 end;;
 
@@ -2326,6 +2342,19 @@ third-party libraries such as Lwt, but with a different API."
   module Jsmain = struct
     include Core
     include Compiler
+
+    let _dflambda = set dump_flambda
+    let _dflambda_heavy_invariants () =
+      flambda_invariant_checks := Heavy_checks
+    let _dflambda_invariants () =
+      flambda_invariant_checks := Light_checks
+    let _dflambda_let stamp = dump_flambda_let := (Some stamp)
+    let _dflambda_no_invariants () =
+      flambda_invariant_checks := No_checks
+    let _dflambda_verbose () =
+      set dump_flambda (); set dump_flambda_verbose ()
+    let _drawflambda = set dump_rawflambda
+
     let _output_complete_obj () =
       output_c_object := true;
       output_complete_object := true;

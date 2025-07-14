@@ -269,6 +269,14 @@ end
 module type Jscomp_options = sig
   include Core_options
   include Compiler_options
+
+  val _dflambda : unit -> unit
+  val _dflambda_heavy_invariants : unit -> unit
+  val _dflambda_invariants : unit -> unit
+  val _dflambda_let : int -> unit
+  val _dflambda_no_invariants : unit -> unit
+  val _dflambda_verbose : unit -> unit
+  val _drawflambda : unit -> unit
 end
 
 module type Ocamldoc_options = sig
