@@ -128,7 +128,7 @@ let llvm_backend = ref false (* -llvm-backend *)
 
 let dump_llvmir = ref false (* -dllvmir *)
 
-let llvm_path = ref Default
+let llvm_path = ref None (* -llvm-path *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
