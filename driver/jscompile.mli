@@ -36,6 +36,9 @@ val instance :
 
 (** {2 Internal functions} **)
 
+(* CR selee: Leaving these here for now - they'll be modified later to emit
+   jsir instead. *)
+
 (** [to_bytecode info typed] takes a typechecked implementation
     and returns its bytecode.
 *)

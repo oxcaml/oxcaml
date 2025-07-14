@@ -50,6 +50,7 @@ let caml_symbol_prefix = "caml"
 (* CR ocaml 5 all-runtime5: Remove this_is_ocamlc and force_runtime4_symbols
    once fully on runtime5 *)
 let this_is_ocamlc = ref false
+let this_is_ocamlj = ref false
 let force_runtime4_symbols = ref true
 
 let upstream_runtime5_symbol_separator =
@@ -60,12 +61,15 @@ let upstream_runtime5_symbol_separator =
 let separator () =
   if !this_is_ocamlc then
     Misc.fatal_error "Didn't expect utils/symbol.ml to be used in ocamlc";
+  if !this_is_ocamlj then
+    Misc.fatal_error "Didn't expect utils/symbol.ml to be used in ocamlj";
   if Config.runtime5 && not !force_runtime4_symbols then
     Printf.sprintf "%c" upstream_runtime5_symbol_separator
   else
     "__"
 
 let this_is_ocamlc () = this_is_ocamlc := true
+let this_is_ocamlj () = this_is_ocamlj := true
 let force_runtime4_symbols () = force_runtime4_symbols := true
 
 let pack_separator = separator
