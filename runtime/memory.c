@@ -355,7 +355,7 @@ CAMLprim value caml_atomic_exchange (value ref, value v)
 
 CAMLprim value caml_atomic_set_field (value ref, value vfield, value v)
 {
-  caml_atomic_exchange(ref, v);
+  caml_atomic_exchange_field(ref, vfield, v);
   return Val_unit;
 }
 
