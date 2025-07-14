@@ -1,56 +1,97 @@
-let () =
-  let enabled_if =
-    (* CR yusumez: Do we need to specify the architecture? *)
-    (* {|(enabled_if (and (= %{context_name} "main") (= %{architecture}
-       "amd64")) )|} *)
-    {|(enabled_if  (= %{context_name} "main"))|}
+(* CR yusumez:
+
+   - context_name == main fails, so that was removed. also, do we need to
+   specify archtiecture?
+
+   - %{bin:ocamlopt.opt} tries building the entire compiler, which causes some
+   issues. We added boot_ocamlopt to the makefile under the bin section, though
+   that should not be pushed.
+
+   - we need to configure the assembler with CC=clang since llvm emits asm
+   directives gcc isn't happy with *)
+
+let print_test ~extra_dep ~extra_subst ~name ~buf rule_template =
+  let extra_deps =
+    match extra_dep with
+    | None -> Printf.sprintf {|(:ml %s.ml)|} name
+    | Some s ->
+      if String.ends_with ~suffix:".ml" s || String.ends_with ~suffix:".mli" s
+      then Printf.sprintf {|(:ml %s %s.ml)|} s name
+      else Printf.sprintf {|%s (:ml %s.ml)|} s name
   in
+  let output = name ^ ".output" in
+  let subst = function
+    | "name" -> name
+    | "output" -> output
+    | "extra_deps" -> extra_deps
+    | label -> (
+      match
+        List.find_opt (fun (label', _) -> String.equal label label') extra_subst
+      with
+      | Some (_, res) -> res
+      | None -> assert false)
+  in
+  Buffer.clear buf;
+  Buffer.add_substitute buf subst rule_template;
+  Buffer.output_buffer Out_channel.stdout buf
+
+let () =
   let buf = Buffer.create 1000 in
-  let print_test_expected_output ?(filter = "filter.sh")
-      ?(extra_flags = "-zero-alloc-check default") ?output ~extra_dep ~exit_code
-      name =
-    let extra_deps =
-      match extra_dep with
-      | None -> Printf.sprintf {|(:ml %s.ml)|} name
-      | Some s ->
-        if String.ends_with ~suffix:".ml" s || String.ends_with ~suffix:".mli" s
-        then Printf.sprintf {|(:ml %s %s.ml)|} s name
-        else Printf.sprintf {|%s (:ml %s.ml)|} s name
-    in
-    let output = Option.value output ~default:(name ^ ".output") in
-    let subst = function
-      | "enabled_if" -> enabled_if
-      | "name" -> name
-      | "output" -> output
-      | "extra_deps" -> extra_deps
-      | "exit_code" -> string_of_int exit_code
-      | "extra_flags" -> extra_flags
-      | "filter" -> filter
-      | _ -> assert false
-    in
-    Buffer.clear buf;
-    Buffer.add_substitute buf subst
+  let print_test_llvmir ?extra_dep name =
+    print_test
+      ~extra_subst:
+        [ "filter", "filter.sh";
+          "flags", "-g -c -llvm-backend -llvm-path true -dllvmir" ]
+      ~extra_dep ~name ~buf
       {|
 (rule
- ${enabled_if}
  (targets ${output}.corrected)
  (deps ${extra_deps} ${filter})
  (action
-  (pipe-outputs
-    (with-accepted-exit-codes ${exit_code}
-    (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
-         -llvm-backend -llvm-path true -dllvm
-         ${extra_flags}))
-    (run mv ${name}.ll ${output}.corrected)
-    (run "./${filter}")
-   )))
+  (with-outputs-to
+   ${output}.corrected
+   (pipe-outputs
+    (run
+     %{bin:boot_ocamlopt} %{ml} -g -c
+     -llvm-backend -llvm-path true -dllvmir)
+    (run cat ${name}.ll)
+    (run ./filter.sh)))))
 
 (rule
- (alias   runtest)
- ${enabled_if}
+ (alias runtest)
  (deps ${output} ${output}.corrected)
- (action (diff ${output} ${output}.corrected)))
-|};
-    Buffer.output_buffer Out_channel.stdout buf
+ (action
+  (diff ${output} ${output}.corrected)))
+          |}
   in
-  print_test_expected_output ~extra_dep:None ~exit_code:0 "id_fn"
+  let print_test_run ~bootstrap name =
+    print_test
+      ~extra_subst:
+        [ "bootstrap", bootstrap;
+          "llvm_flags", "-g -c -llvm-backend -llvm-path clang" ]
+      ~extra_dep:(Some bootstrap) ~name ~buf
+      {|
+(rule
+ (targets ${output}.corrected)
+ (deps ${extra_deps} ${filter})
+ (action
+  (with-outputs-to
+   ${output}.corrected
+   (pipe-outputs
+    (run
+     %{bin:boot_ocamlopt} ${name}.ml -c -opaque ${llvm_flags})
+    (run
+     %{bin:boot_ocamlopt} ${bootstrap}.ml -c -opaque )
+    (run
+     %{bin:boot_ocamlopt} ${name}.cmx ${bootstrap}.cmx -opaque -o test.exe)
+    (run ./test.exe)))))
+
+(rule
+ (alias runtest)
+ (deps ${output} ${output}.corrected)
+ (action
+  (diff ${output} ${output}.corrected)))
+      |}
+  in
+  print_test_llvmir "id_fn";
+  print_test_run ~bootstrap:"const_fn_bootstrap" "const_fn"

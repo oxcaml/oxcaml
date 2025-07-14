@@ -181,7 +181,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   jkind
@@ -793,6 +793,7 @@
 (install
  (files
   (oxcaml_main.bc as ocamlopt.byte)
+  (boot_ocamlopt.exe as boot_ocamlopt) ; DO NOT MERGE
   (oxcaml_main_native.exe as ocamlopt.opt))
  (section bin)
  (package ocaml))
