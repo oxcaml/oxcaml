@@ -1405,7 +1405,10 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
      we seem to have no declaration, and we also do not know the layout. Perhaps
      we should simply not emit any DWARF information for this variable
      instead. *)
-  | Some type_shape -> (
+  | Some { type_shape; type_layout } -> (
+    let type_shape =
+      Type_shape.Type_shape.shape_with_layout ~layout:type_layout type_shape
+    in
     let type_shape =
       match unboxed_projection with
       | None -> `Known type_shape

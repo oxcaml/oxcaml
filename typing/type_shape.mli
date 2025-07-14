@@ -182,9 +182,18 @@ module Type_decl_shape : sig
     ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
 end
 
+type shape_with_layout =
+  { type_shape : Type_shape.without_layout Type_shape.t;
+    type_layout : Layout.t
+  }
+(* CR sspies: There are two options here: We can fold the layout into the shape,
+    or we can keep it on the outside. Currently, we keep it on the outside to
+    make it easier to connect type shapes and shapes (which are agnostic about
+   layouts) in subsequent PRs. *)
+
 val all_type_decls : Type_decl_shape.t Uid.Tbl.t
 
-val all_type_shapes : Layout.t Type_shape.t Uid.Tbl.t
+val all_type_shapes : shape_with_layout Uid.Tbl.t
 
 (* Passing [Path.t -> Uid.t] instead of [Env.t] to avoid a dependency cycle. *)
 val add_to_type_decls :

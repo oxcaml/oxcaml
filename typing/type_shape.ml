@@ -836,9 +836,14 @@ module Type_decl_shape = struct
     | false -> { type_params = []; path = t.path; definition = Tds_other }
 end
 
+type shape_with_layout =
+  { type_shape : Type_shape.without_layout Type_shape.t;
+    type_layout : Layout.t
+  }
+
 let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 16
 
-let (all_type_shapes : Layout.t Type_shape.t Uid.Tbl.t) = Uid.Tbl.create 16
+let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
 
 let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   let type_decl_shape =
@@ -846,10 +851,9 @@ let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   in
   Uid.Tbl.add all_type_decls type_decl.type_uid type_decl_shape
 
-let add_to_type_shapes var_uid type_expr sort uid_of_path =
+let add_to_type_shapes var_uid type_expr type_layout uid_of_path =
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
-  let type_shape = Type_shape.shape_with_layout ~layout:sort type_shape in
-  Uid.Tbl.add all_type_shapes var_uid type_shape
+  Uid.Tbl.add all_type_shapes var_uid { type_shape; type_layout }
 
 let tuple_to_string (strings : string list) =
   match strings with
@@ -986,11 +990,10 @@ let print_table_all_type_shapes ppf =
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
   let entries =
     List.map
-      (fun (k, type_shape) ->
+      (fun (k, { type_shape; type_layout }) ->
         ( Format.asprintf "%a" Uid.print k,
           ( Format.asprintf "%a" Type_shape.print type_shape,
-            Format.asprintf "%a" Jkind_types.Sort.Const.format
-              (Type_shape.shape_layout type_shape) ) ))
+            Format.asprintf "%a" Jkind_types.Sort.Const.format type_layout ) ))
       entries
   in
   let uids, rest = List.split entries in
