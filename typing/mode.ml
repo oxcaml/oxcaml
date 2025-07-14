@@ -2062,6 +2062,7 @@ module Comonadic_axis_gen (Obj : Obj) = struct
 
   let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
 end
+[@@inline]
 
 module Monadic_axis_gen (Obj : Obj) = struct
   open Obj
@@ -2086,6 +2087,7 @@ module Monadic_axis_gen (Obj : Obj) = struct
 
   let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
 end
+[@@inline]
 
 module Locality = struct
   module Const = C.Locality
@@ -2392,7 +2394,8 @@ module Comonadic_with (Areality : Areality) = struct
 
   let legacy = of_const Const.legacy
 
-  (** Take a solver error and determine the problematic axis then return an
+  (** Take a solver error and determine the problematic axis, assuming
+  the operation we were trying to do was [left <= right], then return an
   [axerror] in that axis, as well as the axis itself *)
   let axis_of_solver_error (err : Obj.const S.error) : error =
     let left = err.left in
@@ -2521,7 +2524,8 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
-  (** Take a solver error and determine the problematic axis then return an
+  (** Take a solver error and determine the problematic axis, assuming
+  the operation we were trying to do was [left <= right], then return an
   [axerror] in that axis, as well as the axis itself. Before returning, since
   the monadic fragment is flipped, this function will flip the error sides *)
   let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
@@ -3262,7 +3266,7 @@ module Modality = struct
           then Ok ()
           else
             let (Error (ax, { left; right })) =
-              Mode.axis_of_error { left = c0; right = c1 }
+              Mode.axis_of_solver_error { left = c0; right = c1 }
             in
             Error
               (Error (ax, { left = Join_with left; right = Join_with right }))
@@ -3395,7 +3399,7 @@ module Modality = struct
           then Ok ()
           else
             let (Error (ax, { left; right })) =
-              Mode.axis_of_error { left = c0; right = c1 }
+              Mode.axis_of_solver_error { left = c0; right = c1 }
             in
             Error
               (Error (ax, { left = Meet_with left; right = Meet_with right }))
