@@ -266,6 +266,11 @@ module type Opttop_options = sig
   val _S : unit -> unit
 end
 
+module type Jscomp_options = sig
+  include Core_options
+  include Compiler_options
+end
+
 module type Ocamldoc_options = sig
   include Common_options
   val _impl : string -> unit
@@ -286,6 +291,7 @@ module Make_bytecomp_options : Bytecomp_options -> Arg_list
 module Make_bytetop_options : Bytetop_options -> Arg_list
 module Make_optcomp_options : Optcomp_options -> Arg_list
 module Make_opttop_options : Opttop_options -> Arg_list
+module Make_jscomp_options : Jscomp_options -> Arg_list
 module Make_ocamldoc_options : Ocamldoc_options -> Arg_list
 
 (** [options_with_command_line_syntax options r] returns [options2] that behaves
@@ -303,5 +309,6 @@ module Default: sig
   module Opttopmain: Opttop_options
   module Main: Bytecomp_options
   module Optmain: Optcomp_options
+  module Jsmain : Jscomp_options
   module Odoc_args: Ocamldoc_options
 end
