@@ -1750,7 +1750,7 @@ type ('l1, 'r1, 'l2, 'r2) adj_fn =
       ('b, 'a, 'l2 * 'r2) Lattices_mono.morph
   }
 
-let rec project_solver_hint_to_axis_hint :
+let rec shint_to_axhint :
     type r a left1 left2 right1 right2.
     r Lattices_mono.obj ->
     r ->
@@ -1780,9 +1780,9 @@ let rec project_solver_hint_to_axis_hint :
       in
       compose_shint_with_proj r_shint
     in
-    project_single_axis_solver_hint_to_hint a_obj a a_shint adj
+    single_axis_shint_to_axhint a_obj a a_shint adj
 
-and project_single_axis_solver_hint_to_hint :
+and single_axis_shint_to_axhint :
     type r a left1 right1 left2 right2.
     a Lattices_mono.obj ->
     a ->
@@ -1803,14 +1803,10 @@ and project_single_axis_solver_hint_to_hint :
       match find_responsible_axis_single morph with
       | NoneResponsible -> Empty a
       | SourceIsSingle ->
-        let b_hint =
-          project_single_axis_solver_hint_to_hint b_obj b b_shint adj
-        in
+        let b_hint = single_axis_shint_to_axhint b_obj b b_shint adj in
         Morph (a, morph_hint, b_hint)
       | Axis b_ax ->
-        let b_hint =
-          project_solver_hint_to_axis_hint b_obj b b_shint b_ax adj
-        in
+        let b_hint = shint_to_axhint b_obj b b_shint b_ax adj in
         Morph (a, morph_hint, b_hint))
     | Const a_const_hint -> Const (a, a_const_hint)
     | Branch (x, x_hint, y, y_hint) ->
@@ -1825,9 +1821,11 @@ and project_single_axis_solver_hint_to_hint :
           (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
           assert false
       in
-      project_single_axis_solver_hint_to_hint a_obj chosen chosen_hint adj
+      single_axis_shint_to_axhint a_obj chosen chosen_hint adj
 
-let project_error_to_axis_error :
+(** Take a solver error for a product object, and an axis to project to, and
+convert the error to an [axerror] *)
+let solver_error_to_axerror :
     type r a.
     r Lattices_mono.obj ->
     (r, a) Axis.t ->
@@ -1835,22 +1833,32 @@ let project_error_to_axis_error :
     (a, Hint.morph, Hint.const) axerror =
  fun r_obj axis { left; left_hint; right; right_hint } ->
   let left_projected =
-    project_solver_hint_to_axis_hint r_obj left left_hint axis
+    shint_to_axhint r_obj left left_hint axis
       { fn = Lattices_mono.right_adjoint }
   in
   let right_projected =
-    project_solver_hint_to_axis_hint r_obj right right_hint axis
+    shint_to_axhint r_obj right right_hint axis
       { fn = Lattices_mono.left_adjoint }
   in
   { left = left_projected; right = right_projected }
 
-let solver_error_to_serror : 'a S.error -> ('a, Hint.morph, Hint.const) axerror
-    =
- fun { left; left_hint = _; right; right_hint = _ } -> { left; right }
-
-let flip_and_solver_error_to_serror :
-    'a S.error -> ('a, Hint.morph, Hint.const) axerror =
- fun { left; left_hint = _; right; right_hint = _ } -> { right; left }
+(** Take a solver error for a single axis object and convert it to an [axerror] *)
+let single_axis_solver_error_to_axerror :
+    type r a.
+    a Lattices_mono.obj ->
+    (r, a) Axis.t ->
+    a S.error ->
+    (a, Hint.morph, Hint.const) axerror =
+ fun a_obj _ { left; left_hint; right; right_hint } ->
+  let left_projected =
+    single_axis_shint_to_axhint a_obj left left_hint
+      { fn = Lattices_mono.right_adjoint }
+  in
+  let right_projected =
+    single_axis_shint_to_axhint a_obj right right_hint
+      { fn = Lattices_mono.left_adjoint }
+  in
+  { left = left_projected; right = right_projected }
 
 type changes = S.changes
 
