@@ -167,7 +167,7 @@ module Type_decl_shape : sig
     | Constructor_uniform_value
     | Constructor_mixed of mixed_product_shape
 
-  and mixed_product_shape = base_layout array
+  and mixed_product_shape = Layout.t array
 
   type t =
     { path : Path.t;

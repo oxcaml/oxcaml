@@ -520,7 +520,7 @@ module Type_decl_shape = struct
     | Constructor_uniform_value
     | Constructor_mixed of mixed_product_shape
 
-  and mixed_product_shape = base_layout array
+  and mixed_product_shape = Layout.t array
 
   type t =
     { path : Path.t;
@@ -539,20 +539,24 @@ module Type_decl_shape = struct
 
   let complex_constructors_map f = List.map (complex_constructor_map f)
 
-  let mixed_block_shape_to_base_layout = function
-    | Types.Value -> Jkind_types.Sort.Value
+  let rec mixed_block_shape_to_layout =
+    let open Jkind_types.Sort in
+    function
+    | Types.Value -> Layout.Base Value
     | Types.Float_boxed ->
-      Jkind_types.Sort.Float64
+      Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime, contrary to the name.*)
-    | Types.Float64 -> Jkind_types.Sort.Float64
-    | Types.Float32 -> Jkind_types.Sort.Float32
-    | Types.Bits32 -> Jkind_types.Sort.Bits32
-    | Types.Bits64 -> Jkind_types.Sort.Bits64
-    | Types.Vec128 -> Jkind_types.Sort.Vec128
-    | Types.Vec256 -> Jkind_types.Sort.Vec256
-    | Types.Vec512 -> Jkind_types.Sort.Vec512
-    | Types.Word -> Jkind_types.Sort.Word
-    | Types.Product _ -> Misc.fatal_error "unimplemented"
+    | Types.Float64 -> Layout.Base Float64
+    | Types.Float32 -> Layout.Base Float32
+    | Types.Bits32 -> Layout.Base Bits32
+    | Types.Bits64 -> Layout.Base Bits64
+    | Types.Vec128 -> Layout.Base Vec128
+    | Types.Vec256 -> Layout.Base Vec256
+    | Types.Vec512 -> Layout.Base Vec512
+    | Types.Word -> Layout.Base Word
+    | Types.Product args ->
+      Layout.Product
+        (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
   let of_variant_constructor_with_args name
       (cstr_args : Types.constructor_declaration)
@@ -584,9 +588,7 @@ module Type_decl_shape = struct
         let shapes_and_fields = List.combine (Array.to_list shapes) args in
         List.iter
           (fun (mix_shape, { field_name = _; field_value = _, ly }) ->
-            let ly2 =
-              Layout.Base (mixed_block_shape_to_base_layout mix_shape)
-            in
+            let ly2 = mixed_block_shape_to_layout mix_shape in
             if not (Layout.equal ly ly2)
             then
               Misc.fatal_errorf
@@ -594,15 +596,17 @@ module Type_decl_shape = struct
                  %a but expected %a"
                 Layout.format ly Layout.format ly2)
           shapes_and_fields;
-        Constructor_mixed (Array.map mixed_block_shape_to_base_layout shapes)
+        Constructor_mixed (Array.map mixed_block_shape_to_layout shapes)
       | Constructor_uniform_value ->
         List.iter
           (fun { field_name = _; field_value = _, ly } ->
-            if not (Layout.equal ly (Layout.Base Value))
+            if not
+                 (Layout.equal ly (Layout.Base Value)
+                 || Layout.equal ly (Layout.Base Void))
             then
               Misc.fatal_errorf
                 "Type_shape: variant constructor with mismatched layout, has \
-                 %a but expected value"
+                 %a but expected value or void."
                 Layout.format ly)
           args;
         Constructor_uniform_value
@@ -688,7 +692,7 @@ module Type_decl_shape = struct
             record_of_labels ~uid_of_path Record_boxed lbl_list
           | Record_mixed fields ->
             record_of_labels ~uid_of_path
-              (Record_mixed (Array.map mixed_block_shape_to_base_layout fields))
+              (Record_mixed (Array.map mixed_block_shape_to_layout fields))
               lbl_list
           | Record_unboxed ->
             record_of_labels ~uid_of_path Record_unboxed lbl_list

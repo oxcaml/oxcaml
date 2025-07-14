@@ -172,37 +172,41 @@ let create_simple_variant_die ~reference ~parent_proto_die ~name
         ())
     simple_constructors
 
+let rec layout_to_types_layout ly =
+  match ly with
+  | Layout.Base Value -> Types.Value
+  | Layout.Base Float64 ->
+    Types.Float64
+    (* This is a case, where we potentially have mapped [Float_boxed] to
+       [Float64], but that is fine, because they are reordered like other mixed
+       fields. *)
+    (* CR sspies: Is this true? It currently means we will add an extra hash to
+       the debugging output. But its not clear that that is a bad thing. *)
+  | Layout.Base Float32 -> Types.Float32
+  | Layout.Base Bits32 -> Types.Bits32
+  | Layout.Base Bits64 -> Types.Bits64
+  | Layout.Base Vec128 -> Types.Vec128
+  | Layout.Base Vec256 -> Types.Vec256
+  | Layout.Base Vec512 -> Types.Vec512
+  | Layout.Base Word -> Types.Word
+  | Layout.Base Void -> Types.Product [||]
+  | Layout.Product lys ->
+    Types.Product (Array.of_list (List.map layout_to_types_layout lys))
+
+let field_project_path fields path =
+  match path with
+  | [] -> assert false (* field should exist *)
+  | [i] -> Array.get fields i
+  | _ :: _ -> Misc.fatal_error "nested unboxed record fields not supported"
+
 let reorder_record_fields_for_mixed_record
-    ~(mixed_block_shapes : base_layout array) fields =
+    ~(mixed_block_shapes : Layout.t array) fields =
   (* We go into arrays and back, because it makes the reordering of the fields
      via accesses O(n) instead of O(n^2) *)
   let fields = Array.of_list fields in
   let mixed_block_shapes =
-    Array.map
-      (function
-        | Jkind_types.Sort.Value -> Types.Value
-        | Jkind_types.Sort.Float64 ->
-          Types.Float64
-          (* This is a case, where we potentially have mapped [Float_boxed] to
-             [Float64], but that is fine, because they are reordered like other
-             mixed fields. *)
-          (* CR sspies: Is this true? It currently means we will add an extra
-             hash to the debugging output. But its not clear that that is a bad
-             thing. *)
-        | Jkind_types.Sort.Float32 -> Types.Float32
-        | Jkind_types.Sort.Bits32 -> Types.Bits32
-        | Jkind_types.Sort.Bits64 -> Types.Bits64
-        | Jkind_types.Sort.Vec128 -> Types.Vec128
-        | Jkind_types.Sort.Vec256 -> Types.Vec256
-        | Jkind_types.Sort.Vec512 -> Types.Vec512
-        | Jkind_types.Sort.Word -> Types.Word
-        | Jkind_types.Sort.Void -> Types.Product [||])
-      (* CR sspies: The handling of Void here needs more through testing and
-         perhaps also different handling, once Void is more stable. In the
-         presence of Void, some code expecting Base layouts below could be
-         overly conservative. This should also be revisited once Void has landed
-         more widely in the compiler. *)
-      mixed_block_shapes
+    let open Jkind_types.Sort in
+    Array.map layout_to_types_layout mixed_block_shapes
   in
   let reordering =
     Mixed_block_shape.of_mixed_block_elements
@@ -216,9 +220,9 @@ let reorder_record_fields_for_mixed_record
          mixed_block_shapes)
   in
   let fields =
-    Array.init (Array.length fields) (fun i ->
-        let permute = Mixed_block_shape.new_indexes_to_old_indexes reordering in
-        Array.get fields permute.(i))
+    Array.init (Mixed_block_shape.new_block_length reordering) (fun i ->
+        let old_path = Mixed_block_shape.new_index_to_old_path reordering i in
+        field_project_path fields old_path)
   in
   Array.to_list fields
 
