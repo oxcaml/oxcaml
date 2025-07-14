@@ -3,7 +3,7 @@ let () =
     (* CR yusumez: Do we need to specify the architecture? *)
     (* {|(enabled_if (and (= %{context_name} "main") (= %{architecture}
        "amd64")) )|} *)
-    {|(enabled_if  (= %{context_name} "main") |}
+    {|(enabled_if  (= %{context_name} "main"))|}
   in
   let buf = Buffer.create 1000 in
   let print_test_expected_output ?(filter = "filter.sh")
