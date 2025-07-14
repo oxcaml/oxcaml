@@ -102,76 +102,78 @@ module Type_shape = struct
       | Exception -> "exn"
       | Unboxed u -> unboxed_to_string u ^ "#"
 
-    let simd_vec_split_of_string : string -> simd_vec_split option = function
-      | "int8x16#" -> Some Int8x16
-      | "int16x8#" -> Some Int16x8
-      | "int32x4#" -> Some Int32x4
-      | "int64x2#" -> Some Int64x2
-      | "float32x4#" -> Some Float32x4
-      | "float64x2#" -> Some Float64x2
-      | "int8x32#" -> Some Int8x32
-      | "int16x16#" -> Some Int16x16
-      | "int32x8#" -> Some Int32x8
-      | "int64x4#" -> Some Int64x4
-      | "float32x8#" -> Some Float32x8
-      | "float64x4#" -> Some Float64x4
-      | "int8x64#" -> Some Int8x64
-      | "int16x32#" -> Some Int16x32
-      | "int32x16#" -> Some Int32x16
-      | "int64x8#" -> Some Int64x8
-      | "float32x16#" -> Some Float32x16
-      | "float64x8#" -> Some Float64x8
+    let simd_base_type_of_path = function
+      | p when Path.same p Predef.path_int8x16 -> Some Int8x16
+      | p when Path.same p Predef.path_int16x8 -> Some Int16x8
+      | p when Path.same p Predef.path_int32x4 -> Some Int32x4
+      | p when Path.same p Predef.path_int64x2 -> Some Int64x2
+      | p when Path.same p Predef.path_float32x4 -> Some Float32x4
+      | p when Path.same p Predef.path_float64x2 -> Some Float64x2
+      | p when Path.same p Predef.path_int8x32 -> Some Int8x32
+      | p when Path.same p Predef.path_int16x16 -> Some Int16x16
+      | p when Path.same p Predef.path_int32x8 -> Some Int32x8
+      | p when Path.same p Predef.path_int64x4 -> Some Int64x4
+      | p when Path.same p Predef.path_float32x8 -> Some Float32x8
+      | p when Path.same p Predef.path_float64x4 -> Some Float64x4
+      | p when Path.same p Predef.path_int8x64 -> Some Int8x64
+      | p when Path.same p Predef.path_int16x32 -> Some Int16x32
+      | p when Path.same p Predef.path_int32x16 -> Some Int32x16
+      | p when Path.same p Predef.path_int64x8 -> Some Int64x8
+      | p when Path.same p Predef.path_float32x16 -> Some Float32x16
+      | p when Path.same p Predef.path_float64x8 -> Some Float64x8
       | _ -> None
 
-    let unboxed_of_string = function
-      | "float#" -> Some Unboxed_float
-      | "float32#" -> Some Unboxed_float32
-      | "nativeint#" -> Some Unboxed_nativeint
-      | "int64#" -> Some Unboxed_int64
-      | "int32#" -> Some Unboxed_int32
-      | s -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_string s)
-
-    let simd_base_type_of_string = function
-      | "int8x16" -> Some Int8x16
-      | "int16x8" -> Some Int16x8
-      | "int32x4" -> Some Int32x4
-      | "int64x2" -> Some Int64x2
-      | "float32x4" -> Some Float32x4
-      | "float64x2" -> Some Float64x2
-      | "int8x32" -> Some Int8x32
-      | "int16x16" -> Some Int16x16
-      | "int32x8" -> Some Int32x8
-      | "int64x4" -> Some Int64x4
-      | "float32x8" -> Some Float32x8
-      | "float64x4" -> Some Float64x4
-      | "int8x64" -> Some Int8x64
-      | "int16x32" -> Some Int16x32
-      | "int32x16" -> Some Int32x16
-      | "int64x8" -> Some Int64x8
-      | "float32x16" -> Some Float32x16
-      | "float64x8" -> Some Float64x8
+    let simd_vec_split_of_path = function
+      | p when Path.same p Predef.path_unboxed_int8x16 -> Some Int8x16
+      | p when Path.same p Predef.path_unboxed_int16x8 -> Some Int16x8
+      | p when Path.same p Predef.path_unboxed_int32x4 -> Some Int32x4
+      | p when Path.same p Predef.path_unboxed_int64x2 -> Some Int64x2
+      | p when Path.same p Predef.path_unboxed_float32x4 -> Some Float32x4
+      | p when Path.same p Predef.path_unboxed_float64x2 -> Some Float64x2
+      | p when Path.same p Predef.path_unboxed_int8x32 -> Some Int8x32
+      | p when Path.same p Predef.path_unboxed_int16x16 -> Some Int16x16
+      | p when Path.same p Predef.path_unboxed_int32x8 -> Some Int32x8
+      | p when Path.same p Predef.path_unboxed_int64x4 -> Some Int64x4
+      | p when Path.same p Predef.path_unboxed_float32x8 -> Some Float32x8
+      | p when Path.same p Predef.path_unboxed_float64x4 -> Some Float64x4
+      | p when Path.same p Predef.path_unboxed_int8x64 -> Some Int8x64
+      | p when Path.same p Predef.path_unboxed_int16x32 -> Some Int16x32
+      | p when Path.same p Predef.path_unboxed_int32x16 -> Some Int32x16
+      | p when Path.same p Predef.path_unboxed_int64x8 -> Some Int64x8
+      | p when Path.same p Predef.path_unboxed_float32x16 -> Some Float32x16
+      | p when Path.same p Predef.path_unboxed_float64x8 -> Some Float64x8
       | _ -> None
 
-    let of_string : string -> t option = function
-      | "array" -> Some Array
-      | "bytes" -> Some Bytes
-      | "char" -> Some Char
-      | "extension_constructor" -> Some Extension_constructor
-      | "float" -> Some Float
-      | "float32" -> Some Float32
-      | "floatarray" -> Some Floatarray
-      | "int" -> Some Int
-      | "int32" -> Some Int32
-      | "int64" -> Some Int64
-      | "lazy_t" -> Some Lazy_t
-      | "nativeint" -> Some Nativeint
-      | "string" -> Some String
-      | "exn" -> Some Exception
-      | s -> (
-        match simd_base_type_of_string s with
+    let unboxed_of_path = function
+      | p when Path.same p Predef.path_unboxed_float -> Some Unboxed_float
+      | p when Path.same p Predef.path_unboxed_float32 -> Some Unboxed_float32
+      | p when Path.same p Predef.path_unboxed_nativeint ->
+        Some Unboxed_nativeint
+      | p when Path.same p Predef.path_unboxed_int64 -> Some Unboxed_int64
+      | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
+      | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
+
+    let of_path : Path.t -> t option = function
+      | p when Path.same p Predef.path_array -> Some Array
+      | p when Path.same p Predef.path_bytes -> Some Bytes
+      | p when Path.same p Predef.path_char -> Some Char
+      | p when Path.same p Predef.path_extension_constructor ->
+        Some Extension_constructor
+      | p when Path.same p Predef.path_float -> Some Float
+      | p when Path.same p Predef.path_float32 -> Some Float32
+      | p when Path.same p Predef.path_floatarray -> Some Floatarray
+      | p when Path.same p Predef.path_int -> Some Int
+      | p when Path.same p Predef.path_int32 -> Some Int32
+      | p when Path.same p Predef.path_int64 -> Some Int64
+      | p when Path.same p Predef.path_lazy_t -> Some Lazy_t
+      | p when Path.same p Predef.path_nativeint -> Some Nativeint
+      | p when Path.same p Predef.path_string -> Some String
+      | p when Path.same p Predef.path_exn -> Some Exception
+      | p -> (
+        match simd_base_type_of_path p with
         | Some b -> Some (Simd b)
         | None -> (
-          match unboxed_of_string s with
+          match unboxed_of_path p with
           | Some u -> Some (Unboxed u)
           | None -> None))
 
@@ -282,7 +284,7 @@ module Type_shape = struct
       in
       match desc with
       | Tconstr (path, constrs, _abbrev_memo) -> (
-        match Predef.of_string (Path.name path) with
+        match Predef.of_path path with
         | Some predef -> Ts_predef (predef, map_expr_list constrs)
         | None -> (
           match uid_of_path path with
@@ -380,7 +382,8 @@ module Type_shape = struct
       Ts_predef (predef, shapes)
     | Ts_predef (predef, _), _ ->
       Misc.fatal_errorf
-        "predef has layout %a, but is expected to have layout %a" Layout.format
+        "predef %s has layout %a, but is expected to have layout %a"
+        (Predef.to_string predef) Layout.format
         (Predef.predef_to_layout predef)
         Layout.format layout
     | Ts_variant fields, Base Value ->

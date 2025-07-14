@@ -58,8 +58,6 @@ module Type_shape : sig
 
     val to_string : t -> string
 
-    val of_string : string -> t option
-
     val unboxed_type_to_layout : unboxed -> Jkind_types.Sort.base
 
     val predef_to_layout : t -> Layout.t
@@ -161,7 +159,7 @@ module Type_decl_shape : sig
       field_value : 'a
     }
 
-  (* Unlike in [types.ml], we use [base_layout] entries here, because we can
+  (* Unlike in [types.ml], we use [Layout.t] entries here, because we can
      represent flattened floats simply as float64 in the debugger. *)
   and constructor_representation = Constructor_mixed of mixed_product_shape
 
