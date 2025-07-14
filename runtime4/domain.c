@@ -18,6 +18,8 @@
 
 #include "caml/domain_state.h"
 #include "caml/memory.h"
+#include "caml/fail.h"
+#include "caml/signals.h"
 
 CAMLexport caml_domain_state* Caml_state;
 
@@ -100,16 +102,14 @@ void caml_init_domain (void)
   #endif
 }
 
-#include "caml/fail.h"
+CAMLprim value caml_ml_domain_cpu_relax(value unit)
+{
+  return caml_process_pending_actions_with_root(unit);
+}
 
 /* Dummy implementations to enable [Stdlib.Domain] to link. */
 
 CAMLprim value caml_recommended_domain_count(void)
-{
-  caml_failwith("Domains not supported on runtime4");
-}
-
-CAMLprim value caml_ml_domain_cpu_relax(void)
 {
   caml_failwith("Domains not supported on runtime4");
 }

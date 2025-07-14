@@ -89,6 +89,7 @@ end
 
 let function_layout = ref Function_layout.default   (* -function-layout *)
 
+let disable_builtin_check = ref false   (* -disable-builtin-check *)
 let disable_poll_insertion = ref (not Config.poll_insertion)
                                         (* -disable-poll-insertion *)
 let allow_long_frames = ref true        (* -no-long-frames *)
@@ -122,6 +123,12 @@ let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
   | Set Oclassic -> oclassic
   | Set O2 -> o2
   | Set O3 -> o3
+
+let llvm_backend = ref false (* -llvm-backend *)
+
+let dump_llvmir = ref false (* -dllvmir *)
+
+let llvm_path = ref None (* -llvm-path *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)

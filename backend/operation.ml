@@ -315,6 +315,7 @@ type t =
       }
   | Dls_get
   | Poll
+  | Pause
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
@@ -356,6 +357,7 @@ let is_pure = function
   | Name_for_debugger _ -> false
   | Dls_get -> true
   | Poll -> false
+  | Pause -> false
   | Alloc _ -> false
 
 (* The next 2 functions are copied almost as is from asmcomp/printmach.ml
@@ -431,7 +433,8 @@ let dump ppf op =
   | Reinterpret_cast cast ->
     Format.fprintf ppf "%s" (Printcmm.reinterpret_cast cast)
   | Static_cast cast -> Format.fprintf ppf "%s" (Printcmm.static_cast cast)
-  | Specific _ -> Format.fprintf ppf "specific"
+  | Specific specific ->
+    Format.fprintf ppf "specific %s" (Arch.specific_operation_name specific)
   | Probe_is_enabled { name } -> Format.fprintf ppf "probe_is_enabled %s" name
   | Opaque -> Format.fprintf ppf "opaque"
   | Begin_region -> Format.fprintf ppf "beginregion"
@@ -439,6 +442,7 @@ let dump ppf op =
   | Name_for_debugger _ -> Format.fprintf ppf "name_for_debugger"
   | Dls_get -> Format.fprintf ppf "dls_get"
   | Poll -> Format.fprintf ppf "poll"
+  | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->
     Format.fprintf ppf "alloc %i" bytes
   | Alloc { bytes; dbginfo = _; mode = Local } ->

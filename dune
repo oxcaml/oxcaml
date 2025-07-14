@@ -197,6 +197,8 @@
   datarepr
   global_module
   cmi_format
+  vicuna_traverse_typed_tree
+  vicuna_value_shapes
   persistent_env
   env
   errortrace
@@ -523,6 +525,7 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  llvmize
   ;; backend/regalloc
   regalloc_gi
   regalloc_gi_state

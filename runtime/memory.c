@@ -367,6 +367,12 @@ CAMLprim value caml_atomic_exchange (value ref, value v)
   return ret;
 }
 
+CAMLprim value caml_atomic_set (value ref, value v)
+{
+  caml_atomic_exchange(ref, v);
+  return Val_unit;
+}
+
 CAMLprim value caml_atomic_compare_exchange (value ref, value oldv, value newv)
 {
   if (caml_domain_alone()) {

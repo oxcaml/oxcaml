@@ -675,8 +675,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load _ -> unary (Ccall "caml_atomic_load")
-    | Patomic_set _ | Patomic_exchange _ ->
-      binary (Ccall "caml_atomic_exchange")
+    | Patomic_set _ -> binary (Ccall "caml_atomic_set")
+    | Patomic_exchange _ -> binary (Ccall "caml_atomic_exchange")
     | Patomic_compare_exchange _ ->
       ternary (Ccall "caml_atomic_compare_exchange")
     | Patomic_compare_set _ -> ternary (Ccall "caml_atomic_cas")
@@ -688,6 +688,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_lxor -> binary (Ccall "caml_atomic_lxor")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
+    | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
     | Pstring_load_128 _ | Pbytes_load_128 _ | Pbytes_set_128 _
     | Pbigstring_load_128 _ | Pbigstring_set_128 _ | Pfloatarray_load_128 _

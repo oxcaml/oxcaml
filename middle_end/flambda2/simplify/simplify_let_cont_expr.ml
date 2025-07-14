@@ -553,16 +553,15 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         Continuation.print cont
   in
   let handler, uacc =
-    Variable.Map.fold
+    Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
         let bound_pattern =
           Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
         in
-        let named = Named.create_simple (Simple.var bound_to) in
+        let named = Named.create_simple bound_to in
         let handler, uacc =
           Expr_builder.create_let_binding uacc bound_pattern named
-            ~free_names_of_defining_expr:
-              (Name_occurrences.singleton_variable bound_to Name_mode.normal)
+            ~free_names_of_defining_expr:(Simple.free_names bound_to)
             ~cost_metrics_of_defining_expr:Cost_metrics.zero ~body:handler
         in
         handler, uacc)
