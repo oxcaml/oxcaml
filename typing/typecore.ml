@@ -7107,8 +7107,10 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
-  | Pexp_as (_exp, _ty) ->
-    failwith "admitted"
+  | Pexp_as (exp, ty) ->
+    let typed_exp = type_exp env expected_mode exp in
+    match typed_exp.exp_type.desc with
+    | _ -> failwith "TODO"
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
