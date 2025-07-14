@@ -3687,7 +3687,9 @@ let check_for_hidden_arrow env loc ty =
 let transl_value_decl env loc ~modalities valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   (* CR jrayman: should fixed be false? *)
-  begin match Ctype.type_sort ~why:Structure_element ~fixed:false env ty with
+  begin match
+    Ctype.type_sort ~why:Structure_element ~fixed:false env cty.ctyp_type
+  with
     (* CR jrayman: don't ignore sort information *)
   | Ok _ -> ()
   | Error err ->
