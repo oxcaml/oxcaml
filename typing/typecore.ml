@@ -697,7 +697,6 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-<<<<<<< HEAD
 let lower_bound_externality ~loc ~env lower_bound alloc_mode =
   let externality = Alloc.proj_comonadic Externality alloc_mode in
   let res = Externality.submode lower_bound externality in
@@ -716,21 +715,6 @@ let register_bytecode_allocation_mode ~loc ~env alloc_mode =
 
 let register_allocation_mode ~loc ~env alloc_mode =
   lower_bound_externality ~loc ~env Externality.internal alloc_mode;
-=======
-let register_allocation_mode ~loc ~env alloc_mode =
-  let externality = Alloc.proj (Comonadic Externality) alloc_mode in
-  let res = Externality.submode Externality.internal externality in
-  (match res with
-  | Ok () -> ()
-  | Error failure_reason ->
-    (* CR jcutler: do we need to pass values for these contexts? I don't think
-       they have anything to do with the type error we're raising here... *)
-      let error =
-        Submode_failed(Value.Error (Comonadic Externality,failure_reason), Other, None,
-          None, None, None)
-      in
-      raise (Error(loc, env, error)));
->>>>>>> 6206867253 (add externality modal axis)
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
@@ -5674,13 +5658,9 @@ and type_expect_
       end;
       let alloc_mode, record_mode =
         if is_boxed then
-<<<<<<< HEAD
           let alloc_mode, record_mode =
             register_allocation ~loc ~env expected_mode
           in
-=======
-          let alloc_mode, record_mode = register_allocation ~loc ~env expected_mode in
->>>>>>> 6206867253 (add externality modal axis)
           Some alloc_mode, record_mode
         else
           (register_bytecode_allocation ~loc ~env expected_mode;
@@ -5690,12 +5670,8 @@ and type_expect_
         check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
           ~modalities:label.lbl_modalities record_mode;
         let argument_mode = mode_modality label.lbl_modalities record_mode in
-<<<<<<< HEAD
         type_label_exp ~overwrite ~create:true env argument_mode loc ty_record x
           record_form
-=======
-        type_label_exp ~overwrite ~create:true env argument_mode loc ty_record x record_form
->>>>>>> 6206867253 (add externality modal axis)
       in
       let overwrites =
         assign_label_children (List.length lbl_a_list)
@@ -6235,13 +6211,9 @@ and type_expect_
             row_field_repr (get_row_field l row0)
           with
             Rpresent (Some ty), Rpresent (Some ty0) ->
-<<<<<<< HEAD
               let alloc_mode, argument_mode =
                 register_allocation ~loc ~env expected_mode
               in
-=======
-              let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
->>>>>>> 6206867253 (add externality modal axis)
               let arg =
                 type_argument ~overwrite:No_overwrite env argument_mode sarg ty ty0
               in
@@ -6264,10 +6236,6 @@ and type_expect_
             let alloc_mode, argument_mode =
               register_allocation ~loc ~env expected_mode
             in
-<<<<<<< HEAD
-=======
-            let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
->>>>>>> 6206867253 (add externality modal axis)
             let arg =
               type_expect env argument_mode sarg (mk_expected ty_expected)
             in
@@ -6326,13 +6294,9 @@ and type_expect_
         in
         match is_float_boxing with
         | true ->
-<<<<<<< HEAD
           let alloc_mode, argument_mode =
             register_allocation ~loc ~env expected_mode
           in
-=======
-          let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
->>>>>>> 6206867253 (add externality modal axis)
           let mode = cross_left env Predef.type_unboxed_float mode in
           submode ~loc ~env mode argument_mode;
           let uu =
@@ -6382,7 +6346,6 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-     (* rmode is the mode of the record. *)
       let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -6397,10 +6360,13 @@ and type_expect_
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
 <<<<<<< HEAD
+<<<<<<< HEAD
           type_label_exp ~overwrite:No_overwrite_label ~create:false env mode
             loc ty_record (lid, label, snewval) Legacy
 =======
           (* This is the mode of the field we're updating. Should be internal. *)
+=======
+>>>>>>> 2db4608467 (somehow this got missed)
           type_label_exp ~overwrite:No_overwrite_label ~create:false env mode loc ty_record
             (lid, label, snewval) Legacy
 >>>>>>> 6206867253 (add externality modal axis)
@@ -8121,7 +8087,6 @@ and type_label_exp
      - first try: we try with [ty_arg] as expected type;
      - second try; if that fails, we backtrack and try without
   *)
-    (* CR jcutler: ty_Arg is the expected? real? type of the argument *)
   let (vars, ty_arg, snap, arg) =
     (* try the first approach *)
     with_local_level begin fun () ->
@@ -11318,10 +11283,14 @@ let report_error ~loc env =
         | Error (Comonadic Yielding, _) -> []
         | Error (Comonadic Statefulness, _) -> []
 <<<<<<< HEAD
+<<<<<<< HEAD
         | Error (Comonadic Externality, _) -> []
 =======
         | Error (Comonadic Externality, _) -> [] (* CR jcutler: fixme *)
 >>>>>>> 6206867253 (add externality modal axis)
+=======
+        | Error (Comonadic Externality, _) -> []
+>>>>>>> 2db4608467 (somehow this got missed)
       in
       Location.errorf ~loc ~sub "@[%t@]" begin
         match fail_reason with
