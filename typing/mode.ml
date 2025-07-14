@@ -1845,11 +1845,8 @@ let solver_error_to_axerror :
 (** Take a solver error for a single axis object and convert it to an [axerror] *)
 let single_axis_solver_error_to_axerror :
     type r a.
-    a Lattices_mono.obj ->
-    (r, a) Axis.t ->
-    a S.error ->
-    (a, Hint.morph, Hint.const) axerror =
- fun a_obj _ { left; left_hint; right; right_hint } ->
+    a Lattices_mono.obj -> a S.error -> (a, Hint.morph, Hint.const) axerror =
+ fun a_obj { left; left_hint; right; right_hint } ->
   let left_projected =
     single_axis_shint_to_axhint a_obj left left_hint
       { fn = Lattices_mono.right_adjoint }
@@ -1916,7 +1913,10 @@ let equate_from_submode' submode m0 m1 =
     | Ok () -> Ok ())
   [@@inline]
 
-module Comonadic_gen (Obj : Obj) = struct
+(* Common code for comonadic and monadic objects, for both single-axis
+   and product lattices *)
+
+module Comonadic_common_gen (Obj : Obj) = struct
   open Obj
 
   type 'd t = (const, 'l * 'r) Solver.mode constraint 'd = 'l * 'r
@@ -1926,10 +1926,6 @@ module Comonadic_gen (Obj : Obj) = struct
   type r = (disallowed * allowed) t
 
   type lr = (allowed * allowed) t
-
-  type nonrec error = (const, Hint.morph, Hint.const) axerror
-
-  type equate_error = equate_step * error
 
   type (_, _, 'd) sided = 'd t
 
@@ -1951,23 +1947,9 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let newvar_below m = Solver.newvar_below obj m
 
-  let submode_log a b ~log = Solver.submode obj a b ~log
-
-  let submode a b =
-    try_with_log (submode_log a b) |> Result.map_error solver_error_to_serror
-
   let join l = Solver.join obj l
 
   let meet l = Solver.meet obj l
-
-  let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
-
-  let equate a b =
-    try_with_log (equate_from_submode submode_log a b)
-    |> Result.map_error (fun (eq_step, err) ->
-           eq_step, solver_error_to_serror err)
-
-  let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
   let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
 
@@ -1993,7 +1975,7 @@ module Comonadic_gen (Obj : Obj) = struct
 end
 [@@inline]
 
-module Monadic_gen (Obj : Obj) = struct
+module Monadic_common_gen (Obj : Obj) = struct
   (* Monadic lattices are flipped. See "Notes on flipping". *)
   open Obj
 
@@ -2004,10 +1986,6 @@ module Monadic_gen (Obj : Obj) = struct
   type r = (disallowed * allowed) t
 
   type lr = (allowed * allowed) t
-
-  type nonrec error = (const, Hint.morph, Hint.const) axerror
-
-  type equate_error = equate_step * error
 
   type (_, _, 'd) sided = 'd t
 
@@ -2029,21 +2007,9 @@ module Monadic_gen (Obj : Obj) = struct
 
   let newvar_below m = Solver.newvar_above obj m
 
-  let submode_log a b ~log =
-    Solver.submode obj b a ~log
-    |> Result.map_error flip_and_solver_error_to_serror
-
-  let submode a b = try_with_log (submode_log a b)
-
   let join l = Solver.meet obj l
 
   let meet l = Solver.join obj l
-
-  let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
-
-  let equate a b = try_with_log (equate_from_submode submode_log a b)
-
-  let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
   let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
 
@@ -2063,6 +2029,55 @@ module Monadic_gen (Obj : Obj) = struct
 end
 [@@inline]
 
+(* Common code for comonadic and monadic objects, only for single axes *)
+
+module Comonadic_axis_gen (Obj : Obj) = struct
+  open Obj
+  include Comonadic_common_gen (Obj)
+
+  type error = (const, Hint.morph, Hint.const) axerror
+
+  type equate_error = equate_step * error
+
+  let[@inline] solver_error_to_axerror =
+    single_axis_solver_error_to_axerror Obj.obj
+
+  let submode_log a b ~log =
+    Solver.submode obj a b ~log |> Result.map_error solver_error_to_axerror
+
+  let submode a b = try_with_log (submode_log a b)
+
+  let submode_exn m0 m1 = assert (submode m0 m1 |> Result.is_ok)
+
+  let equate a b = try_with_log (equate_from_submode submode_log a b)
+
+  let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
+end
+
+module Monadic_axis_gen (Obj : Obj) = struct
+  open Obj
+  include Monadic_common_gen (Obj)
+
+  type error = (const, Hint.morph, Hint.const) axerror
+
+  type equate_error = equate_step * error
+
+  (* TODO - we're going to have problems here, as the flipping isn't as easy to do
+     as it will no longer type-check. Solve this another time *)
+
+  let submode_log a b ~log =
+    Solver.submode obj b a ~log
+    |> Result.map_error flip_and_solver_error_to_axerror
+
+  let submode a b = try_with_log (submode_log a b)
+
+  let submode_exn m0 m1 = assert (submode m0 m1 |> Result.is_ok)
+
+  let equate a b = try_with_log (equate_from_submode submode_log a b)
+
+  let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
+end
+
 module Locality = struct
   module Const = C.Locality
 
@@ -2072,7 +2087,7 @@ module Locality = struct
     let obj = C.Locality
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_axis_gen (Obj)
 
   let global = of_const Global
 
@@ -2104,7 +2119,7 @@ module Regionality = struct
     let obj = C.Regionality
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_axis_gen (Obj)
 
   let local = of_const Const.Local
 
@@ -2126,7 +2141,7 @@ module Linearity = struct
     let obj : _ C.obj = C.Linearity
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_axis_gen (Obj)
 
   let many = of_const Many
 
@@ -2146,7 +2161,7 @@ module Statefulness = struct
     let obj = C.Statefulness
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_axis_gen (Obj)
 
   let stateless = of_const Stateless
 
@@ -2169,7 +2184,7 @@ module Visibility = struct
     let obj = C.Visibility_op
   end
 
-  include Monadic_gen (Obj)
+  include Monadic_axis_gen (Obj)
 
   let immutable = of_const Immutable
 
@@ -2191,7 +2206,7 @@ module Portability = struct
     let obj : _ C.obj = C.Portability
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_axis_gen (Obj)
 
   let legacy = of_const Const.legacy
 
@@ -2211,7 +2226,7 @@ module Uniqueness = struct
     let obj = C.Uniqueness_op
   end
 
-  include Monadic_gen (Obj)
+  include Monadic_axis_gen (Obj)
 
   let aliased = of_const Aliased
 
@@ -2232,7 +2247,7 @@ module Contention = struct
     let obj = C.Contention_op
   end
 
-  include Monadic_gen (Obj)
+  include Monadic_axis_gen (Obj)
 
   let legacy = of_const Const.legacy
 
@@ -2252,7 +2267,7 @@ module Yielding = struct
     let obj = C.Yielding
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_axis_gen (Obj)
 
   let yielding = of_const Yielding
 
@@ -2300,7 +2315,7 @@ module Comonadic_with (Areality : Areality) = struct
     let obj = C.comonadic_with_obj Areality.Obj.obj
   end
 
-  include Comonadic_gen (Obj)
+  include Comonadic_common_gen (Obj)
 
   module Axis = struct
     type 'a t = (Obj.const, 'a) Axis.t
@@ -2368,23 +2383,26 @@ module Comonadic_with (Areality : Areality) = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : Obj.const axerror) : error =
-    let { left =
-            { areality = areality1;
-              linearity = linearity1;
-              portability = portability1;
-              yielding = yielding1;
-              statefulness = statefulness1
-            };
-          right =
-            { areality = areality2;
-              linearity = linearity2;
-              portability = portability2;
-              yielding = yielding2;
-              statefulness = statefulness2
-            }
+  (** Take a solver error and determine the problematic axis then return an
+  [axerror] in that axis, as well as the axis itself *)
+  let axis_of_solver_error (err : Obj.const S.error) : error =
+    let left = err.left in
+    let { areality = areality1;
+          linearity = linearity1;
+          portability = portability1;
+          yielding = yielding1;
+          statefulness = statefulness1
         } =
-      err
+      left
+    in
+    let right = err.right in
+    let { areality = areality2;
+          linearity = linearity2;
+          portability = portability2;
+          yielding = yielding2;
+          statefulness = statefulness2
+        } =
+      right
     in
     if Areality.Const.le areality1 areality2
     then
@@ -2399,41 +2417,29 @@ module Comonadic_with (Areality : Areality) = struct
             else
               Error
                 ( Statefulness,
-                  { left = err.left.statefulness;
-                    left_hint = _;
-                    right = err.right.statefulness;
-                    right_hint = _
-                  } )
+                  solver_error_to_axerror Obj.obj Axis.Statefulness err )
           else
-            Error
-              ( Yielding,
-                { left = err.left.yielding; right = err.right.yielding } )
+            Error (Yielding, solver_error_to_axerror Obj.obj Axis.Yielding err)
         else
           Error
-            ( Portability,
-              { left = err.left.portability; right = err.right.portability } )
-      else
-        Error
-          (Linearity, { left = err.left.linearity; right = err.right.linearity })
-    else
-      Error
-        ( Areality,
-          { left = err.left.areality;
-            left_hint = _;
-            right = err.right.areality;
-            right_hint = _
-          } )
+            (Portability, solver_error_to_axerror Obj.obj Axis.Portability err)
+      else Error (Linearity, solver_error_to_axerror Obj.obj Axis.Linearity err)
+    else Error (Areality, solver_error_to_axerror Obj.obj Axis.Areality err)
 
-  (* overriding to report the offending axis *)
+  (* unlike for a single axis object, the below submoding and equality functions
+     report the offending axis *)
   let submode_log m0 m1 ~log : _ result =
-    match submode_log m0 m1 ~log with
+    match Solver.submode Obj.obj m0 m1 ~log with
     | Ok () -> Ok ()
-    | Error e -> Error (e |> solver_error_to_serror |> axis_of_error)
+    | Error e -> Error (e |> axis_of_solver_error)
 
   let submode a b = try_with_log (submode_log a b)
 
-  (* override to report the offending axis *)
+  let submode_exn m0 m1 = assert (submode m0 m1 |> Result.is_ok)
+
   let equate a b = try_with_log (equate_from_submode submode_log a b)
+
+  let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
 end
 [@@inline]
 
@@ -2445,7 +2451,7 @@ module Monadic = struct
     let obj = C.Monadic_op
   end
 
-  include Monadic_gen (Obj)
+  include Monadic_common_gen (Obj)
 
   module Axis = struct
     type 'a t = (Obj.const, 'a) C.Axis.t
@@ -2506,20 +2512,20 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : (Obj.const, Hint.morph, Hint.const) axerror) : error
-      =
-    let { left =
-            { uniqueness = uniqueness1;
-              contention = contention1;
-              visibility = visibility1
-            };
-          right =
-            { uniqueness = uniqueness2;
-              contention = contention2;
-              visibility = visibility2
-            }
+  let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
+    let left = err.left in
+    let { uniqueness = uniqueness1;
+          contention = contention1;
+          visibility = visibility1
         } =
-      err
+      left
+    in
+    let right = err.right in
+    let { uniqueness = uniqueness2;
+          contention = contention2;
+          visibility = visibility2
+        } =
+      right
     in
     if Uniqueness.Const.le uniqueness1 uniqueness2
     then
@@ -2530,26 +2536,32 @@ module Monadic = struct
         else
           Error
             ( Visibility,
-              { left = err.left.visibility; right = err.right.visibility } )
+              flipped_solver_error_to_axerror Obj.obj Axis.Visibility err )
       else
         Error
           ( Contention,
-            { left = err.left.contention; right = err.right.contention } )
+            flipped_solver_error_to_axerror Obj.obj Axis.Contention err )
     else
       Error
-        ( Uniqueness,
-          { left = err.left.uniqueness; right = err.right.uniqueness } )
+        (Uniqueness, flipped_solver_error_to_axerror Obj.obj Axis.Uniqueness err)
 
-  (* overriding to report the offending axis *)
+  (* unlike for a single axis object, the below submoding and equality functions
+     report the offending axis *)
+
   let submode_log m0 m1 ~log : _ result =
-    match submode_log m0 m1 ~log with
+    (* Note, the order of the arguments is flipped because the monadic
+       fragment is flipped. This must be "un-flipped" when reporting errors *)
+    match Solver.submode Obj.obj m1 m0 ~log with
     | Ok () -> Ok ()
-    | Error e -> Error (e |> axis_of_error)
+    | Error e -> Error (e |> flipped_axis_of_solver_error)
 
   let submode a b = try_with_log (submode_log a b)
 
-  (* override to report the offending axis *)
+  let submode_exn m0 m1 = assert (submode m0 m1 |> Result.is_ok)
+
   let equate a b = try_with_log (equate_from_submode submode_log a b)
+
+  let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
 end
 
 type ('mo, 'como) monadic_comonadic =
