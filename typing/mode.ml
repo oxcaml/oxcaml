@@ -1757,12 +1757,12 @@ let rec project_solver_hint_to_axis_hint :
     (r, left1 * right1) S.hint ->
     (r, a) Axis.t ->
     (left1, right1, left2, right2) adj_fn ->
-    (a, Hint.morph, Hint.const) hint =
+    (a, Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type r a left1 left2 right1 right2) (r_obj : r obj) (r : r)
       (r_shint : (r, left1 * right1) S.hint) (ax : (r, a) Axis.t) adj ->
     (* This function is for when we have a solver hint (aka "shint") for a product lattice and
-       wish to project the hint to be for a single axis and convert it to a mode hint. *)
+       wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
     let a_obj = proj_obj ax r_obj in
     let proj = Proj (r_obj, ax) in
     let a = apply a_obj proj r in
@@ -1788,13 +1788,13 @@ and project_single_axis_solver_hint_to_hint :
     a ->
     (a, left1 * right1) S.hint ->
     (left1, right1, left2, right2) adj_fn ->
-    (a, Hint.morph, Hint.const) hint =
+    (a, Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type r a left1 right1 left2 right2) (a_obj : a obj) (a : a)
       (a_shint_inp : (a, left1 * right1) S.hint)
       (adj : (left1, right1, left2, right2) adj_fn) ->
     (* This function is for when we have a solver hint (aka "shint") for a
-       single axis and wish to convert it to a mode hint. *)
+       single axis and wish to convert it to a mode "axhint". *)
     match a_shint_inp with
     | Morph (morph_hint, morph, b_shint) -> (
       let b_obj = src a_obj morph in

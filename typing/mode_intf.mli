@@ -16,17 +16,19 @@ open Allowance
 
 (** Hints for the mode solvers. These are axis-specific hints that contain a trace
 of the values in a single axis from an error. *)
-type ('a, 'morph, 'const) hint =
-  | Morph : 'a * 'morph * ('b, 'morph, 'const) hint -> ('a, 'morph, 'const) hint
-  | Const : 'a * 'const -> ('a, 'morph, 'const) hint
-  | Empty : 'a -> ('a, 'morph, 'const) hint
+type ('a, 'morph, 'const) axhint =
+  | Morph :
+      'a * 'morph * ('b, 'morph, 'const) axhint
+      -> ('a, 'morph, 'const) axhint
+  | Const : 'a * 'const -> ('a, 'morph, 'const) axhint
+  | Empty : 'a -> ('a, 'morph, 'const) axhint
 
 (** Errors for the mode solvers. These are axis-specific processed versions of
 the errors returned by the solver, as the solver errors consider axis products.
-The hints in this error type are [hint] values. *)
+The hints in this error type are [axhint] values. *)
 type ('a, 'morph, 'const) axerror =
-  { left : ('a, 'morph, 'const) hint;
-    right : ('a, 'morph, 'const) hint
+  { left : ('a, 'morph, 'const) axhint;
+    right : ('a, 'morph, 'const) axhint
   }
 
 (* While all our lattices are bi-Heyting algebras (see [mode.ml]), the extra
