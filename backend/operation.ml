@@ -433,7 +433,8 @@ let dump ppf op =
   | Reinterpret_cast cast ->
     Format.fprintf ppf "%s" (Printcmm.reinterpret_cast cast)
   | Static_cast cast -> Format.fprintf ppf "%s" (Printcmm.static_cast cast)
-  | Specific _ -> Format.fprintf ppf "specific"
+  | Specific specific ->
+    Format.fprintf ppf "specific %s" (Arch.specific_operation_name specific)
   | Probe_is_enabled { name } -> Format.fprintf ppf "probe_is_enabled %s" name
   | Opaque -> Format.fprintf ppf "opaque"
   | Begin_region -> Format.fprintf ppf "beginregion"
