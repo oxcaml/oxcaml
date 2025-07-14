@@ -106,6 +106,10 @@ val cached_generic_functions_path : string ref
 
 val symbol_visibility_protected : bool ref
 
+val llvm_backend : bool ref
+val dump_llvmir : bool ref
+val llvm_path : string option ref
+
 module Flambda2 : sig
   val debug : bool ref
 
