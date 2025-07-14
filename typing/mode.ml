@@ -1801,7 +1801,7 @@ and project_single_axis_solver_hint_to_hint :
       let morph_inv : (a, _, left2 * right2) morph = adj.fn a_obj morph in
       let b = apply b_obj morph_inv a in
       match find_responsible_axis_single morph with
-      | NoneResponsible -> Empty
+      | NoneResponsible -> Empty a
       | SourceIsSingle ->
         let b_hint =
           project_single_axis_solver_hint_to_hint b_obj b b_shint adj
@@ -1846,18 +1846,7 @@ let project_error_to_axis_error :
 
 let solver_error_to_serror : 'a S.error -> ('a, Hint.morph, Hint.const) axerror
     =
-  let rec construct_with_hint (m : 'a) :
-      ('a, 'd) S.hint -> ('a, Hint.morph, Hint.const) hint = function
-    | Morph (hint, morph, b_hint) ->
-      let b_hint' = _ in
-      Morph (m, hint, b_hint')
-    | Const hint -> Const (m, hint)
-    | Branch _ -> _
-  in
-  fun { left; left_hint; right; right_hint } ->
-    { left = construct_with_hint left left_hint;
-      right = construct_with_hint right right_hint
-    }
+ fun { left; left_hint = _; right; right_hint = _ } -> { left; right }
 
 let flip_and_solver_error_to_serror :
     'a S.error -> ('a, Hint.morph, Hint.const) axerror =
@@ -1930,7 +1919,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   type lr = (allowed * allowed) t
 
-  type nonrec error = const axerror
+  type nonrec error = (const, Hint.morph, Hint.const) axerror
 
   type equate_error = equate_step * error
 
@@ -2008,7 +1997,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   type lr = (allowed * allowed) t
 
-  type nonrec error = const axerror
+  type nonrec error = (const, Hint.morph, Hint.const) axerror
 
   type equate_error = equate_step * error
 
@@ -2319,7 +2308,8 @@ module Comonadic_with (Areality : Areality) = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error = Error : 'a Axis.t * 'a axerror -> error
+  type error =
+    | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
 
   type equate_error = equate_step * error
 
@@ -2463,7 +2453,8 @@ module Monadic = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error = Error : 'a Axis.t * 'a axerror -> error
+  type error =
+    | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
 
   type equate_error = equate_step * error
 
@@ -2507,7 +2498,8 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
-  let axis_of_error (err : Obj.const axerror) : error =
+  let axis_of_error (err : (Obj.const, Hint.morph, Hint.const) axerror) : error
+      =
     let { left =
             { uniqueness = uniqueness1;
               contention = contention1;
@@ -2916,7 +2908,8 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  type error = Error : 'a Axis.t * 'a axerror -> error
+  type error =
+    | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
 
   type equate_error = equate_step * error
 
@@ -3218,7 +3211,8 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error = Error : 'a axis * 'a raw axerror -> error
+    type error =
+      | Error : 'a axis * ('a raw, Hint.morph, Hint.const) axerror -> error
 
     module Const = struct
       type t = Join_const of Mode.Const.t
@@ -3350,7 +3344,8 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error = Error : 'a axis * 'a raw axerror -> error
+    type error =
+      | Error : 'a axis * ('a raw, Hint.morph, Hint.const) axerror -> error
 
     module Const = struct
       type t = Meet_const of Mode.Const.t
@@ -3502,7 +3497,10 @@ module Modality = struct
   end
 
   module Value = struct
-    type error = Error : 'a Value.Axis.t * 'a raw axerror -> error
+    type error =
+      | Error :
+          'a Value.Axis.t * ('a raw, Hint.morph, Hint.const) axerror
+          -> error
 
     type equate_error = equate_step * error
 

@@ -17,7 +17,7 @@ open Allowance
 type ('a, 'morph, 'const) hint =
   | Morph : 'a * 'morph * ('b, 'morph, 'const) hint -> ('a, 'morph, 'const) hint
   | Const : 'a * 'const -> ('a, 'morph, 'const) hint
-  | Empty : ('a, 'morph, 'const) hint
+  | Empty : 'a -> ('a, 'morph, 'const) hint
 
 type ('a, 'morph, 'const) axerror =
   { left : ('a, 'morph, 'const) hint;
