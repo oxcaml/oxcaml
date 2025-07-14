@@ -163,9 +163,7 @@ module Type_decl_shape : sig
 
   (* Unlike in [types.ml], we use [base_layout] entries here, because we can
      represent flattened floats simply as float64 in the debugger. *)
-  and constructor_representation =
-    | Constructor_uniform_value
-    | Constructor_mixed of mixed_product_shape
+  and constructor_representation = Constructor_mixed of mixed_product_shape
 
   and mixed_product_shape = Layout.t array
 

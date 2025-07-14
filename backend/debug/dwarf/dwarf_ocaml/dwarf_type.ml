@@ -193,14 +193,44 @@ let rec layout_to_types_layout ly =
   | Layout.Product lys ->
     Types.Product (Array.of_list (List.map layout_to_types_layout lys))
 
+let rec project_layout shape path =
+  match shape, path with
+  | Layout.Base b, [] -> b
+  | Layout.Product p, i :: path -> project_layout (List.nth p i) path
+  | _, _ -> assert false
+
+let rec field_name_with_path base path =
+  match path with
+  | [] -> base
+  | i :: path -> field_name_with_path base path ^ ".#" ^ Int.to_string i
+
 let field_project_path fields path =
   match path with
   | [] -> assert false (* field should exist *)
-  | [i] -> Array.get fields i
-  | _ :: _ -> Misc.fatal_error "nested unboxed record fields not supported"
+  | [i] -> (
+    match Array.get fields i with
+    | name, sh, Layout.Base ly -> name, sh, ly
+    | name, sh, Layout.Product _ ->
+      assert false
+      (* If this is a product type, then the flattening of the record fields has
+         failed. *))
+  | i :: subpath ->
+    let field_name, field_type, field_layout = Array.get fields i in
+    let field_name = Option.value ~default:("." ^ Int.to_string i) field_name in
+    let field_name_with_projection = field_name_with_path field_name subpath in
+    ( Some field_name_with_projection,
+      Type_shape.Type_shape.Ts_other
+        Type_shape.Type_shape.Layout_to_be_determined,
+      (* CR sspies: To properly support unboxed records in mixed records, we we
+         need to propagate the right shape information here. *)
+      project_layout field_layout subpath )
 
-let reorder_record_fields_for_mixed_record
-    ~(mixed_block_shapes : Layout.t array) fields =
+let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
+    (fields :
+      (string option
+      * Type_shape.Type_shape.without_layout Type_shape.Type_shape.t
+      * Layout.t)
+      list) =
   (* We go into arrays and back, because it makes the reordering of the fields
      via accesses O(n) instead of O(n^2) *)
   let fields = Array.of_list fields in
@@ -225,12 +255,6 @@ let reorder_record_fields_for_mixed_record
         field_project_path fields old_path)
   in
   Array.to_list fields
-
-let variant_constructor_reorder_fields fields kind =
-  match kind with
-  | Type_shape.Type_decl_shape.Constructor_uniform_value -> fields
-  | Type_shape.Type_decl_shape.Constructor_mixed mixed_block_shapes ->
-    reorder_record_fields_for_mixed_record ~mixed_block_shapes fields
 
 (* CR sspies: This is a very hacky way of doing an unboxed variant with just a
    single constructor. DWARF variants expect to have a discriminator. So what we
@@ -309,13 +333,10 @@ let create_unboxed_variant_die ~reference ~parent_proto_die ~name ~constr_name
 let create_complex_variant_die ~reference ~parent_proto_die ~name
     ~simple_constructors
     ~(complex_constructors :
-       (Proto_die.reference * base_layout)
-       Type_shape.Type_decl_shape.complex_constructor
-       list) =
+       (string * (string option * Proto_die.reference * base_layout) list) list)
+    =
   let complex_constructors_names =
-    List.map
-      (fun { Type_shape.Type_decl_shape.name; kind = _; args = _ } -> name)
-      complex_constructors
+    List.map (fun (name, _) -> name) complex_constructors
   in
   let value_size = Arch.size_addr in
   let variant_part_immediate_or_pointer =
@@ -451,7 +472,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
           ()
       in
       List.iteri
-        (fun i { Type_shape.Type_decl_shape.name; kind = _; args = _ } ->
+        (fun i (name, _) ->
           Proto_die.create_ignore ~parent:(Some enum_die)
             ~tag:Dwarf_tag.Enumerator
             ~attribute_values:
@@ -472,23 +493,16 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
            ~proto_die_reference:(Proto_die.reference discriminant))
     in
     List.iteri
-      (fun i
-           { Type_shape.Type_decl_shape.name = _;
-             kind = constructor_kind;
-             args
-           } ->
+      (fun i (_, fields) ->
         let subvariant =
           Proto_die.create ~parent:(Some variant_part_pointer)
             ~tag:Dwarf_tag.Variant
             ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int i)]
             ()
         in
-        let args = variant_constructor_reorder_fields args constructor_kind in
         let offset = ref 0 in
         List.iter
-          (fun { Type_shape.Type_decl_shape.field_name;
-                 field_value = field_type, ly
-               } ->
+          (fun (field_name, field_type, ly) ->
             let member_size = base_layout_to_byte_size_in_mixed_block ly in
             let member_die =
               Proto_die.create ~parent:(Some subvariant) ~tag:Dwarf_tag.Member
@@ -508,7 +522,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
               Proto_die.add_or_replace_attribute_value member_die
                 (DAH.create_name name)
             | None -> ())
-          args)
+          fields)
       complex_constructors
   in
   ()
@@ -1183,25 +1197,23 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
     | Tds_record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
       assert false
     | Tds_record { fields; kind = Record_mixed mixed_block_shapes } ->
+      let fields = List.map (fun (name, sh, ly) -> Some name, sh, ly) fields in
+      let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
       let fields =
         List.map
-          (fun (name, type_shape, type_layout) ->
+          (fun (name, type_shape, base_layout) ->
             let type_shape' =
-              Type_shape.Type_shape.shape_with_layout ~layout:type_layout
+              Type_shape.Type_shape.shape_with_layout ~layout:(Base base_layout)
                 type_shape
             in
-            match (type_layout : Layout.t) with
-            | Base base_layout ->
+            match name with
+            | Some name ->
               ( name,
                 base_layout_to_byte_size_in_mixed_block base_layout,
                 type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
                   type_shape' )
-            | Product _ ->
-              Misc.fatal_error "mixed products must contain base layouts")
+            | _ -> assert false)
           fields
-      in
-      let fields =
-        reorder_record_fields_for_mixed_record ~mixed_block_shapes fields
       in
       create_record_die ~reference ~parent_proto_die ~name ~fields
     | Tds_variant { simple_constructors; complex_constructors } -> (
@@ -1210,18 +1222,36 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
         create_simple_variant_die ~reference ~parent_proto_die ~name
           ~simple_constructors
       | _ :: _ ->
+        (* we flatten the fields of the constructors first *)
         let complex_constructors =
-          Type_shape.Type_decl_shape.complex_constructors_map
-            (fun (sh, layout) ->
-              match layout with
-              | Jkind_types.Sort.Const.Base ly ->
-                let sh = Type_shape.Type_shape.shape_with_layout ~layout sh in
-                ( type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-                    sh,
-                  ly )
-              | Jkind_types.Sort.Const.Product _ ->
-                Misc.fatal_error
-                  "unboxed product in complex constructor is not allowed")
+          List.map
+            (fun { Type_shape.Type_decl_shape.name; kind; args } ->
+              ( name,
+                match kind with
+                | Constructor_mixed mixed_block_shapes ->
+                  flatten_fields_in_mixed_record ~mixed_block_shapes
+                    (List.map
+                       (fun { Type_shape.Type_decl_shape.field_name = name;
+                              field_value = sh, ly
+                            } -> name, sh, ly)
+                       args) ))
+            complex_constructors
+        in
+        let complex_constructors =
+          List.map
+            (fun (constr_name, fields) ->
+              ( constr_name,
+                List.map
+                  (fun (field_name, sh, ly) ->
+                    let sh =
+                      Type_shape.Type_shape.shape_with_layout
+                        ~layout:(Layout.Base ly) sh
+                    in
+                    ( field_name,
+                      type_shape_to_dwarf_die ~parent_proto_die
+                        ~fallback_value_die sh,
+                      ly ))
+                  fields ))
             complex_constructors
         in
         create_complex_variant_die ~reference ~parent_proto_die ~name

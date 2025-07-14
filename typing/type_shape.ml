@@ -516,9 +516,7 @@ module Type_decl_shape = struct
       field_value : 'a
     }
 
-  and constructor_representation =
-    | Constructor_uniform_value
-    | Constructor_mixed of mixed_product_shape
+  and constructor_representation = Constructor_mixed of mixed_product_shape
 
   and mixed_product_shape = Layout.t array
 
@@ -598,18 +596,21 @@ module Type_decl_shape = struct
           shapes_and_fields;
         Constructor_mixed (Array.map mixed_block_shape_to_layout shapes)
       | Constructor_uniform_value ->
-        List.iter
-          (fun { field_name = _; field_value = _, ly } ->
-            if not
-                 (Layout.equal ly (Layout.Base Value)
-                 || Layout.equal ly (Layout.Base Void))
-            then
-              Misc.fatal_errorf
-                "Type_shape: variant constructor with mismatched layout, has \
-                 %a but expected value or void."
-                Layout.format ly)
-          args;
-        Constructor_uniform_value
+        let lys =
+          List.map
+            (fun { field_name = _; field_value = _, ly } ->
+              if not
+                   (Layout.equal ly (Layout.Base Value)
+                   || Layout.equal ly (Layout.Base Void))
+              then
+                Misc.fatal_errorf
+                  "Type_shape: variant constructor with mismatched layout, has \
+                   %a but expected value or void."
+                  Layout.format ly
+              else ly)
+            args
+        in
+        Constructor_mixed (Array.of_list lys)
     in
     { name; kind = constructor_repr; args }
 
