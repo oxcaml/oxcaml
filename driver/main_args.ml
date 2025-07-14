@@ -1163,7 +1163,6 @@ end;;
 module type Jscomp_options = sig
   include Core_options
   include Compiler_options
-
   (* CR selee: should we include more things from [Native]? Review *)
   val _dflambda : unit -> unit
   val _dflambda_heavy_invariants : unit -> unit
