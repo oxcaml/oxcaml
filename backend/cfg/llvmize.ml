@@ -62,14 +62,14 @@ end
 module Llvm_typ = struct
   (** Type representing LLVM types *)
   type t =
-    | Int of int  (** Argument is the bitwidth of the integer *)
+    | Int of { width_in_bits : int }
     | Ptr
     | Struct of t list
 
   let of_machtyp_component (c : Cmm.machtype_component) =
     match c with
     | Val | Addr | Int ->
-      Int 64
+      Int { width_in_bits = 64 }
       (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
          make LLVM happy for now. *)
     | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 ->
@@ -78,7 +78,7 @@ module Llvm_typ = struct
   let rec pp_t ppf t =
     let open Format in
     match t with
-    | Int n -> fprintf ppf "i%d" n
+    | Int { width_in_bits } -> fprintf ppf "i%d" width_in_bits
     | Ptr -> fprintf ppf "ptr"
     | Struct typs ->
       fprintf ppf "{ %a }"
@@ -100,8 +100,9 @@ type t =
     oc : Out_channel.t;
     ppf : Format.formatter;
     asm_filename : string;
-    current_fun_info : fun_info ref; (* should be reset for every function *)
-    data : Cmm.data_item list ref
+    mutable current_fun_info : fun_info;
+        (* should be reset for every function *)
+    mutable data : Cmm.data_item list
   }
 
 let create_fun_info () =
@@ -114,31 +115,30 @@ let create_fun_info () =
 let create ~llvmir_filename ~asm_filename =
   let oc = Out_channel.open_text llvmir_filename in
   let ppf = Format.formatter_of_out_channel oc in
-  let current_fun_info = ref (create_fun_info ()) in
-  let data = ref [] in
+  let current_fun_info = create_fun_info () in
+  let data = [] in
   { llvmir_filename; asm_filename; oc; ppf; current_fun_info; data }
 
-let reset_fun_info t = t.current_fun_info := create_fun_info ()
+let reset_fun_info t = t.current_fun_info <- create_fun_info ()
+
+let get_ident_aux t table key ~find_opt ~add =
+  let fun_info = t.current_fun_info in
+  match find_opt table key with
+  | Some ident -> ident
+  | None ->
+    let ident = Ident.Gen.get_fresh fun_info.ident_gen in
+    add table key ident;
+    ident
 
 let get_ident_for_label t label =
-  let fun_info = !(t.current_fun_info) in
-  match Label.Tbl.find_opt fun_info.label2ident label with
-  | Some ident -> ident
-  | None ->
-    let ident = Ident.Gen.get_fresh fun_info.ident_gen in
-    Label.Tbl.add fun_info.label2ident label ident;
-    ident
+  get_ident_aux t t.current_fun_info.label2ident label
+    ~find_opt:Label.Tbl.find_opt ~add:Label.Tbl.add
 
-let get_ident_for_reg t reg =
-  let fun_info = !(t.current_fun_info) in
-  match Reg.Tbl.find_opt fun_info.reg2ident reg with
-  | Some ident -> ident
-  | None ->
-    let ident = Ident.Gen.get_fresh fun_info.ident_gen in
-    Reg.Tbl.add fun_info.reg2ident reg ident;
-    ident
+let get_ident_for_reg t label =
+  get_ident_aux t t.current_fun_info.reg2ident label ~find_opt:Reg.Tbl.find_opt
+    ~add:Reg.Tbl.add
 
-let fresh_ident t = Ident.Gen.get_fresh !(t.current_fun_info).ident_gen
+let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 
 module F = struct
   open Format
@@ -348,7 +348,7 @@ module F = struct
   let typ_of_data_item (d : Cmm.data_item) =
     match d with
     | Cdefine_symbol _ -> assert false (* cannot happen *)
-    | Cint _ -> Llvm_typ.Int 64
+    | Cint _ -> Llvm_typ.Int { width_in_bits = 64 }
     | Csymbol_address _ -> Llvm_typ.Ptr
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
@@ -360,7 +360,12 @@ module F = struct
     match d with
     | Cdefine_symbol _ -> assert false (* cannot happen *)
     | Cint n -> fprintf ppf "%s" (Nativeint.to_string n)
-    | Csymbol_address { sym_name; sym_global = _ } -> pp_global ppf sym_name
+    | Csymbol_address { sym_name; sym_global } -> (
+      match sym_global with
+      | Global -> pp_global ppf sym_name
+      | Local ->
+        Misc.fatal_error
+          "Unimplemented data item encountered in [Llvmize.pp_const_data_item]")
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
@@ -425,13 +430,13 @@ let collect_body_regs cfg =
       let body_regs =
         DLL.fold_left block.body
           ~f:(fun regs (instr : Cfg.basic Cfg.instruction) ->
-            Reg.Set.add_seq
-              (Seq.append (Array.to_seq instr.res) (Array.to_seq instr.arg))
-              regs)
+            Reg.add_set_array regs (Array.append instr.res instr.arg))
           ~init:Reg.Set.empty
       in
-      let terminator_regs = Array.to_seq block.terminator.res in
-      Reg.Set.add_seq terminator_regs body_regs |> Reg.Set.union regs)
+      let terminator_regs =
+        Array.append block.terminator.res block.terminator.arg
+      in
+      Reg.add_set_array body_regs terminator_regs |> Reg.Set.union regs)
     ~init:Reg.Set.empty
 
 (* Allocates every reg in [cfg] on the stack and fills up the [reg2ident] table
@@ -481,9 +486,9 @@ let cfg (cl : CL.t) =
     F.terminator t block.terminator
   in
   let pp_body () =
-    (* Last argument id + 1 is reserved, so we cannot use it. we explicitly skip
-       it here *)
-    let (_ : Ident.t) = Ident.Gen.get_fresh !(t.current_fun_info).ident_gen in
+    (* First unused numbered identifier after the argument list is reserved, so
+       we cannot use it. We explicitly skip it here *)
+    let (_ : Ident.t) = Ident.Gen.get_fresh t.current_fun_info.ident_gen in
     alloca_regs t cfg fun_args_with_idents;
     F.ins t "br %a" (F.pp_label t) entry_label;
     DLL.iter ~f:pp_block layout
@@ -495,7 +500,7 @@ let cfg (cl : CL.t) =
 (* CR yusumez: Implement this *)
 let data ds =
   let t = Option.get !current_compilation_unit in
-  t.data := List.append !(t.data) ds
+  t.data <- List.append t.data ds
 
 (* CR yusumez: We do this cumbersome list wrangling since we receive data
    declarations as a flat list. Ideally, [data_item]s would be represented in a
@@ -506,15 +511,18 @@ let emit_data t =
     List.fold_left
       (fun (cur_sym, ds) (d : Cmm.data_item) ->
         match d with
-        | Cdefine_symbol { sym_name; sym_global = _ } ->
-          Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-          Some sym_name, []
+        | Cdefine_symbol { sym_name; sym_global } -> (
+          match sym_global with
+          | Global ->
+            Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
+            Some sym_name, []
+          | Local -> Misc.fatal_error "Local symbols not implemented")
         | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
         | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
         | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
         | Calign _ ->
           Misc.fatal_error "Unimplemented data item")
-      (None, []) !(t.data)
+      (None, []) t.data
   in
   Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym
 

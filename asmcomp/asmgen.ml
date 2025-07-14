@@ -425,6 +425,31 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
+let compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout =
+  (* missing pass: stack checks *)
+  cfg_with_layout
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+       (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
+       (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After comballoc"
+  ++ Profile.record ~accumulate:true "save_cfg" save_cfg
+  ++ Profile.record ~accumulate:true "llvmize" Llvmize.cfg
+
+let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
+  cfg_with_layout
+  ++ compile_cfg ppf_dump ~funcnames fd_cmm
+  ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
+  ++ Profile.record ~accumulate:true "save_linear" save_linear
+  ++ (fun (fd : Linear.fundecl) ->
+       match !Oxcaml_flags.cfg_stack_checks with
+       | false -> Stack_check.linear fd
+       | true -> fd)
+  ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
+
 let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
   Reg.clear_relocatable_regs ();
@@ -436,30 +461,8 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
          if !Oxcaml_flags.llvm_backend
-         then
-           (* missing pass: stack checks *)
-           cfg_with_layout
-           ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
-                (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
-           ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
-                (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
-           ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc"
-                Cfg_comballoc.run
-           ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
-           ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After comballoc"
-           ++ Profile.record ~accumulate:true "save_cfg" save_cfg
-           ++ Profile.record ~accumulate:true "llvmize" Llvmize.cfg
-         else
-           cfg_with_layout
-           ++ compile_cfg ppf_dump ~funcnames fd_cmm
-           ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
-           ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
-           ++ Profile.record ~accumulate:true "save_linear" save_linear
-           ++ (fun (fd : Linear.fundecl) ->
-                match !Oxcaml_flags.cfg_stack_checks with
-                | false -> Stack_check.linear fd
-                | true -> fd)
-           ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl)
+         then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
+         else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 
