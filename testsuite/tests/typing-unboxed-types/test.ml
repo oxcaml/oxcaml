@@ -544,6 +544,7 @@ val g : f array =
 val h : f = #{field = []}
 |}];;
 
+(* CR jcutler: This test needs to be fixed before the external mode can be merged.*)
 (* Using [@@immediate] information (GPR#1469) *)
 type 'a t [@@immediate];;
 type u = U : 'a t -> u [@@unboxed];;

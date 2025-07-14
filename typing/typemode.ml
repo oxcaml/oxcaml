@@ -61,6 +61,9 @@ module Axis_pair = struct
       Any_axis_pair (Modal (Comonadic Externality), Externality.Const.External64)
     | "external_" ->
       Any_axis_pair (Modal (Comonadic Externality), Externality.Const.External)
+    | "byte_external" ->
+      Any_axis_pair
+        (Modal (Comonadic Externality), Externality.Const.Byte_external)
     | "yielding" ->
       Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Yielding)
     | "unyielding" ->
@@ -118,7 +121,7 @@ module Transled_modifiers = struct
       yielding : Mode.Yielding.Const.t Location.loc option;
       statefulness : Mode.Statefulness.Const.t Location.loc option;
       visibility : Mode.Visibility.Const.t Location.loc option;
-      externality_mod : Mode.Externality.Const.t Location.loc option;
+      externality : Mode.Externality.Const.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
     }
@@ -132,7 +135,7 @@ module Transled_modifiers = struct
       yielding = None;
       statefulness = None;
       visibility = None;
-      externality_mod = None;
+      externality = None;
       nullability = None;
       separability = None
     }
@@ -147,7 +150,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> t.yielding
     | Modal (Comonadic Statefulness) -> t.statefulness
     | Modal (Monadic Visibility) -> t.visibility
-    | Modal (Comonadic Externality) -> t.externality_mod
+    | Modal (Comonadic Externality) -> t.externality
     | Nonmodal Nullability -> t.nullability
     | Nonmodal Separability -> t.separability
 
@@ -162,7 +165,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> { t with yielding = value }
     | Modal (Comonadic Statefulness) -> { t with statefulness = value }
     | Modal (Monadic Visibility) -> { t with visibility = value }
-    | Modal (Comonadic Externality) -> { t with externality_mod = value }
+    | Modal (Comonadic Externality) -> { t with externality = value }
     | Nonmodal Nullability -> { t with nullability = value }
     | Nonmodal Separability -> { t with separability = value }
 end
@@ -196,7 +199,7 @@ let transl_mod_bounds annots =
           portability = Some { txt = Portability.Const.min; loc };
           contention = Some { txt = Contention.Const_op.min; loc };
           yielding = Some { txt = Yielding.Const.min; loc };
-          externality_mod = Some { txt = Mode.Externality.Const.min; loc };
+          externality = Some { txt = Mode.Externality.Const.min; loc };
           statefulness = Some { txt = Statefulness.Const.min; loc };
           visibility = Some { txt = Visibility.Const_op.min; loc };
           nullability =
@@ -274,7 +277,7 @@ let transl_mod_bounds annots =
   in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
-      modifiers.externality_mod
+      modifiers.externality
   in
   let nullability =
     Option.fold ~some:Location.get_txt ~none:Nullability.max
@@ -341,7 +344,7 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
       yielding = Option.map get_txt modes.yielding;
       statefulness = Option.map get_txt modes.statefulness;
       visibility = Option.map get_txt modes.visibility;
-      externality = Option.map get_txt modes.externality_mod
+      externality = Option.map get_txt modes.externality
     }
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
@@ -464,9 +467,9 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
     | Atom
         (Comonadic Externality, Meet_with Mode.Externality.Const.Byte_external)
       ->
+      (* We don't want to show byte_external to users, so we print external_ instead.
+         See the comment in mode.ml to understand more of the rationale behind this.*)
       "external_"
-    (* CR jcutler: think about correct printing of byte external, do we
-       actually want to ever show this to anyone? *)
     | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External) ->
       "external_"
     | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External64)
@@ -487,15 +490,13 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
    removed. The implications on the monadic axes will stay. Implied modalities
    can be overriden. *)
 (* CR zqian: decouple mutable and comonadic modalities *)
-(* CR jcutler: why is this? Why aliased? Can we get away without *)
 let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let comonadic : Modality.t list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
       Atom (Comonadic Portability, Meet_with Portability.Const.legacy);
       Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-      Atom (Comonadic Statefulness, Meet_with Statefulness.Const.legacy);
-    ]
+      Atom (Comonadic Statefulness, Meet_with Statefulness.Const.legacy) ]
   in
   let monadic : Modality.t list =
     [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);

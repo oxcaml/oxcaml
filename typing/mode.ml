@@ -45,7 +45,7 @@ module type CoHeyting = sig
   val subtract : t -> t -> t
 end
 
-(* Even thoudgh our lattices are all bi-heyting algebras, that knowledge is
+(* Even though our lattices are all bi-heyting algebras, that knowledge is
    internal to this module. Externally they are seen as normal lattices. *)
 module Lattices = struct
   module Total = struct
@@ -493,6 +493,10 @@ module Lattices = struct
 
   module Externality = struct
     type t =
+      (* What is byte_external? It includes types like int/bool, but excludes
+         types like #(int * int), which are external on native code systems, but
+         not when compiled with bytecode. This is necessary so we don't skip
+         [caml_modify]s for such types. *)
       | Byte_external
       | External
       | External64
@@ -557,8 +561,18 @@ module Lattices = struct
         | Internal, Internal -> Internal
 
       let print ppf = function
-        | Byte_external ->
-          Format.fprintf ppf "external_" (* CR jcutler: do we want this??*)
+        (* We never want to show the programmer byte_external. Jane Street
+           libraries relying on externality are written with the intent of being
+           used in native-compiled code, so clients should never come across
+           byte_external "in the wild". Seeing it in error messages would just
+           confuse them.
+
+           Since you *can* write byte_external in programs, this means that you
+           can write a program that typechecks, print it out, and then the
+           printed code will fail to typecheck. But this is just something we're
+           going to live with for now.
+        *)
+        | Byte_external -> Format.fprintf ppf "external_"
         | External -> Format.fprintf ppf "external_"
         | External64 -> Format.fprintf ppf "external64"
         | Internal -> Format.fprintf ppf "internal"

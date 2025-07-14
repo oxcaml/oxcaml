@@ -702,8 +702,6 @@ let register_allocation_mode ~loc ~env alloc_mode =
   (match res with
   | Ok () -> ()
   | Error failure_reason ->
-    (* CR jcutler: do we need to pass values for these contexts? I don't think
-       they have anything to do with the type error we're raising here... *)
       let error =
         Submode_failed(Value.Error (Comonadic Externality,failure_reason), Other, None,
           None, None, None)
@@ -6319,7 +6317,6 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-     (* rmode is the mode of the record. *)
       let (record, _, rmode, label, expected_type) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -6333,7 +6330,6 @@ and type_expect_
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
-          (* This is the mode of the field we're updating. Should be internal. *)
           type_label_exp ~overwrite:No_overwrite_label ~create:false env mode loc ty_record
             (lid, label, snewval) Legacy
         | Immutable ->
@@ -8038,7 +8034,6 @@ and type_label_exp
      - first try: we try with [ty_arg] as expected type;
      - second try; if that fails, we backtrack and try without
   *)
-    (* CR jcutler: ty_Arg is the expected? real? type of the argument *)
   let (vars, ty_arg, snap, arg) =
     (* try the first approach *)
     with_local_level begin fun () ->
@@ -11181,7 +11176,7 @@ let report_error ~loc env =
         | Error (Comonadic Portability, _ ) -> []
         | Error (Comonadic Yielding, _) -> []
         | Error (Comonadic Statefulness, _) -> []
-        | Error (Comonadic Externality, _) -> [] (* CR jcutler: fixme *)
+        | Error (Comonadic Externality, _) -> []
       in
       Location.errorf ~loc ~sub "@[%t@]" begin
         match fail_reason with

@@ -406,7 +406,6 @@ module type S = sig
       | Linearity : ('areality comonadic_with, Linearity.Const.t) t
       | Statefulness : ('areality comonadic_with, Statefulness.Const.t) t
       | Portability : ('areality comonadic_with, Portability.Const.t) t
-      (* CR jcutler: is this in the right order?? *)
       | Externality : ('areality comonadic_with, Externality.Const.t) t
       | Uniqueness : (monadic, Uniqueness.Const.t) t
       | Visibility : (monadic, Visibility.Const.t) t

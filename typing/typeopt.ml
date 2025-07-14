@@ -97,12 +97,7 @@ let is_always_gc_ignorable env ty =
     then External64
     else External
   in
-  let upper_bound =
-    Jkind.set_externality_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) externality
-  in
-  match Ctype.check_type_jkind env ty upper_bound with
-  | Ok () -> true
-  | Error _ -> false
+  Ctype.check_type_externality env ty externality
 
 let maybe_pointer_type env ty =
   let ty = scrape_ty env ty in

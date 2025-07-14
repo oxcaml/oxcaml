@@ -485,7 +485,8 @@ let msig_of_external_type env decl =
     Result.is_error (Ctype.check_decl_jkind env decl
                         (Jkind.Builtin.value_or_null ~why:Separability_check))
   in
-  (* CR jcutler: this is now slightly more pessimistic. Unclaer if it's the right choice. *)
+  (* CR jcutler: There are types that are external but not separable,
+  so externality is no longer sufficient to ensure separability. *)
   if is_not_value_or_null then best_msig decl else worst_msig decl
 
 (** [msig_of_context ~decl_loc constructor context] returns the

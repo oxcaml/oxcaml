@@ -2577,6 +2577,17 @@ let constrain_type_jkind env ty jkind =
 let () =
   Env.constrain_type_jkind := constrain_type_jkind
 
+let check_type_externality env ty externality =
+  let upper_bound =
+    Jkind.set_externality_upper_bound
+      (Jkind.Builtin.any ~why:Dummy_jkind)
+      externality
+  in
+  match check_type_jkind env ty upper_bound with
+  | Ok () -> true
+  | Error _ -> false
+
+
 let check_type_nullability env ty null =
   let upper_bound =
     Jkind.set_nullability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) null
