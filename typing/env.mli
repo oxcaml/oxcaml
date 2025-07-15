@@ -25,14 +25,20 @@ type value_unbound_reason =
   | Val_unbound_ghost_recursive of Location.t
 
 type module_unbound_reason =
-  | Mod_unbound_illegal_recursion
+  | Mod_unbound_illegal_recursion of
+      { container : string option; unbound: string }
+
+type locks
 
 type summary =
     Env_empty
   | Env_value of summary * Ident.t * value_description * Mode.Value.l
   | Env_type of summary * Ident.t * type_declaration
   | Env_extension of summary * Ident.t * extension_constructor
-  | Env_module of summary * Ident.t * module_presence * module_declaration
+  | Env_module of summary * Ident.t * module_presence * module_declaration *
+      Mode.Value.l * locks
+  (* CR zqian: change to [locks option], so for module aliases it could be
+  [Some []]. *)
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
@@ -162,6 +168,9 @@ val mark_value_used: Uid.t -> unit
 val mark_module_used: Uid.t -> unit
 val mark_type_used: Uid.t -> unit
 
+(* Mark mutable variable as mutated *)
+val mark_value_mutated: Uid.t -> unit
+
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 val mark_constructor_used:
     constructor_usage -> constructor_declaration -> unit
@@ -206,9 +215,7 @@ type shared_context =
   | Class
   | Probe
 
-type locks
-
-type held_locks = locks * Longident.t * Location.t
+type mode_with_locks = Mode.Value.l * locks
 (** Sometimes we get the locks for something, but either want to walk them later, or
 walk them for something else. The [Longident.t] and [Location.t] are only for error
 messages, and point to the variable for which we actually want to walk the locks. *)
@@ -216,6 +223,8 @@ messages, and point to the variable for which we actually want to walk the locks
 val locks_empty : locks
 
 val locks_is_empty : locks -> bool
+
+val mode_unit : Mode.Value.lr
 
 (** Items whose accesses are affected by locks *)
 type lock_item =
@@ -246,7 +255,14 @@ type lookup_error =
   | Functor_used_as_structure of Longident.t * structure_components_reason
   | Abstract_used_as_structure of Longident.t * Path.t * structure_components_reason
   | Generative_used_as_applicative of Longident.t
-  | Illegal_reference_to_recursive_module
+  | Illegal_reference_to_recursive_module of
+      { container : string option; unbound : string }
+  | Illegal_reference_to_recursive_class_type of
+      { container : string option;
+        unbound : string;
+        unbound_class_type : Longident.t;
+        container_class_type : string
+      }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
@@ -279,22 +295,22 @@ type actual_mode = {
   (** Explains why [mode] is high. *)
 }
 
-(** Takes the [mode] and [ty] of a value at definition site, walks through the list of
-    locks and constrains [mode] and [ty]. Return the access mode of the value allowed by
-    the locks. [ty] is optional as the function works on modules and classes as well, for
-    which [ty] should be [None]. *)
-val walk_locks : env:t -> item:lock_item -> Mode.Value.l -> type_expr option ->
-  held_locks -> actual_mode
+(** Takes the mode and the type of a value at definition site, walks through the
+    list of locks and constrains the mode and the type. Return the access mode
+    of the value allowed by the locks. [ty] is optional as the function works on
+    modules and classes as well, for which [ty] should be [None]. *)
+val walk_locks : env:t -> loc:Location.t -> Longident.t -> item:lock_item ->
+  type_expr option -> mode_with_locks -> actual_mode
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
-  Path.t * value_description * Mode.Value.l * locks
+  Path.t * value_description * mode_with_locks
 val lookup_type:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * type_declaration
 val lookup_module:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
-  Path.t * module_declaration * locks
+  Path.t * module_declaration * mode_with_locks
 val lookup_modtype:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * modtype_declaration
@@ -309,7 +325,7 @@ val lookup_cltype:
   defined (always legacy), and thus not returned. *)
 val lookup_module_path:
   ?use:bool -> loc:Location.t -> load:bool -> Longident.t -> t ->
-    Path.t * locks
+    Path.t * mode_with_locks
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
@@ -342,6 +358,8 @@ type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
   | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
 
+(** For a mutable variable, [use] means mark as mutated. For an instance
+    variable, it means mark as used. *)
 val lookup_settable_variable:
   ?use:bool -> loc:Location.t -> string -> t -> settable_variable
 
@@ -410,14 +428,18 @@ val add_type:
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
+(* Modules can be added without modes, which defaults to the max mode *)
 val add_module: ?arg:bool -> ?shape:Shape.t ->
-  Ident.t -> module_presence -> module_type -> t -> t
+  Ident.t -> module_presence -> module_type -> ?mode:Mode.Value.l -> t -> t
 val add_module_lazy: update_summary:bool ->
-  Ident.t -> module_presence -> Subst.Lazy.module_type -> t -> t
+  Ident.t -> module_presence -> Subst.Lazy.module_type -> ?mode:Mode.Value.l ->
+  t -> t
 val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool ->
-  Ident.t -> module_presence -> module_declaration -> ?locks:locks -> t -> t
+  Ident.t -> module_presence -> module_declaration ->
+  ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks -> t -> t
 val add_module_declaration_lazy: ?arg:bool -> update_summary:bool ->
-  Ident.t -> module_presence -> Subst.Lazy.module_declaration -> t -> t
+  Ident.t -> module_presence -> Subst.Lazy.module_declaration ->
+  ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks -> t -> t
 val add_modtype: Ident.t -> modtype_declaration -> t -> t
 val add_modtype_lazy: update_summary:bool ->
    Ident.t -> Subst.Lazy.modtype_declaration -> t -> t
@@ -456,12 +478,11 @@ val open_signature:
     used_slot:bool ref ->
     loc:Location.t -> toplevel:bool ->
     Asttypes.override_flag -> Longident.t Location.loc ->
-    t -> Path.t * t
+    t -> Path.t * mode_with_locks * t
 
-(* CR zqian: locks beyond the open are not tracked. Fix that. *)
 val open_signature_by_path: Path.t -> t -> t
 
-val open_pers_signature: string -> t -> Path.t * t
+val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
 
 val remove_last_open: Path.t -> t -> t option
 
@@ -476,10 +497,11 @@ val enter_extension:
   extension_constructor -> t -> Ident.t * t
 val enter_module:
   scope:int -> ?arg:bool -> string -> module_presence ->
-  module_type -> t -> Ident.t * t
+  module_type -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> t -> Ident.t * t
 val enter_module_declaration:
   scope:int -> ?arg:bool -> ?shape:Shape.t -> string -> module_presence ->
-  module_declaration -> ?locks:locks -> t -> Ident.t * t
+  module_declaration -> ?mode:(Mode.allowed * 'r) Mode.Value.t ->
+  ?locks:locks -> t -> Ident.t * t
 val enter_modtype:
   scope:int -> string -> modtype_declaration -> t -> Ident.t * t
 val enter_class: scope:int -> string -> class_declaration -> t -> Ident.t * t
@@ -488,14 +510,15 @@ val enter_cltype:
 
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
-val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature -> t ->
-  signature * t
+val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature ->
+  ?mode:(Mode.allowed * 'r) Mode.Value.t -> t -> signature * t
 
 (* Same as [enter_signature] but also extends the shape map ([parent_shape])
    with all the the items from the signature, their shape being a projection
    from the given shape. *)
 val enter_signature_and_shape: scope:int -> parent_shape:Shape.Map.t ->
-  Shape.t -> signature -> t -> signature * Shape.Map.t * t
+  Shape.t -> signature -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> t ->
+  signature * Shape.Map.t * t
 
 val enter_unbound_value : string -> value_unbound_reason -> t -> t
 
@@ -617,6 +640,8 @@ val in_signature: bool -> t -> t
 val is_in_signature: t -> bool
 
 val set_value_used_callback:
+    Subst.Lazy.value_description -> (unit -> unit) -> unit
+val set_value_mutated_callback:
     Subst.Lazy.value_description -> (unit -> unit) -> unit
 val set_type_used_callback:
     type_declaration -> ((unit -> unit) -> unit) -> unit

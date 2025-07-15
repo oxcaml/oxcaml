@@ -81,6 +81,7 @@ end
 
 
 val function_layout : Function_layout.t ref
+val disable_builtin_check : bool ref
 val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
 val max_long_frames_threshold : int
@@ -104,6 +105,10 @@ val use_cached_generic_functions : bool ref
 val cached_generic_functions_path : string ref
 
 val symbol_visibility_protected : bool ref
+
+val llvm_backend : bool ref
+val dump_llvmir : bool ref
+val llvm_path : string option ref
 
 module Flambda2 : sig
   val debug : bool ref

@@ -277,9 +277,9 @@ let minimize_extra_args_for_one_continuation ~(source_info : T.Acc.t)
   in
   let lets_to_introduce =
     match exception_handler_first_param_aliased with
-    | Not_aliased | Aliased_to_a_symbol -> Variable.Map.empty
+    | Not_aliased | Aliased_to_a_symbol -> Variable.Lmap.empty
     | Aliased { alias_var = alias; exception_param } ->
-      Variable.Map.singleton alias (Simple.var exception_param)
+      Variable.Lmap.singleton alias (Simple.var exception_param)
   in
   let removed_aliased_params_and_extra_params, lets_to_introduce =
     List.fold_left
@@ -289,7 +289,7 @@ let minimize_extra_args_for_one_continuation ~(source_info : T.Acc.t)
           let lets_to_introduce =
             if Simple.Set.mem alias unboxed_blocks
             then lets_to_introduce
-            else Variable.Map.add param alias lets_to_introduce
+            else Variable.Lmap.add param alias lets_to_introduce
           in
           removed, lets_to_introduce
         in

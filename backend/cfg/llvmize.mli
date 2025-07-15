@@ -2,10 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                              Jane Street                               *)
 (*                                                                        *)
-(*   Copyright 1998 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
+(*   Copyright 2025 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -13,4 +12,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val extract_from_typed_tree : Typedtree.structure -> Value_shapes.extfun list
+(* Generate LLVM IR *)
+val cfg : Cfg_with_layout.t -> unit
+
+val data : Cmm.data_item list -> unit
+
+val begin_assembly : unit -> unit
+
+val end_assembly : sourcefile:string option -> unit
+
+val close_out : unit -> unit
+
+val open_out : asm_filename:string -> output_prefix:string -> unit

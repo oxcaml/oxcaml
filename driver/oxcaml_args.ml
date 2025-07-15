@@ -210,6 +210,11 @@ let mk_function_layout f =
   (Printf.sprintf " Order of functions in the generated assembly (default: %s)"
      default)
 
+let mk_disable_builtin_check f =
+  "-disable-builtin-check", Arg.Unit f,
+  " If an external annotated with [@@builtin] is not recognized, \
+    fall back to the corresponding C stub, instead of compilation error."
+
 let mk_disable_poll_insertion f =
   "-disable-poll-insertion", Arg.Unit f, " Do not insert poll points"
 
@@ -245,6 +250,15 @@ let mk_internal_assembler f =
 
 let mk_gc_timings f =
   "-dgc-timings", Arg.Unit f, "Output information about time spent in the GC"
+
+let mk_llvm_backend f =
+  "-llvm-backend", Arg.Unit f, " Enable LLVM backend (...does nothing for now)"
+
+let mk_dllvmir f =
+  "-dllvmir", Arg.Unit f, " (undocumented)"
+
+let mk_llvm_path f =
+  "-llvm-path", Arg.String f, " Specify which LLVM compiler to use"
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -788,6 +802,7 @@ module type Oxcaml_options = sig
   val zero_alloc_checker_join : int -> unit
 
   val function_layout : string -> unit
+  val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
   val enable_poll_insertion : unit -> unit
 
@@ -804,6 +819,10 @@ module type Oxcaml_options = sig
   val gc_timings : unit -> unit
 
   val no_mach_ir : unit -> unit
+
+  val llvm_backend : unit -> unit
+  val dllvmir : unit -> unit
+  val llvm_path : string -> unit
 
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
@@ -927,6 +946,7 @@ struct
     mk_zero_alloc_checker_join F.zero_alloc_checker_join;
 
     mk_function_layout F.function_layout;
+    mk_disable_builtin_check F.disable_builtin_check;
     mk_disable_poll_insertion F.disable_poll_insertion;
     mk_enable_poll_insertion F.enable_poll_insertion;
 
@@ -944,6 +964,10 @@ struct
     mk_gc_timings F.gc_timings;
 
     mk_no_mach_ir F.no_mach_ir;
+
+    mk_llvm_backend F.llvm_backend;
+    mk_dllvmir F.dllvmir;
+    mk_llvm_path F.llvm_path;
 
     mk_flambda2_debug F.flambda2_debug;
     mk_no_flambda2_debug F.no_flambda2_debug;
@@ -1142,6 +1166,7 @@ module Oxcaml_options_impl = struct
     | Some layout ->
       Oxcaml_flags.function_layout := layout
 
+  let disable_builtin_check = set' Oxcaml_flags.disable_builtin_check
   let disable_poll_insertion = set' Oxcaml_flags.disable_poll_insertion
   let enable_poll_insertion = clear' Oxcaml_flags.disable_poll_insertion
 
@@ -1160,6 +1185,10 @@ module Oxcaml_options_impl = struct
   let gc_timings = set' Oxcaml_flags.gc_timings
 
   let no_mach_ir () = ()
+
+  let llvm_backend () = set' Oxcaml_flags.llvm_backend ()
+  let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
+  let llvm_path s = Oxcaml_flags.llvm_path := Some s
 
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
@@ -1477,8 +1506,10 @@ module Extra_params = struct
          raise
            (Arg.Bad
               (Printf.sprintf "Unexpected value %s for %s" v name)))
+    | "builtin-check" -> set' Oxcaml_flags.disable_builtin_check
     | "poll-insertion" -> set' Oxcaml_flags.disable_poll_insertion
-    | "symbol-visibility-protected" -> set' Oxcaml_flags.disable_poll_insertion
+    | "symbol-visibility-protected" ->
+      set' Oxcaml_flags.symbol_visibility_protected
     | "long-frames" -> set' Oxcaml_flags.allow_long_frames
     | "debug-long-frames-threshold" ->
       begin match Compenv.check_int ppf name v with
@@ -1497,6 +1528,8 @@ module Extra_params = struct
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-max-function-complexity" ->
       set_int' Debugging.dwarf_max_function_complexity
+    | "llvm-backend" -> set' Oxcaml_flags.llvm_backend
+    | "llvm-path" -> Oxcaml_flags.llvm_path := Some v; true
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->

@@ -21,13 +21,11 @@
    make it produce an error ? *)
 
 module T0 = struct
-  include Numeric_types.Int64
+  include Targetint_32_64
 
-  let minus_one = -1L
+  let ten = Targetint_32_64.of_int 10
 
-  let ten = 10L
-
-  let hex_ff = 0xffL
+  let hex_ff = Targetint_32_64.of_int 0xff
 
   let bool_true = one
 
@@ -35,47 +33,44 @@ module T0 = struct
 
   let bool b = if b then bool_true else bool_false
 
-  let min_value = Int64.min_int
+  let min_value = Targetint_32_64.min_int
 
-  let max_value = Int64.max_int
+  let max_value = Targetint_32_64.max_int
 
-  let bottom_byte_to_int t = Int64.to_int (Int64.logand t hex_ff)
+  let bottom_byte_to_int t =
+    Targetint_32_64.to_int (Targetint_32_64.logand t hex_ff)
 
-  let xor = Int64.logxor
+  let xor = Targetint_32_64.logxor
 
-  let or_ = Int64.logor
+  let or_ = Targetint_32_64.logor
 
-  let and_ = Int64.logand
+  let and_ = Targetint_32_64.logand
 
-  let mod_ = Int64.rem
+  let mod_ = Targetint_32_64.rem
 
-  let of_char c = Int64.of_int (Char.code c)
+  let of_char c = Targetint_32_64.of_int (Char.code c)
 
   let of_int_option i = Some (of_int i)
 
-  let of_int64 t = t
+  let to_targetint t = t
 
-  let to_int64 t = t
+  let of_targetint t = t
 
-  let to_targetint = Targetint_32_64.of_int64
+  let max t1 t2 = if Targetint_32_64.compare t1 t2 < 0 then t2 else t1
 
-  let of_targetint = Targetint_32_64.to_int64
+  let min t1 t2 = if Targetint_32_64.compare t1 t2 < 0 then t1 else t2
 
-  let max t1 t2 = if Int64.compare t1 t2 < 0 then t2 else t1
+  let ( <= ) t1 t2 = Stdlib.( <= ) (Targetint_32_64.compare t1 t2) 0
 
-  let min t1 t2 = if Int64.compare t1 t2 < 0 then t1 else t2
+  let ( >= ) t1 t2 = Stdlib.( >= ) (Targetint_32_64.compare t1 t2) 0
 
-  let ( <= ) t1 t2 = Stdlib.( <= ) (Int64.compare t1 t2) 0
+  let ( < ) t1 t2 = Stdlib.( < ) (Targetint_32_64.compare t1 t2) 0
 
-  let ( >= ) t1 t2 = Stdlib.( >= ) (Int64.compare t1 t2) 0
-
-  let ( < ) t1 t2 = Stdlib.( < ) (Int64.compare t1 t2) 0
-
-  let ( > ) t1 t2 = Stdlib.( > ) (Int64.compare t1 t2) 0
+  let ( > ) t1 t2 = Stdlib.( > ) (Targetint_32_64.compare t1 t2) 0
 
   let to_int_option t =
-    let min_int_as_int64 = Int64.of_int Stdlib.min_int in
-    let max_int_as_int64 = Int64.of_int Stdlib.max_int in
+    let min_int_as_int64 = Targetint_32_64.of_int Stdlib.min_int in
+    let max_int_as_int64 = Targetint_32_64.of_int Stdlib.max_int in
     if min_int_as_int64 <= t && t <= max_int_as_int64
     then Some (to_int t)
     else None
@@ -83,15 +78,19 @@ module T0 = struct
   let to_int_exn t =
     match to_int_option t with
     | Some i -> i
-    | None -> Misc.fatal_errorf "Targetint_31_63.to_int_exn: %Ld out of range" t
+    | None ->
+      Misc.fatal_errorf "Targetint_31_63.to_int_exn: %a out of range"
+        Targetint_32_64.print t
 
   let get_least_significant_16_bits_then_byte_swap t =
-    let least_significant_byte = Int64.logand t 0xffL in
+    let least_significant_byte = Targetint_32_64.logand t hex_ff in
     let second_to_least_significant_byte =
-      Int64.shift_right_logical (Int64.logand t 0xff00L) 8
+      Targetint_32_64.shift_right_logical
+        (Targetint_32_64.logand t (Targetint_32_64.of_int 0xff00))
+        8
     in
-    Int64.logor second_to_least_significant_byte
-      (Int64.shift_left least_significant_byte 8)
+    Targetint_32_64.logor second_to_least_significant_byte
+      (Targetint_32_64.shift_left least_significant_byte 8)
 
   let is_non_negative t = t >= zero
 end
