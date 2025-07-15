@@ -443,19 +443,16 @@ let %s = {
     binding constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
+  let module Map = Map.Make (String) in
+  let all =
+    Hashtbl.to_seq_keys all_instructions
+    |> Seq.map (fun instr -> String.capitalize_ascii (binding instr), instr)
+    |> Map.of_seq
+  in
   print_endline "type id = ";
-  let constructors = Hashtbl.create 1024 in
-  Hashtbl.iter
-    (fun instr () ->
-      let ctr = String.capitalize_ascii (binding instr) in
-      match Hashtbl.find_opt constructors ctr with
-      | Some () -> ()
-      | None ->
-        Hashtbl.add constructors ctr ();
-        printf "  | %s\n" ctr)
-    all_instructions;
+  Map.iter (fun binding _ -> printf "  | %s\n" binding) all;
   print_endline "\ntype nonrec instr = id instr";
-  Hashtbl.iter (fun instr () -> print_one instr) all_instructions
+  Map.iter (fun _ instr -> print_one instr) all
 
 let parse_ext = function
   | "SSE" -> Some [| SSE |]
