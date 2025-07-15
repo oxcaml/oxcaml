@@ -220,6 +220,14 @@
 
 /* Define HAS_MKTIME if you have mktime(). */
 
+#undef HAS_GMTIME_R
+
+/* Define HAS_GMTIME_R if you have gmtime_r(). */
+
+#undef HAS_LOCALTIME_R
+
+/* Define HAS_LOCALTIME_R if you have localtime_r(). */
+
 #undef HAS_SETSID
 
 /* Define HAS_SETSID if you have setsid(). */
@@ -268,6 +276,26 @@
    The value of this symbol is the number of arguments of
    gethostbyaddr_r(): either 7 or 8 depending on prototype.
    (7 is the Solaris version, 8 is the Linux version). */
+
+#undef HAS_GETLOGIN_R
+
+/* Define HAS_GETLOGIN_R if getlogin_r() is available. */
+
+#undef HAS_GETPWNAM_R
+
+/* Define HAS_GETPWNAM_R if getpwnam_r() is available. */
+
+#undef HAS_GETGRNAM_R
+
+/* Define HAS_GETGRNAM_R if getgrnam_r() is available. */
+
+#undef HAS_GETPWUID_R
+
+/* Define HAS_GETPWUID_R if getpwuid_r() is available. */
+
+#undef HAS_GETGRGID_R
+
+/* Define HAS_GETGRGID_R if getgrgid_r() is available. */
 
 #undef HAS_MKSTEMP
 

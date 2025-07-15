@@ -2253,6 +2253,14 @@ AC_CHECK_FUNC([gettimeofday],
 
 AC_CHECK_FUNC([mktime], [AC_DEFINE([HAS_MKTIME])])
 
+## gmtime_r
+
+AC_CHECK_FUNC([gmtime_r], [AC_DEFINE([HAS_GMTIME_R])])
+
+## localtime_r
+
+AC_CHECK_FUNC([localtime_r], [AC_DEFINE([HAS_LOCALTIME_R])])
+
 ## setsid
 
 AS_CASE([$host],
@@ -2379,6 +2387,26 @@ AX_FUNC_WHICH_GETHOSTBYADDR_R
 AS_CASE([$ac_cv_func_which_gethostbyaddr_r],
   [eight], [AC_DEFINE([HAS_GETHOSTBYADDR_R],[8])],
   [seven], [AC_DEFINE([HAS_GETHOSTBYADDR_R],[7])])
+
+## getlogin_r
+
+AC_CHECK_FUNC([getlogin_r], [AC_DEFINE([HAS_GETLOGIN_R])])
+
+## getpwnam_r
+
+AC_CHECK_FUNC([getpwnam_r], [AC_DEFINE([HAS_GETPWNAM_R])])
+
+## getgrnam_r
+
+AC_CHECK_FUNC([getgrnam_r], [AC_DEFINE([HAS_GETGRNAM_R])])
+
+## getpwuid_r
+
+AC_CHECK_FUNC([getpwuid_r], [AC_DEFINE([HAS_GETPWUID_R])])
+
+## getgrgid_r
+
+AC_CHECK_FUNC([getgrgid_r], [AC_DEFINE([HAS_GETGRGID_R])])
 
 ## mkstemp
 

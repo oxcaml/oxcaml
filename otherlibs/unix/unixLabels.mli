@@ -177,7 +177,9 @@ val unsafe_getenv : string -> string
    @raise Not_found if the variable is unbound.
    @since 4.06  *)
 
-val putenv : string -> string -> unit
+val putenv : string -> string -> unit @@ nonportable
+[@@alert unsafe_multidomain
+    "Mutating the environment makes reading the environment unsafe."]
 (** [putenv name value] sets the value associated to a
    variable in the process environment.
    [name] is the name of the environment variable,
@@ -243,7 +245,7 @@ val execvpe : prog:string -> args:string array -> env:string array -> 'a
 (** Same as {!execve}, except that
    the program is searched in the path. *)
 
-val fork : unit -> int
+val fork : unit -> int @@ nonportable
 (** Fork a new process. The returned integer is 0 for the child
    process, the pid of the child process for the parent process. It
    fails if the OCaml process is multi-core (any domain has been
@@ -1737,19 +1739,19 @@ val gethostbyaddr : inet_addr -> host_entry
 (** Find an entry in [hosts] with the given address.
     @raise Not_found if no such entry exists. *)
 
-val getprotobyname : string -> protocol_entry
+val getprotobyname : string -> protocol_entry @@ nonportable
 (** Find an entry in [protocols] with the given name.
     @raise Not_found if no such entry exists. *)
 
-val getprotobynumber : int -> protocol_entry
+val getprotobynumber : int -> protocol_entry @@ nonportable
 (** Find an entry in [protocols] with the given protocol number.
     @raise Not_found if no such entry exists. *)
 
-val getservbyname : string -> protocol:string -> service_entry
+val getservbyname : string -> protocol:string -> service_entry @@ nonportable
 (** Find an entry in [services] with the given name.
     @raise Not_found if no such entry exists. *)
 
-val getservbyport : int -> protocol:string -> service_entry
+val getservbyport : int -> protocol:string -> service_entry @@ nonportable
 (** Find an entry in [services] with the given service number.
     @raise Not_found if no such entry exists. *)
 
@@ -1774,8 +1776,7 @@ type getaddrinfo_option = Unix.getaddrinfo_option =
                                             for use with {!bind} *)
 (** Options to {!getaddrinfo}. *)
 
-val getaddrinfo:
-  string -> string -> getaddrinfo_option list -> addr_info list
+val getaddrinfo : string -> string -> getaddrinfo_option list -> addr_info list
 (** [getaddrinfo host service opts] returns a list of {!addr_info}
     records describing socket parameters and addresses suitable for
     communicating with the given host and service.  The empty list is
