@@ -20,11 +20,11 @@
  *)
 
 type t =
-  { src : string option
-  ; name : string option
-  ; col : int
-  ; line : int
-  ; idx : int
+  { src : string option;
+    name : string option;
+    col : int;
+    line : int;
+    idx : int
   }
 
 val zero : t

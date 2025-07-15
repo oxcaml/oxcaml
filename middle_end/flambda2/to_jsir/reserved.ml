@@ -26,153 +26,151 @@ let keyword =
     ~f:(fun acc x -> StringSet.add x acc)
     ~init:StringSet.empty
     [ (* keyword *)
-      "break"
-    ; "case"
-    ; "catch"
-    ; "continue"
-    ; "debugger"
-    ; "default"
-    ; "delete"
-    ; "do"
-    ; "else"
-    ; "finally"
-    ; "for"
-    ; "function"
-    ; "if"
-    ; "in"
-    ; "instanceof"
-    ; "new"
-    ; "return"
-    ; "switch"
-    ; "this"
-    ; "throw"
-    ; "try"
-    ; "typeof"
-    ; "var"
-    ; "void"
-    ; "while"
-    ; "with"
-    ; (* reserved in ECMAScript 5 *)
-      "class"
-    ; "enum"
-    ; "export"
-    ; "extends"
-    ; "import"
-    ; "super"
-    ; "implements"
-    ; "interface"
-    ; "let"
-    ; "package"
-    ; "private"
-    ; "protected"
-    ; "public"
-    ; "static"
-    ; "yield"
-    ; (* other *)
-      "null"
-    ; "true"
-    ; "false"
-    ; "NaN"
-    ; "undefined"
-    ; "this"
-    ; (* Unexpected eval or arguments in strict mode *)
-      "eval"
-    ; "arguments"
-    ; (* also reserved in ECMAScript 3 *)
-      "abstract"
-    ; "boolean"
-    ; "byte"
-    ; "char"
-    ; "const"
-    ; "double"
-    ; "final"
-    ; "float"
-    ; "goto"
-    ; "int"
-    ; "long"
-    ; "native"
-    ; "short"
-    ; "synchronized"
-    ; "throws"
-    ; "transient"
-    ; "volatile"
-    ; (* also reserved in ECMAScript 6 *)
-      "await"
-    ]
+      "break";
+      "case";
+      "catch";
+      "continue";
+      "debugger";
+      "default";
+      "delete";
+      "do";
+      "else";
+      "finally";
+      "for";
+      "function";
+      "if";
+      "in";
+      "instanceof";
+      "new";
+      "return";
+      "switch";
+      "this";
+      "throw";
+      "try";
+      "typeof";
+      "var";
+      "void";
+      "while";
+      "with";
+      (* reserved in ECMAScript 5 *)
+      "class";
+      "enum";
+      "export";
+      "extends";
+      "import";
+      "super";
+      "implements";
+      "interface";
+      "let";
+      "package";
+      "private";
+      "protected";
+      "public";
+      "static";
+      "yield";
+      (* other *)
+      "null";
+      "true";
+      "false";
+      "NaN";
+      "undefined";
+      "this";
+      (* Unexpected eval or arguments in strict mode *)
+      "eval";
+      "arguments";
+      (* also reserved in ECMAScript 3 *)
+      "abstract";
+      "boolean";
+      "byte";
+      "char";
+      "const";
+      "double";
+      "final";
+      "float";
+      "goto";
+      "int";
+      "long";
+      "native";
+      "short";
+      "synchronized";
+      "throws";
+      "transient";
+      "volatile";
+      (* also reserved in ECMAScript 6 *)
+      "await" ]
 
 let provided =
   List.fold_left
     ~f:(fun acc x -> StringSet.add x acc)
     ~init:StringSet.empty
-    [ "event"
-    ; "location"
-    ; "window"
-    ; "document"
-    ; "eval"
-    ; "navigator"
-    ; "self"
-    ; "Array"
-    ; "Function"
-    ; "Date"
-    ; "Math"
-    ; "JSON"
-    ; "Object"
-    ; "globalThis"
-    ; "RegExp"
-    ; "String"
-    ; "Boolean"
-    ; "Number"
-    ; "BigInt"
-    ; "Infinity"
-    ; "isFinite"
-    ; "ActiveXObject"
-    ; "XMLHttpRequest"
-    ; "XDomainRequest"
-    ; "DOMException"
-    ; "Error"
-    ; "SyntaxError"
-    ; "TypeError"
-    ; "arguments"
-    ; "decodeURI"
-    ; "decodeURIComponent"
-    ; "encodeURI"
-    ; "encodeURIComponent"
-    ; "escape"
-    ; "unescape"
-    ; "isNaN"
-    ; "parseFloat"
-    ; "parseInt"
-    ; "module" (* only available in node *)
-    ; "require" (* only available in node *)
-    ; "Symbol"
-    ; "ArrayBuffer"
-    ; "Float32Array"
-    ; "Float64Array"
-    ; "Int16Array"
-    ; "Int32Array"
-    ; "Int8Array"
-    ; "TextDecoder"
-    ; "TextEncoder"
-    ; "Uint16Array"
-    ; "Uint32Array"
-    ; "Uint8Array"
-    ; "Uint8ClampedArray"
-    ; "URL"
-    ; "atob"
-    ; "btoa"
-    ; "clearInterval"
-    ; "console"
-    ; "global" (* only available in node *)
-    ; "importScripts" (* only available in WebWorker *)
-    ; "performance" (* Not available in node until v16+ *)
-    ; "setTimeout"
-    ; "Map"
-    ; "Set"
-    ; "WeakRef"
-    ; "WeakMap"
-    ; "FinalizationRegistry"
-    ; "WebAssembly"
-    ; "Promise"
-    ; "fetch"
-    ; "crypto"
-    ]
+    [ "event";
+      "location";
+      "window";
+      "document";
+      "eval";
+      "navigator";
+      "self";
+      "Array";
+      "Function";
+      "Date";
+      "Math";
+      "JSON";
+      "Object";
+      "globalThis";
+      "RegExp";
+      "String";
+      "Boolean";
+      "Number";
+      "BigInt";
+      "Infinity";
+      "isFinite";
+      "ActiveXObject";
+      "XMLHttpRequest";
+      "XDomainRequest";
+      "DOMException";
+      "Error";
+      "SyntaxError";
+      "TypeError";
+      "arguments";
+      "decodeURI";
+      "decodeURIComponent";
+      "encodeURI";
+      "encodeURIComponent";
+      "escape";
+      "unescape";
+      "isNaN";
+      "parseFloat";
+      "parseInt";
+      "module" (* only available in node *);
+      "require" (* only available in node *);
+      "Symbol";
+      "ArrayBuffer";
+      "Float32Array";
+      "Float64Array";
+      "Int16Array";
+      "Int32Array";
+      "Int8Array";
+      "TextDecoder";
+      "TextEncoder";
+      "Uint16Array";
+      "Uint32Array";
+      "Uint8Array";
+      "Uint8ClampedArray";
+      "URL";
+      "atob";
+      "btoa";
+      "clearInterval";
+      "console";
+      "global" (* only available in node *);
+      "importScripts" (* only available in WebWorker *);
+      "performance" (* Not available in node until v16+ *);
+      "setTimeout";
+      "Map";
+      "Set";
+      "WeakRef";
+      "WeakMap";
+      "FinalizationRegistry";
+      "WebAssembly";
+      "Promise";
+      "fetch";
+      "crypto" ]

@@ -25,8 +25,8 @@ let series = ref None
 let stop_profiling () =
   match !series with
   | Some _x ->
-      (* Spacetime.Series.save_and_close x; *)
-      series := None
+    (* Spacetime.Series.save_and_close x; *)
+    series := None
   | None -> ()
 
 let start_profiling name =
@@ -40,9 +40,9 @@ let take_snapshot () =
   match !series with
   | None -> ()
   | Some _series ->
-      Gc.minor ();
-      (* Spacetime.Snapshot.take series; *)
-      ()
+    Gc.minor ();
+    (* Spacetime.Snapshot.take series; *)
+    ()
 
 let debugs : (string * bool ref) list ref = ref []
 
@@ -53,9 +53,9 @@ let find ?(even_if_quiet = false) s =
     match List.string_assoc s !debugs with
     | Some s -> s
     | None ->
-        let state = ref false in
-        debugs := (s, state) :: !debugs;
-        state
+      let state = ref false in
+      debugs := (s, state) :: !debugs;
+      state
   in
   fun () ->
     if String.equal s "times" then take_snapshot ();

@@ -158,9 +158,9 @@ type constant =
 module Constant : sig
   type t = constant
 
-  val ocaml_equal : t -> t -> bool option
   (** Guaranteed equality in terms of OCaml [(=)]: if [constant_equal a b =
     Some v], then [Poly.equal a b = v]. This is used for optimization purposes. *)
+  val ocaml_equal : t -> t -> bool option
 end
 
 type loc =
@@ -188,9 +188,9 @@ type field_type =
 
 type expr =
   | Apply of
-      { f : Var.t
-      ; args : Var.t list
-      ; exact : bool (* if true, then # of arguments = # of parameters *)
+      { f : Var.t;
+        args : Var.t list;
+        exact : bool (* if true, then # of arguments = # of parameters *)
       }
   | Block of int * Var.t array * array_or_not * mutability
   | Field of Var.t * int * field_type
@@ -209,7 +209,7 @@ type instr =
 
 type last =
   | Return of Var.t
-  | Raise of Var.t * [ `Normal | `Notrace | `Reraise ]
+  | Raise of Var.t * [`Normal | `Notrace | `Reraise]
   | Stop
   | Branch of cont
   | Cond of Var.t * cont * cont
@@ -218,15 +218,15 @@ type last =
   | Poptrap of cont
 
 type block =
-  { params : Var.t list
-  ; body : instr list
-  ; branch : last
+  { params : Var.t list;
+    body : instr list;
+    branch : last
   }
 
 type program =
-  { start : Addr.t
-  ; blocks : block Addr.Map.t
-  ; free_pc : Addr.t
+  { start : Addr.t;
+    blocks : block Addr.Map.t;
+    free_pc : Addr.t
   }
 
 module Print : sig
@@ -243,24 +243,25 @@ module Print : sig
   val instr : Format.formatter -> instr -> unit
 
   val block :
-    Format.formatter -> (Addr.Map.key -> xinstr -> string) -> int -> block -> unit
+    Format.formatter ->
+    (Addr.Map.key -> xinstr -> string) ->
+    int ->
+    block ->
+    unit
 
-  val program : Format.formatter -> (Addr.Map.key -> xinstr -> string) -> program -> unit
+  val program :
+    Format.formatter -> (Addr.Map.key -> xinstr -> string) -> program -> unit
 
   val last : Format.formatter -> last -> unit
 
   val cont : Format.formatter -> cont -> unit
 end
 
-type 'c fold_blocs = block Addr.Map.t -> Addr.t -> (Addr.t -> 'c -> 'c) -> 'c -> 'c
+type 'c fold_blocs =
+  block Addr.Map.t -> Addr.t -> (Addr.t -> 'c -> 'c) -> 'c -> 'c
 
 type fold_blocs_poly = { fold : 'a. 'a fold_blocs } [@@unboxed]
 
-val fold_closures :
-     program
-  -> (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd)
-  -> 'd
-  -> 'd
 (** [fold_closures p f init] folds [f] over all closures in the program [p],
     starting from the initial value [init]. For each closure, [f] is called
     with the following arguments: the closure name (enclosed in
@@ -270,24 +271,29 @@ val fold_closures :
     [None] as the closure name.  All closures in all blocks of [p] are
     included in the fold, not only the ones reachable from
     [p.start]. *)
+val fold_closures :
+  program ->
+  (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd) ->
+  'd ->
+  'd
 
-val fold_closures_innermost_first :
-     program
-  -> (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd)
-  -> 'd
-  -> 'd
 (** Similar to {!fold_closures}, but applies the fold function to the
     innermost closures first. Unlike with {!fold_closures}, only the closures
     reachable from [p.start] are considered. *)
+val fold_closures_innermost_first :
+  program ->
+  (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd) ->
+  'd ->
+  'd
 
-val fold_closures_outermost_first :
-     program
-  -> (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd)
-  -> 'd
-  -> 'd
 (** Similar to {!fold_closures}, but applies the fold function to the
     outermost closures first. Unlike with {!fold_closures}, only the closures
     reachable from [p.start] are considered. *)
+val fold_closures_outermost_first :
+  program ->
+  (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd) ->
+  'd ->
+  'd
 
 val fold_children : 'c fold_blocs
 
@@ -296,13 +302,23 @@ val fold_children_skip_try_body : 'c fold_blocs
 val poptraps : block Addr.Map.t -> Addr.t -> Addr.Set.t
 
 val traverse :
-  fold_blocs_poly -> (Addr.t -> 'c -> 'c) -> Addr.t -> block Addr.Map.t -> 'c -> 'c
+  fold_blocs_poly ->
+  (Addr.t -> 'c -> 'c) ->
+  Addr.t ->
+  block Addr.Map.t ->
+  'c ->
+  'c
 
 val preorder_traverse :
-  fold_blocs_poly -> (Addr.t -> 'c -> 'c) -> Addr.t -> block Addr.Map.t -> 'c -> 'c
+  fold_blocs_poly ->
+  (Addr.t -> 'c -> 'c) ->
+  Addr.t ->
+  block Addr.Map.t ->
+  'c ->
+  'c
 
-val last_instr : instr list -> instr option
 (** Last instruction of a block body, ignoring events *)
+val last_instr : instr list -> instr option
 
 val used_blocks : program -> BitSet.t
 
