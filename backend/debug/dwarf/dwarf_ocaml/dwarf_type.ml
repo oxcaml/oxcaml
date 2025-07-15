@@ -228,7 +228,7 @@ let field_project_path fields path =
 let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
     (fields :
       (string option
-      * Type_shape.Type_shape.without_layout Type_shape.Type_shape.t
+      * Type_shape.Type_shape.without_layout Type_shape.Type_shape.ts
       * Layout.t)
       list) =
   (* We go into arrays and back, because it makes the reordering of the fields
@@ -1002,7 +1002,7 @@ let create_base_layout_type ?(simd_vec_split = None) ~reference
 
 module Shape_with_layout = struct
   include Identifiable.Make (struct
-    type nonrec t = Layout.t Type_shape.Type_shape.t
+    type nonrec t = Layout.t Type_shape.Type_shape.ts
 
     let compare = Stdlib.compare
 
@@ -1020,7 +1020,7 @@ module Cache = Shape_with_layout.Tbl
 
 let cache = Cache.create 16
 
-let rec type_shape_to_dwarf_die (type_shape : Layout.t Type_shape.Type_shape.t)
+let rec type_shape_to_dwarf_die (type_shape : Layout.t Type_shape.Type_shape.ts)
     ~parent_proto_die ~fallback_value_die =
   match Cache.find_opt cache type_shape with
   | Some reference -> reference
@@ -1283,8 +1283,7 @@ and type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
   create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die ~name
     constructors_with_references
 
-let rec flatten_to_base_sorts (sort : Jkind_types.Sort.Const.t) :
-    base_layout list =
+let rec flatten_to_base_sorts (sort : Layout.t) : base_layout list =
   match sort with
   | Base b -> [b]
   | Product sorts -> List.concat_map flatten_to_base_sorts sorts
@@ -1295,8 +1294,7 @@ let rec flatten_to_base_sorts (sort : Jkind_types.Sort.Const.t) :
    type variables). In these cases, we produce the corresponding number of
    entries of the form [`Unknown base_layout] for the fields. Otherwise, when
    the type is known, we produce [`Known type_shape] for the fields. *)
-let rec flatten_shape
-    (type_shape : Jkind_types.Sort.Const.t Type_shape.Type_shape.t) =
+let rec flatten_shape (type_shape : Layout.t Type_shape.Type_shape.ts) =
   let unknown_base_layouts layout =
     let base_sorts = flatten_to_base_sorts layout in
     List.map (fun base_sort -> `Unknown base_sort) base_sorts

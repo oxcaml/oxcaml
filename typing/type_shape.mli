@@ -3,6 +3,10 @@ module Layout = Jkind_types.Sort.Const
 
 type base_layout = Jkind_types.Sort.base
 
+(* CR sspies: To prepare for moving the definitions of this file into [shapes.ml]
+   the declarations for type shapes and type declaration shapes have been renamed
+   in from [t] to [ts] (for type shape) and [tds] (for type declaration shape).*)
+
 module Type_shape : sig
   (* For several builtin types, we provide predefined type shapes with custom
      logic associated with them for emitting the DWARF debugging information. *)
@@ -69,14 +73,14 @@ module Type_shape : sig
      and then later substituting in a layout of type [Layout.t]. *)
   type without_layout = Layout_to_be_determined
 
-  type 'a t =
-    | Ts_constr of (Uid.t * Path.t * 'a) * without_layout t list
-    | Ts_tuple of 'a t list
-    | Ts_unboxed_tuple of 'a t list
+  type 'a ts =
+    | Ts_constr of (Uid.t * Path.t * 'a) * without_layout ts list
+    | Ts_tuple of 'a ts list
+    | Ts_unboxed_tuple of 'a ts list
     | Ts_var of string option * 'a
-    | Ts_predef of Predef.t * without_layout t list
-    | Ts_arrow of without_layout t * without_layout t
-    | Ts_variant of 'a t poly_variant_constructors
+    | Ts_predef of Predef.t * without_layout ts list
+    | Ts_arrow of without_layout ts * without_layout ts
+    | Ts_variant of 'a ts poly_variant_constructors
     | Ts_other of 'a
 
   and 'a poly_variant_constructors = 'a poly_variant_constructor list
@@ -86,31 +90,31 @@ module Type_shape : sig
       pv_constr_args : 'a list
     }
 
-  val shape_layout : Layout.t t -> Layout.t
+  val shape_layout : Layout.t ts -> Layout.t
 
-  val shape_with_layout : layout:Layout.t -> without_layout t -> Layout.t t
+  val shape_with_layout : layout:Layout.t -> without_layout ts -> Layout.t ts
 
-  val print : Format.formatter -> 'a t -> unit
+  val print : Format.formatter -> 'a ts -> unit
 
   val poly_variant_constructors_map :
     ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
 
   val of_type_expr :
-    Types.type_expr -> (Path.t -> Uid.t option) -> without_layout t
+    Types.type_expr -> (Path.t -> Uid.t option) -> without_layout ts
 end
 
 module Type_decl_shape : sig
   (** For type substitution to work as expected, we store the layouts in the
       declaration alongside the shapes instead of directly going for the
       substituted version. *)
-  type tds =
+  type tds_desc =
     | Tds_variant of
         { simple_constructors : string list;
               (** The string is the name of the constructor. The runtime
                   representation of the constructor at index [i] in this list is
                   [2 * i + 1]. See [dwarf_type.ml] for more details. *)
           complex_constructors :
-            (Type_shape.without_layout Type_shape.t * Layout.t)
+            (Type_shape.without_layout Type_shape.ts * Layout.t)
             complex_constructors
               (** All constructors in this category are represented as blocks.
                   The index [i] in the list indicates the tag at runtime. The
@@ -122,17 +126,17 @@ module Type_decl_shape : sig
           arg_name : string option;
               (** if this is [None], we are looking at a singleton tuple;
                 otherwise, it is a singleton record. *)
-          arg_shape : Type_shape.without_layout Type_shape.t;
+          arg_shape : Type_shape.without_layout Type_shape.ts;
           arg_layout : Layout.t
         }
         (** An unboxed variant corresponds to the [@@unboxed] annotation.
           It must have a single, complex constructor. *)
     | Tds_record of
         { fields :
-            (string * Type_shape.without_layout Type_shape.t * Layout.t) list;
+            (string * Type_shape.without_layout Type_shape.ts * Layout.t) list;
           kind : record_kind
         }
-    | Tds_alias of Type_shape.without_layout Type_shape.t
+    | Tds_alias of Type_shape.without_layout Type_shape.ts
     | Tds_other
 
   and record_kind =
@@ -168,15 +172,15 @@ module Type_decl_shape : sig
 
   and mixed_product_shape = Layout.t array
 
-  type t =
+  type tds =
     { path : Path.t;
-      definition : tds;
-      type_params : Type_shape.without_layout Type_shape.t list
+      definition : tds_desc;
+      type_params : Type_shape.without_layout Type_shape.ts list
     }
 
-  val print : Format.formatter -> t -> unit
+  val print : Format.formatter -> tds -> unit
 
-  val replace_tvar : t -> Type_shape.without_layout Type_shape.t list -> t
+  val replace_tvar : tds -> Type_shape.without_layout Type_shape.ts list -> tds
 
   val complex_constructor_map :
     ('a -> 'b) -> 'a complex_constructor -> 'b complex_constructor
@@ -185,11 +189,11 @@ module Type_decl_shape : sig
     ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
 
   val of_type_declaration :
-    Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> t
+    Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> tds
 end
 
 type shape_with_layout =
-  { type_shape : Type_shape.without_layout Type_shape.t;
+  { type_shape : Type_shape.without_layout Type_shape.ts;
     type_layout : Layout.t
   }
 (* CR sspies: There are two options here: We can fold the layout into the shape,
@@ -197,7 +201,7 @@ type shape_with_layout =
     make it easier to connect type shapes and shapes (which are agnostic about
    layouts) in subsequent PRs. *)
 
-val all_type_decls : Type_decl_shape.t Uid.Tbl.t
+val all_type_decls : Type_decl_shape.tds Uid.Tbl.t
 
 val all_type_shapes : shape_with_layout Uid.Tbl.t
 
@@ -212,9 +216,9 @@ val add_to_type_shapes :
   (Path.t -> Uid.t option) ->
   unit
 
-val find_in_type_decls : Uid.t -> Type_decl_shape.t option
+val find_in_type_decls : Uid.t -> Type_decl_shape.tds option
 
-val type_name : 'a. 'a Type_shape.t -> string
+val type_name : 'a. 'a Type_shape.ts -> string
 
 val print_table_all_type_decls : Format.formatter -> unit
 

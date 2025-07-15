@@ -228,14 +228,14 @@ module Type_shape = struct
 
   type without_layout = Layout_to_be_determined
 
-  type 'a t =
-    | Ts_constr of (Uid.t * Path.t * 'a) * without_layout t list
-    | Ts_tuple of 'a t list
-    | Ts_unboxed_tuple of 'a t list
+  type 'a ts =
+    | Ts_constr of (Uid.t * Path.t * 'a) * without_layout ts list
+    | Ts_tuple of 'a ts list
+    | Ts_unboxed_tuple of 'a ts list
     | Ts_var of string option * 'a
-    | Ts_predef of Predef.t * without_layout t list
-    | Ts_arrow of without_layout t * without_layout t
-    | Ts_variant of 'a t poly_variant_constructors
+    | Ts_predef of Predef.t * without_layout ts list
+    | Ts_arrow of without_layout ts * without_layout ts
+    | Ts_variant of 'a ts poly_variant_constructors
     | Ts_other of 'a
 
   and 'a poly_variant_constructors = 'a poly_variant_constructor list
@@ -250,7 +250,7 @@ module Type_shape = struct
       (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
       pvs
 
-  let rec shape_layout (sh : Layout.t t) =
+  let rec shape_layout (sh : Layout.t ts) =
     match sh with
     | Ts_constr ((_, _, ly), _) -> ly
     | Ts_tuple _ -> Layout.Base Value
@@ -337,8 +337,8 @@ module Type_shape = struct
   let of_type_expr (expr : Types.type_expr) uid_of_path =
     of_type_expr_go ~visited:Numbers.Int.Set.empty ~depth:(-1) expr uid_of_path
 
-  let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout t) :
-      Layout.t t =
+  let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
+      Layout.t ts =
     match sh, layout with
     | Ts_constr ((uid, path, Layout_to_be_determined), shapes), _ ->
       Ts_constr ((uid, path, layout), shapes)
@@ -397,7 +397,7 @@ module Type_shape = struct
       Misc.fatal_errorf "polymorphic variant must have layout value"
     | Ts_other Layout_to_be_determined, _ -> Ts_other layout
 
-  let rec print : type a. Format.formatter -> a t -> unit =
+  let rec print : type a. Format.formatter -> a ts -> unit =
    fun ppf -> function
     | Ts_predef (predef, shapes) ->
       Format.fprintf ppf "Ts_predef %s (%a)" (Predef.to_string predef)
@@ -446,7 +446,8 @@ module Type_shape = struct
   (* CR sspies: This is a hacky "solution" to do type variable substitution in
      type expression shapes. In subsequent PRs, this code should be changed to
      use the shape mechanism instead. *)
-  let rec replace_tvar t ~(pairs : (without_layout t * without_layout t) list) =
+  let rec replace_tvar t ~(pairs : (without_layout ts * without_layout ts) list)
+      =
     match
       List.filter_map
         (fun (from, to_) -> if t = from then Some to_ else None)
@@ -474,11 +475,11 @@ module Type_shape = struct
 end
 
 module Type_decl_shape = struct
-  type tds =
+  type tds_desc =
     | Tds_variant of
         { simple_constructors : string list;
           complex_constructors :
-            (Type_shape.without_layout Type_shape.t * Layout.t)
+            (Type_shape.without_layout Type_shape.ts * Layout.t)
             complex_constructors
         }
     | Tds_variant_unboxed of
@@ -486,17 +487,17 @@ module Type_decl_shape = struct
           arg_name : string option;
               (** if this is [None], we are looking at a singleton tuple;
               otherwise, it is a singleton record. *)
-          arg_shape : Type_shape.without_layout Type_shape.t;
+          arg_shape : Type_shape.without_layout Type_shape.ts;
           arg_layout : Layout.t
         }
         (** An unboxed variant corresponds to the [@@unboxed] annotation.
         It must have a single, complex constructor. *)
     | Tds_record of
         { fields :
-            (string * Type_shape.without_layout Type_shape.t * Layout.t) list;
+            (string * Type_shape.without_layout Type_shape.ts * Layout.t) list;
           kind : record_kind
         }
-    | Tds_alias of Type_shape.without_layout Type_shape.t
+    | Tds_alias of Type_shape.without_layout Type_shape.ts
     | Tds_other
 
   and record_kind =
@@ -523,10 +524,10 @@ module Type_decl_shape = struct
 
   and mixed_product_shape = Layout.t array
 
-  type t =
+  type tds =
     { path : Path.t;
-      definition : tds;
-      type_params : Type_shape.without_layout Type_shape.t list
+      definition : tds_desc;
+      type_params : Type_shape.without_layout Type_shape.ts list
     }
 
   let complex_constructor_map f { name; kind; args } =
@@ -752,7 +753,7 @@ module Type_decl_shape = struct
   let print_only_shape ppf (shape, _) = Type_shape.print ppf shape
 
   let print_field ppf
-      ((name, shape, _) : _ * Type_shape.without_layout Type_shape.t * _) =
+      ((name, shape, _) : _ * Type_shape.without_layout Type_shape.ts * _) =
     Format.fprintf ppf "%a: %a" Format.pp_print_string name Type_shape.print
       shape
 
@@ -794,8 +795,8 @@ module Type_decl_shape = struct
   (* CR sspies: This is a hacky "solution" to do type variable substitution in
      type declaration shapes. In subsequent PRs, this code should be changed to
      use the shape mechanism instead. *)
-  let replace_tvar (t : t)
-      (shapes : Type_shape.without_layout Type_shape.t list) =
+  let replace_tvar (t : tds)
+      (shapes : Type_shape.without_layout Type_shape.ts list) =
     match List.length t.type_params == List.length shapes with
     | true ->
       let subst = List.combine t.type_params shapes in
@@ -837,11 +838,11 @@ module Type_decl_shape = struct
 end
 
 type shape_with_layout =
-  { type_shape : Type_shape.without_layout Type_shape.t;
+  { type_shape : Type_shape.without_layout Type_shape.ts;
     type_layout : Layout.t
   }
 
-let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 16
+let (all_type_decls : Type_decl_shape.tds Uid.Tbl.t) = Uid.Tbl.create 16
 
 let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
 
@@ -876,7 +877,7 @@ let shapes_to_string (strings : string list) =
 let find_in_type_decls (type_uid : Uid.t) =
   Uid.Tbl.find_opt all_type_decls type_uid
 
-let rec type_name : 'a. 'a Type_shape.t -> _ =
+let rec type_name : 'a. 'a Type_shape.ts -> _ =
  fun type_shape ->
   match type_shape with
   | Ts_predef (predef, shapes) ->
