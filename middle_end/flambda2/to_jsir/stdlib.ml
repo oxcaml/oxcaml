@@ -23,9 +23,11 @@ let open_in_text = open_in
 let open_out_text = open_out
 
 module Deprecated : sig
-  val open_in : string -> in_channel [@@deprecated "use open_int_text/open_int_bin"]
+  val open_in : string -> in_channel
+    [@@deprecated "use open_int_text/open_int_bin"]
 
-  val open_out : string -> out_channel [@@deprecated "use open_out_text/open_out_bin"]
+  val open_out : string -> out_channel
+    [@@deprecated "use open_out_text/open_out_bin"]
 end = struct
   let open_in = open_in
 
@@ -88,7 +90,9 @@ let warn fmt =
 let fail = ref true
 
 let failwith_ fmt =
-  Printf.ksprintf (fun s -> if !fail then failwith s else Format.eprintf "%s@." s) fmt
+  Printf.ksprintf
+    (fun s -> if !fail then failwith s else Format.eprintf "%s@." s)
+    fmt
 
 let raise_ exn =
   if !fail then raise exn else Format.eprintf "%s@." (Printexc.to_string exn)
@@ -104,19 +108,16 @@ module List = struct
 
   let (remove_assoc [@deprecated "use List.filter"]) = List.remove_assoc
 
-  let rec mem ~eq x = function
-    | [] -> false
-    | a :: l -> eq a x || mem ~eq x l
+  let rec mem ~eq x = function [] -> false | a :: l -> eq a x || mem ~eq x l
 
   let string_assoc name l =
     List.find_map
-      (fun (name', state) -> if String.equal name name' then Some state else None)
+      (fun (name', state) ->
+        if String.equal name name' then Some state else None)
       l
 
   let rec rev_append_map ~f l acc =
-    match l with
-    | [] -> acc
-    | x :: xs -> rev_append_map ~f xs (f x :: acc)
+    match l with [] -> acc | x :: xs -> rev_append_map ~f xs (f x :: acc)
 
   let slow_map l ~f = rev (rev_map ~f l) [@@if ocaml_version < (4, 14, 0)]
 
@@ -128,137 +129,121 @@ module List = struct
   let rec count_map ~f l ctr =
     match l with
     | [] -> []
-    | [ x1 ] ->
-        let f1 = f x1 in
-        [ f1 ]
-    | [ x1; x2 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        [ f1; f2 ]
-    | [ x1; x2; x3 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        [ f1; f2; f3 ]
-    | [ x1; x2; x3; x4 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        let f4 = f x4 in
-        [ f1; f2; f3; f4 ]
+    | [x1] ->
+      let f1 = f x1 in
+      [f1]
+    | [x1; x2] ->
+      let f1 = f x1 in
+      let f2 = f x2 in
+      [f1; f2]
+    | [x1; x2; x3] ->
+      let f1 = f x1 in
+      let f2 = f x2 in
+      let f3 = f x3 in
+      [f1; f2; f3]
+    | [x1; x2; x3; x4] ->
+      let f1 = f x1 in
+      let f2 = f x2 in
+      let f3 = f x3 in
+      let f4 = f x4 in
+      [f1; f2; f3; f4]
     | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        let f4 = f x4 in
-        let f5 = f x5 in
-        f1
-        :: f2
-        :: f3
-        :: f4
-        :: f5
-        :: (if ctr > max_non_tailcall then slow_map ~f tl else count_map ~f tl (ctr + 1))
-  [@@if ocaml_version < (4, 14, 0)]
+      let f1 = f x1 in
+      let f2 = f x2 in
+      let f3 = f x3 in
+      let f4 = f x4 in
+      let f5 = f x5 in
+      f1 :: f2 :: f3 :: f4 :: f5
+      ::
+      (if ctr > max_non_tailcall
+      then slow_map ~f tl
+      else count_map ~f tl (ctr + 1))
+    [@@if ocaml_version < (4, 14, 0)]
 
   (* CR selee: hacky commenting just to get things working. Clean up later *)
   (* let map l ~f = count_map ~f l 0 [@@if ocaml_version < (4, 14, 0)] *)
 
   let[@tail_mod_cons] rec map l ~f =
-    match l with
-    | [] -> []
-    | x :: tl -> f x :: (map [@tailcall]) tl ~f
-  [@@if ocaml_version >= (4, 14, 0)]
+    match l with [] -> [] | x :: tl -> f x :: (map [@tailcall]) tl ~f
+    [@@if ocaml_version >= (4, 14, 0)]
 
   let rec take' acc n l =
     if n = 0
     then acc, l
-    else
-      match l with
-      | [] -> acc, []
-      | x :: xs -> take' (x :: acc) (pred n) xs
+    else match l with [] -> acc, [] | x :: xs -> take' (x :: acc) (pred n) xs
 
   let take n l =
     let x, xs = take' [] n l in
     rev x, xs
 
-  let rec last = function
-    | [] -> None
-    | [ x ] -> Some x
-    | _ :: xs -> last xs
+  let rec last = function [] -> None | [x] -> Some x | _ :: xs -> last xs
 
-  let is_empty = function
-    | [] -> true
-    | _ -> false
-  [@@if ocaml_version < (5, 1, 0)]
+  let is_empty = function [] -> true | _ -> false
+    [@@if ocaml_version < (5, 1, 0)]
 
-  let tail_append l1 l2 = rev_append (rev l1) l2 [@@if ocaml_version < (5, 1, 0)]
+  let tail_append l1 l2 = rev_append (rev l1) l2
+    [@@if ocaml_version < (5, 1, 0)]
 
   let rec count_append l1 l2 count =
     match l2 with
     | [] -> l1
     | _ -> (
-        match l1 with
-        | [] -> l2
-        | [ x1 ] -> x1 :: l2
-        | [ x1; x2 ] -> x1 :: x2 :: l2
-        | [ x1; x2; x3 ] -> x1 :: x2 :: x3 :: l2
-        | [ x1; x2; x3; x4 ] -> x1 :: x2 :: x3 :: x4 :: l2
-        | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
-            x1
-            :: x2
-            :: x3
-            :: x4
-            :: x5
-            ::
-            (if count > max_non_tailcall
-             then tail_append tl l2
-             else count_append tl l2 (count + 1)))
-  [@@if ocaml_version < (5, 1, 0)]
+      match l1 with
+      | [] -> l2
+      | [x1] -> x1 :: l2
+      | [x1; x2] -> x1 :: x2 :: l2
+      | [x1; x2; x3] -> x1 :: x2 :: x3 :: l2
+      | [x1; x2; x3; x4] -> x1 :: x2 :: x3 :: x4 :: l2
+      | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
+        x1 :: x2 :: x3 :: x4 :: x5
+        ::
+        (if count > max_non_tailcall
+        then tail_append tl l2
+        else count_append tl l2 (count + 1)))
+    [@@if ocaml_version < (5, 1, 0)]
 
   let append l1 l2 = count_append l1 l2 0 [@@if ocaml_version < (5, 1, 0)]
 
   let group l ~f =
-    let rec loop (l : 'a list) (this_group : 'a list) (acc : 'a list list) : 'a list list
-        =
+    let rec loop (l : 'a list) (this_group : 'a list) (acc : 'a list list) :
+        'a list list =
       match l with
       | [] -> List.rev (List.rev this_group :: acc)
       | x :: xs ->
-          let pred = List.hd this_group in
-          if f x pred
-          then loop xs (x :: this_group) acc
-          else loop xs [ x ] (List.rev this_group :: acc)
+        let pred = List.hd this_group in
+        if f x pred
+        then loop xs (x :: this_group) acc
+        else loop xs [x] (List.rev this_group :: acc)
     in
-    match l with
-    | [] -> []
-    | x :: xs -> loop xs [ x ] []
+    match l with [] -> [] | x :: xs -> loop xs [x] []
 
   let split_last xs =
     let rec aux acc = function
       | [] -> None
-      | [ x ] -> Some (rev acc, x)
+      | [x] -> Some (rev acc, x)
       | x :: xs -> aux (x :: acc) xs
     in
     aux [] xs
 
-  (* like [List.map] except that it calls the function with
-     an additional argument to indicate whether we're mapping
-     over the last element of the list *)
+  (* like [List.map] except that it calls the function with an additional
+     argument to indicate whether we're mapping over the last element of the
+     list *)
   let rec map_last ~f l =
     match l with
     | [] -> assert false
-    | [ x ] -> [ f true x ]
+    | [x] -> [f true x]
     | x :: xs -> f false x :: map_last ~f xs
 
-  (* like [List.iter] except that it calls the function with
-     an additional argument to indicate whether we're iterating
-     over the last element of the list *)
+  (* like [List.iter] except that it calls the function with an additional
+     argument to indicate whether we're iterating over the last element of the
+     list *)
   let rec iter_last ~f l =
     match l with
     | [] -> ()
-    | [ a ] -> f true a
+    | [a] -> f true a
     | a :: l ->
-        f false a;
-        iter_last ~f l
+      f false a;
+      iter_last ~f l
 end
 
 let ( @ ) = List.append
@@ -280,29 +265,21 @@ module Int32 = struct
 
   let warn_overflow name ~to_dec ~to_hex i i32 =
     warn
-      "Warning: integer overflow: %s 0x%s (%s) truncated to 0x%lx (%ld); the generated \
-       code might be incorrect.@."
-      name
-      (to_hex i)
-      (to_dec i)
-      i32
-      i32
+      "Warning: integer overflow: %s 0x%s (%s) truncated to 0x%lx (%ld); the \
+       generated code might be incorrect.@."
+      name (to_hex i) (to_dec i) i32 i32
 
-  let convert_warning_on_overflow name ~to_int32 ~of_int32 ~equal ~to_dec ~to_hex x =
+  let convert_warning_on_overflow name ~to_int32 ~of_int32 ~equal ~to_dec
+      ~to_hex x =
     let i32 = to_int32 x in
     let x' = of_int32 i32 in
     if not (equal x' x) then warn_overflow name ~to_dec ~to_hex x i32;
     i32
 
   let of_nativeint_warning_on_overflow n =
-    convert_warning_on_overflow
-      "native integer"
-      ~to_int32:Nativeint.to_int32
-      ~of_int32:Nativeint.of_int32
-      ~equal:Nativeint.equal
-      ~to_dec:(Printf.sprintf "%nd")
-      ~to_hex:(Printf.sprintf "%nx")
-      n
+    convert_warning_on_overflow "native integer" ~to_int32:Nativeint.to_int32
+      ~of_int32:Nativeint.of_int32 ~equal:Nativeint.equal
+      ~to_dec:(Printf.sprintf "%nd") ~to_hex:(Printf.sprintf "%nx") n
 end
 
 module Int64 = struct
@@ -324,29 +301,16 @@ end
 module Option = struct
   include Option
 
-  let map ~f x =
-    match x with
-    | None -> None
-    | Some v -> Some (f v)
+  let map ~f x = match x with None -> None | Some v -> Some (f v)
 
-  let bind ~f x =
-    match x with
-    | None -> None
-    | Some v -> f v
+  let bind ~f x = match x with None -> None | Some v -> f v
 
-  let iter ~f x =
-    match x with
-    | None -> ()
-    | Some v -> f v
+  let iter ~f x = match x with None -> () | Some v -> f v
 
   let filter ~f x =
-    match x with
-    | None -> None
-    | Some v -> if f v then Some v else None
+    match x with None -> None | Some v -> if f v then Some v else None
 
-  let value ~default = function
-    | None -> default
-    | Some s -> s
+  let value ~default = function None -> default | Some s -> s
 end
 
 module Float = struct
@@ -409,66 +373,61 @@ module Char = struct
 
   external ( >= ) : char -> char -> bool = "%greaterequal"
 
-  let is_letter = function
-    | 'a' .. 'z' | 'A' .. 'Z' -> true
-    | _ -> false
+  let is_letter = function 'a' .. 'z' | 'A' .. 'Z' -> true | _ -> false
 
-  let is_digit = function
-    | '0' .. '9' -> true
-    | _ -> false
+  let is_digit = function '0' .. '9' -> true | _ -> false
 end
 
 module Uchar = struct
   include Uchar
 
   module Utf_decode : sig
-    type utf_decode [@@immediate]
     (** The type for UTF decode results. Values of this type represent
     the result of a Unicode Transformation Format decoding attempt. *)
+    type utf_decode [@@immediate]
 
-    val utf_decode_is_valid : utf_decode -> bool
     (** [utf_decode_is_valid d] is [true] if and only if [d] holds a valid
     decode. *)
+    val utf_decode_is_valid : utf_decode -> bool
 
-    val utf_decode_uchar : utf_decode -> t
     (** [utf_decode_uchar d] is the Unicode character decoded by [d] if
     [utf_decode_is_valid d] is [true] and {!Uchar.rep} otherwise. *)
+    val utf_decode_uchar : utf_decode -> t
 
-    val utf_decode_length : utf_decode -> int
     (** [utf_decode_length d] is the number of elements from the source
     that were consumed by the decode [d]. This is always strictly
     positive and smaller or equal to [4]. The kind of source elements
     depends on the actual decoder; for the decoders of the standard
     library this function always returns a length in bytes. *)
+    val utf_decode_length : utf_decode -> int
 
-    val utf_decode : int -> t -> utf_decode
     (** [utf_decode n u] is a valid UTF decode for [u] that consumed [n]
     elements from the source for decoding. [n] must be positive and
     smaller or equal to [4] (this is not checked by the module). *)
+    val utf_decode : int -> t -> utf_decode
 
-    val utf_decode_invalid : int -> utf_decode
     (** [utf_decode_invalid n] is an invalid UTF decode that consumed [n]
     elements from the source to error. [n] must be positive and
     smaller or equal to [4] (this is not checked by the module). The
     resulting decode has {!rep} as the decoded Unicode character. *)
+    val utf_decode_invalid : int -> utf_decode
 
-    val utf_8_byte_length : t -> int
     (** [utf_8_byte_length u] is the number of bytes needed to encode
     [u] in UTF-8. *)
+    val utf_8_byte_length : t -> int
 
-    val utf_16_byte_length : t -> int
     (** [utf_16_byte_length u] is the number of bytes needed to encode
     [u] in UTF-16. *)
+    val utf_16_byte_length : t -> int
   end = struct
     (* UTF codecs tools *)
 
     type utf_decode = int
-    (* This is an int [0xDUUUUUU] decomposed as follows:
-       - [D] is four bits for decode information, the highest bit is set if the
-         decode is valid. The three lower bits indicate the number of elements
-         from the source that were consumed by the decode.
-       - [UUUUUU] is the decoded Unicode character or the Unicode replacement
-         character U+FFFD if for invalid decodes. *)
+    (* This is an int [0xDUUUUUU] decomposed as follows: - [D] is four bits for
+       decode information, the highest bit is set if the decode is valid. The
+       three lower bits indicate the number of elements from the source that
+       were consumed by the decode. - [UUUUUU] is the decoded Unicode character
+       or the Unicode replacement character U+FFFD if for invalid decodes. *)
 
     let rep = 0xFFFD
 
@@ -530,9 +489,7 @@ module String = struct
     let hash = hash
   end)
 
-  let is_empty = function
-    | "" -> true
-    | _ -> false
+  let is_empty = function "" -> true | _ -> false
 
   let drop_prefix ~prefix s =
     let plen = String.length prefix in
@@ -565,13 +522,17 @@ module String = struct
   let lsplit2 line ~on:delim =
     try
       let pos = index line delim in
-      Some (sub line ~pos:0 ~len:pos, sub line ~pos:(pos + 1) ~len:(length line - pos - 1))
+      Some
+        ( sub line ~pos:0 ~len:pos,
+          sub line ~pos:(pos + 1) ~len:(length line - pos - 1) )
     with Not_found -> None
 
   let rsplit2 line ~on:delim =
     try
       let pos = rindex line delim in
-      Some (sub line ~pos:0 ~len:pos, sub line ~pos:(pos + 1) ~len:(length line - pos - 1))
+      Some
+        ( sub line ~pos:0 ~len:pos,
+          sub line ~pos:(pos + 1) ~len:(length line - pos - 1) )
     with Not_found -> None
 
   let[@inline] not_in_x80_to_xBF b = b lsr 6 <> 0b10
@@ -612,138 +573,140 @@ module String = struct
     (* See The Unicode Standard, Table 3.7 *)
     | '\x00' .. '\x7F' -> dec_ret 1 b0
     | '\xC2' .. '\xDF' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_x80_to_xBF b1
         then dec_invalid 1
-        else
-          let b1 = get b i in
-          if not_in_x80_to_xBF b1 then dec_invalid 1 else dec_ret 2 (utf_8_uchar_2 b0 b1)
+        else dec_ret 2 (utf_8_uchar_2 b0 b1)
     | '\xE0' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_xA0_to_xBF b1
         then dec_invalid 1
         else
-          let b1 = get b i in
-          if not_in_xA0_to_xBF b1
-          then dec_invalid 1
+          let i = i + 1 in
+          if i > max
+          then dec_invalid 2
           else
-            let i = i + 1 in
-            if i > max
+            let b2 = get b i in
+            if not_in_x80_to_xBF b2
             then dec_invalid 2
-            else
-              let b2 = get b i in
-              if not_in_x80_to_xBF b2
-              then dec_invalid 2
-              else dec_ret 3 (utf_8_uchar_3 b0 b1 b2)
+            else dec_ret 3 (utf_8_uchar_3 b0 b1 b2)
     | '\xE1' .. '\xEC' | '\xEE' .. '\xEF' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_x80_to_xBF b1
         then dec_invalid 1
         else
-          let b1 = get b i in
-          if not_in_x80_to_xBF b1
-          then dec_invalid 1
+          let i = i + 1 in
+          if i > max
+          then dec_invalid 2
           else
-            let i = i + 1 in
-            if i > max
+            let b2 = get b i in
+            if not_in_x80_to_xBF b2
             then dec_invalid 2
-            else
-              let b2 = get b i in
-              if not_in_x80_to_xBF b2
-              then dec_invalid 2
-              else dec_ret 3 (utf_8_uchar_3 b0 b1 b2)
+            else dec_ret 3 (utf_8_uchar_3 b0 b1 b2)
     | '\xED' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_x80_to_x9F b1
         then dec_invalid 1
         else
-          let b1 = get b i in
-          if not_in_x80_to_x9F b1
-          then dec_invalid 1
+          let i = i + 1 in
+          if i > max
+          then dec_invalid 2
           else
-            let i = i + 1 in
-            if i > max
+            let b2 = get b i in
+            if not_in_x80_to_xBF b2
             then dec_invalid 2
-            else
-              let b2 = get b i in
-              if not_in_x80_to_xBF b2
-              then dec_invalid 2
-              else dec_ret 3 (utf_8_uchar_3 b0 b1 b2)
+            else dec_ret 3 (utf_8_uchar_3 b0 b1 b2)
     | '\xF0' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_x90_to_xBF b1
         then dec_invalid 1
         else
-          let b1 = get b i in
-          if not_in_x90_to_xBF b1
-          then dec_invalid 1
+          let i = i + 1 in
+          if i > max
+          then dec_invalid 2
           else
-            let i = i + 1 in
-            if i > max
+            let b2 = get b i in
+            if not_in_x80_to_xBF b2
             then dec_invalid 2
             else
-              let b2 = get b i in
-              if not_in_x80_to_xBF b2
-              then dec_invalid 2
+              let i = i + 1 in
+              if i > max
+              then dec_invalid 3
               else
-                let i = i + 1 in
-                if i > max
+                let b3 = get b i in
+                if not_in_x80_to_xBF b3
                 then dec_invalid 3
-                else
-                  let b3 = get b i in
-                  if not_in_x80_to_xBF b3
-                  then dec_invalid 3
-                  else dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
+                else dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
     | '\xF1' .. '\xF3' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_x80_to_xBF b1
         then dec_invalid 1
         else
-          let b1 = get b i in
-          if not_in_x80_to_xBF b1
-          then dec_invalid 1
+          let i = i + 1 in
+          if i > max
+          then dec_invalid 2
           else
-            let i = i + 1 in
-            if i > max
+            let b2 = get b i in
+            if not_in_x80_to_xBF b2
             then dec_invalid 2
             else
-              let b2 = get b i in
-              if not_in_x80_to_xBF b2
-              then dec_invalid 2
+              let i = i + 1 in
+              if i > max
+              then dec_invalid 3
               else
-                let i = i + 1 in
-                if i > max
+                let b3 = get b i in
+                if not_in_x80_to_xBF b3
                 then dec_invalid 3
-                else
-                  let b3 = get b i in
-                  if not_in_x80_to_xBF b3
-                  then dec_invalid 3
-                  else dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
+                else dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
     | '\xF4' ->
-        let i = i + 1 in
-        if i > max
+      let i = i + 1 in
+      if i > max
+      then dec_invalid 1
+      else
+        let b1 = get b i in
+        if not_in_x80_to_x8F b1
         then dec_invalid 1
         else
-          let b1 = get b i in
-          if not_in_x80_to_x8F b1
-          then dec_invalid 1
+          let i = i + 1 in
+          if i > max
+          then dec_invalid 2
           else
-            let i = i + 1 in
-            if i > max
+            let b2 = get b i in
+            if not_in_x80_to_xBF b2
             then dec_invalid 2
             else
-              let b2 = get b i in
-              if not_in_x80_to_xBF b2
-              then dec_invalid 2
+              let i = i + 1 in
+              if i > max
+              then dec_invalid 3
               else
-                let i = i + 1 in
-                if i > max
+                let b3 = get b i in
+                if not_in_x80_to_xBF b3
                 then dec_invalid 3
-                else
-                  let b3 = get b i in
-                  if not_in_x80_to_xBF b3
-                  then dec_invalid 3
-                  else dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
+                else dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
     | _ -> dec_invalid 1
 
   let fold_utf_8 s ~f acc =
@@ -772,61 +735,55 @@ module String = struct
         match Char.unsafe_chr (get b i) with
         | '\x00' .. '\x7F' -> loop max b (i + 1)
         | '\xC2' .. '\xDF' ->
-            let last = i + 1 in
-            if last > max || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 1 in
+          if last > max || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | '\xE0' ->
-            let last = i + 2 in
-            if
-              last > max
-              || not_in_xA0_to_xBF (get b (i + 1))
-              || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 2 in
+          if last > max
+             || not_in_xA0_to_xBF (get b (i + 1))
+             || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | '\xE1' .. '\xEC' | '\xEE' .. '\xEF' ->
-            let last = i + 2 in
-            if
-              last > max
-              || not_in_x80_to_xBF (get b (i + 1))
-              || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 2 in
+          if last > max
+             || not_in_x80_to_xBF (get b (i + 1))
+             || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | '\xED' ->
-            let last = i + 2 in
-            if
-              last > max
-              || not_in_x80_to_x9F (get b (i + 1))
-              || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 2 in
+          if last > max
+             || not_in_x80_to_x9F (get b (i + 1))
+             || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | '\xF0' ->
-            let last = i + 3 in
-            if
-              last > max
-              || not_in_x90_to_xBF (get b (i + 1))
-              || not_in_x80_to_xBF (get b (i + 2))
-              || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 3 in
+          if last > max
+             || not_in_x90_to_xBF (get b (i + 1))
+             || not_in_x80_to_xBF (get b (i + 2))
+             || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | '\xF1' .. '\xF3' ->
-            let last = i + 3 in
-            if
-              last > max
-              || not_in_x80_to_xBF (get b (i + 1))
-              || not_in_x80_to_xBF (get b (i + 2))
-              || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 3 in
+          if last > max
+             || not_in_x80_to_xBF (get b (i + 1))
+             || not_in_x80_to_xBF (get b (i + 2))
+             || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | '\xF4' ->
-            let last = i + 3 in
-            if
-              last > max
-              || not_in_x80_to_x8F (get b (i + 1))
-              || not_in_x80_to_xBF (get b (i + 2))
-              || not_in_x80_to_xBF (get b last)
-            then false
-            else loop max b (last + 1)
+          let last = i + 3 in
+          if last > max
+             || not_in_x80_to_x8F (get b (i + 1))
+             || not_in_x80_to_xBF (get b (i + 2))
+             || not_in_x80_to_xBF (get b last)
+          then false
+          else loop max b (last + 1)
         | _ -> false
     in
     loop (length b - 1) b 0
@@ -988,8 +945,9 @@ module Filename = struct
   include Filename
 
   let temp_file_name =
-    (* Inlined unavailable Filename.temp_file_name. Filename.temp_file gives
-       us incorrect permissions. https://github.com/ocsigen/js_of_ocaml/issues/182 *)
+    (* Inlined unavailable Filename.temp_file_name. Filename.temp_file gives us
+       incorrect permissions.
+       https://github.com/ocsigen/js_of_ocaml/issues/182 *)
     let prng = lazy (Random.State.make_self_init ()) in
     fun ~temp_dir prefix suffix ->
       let rnd = Random.State.bits (Lazy.force prng) land 0xFFFFFF in
@@ -997,7 +955,8 @@ module Filename = struct
 
   let gen_file file f =
     let f_tmp =
-      temp_file_name ~temp_dir:(Filename.dirname file) (Filename.basename file) ".tmp"
+      temp_file_name ~temp_dir:(Filename.dirname file) (Filename.basename file)
+        ".tmp"
     in
     try
       let ch = open_out_bin f_tmp in
@@ -1141,7 +1100,7 @@ module In_channel = struct
     match stdlib_input_line ic with
     | line -> line :: input_lines ic
     | exception End_of_file -> []
-  [@@if ocaml_version < (5, 1, 0)]
+    [@@if ocaml_version < (5, 1, 0)]
 
   let input_line_exn = stdlib_input_line
 end
@@ -1179,9 +1138,9 @@ let split_lines s =
 let input_lines_read_once ic len = really_input_string ic len |> split_lines
 
 let file_lines_bin fname =
-  (* If possible, read the entire file and split it in lines.
-     This is faster than reading it line by line.
-     Otherwise, we fall back to a line-by-line read. *)
+  (* If possible, read the entire file and split it in lines. This is faster
+     than reading it line by line. Otherwise, we fall back to a line-by-line
+     read. *)
   let ic = open_in_bin fname in
   let len = in_channel_length ic in
   let x =
@@ -1205,11 +1164,13 @@ let generated_name = function
 module Hashtbl = struct
   include Hashtbl
 
-  let (create [@deprecated "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"])
+  let (create
+      [@deprecated "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"])
       =
     Hashtbl.create
 
-  let (of_seq [@deprecated "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"])
+  let (of_seq
+      [@deprecated "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"])
       =
     Hashtbl.of_seq
 end
