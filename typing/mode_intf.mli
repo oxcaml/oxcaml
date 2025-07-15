@@ -190,6 +190,14 @@ module type S = sig
     val morph_none : morph
   end
 
+  val axhint_get_const : ('a, 'morph, 'const) axhint -> 'a
+
+  val axerror_get_left_const : ('a, 'morph, 'const) axerror -> 'a
+
+  val axerror_get_right_const : ('a, 'morph, 'const) axerror -> 'a
+
+  val axerror_get_consts_pair : ('a, 'morph, 'const) axerror -> 'a * 'a
+
   type changes
 
   val undo_changes : changes -> unit
