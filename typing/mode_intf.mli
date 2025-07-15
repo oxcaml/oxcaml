@@ -89,6 +89,10 @@ type equate_step =
 module type Common = sig
   module Const : Lattice
 
+  type hint_morph
+
+  type hint_const
+
   type error
 
   type equate_error = equate_step * error
@@ -117,6 +121,8 @@ module type Common = sig
 
   val newvar : unit -> ('l * 'r) t
 
+  val apply_hint : hint_morph -> ('l * 'r) t -> ('l * 'r) t
+
   val submode : (allowed * 'r) t -> ('l * allowed) t -> (unit, error) result
 
   val equate : lr -> lr -> (unit, equate_error) result
@@ -143,15 +149,17 @@ module type Common = sig
 end
 
 module type Common_axis = sig
+  module Const : Lattice
+
   type hint_morph
 
   type hint_const
 
-  module Const : Lattice
-
   include
     Common
       with module Const := Const
+       and type hint_morph := hint_morph
+       and type hint_const := hint_const
        and type error = (Const.t, hint_morph, hint_const) axerror
 end
 
@@ -183,16 +191,25 @@ module type Common_product = sig
   type error =
     | Error : 'a Axis.t * ('a, hint_morph, hint_const) axerror -> error
 
-  include Common with type error := error and module Const := Const
+  include
+    Common
+      with type hint_morph := hint_morph
+       and type hint_const := hint_const
+       and type error := error
+       and module Const := Const
 end
 
 module type S = sig
   module Hint : sig
-    type const
+    type const = None
 
     val const_none : const
 
-    type morph
+    type morph =
+      | None
+      | Close_over of Location.t
+      | Is_closed_by of Location.t
+      | Compose of morph * morph
 
     val morph_none : morph
   end
@@ -472,7 +489,10 @@ module type S = sig
   end
 
   module type Mode := sig
-    module Areality : Common
+    module Areality :
+      Common
+        with type hint_morph := Hint.morph
+         and type hint_const := Hint.const
 
     module Monadic : sig
       include
@@ -584,6 +604,8 @@ module type S = sig
     include
       Common
         with module Const := Const
+         and type hint_morph := Hint.morph
+         and type hint_const := Hint.const
          and type error := error
          and type 'd t := 'd t
 
@@ -615,7 +637,8 @@ module type S = sig
 
     val zap_to_legacy : lr -> Const.t
 
-    val comonadic_to_monadic : ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+    val comonadic_to_monadic :
+      ?hint:Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
 
     (* The following two are about the scenario where we partially apply a
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the

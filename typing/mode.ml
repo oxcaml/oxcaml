@@ -1554,19 +1554,31 @@ module Hint = struct
   (* This implementation is just temporary,
      until we create a proper implementation which properly tracks hints *)
 
-  type const = CNone
+  type const = None
 
-  let const_none = CNone
+  let const_none = None
 
-  type morph = MNone
+  type morph =
+    | None
+    | Close_over of Location.t
+    | Is_closed_by of Location.t
+    | Compose of morph * morph
 
-  let morph_none = MNone
+  let morph_none = None
 
-  let left_adjoint MNone = MNone
+  let left_adjoint = function
+    | None -> None
+    | Close_over l -> Is_closed_by l
+    | Is_closed_by l -> Close_over l
+    | Compose (x, y) -> Compose (y, x)
 
-  let right_adjoint MNone = MNone
+  let right_adjoint = function
+    | None -> None
+    | Close_over l -> Close_over l
+    | Is_closed_by l -> Is_closed_by l
+    | Compose (x, y) -> Compose (y, x)
 
-  let compose MNone MNone = MNone
+  let compose x y = Compose (x, y)
 end
 
 module C = Lattices_mono
@@ -1938,6 +1950,9 @@ module Comonadic_common_gen (Obj : Obj) = struct
 
   let imply c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
 
+  let apply_hint (type l r) (morph_hint : Hint.morph) : (l * r) t -> (l * r) t =
+    Solver.apply Obj.obj ~hint:morph_hint Id
+
   module Guts = struct
     let get_floor m = Solver.get_floor obj m
 
@@ -1997,6 +2012,9 @@ module Monadic_common_gen (Obj : Obj) = struct
   let join_const c m = Solver.apply Obj.obj (Meet_with c) m
 
   let subtract c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
+
+  let apply_hint (type l r) (morph_hint : Hint.morph) : (l * r) t -> (l * r) t =
+    Solver.apply Obj.obj ~hint:morph_hint Id
 
   module Guts = struct
     let get_ceil m = Solver.get_floor obj m
@@ -2915,6 +2933,12 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
+  let apply_hint (type l r) (morph_hint : Hint.morph)
+      ({ monadic; comonadic } : (l * r) t) : (l * r) t =
+    { monadic = Monadic.apply_hint morph_hint monadic;
+      comonadic = Comonadic.apply_hint morph_hint comonadic
+    }
+
   type error =
     | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
 
@@ -2992,8 +3016,8 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.meet mo in
     { comonadic; monadic }
 
-  let comonadic_to_monadic m =
-    S.apply Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
+  let comonadic_to_monadic ?hint m =
+    S.apply ?hint Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
 
   let monadic_to_comonadic_min m =
     S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
