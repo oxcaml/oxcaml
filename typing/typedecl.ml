@@ -1756,7 +1756,8 @@ let update_constructor_representation
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            Element_repr.classify env loc arg_type arg_jkind Immutable, arg_type)
+            Element_repr.classify env loc arg_type arg_jkind Immutable,
+            arg_type)
             arg_types_and_modes arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_tuple
@@ -1899,10 +1900,11 @@ let rec update_decl_jkind env dpath decl =
             in
             Record_mixed shape
         (* value-only records are stored as boxed records *)
-        | { values = true; float64s = false; non_float64_unboxed_fields = false }
+        | { values = true; float64s = false;
+            non_float64_unboxed_fields = false }
           -> rep
-        (* All-nonatomic-float and all-nonatomic-float64 records are stored as flat float
-           records.
+        (* All-nonatomic-float and all-nonatomic-float64 records are stored as
+           flat float records.
         *)
         | { values = false; floats = true ; float64s = false;
             non_float64_unboxed_fields = false } ->
