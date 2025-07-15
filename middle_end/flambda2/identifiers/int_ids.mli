@@ -101,6 +101,8 @@ module Variable : sig
 
   include Container_types.S with type t := t
 
+  module Lmap : Lmap.S with type key := t
+
   val create : ?user_visible:unit -> string -> t
 
   val compilation_unit : t -> Compilation_unit.t
@@ -151,6 +153,10 @@ module Name : sig
   include Container_types.S_plus_iterator with type t := t
 
   val var : Variable.t -> t
+
+  val var_set : Variable.Set.t -> Set.t
+
+  val var_map : 'a Variable.Map.t -> 'a Map.t
 
   val symbol : Symbol.t -> t
 

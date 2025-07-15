@@ -458,6 +458,7 @@ module Variable = struct
 
   module Set = Tree.Set
   module Map = Tree.Map
+  module Lmap = Lmap.Make (T)
 
   let export t = find_data t
 
@@ -543,6 +544,10 @@ module Name = struct
   type t = Id.t
 
   let var v = v
+
+  let var_set s = s
+
+  let var_map m = m
 
   let symbol s = s
 

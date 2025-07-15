@@ -126,7 +126,7 @@ type imm =
    of simdgen, backend should only depend on the result of simdgen. *)
 type 'id instr =
   { id : 'id;
-    ext : ext array;
+    ext : ext array; (* Multiple extensions may be required. *)
     args : arg array;
     res : res;
     imm : imm;

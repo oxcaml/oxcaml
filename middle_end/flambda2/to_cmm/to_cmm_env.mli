@@ -68,6 +68,15 @@ type 'env trans_prim =
         Flambda_primitive.ternary_primitive,
         Cmm.expression -> Cmm.expression -> Cmm.expression -> prim_res )
       prim_helper;
+    quaternary :
+      ( 'env,
+        Flambda_primitive.quaternary_primitive,
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        prim_res )
+      prim_helper;
     variadic :
       ( 'env,
         Flambda_primitive.variadic_primitive,
@@ -259,6 +268,8 @@ val add_alias :
   alias_of:Variable.t ->
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
   t * To_cmm_result.t
+
+val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :

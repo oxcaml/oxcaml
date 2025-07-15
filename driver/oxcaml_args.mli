@@ -67,6 +67,7 @@ module type Oxcaml_options = sig
   val zero_alloc_checker_join : int -> unit
 
   val function_layout : string -> unit
+  val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
   val enable_poll_insertion : unit -> unit
 
@@ -83,6 +84,10 @@ module type Oxcaml_options = sig
   val gc_timings : unit -> unit
 
   val no_mach_ir : unit -> unit
+
+  val llvm_backend : unit -> unit
+  val dllvmir : unit -> unit
+  val llvm_path : string -> unit
 
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit

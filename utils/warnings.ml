@@ -72,8 +72,8 @@ type t =
   | Useless_record_with of string           (* 23 *)
   | Bad_module_name of string               (* 24 *)
   | All_clauses_guarded                     (* 8, used to be 25 *)
-  | Unused_var of string                    (* 26 *)
-  | Unused_var_strict of string             (* 27 *)
+  | Unused_var of { name : string ; mutated : bool } (* 26 *)
+  | Unused_var_strict of { name : string ; mutated : bool } (* 27 *)
   | Wildcard_arg_to_constant_constr         (* 28 *)
   | Eol_in_string                           (* 29 *)
   | Duplicate_definitions of string * string * string * string (*30 *)
@@ -122,6 +122,7 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
+  | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
@@ -216,6 +217,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
   | Unnecessarily_partial_tuple_pattern -> 189
@@ -570,6 +572,12 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 186;
+    names = ["unmutated-mutable"];
+    description =
+    "Mutable variable was never mutated: mutable variable that\n\
+    \    doesn't start with an underscore (\"_\") character was never mutated.";
+    since = since 5 2 };
   { number = 187;
     names = ["incompatible-with-upstream"];
     description = "Extension usage is incompatible with upstream.";
@@ -1017,7 +1025,12 @@ let message = function
   | All_clauses_guarded ->
       "this pattern-matching is not exhaustive.\n\
        All clauses in this pattern-matching are guarded."
-  | Unused_var v | Unused_var_strict v -> "unused variable " ^ v ^ "."
+  | Unused_var { name = v; mutated = false }
+  | Unused_var_strict { name = v; mutated = false } ->
+    "unused variable " ^ v ^ "."
+  | Unused_var { name = v; mutated = true }
+  | Unused_var_strict { name = v; mutated = true } ->
+    "variable " ^ v ^ " was mutated but never used."
   | Wildcard_arg_to_constant_constr ->
      "wildcard pattern given as argument to a constant constructor"
   | Eol_in_string ->
@@ -1213,6 +1226,7 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
       "Usage of layout immediate/immediate64 in %s \n\

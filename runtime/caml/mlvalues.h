@@ -79,7 +79,7 @@ typedef opcode_t * code_t;
 
 /* Longs vs blocks. */
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(HAS_BMI)
 // Specialize the implementation of Is_block and Is_long on x86-64.
 //
 // Is_block(x) returns 1 if the least significant bit of x is 0, and x != 0.

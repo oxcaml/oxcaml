@@ -843,6 +843,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
+    md_modalities: Mode.Modality.Value.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -898,9 +899,11 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       val_uid
     }
 
-  let module_declaration m {md_type; md_attributes; md_loc; md_uid} =
+  let module_declaration m {md_type; md_modalities; md_attributes;
+    md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
+      md_modalities;
       md_attributes;
       md_loc;
       md_uid;
@@ -1805,3 +1808,6 @@ let undo_compress (changes, _old) =
             Transient_expr.set_desc ty desc; r := !next
         | _ -> ())
         log
+
+let functor_param_mode = Mode.Alloc.legacy
+let functor_res_mode = Mode.Alloc.legacy
