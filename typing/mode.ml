@@ -1669,11 +1669,11 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let meet l = Solver.meet obj l
 
-  let submode_exn m0 m1 = assert (submode m0 m1 |> Result.is_ok)
+  let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
 
   let equate a b = try_with_log (equate_from_submode submode_log a b)
 
-  let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
+  let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
   let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
 
@@ -1747,11 +1747,11 @@ module Monadic_gen (Obj : Obj) = struct
 
   let meet l = Solver.join obj l
 
-  let submode_exn m0 m1 = assert (submode m0 m1 |> Result.is_ok)
+  let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
 
   let equate a b = try_with_log (equate_from_submode submode_log a b)
 
-  let equate_exn m0 m1 = assert (equate m0 m1 |> Result.is_ok)
+  let equate_exn m0 m1 = equate m0 m1 |> Result.get_ok
 
   let print ?verbose () ppf m = Solver.print ?verbose obj ppf m
 
@@ -3207,6 +3207,11 @@ module Modality = struct
       | Const c -> c
       | Undefined -> Misc.fatal_error "modality Undefined should not be zapped."
       | Exactly (mm, m) ->
+        (* The following zaps [mm] to ceil, which might conflict with future
+           mode constraints on [mm]. We find constraining [mm] to [legacy] a
+           good workaround. *)
+        (* CR zqian: Find a better solution *)
+        Mode.submode mm Mode.legacy |> ignore;
         let m = Mode.zap_to_floor m in
         let mm = Mode.zap_to_ceil mm in
         let c = Mode.Const.imply mm m in

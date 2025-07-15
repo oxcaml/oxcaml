@@ -241,6 +241,8 @@ module Typing_env : sig
 
   val bump_current_level_scope : t -> t
 
+  val stable_compare_simples : t -> Simple.t -> Simple.t -> int
+
   module Alias_set : sig
     type t
 

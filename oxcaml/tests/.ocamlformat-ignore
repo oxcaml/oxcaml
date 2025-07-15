@@ -10,6 +10,7 @@ simd/arrays.ml
 simd/arrays256.ml
 small_numbers/float32_u_lib.ml
 backend/zero_alloc_checker/fail27.ml
+backend/zero_alloc_checker/test_arch_specific_witness.ml
 intrinsics/select_float.ml
 backend/zero_alloc_checker/test_remove_inferred_assume.ml
 backend/zero_alloc_checker/test_remove_inferred_assume_workaround.ml

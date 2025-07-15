@@ -6,6 +6,7 @@
   (with-stdout-to
    ops_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops.ml")))))
@@ -17,6 +18,7 @@
   (with-stdout-to
    ops_float32x4_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops_float32x4.ml")))))
@@ -28,6 +30,7 @@
   (with-stdout-to
    ops_float64x2_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops_float64x2.ml")))))
@@ -39,6 +42,7 @@
   (with-stdout-to
    ops_int64x2_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops_int64x2.ml")))))
@@ -50,6 +54,7 @@
   (with-stdout-to
    ops_int32x4_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops_int32x4.ml")))))
@@ -61,6 +66,7 @@
   (with-stdout-to
    ops_int16x8_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops_int16x8.ml")))))
@@ -72,9 +78,82 @@
   (with-stdout-to
    ops_int8x16_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "ops_int8x16.ml")))))
+
+(rule
+ (targets ops_float32x8_u.ml)
+ (deps ops_float32x8.ml)
+ (action
+  (with-stdout-to
+   ops_float32x8_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_float32x8.ml")))))
+
+(rule
+ (targets ops_float64x4_u.ml)
+ (deps ops_float64x4.ml)
+ (action
+  (with-stdout-to
+   ops_float64x4_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_float64x4.ml")))))
+
+(rule
+ (targets ops_int32x8_u.ml)
+ (deps ops_int32x8.ml)
+ (action
+  (with-stdout-to
+   ops_int32x8_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int32x8.ml")))))
+
+(rule
+ (targets ops_int64x4_u.ml)
+ (deps ops_int64x4.ml)
+ (action
+  (with-stdout-to
+   ops_int64x4_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int64x4.ml")))))
+
+(rule
+ (targets ops_int16x16_u.ml)
+ (deps ops_int16x16.ml)
+ (action
+  (with-stdout-to
+   ops_int16x16_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int16x16.ml")))))
+
+(rule
+ (targets ops_int8x32_u.ml)
+ (deps ops_int8x32.ml)
+ (action
+  (with-stdout-to
+   ops_int8x32_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "ops_int8x32.ml")))))
 
 (rule
  (targets sse_other_ops_u.ml)
@@ -83,6 +162,7 @@
   (with-stdout-to
    sse_other_ops_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "sse_other_ops.ml")))))
@@ -94,6 +174,7 @@
   (with-stdout-to
    sse42_string_ops_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "sse42_string_ops.ml")))))
@@ -1312,6 +1393,198 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32.out)))
+
+(executable
+ (name ops_float32x8_u)
+ (modules ops_float32x8_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_float32x8_u.out
+   (run ./ops_float32x8_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_float32x8_u.out)))
+
+(executable
+ (name ops_float64x4_u)
+ (modules ops_float64x4_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_float64x4_u.out
+   (run ./ops_float64x4_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_float64x4_u.out)))
+
+(executable
+ (name ops_int32x8_u)
+ (modules ops_int32x8_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int32x8_u.out
+   (run ./ops_int32x8_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int32x8_u.out)))
+
+(executable
+ (name ops_int64x4_u)
+ (modules ops_int64x4_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int64x4_u.out
+   (run ./ops_int64x4_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int64x4_u.out)))
+
+(executable
+ (name ops_int16x16_u)
+ (modules ops_int16x16_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int16x16_u.out
+   (run ./ops_int16x16_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int16x16_u.out)))
+
+(executable
+ (name ops_int8x32_u)
+ (modules ops_int8x32_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int8x32_u.out
+   (run ./ops_int8x32_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int8x32_u.out)))
 
 (rule
  (alias runtest)
@@ -2857,6 +3130,252 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_float32x8_u.ml ops_float32x8_u_nodynlink.ml)))
+
+(executable
+ (name ops_float32x8_u_nodynlink)
+ (modules ops_float32x8_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_float32x8_u_nodynlink.out
+   (run ./ops_float32x8_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_float32x8_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_float64x4_u.ml ops_float64x4_u_nodynlink.ml)))
+
+(executable
+ (name ops_float64x4_u_nodynlink)
+ (modules ops_float64x4_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_float64x4_u_nodynlink.out
+   (run ./ops_float64x4_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_float64x4_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int32x8_u.ml ops_int32x8_u_nodynlink.ml)))
+
+(executable
+ (name ops_int32x8_u_nodynlink)
+ (modules ops_int32x8_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int32x8_u_nodynlink.out
+   (run ./ops_int32x8_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int32x8_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int64x4_u.ml ops_int64x4_u_nodynlink.ml)))
+
+(executable
+ (name ops_int64x4_u_nodynlink)
+ (modules ops_int64x4_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int64x4_u_nodynlink.out
+   (run ./ops_int64x4_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int64x4_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int16x16_u.ml ops_int16x16_u_nodynlink.ml)))
+
+(executable
+ (name ops_int16x16_u_nodynlink)
+ (modules ops_int16x16_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int16x16_u_nodynlink.out
+   (run ./ops_int16x16_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int16x16_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int8x32_u.ml ops_int8x32_u_nodynlink.ml)))
+
+(executable
+ (name ops_int8x32_u_nodynlink)
+ (modules ops_int8x32_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int8x32_u_nodynlink.out
+   (run ./ops_int8x32_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int8x32_u_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -4702,3 +5221,249 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_float32x8_u.ml ops_float32x8_u_internal_assembler.ml)))
+
+(executable
+ (name ops_float32x8_u_internal_assembler)
+ (modules ops_float32x8_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_float32x8_u_internal_assembler.out
+   (run ./ops_float32x8_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_float32x8_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_float64x4_u.ml ops_float64x4_u_internal_assembler.ml)))
+
+(executable
+ (name ops_float64x4_u_internal_assembler)
+ (modules ops_float64x4_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_float64x4_u_internal_assembler.out
+   (run ./ops_float64x4_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_float64x4_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int32x8_u.ml ops_int32x8_u_internal_assembler.ml)))
+
+(executable
+ (name ops_int32x8_u_internal_assembler)
+ (modules ops_int32x8_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int32x8_u_internal_assembler.out
+   (run ./ops_int32x8_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int32x8_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int64x4_u.ml ops_int64x4_u_internal_assembler.ml)))
+
+(executable
+ (name ops_int64x4_u_internal_assembler)
+ (modules ops_int64x4_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int64x4_u_internal_assembler.out
+   (run ./ops_int64x4_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int64x4_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int16x16_u.ml ops_int16x16_u_internal_assembler.ml)))
+
+(executable
+ (name ops_int16x16_u_internal_assembler)
+ (modules ops_int16x16_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int16x16_u_internal_assembler.out
+   (run ./ops_int16x16_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int16x16_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops_int8x32_u.ml ops_int8x32_u_internal_assembler.ml)))
+
+(executable
+ (name ops_int8x32_u_internal_assembler)
+ (modules ops_int8x32_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops_int8x32_u_internal_assembler.out
+   (run ./ops_int8x32_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops_int8x32_u_internal_assembler.out)))
