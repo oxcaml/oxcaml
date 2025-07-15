@@ -1495,63 +1495,6 @@ module Lattices_mono = struct
    fun dst f g ->
     match maybe_compose dst f g with Some m -> m | None -> Compose (f, g)
 
-  type (_, _, _, _) maybe_compose_with_proj_result =
-    | None : ('a, 'c, 'l, 'r) maybe_compose_with_proj_result
-    | Single :
-        ('a, 'c, 'l * 'r) morph
-        -> ('a, 'c, 'l, 'r) maybe_compose_with_proj_result
-    | ProjThenMorph :
-        ('b2, 'c, 'l * 'r) morph * 'b2 obj * ('a, 'b2) Axis.t
-        -> ('a, 'c, 'l, 'r) maybe_compose_with_proj_result
-
-  type (_, _, _, _) extracted_trailing_proj =
-    | Extracted :
-        ('b, 'c, 'l * 'r) morph * 'b obj * ('a, 'b) Axis.t
-        -> ('a, 'c, 'l, 'r) extracted_trailing_proj
-  (*
-  (** Given a morphism, [f], expected (but not required) to be a composition morphism,
-   if it can find that the final morphism of the composition is a projection, [proj],
-   it returns the axis for this, along with the previous composition morphism, [f'],
-   such that [f = f' . proj]. *)
-  let rec extract_trailing_proj_from_morph :
-      type a b l r.
-      (a, b, l * r) morph -> (a, b, l, r) extracted_trailing_proj option =
-    function
-    | Compose (f, Proj (mid, ax)) -> Some (Extracted (f, mid, ax))
-    | Compose (f, g) ->
-      Option.map
-        (fun (Extracted (g', mid, ax)) -> Extracted (Compose (f, g'), mid, ax))
-        (extract_trailing_proj_from_morph g)
-    | _ -> None
-    [@@ocaml.warning "-4"] *)
-  (*
-  (** [maybe_compose_with_proj ax f] will consider the composition [proj . f]
-   (where [proj] is a projection to axis [ax]) and run maybe_compose
-   on this. Due to the nature of this operation, the return type can be more specific,
-   returning one of:
-   1. [Single f'] - when a single, non-compositional morphism, [f'],
-        can represents the composition,
-   2. [ProjThenMorph] - when the composition is simplified to a composition of the
-        form [f' . proj'], where [f'] is a new morphism, and [proj'] is a new projection,
-   3. [None] - when the other cases don't apply. This should be a rare case. *)
-  let rec maybe_compose_with_proj :
-      type a b c l r.
-      b obj ->
-      c obj ->
-      (b, c) Axis.t ->
-      (a, b, l * r) morph ->
-      (a, c, l, r) maybe_compose_with_proj_result =
-   fun b_obj c_obj ax f ->
-    let proj = Proj (b_obj, ax) in
-    match maybe_compose c_obj proj f with
-    | None -> None
-    | Some (Compose _ as f_comp) -> (
-      match extract_trailing_proj_from_morph f_comp with
-      | None -> None
-      | Some (Extracted (f', b2_obj, ax2)) -> ProjThenMorph (f', b2_obj, ax2))
-    | Some f' -> Single f'
-   [@@ocaml.warning "-4"] *)
-
   let rec left_adjoint :
       type a b l.
       b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
@@ -1771,9 +1714,9 @@ let shint_to_axhint_side_fn :
    | RightAdjoint -> C.right_adjoint
 
 let shint_to_axhint_side_le :
-    type a b l1 l2 r1 r2.
+    type a l1 l2 r1 r2.
     (l1, r1, l2, r2) shint_to_axhint_side -> a C.obj -> a -> a -> bool =
-  fun (type a b l1 l2 r1 r2) (side : (l1, r1, l2, r2) shint_to_axhint_side)
+  fun (type a l1 l2 r1 r2) (side : (l1, r1, l2, r2) shint_to_axhint_side)
       (a_obj : a C.obj) x y ->
    match side with
    | LeftAdjoint -> C.le a_obj x y
@@ -1788,8 +1731,8 @@ let rec shint_to_axhint :
     (left1, right1, left2, right2) shint_to_axhint_side ->
     (a, Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
-  fun (type r a left1 left2 right1 right2) (r_obj : r obj) (r : r)
-      (r_shint : (r, left1 * right1) S.hint) (ax : (r, a) Axis.t) side ->
+  fun (type r a) (r_obj : r obj) (r : r) (r_shint : (r, left1 * right1) S.hint)
+      (ax : (r, a) Axis.t) side ->
     (* This function is for when we have a solver hint (aka "shint") for a product lattice and
        wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
     let a_obj = proj_obj ax r_obj in
