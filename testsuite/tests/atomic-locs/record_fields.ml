@@ -130,3 +130,32 @@ module Extension_with_inline_record :
     val test : t -> int
   end
 |}]
+
+(* Marking a field [@atomic] in a float-only record disables the unboxing optimization. *)
+module Float_records = struct
+  type flat = { x : float; mutable y : float }
+  type t = { x : float; mutable y : float [@atomic] }
+
+  let mk_flat x y : flat = { x; y }
+  let mk_t x y : t = { x; y }
+  let get v = v.y
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Float_records/347"
+  (let
+    (mk_flat =
+       (function {nlocal = 0} x[float] y[float] (makefloatblock Mutable x y))
+     mk_t =
+       (function {nlocal = 0} x[float] y[float]
+         (makemutable 0 (float,float) x y))
+     get = (function {nlocal = 0} v : float (field_mut 1 v)))
+    (makeblock 0 mk_flat mk_t get)))
+module Float_records :
+  sig
+    type flat = { x : float; mutable y : float; }
+    type t = { x : float; mutable y : float [@atomic]; }
+    val mk_flat : float -> float -> flat
+    val mk_t : float -> float -> t
+    val get : t -> float
+  end
+|}];;

@@ -44,6 +44,10 @@ type mutability =
     if not interested in the payload of [Mutable]. *)
 val is_mutable : mutability -> bool
 
+(** Returns [true] is the [mutable_flag] is atomic. Should be called
+    if not interested in the payload of [Mutable]. *)
+val is_atomic : mutability -> bool
+
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
 val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
