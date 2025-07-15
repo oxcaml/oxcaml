@@ -19,8 +19,6 @@ open Allowance
 open Solver
 open Mode_intf
 
-type empty = |
-
 type nonrec allowed = allowed
 
 type nonrec disallowed = disallowed
@@ -1797,14 +1795,14 @@ let rec shint_to_axhint :
     single_axis_shint_to_axhint a_obj a a_shint adj
 
 and single_axis_shint_to_axhint :
-    type r a left1 right1 left2 right2.
+    type a left1 right1 left2 right2.
     a Lattices_mono.obj ->
     a ->
     (a, left1 * right1) S.hint ->
     (left1, right1, left2, right2) adj_fn ->
     (a, Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
-  fun (type r a left1 right1 left2 right2) (a_obj : a obj) (a : a)
+  fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
       (a_shint_inp : (a, left1 * right1) S.hint)
       (adj : (left1, right1, left2, right2) adj_fn) ->
     (* This function is for when we have a solver hint (aka "shint") for a
@@ -1864,7 +1862,7 @@ let flipped_solver_error_to_axerror r_obj axis err =
 
 (** Take a solver error for a single axis object and convert it to an [axerror] *)
 let single_axis_solver_error_to_axerror :
-    type r a.
+    type a.
     a Lattices_mono.obj -> a S.error -> (a, Hint.morph, Hint.const) axerror =
  fun a_obj { left; left_hint; right; right_hint } ->
   let left_projected =
@@ -2062,8 +2060,7 @@ module Comonadic_axis_gen (Obj : Obj) = struct
 
   type equate_error = equate_step * error
 
-  let[@inline] solver_error_to_axerror =
-    single_axis_solver_error_to_axerror Obj.obj
+  let solver_error_to_axerror = single_axis_solver_error_to_axerror Obj.obj
 
   let submode_log a b ~log =
     Solver.submode obj a b ~log |> Result.map_error solver_error_to_axerror
@@ -2086,7 +2083,7 @@ module Monadic_axis_gen (Obj : Obj) = struct
 
   type equate_error = equate_step * error
 
-  let[@inline] flipped_solver_error_to_axerror =
+  let flipped_solver_error_to_axerror =
     flipped_single_axis_solver_error_to_axerror Obj.obj
 
   let submode_log a b ~log =
