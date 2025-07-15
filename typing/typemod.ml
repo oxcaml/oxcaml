@@ -2419,8 +2419,11 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
          in
          let mmode =
            Option.map (fun smmode ->
-            smmode |> Typemode.transl_mode_annots |> new_mode_var_from_annots
-            ) smmode
+            smmode
+            |> Typemode.transl_mode_annots
+            |> Alloc.Const.Option.value ~default:Alloc.Const.legacy
+            |> Alloc.of_const
+            |> alloc_as_value) smmode
           in
          (id_shape, pmd.pmd_name, md, mmode, ()))
       ids sdecls
