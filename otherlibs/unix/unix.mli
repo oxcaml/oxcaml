@@ -178,7 +178,9 @@ val unsafe_getenv : string -> string
    @raise Not_found if the variable is unbound.
    @since 4.06  *)
 
-val putenv : string -> string -> unit
+val putenv : string -> string -> unit @@ nonportable
+[@@alert unsafe_multidomain
+    "Mutating the environment makes reading the environment unsafe."]
 (** [putenv name value] sets the value associated to a
    variable in the process environment.
    [name] is the name of the environment variable,
@@ -244,7 +246,7 @@ val execvpe : string -> string array -> string array -> 'a
 (** Same as {!execve}, except that
    the program is searched in the path. *)
 
-val fork : unit -> int
+val fork : unit -> int @@ nonportable
 (** Fork a new process. The returned integer is 0 for the child
    process, the pid of the child process for the parent process. It
    fails if the OCaml process is multi-core (any domain has been
@@ -1389,24 +1391,24 @@ type group_entry =
   }
 (** Structure of entries in the [groups] database. *)
 
-val getlogin : unit -> string
+val getlogin : unit -> string @@ nonportable
 (** Return the login name of the user executing the process. *)
 
-val getpwnam : string -> passwd_entry
+val getpwnam : string -> passwd_entry @@ nonportable
 (** Find an entry in [passwd] with the given name.
    @raise Not_found if no such entry exists, or always on Windows. *)
 
-val getgrnam : string -> group_entry
+val getgrnam : string -> group_entry @@ nonportable
 (** Find an entry in [group] with the given name.
 
    @raise Not_found if no such entry exists, or always on Windows. *)
 
-val getpwuid : int -> passwd_entry
+val getpwuid : int -> passwd_entry @@ nonportable
 (** Find an entry in [passwd] with the given user id.
 
    @raise Not_found if no such entry exists, or always on Windows. *)
 
-val getgrgid : int -> group_entry
+val getgrgid : int -> group_entry @@ nonportable
 (** Find an entry in [group] with the given group id.
 
    @raise Not_found if no such entry exists, or always on Windows. *)
