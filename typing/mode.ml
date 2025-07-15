@@ -1754,13 +1754,30 @@ and find_responsible_axis_prod :
 
 (** Container for an adjoint function. We use a special record type instead of inlining
 the type so that we can have universal quantification over the input object types. *)
-type ('l1, 'r1, 'l2, 'r2) adj_fn =
-  { fn :
-      'a 'b.
-      'b Lattices_mono.obj ->
-      ('a, 'b, 'l1 * 'r1) Lattices_mono.morph ->
-      ('b, 'a, 'l2 * 'r2) Lattices_mono.morph
-  }
+type ('l1, 'r1, 'l2, 'r2) shint_to_axhint_side =
+  | LeftAdjoint : (_, allowed, allowed, disallowed) shint_to_axhint_side
+  | RightAdjoint : (allowed, _, disallowed, allowed) shint_to_axhint_side
+
+let shint_to_axhint_side_fn :
+    type a b l1 l2 r1 r2.
+    (l1, r1, l2, r2) shint_to_axhint_side ->
+    b C.obj ->
+    (a, b, l1 * r1) C.morph ->
+    (b, a, l2 * r2) C.morph =
+  fun (type a b l1 l2 r1 r2) (side : (l1, r1, l2, r2) shint_to_axhint_side) :
+      (b C.obj -> (a, b, l1 * r1) C.morph -> (b, a, l2 * r2) C.morph) ->
+   match side with
+   | LeftAdjoint -> C.left_adjoint
+   | RightAdjoint -> C.right_adjoint
+
+let shint_to_axhint_side_le :
+    type a b l1 l2 r1 r2.
+    (l1, r1, l2, r2) shint_to_axhint_side -> a C.obj -> a -> a -> bool =
+  fun (type a b l1 l2 r1 r2) (side : (l1, r1, l2, r2) shint_to_axhint_side)
+      (a_obj : a C.obj) x y ->
+   match side with
+   | LeftAdjoint -> C.le a_obj x y
+   | RightAdjoint -> C.le a_obj y x
 
 let rec shint_to_axhint :
     type r a left1 left2 right1 right2.
@@ -1768,11 +1785,11 @@ let rec shint_to_axhint :
     r ->
     (r, left1 * right1) S.hint ->
     (r, a) Axis.t ->
-    (left1, right1, left2, right2) adj_fn ->
+    (left1, right1, left2, right2) shint_to_axhint_side ->
     (a, Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type r a left1 left2 right1 right2) (r_obj : r obj) (r : r)
-      (r_shint : (r, left1 * right1) S.hint) (ax : (r, a) Axis.t) adj ->
+      (r_shint : (r, left1 * right1) S.hint) (ax : (r, a) Axis.t) side ->
     (* This function is for when we have a solver hint (aka "shint") for a product lattice and
        wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
     let a_obj = proj_obj ax r_obj in
@@ -1792,48 +1809,48 @@ let rec shint_to_axhint :
       in
       compose_shint_with_proj r_shint
     in
-    single_axis_shint_to_axhint a_obj a a_shint adj
+    single_axis_shint_to_axhint a_obj a a_shint side
 
 and single_axis_shint_to_axhint :
     type a left1 right1 left2 right2.
     a Lattices_mono.obj ->
     a ->
     (a, left1 * right1) S.hint ->
-    (left1, right1, left2, right2) adj_fn ->
+    (left1, right1, left2, right2) shint_to_axhint_side ->
     (a, Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
       (a_shint_inp : (a, left1 * right1) S.hint)
-      (adj : (left1, right1, left2, right2) adj_fn) ->
+      (side : (left1, right1, left2, right2) shint_to_axhint_side) ->
     (* This function is for when we have a solver hint (aka "shint") for a
        single axis and wish to convert it to a mode "axhint". *)
     match a_shint_inp with
     | Morph (morph_hint, morph, b_shint) -> (
       let b_obj = src a_obj morph in
-      let morph_inv : (a, _, left2 * right2) morph = adj.fn a_obj morph in
+      let morph_inv : (a, _, left2 * right2) morph =
+        shint_to_axhint_side_fn side a_obj morph
+      in
       let b = apply b_obj morph_inv a in
       match find_responsible_axis_single morph with
       | NoneResponsible -> Empty a
       | SourceIsSingle ->
-        let b_hint = single_axis_shint_to_axhint b_obj b b_shint adj in
+        let b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
         Morph (a, morph_hint, b_hint)
       | Axis b_ax ->
-        let b_hint = shint_to_axhint b_obj b b_shint b_ax adj in
+        let b_hint = shint_to_axhint b_obj b b_shint b_ax side in
         Morph (a, morph_hint, b_hint))
     | Const a_const_hint -> Const (a, a_const_hint)
     | Branch (x, x_hint, y, y_hint) ->
-      (* TODO - this is only designed for handling upper bounds,
-         finish this when fixing for left-/right-adjoints too *)
       let chosen, chosen_hint =
-        if C.le a_obj x y
+        if shint_to_axhint_side_le side a_obj x y
         then x, x_hint
-        else if C.le a_obj y x
+        else if shint_to_axhint_side_le side a_obj y x
         then y, y_hint
         else
           (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
           assert false
       in
-      single_axis_shint_to_axhint a_obj chosen chosen_hint adj
+      single_axis_shint_to_axhint a_obj chosen chosen_hint side
 
 let flip_axerror ({ left; right } : _ axerror) : _ axerror =
   { left = right; right = left }
@@ -1847,13 +1864,9 @@ let solver_error_to_axerror :
     r S.error ->
     (a, Hint.morph, Hint.const) axerror =
  fun r_obj axis { left; left_hint; right; right_hint } ->
-  let left_projected =
-    shint_to_axhint r_obj left left_hint axis
-      { fn = Lattices_mono.right_adjoint }
-  in
+  let left_projected = shint_to_axhint r_obj left left_hint axis RightAdjoint in
   let right_projected =
-    shint_to_axhint r_obj right right_hint axis
-      { fn = Lattices_mono.left_adjoint }
+    shint_to_axhint r_obj right right_hint axis LeftAdjoint
   in
   { left = left_projected; right = right_projected }
 
@@ -1866,12 +1879,10 @@ let single_axis_solver_error_to_axerror :
     a Lattices_mono.obj -> a S.error -> (a, Hint.morph, Hint.const) axerror =
  fun a_obj { left; left_hint; right; right_hint } ->
   let left_projected =
-    single_axis_shint_to_axhint a_obj left left_hint
-      { fn = Lattices_mono.right_adjoint }
+    single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
   in
   let right_projected =
-    single_axis_shint_to_axhint a_obj right right_hint
-      { fn = Lattices_mono.left_adjoint }
+    single_axis_shint_to_axhint a_obj right right_hint LeftAdjoint
   in
   { left = left_projected; right = right_projected }
 
