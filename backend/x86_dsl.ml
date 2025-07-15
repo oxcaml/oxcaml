@@ -93,17 +93,6 @@ let mem64 typ ?(scale = 1) ?base ?sym displ idx =
 
 let mem64_rip typ ?(ofs = 0) s = Mem64_RIP (typ, s, ofs)
 
-let is_mem = function
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
-    false
-  | Mem _ | Mem64_RIP _ -> true
-
-let is_regf = function
-  | Regf _ -> true
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
-  | Mem64_RIP _ ->
-    false
-
 module I = struct
   let add x y = emit (ADD (x, y))
 

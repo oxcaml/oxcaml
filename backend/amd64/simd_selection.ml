@@ -1110,8 +1110,14 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         Array.init num_args_addressing (fun i ->
             Vectorize_utils.Vectorized_instruction.Original (i + 1))
       in
+      let append_result res args =
+        let args = Array.append res args in
+        if Proc.has_three_operand_float_ops ()
+        then args.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
+        args
+      in
       if is_aligned_to_vector_width ()
-      then (
+      then
         let sse_op : Simd.Mem.operation =
           match float_width, float_op with
           | Float64, Ifloatadd -> Add_f64
@@ -1123,15 +1129,13 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Float32, Ifloatmul -> Mul_f32
           | Float32, Ifloatdiv -> Div_f32
         in
-        let arguments = Array.append results address_args in
-        if Proc.has_three_operand_float_ops ()
-        then arguments.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
+        let arguments = append_result results address_args in
         Some
           [ { operation =
                 Operation.Specific (Isimd_mem (sse_op, addressing_mode));
               arguments;
               results
-            } ])
+            } ]
       else
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be
@@ -1162,9 +1166,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             results = new_reg
           }
         in
-        let arguments = Array.append results new_reg in
-        if Proc.has_three_operand_float_ops ()
-        then arguments.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
+        let arguments = append_result results new_reg in
         let arith : Vectorize_utils.Vectorized_instruction.t =
           { operation = sse_or_avx sse avx; arguments; results }
         in

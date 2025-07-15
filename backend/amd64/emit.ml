@@ -674,7 +674,9 @@ let sse_or_avx sse vex src dst =
 let sse_or_avx3 sse vex src1 src2 dst =
   if Arch.Extension.enabled AVX
   then I.simd vex [| src2; src1; dst |]
-  else I.simd sse [| src2; dst |]
+  else (
+    assert (equal_arg src1 dst);
+    I.simd sse [| src2; dst |])
 
 let sse_or_avx_dst sse vex src dst =
   if Arch.Extension.enabled AVX
@@ -963,7 +965,7 @@ let emit_global_label ~section s =
 
 let movd src dst =
   let open Simd_instrs in
-  match Arch.Extension.enabled AVX, X86_dsl.is_regf src with
+  match Arch.Extension.enabled AVX, is_regf src with
   | false, false -> I.simd movd_X_r32m32 [| src; dst |]
   | false, true -> I.simd movd_r32m32_X [| src; dst |]
   | true, false -> I.simd vmovd_X_r32m32 [| src; dst |]
@@ -971,7 +973,7 @@ let movd src dst =
 
 let movq src dst =
   let open Simd_instrs in
-  match Arch.Extension.enabled AVX, X86_dsl.is_regf src with
+  match Arch.Extension.enabled AVX, is_regf src with
   | false, false -> I.simd movq_X_r64m64 [| src; dst |]
   | false, true -> I.simd movq_r64m64_X [| src; dst |]
   | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
@@ -979,7 +981,7 @@ let movq src dst =
 
 let movss src dst =
   let open Simd_instrs in
-  match Arch.Extension.enabled AVX, X86_dsl.is_mem src, X86_dsl.is_mem dst with
+  match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
   | _, true, true -> assert false
   | false, false, _ -> I.simd movss_Xm32_X [| src; dst |]
   | false, true, _ -> I.simd movss_X_m32 [| src; dst |]
@@ -989,7 +991,7 @@ let movss src dst =
 
 let movsd src dst =
   let open Simd_instrs in
-  match Arch.Extension.enabled AVX, X86_dsl.is_mem src, X86_dsl.is_mem dst with
+  match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
   | _, true, true -> assert false
   | false, false, _ -> I.simd movsd_Xm64_X [| src; dst |]
   | false, true, _ -> I.simd movsd_X_m64 [| src; dst |]
@@ -999,7 +1001,7 @@ let movsd src dst =
 
 let movpd ~unaligned src dst =
   let open Simd_instrs in
-  match Arch.Extension.enabled AVX, X86_dsl.is_mem src, unaligned with
+  match Arch.Extension.enabled AVX, is_mem src, unaligned with
   | false, true, false -> I.simd movapd_X_Xm128 [| src; dst |]
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
