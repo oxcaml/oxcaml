@@ -94,6 +94,9 @@ module Type_shape : sig
 
   val poly_variant_constructors_map :
     ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
+
+  val of_type_expr :
+    Types.type_expr -> (Path.t -> Uid.t option) -> without_layout t
 end
 
 module Type_decl_shape : sig
@@ -180,6 +183,9 @@ module Type_decl_shape : sig
 
   val complex_constructors_map :
     ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
+
+  val of_type_declaration :
+    Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> t
 end
 
 type shape_with_layout =
