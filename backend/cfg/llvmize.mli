@@ -24,3 +24,5 @@ val end_assembly : sourcefile:string option -> unit
 val close_out : unit -> unit
 
 val open_out : asm_filename:string -> output_prefix:string -> unit
+
+val is_current_compilation_unit_set : unit -> bool

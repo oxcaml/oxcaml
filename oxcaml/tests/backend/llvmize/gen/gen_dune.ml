@@ -23,13 +23,14 @@ let print_test ~extra_dep ~extra_subst ~name ~buf rule_template =
   let subst = function
     | "name" -> name
     | "output" -> output
+    | "ocamlopt" -> "%{bin:ocamlopt.opt}"
     | "extra_deps" -> extra_deps
     | label -> (
       match
         List.find_opt (fun (label', _) -> String.equal label label') extra_subst
       with
       | Some (_, res) -> res
-      | None -> assert false)
+      | None -> "what")
   in
   Buffer.clear buf;
   Buffer.add_substitute buf subst rule_template;
@@ -41,7 +42,7 @@ let () =
     print_test
       ~extra_subst:
         [ "filter", "filter.sh";
-          "flags", "-g -c -llvm-backend -llvm-path true -dllvmir" ]
+          "llvm_flags", "-g -c -llvm-backend -llvm-path true -dllvmir" ]
       ~extra_dep ~name ~buf
       {|
 (rule
@@ -52,10 +53,9 @@ let () =
    ${output}.corrected
    (pipe-outputs
     (run
-     %{bin:boot_ocamlopt} %{ml} -g -c
-     -llvm-backend -llvm-path true -dllvmir)
+     ${ocamlopt} %{ml} -g -c ${llvm_flags})
     (run cat ${name}.ll)
-    (run ./filter.sh)))))
+    (run ${filter})))))
 
 (rule
  (alias runtest)
@@ -73,17 +73,17 @@ let () =
       {|
 (rule
  (targets ${output}.corrected)
- (deps ${extra_deps} ${filter})
+ (deps ${extra_deps})
  (action
   (with-outputs-to
    ${output}.corrected
    (pipe-outputs
     (run
-     %{bin:boot_ocamlopt} ${name}.ml -c -opaque ${llvm_flags})
+     ${ocamlopt} ${name}.ml -c -opaque ${llvm_flags})
     (run
-     %{bin:boot_ocamlopt} ${bootstrap}.ml -c -opaque )
+     ${ocamlopt} ${bootstrap}.ml -c -opaque)
     (run
-     %{bin:boot_ocamlopt} ${name}.cmx ${bootstrap}.cmx -opaque -o test.exe)
+     ${ocamlopt} ${name}.cmx ${bootstrap}.cmx -opaque -o test.exe)
     (run ./test.exe)))))
 
 (rule
@@ -94,4 +94,4 @@ let () =
       |}
   in
   print_test_llvmir "id_fn";
-  print_test_run ~bootstrap:"const_fn_bootstrap" "const_fn"
+  print_test_run ~bootstrap:"const_val_bootstrap" "const_val"

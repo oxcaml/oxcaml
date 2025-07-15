@@ -117,6 +117,7 @@ let create ~llvmir_filename ~asm_filename =
   let ppf = Format.formatter_of_out_channel oc in
   let current_fun_info = create_fun_info () in
   let data = [] in
+  print_endline "create";
   { llvmir_filename; asm_filename; oc; ppf; current_fun_info; data }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
@@ -391,6 +392,14 @@ end
 
 let current_compilation_unit = ref None
 
+let get_current_compilation_unit msg =
+  Option.value
+    ~default:(Misc.fatal_error ("Current compilation unit not set " ^ msg))
+    !current_compilation_unit
+
+let is_current_compilation_unit_set () =
+  Option.is_some !current_compilation_unit
+
 let llvmir_to_assembly t =
   (* CR-someday gyorsh: add other optimization flags and control which passes to
      perform. *)
@@ -408,16 +417,20 @@ let llvmir_to_assembly t =
             Filename.quote t.llvmir_filename ]))
 
 let close_out () =
+  print_endline "close";
   match !current_compilation_unit with
   | None -> ()
   | Some t ->
     (* Exception raised during llvmize, keep .ll file. *)
     Out_channel.close t.oc;
+    print_endline "close out set none";
     current_compilation_unit := None
 
 let open_out ~asm_filename ~output_prefix =
+  print_endline "open";
   (* Create LLVM IR file for the current compilation unit. *)
   let llvmir_filename = output_prefix ^ ".ll" in
+  print_endline "open out set some";
   current_compilation_unit := Some (create ~llvmir_filename ~asm_filename)
 
 let fun_attrs _t _codegen_options : string list =
@@ -451,7 +464,7 @@ let alloca_regs t cfg old_arg_idents =
   List.iter (fun (reg, old_ident) -> F.ins_store t old_ident reg) old_arg_idents
 
 let cfg (cl : CL.t) =
-  let t = Option.get !current_compilation_unit in
+  let t = get_current_compilation_unit "cfg" in
   reset_fun_info t;
   let layout = CL.layout cl in
   let cfg = CL.cfg cl in
@@ -500,7 +513,7 @@ let cfg (cl : CL.t) =
 
 (* CR yusumez: Implement this *)
 let data ds =
-  let t = Option.get !current_compilation_unit in
+  let t = get_current_compilation_unit "data" in
   t.data <- List.append t.data ds
 
 (* CR yusumez: We do this cumbersome list wrangling since we receive data
@@ -532,7 +545,8 @@ let remove_file filename =
   with Sys_error _msg -> ()
 
 let begin_assembly () =
-  let t = Option.get !current_compilation_unit in
+  print_endline "begin asm";
+  let t = get_current_compilation_unit "begin-asm" in
   (* CR yusumez: Source filename needs to get emitted here (it won't work at the
      end), but we don't have access to it here. It isn't required for now. *)
   (* Option.iter (F.source_filename t) sourcefile; *)
@@ -542,7 +556,8 @@ let begin_assembly () =
   Format.pp_print_newline t.ppf ()
 
 let end_assembly ~sourcefile =
-  let t = Option.get !current_compilation_unit in
+  print_endline "end asm";
+  let t = get_current_compilation_unit "end-asm" in
   (* Emit data declarations *)
   emit_data t;
   F.symbol_decl t "data_end";
@@ -561,6 +576,7 @@ let end_assembly ~sourcefile =
               ret_code )));
   (* CR yusumez: This should be a separate flag (like save_llvmir). *)
   if not !Oxcaml_flags.dump_llvmir then remove_file t.llvmir_filename;
+  print_endline "end asm set none";
   current_compilation_unit := None
 
 (* CR-someday gyorsh: currently, llvm backend can be selected at the compilation

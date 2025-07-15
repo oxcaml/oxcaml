@@ -1,3 +1,3 @@
 let () =
   print_int Const_val.x;
-  print_endline ()
+  print_newline ()
