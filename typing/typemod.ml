@@ -2288,7 +2288,17 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         typedtree, tsg, newenv
     | Psig_attribute attr ->
         Builtin_attributes.parse_standard_interface_attributes attr;
-        mksig (Tsig_attribute attr) env loc, [], env
+        let register_default env (var_name, jkind_annot) =
+          let context =
+            Jkind.History.Type_variable_default var_name
+          in
+          Env.add_variable_default
+            var_name (Jkind.of_annotation ~context jkind_annot) env
+        in
+        let newenv = List.fold_left register_default env
+          (Builtin_attributes.get_variable_attr attr)
+        in
+        mksig (Tsig_attribute attr) env loc, [], newenv
     | Psig_extension (ext, _attrs) ->
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Psig_kind_abbrev _ ->
