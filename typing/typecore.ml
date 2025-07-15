@@ -10448,8 +10448,8 @@ let escaping_hint (failure_reason : Value.error) submode_reason
       (context : Env.locality_context option) =
   begin match failure_reason, context with
   | Error (Comonadic Areality, e), Some h ->
-    begin match e, h with
-    | {left=Local; right=Regional}, Return ->
+    begin match (axerror_get_consts_pair e), h with
+    | (Local, Regional), Return ->
       (* Only hint to use exclave_, when the user wants to return local, but
          expected mode is regional. If the expected mode is as strict as
          global, then exclave_ won't solve the problem. *)
@@ -11203,7 +11203,8 @@ let report_error ~loc env =
         match fail_reason with
         | Error (Comonadic Areality, _) ->
             Format.dprintf "This value escapes its region."
-        | Error (ax, {left; right}) ->
+        | Error (ax, err) ->
+          let left, right = axerror_get_consts_pair err in
             let pp_expectation ppf () =
               let open Contention.Const in
               match ax, right with
@@ -11244,13 +11245,14 @@ let report_error ~loc env =
       Location.errorf ~loc ~sub
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
-         (Alloc.Const.print_axis ax) left
+         (Alloc.Const.print_axis ax) (axhint_get_const left)
   | Param_mode_mismatch (s, Error (ax, {left; right})) ->
       let actual, expected =
         match s with
         | Left_le_right -> left, right
         | Right_le_left -> right, left
       in
+      let actual, expected = axhint_get_const actual, axhint_get_const expected in
       Location.errorf ~loc
         "@[This function takes a parameter which is %a,@ \
         but was expected to take a parameter which is %a.@]"
@@ -11262,7 +11264,8 @@ let report_error ~loc env =
           Location.errorf ~loc
             "This function or one of its parameters escape their region@ \
             when it is partially applied."
-      | Error (ax, {left; right}) ->
+      | Error (ax, err) ->
+          let left, right = axerror_get_consts_pair err in
           Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."
