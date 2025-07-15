@@ -2,8 +2,16 @@
    expect;
 *)
 
-(* [exn] currently crosses portability. To make it safe, exception constructors
-are portable iff all its arguments are portable. *)
+(* [exn] currently crosses portability and contention.
+
+   To make it safe, exception constructors under a portable lock:
+   - Require their fields cross contention and be at portable during creation
+   - Require their fields cross portability and mark as contended during pattern-matching
+
+   This can be modeled as each exception constructor being contained in
+   the original capsule it was defined in. Creating/destroying instances
+   of that constructor moves its arguments across capsule boundaries.
+*)
 
 exception Nonportable of (unit -> unit)
 exception Portable of unit
@@ -22,13 +30,15 @@ val x : exn = Nonportable <fun>
 
 let (foo @ portable) () =
     match x with
-    | Nonportable g -> ()
+    | Nonportable g -> g ()
     | _ -> ()
 [%%expect{|
 Line 3, characters 6-17:
-3 |     | Nonportable g -> ()
+3 |     | Nonportable g -> g ()
           ^^^^^^^^^^^
-Error: The constructor "Nonportable" is nonportable, so cannot be used inside a function that is portable.
+Error: This value is "nonportable" but expected to be "portable".
+  Hint: All arguments of the constructor "Nonportable"
+  must cross this axis to use it in this position.
 |}]
 
 let (foo @ portable) () =
@@ -47,13 +57,19 @@ let (foo @ portable) () =
 val foo : unit -> unit = <fun>
 |}]
 
-let (foo @ portable) () =
-    raise (Nonportable (fun () -> ()))
+let (foo @ portable) g =
+    raise (Nonportable g)
 [%%expect{|
-Line 2, characters 11-22:
-2 |     raise (Nonportable (fun () -> ()))
-               ^^^^^^^^^^^
-Error: The constructor "Nonportable" is nonportable, so cannot be used inside a function that is portable.
+val foo : (unit -> unit) @ portable -> 'a = <fun>
+|}]
+
+let (foo @ portable) (g @ nonportable) =
+    raise (Nonportable g)
+[%%expect{|
+Line 2, characters 23-24:
+2 |     raise (Nonportable g)
+                           ^
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 let (foo @ portable) () =
@@ -78,12 +94,33 @@ let (foo @ portable) () =
 Line 3, characters 33-44:
 3 |         exception Nonportable' = Nonportable
                                      ^^^^^^^^^^^
-Error: The constructor "Nonportable" is nonportable, so cannot be used inside a function that is portable.
+Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+       Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
+(* Rebinding with crossing types succeeds. *)
 
-(* CR zqian: the following should be allowed, but requires a completely different
-approach (coportable). *)
+exception Crossing of int list
+[%%expect{|
+exception Crossing of int list
+|}]
+
+let (cross @ portable) () =
+    let module M = struct
+        exception Crossing' = Crossing
+    end in
+    raise (M.Crossing' [3; 4; 5])
+[%%expect{|
+val cross : unit -> 'a = <fun>
+|}, Principal{|
+Line 3, characters 30-38:
+3 |         exception Crossing' = Crossing
+                                  ^^^^^^^^
+Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+       Hint: all argument types must mode-cross for rebinding to succeed.
+|}]
+
+(* CR modes: accepting this requires [coportable]. *)
 exception SemiPortable of string * (unit -> unit)
 
 let (foo @ portable) () =
@@ -94,11 +131,11 @@ exception SemiPortable of string * (unit -> unit)
 Line 5, characters 4-16:
 5 |     SemiPortable (s, _) -> print_endline s
         ^^^^^^^^^^^^
-Error: The constructor "SemiPortable" is nonportable, so cannot be used inside a function that is portable.
+Error: This value is "nonportable" but expected to be "portable".
+  Hint: All arguments of the constructor "SemiPortable"
+  must cross this axis to use it in this position.
 |}]
 
-(* [exn] also crosses contention. To make it safe, exception constructors
-are uncontended iff all its arguments are uncontended. *)
 exception Uncontended of unit
 exception Uncontended' of int ref @@ contended
 exception Contended of int ref
@@ -129,9 +166,17 @@ let (foo @ portable) () =
     | Contended _ -> ()
     | _ -> ()
 [%%expect{|
-Line 3, characters 6-15:
-3 |     | Contended _ -> ()
-          ^^^^^^^^^
+val foo : unit -> unit = <fun>
+|}]
+
+let (foo @ portable) () =
+    match x with
+    | Contended r -> r := 4
+    | _ -> ()
+[%%expect{|
+Line 3, characters 21-22:
+3 |     | Contended r -> r := 4
+                         ^
 Error: This value is "contended" but expected to be "uncontended".
 |}]
 
@@ -154,6 +199,8 @@ Line 2, characters 11-20:
 2 |     raise (Contended (ref 42))
                ^^^^^^^^^
 Error: This value is "contended" but expected to be "uncontended".
+  Hint: All arguments of the constructor "Contended"
+  must cross this axis to use it in this position.
 |}]
 
 (* rebinding counts as usage *)
@@ -167,11 +214,28 @@ Line 3, characters 31-40:
 3 |         exception Contended' = Contended
                                    ^^^^^^^^^
 Error: This constructor is at mode "contended", but expected to be at mode "uncontended".
+       Hint: all argument types must mode-cross for rebinding to succeed.
 |}, Principal{|
 Line 3, characters 31-40:
 3 |         exception Contended' = Contended
                                    ^^^^^^^^^
-Error: The constructor "Contended" is nonportable, so cannot be used inside a function that is portable.
+Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+       Hint: all argument types must mode-cross for rebinding to succeed.
+|}]
+
+let (bar @ portable) () =
+    let module M = struct
+        exception Uncontended'' = Uncontended
+    end in
+    raise (M.Uncontended'' ())
+[%%expect{|
+val bar : unit -> 'a = <fun>
+|}, Principal{|
+Line 3, characters 34-45:
+3 |         exception Uncontended'' = Uncontended
+                                      ^^^^^^^^^^^
+Error: This constructor is at mode "nonportable", but expected to be at mode "portable".
+       Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
 
@@ -193,4 +257,28 @@ Line 8, characters 12-13:
 8 |     ignore (x : _ @ portable)
                 ^
 Error: The value "x" is nonportable, so cannot be used inside a function that is portable.
+|}]
+
+module type S = sig
+    exception Exn of string ref
+end
+[%%expect{|
+module type S = sig exception Exn of string ref end
+|}]
+
+(* CR modes: test that portable modules, when implemented,
+   handle constructor locks correctly. *)
+
+let make_s () : (module S) @ portable =
+    let module M = struct
+        exception Exn of string ref
+    end
+    in
+    (module M : S)
+
+[%%expect{|
+Line 6, characters 4-18:
+6 |     (module M : S)
+        ^^^^^^^^^^^^^^
+Error: This value is "nonportable" but expected to be "portable".
 |}]
