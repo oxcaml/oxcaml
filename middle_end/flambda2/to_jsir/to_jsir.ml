@@ -11,6 +11,7 @@ let rec expr ~env ~res e =
 
 and let_expr ~env ~res e =
   (* CR selee: translate to [Let] *)
+  ignore (env, res, e);
   failwith "unimplemented"
 
 and let_cont ~env ~res e =
