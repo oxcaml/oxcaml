@@ -88,7 +88,9 @@ module Extension = struct
     | AVX2 -> "Haswell+"
     | AVX512F -> "SkylakeXeon+"
 
+  (* The set of default extensions must be closed under [implies]. *)
   let enabled_by_default = function
+    (* CR-soon mslater: defaults should be determined by configure. *)
     | SSE3 | SSSE3 | SSE4_1 | SSE4_2
     | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 -> true
     | PREFETCHW | PREFETCHWT1 | AVX512F -> false
@@ -103,6 +105,7 @@ module Extension = struct
   let enabled t = Set.mem t !config
   let disabled t = not (enabled t)
 
+  (* Must be kept in sync with [implied_by]. *)
   let implies t =
     match t with
     | SSE3 | SSSE3 | SSE4_1 | SSE4_2
@@ -111,6 +114,7 @@ module Extension = struct
     | AVX2 -> [t; AVX]
     | AVX512F -> [t; AVX; AVX2]
 
+  (* Must be kept in sync with [implies]. *)
   let implied_by t =
     match t with
     | SSE3 | SSSE3 | SSE4_1 | SSE4_2
