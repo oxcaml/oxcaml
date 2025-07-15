@@ -3002,7 +3002,6 @@ and type_pat_aux
           (Constructor.disambiguate Env.Pattern lid !!penv expected_type)
           candidates
       in
-      let held_locks = (locks, lid.txt, lid.loc) in
       begin match no_existentials, constr.cstr_existentials with
       | None, _ | _, [] -> ()
       | Some r, (_ :: _) ->
@@ -3076,7 +3075,7 @@ and type_pat_aux
 
       let constructor_mode =
         match Ctype.check_constructor_crossing Destruction !!penv
-          constr.cstr_tag ~res:expected_ty ~args held_locks with
+          lid constr.cstr_tag ~res:expected_ty ~args locks with
         | Ok mode -> mode
         | Error e -> raise (Error (lid.loc, !!penv,
           Submode_failed (e, Constructor lid.txt, None, None, None, None)))
@@ -8674,7 +8673,6 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       ty_expected_explained
       (Constructor.disambiguate Env.Positive lid env expected_type) constrs
   in
-  let held_locks = (locks, lid.txt, lid.loc) in
   let sargs =
     match sarg with
     | None -> []
@@ -8747,8 +8745,8 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       end
   in
   let constructor_mode =
-    match Ctype.check_constructor_crossing Creation env constr.cstr_tag
-      ~res:ty_res ~args:ty_args held_locks with
+    match Ctype.check_constructor_crossing Creation env lid
+      constr.cstr_tag ~res:ty_res ~args:ty_args locks with
     | Ok mode -> mode
     | Error e -> raise (Error (lid.loc, env,
         Submode_failed (e, Constructor lid.txt, None, None, None, None)))

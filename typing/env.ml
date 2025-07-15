@@ -3769,7 +3769,7 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
       lookup_all_ident_constructors
         ~errors ~use ~loc usage s (Lazy.force initial)
   | _ ->
-      let (_, locks, comps) =
+      let (_, (_, locks), comps) =
         lookup_structure_components ~errors ~use ~loc l env
       in
       match NameMap.find s comps.comp_constrs with
