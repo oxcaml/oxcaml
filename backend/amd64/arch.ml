@@ -89,9 +89,20 @@ module Extension = struct
     | AVX512F -> "SkylakeXeon+"
 
   let enabled_by_default = function
-    (* CR-soon mslater: defaults should be determined by configure. *)
-    | SSE3 | SSSE3 | SSE4_1 | SSE4_2
-    | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 -> true
+    (* We enable all Haswell extensions by default, unless the compiler
+       was configured on a CPU without support. Note SSE/SSE2 cannot be
+       disabled as they are included in baseline x86_64. *)
+    | POPCNT -> Config.has_popcnt
+    | CLMUL -> Config.has_pclmul
+    | LZCNT -> Config.has_lzcnt
+    | SSE3 -> Config.has_sse3
+    | SSSE3 -> Config.has_ssse3
+    | SSE4_1 -> Config.has_sse4_1
+    | SSE4_2 -> Config.has_sse4_2
+    | BMI -> Config.has_bmi
+    | BMI2 -> Config.has_bmi2
+    | AVX -> Config.has_avx
+    | AVX2 -> Config.has_avx2
     | PREFETCHW | PREFETCHWT1 | AVX512F -> false
 
   let all =
@@ -111,21 +122,23 @@ module Extension = struct
     | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
       | SSE4_2 | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
 
-  let implication ext =
-    let rec fix set less =
-      let closure =
-        Set.filter (fun ext -> Set.exists (less ext) set) all
-        |> Set.union set
-      in
-      if Set.equal closure set then set
-      else fix closure less
+  let rec fix set less =
+    let closure =
+      Set.filter (fun ext -> Set.exists (less ext) set) all
+      |> Set.union set
     in
+    if Set.equal closure set then set
+    else fix closure less
+
+  let implication ext =
     let set = Set.singleton ext in
     let implies = fix set directly_implied_by in
     let implied_by = fix set (fun e1 e2 -> directly_implied_by e2 e1) in
     implies, implied_by
 
-  let config = ref (Set.filter enabled_by_default all)
+  let config =
+    let default = Set.filter enabled_by_default all in
+    ref (fix default directly_implied_by)
 
   let enabled t = Set.mem t !config
   let disabled t = not (enabled t)
