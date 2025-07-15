@@ -19,7 +19,7 @@ val meet :
   Type_grammar.t ->
   (Type_grammar.t * Typing_env.t) Or_bottom.t
 
-val meet_type : unit -> Typing_env.meet_type
+val meet_type : unit -> Meet_env.meet_type
 
 val meet_shape :
   Typing_env.t ->

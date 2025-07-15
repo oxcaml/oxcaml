@@ -47,7 +47,7 @@ module I = struct
   include I
 
   let simd simd args =
-    Arch.Extension.require_simd simd;
+    Arch.Extension.require_instruction simd;
     I.simd simd args
 end
 
@@ -80,10 +80,10 @@ let register_name typ r : X86_ast.arg =
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
   | Vec256 ->
-    Arch.Extension.require AVX;
+    Arch.Extension.require_vec256 ();
     Regf ymm_reg_name.(r - 100)
   | Vec512 ->
-    Arch.Extension.require AVX512F;
+    Arch.Extension.require_vec512 ();
     Regf zmm_reg_name.(r - 100)
 
 let phys_rax = phys_reg Int 0
@@ -337,10 +337,10 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   | Float -> REAL8
   | Vec128 -> VEC128
   | Vec256 ->
-    Arch.Extension.require AVX;
+    Arch.Extension.require_vec256 ();
     VEC256
   | Vec512 ->
-    Arch.Extension.require AVX512F;
+    Arch.Extension.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
   | Int | Addr | Val -> QWORD
@@ -444,11 +444,11 @@ let must_save_simd_regs live =
     live;
   if !v512
   then (
-    Arch.Extension.require AVX512F;
+    Arch.Extension.require_vec512 ();
     Save_zmm)
   else if !v256
   then (
-    Arch.Extension.require AVX;
+    Arch.Extension.require_vec256 ();
     Save_ymm)
   else Save_xmm
 
