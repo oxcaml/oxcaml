@@ -99,10 +99,13 @@ type t =
   { llvmir_filename : string;
     oc : Out_channel.t;
     ppf : Format.formatter;
-    asm_filename : string;
+    ppf_dump : Format.formatter;
+    mutable asm_filename : string option;
+        (* This gets provided when [begin_assembly] gets called *)
     mutable current_fun_info : fun_info;
-        (* should be reset for every function *)
+        (* Maintains the state of the current function *)
     mutable data : Cmm.data_item list
+        (* Collects data items as they come and processes them at the end *)
   }
 
 let create_fun_info () =
@@ -112,13 +115,14 @@ let create_fun_info () =
     label2ident = Label.Tbl.create 37
   }
 
-let create ~llvmir_filename ~asm_filename =
+let create ~llvmir_filename ~ppf_dump =
+  let asm_filename = None in
   let oc = Out_channel.open_text llvmir_filename in
   let ppf = Format.formatter_of_out_channel oc in
   let current_fun_info = create_fun_info () in
   let data = [] in
   print_endline "create";
-  { llvmir_filename; asm_filename; oc; ppf; current_fun_info; data }
+  { llvmir_filename; asm_filename; oc; ppf; ppf_dump; current_fun_info; data }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
 
@@ -140,6 +144,10 @@ let get_ident_for_reg t label =
     ~add:Reg.Tbl.add
 
 let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
+
+(* CR yusumez: Write to this ppf alongside the normal one when -dllvmir is
+   passed *)
+let _get_ppf_dump t = t.ppf_dump
 
 module F = struct
   open Format
@@ -171,7 +179,7 @@ module F = struct
     pp_indent t.ppf ();
     kfprintf (fun ppf -> pp_print_newline ppf ()) t.ppf
 
-  let _source_filename t s = line t.ppf "source_filename = \"%s\"" s
+  let source_filename t s = line t.ppf "source_filename = \"%s\"" s
 
   let machtyp_component (m : Cmm.machtype_component) =
     Llvm_typ.(of_machtyp_component m |> to_string)
@@ -393,12 +401,9 @@ end
 let current_compilation_unit = ref None
 
 let get_current_compilation_unit msg =
-  Option.value
-    ~default:(Misc.fatal_error ("Current compilation unit not set " ^ msg))
-    !current_compilation_unit
-
-let is_current_compilation_unit_set () =
-  Option.is_some !current_compilation_unit
+  match !current_compilation_unit with
+  | Some t -> t
+  | None -> Misc.fatal_error ("Current compilation unit not set: " ^ msg)
 
 let llvmir_to_assembly t =
   (* CR-someday gyorsh: add other optimization flags and control which passes to
@@ -406,32 +411,37 @@ let llvmir_to_assembly t =
   let cmd =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
-  Ccomp.command
-    (String.concat " "
-       (cmd
-       :: [ "-o";
-            Filename.quote t.asm_filename;
-            "-O3";
-            "-S";
-            "-x ir";
-            Filename.quote t.llvmir_filename ]))
+  match t.asm_filename with
+  | None -> 0
+  | Some asm_filename ->
+    Ccomp.command
+      (String.concat " "
+         [ cmd;
+           "-o";
+           Filename.quote asm_filename;
+           "-O3";
+           "-S";
+           "-x ir";
+           Filename.quote t.llvmir_filename ])
+
+(* Create LLVM IR file for the current compilation unit. *)
+let init ~output_prefix ~ppf_dump =
+  let llvmir_filename = output_prefix ^ ".ll" in
+  current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
 let close_out () =
-  print_endline "close";
+  print_endline "close_out";
   match !current_compilation_unit with
   | None -> ()
   | Some t ->
     (* Exception raised during llvmize, keep .ll file. *)
     Out_channel.close t.oc;
-    print_endline "close out set none";
     current_compilation_unit := None
 
-let open_out ~asm_filename ~output_prefix =
-  print_endline "open";
-  (* Create LLVM IR file for the current compilation unit. *)
-  let llvmir_filename = output_prefix ^ ".ll" in
-  print_endline "open out set some";
-  current_compilation_unit := Some (create ~llvmir_filename ~asm_filename)
+let open_out ~asm_filename =
+  print_endline "open_out";
+  let t = get_current_compilation_unit "open_out" in
+  t.asm_filename <- Some asm_filename
 
 let fun_attrs _t _codegen_options : string list =
   (* CR gyorsh: translate and communicate to llvm backend *)
@@ -544,20 +554,18 @@ let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
   with Sys_error _msg -> ()
 
-let begin_assembly () =
-  print_endline "begin asm";
-  let t = get_current_compilation_unit "begin-asm" in
-  (* CR yusumez: Source filename needs to get emitted here (it won't work at the
-     end), but we don't have access to it here. It isn't required for now. *)
-  (* Option.iter (F.source_filename t) sourcefile; *)
+let begin_assembly ~sourcefile =
+  print_endline "begin_asm";
+  let t = get_current_compilation_unit "begin_asm" in
+  Option.iter (F.source_filename t) sourcefile;
   F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
   F.symbol_decl t "data_begin";
   F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
 let end_assembly ~sourcefile =
-  print_endline "end asm";
-  let t = get_current_compilation_unit "end-asm" in
+  print_endline "end_asm";
+  let t = get_current_compilation_unit "end_asm" in
   (* Emit data declarations *)
   emit_data t;
   F.symbol_decl t "data_end";
@@ -574,9 +582,7 @@ let end_assembly ~sourcefile =
          (Asm_generation
             ( Option.value ~default:"(no source file specified)" sourcefile,
               ret_code )));
-  (* CR yusumez: This should be a separate flag (like save_llvmir). *)
-  if not !Oxcaml_flags.dump_llvmir then remove_file t.llvmir_filename;
-  print_endline "end asm set none";
+  if not !Oxcaml_flags.keep_llvmir then remove_file t.llvmir_filename;
   current_compilation_unit := None
 
 (* CR-someday gyorsh: currently, llvm backend can be selected at the compilation

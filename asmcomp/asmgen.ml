@@ -202,11 +202,11 @@ let should_use_linscan fd =
 
 let if_emit_do f x = if should_emit () then f x else ()
 
-let emit_begin_assembly unix =
+let emit_begin_assembly ~sourcefile unix =
   if_emit_do
     (fun () ->
       if !Oxcaml_flags.llvm_backend
-      then Llvmize.begin_assembly ()
+      then Llvmize.begin_assembly ~sourcefile
       else Emit.begin_assembly unix)
     ()
 
@@ -524,11 +524,12 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
+  if !Oxcaml_flags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
   let open_asm_file () =
     if create_asm
     then
       if !Oxcaml_flags.llvm_backend
-      then Llvmize.open_out ~asm_filename ~output_prefix
+      then Llvmize.open_out ~asm_filename
       else Emitaux.output_channel := open_out asm_filename
   in
   let close_asm_file () =
@@ -574,7 +575,7 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
        if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
@@ -639,7 +640,7 @@ let linear_gen_implementation unix filename =
   (* CR mshinwell: set [sourcefile] properly; [filename] isn't a .ml file *)
   let sourcefile = Some filename in
   Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  emit_begin_assembly ~sourcefile unix;
   Profile.record "Emit" (List.iter emit_item) linear_unit_info.items;
   emit_end_assembly ~sourcefile ()
 

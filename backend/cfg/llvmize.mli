@@ -17,12 +17,12 @@ val cfg : Cfg_with_layout.t -> unit
 
 val data : Cmm.data_item list -> unit
 
-val begin_assembly : unit -> unit
+val begin_assembly : sourcefile:string option -> unit
 
 val end_assembly : sourcefile:string option -> unit
 
 val close_out : unit -> unit
 
-val open_out : asm_filename:string -> output_prefix:string -> unit
+val open_out : asm_filename:string -> unit
 
-val is_current_compilation_unit_set : unit -> bool
+val init : output_prefix:string -> ppf_dump:Format.formatter -> unit

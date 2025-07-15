@@ -575,10 +575,10 @@ module Compiler_pass = struct
     | Lambda -> 2
     | Middle_end -> 3
     | Selection -> 20
+    | Llvmize -> 25
     | Register_allocation -> 30
     | Simplify_cfg -> 49
     | Linearization -> 50
-    | Llvmize -> 55
     | Emit -> 60
 
   let passes = [
