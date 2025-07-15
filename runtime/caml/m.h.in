@@ -107,3 +107,5 @@
 #undef STACK_CHECKS_ENABLED
 
 #undef MULTIDOMAIN
+
+#undef HAS_BMI

@@ -293,6 +293,17 @@ let print_addressing printreg addr ppf arg =
       let idx = if n <> 0 then Printf.sprintf " + %i" n else "" in
       fprintf ppf "%a + %a * %i%s" printreg arg.(0) printreg arg.(1) scale idx
 
+let floatartith_name (width : float_width) op =
+  match width, op with
+  | Float64, Ifloatadd -> "+f"
+  | Float64, Ifloatsub -> "-f"
+  | Float64, Ifloatmul -> "*f"
+  | Float64, Ifloatdiv -> "/f"
+  | Float32, Ifloatadd -> "+f32"
+  | Float32, Ifloatsub -> "-f32"
+  | Float32, Ifloatmul -> "*f32"
+  | Float32, Ifloatdiv -> "/f32"
+
 let print_specific_operation printreg op ppf arg =
   match op with
   | Ilea addr -> print_addressing printreg addr ppf arg
@@ -303,15 +314,7 @@ let print_specific_operation printreg op ppf arg =
   | Ioffset_loc(n, addr) ->
       fprintf ppf "[%a] +:= %i" (print_addressing printreg addr) arg n
   | Ifloatarithmem(width, op, addr) ->
-      let op_name = match width, op with
-      | Float64, Ifloatadd -> "+f"
-      | Float64, Ifloatsub -> "-f"
-      | Float64, Ifloatmul -> "*f"
-      | Float64, Ifloatdiv -> "/f"
-      | Float32, Ifloatadd -> "+f32"
-      | Float32, Ifloatsub -> "-f32"
-      | Float32, Ifloatmul -> "*f32"
-      | Float32, Ifloatdiv -> "/f32" in
+      let op_name = floatartith_name width op in
       fprintf ppf "%a %s float64[%a]" printreg arg.(0) op_name
                    (print_addressing printreg addr)
                    (Array.sub arg 1 (Array.length arg - 1))
@@ -345,6 +348,28 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "prefetch is_write=%b prefetch_temporal_locality_hint=%s %a"
         is_write (string_of_prefetch_temporal_locality_hint locality)
         printreg arg.(0)
+
+let specific_operation_name : specific_operation -> string = fun op ->
+  match op with
+  | Ilea _ -> "lea"
+  | Istore_int (n,_addr,_is_assign) -> "store_int "^ (Nativeint.to_string n)
+  | Ioffset_loc (n,_addr) -> "offset_loc "^(string_of_int n)
+  | Ifloatarithmem (width, op, _addr) -> floatartith_name width op
+  | Ibswap { bitwidth } ->
+      "bswap " ^ (bitwidth |> int_of_bswap_bitwidth |> string_of_int)
+  | Isextend32 -> "sextend32"
+  | Izextend32 -> "zextend32"
+  | Irdtsc -> "rdtsc"
+  | Ilfence -> "lfence"
+  | Isfence -> "sfence"
+  | Imfence -> "mfence"
+  | Irdpmc -> "rdpmc"
+  | Ipackf32 -> "packf32"
+  | Isimd _simd -> "simd"
+  | Isimd_mem (_simd,_addr) -> "simd_mem"
+  | Ipause -> "pause"
+  | Icldemote _ -> "cldemote"
+  | Iprefetch _ -> "prefetch"
 
 (* Are we using the Windows 64-bit ABI? *)
 let win64 =

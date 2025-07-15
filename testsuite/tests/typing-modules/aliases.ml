@@ -30,17 +30,17 @@ module C' :
 - : char = 'B'
 module C3 :
   sig
-    external code : char -> int @@ portable = "%identity"
-    val chr : int -> char @@ portable
-    val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
+    external code : char -> int = "%identity"
+    val chr : int -> char
+    val escaped : char -> string
+    val lowercase_ascii : char -> char
+    val uppercase_ascii : char -> char
     type t = char
-    val compare : t -> t -> int @@ portable
-    val equal : t -> t -> bool @@ portable
-    val seeded_hash : int -> t -> int @@ portable
-    val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
+    val compare : t -> t -> int
+    val equal : t -> t -> bool
+    val seeded_hash : int -> t -> int
+    val hash : t -> int
+    external unsafe_chr : int -> char = "%identity"
   end
 - : char = 'B'
 |}];;
@@ -243,24 +243,24 @@ module M : sig module C : Complex end
 module C = Complex
 - : float = 1.
 type t = Complex.t = { re : float; im : float; }
-val zero : t @@ portable = {re = 0.; im = 0.}
-val one : t @@ portable = {re = 1.; im = 0.}
-val i : t @@ portable = {re = 0.; im = 1.}
-val neg : t -> t @@ portable = <fun>
-val conj : t -> t @@ portable = <fun>
-val add : t -> t -> t @@ portable = <fun>
-val sub : t -> t -> t @@ portable = <fun>
-val mul : t -> t -> t @@ portable = <fun>
-val inv : t -> t @@ portable = <fun>
-val div : t -> t -> t @@ portable = <fun>
-val sqrt : t -> t @@ portable = <fun>
-val norm2 : t -> float @@ portable = <fun>
-val norm : t -> float @@ portable = <fun>
-val arg : t -> float @@ portable = <fun>
-val polar : float -> float -> t @@ portable = <fun>
-val exp : t -> t @@ portable = <fun>
-val log : t -> t @@ portable = <fun>
-val pow : t -> t -> t @@ portable = <fun>
+val zero : t = {re = 0.; im = 0.}
+val one : t = {re = 1.; im = 0.}
+val i : t = {re = 0.; im = 1.}
+val neg : t -> t = <fun>
+val conj : t -> t = <fun>
+val add : t -> t -> t = <fun>
+val sub : t -> t -> t = <fun>
+val mul : t -> t -> t = <fun>
+val inv : t -> t = <fun>
+val div : t -> t -> t = <fun>
+val sqrt : t -> t = <fun>
+val norm2 : t -> float = <fun>
+val norm : t -> float = <fun>
+val arg : t -> float = <fun>
+val polar : float -> float -> t = <fun>
+val exp : t -> t = <fun>
+val log : t -> t = <fun>
+val pow : t -> t -> t = <fun>
 |}];;
 
 module F(X:sig module C = Char end) = struct module C = X.C end;;
@@ -511,7 +511,7 @@ module A1 : sig end
 module A2 : sig end
 module L1 : sig module X = A1 end
 module L2 : sig module X = A2 end
-module F : functor (L : sig module X : sig end end) -> sig end
+module F : functor (L : sig module X : sig end @@ stateless end) -> sig end
 module F1 : sig end
 module F2 : sig end
 |}];;
@@ -592,7 +592,7 @@ module M :
   end
 module type S =
   sig
-    module I = Int
+    module I = Int @@ portable
     type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(I).t) eq
   end
 module Int2 : sig type t = int val compare : 'a -> 'a -> int end
@@ -636,10 +636,11 @@ module M :
   end
 module type S =
   sig
-    module N : sig module I = Int end
-    module P : sig module I = N.I end
+    module N : sig module I = Int @@ portable end
+    module P : sig module I = N.I @@ portable end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(P.I).t) eq end
+      @@ stateless
   end
 |}];;
 
@@ -661,14 +662,15 @@ module M :
   end
 module type S =
   sig
-    module N : sig module I = Int end
+    module N : sig module I = Int @@ portable end
     module P :
       sig
-        module I :
-          sig type t = int val compare : 'a -> 'a -> int @@ portable end
+        module I : sig type t = int val compare : 'a -> 'a -> int end @@
+          portable
       end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(N.I).t) eq end
+      @@ stateless
   end
 |}];;
 
@@ -815,7 +817,7 @@ module type S = sig module N = M val x : N.t end
 module type T = sig val x : M.t end
 |}];;
 
-
+(* CR zqian: the following should pass with module mode crossing *)
 module X = struct module N = struct end end
 module Y : sig
   module type S = sig module N = X.N end
@@ -824,7 +826,28 @@ end = struct
 end;;
 [%%expect{|
 module X : sig module N : sig end end
-module Y : sig module type S = sig module N = X.N end end
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   module type S = module type of struct include X end
+6 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig module type S = sig module N = X.N @@ stateless end end
+       is not included in
+         sig module type S = sig module N = X.N end end
+       Module type declarations do not match:
+         module type S = sig module N = X.N @@ stateless end
+       does not match
+         module type S = sig module N = X.N end
+       The second module type is not included in the first
+       At position "module type S = <here>"
+       Module types do not match:
+         sig module N = X.N end
+       is not equal to
+         sig module N = X.N @@ stateless end
+       At position "module type S = <here>"
+       Modalities on N do not match:
+       The second is portable and the first is not.
 |}];;
 
 module type S = sig

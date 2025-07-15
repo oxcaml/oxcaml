@@ -313,8 +313,7 @@ let error_of_filter_arrow_failure ~explanation ~first ty_fun
 
 let type_module =
   ref ((fun _env _md -> assert false) :
-       Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t *
-        Env.locks)
+       Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t)
 
 (* Forward declaration, to be filled in by Typemod.type_open *)
 
@@ -326,7 +325,7 @@ let type_open :
 
 let type_open_decl :
   (?used_slot:bool ref -> Env.t -> Parsetree.open_declaration
-   -> open_declaration * Types.signature * Env.t)
+   -> open_declaration * Env.t)
     ref =
   ref (fun ?used_slot:_ _ -> assert false)
 
@@ -497,6 +496,11 @@ let mode_default mode =
     tuple_modes = None }
 
 let mode_legacy = mode_default Value.legacy
+
+let mode_default_opt mode_opt =
+  match mode_opt with
+  | None -> mode_legacy
+  | Some mode -> mode_default mode
 
 let as_single_mode {mode; tuple_modes; _} =
   match tuple_modes with
@@ -1308,7 +1312,7 @@ let add_module_variables env module_variables =
          Here, on the other hand, we're calling [type_module] outside the
          raised level, so there's no extra step to take.
       *)
-      let modl, md_shape, locks =
+      let modl, md_shape =
         !type_module env
           Ast_helper.(
             Mod.unpack ~loc:mv_loc
@@ -1323,12 +1327,13 @@ let add_module_variables env module_variables =
       in
       let md =
         { md_type = modl.mod_type; md_attributes = [];
+          md_modalities = Mode.Modality.Value.id;
           md_loc = mv_name.loc;
           md_uid = mv_uid; }
       in
+      let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
       Env.add_module_declaration ~shape:md_shape ~check:true mv_id pres md
-        (* the [locks] is always empty, but typecore doesn't need to know *)
-        ~locks env
+        ~mode env
     end
   ) env module_variables_as_list
 
@@ -1348,7 +1353,6 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
       | Modvars_rejected ->
           raise (Error (loc, Env.empty, Modules_not_allowed));
       | Modvars_allowed { scope; module_variables } ->
-          escape ~loc ~env:Env.empty ~reason:Other mode;
           let id = Ident.create_scoped name.txt ~scope in
           let module_variables =
             { mv_id = id;
@@ -3295,8 +3299,8 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes}
         (pv, val_env, met_env) ->
          let check s =
-           if pv_as_var then Warnings.Unused_var s
-           else Warnings.Unused_var_strict s in
+           if pv_as_var then Warnings.Unused_var { name = s; mutated = false }
+           else Warnings.Unused_var_strict { name = s; mutated = false } in
          let id' = Ident.rename pv_id in
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
@@ -6619,7 +6623,7 @@ and type_expect_
         with_local_level begin fun () ->
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
-              let modl, md_shape, locks = !type_module env smodl in
+              let modl, md_shape = !type_module env smodl in
               Mtype.lower_nongen lv modl.mod_type;
               let pres =
                 match modl.mod_type with
@@ -6631,16 +6635,19 @@ and type_expect_
               let md_shape = Shape.set_uid_if_none md_shape md_uid in
               let md =
                 { md_type = modl.mod_type; md_attributes = [];
+                  md_modalities = Modality.Value.id;
                   md_loc = name.loc;
                   md_uid; }
               in
+              let mode, locks = modl.mod_mode in
+              let locks = Option.map (fun (a, _, _) -> a) locks in
               let (id, new_env) =
                 match name.txt with
                 | None -> None, env
                 | Some name ->
                     let id, env =
                       Env.enter_module_declaration
-                        ~scope ~shape:md_shape name pres md ~locks env
+                        ~scope ~shape:md_shape name pres md ~mode ?locks env
                     in
                     Some id, env
               in
@@ -6782,8 +6789,6 @@ and type_expect_
     type_newtype_expr ~loc ~env ~expected_mode ~rue ~attributes:sexp.pexp_attributes
       name jkind sbody
   | Pexp_pack m ->
-      (* CR zqian: pass [expected_mode] to [type_package] *)
-      submode ~loc ~env Value.legacy expected_mode;
       let (p, fl) =
         match get_desc (Ctype.expand_head env (instance ty_expected)) with
           Tpackage (p, fl) ->
@@ -6801,6 +6806,8 @@ and type_expect_
             raise (Error (loc, env, Not_a_packed_module ty_expected))
       in
       let (modl, fl') = !type_package env m p fl in
+      let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
+      submode ~loc ~env mode expected_mode;
       rue {
         exp_desc = Texp_pack modl;
         exp_loc = loc; exp_extra = [];
@@ -6809,7 +6816,7 @@ and type_expect_
         exp_env = env }
   | Pexp_open (od, e) ->
       let tv = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-      let (od, _, newenv) = !type_open_decl env od in
+      let (od, newenv) = !type_open_decl env od in
       let exp = type_expect newenv expected_mode e ty_expected_explained in
       (* Force the return type to be well-formed in the original
          environment. *)
@@ -7253,7 +7260,9 @@ and type_constraint_expect
   ret, ty, exp_extra
 
 and type_ident env ?(recarg=Rejected) lid =
-  let path, desc, mode, locks = Env.lookup_value ~loc:lid.loc lid.txt env in
+  (* CR zqian: [lookup_value] should close over the memaddr of all prefix
+  modules.  *)
+  let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
   (* We cross modes when typing [Ppat_ident], before adding new variables into
   the environment. Therefore, one might think all values in the environment are
   already mode-crossed. That is not true for several reasons:
@@ -7290,8 +7299,8 @@ and type_ident env ?(recarg=Rejected) lid =
   *)
   (* CR modes: codify the above per-axis argument. *)
   let actual_mode =
-    Env.walk_locks ~env ~item:Value mode (Some desc.val_type)
-      (locks, lid.txt, lid.loc)
+    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
+      (mode, locks)
   in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
@@ -8982,8 +8991,10 @@ and map_half_typed_cases
         *)
         let ext_env =
           add_pattern_variables ext_env pvs
-            ~check:(fun s -> Warnings.Unused_var_strict s)
-            ~check_as:(fun s -> Warnings.Unused_var s)
+            ~check:(fun s ->
+              Warnings.Unused_var_strict { name = s; mutated = false })
+            ~check_as:(fun s ->
+              Warnings.Unused_var { name = s; mutated = false})
         in
         let ext_env = add_module_variables ext_env mvs in
         let ty_expected =
@@ -9473,8 +9484,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   (l, new_env)
 
 and type_let_def_wrap_warnings
-    ?(check = fun s -> Warnings.Unused_var s)
-    ?(check_strict = fun s -> Warnings.Unused_var_strict s)
+    ?(check = fun name mutated -> Warnings.Unused_var { name; mutated })
+    ?(check_strict = fun name mutated ->
+      Warnings.Unused_var_strict { name; mutated } )
+    ?(check_mutable = fun name -> Warnings.Unmutated_mutable name)
     ~is_recursive ~entirely_functions ~exp_env ~new_env ~spat_sexp_list
     ~attrs_list ~mode_pat_typ_list ~pvs
     type_def =
@@ -9492,7 +9505,9 @@ and type_let_def_wrap_warnings
     List.exists
       (fun attrs ->
          Builtin_attributes.warning_scope ~ppwarning:false attrs (fun () ->
-           Warnings.is_active (check "") || Warnings.is_active (check_strict "")
+              Warnings.is_active (check "" false)
+           || Warnings.is_active (check_strict "" false)
+           || Warnings.is_active (check_mutable "")
            || (is_recursive && (Warnings.is_active Warnings.Unused_rec_flag))))
       attrs_list
   in
@@ -9549,12 +9564,27 @@ and type_let_def_wrap_warnings
                    event *)
                 let name = Ident.name id in
                 let used = ref false in
+                let mutable_ =
+                  (match vd.val_kind with
+                   | Val_mut _ -> true
+                   | Val_reg | Val_prim _ | Val_ivar _
+                   | Val_self _ | Val_anc _ -> false)
+                in
+                let mutated = ref false in
                 if not (name = "" || name.[0] = '_' || name.[0] = '#') then
                   add_delayed_check
                     (fun () ->
+                      let warn w =
+                        Location.prerr_warning vd.Subst.Lazy.val_loc w
+                      in
                       if not !used then
-                        Location.prerr_warning vd.Subst.Lazy.val_loc
-                          ((if !some_used then check_strict else check) name)
+                        warn
+                          ((if !some_used then check_strict else check)
+                            name !mutated)
+                      (* To reduce noise, don't issue an [unmutated-mutable]
+                         warning with [unused-var] *)
+                      else if mutable_ && not !mutated then
+                        warn (check_mutable name)
                     );
                 Env.set_value_used_callback
                   vd
@@ -9566,7 +9596,13 @@ and type_let_def_wrap_warnings
                         List.iter Env.mark_value_used (get_ref slot);
                         used := true;
                         some_used := true
-                  )
+                  );
+                match vd.val_kind with
+                | Val_mut _->
+                  Env.set_value_mutated_callback
+                    vd (fun () -> mutated := true)
+                | Val_reg | Val_prim _ | Val_ivar _
+                | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);
             mode, expected_ty, Some slot
@@ -9995,7 +10031,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
           bindings
       in
       let env =
-        let check s = Warnings.Unused_var s in
+        let check s = Warnings.Unused_var { name = s; mutated = false } in
         let pvs = tps.tps_pattern_variables in
         add_pattern_variables ~check ~check_as:check env pvs
       in
@@ -10200,8 +10236,8 @@ let maybe_check_uniqueness_value_bindings vbl =
 let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
-      ~check:(fun s -> Warnings.Unused_value_declaration s)
-      ~check_strict:(fun s -> Warnings.Unused_value_declaration s)
+      ~check:(fun s _ -> Warnings.Unused_value_declaration s)
+      ~check_strict:(fun s _ -> Warnings.Unused_value_declaration s)
       ?force_toplevel
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
@@ -10233,7 +10269,7 @@ let type_expression env jkind sexp =
       Pexp_ident lid ->
         let loc = sexp.pexp_loc in
         (* Special case for keeping type variables when looking-up a variable *)
-        let (_path, desc, _, _) =
+        let (_path, desc, _) =
           Env.lookup_value ~use:false ~loc lid.txt env
         in
         {exp with exp_type = desc.val_type}
@@ -11347,12 +11383,14 @@ let check_partial ?lev a b c cases =
 
 (* drop unnecessary arguments from the external API
    and check for uniqueness *)
-let type_expect env e ty =
-  let exp = type_expect env mode_legacy e ty in
+let type_expect env ?mode e ty =
+  let expected_mode = mode_default_opt mode in
+  let exp = type_expect env expected_mode e ty in
   maybe_check_uniqueness_exp exp; exp
 
-let type_exp env e =
-  let exp = type_exp env mode_legacy e in
+let type_exp env ?mode e =
+  let expected_mode = mode_default_opt mode in
+  let exp = type_exp env expected_mode e in
   maybe_check_uniqueness_exp exp; exp
 
 let type_argument env e t1 t2 =
