@@ -40,8 +40,13 @@ module Extension : sig
   val enabled : t -> bool
   val available : unit -> t list
 
-  val require : t -> unit
-  val require_simd : Amd64_simd_instrs.instr -> unit
+  val enabled_vec256 : unit -> bool
+  val enabled_vec512 : unit -> bool
+
+  val require_vec256 : unit -> unit
+  val require_vec512 : unit -> unit
+
+  val require_instruction : Amd64_simd_instrs.instr -> unit
 end
 
 val trap_notes : bool ref

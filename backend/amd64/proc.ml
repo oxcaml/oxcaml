@@ -113,11 +113,11 @@ let hard_float32_reg =
   Array.map (fun r -> {r with Reg.typ = Float32}) hard_float_reg
 
 let add_hard_vec256_regs list ~f =
-  if Arch.Extension.enabled AVX
+  if Arch.Extension.enabled_vec256 ()
   then f hard_vec256_reg :: list else list
 
 let add_hard_vec512_regs list ~f =
-  if Arch.Extension.enabled AVX512F
+  if Arch.Extension.enabled_vec512 ()
   then f hard_vec512_reg :: list else list
 
 let all_phys_regs =
@@ -133,10 +133,10 @@ let phys_reg ty n =
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
   | Vec256 ->
-    Arch.Extension.require AVX;
+    Arch.Extension.require_vec256 ();
     hard_vec256_reg.(n - 100)
   | Vec512 ->
-    Arch.Extension.require AVX512F;
+    Arch.Extension.require_vec512 ();
     hard_vec512_reg.(n - 100)
 
 let rax = phys_reg Int 0
@@ -222,7 +222,7 @@ let calling_conventions
         ofs := !ofs + size_vec128
       end
     | Vec256 ->
-      Arch.Extension.require AVX;
+      Arch.Extension.require_vec256 ();
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec256 !float;
         incr float
@@ -233,7 +233,7 @@ let calling_conventions
         ofs := !ofs + size_vec256
       end
     | Vec512 ->
-      Arch.Extension.require AVX512F;
+      Arch.Extension.require_vec512 ();
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec512 !float;
         incr float
@@ -711,10 +711,10 @@ let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
   | Creinterpret_cast V256_of_v256
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
-    Arch.Extension.enabled AVX
+    Arch.Extension.enabled_vec256 ()
   | Creinterpret_cast V512_of_v512
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
-    Arch.Extension.enabled AVX512F
+    Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -747,7 +747,7 @@ let expression_supported = function
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
   | Cexit _ -> true
-  | Cconst_vec256 _ -> Arch.Extension.enabled AVX
-  | Cconst_vec512 _ -> Arch.Extension.enabled AVX512F
+  | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
+  | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 
 let trap_size_in_bytes = 16

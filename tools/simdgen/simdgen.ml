@@ -316,7 +316,7 @@ let binding instr =
     instr.mnemonic ^ "_" ^ res ^ args
   else instr.mnemonic
 
-let print_one instr =
+let print_one bind instr =
   let print_ext : ext -> string = function
     | SSE -> "SSE"
     | SSE2 -> "SSE2"
@@ -413,8 +413,7 @@ let print_one instr =
     sprintf "{ prefix = %s; rm_reg = %s; opcode = %d }" (print_prefix p)
       (print_rm_reg r) opcode
   in
-  let binding = binding instr in
-  let constructor = String.capitalize_ascii binding in
+  let constructor = String.capitalize_ascii bind in
   let ext =
     Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
   in
@@ -440,19 +439,19 @@ let %s = {
   ; mnemonic = "%s"
   ; enc = %s
 }|}
-    binding constructor ext args res imm instr.mnemonic enc
+    bind constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
   let module Map = Map.Make (String) in
   let all =
     Hashtbl.to_seq_keys all_instructions
-    |> Seq.map (fun instr -> String.capitalize_ascii (binding instr), instr)
+    |> Seq.map (fun instr -> binding instr, instr)
     |> Map.of_seq
   in
   print_endline "type id = ";
-  Map.iter (fun binding _ -> printf "  | %s\n" binding) all;
+  Map.iter (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind)) all;
   print_endline "\ntype nonrec instr = id instr";
-  Map.iter (fun _ instr -> print_one instr) all
+  Map.iter (fun bind instr -> print_one bind instr) all
 
 let parse_ext = function
   | "SSE" -> Some [| SSE |]
