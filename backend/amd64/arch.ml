@@ -152,12 +152,12 @@ module Extension = struct
   let enabled_vec512 () = enabled AVX512F
 
   let require_vec256 () =
-    if not (enabled AVX)
-    then Misc.fatal_error "Using 256-bit registers requires AVX, which is not enabled."
+    if not (enabled AVX) then Misc.fatal_error
+      "Using 256-bit registers requires AVX, which is not enabled."
 
   let require_vec512 () =
-    if not (enabled AVX512F)
-    then Misc.fatal_error "Using 512-bit registers requires AVX512F, which is not enabled."
+    if not (enabled AVX512F) then Misc.fatal_error
+      "Using 512-bit registers requires AVX512F, which is not enabled."
 
   let require_instruction (instr : Amd64_simd_instrs.instr) =
     let enabled : Amd64_simd_defs.ext -> bool = function
