@@ -266,19 +266,40 @@ end
 module type S = sig exception Exn of string ref end
 |}]
 
-(* CR modes: test that portable modules, when implemented,
-   handle constructor locks correctly. *)
+(* CR dkalinichenko: fix. *)
 
-let make_s () : (module S) @ portable =
+let make_s : (unit -> (module S)) Modes.Portable.t =
     let module M = struct
         exception Exn of string ref
     end
     in
-    (module M : S)
+    { portable = fun () -> (module M : S) }
 
 [%%expect{|
-Line 6, characters 4-18:
-6 |     (module M : S)
-        ^^^^^^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
+val make_s : (unit -> (module S)) Modes.Portable.t =
+  {Modes.Portable.portable = <fun>}
+|}]
+
+let (foo @ portable) () =
+    let module M = (val make_s.portable ()) in
+    raise (M.Exn (ref "foo"))
+
+[%%expect{|
+val foo : unit -> 'a = <fun>
+|}]
+
+let (bar @ portable) f =
+    let module M = (val make_s.portable ()) in
+    try f () with
+    | M.Exn r -> !r
+    | _ -> "other exception"
+
+[%%expect{|
+val bar : (unit -> string) -> string = <fun>
+|}]
+
+let _ = bar foo
+
+[%%expect{|
+- : string = "foo"
 |}]

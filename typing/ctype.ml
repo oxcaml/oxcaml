@@ -7357,10 +7357,10 @@ type 'res constructor_crossing_kind =
 
 let check_exn_constructor_crossing (type res)
    (kind : res constructor_crossing_kind)
-   env ~args held_locks : (res, Mode.Value.error) result =
+   env lid ~args locks : (res, Mode.Value.error) result =
   let vmode =
-    Env.walk_locks ~env ~item:Constructor
-      (Mode.Value.(disallow_right min)) None held_locks
+    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Constructor
+      None ((Mode.Value.(disallow_right min)), locks)
   in
   (* Exceptions cross portability and contention, so we project those axes. *)
   let monadic =
@@ -7413,7 +7413,7 @@ let check_exn_constructor_crossing (type res)
 
 let check_constructor_crossing (type res)
    (kind : res constructor_crossing_kind)
-    env tag ~res ~args held_locks =
+    env lid tag ~res ~args held_locks =
   let no_check : res =
     match kind with
     | Creation -> Mode.Value.(disallow_left max)
@@ -7426,5 +7426,5 @@ let check_constructor_crossing (type res)
       match get_desc (expand_head env res) with
       | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
           (* Currently, only [exn] is treated specially. *)
-          check_exn_constructor_crossing kind env ~args held_locks
+          check_exn_constructor_crossing kind env lid ~args held_locks
       | _ -> Ok no_check

@@ -3053,7 +3053,6 @@ let transl_extension_constructor ~scope env type_path type_params
         let cdescr, locks =
           Env.lookup_constructor ~loc:lid.loc usage lid.txt env
         in
-        let held_locks = (locks, lid.txt, lid.loc) in
         let (args, cstr_res, _ex) =
           Ctype.instance_constructor Keep_existentials_flexible cdescr
         in
@@ -3087,8 +3086,8 @@ let transl_extension_constructor ~scope env type_path type_params
               | _ -> ())
             typext_params
         end;
-        (match Ctype.check_constructor_crossing Rebinding env cdescr.cstr_tag
-          ~res:cstr_res ~args held_locks with
+        (match Ctype.check_constructor_crossing Rebinding env lid
+          cdescr.cstr_tag ~res:cstr_res ~args locks with
         | Ok () -> ()
         | Error e -> raise (Error (lid.loc, Constructor_submode_failed e)));
         (* Ensure that constructor's type matches the type being extended *)
