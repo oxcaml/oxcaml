@@ -416,3 +416,31 @@ module type S =
     module rec M : sig module N : sig end end
   end
 |}]
+
+module rec Foo : sig
+    val bar : unit -> unit
+end = struct
+include (Foo : module type of struct
+    include Foo
+end)
+let (bar @ stateful) () = ()
+end
+[%%expect{|
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 | include (Foo : module type of struct
+5 |     include Foo
+6 | end)
+7 | let (bar @ stateful) () = ()
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val bar : unit -> unit end (* at nonportable *)
+       is not included in
+         sig val bar : unit -> unit end (* at portable *)
+       Values do not match:
+         val bar : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val bar : unit -> unit (* in a structure at portable *)
+       The first is "nonportable" but the second is "portable".
+|}]
