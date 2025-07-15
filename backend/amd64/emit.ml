@@ -959,7 +959,7 @@ let movd src dst =
   match Arch.Extension.enabled AVX with
   | false -> I.movd src dst
   | true -> (
-    match X86_dsl.is_regf src with
+    match is_regf src with
     | false -> I.simd vmovd_X_r32m32 [| src; dst |]
     | true -> I.simd vmovd_r32m32_X [| src; dst |])
 
@@ -968,7 +968,7 @@ let movq src dst =
   match Arch.Extension.enabled AVX with
   | false -> I.movq src dst
   | true -> (
-    match X86_dsl.is_regf src with
+    match is_regf src with
     | false -> I.simd vmovq_X_r64m64 [| src; dst |]
     | true -> I.simd vmovq_r64m64_X [| src; dst |])
 
@@ -977,7 +977,7 @@ let movss src dst =
   match Arch.Extension.enabled AVX with
   | false -> I.movss src dst
   | true -> (
-    match X86_dsl.is_mem src, X86_dsl.is_mem dst with
+    match is_mem src, is_mem dst with
     | false, false -> I.simd vmovss_X_X_X [| src; dst; dst |]
     | false, true -> I.simd vmovss_m32_X [| src; dst |]
     | true, false -> I.simd vmovss_X_m32 [| src; dst |]
@@ -988,7 +988,7 @@ let movsd src dst =
   match Arch.Extension.enabled AVX with
   | false -> I.movsd src dst
   | true -> (
-    match X86_dsl.is_mem src, X86_dsl.is_mem dst with
+    match is_mem src, is_mem dst with
     | false, false -> I.simd vmovsd_X_X_X [| src; dst; dst |]
     | false, true -> I.simd vmovsd_m64_X [| src; dst |]
     | true, false -> I.simd vmovsd_X_m64 [| src; dst |]
@@ -1000,11 +1000,11 @@ let movpd ~unaligned src dst =
   | false, true -> I.movupd src dst
   | false, false -> I.movapd src dst
   | true, true -> (
-    match X86_dsl.is_mem src with
+    match is_mem src with
     | false -> I.simd vmovupd_Xm128_X [| src; dst |]
     | true -> I.simd vmovupd_X_Xm128 [| src; dst |])
   | true, false -> (
-    match X86_dsl.is_mem src with
+    match is_mem src with
     | false -> I.simd vmovapd_Xm128_X [| src; dst |]
     | true -> I.simd vmovapd_X_Xm128 [| src; dst |])
 
