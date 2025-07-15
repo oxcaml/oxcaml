@@ -42,7 +42,12 @@ CAMLprim value caml_unix_gmtime(value t)
   time_t clock;
   struct tm * tm;
   clock = (time_t) Double_val(t);
+#ifdef HAS_GMTIME_R
+  struct tm tm_val;
+  tm = gmtime_r(&clock, &tm_val);
+#else
   tm = gmtime(&clock);
+#endif
   if (tm == NULL) caml_unix_error(EINVAL, "gmtime", Nothing);
   return alloc_tm(tm);
 }
@@ -52,7 +57,12 @@ CAMLprim value caml_unix_localtime(value t)
   time_t clock;
   struct tm * tm;
   clock = (time_t) Double_val(t);
+#ifdef HAS_LOCALTIME_R
+  struct tm tm_val;
+  tm = localtime_r(&clock, &tm_val);
+#else
   tm = localtime(&clock);
+#endif
   if (tm == NULL) caml_unix_error(EINVAL, "localtime", Nothing);
   return alloc_tm(tm);
 }
