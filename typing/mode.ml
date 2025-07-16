@@ -3907,41 +3907,47 @@ end
 let print_longident =
   ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
 
-let print_const_hint ppf : Hint.const -> unit =
-  let open Format in
-  function None -> fprintf ppf "it is"
+let opt_sprint_const_hint : Hint.const -> string option = function
+  | None -> None
 
-let print_morph_hint : type l r. _ -> (l * r) Hint.morph -> unit =
- fun ppf hint ->
+let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
   let open Format in
-  let rec collect_hint_messages : (l * r) Hint.morph -> string list = function
-    | None -> []
-    | Close_over loc ->
-      [asprintf "it closes over something (at %a)" Location.print_loc loc]
-    | Is_closed_by loc ->
-      [asprintf "it is closed by something (at %a)" Location.print_loc loc]
-    | Compose (hint1, hint2) ->
-      collect_hint_messages hint1 @ collect_hint_messages hint2
-  in
-  let hint_messages = collect_hint_messages hint in
-  pp_print_list
-    ~pp_sep:(fun ppf () -> fprintf ppf " and ")
-    (fun ppf message -> fprintf ppf "%s" message)
-    ppf hint_messages
+  function
+  | None -> Some "emptymorphhint"
+  | Close_over loc ->
+    Some (asprintf "closes over something (at %a)" Location.print_loc loc)
+  | Is_closed_by loc ->
+    Some (asprintf "is closed by something (at %a)" Location.print_loc loc)
+  | Compose (hint1, hint2) ->
+    Option.bind (opt_sprint_morph_hint hint1) (fun s1 ->
+        match opt_sprint_morph_hint hint2 with
+        | None -> Some s1
+        | Some s2 -> Some (sprintf "%s, which %s" s1 s2))
 
-let print_axhint (type a l r) ppf
-    (hint : (a, (l * r) Hint.morph, Hint.const) axhint) =
+let rec opt_sprint_axhint_chain :
+    type a l r. (a, (l * r) Hint.morph, Hint.const) axhint -> string option =
+ fun (hint : (a, (l * r) Hint.morph, Hint.const) axhint) ->
   let open Format in
   match hint with
   | Morph (a, print_const, morph_hint, b_hint) ->
-    fprintf ppf "This is %a because %a %a." print_const a print_morph_hint
-      morph_hint
-      (axhint_get_printer b_hint)
-      (axhint_get_const b_hint)
+    (* CR pdsouza: should probably have it so that if a morph has no good hint
+           message then just skip that morph but still continue down the chain,
+           instead of stopping the trace there *)
+    Option.bind (opt_sprint_morph_hint morph_hint) (fun morph_hint_str ->
+        let subchain_str =
+          match opt_sprint_axhint_chain b_hint with
+          | None -> ""
+          | Some s -> sprintf "\n%s" s
+        in
+        Some
+          (asprintf "This is %a because it %s %a.%s" print_const a
+             morph_hint_str
+             (axhint_get_printer b_hint)
+             (axhint_get_const b_hint) subchain_str))
   | Const (a, print_const, const_hint) ->
-    fprintf ppf "This is %a because %a." print_const a print_const_hint
-      const_hint
-  | Empty (a, print_const) -> fprintf ppf "It is %a." print_const a
+    Option.bind (opt_sprint_const_hint const_hint) (fun const_hint_str ->
+        Some (asprintf "This is %a because it %s." print_const a const_hint_str))
+  | Empty _ -> Some "emptymorphchain"
 
 let report_submode_error ppf : submode_exn_error -> unit =
   let open Format in
@@ -3952,15 +3958,23 @@ let report_submode_error ppf : submode_exn_error -> unit =
       | Some lid ->
         fprintf ppf "%a" (Misc.Style.as_inline_code !print_longident) lid
     in
+    let right_trace_str =
+      match opt_sprint_axhint_chain right with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    let left_trace_str =
+      match opt_sprint_axhint_chain left with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
     fprintf ppf
-      {| %a is expected to be at most %a.
-%a
+      {| %a is expected to be at most %a.%s
 
-However, %a is actually at least %a.
-%a |}
+However, %a is actually at least %a.%s |}
       print_lid lid_opt (axhint_get_printer right) (axhint_get_const right)
-      print_axhint right print_lid lid_opt (axhint_get_printer left)
-      (axhint_get_const left) print_axhint left
+      right_trace_str print_lid lid_opt (axhint_get_printer left)
+      (axhint_get_const left) left_trace_str
 
 let () =
   Location.register_error_of_exn (function
