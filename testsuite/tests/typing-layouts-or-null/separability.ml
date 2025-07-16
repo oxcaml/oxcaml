@@ -504,8 +504,8 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "t_val or_null" should be an instance of type
          "('a : any mod separable)"
-       The kind of t_val or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of t_val or_null is value_or_null mod everything with t_val
+         because it is the primitive type or_null.
        But the kind of t_val or_null must be a subkind of any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
@@ -559,8 +559,19 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any mod separable)"
-       The kind of float or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of float or_null is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of float or_null must be a subkind of any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}, Principal{|
+Line 1, characters 13-26:
+1 | type fails = float or_null accepts_sep
+                 ^^^^^^^^^^^^^
+Error: This type "float or_null" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float or_null is value_or_null mod everything with float
+         because it is the primitive type or_null.
        But the kind of float or_null must be a subkind of any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
@@ -600,8 +611,18 @@ Line 1, characters 22-33:
                           ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of int or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of int or_null is value_or_null mod everything
+         because it is the primitive type or_null.
+       But the kind of int or_null must be a subkind of any_non_null
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 22-33:
+1 | type should_succeed = int or_null array
+                          ^^^^^^^^^^^
+Error: This type "int or_null" should be an instance of type
+         "('a : any_non_null)"
+       The kind of int or_null is value_or_null mod everything with int
+         because it is the primitive type or_null.
        But the kind of int or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
 |}]
@@ -614,8 +635,19 @@ Line 1, characters 22-36:
                           ^^^^^^^^^^^^^^
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of string or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of string or_null is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of string or_null must be a subkind of any_non_null
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 22-36:
+1 | type should_succeed = string or_null array
+                          ^^^^^^^^^^^^^^
+Error: This type "string or_null" should be an instance of type
+         "('a : any_non_null)"
+       The kind of string or_null is value_or_null mod everything with string
+         because it is the primitive type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
 |}]
@@ -630,8 +662,19 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of float or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of float or_null is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of float or_null must be a subkind of any_non_null
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 13-26:
+1 | type fails = float or_null array
+                 ^^^^^^^^^^^^^
+Error: This type "float or_null" should be an instance of type
+         "('a : any_non_null)"
+       The kind of float or_null is value_or_null mod everything with float
+         because it is the primitive type or_null.
        But the kind of float or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
 |}]
@@ -646,8 +689,19 @@ Line 1, characters 22-36:
                           ^^^^^^^^^^^^^^
 Error: This type "string or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of string or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of string or_null is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of string or_null must be a subkind of any_non_null
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 22-36:
+1 | type should_succeed = string or_null array
+                          ^^^^^^^^^^^^^^
+Error: This type "string or_null" should be an instance of type
+         "('a : any_non_null)"
+       The kind of string or_null is value_or_null mod everything with string
+         because it is the primitive type or_null.
        But the kind of string or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
 |}]
@@ -660,8 +714,18 @@ Line 1, characters 22-33:
                           ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : any_non_null)"
-       The kind of int or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of int or_null is value_or_null mod everything
+         because it is the primitive type or_null.
+       But the kind of int or_null must be a subkind of any_non_null
+         because it's the type argument to the array type.
+|}, Principal{|
+Line 1, characters 22-33:
+1 | type should_succeed = int or_null array
+                          ^^^^^^^^^^^
+Error: This type "int or_null" should be an instance of type
+         "('a : any_non_null)"
+       The kind of int or_null is value_or_null mod everything with int
+         because it is the primitive type or_null.
        But the kind of int or_null must be a subkind of any_non_null
          because it's the type argument to the array type.
 |}]
@@ -688,15 +752,7 @@ type works = int or_null smth bounded
 [%%expect{|
 type 'a smth : immediate with 'a
 type ('a : immediate) bounded
-Line 7, characters 13-29:
-7 | type works = int or_null smth bounded
-                 ^^^^^^^^^^^^^^^^
-Error: This type "int or_null smth" should be an instance of type
-         "('a : immediate)"
-       The kind of int or_null smth is value mod non_float
-         because of the definition of smth at line 1, characters 0-50.
-       But the kind of int or_null smth must be a subkind of immediate
-         because of the definition of bounded at line 3, characters 0-29.
+type works = int or_null smth bounded
 |}, Principal{|
 type 'a smth : immediate with 'a
 type ('a : immediate) bounded
@@ -832,8 +888,21 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any mod non_float)"
-       The kind of float Or_null_reexport.t is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of float Or_null_reexport.t is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of float Or_null_reexport.t must be a subkind of
+           any mod non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-46.
+|}, Principal{|
+Line 1, characters 13-37:
+1 | type fails = float Or_null_reexport.t accepts_nonfloat
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "float Or_null_reexport.t" = "float or_null"
+       should be an instance of type "('a : any mod non_float)"
+       The kind of float Or_null_reexport.t is
+           value_or_null mod everything with float
+         because it is the primitive type or_null.
        But the kind of float Or_null_reexport.t must be a subkind of
            any mod non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
@@ -847,8 +916,21 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any mod separable)"
-       The kind of float Or_null_reexport.t is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of float Or_null_reexport.t is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of float Or_null_reexport.t must be a subkind of
+           any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}, Principal{|
+Line 1, characters 13-37:
+1 | type fails = float Or_null_reexport.t accepts_sep
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "float Or_null_reexport.t" = "float or_null"
+       should be an instance of type "('a : any mod separable)"
+       The kind of float Or_null_reexport.t is
+           value_or_null mod everything with float
+         because it is the primitive type or_null.
        But the kind of float Or_null_reexport.t must be a subkind of
            any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -878,8 +960,21 @@ Line 1, characters 13-31:
                  ^^^^^^^^^^^^^^^^^^
 Error: This type "float unbx or_null" should be an instance of type
          "('a : any mod separable)"
-       The kind of float unbx or_null is value_or_null
-         because it is the primitive value_or_null type or_null.
+       The kind of float unbx or_null is
+           value_or_null mod many unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of float unbx or_null must be a subkind of
+           any mod separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}, Principal{|
+Line 1, characters 13-31:
+1 | type fails = float unbx or_null accepts_sep
+                 ^^^^^^^^^^^^^^^^^^
+Error: This type "float unbx or_null" should be an instance of type
+         "('a : any mod separable)"
+       The kind of float unbx or_null is
+           value_or_null mod everything with float unbx
+         because it is the primitive type or_null.
        But the kind of float unbx or_null must be a subkind of
            any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.

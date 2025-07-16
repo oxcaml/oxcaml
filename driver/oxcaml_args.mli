@@ -85,6 +85,10 @@ module type Oxcaml_options = sig
 
   val no_mach_ir : unit -> unit
 
+  val llvm_backend : unit -> unit
+  val dllvmir : unit -> unit
+  val llvm_path : string -> unit
+
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit

@@ -5060,6 +5060,50 @@ let zap_modalities_to_floor_if_modes_enabled_at level =
     then Mode.Modality.Value.zap_to_floor
     else Mode.Modality.Value.zap_to_id
 
+
+(** The mode crossing of the memory block of a structure. *)
+let mode_crossing_structure_memaddr =
+  (* CR-someday lmaurer: This is hard to read or maintain. We should have a
+     constructor for [Mode.Crossing.t] that takes a simple [Cross] or
+     [Don't_cross] for each axis. *)
+  Mode.Crossing.of_bounds
+  { monadic = {
+      uniqueness = Unique;
+      contention = Contended;
+      visibility = Immutable
+    };
+    comonadic = {
+      areality = Local;
+      linearity = Many;
+      portability = Portable;
+      yielding = Unyielding;
+      statefulness = Stateless;
+  }}
+
+(** The mode crossing of a functor. *)
+let mode_crossing_functor =
+  Mode.Crossing.of_bounds
+  { monadic = {
+      uniqueness = Aliased;
+      contention = Contended;
+      visibility = Immutable
+    };
+    comonadic = {
+      areality = Local;
+      linearity = Once;
+      portability = Nonportable;
+      yielding = Yielding;
+      statefulness = Stateful;
+  }}
+
+(** The mode crossing of any module. *)
+let mode_crossing_module = Mode.Crossing.top
+
+let zap_modalities_to_floor_if_at_least level =
+  if Language_extension.(is_at_least Mode level)
+    then Mode.Modality.Value.zap_to_floor
+    else Mode.Modality.Value.zap_to_id
+
 let crossing_of_jkind env jkind =
   let jkind_of_type = type_jkind_purely_if_principal env in
   Jkind.get_mode_crossing ~jkind_of_type jkind

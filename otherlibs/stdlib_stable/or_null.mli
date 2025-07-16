@@ -24,10 +24,11 @@
 (* CR layouts: enable ocamlformat for this module when it starts supporting
    jkind annotations. *)
 
-type 'a t : value_or_null = 'a or_null [@@or_null_reexport]
+type 'a t : value_or_null mod everything with 'a = 'a or_null
+[@@or_null_reexport]
       (** The type of nullable values. Either [Null] or a value [This v].
-          ['a or_null] accepts arguments of kind [value] while itself
-          having kind [value_or_null], forbidding [_ or_null or_null]. *)
+          ['a or_null] has a non-standard [value_or_null] layout,
+          preventing the type constructor from being nested. *)
 
 val null : 'a t
 (** [null] is [Null]. *)

@@ -28,12 +28,18 @@ module Signature_names : sig
   val simplify: Env.t -> t -> signature -> signature
 end
 
+(* In the following, the optional [expected_mode] is for better error messages
+and not strictly enforced. The caller is reponsible to enforce mode constraint
+by inspecting the returned mode. *)
+(* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
+
 val type_module:
-        Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+        Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.module_expr ->
+        Typedtree.module_expr * Shape.t
 val type_structure:
-  Env.t -> Parsetree.structure ->
-  Typedtree.structure * Types.signature * Signature_names.t * Shape.t *
-  Env.t
+  Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.structure ->
+  Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
+  Shape.t * Env.t
 val type_toplevel_phrase:
   Env.t -> Types.signature -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Signature_names.t * Shape.t *
@@ -110,6 +116,17 @@ type functor_dependency_error =
     Functor_applied
   | Functor_included
 
+(** Modules that are required to be legacy mode *)
+type legacy_module =
+  | Compilation_unit
+  | Toplevel
+  | Functor_body
+
+(** Places where modes annotations are not supported *)
+type unsupported_modal_module =
+  | Functor_param
+  | Functor_res
+
 type error =
     Cannot_apply of module_type
   | Not_included of Includemod.explanation
@@ -164,7 +181,9 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
-  | Modal_module_not_supported
+  | Item_weaker_than_structure of Mode.Value.error
+  | Unsupported_modal_module of unsupported_modal_module
+  | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

@@ -518,7 +518,13 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     Env.get_code_metadata env code_id
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
   in
-  C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll, res
+  let fun_ret_type =
+    Env.get_code_metadata env code_id
+    |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
+    |> C.Extended_machtype.to_machtype
+  in
+  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
+    res )
 
 let params_and_body env res code_id p ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~translate_expr =

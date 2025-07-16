@@ -117,8 +117,6 @@ let () =
 [%%expect{|
 |}]
 
-(* [immediate_or_null] is [non_float]: *)
-
 type ('a : value_or_null mod non_float) accepts_nonfloat
 
 type succeeds = t_immediate_or_null accepts_nonfloat
@@ -126,4 +124,14 @@ type succeeds = t_immediate_or_null accepts_nonfloat
 [%%expect{|
 type ('a : value_or_null mod non_float) accepts_nonfloat
 type succeeds = t_immediate_or_null accepts_nonfloat
+|}]
+
+(* Values of [int or_null] mode-cross: *)
+
+let f (x : int or_null @ local) (g : int or_null -> unit) = g x [@nontail]
+
+[%%expect{|
+val f : local_ int or_null -> ((int or_null -> unit) -> unit) = <fun>
+|}, Principal{|
+val f : local_ int or_null -> (int or_null -> unit) -> unit = <fun>
 |}]

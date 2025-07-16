@@ -7,6 +7,7 @@ simd/*_u.ml
 simd/let_mutable.ml
 simd/unbox_types.ml
 simd/arrays.ml
+simd/arrays256.ml
 small_numbers/float32_u_lib.ml
 backend/zero_alloc_checker/fail27.ml
 backend/zero_alloc_checker/test_arch_specific_witness.ml

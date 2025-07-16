@@ -674,32 +674,33 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parray_of_iarray -> unary (Ccall "caml_array_of_iarray")
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
-    | Patomic_load _ -> unary (Ccall "caml_atomic_load")
-    | Patomic_set _ -> binary (Ccall "caml_atomic_set")
-    | Patomic_exchange _ -> binary (Ccall "caml_atomic_exchange")
-    | Patomic_compare_exchange _ ->
-      ternary (Ccall "caml_atomic_compare_exchange")
-    | Patomic_compare_set _ -> ternary (Ccall "caml_atomic_cas")
-    | Patomic_fetch_add -> binary (Ccall "caml_atomic_fetch_add")
-    | Patomic_add -> binary (Ccall "caml_atomic_add")
-    | Patomic_sub -> binary (Ccall "caml_atomic_sub")
-    | Patomic_land -> binary (Ccall "caml_atomic_land")
-    | Patomic_lor -> binary (Ccall "caml_atomic_lor")
-    | Patomic_lxor -> binary (Ccall "caml_atomic_lxor")
+    | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
+    | Patomic_compare_exchange_field _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
+    | Patomic_compare_set_field _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_cas_field")
+    | Patomic_fetch_add_field -> ternary (Ccall "caml_atomic_fetch_add_field")
+    | Patomic_add_field -> ternary (Ccall "caml_atomic_add_field")
+    | Patomic_sub_field -> ternary (Ccall "caml_atomic_sub_field")
+    | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
+    | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
+    | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
-    | Pstring_load_128 _ | Pbytes_load_128 _ | Pbytes_set_128 _
-    | Pbigstring_load_128 _ | Pbigstring_set_128 _ | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _ | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _ | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _ | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _ | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _ | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _ | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _ | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _ | Pbox_vector _ | Punbox_vector _ ->
+    | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
+    | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _ | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _ | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()

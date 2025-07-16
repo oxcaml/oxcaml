@@ -352,6 +352,8 @@ type string_accessor_width = Flambda_primitive.string_accessor_width =
   | Single
   | Sixty_four
   | One_twenty_eight of { aligned : bool }
+  | Two_fifty_six of { aligned : bool }
+  | Five_twelve of { aligned : bool }
 
 type array_load_kind = Flambda_primitive.Array_load_kind.t =
   | Immediates

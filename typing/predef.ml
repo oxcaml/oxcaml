@@ -678,8 +678,13 @@ let or_null_kind tvar =
   in
   Type_variant (cstrs, Variant_with_null, None)
 
-let or_null_jkind _ =
-  Jkind.Builtin.value_or_null ~why:(Primitive ident_or_null)
+let or_null_jkind param =
+  Jkind.Const.Builtin.value_or_null_mod_everything
+  |> Jkind.of_builtin ~why:(Primitive ident_or_null)
+  |> Jkind.add_with_bounds
+    ~modality:Mode.Modality.Value.Const.id
+    ~type_expr:param
+  |> Jkind.mark_best
 
 let add_or_null add_type env =
   let add_type1 = mk_add_type1 add_type in

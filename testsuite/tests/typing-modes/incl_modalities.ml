@@ -1,5 +1,5 @@
 (* TEST
-    flags += "-extension mode";
+    flags += "-extension mode_alpha";
     expect;
 *)
 
@@ -217,7 +217,7 @@ module M :
     module type Foo = sig val foo : 'a -> 'a end
     module type Foo' = Foo
     module type S = sig module N : Foo' end
-  end
+  end @@ stateless
 module type S' = sig module N : sig val foo : 'a -> 'a @@ portable end end
 |}]
 
