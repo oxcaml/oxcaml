@@ -1658,7 +1658,8 @@ let axerror_get_consts_pair err =
 
 type submode_exn_error =
   | SubmodeError :
-      ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
+      Longident.t option
+      * ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
       -> submode_exn_error
 
 exception Submode_exn of Location.t * submode_exn_error
@@ -3903,47 +3904,62 @@ module Crossing = struct
     Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
 end
 
+let print_longident =
+  ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
+
 let print_const_hint ppf : Hint.const -> unit =
   let open Format in
   function None -> fprintf ppf "it is"
 
-let rec print_morph_hint : type l r. _ -> (l * r) Hint.morph -> unit =
- fun ppf ->
+let print_morph_hint : type l r. _ -> (l * r) Hint.morph -> unit =
+ fun ppf hint ->
   let open Format in
-  function
-  | None -> fprintf ppf "it is"
-  | Close_over loc ->
-    fprintf ppf "it closes over something (at %a)" Location.print_loc loc
-  | Is_closed_by loc ->
-    fprintf ppf "it is closed by something (at %a)" Location.print_loc loc
-  | Compose (hint1, hint2) ->
-    fprintf ppf "%a and %a" print_morph_hint hint1 print_morph_hint hint2
+  let rec collect_hint_messages : (l * r) Hint.morph -> string list = function
+    | None -> []
+    | Close_over loc ->
+      [asprintf "it closes over something (at %a)" Location.print_loc loc]
+    | Is_closed_by loc ->
+      [asprintf "it is closed by something (at %a)" Location.print_loc loc]
+    | Compose (hint1, hint2) ->
+      collect_hint_messages hint1 @ collect_hint_messages hint2
+  in
+  let hint_messages = collect_hint_messages hint in
+  pp_print_list
+    ~pp_sep:(fun ppf () -> fprintf ppf " and ")
+    (fun ppf message -> fprintf ppf "%s" message)
+    ppf hint_messages
 
 let print_axhint (type a l r) ppf
     (hint : (a, (l * r) Hint.morph, Hint.const) axhint) =
   let open Format in
   match hint with
   | Morph (a, print_const, morph_hint, b_hint) ->
-    fprintf ppf "It is %a because %a %a." print_const a print_morph_hint
+    fprintf ppf "This is %a because %a %a." print_const a print_morph_hint
       morph_hint
       (axhint_get_printer b_hint)
       (axhint_get_const b_hint)
   | Const (a, print_const, const_hint) ->
-    fprintf ppf "It is %a because %a." print_const a print_const_hint const_hint
+    fprintf ppf "This is %a because %a." print_const a print_const_hint
+      const_hint
   | Empty (a, print_const) -> fprintf ppf "It is %a." print_const a
 
 let report_submode_error ppf : submode_exn_error -> unit =
   let open Format in
   function
-  | SubmodeError { left; right } ->
+  | SubmodeError (lid_opt, { left; right }) ->
+    let print_lid ppf = function
+      | None -> fprintf ppf "The value"
+      | Some lid ->
+        fprintf ppf "%a" (Misc.Style.as_inline_code !print_longident) lid
+    in
     fprintf ppf
-      {| %s is expected to be at most %a.
+      {| %a is expected to be at most %a.
 %a
 
-However, %s is actually at least %a.
+However, %a is actually at least %a.
 %a |}
-      "TODO(right name)" (axhint_get_printer right) (axhint_get_const right)
-      print_axhint right "TODO(left name)" (axhint_get_printer left)
+      print_lid lid_opt (axhint_get_printer right) (axhint_get_const right)
+      print_axhint right print_lid lid_opt (axhint_get_printer left)
       (axhint_get_const left) print_axhint left
 
 let () =

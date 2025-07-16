@@ -811,7 +811,7 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of Mode.Value.Comonadic.error
+  | Value_used_in_closure of Longident.t * Mode.Value.Comonadic.error
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
@@ -3320,7 +3320,7 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     in
     {mode; context = Some shared_context}
 
-let closure_mode ~errors ~env ~loc ~item:_ ~lid:_
+let closure_mode ~errors ~env ~loc ~item:_ ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) _locality_context (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
   begin
     match
@@ -3331,7 +3331,7 @@ let closure_mode ~errors ~env ~loc ~item:_ ~lid:_
     with
     | Error e ->
         may_lookup_error errors loc env
-          (Value_used_in_closure (e))
+          (Value_used_in_closure (lid, e))
     | Ok () -> ()
   end;
   let monadic =
@@ -4805,8 +4805,8 @@ let report_lookup_error _loc env ppf = function
             inside %s@]"
         print_lock_item (item, lid)
         (string_of_shared_context context)
-  | Value_used_in_closure (Error (_ax, error)) ->
-    Mode.report_submode_error ppf (Mode.SubmodeError error)
+  | Value_used_in_closure (lid, Error (_ax, error)) ->
+    Mode.report_submode_error ppf (Mode.SubmodeError (Some lid, error))
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"

@@ -247,7 +247,8 @@ module type S = sig
 
   type submode_exn_error =
     | SubmodeError :
-        ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
+        Longident.t option
+        * ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
         -> submode_exn_error
 
   exception Submode_exn of Location.t * submode_exn_error
@@ -936,6 +937,8 @@ module type S = sig
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Format.formatter -> t -> unit
   end
+
+  val print_longident : (Format.formatter -> Longident.t -> unit) ref
 
   val report_submode_error : Format.formatter -> submode_exn_error -> unit
 end
