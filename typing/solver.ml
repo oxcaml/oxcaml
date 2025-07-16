@@ -30,7 +30,7 @@ end
 
 module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type ('a, 'd) hint =
-    | Morph : H.morph * ('b, 'a, 'd) C.morph * ('b, 'd) hint -> ('a, 'd) hint
+    | Morph : 'd H.morph * ('b, 'a, 'd) C.morph * ('b, 'd) hint -> ('a, 'd) hint
     | Const : H.const -> ('a, 'd) hint
     | Branch : 'a * ('a, 'd) hint * 'a * ('a, 'd) hint -> ('a, 'd) hint
 
@@ -106,7 +106,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   and 'b lmorphvar = ('b, left_only) morphvar
 
   and ('b, 'd) morphvar =
-    | Amorphvar : 'a var * ('a, 'b, 'd) C.morph * H.morph -> ('b, 'd) morphvar
+    | Amorphvar :
+        'a var * ('a, 'b, 'd) C.morph * 'd H.morph
+        -> ('b, 'd) morphvar
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -225,14 +227,17 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let rec allow_left : type a l r. (a, allowed * r) hint -> (a, l * r) hint =
       function
-      | Morph (f_hint, f, h) -> Morph (f_hint, C.allow_left f, allow_left h)
+      | Morph (f_hint, f, h) ->
+        Morph (H.Allow_disallow.allow_left f_hint, C.allow_left f, allow_left h)
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, allow_left a_hint, b, allow_left b_hint)
 
     let rec allow_right : type a l r. (a, l * allowed) hint -> (a, l * r) hint =
       function
-      | Morph (f_hint, f, h) -> Morph (f_hint, C.allow_right f, allow_right h)
+      | Morph (f_hint, f, h) ->
+        Morph
+          (H.Allow_disallow.allow_right f_hint, C.allow_right f, allow_right h)
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, allow_right a_hint, b, allow_right b_hint)
@@ -240,7 +245,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let rec disallow_left :
         type a l r. (a, l * r) hint -> (a, disallowed * r) hint = function
       | Morph (f_hint, f, h) ->
-        Morph (f_hint, C.disallow_left f, disallow_left h)
+        Morph
+          ( H.Allow_disallow.disallow_left f_hint,
+            C.disallow_left f,
+            disallow_left h )
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, disallow_left a_hint, b, disallow_left b_hint)
@@ -248,7 +256,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let rec disallow_right :
         type a l r. (a, l * r) hint -> (a, l * disallowed) hint = function
       | Morph (f_hint, f, h) ->
-        Morph (f_hint, C.disallow_right f, disallow_right h)
+        Morph
+          ( H.Allow_disallow.disallow_right f_hint,
+            C.disallow_right f,
+            disallow_right h )
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, disallow_right a_hint, b, disallow_right b_hint)
@@ -259,21 +270,25 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let allow_left :
         type a l r. (a, allowed * r) morphvar -> (a, l * r) morphvar = function
-      | Amorphvar (v, m, h) -> Amorphvar (v, C.allow_left m, h)
+      | Amorphvar (v, m, h) ->
+        Amorphvar (v, C.allow_left m, H.Allow_disallow.allow_left h)
 
     let allow_right :
         type a l r. (a, l * allowed) morphvar -> (a, l * r) morphvar = function
-      | Amorphvar (v, m, h) -> Amorphvar (v, C.allow_right m, h)
+      | Amorphvar (v, m, h) ->
+        Amorphvar (v, C.allow_right m, H.Allow_disallow.allow_right h)
 
     let disallow_left :
         type a l r. (a, l * r) morphvar -> (a, disallowed * r) morphvar =
       function
-      | Amorphvar (v, m, h) -> Amorphvar (v, C.disallow_left m, h)
+      | Amorphvar (v, m, h) ->
+        Amorphvar (v, C.disallow_left m, H.Allow_disallow.disallow_left h)
 
     let disallow_right :
         type a l r. (a, l * r) morphvar -> (a, l * disallowed) morphvar =
       function
-      | Amorphvar (v, m, h) -> Amorphvar (v, C.disallow_right m, h)
+      | Amorphvar (v, m, h) ->
+        Amorphvar (v, C.disallow_right m, H.Allow_disallow.disallow_right h)
   end)
 
   include Magic_allow_disallow (struct
@@ -317,12 +332,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let mlower dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.lower
 
   let mlower_hint (Amorphvar (var, morph, hint)) =
-    Morph (hint, C.disallow_right morph, Hint.disallow_right var.lower_hint)
+    Morph
+      ( H.Allow_disallow.disallow_right hint,
+        C.disallow_right morph,
+        Hint.disallow_right var.lower_hint )
 
   let mupper dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.upper
 
   let mupper_hint (Amorphvar (var, morph, hint)) =
-    Morph (hint, C.disallow_left morph, Hint.disallow_left var.upper_hint)
+    Morph
+      ( H.Allow_disallow.disallow_left hint,
+        C.disallow_left morph,
+        Hint.disallow_left var.upper_hint )
 
   let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.const_none)
 
@@ -337,7 +358,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let apply :
       type a b l r.
       b C.obj ->
-      ?hint:H.morph ->
+      ?hint:(l * r) H.morph ->
       (a, b, l * r) C.morph ->
       (a, l * r) mode ->
       (b, l * r) mode =
@@ -531,7 +552,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        match submode_vc ~log src v a' a'_hint with
        | Ok () -> Ok ()
        | Error (e, e_hint) ->
-         Error (C.apply obj f e, Morph (f_hint, C.disallow_right f, e_hint))
+         Error
+           ( C.apply obj f e,
+             Morph
+               ( H.Allow_disallow.disallow_right f_hint,
+                 C.disallow_right f,
+                 e_hint ) )
 
   let eq_morphvar :
       type a l0 r0 l1 r1. (a, l0 * r0) morphvar -> (a, l1 * r1) morphvar -> bool
@@ -573,7 +599,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           let g'_hint = H.left_adjoint g_hint in
           let src = C.src dst g in
           let g'f = C.compose src g' (C.disallow_right f) in
-          let x = Amorphvar (v, g'f, H.compose g'_hint f_hint) in
+          let g'f_hint =
+            H.compose g'_hint (H.Allow_disallow.disallow_right f_hint)
+          in
+          let x = Amorphvar (v, g'f, g'f_hint) in
           let key = get_key x in
           if not (VarMap.mem key u.vlower)
           then set_vlower ~log u (VarMap.add key x u.vlower);

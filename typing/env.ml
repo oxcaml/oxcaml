@@ -3322,13 +3322,13 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     {mode; context = Some shared_context}
 
 let closure_mode ~errors ~env ~loc ~item ~lid
-  ({mode = {Mode.monadic; comonadic}; _} as vmode) locality_context comonadic0 =
+  ({mode = {Mode.monadic; comonadic}; _} as vmode) locality_context (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
   begin
     match
-      Mode.Value.Comonadic.submode comonadic
+      Mode.Value.Comonadic.submode
         (Mode.Value.Comonadic.apply_hint
           (Mode.Hint.Close_over loc)
-          comonadic0)
+          comonadic) comonadic0
     with
     | Error e ->
         may_lookup_error errors loc env

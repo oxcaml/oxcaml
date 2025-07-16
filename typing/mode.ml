@@ -1558,27 +1558,65 @@ module Hint = struct
 
   let const_none = None
 
-  type morph =
-    | None
-    | Close_over of Location.t
-    | Is_closed_by of Location.t
-    | Compose of morph * morph
+  type 'd morph =
+    | None : (_ * _) morph
+    | Close_over : Location.t -> ('l * disallowed) morph
+    | Is_closed_by : Location.t -> (disallowed * 'r) morph
+    | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
 
   let morph_none = None
 
-  let left_adjoint = function
+  let rec left_adjoint :
+      type l. (l * allowed) morph -> (allowed * disallowed) morph = function
+    | None -> None
+    | Is_closed_by l -> Close_over l
+    | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
+
+  let rec right_adjoint :
+      type r. (allowed * r) morph -> (disallowed * allowed) morph = function
     | None -> None
     | Close_over l -> Is_closed_by l
-    | Is_closed_by l -> Close_over l
-    | Compose (x, y) -> Compose (y, x)
-
-  let right_adjoint = function
-    | None -> None
-    | Close_over l -> Close_over l
-    | Is_closed_by l -> Is_closed_by l
-    | Compose (x, y) -> Compose (y, x)
+    | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
   let compose x y = Compose (x, y)
+
+  module Allow_disallow = Magic_allow_disallow (struct
+    type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
+
+    let rec allow_left : type a l r. (allowed * r) morph -> (l * r) morph =
+      fun (type a l r) (h : (allowed * r) morph) : (l * r) morph ->
+       match h with
+       | None -> None
+       | Close_over l -> Close_over l
+       | Compose (x, y) -> Compose (allow_left x, allow_left y)
+
+    let rec allow_right : type a l r. (l * allowed) morph -> (l * r) morph =
+      fun (type a l r) (h : (l * allowed) morph) : (l * r) morph ->
+       match h with
+       | None -> None
+       | Is_closed_by l -> Is_closed_by l
+       | Compose (x, y) -> Compose (allow_right x, allow_right y)
+
+    let rec disallow_left : type a l r. (l * r) morph -> (disallowed * r) morph
+        =
+      fun (type a l r) (h : (l * r) morph) : (disallowed * r) morph ->
+       match h with
+       | None -> None
+       | Close_over l -> Close_over l
+       | Is_closed_by l -> Is_closed_by l
+       | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
+
+    let rec disallow_right : type a l r. (l * r) morph -> (l * disallowed) morph
+        =
+      fun (type a l r) (h : (l * r) morph) : (l * disallowed) morph ->
+       match h with
+       | None -> None
+       | Close_over l -> Close_over l
+       | Is_closed_by l -> Is_closed_by l
+       | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
+  end)
 end
 
 module C = Lattices_mono
@@ -1741,7 +1779,7 @@ let rec shint_to_axhint :
     (r, left1 * right1) S.hint ->
     (r, a) Axis.t ->
     (left1, right1, left2, right2) shint_to_axhint_side ->
-    (a, Hint.morph, Hint.const) axhint =
+    (a, (left1 * right1) Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type r a) (r_obj : r obj) (r : r) (r_shint : (r, left1 * right1) S.hint)
       (ax : (r, a) Axis.t) side ->
@@ -1772,7 +1810,7 @@ and single_axis_shint_to_axhint :
     a ->
     (a, left1 * right1) S.hint ->
     (left1, right1, left2, right2) shint_to_axhint_side ->
-    (a, Hint.morph, Hint.const) axhint =
+    (a, (left1 * right1) Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
       (a_shint_inp : (a, left1 * right1) S.hint)
@@ -1807,7 +1845,8 @@ and single_axis_shint_to_axhint :
       in
       single_axis_shint_to_axhint a_obj chosen chosen_hint side
 
-let flip_axerror ({ left; right } : _ axerror) : _ axerror =
+let flip_axerror ({ left; right } : ('a, 'lmorph, 'rmorph, 'const) axerror) :
+    ('a, 'rmorph, 'lmorph, 'const) axerror =
   { left = right; right = left }
 
 (** Take a solver error for a product object, and an axis to project to, and
@@ -1817,7 +1856,7 @@ let solver_error_to_axerror :
     r Lattices_mono.obj ->
     (r, a) Axis.t ->
     r S.error ->
-    (a, Hint.morph, Hint.const) axerror =
+    (a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror =
  fun r_obj axis { left; left_hint; right; right_hint } ->
   let left_projected = shint_to_axhint r_obj left left_hint axis RightAdjoint in
   let right_projected =
@@ -1831,7 +1870,9 @@ let flipped_solver_error_to_axerror r_obj axis err =
 (** Take a solver error for a single axis object and convert it to an [axerror] *)
 let single_axis_solver_error_to_axerror :
     type a.
-    a Lattices_mono.obj -> a S.error -> (a, Hint.morph, Hint.const) axerror =
+    a Lattices_mono.obj ->
+    a S.error ->
+    (a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror =
  fun a_obj { left; left_hint; right; right_hint } ->
   let left_projected =
     single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
@@ -1950,7 +1991,8 @@ module Comonadic_common_gen (Obj : Obj) = struct
 
   let imply c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
 
-  let apply_hint (type l r) (morph_hint : Hint.morph) : (l * r) t -> (l * r) t =
+  let apply_hint (type l r) (morph_hint : (l * r) Hint.morph) :
+      (l * r) t -> (l * r) t =
     Solver.apply Obj.obj ~hint:morph_hint Id
 
   module Guts = struct
@@ -2013,7 +2055,8 @@ module Monadic_common_gen (Obj : Obj) = struct
 
   let subtract c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
 
-  let apply_hint (type l r) (morph_hint : Hint.morph) : (l * r) t -> (l * r) t =
+  let apply_hint (type l r) (morph_hint : (r * l) Hint.morph) :
+      (l * r) t -> (l * r) t =
     Solver.apply Obj.obj ~hint:morph_hint Id
 
   module Guts = struct
@@ -2028,7 +2071,8 @@ module Comonadic_axis_gen (Obj : Obj) = struct
   open Obj
   include Comonadic_common_gen (Obj)
 
-  type error = (const, Hint.morph, Hint.const) axerror
+  type error =
+    (const, left_only Hint.morph, left_only Hint.morph, Hint.const) axerror
 
   type equate_error = equate_step * error
 
@@ -2051,7 +2095,8 @@ module Monadic_axis_gen (Obj : Obj) = struct
   open Obj
   include Monadic_common_gen (Obj)
 
-  type error = (const, Hint.morph, Hint.const) axerror
+  type error =
+    (const, right_only Hint.morph, right_only Hint.morph, Hint.const) axerror
 
   type equate_error = equate_step * error
 
@@ -2326,7 +2371,10 @@ module Comonadic_with (Areality : Areality) = struct
   end
 
   type error =
-    | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
+    | Error :
+        'a Axis.t
+        * ('a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror
+        -> error
 
   type equate_error = equate_step * error
 
@@ -2467,7 +2515,10 @@ module Monadic = struct
   end
 
   type error =
-    | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
+    | Error :
+        'a Axis.t
+        * ('a, right_only Hint.morph, left_only Hint.morph, Hint.const) axerror
+        -> error
 
   type equate_error = equate_step * error
 
@@ -2933,14 +2984,17 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  let apply_hint (type l r) (morph_hint : Hint.morph)
-      ({ monadic; comonadic } : (l * r) t) : (l * r) t =
+  let apply_hint (morph_hint : (allowed * allowed) Hint.morph)
+      ({ monadic; comonadic } : (allowed * allowed) t) : (allowed * allowed) t =
     { monadic = Monadic.apply_hint morph_hint monadic;
       comonadic = Comonadic.apply_hint morph_hint comonadic
     }
 
   type error =
-    | Error : 'a Axis.t * ('a, Hint.morph, Hint.const) axerror -> error
+    | Error :
+        'a Axis.t
+        * ('a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror
+        -> error
 
   type equate_error = equate_step * error
 

@@ -169,7 +169,7 @@ module type Solver_mono = sig
   type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
   (** Hints describing the reasons for morphisms *)
-  type hint_morph
+  type 'd hint_morph constraint 'd = 'l * 'r
 
   (** Hints describing the reasons for constants *)
   type hint_const
@@ -179,7 +179,9 @@ module type Solver_mono = sig
 
   (** ['a hint] explains a bound of type ['a], but doesn't include the bound itself *)
   type ('a, 'd) hint =
-    | Morph : hint_morph * ('b, 'a, 'd) morph * ('b, 'd) hint -> ('a, 'd) hint
+    | Morph :
+        'd hint_morph * ('b, 'a, 'd) morph * ('b, 'd) hint
+        -> ('a, 'd) hint
         (** [Morph m f x_hint] says the current bound is derived by applying morphism [f] (explained by [m]) to another bound explained by [x_hint] *)
     | Const : hint_const -> ('a, 'd) hint
         (** [Const c] says the current bound is explained by [c] *)
@@ -294,7 +296,7 @@ module type Solver_mono = sig
   (** Apply a monotone morphism. *)
   val apply :
     'b obj ->
-    ?hint:hint_morph ->
+    ?hint:('l * 'r) hint_morph ->
     ('a, 'b, 'l * 'r) morph ->
     ('a, 'l * 'r) mode ->
     ('b, 'l * 'r) mode
@@ -308,22 +310,24 @@ module type Hint = sig
   val const_none : const
 
   (** The type of hints for mode variables with morphisms *)
-  type morph
+  type 'd morph constraint 'd = 'l * 'r
 
   (** The empty mode morphism hint *)
-  val morph_none : morph
+  val morph_none : 'd morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
-  val left_adjoint : morph -> morph
+  val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
 
   (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
-  val right_adjoint : morph -> morph
+  val right_adjoint : (allowed * _) morph -> (disallowed * allowed) morph
 
   (** Given hints for two mode morphisms, return a hint for their composition.
     If [h1] is a hint for [f1] and [h2] is a hint for [f2] then
     [compose h2 h1] refers the hint for the composition [f2 . f1]
     (i.e. first applying [f1] then applying [f2]) *)
-  val compose : morph -> morph -> morph
+  val compose : 'd morph -> 'd morph -> 'd morph
+
+  module Allow_disallow : Allow_disallow with type (_, _, 'd) sided = 'd morph
 end
 
 module type S = sig
@@ -339,6 +343,6 @@ module type S = sig
     Solver_mono
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj
-       and type hint_morph := Hint.morph
+       and type 'd hint_morph := 'd Hint.morph
        and type hint_const := Hint.const
 end
