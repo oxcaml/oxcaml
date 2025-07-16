@@ -22,7 +22,7 @@ let print_test ~extra_subst ~name ~buf rule_template =
 let () =
   let buf = Buffer.create 1000 in
   let print_test_llvmir name =
-    (* we pass -stop-after llvmize since the compiler might not be configured
+    (* We pass -stop-after llvmize since the compiler might not be configured
        with clang *)
     print_test
       ~extra_subst:
@@ -52,11 +52,13 @@ let () =
 |}
   in
   let print_test_run name =
+    (* We pass -dno-asm-comments to avoid printing flaky identifiers in Cfg
+       instructions *)
     print_test
       ~extra_subst:
         [ "main", name ^ "_main";
           "test", name ^ "_test";
-          "llvm_flags", "-llvm-backend -llvm-path clang";
+          "llvm_flags", "-llvm-backend -llvm-path clang -dno-asm-comments";
           "common_flags", "-g -O3 -opaque" ]
       ~name ~buf
       {|

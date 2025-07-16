@@ -169,20 +169,25 @@ module F = struct
 
      yusumez: Multiline comments don't work for some reason... *)
 
+  let do_if_comments_enabled f = if !Oxcaml_flags.dasm_comments then f ()
+
   let pp_dbg ppf dbg =
     if Debuginfo.is_none dbg
     then ()
     else fprintf ppf "[ %a ]" Debuginfo.print_compact dbg
 
-  let pp_dbg_fun ppf name dbg = line ppf "; %s %a" name pp_dbg dbg
+  let pp_dbg_fun ppf name dbg =
+    do_if_comments_enabled (fun () -> line ppf "; %s %a" name pp_dbg dbg)
 
   let pp_dbg_instr_basic ppf ins =
-    pp_indent ppf ();
-    line ppf "; %a %a" Cfg.print_basic ins pp_dbg ins.Cfg.dbg
+    do_if_comments_enabled (fun () ->
+        pp_indent ppf ();
+        line ppf "; %a %a" Cfg.print_basic ins pp_dbg ins.Cfg.dbg)
 
   let pp_dbg_instr_terminator ppf ins =
-    pp_indent ppf ();
-    line ppf "; %a %a" Cfg.print_terminator ins pp_dbg ins.Cfg.dbg
+    do_if_comments_enabled (fun () ->
+        pp_indent ppf ();
+        line ppf "; %a %a" Cfg.print_terminator ins pp_dbg ins.Cfg.dbg)
 
   let ins t =
     pp_indent t.ppf ();

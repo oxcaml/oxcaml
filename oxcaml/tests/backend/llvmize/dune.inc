@@ -45,7 +45,7 @@
  (deps const_val_main.ml const_val_test.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} const_val_test.ml -c -g -O3 -opaque -llvm-backend -llvm-path clang)
+   (run %{bin:ocamlopt.opt} const_val_test.ml -c -g -O3 -opaque -llvm-backend -llvm-path clang -dno-asm-comments)
    (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -opaque)
    (run %{bin:ocamlopt.opt} const_val_test.cmx const_val_main.cmx -opaque -o const_val.output.exe))))
 
