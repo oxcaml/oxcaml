@@ -362,7 +362,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, l * r) C.morph ->
       (a, l * r) mode ->
       (b, l * r) mode =
-   fun dst ?(hint = H.morph_none) morph m ->
+   fun dst ?(hint : (l * r) H.morph = H.morph_none) morph m ->
     match m with
     | Amode (a, h) -> Amode (C.apply dst morph a, Morph (hint, morph, h))
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)

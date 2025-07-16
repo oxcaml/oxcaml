@@ -811,8 +811,7 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of lock_item * Longident.t *
-      Mode.Value.Comonadic.error * closure_context
+  | Value_used_in_closure of Mode.Value.Comonadic.error
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
@@ -3321,8 +3320,8 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     in
     {mode; context = Some shared_context}
 
-let closure_mode ~errors ~env ~loc ~item ~lid
-  ({mode = {Mode.monadic; comonadic}; _} as vmode) locality_context (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
+let closure_mode ~errors ~env ~loc ~item:_ ~lid:_
+  ({mode = {Mode.monadic; comonadic}; _} as vmode) _locality_context (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
   begin
     match
       Mode.Value.Comonadic.submode
@@ -3332,7 +3331,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
     with
     | Error e ->
         may_lookup_error errors loc env
-          (Value_used_in_closure (item, lid, e, locality_context))
+          (Value_used_in_closure (e))
     | Ok () -> ()
   end;
   let monadic =
@@ -4806,50 +4805,8 @@ let report_lookup_error _loc env ppf = function
             inside %s@]"
         print_lock_item (item, lid)
         (string_of_shared_context context)
-  | Value_used_in_closure (item, lid, error, context) ->
-      let e0, e1 =
-        match error with
-        | Error (Areality, _) -> "local", "might escape"
-        | Error (Linearity, _) -> "once", "is many"
-        | Error (Portability, _) -> "nonportable", "is portable"
-        | Error (Yielding, _) -> "yielding", "may not yield"
-        | Error (Statefulness, {left; right}) ->
-          asprintf "%a" Mode.Statefulness.Const.print (Mode.axhint_get_const left),
-          asprintf "is %a" Mode.Statefulness.Const.print (Mode.axhint_get_const right)
-      in
-      let s, hint =
-        match context with
-        | Function context ->
-            let hint =
-              match error, context with
-              | Error (Areality, _), Some Tailcall_argument ->
-                  fun ppf ->
-                    fprintf ppf "@.@[Hint: The function might escape because it \
-                                is an argument to a tail call@]"
-              | _ -> fun _ppf -> ()
-            in
-            "function that " ^ e1, hint
-        | Functor ->
-            let s =
-              match error with
-              | Error (Areality, _) -> "functor"
-              | _ -> "functor that " ^ e1
-            in
-            s, fun _ppf -> ()
-        | Lazy ->
-            let s =
-              match error with
-              | Error (Areality, _) -> "lazy expression"
-              | _ -> "lazy expression that " ^ e1
-            in
-            s, fun _ppf -> ()
-      in
-      fprintf ppf
-      "@[%a %s, so cannot be used \
-            inside a %s.@]"
-      print_lock_item (item, lid)
-      e0 s;
-      hint ppf
+  | Value_used_in_closure (Error (_ax, error)) ->
+    Mode.report_submode_error ppf (Mode.SubmodeError error)
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"

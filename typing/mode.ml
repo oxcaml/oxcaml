@@ -1640,9 +1640,14 @@ type 'a comonadic_with = 'a C.comonadic_with =
 module Axis = C.Axis
 
 let axhint_get_const = function
-  | Morph (a, _, _) -> a
-  | Const (a, _) -> a
-  | Empty a -> a
+  | Morph (a, _, _, _) -> a
+  | Const (a, _, _) -> a
+  | Empty (a, _) -> a
+
+let axhint_get_printer = function
+  | Morph (_, pp, _, _) -> pp
+  | Const (_, pp, _) -> pp
+  | Empty (_, pp) -> pp
 
 let axerror_get_left_const { left; right = _ } = axhint_get_const left
 
@@ -1835,14 +1840,14 @@ and single_axis_shint_to_axhint :
       in
       let b = apply b_obj morph_inv a in
       match find_responsible_axis_single morph with
-      | NoneResponsible -> Empty a
+      | NoneResponsible -> Empty (a, C.print a_obj)
       | SourceIsSingle ->
         let b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        Morph (a, morph_hint, b_hint)
+        Morph (a, C.print a_obj, morph_hint, b_hint)
       | Axis b_ax ->
         let b_hint = shint_to_axhint b_obj b b_shint b_ax side in
-        Morph (a, morph_hint, b_hint))
-    | Const a_const_hint -> Const (a, a_const_hint)
+        Morph (a, C.print a_obj, morph_hint, b_hint))
+    | Const a_const_hint -> Const (a, C.print a_obj, a_const_hint)
     | Branch (x, x_hint, y, y_hint) ->
       let chosen, chosen_hint =
         if shint_to_axhint_side_le side a_obj x y
@@ -2576,9 +2581,10 @@ module Monadic = struct
     | Axis_with_proj_pair : 'a Axis.t * 'a * 'a -> axis_with_proj_pair
 
   (* Given the left and right parts of a submoding error, return the offending axis,
-     and the projections of the left and right constants in that axis. *)
-  let axis_of_error (left : Obj.const) (right : Obj.const) : axis_with_proj_pair
-      =
+     but considering them on the opposite side. Also returns the projections of the
+     left and right constants in that axis, in the flipped order. *)
+  let flipped_axis_of_error (left : Obj.const) (right : Obj.const) :
+      axis_with_proj_pair =
     let { uniqueness = uniqueness1;
           contention = contention1;
           visibility = visibility1
@@ -2591,15 +2597,15 @@ module Monadic = struct
         } =
       right
     in
-    if Uniqueness.Const.le uniqueness1 uniqueness2
+    if Uniqueness.Const.le uniqueness2 uniqueness1
     then
-      if Contention.Const.le contention1 contention2
+      if Contention.Const.le contention2 contention1
       then
-        if Visibility.Const.le visibility1 visibility2
+        if Visibility.Const.le visibility2 visibility1
         then assert false
-        else Axis_with_proj_pair (Visibility, visibility1, visibility2)
-      else Axis_with_proj_pair (Contention, contention1, contention2)
-    else Axis_with_proj_pair (Uniqueness, uniqueness1, uniqueness2)
+        else Axis_with_proj_pair (Visibility, visibility2, visibility1)
+      else Axis_with_proj_pair (Contention, contention2, contention1)
+    else Axis_with_proj_pair (Uniqueness, uniqueness2, uniqueness1)
 
   (** Take a solver error and determine the problematic axis, assuming
   the operation we were trying to do was [left <= right], then return an
@@ -2608,7 +2614,7 @@ module Monadic = struct
   let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
     let left = err.left in
     let right = err.right in
-    let (Axis_with_proj_pair (ax, _, _)) = axis_of_error left right in
+    let (Axis_with_proj_pair (ax, _, _)) = flipped_axis_of_error left right in
     Error (ax, flipped_solver_error_to_axerror Obj.obj ax err)
 
   (* unlike for a single axis object, the below submoding and equality functions
@@ -3320,13 +3326,13 @@ module Modality = struct
           then Ok ()
           else
             let (Axis_with_proj_pair (ax, left, right)) =
-              Mode.axis_of_error c0 c1
+              Mode.flipped_axis_of_error c0 c1
             in
             Error
               (Error
                  ( ax,
-                   { left = Empty (Join_with left);
-                     right = Empty (Join_with right)
+                   { left = Empty (Join_with left, fun _ _ -> ());
+                     right = Empty (Join_with right, fun _ _ -> ())
                    } ))
 
       let concat ~then_ t =
@@ -3365,8 +3371,9 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left = Empty (Join_with (axhint_get_const left));
-                   right = Empty (Join_with (Axis.proj ax c))
+                 { left =
+                     Empty (Join_with (axhint_get_const left), fun _ _ -> ());
+                   right = Empty (Join_with (Axis.proj ax c), fun _ _ -> ())
                  } )))
       | Diff (_, _m0), Diff (_, _m1) ->
         (* [m1] is a left mode so it cannot appear on the right. So we can't do
@@ -3463,8 +3470,8 @@ module Modality = struct
             Error
               (Error
                  ( ax,
-                   { left = Empty (Meet_with left);
-                     right = Empty (Meet_with right)
+                   { left = Empty (Meet_with left, fun _ _ -> ());
+                     right = Empty (Meet_with right, fun _ _ -> ())
                    } ))
 
       let concat ~then_ t =
@@ -3507,8 +3514,9 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left = Empty (Meet_with (axhint_get_const left));
-                   right = Empty (Meet_with (Axis.proj ax c))
+                 { left =
+                     Empty (Meet_with (axhint_get_const left), fun _ _ -> ());
+                   right = Empty (Meet_with (Axis.proj ax c), fun _ _ -> ())
                  } )))
       | Exactly (_, _m0), Exactly (_, _m1) ->
         (* [m1] is a left mode, so there is no good way to check.
@@ -3890,7 +3898,8 @@ let print_const_hint ppf : Hint.const -> unit =
   let open Format in
   function None -> fprintf ppf "it is"
 
-let print_morph_hint (type l r) ppf : (l * r) Hint.morph -> unit =
+let rec print_morph_hint : type l r. _ -> (l * r) Hint.morph -> unit =
+ fun ppf ->
   let open Format in
   function
   | None -> fprintf ppf "it is"
@@ -3898,21 +3907,21 @@ let print_morph_hint (type l r) ppf : (l * r) Hint.morph -> unit =
     fprintf ppf "it closes over something (at %a)" Location.print_loc loc
   | Is_closed_by loc ->
     fprintf ppf "it is closed by something (at %a)" Location.print_loc loc
-  | Compose _ -> _
+  | Compose (hint1, hint2) ->
+    fprintf ppf "%a and %a" print_morph_hint hint1 print_morph_hint hint2
 
-let print_const (type a) ppf : a -> unit =
-  (* TODO - need to have way to print a const of any lattice *) _
-
-let rec print_axhint (type a l r) ppf
+let print_axhint (type a l r) ppf
     (hint : (a, (l * r) Hint.morph, Hint.const) axhint) =
   let open Format in
   match hint with
-  | Morph (a, morph_hint, b_hint) ->
+  | Morph (a, print_const, morph_hint, b_hint) ->
     fprintf ppf "It is %a because %a %a." print_const a print_morph_hint
-      morph_hint print_const (axhint_get_const b_hint)
-  | Const (a, const_hint) ->
+      morph_hint
+      (axhint_get_printer b_hint)
+      (axhint_get_const b_hint)
+  | Const (a, print_const, const_hint) ->
     fprintf ppf "It is %a because %a." print_const a print_const_hint const_hint
-  | Empty a -> fprintf ppf "It is %a." print_const a
+  | Empty (a, print_const) -> fprintf ppf "It is %a." print_const a
 
 let report_submode_error ppf : submode_exn_error -> unit =
   let open Format in
@@ -3924,8 +3933,9 @@ let report_submode_error ppf : submode_exn_error -> unit =
 
 However, %s is actually at least %a.
 %a |}
-      "TODO(left name)" print_const (axhint_get_const left) print_axhint left
-      "TODO(right name)" print_const (axhint_get_const right) print_axhint right
+      "TODO(left name)" (axhint_get_printer left) (axhint_get_const left)
+      print_axhint left "TODO(right name)" (axhint_get_printer right)
+      (axhint_get_const right) print_axhint right
 
 let () =
   Location.register_error_of_exn (function

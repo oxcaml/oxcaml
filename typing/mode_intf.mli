@@ -20,10 +20,15 @@ type empty = |
 of the values in a single axis from an error. *)
 type ('a, 'morph, 'const) axhint =
   | Morph :
-      'a * 'morph * ('b, 'morph, 'const) axhint
+      'a
+      * (Format.formatter -> 'a -> unit)
+      * 'morph
+      * ('b, 'morph, 'const) axhint
       -> ('a, 'morph, 'const) axhint
-  | Const : 'a * 'const -> ('a, 'morph, 'const) axhint
-  | Empty : 'a -> ('a, 'morph, 'const) axhint
+  | Const :
+      'a * (Format.formatter -> 'a -> unit) * 'const
+      -> ('a, 'morph, 'const) axhint
+  | Empty : 'a * (Format.formatter -> 'a -> unit) -> ('a, 'morph, 'const) axhint
 
 (** Errors for the mode solvers. These are axis-specific processed versions of
 the errors returned by the solver, as the solver errors consider axis products.
@@ -240,7 +245,10 @@ module type S = sig
   val axerror_get_consts_pair :
     ('a, 'lmorph, 'rmorph, 'const) axerror -> 'a * 'a
 
-  type submode_exn_error
+  type submode_exn_error =
+    | SubmodeError :
+        ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
+        -> submode_exn_error
 
   exception Submode_exn of Location.t * submode_exn_error
 
@@ -928,4 +936,6 @@ module type S = sig
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Format.formatter -> t -> unit
   end
+
+  val report_submode_error : Format.formatter -> submode_exn_error -> unit
 end
