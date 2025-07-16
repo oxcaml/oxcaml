@@ -63,6 +63,8 @@ module Llvm_typ = struct
   (** Type representing LLVM types *)
   type t =
     | Int of { width_in_bits : int }
+    | Float (* 32-bit *)
+    | Double (* 64 bit *)
     | Ptr
     | Struct of t list
 
@@ -80,13 +82,17 @@ module Llvm_typ = struct
       Int { width_in_bits = 64 }
       (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
          make LLVM happy for now. *)
-    | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 ->
+    | Float -> Double
+    | Float32 -> Float
+    | Vec128 | Vec256 | Vec512 | Valx2 ->
       Misc.fatal_error "Llvmize.Llvm_typ.of_machtyp_component: not implemented"
 
   let rec pp_t ppf t =
     let open Format in
     match t with
     | Int { width_in_bits } -> fprintf ppf "i%d" width_in_bits
+    | Float -> fprintf ppf "float"
+    | Double -> fprintf ppf "double"
     | Ptr -> fprintf ppf "ptr"
     | Struct typs ->
       fprintf ppf "{ %a }"
@@ -180,12 +186,20 @@ module F = struct
   let pp_dbg_fun ppf name dbg = line ppf "; %s %a" name pp_dbg dbg
 
   let pp_dbg_instr_basic ppf ins =
+    let ins_str =
+      asprintf "%a" Cfg.print_basic ins
+      |> String.map (function '\n' -> ' ' | ch -> ch)
+    in
     pp_indent ppf ();
-    line ppf "; %a %a" Cfg.print_basic ins pp_dbg ins.Cfg.dbg
+    line ppf "; %s %a" ins_str pp_dbg ins.Cfg.dbg
 
   let pp_dbg_instr_terminator ppf ins =
+    let ins_str =
+      asprintf "%a" Cfg.print_terminator ins
+      |> String.map (function '\n' -> ' ' | ch -> ch)
+    in
     pp_indent ppf ();
-    line ppf "; %a %a" Cfg.print_terminator ins pp_dbg ins.Cfg.dbg
+    line ppf "; %s %a" ins_str pp_dbg ins.Cfg.dbg
 
   let ins t =
     pp_indent t.ppf ();
@@ -397,6 +411,12 @@ module F = struct
       (Llvm_typ.of_machtyp_component i.res.(0).typ);
     ins_store_reg t res i.res.(0)
 
+  let float_op _t (i : Cfg.basic Cfg.instruction) _width
+      (op : Operation.float_operation) =
+    match op with
+    | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf | Icompf _ ->
+      not_implemented_basic i
+
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
     | Move ->
@@ -453,9 +473,10 @@ module F = struct
       | Double ->
         not_implemented_basic i)
     | Intop op -> int_op t i op
+    | Floatop (width, op) -> float_op t i width op
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
     | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_imm _
-    | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+    | Intop_atomic _ | Csel _ | Reinterpret_cast _ | Static_cast _
     | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
     | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ ->
       not_implemented_basic i
