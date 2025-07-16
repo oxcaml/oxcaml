@@ -3338,7 +3338,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic ~hint:(Mode.Hint.Close_over loc) comonadic0 ]
+        Mode.Value.comonadic_to_monadic ~hint:(Mode.Hint.Is_closed_by loc) comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 

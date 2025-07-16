@@ -1566,6 +1566,8 @@ module Hint = struct
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
+  type 'd neg_morph = 'd neg morph constraint 'd = _ * _
+
   let morph_none = None
 
   let rec left_adjoint :
@@ -2075,7 +2077,7 @@ module Comonadic_axis_gen (Obj : Obj) = struct
   include Comonadic_common_gen (Obj)
 
   type error =
-    (const, left_only Hint.morph, left_only Hint.morph, Hint.const) axerror
+    (const, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror
 
   type equate_error = equate_step * error
 
@@ -2099,7 +2101,7 @@ module Monadic_axis_gen (Obj : Obj) = struct
   include Monadic_common_gen (Obj)
 
   type error =
-    (const, right_only Hint.morph, right_only Hint.morph, Hint.const) axerror
+    (const, right_only Hint.morph, left_only Hint.morph, Hint.const) axerror
 
   type equate_error = equate_step * error
 
@@ -2429,7 +2431,7 @@ module Comonadic_with (Areality : Areality) = struct
   let legacy = of_const Const.legacy
 
   type axis_with_proj_pair =
-    | Axis_with_proj_pair : 'a axis * 'a * 'a -> axis_with_proj_pair
+    | Axis_with_proj_pair : 'a Axis.t * 'a * 'a -> axis_with_proj_pair
 
   (* Given the left and right parts of a submoding error, return the offending axis,
      and the projections of the left and right constants in that axis. *)
@@ -2566,7 +2568,7 @@ module Monadic = struct
   let legacy = of_const Const.legacy
 
   type axis_with_proj_pair =
-    | Axis_with_proj_pair : 'a axis * 'a * 'a -> axis_with_proj_pair
+    | Axis_with_proj_pair : 'a Axis.t * 'a * 'a -> axis_with_proj_pair
 
   (* Given the left and right parts of a submoding error, return the offending axis,
      and the projections of the left and right constants in that axis. *)
@@ -2987,16 +2989,10 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  let apply_hint (morph_hint : (allowed * allowed) Hint.morph)
-      ({ monadic; comonadic } : (allowed * allowed) t) : (allowed * allowed) t =
-    { monadic = Monadic.apply_hint morph_hint monadic;
-      comonadic = Comonadic.apply_hint morph_hint comonadic
-    }
-
   type error =
     | Error :
         'a Axis.t
-        * ('a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror
+        * ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
         -> error
 
   type equate_error = equate_step * error
@@ -3073,7 +3069,8 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.meet mo in
     { comonadic; monadic }
 
-  let comonadic_to_monadic ?hint m =
+  let comonadic_to_monadic (type l r) ?(hint : (l * r) Hint.morph option)
+      (m : (l * r) Comonadic.t) : (r * l) Monadic.t =
     S.apply ?hint Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
 
   let monadic_to_comonadic_min m =
@@ -3299,7 +3296,8 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error = Error : 'a axis * ('a raw, empty, empty) axerror -> error
+    type error =
+      | Error : 'a axis * ('a raw, empty, empty, empty) axerror -> error
 
     module Const = struct
       type t = Join_const of Mode.Const.t
@@ -3436,7 +3434,8 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error = Error : 'a axis * ('a raw, empty, empty) axerror -> error
+    type error =
+      | Error : 'a axis * ('a raw, empty, empty, empty) axerror -> error
 
     module Const = struct
       type t = Meet_const of Mode.Const.t
@@ -3594,7 +3593,7 @@ module Modality = struct
 
   module Value = struct
     type error =
-      | Error : 'a Value.Axis.t * ('a raw, empty, empty) axerror -> error
+      | Error : 'a Value.Axis.t * ('a raw, empty, empty, empty) axerror -> error
 
     type equate_error = equate_step * error
 
