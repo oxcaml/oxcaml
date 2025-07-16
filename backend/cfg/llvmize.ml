@@ -73,7 +73,7 @@ module Llvm_typ = struct
       (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
          make LLVM happy for now. *)
     | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 ->
-      Misc.fatal_error "Not implemented [Llvm_typ.of_machtyp_component]"
+      Misc.fatal_error "Llvmize.Llvm_typ.of_machtyp_component: not implemented"
 
   let rec pp_t ppf t =
     let open Format in
@@ -99,10 +99,14 @@ type t =
   { llvmir_filename : string;
     oc : Out_channel.t;
     ppf : Format.formatter;
-    asm_filename : string;
+    ppf_dump : Format.formatter;
+    mutable asm_filename : string option;
+        (* This gets provided when [begin_assembly] gets called *)
     mutable current_fun_info : fun_info;
-        (* should be reset for every function *)
+        (* Maintains the state of the current function (reset for every
+           function) *)
     mutable data : Cmm.data_item list
+        (* Collects data items as they come and processes them at the end *)
   }
 
 let create_fun_info () =
@@ -112,12 +116,13 @@ let create_fun_info () =
     label2ident = Label.Tbl.create 37
   }
 
-let create ~llvmir_filename ~asm_filename =
+let create ~llvmir_filename ~ppf_dump =
+  let asm_filename = None in
   let oc = Out_channel.open_text llvmir_filename in
   let ppf = Format.formatter_of_out_channel oc in
   let current_fun_info = create_fun_info () in
   let data = [] in
-  { llvmir_filename; asm_filename; oc; ppf; current_fun_info; data }
+  { llvmir_filename; asm_filename; oc; ppf; ppf_dump; current_fun_info; data }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
 
@@ -140,6 +145,10 @@ let get_ident_for_reg t label =
 
 let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 
+(* CR yusumez: Write to this ppf alongside the normal one when -dllvmir is
+   passed *)
+let _get_ppf_dump t = t.ppf_dump
+
 module F = struct
   open Format
 
@@ -149,28 +158,32 @@ module F = struct
 
   let line ppf = kfprintf (fun ppf -> pp_print_newline ppf ()) ppf
 
+  (* CR gyorsh: emit metadata debuginfo (of the form !dbg <id>). For now just
+     emit a comment, to help debug llvmize pass. Emit a block comment in the
+     case there is a newline after it.
+
+     yusumez: Multiline comments don't work for some reason... *)
+
   let pp_dbg ppf dbg =
-    (* CR gyorsh: emit metadata debuginfo. For now just emit a comment, to help
-       debug llvmize pass. Emit a block comment in the case there is a newline
-       after it. *)
-    (* CR yusumez: Multiline comments don't work...? *)
-    fprintf ppf "  ; !dbg <id> %a" Debuginfo.print_compact dbg
+    if Debuginfo.is_none dbg
+    then ()
+    else fprintf ppf "[ %a ]" Debuginfo.print_compact dbg
 
-  let pp_dbg_instr_basic ppf instr =
-    fprintf ppf "  ; !dbg <id> %a [ %a ]" Debuginfo.print_compact instr.Cfg.dbg
-      Cfg.print_basic instr
+  let pp_dbg_fun ppf name dbg = line ppf "; %s %a" name pp_dbg dbg
 
-  let pp_dbg_instr_terminator ppf instr =
-    fprintf ppf "  ; !dbg <id> %a [ %a ]" Debuginfo.print_compact instr.Cfg.dbg
-      Cfg.print_terminator instr
+  let pp_dbg_instr_basic ppf ins =
+    pp_indent ppf ();
+    line ppf "; %a %a" Cfg.print_basic ins pp_dbg ins.Cfg.dbg
 
-  (* let pp_dbg_newline ppf dbg = line ppf "%a" pp_dbg dbg *)
+  let pp_dbg_instr_terminator ppf ins =
+    pp_indent ppf ();
+    line ppf "; %a %a" Cfg.print_terminator ins pp_dbg ins.Cfg.dbg
 
   let ins t =
     pp_indent t.ppf ();
     kfprintf (fun ppf -> pp_print_newline ppf ()) t.ppf
 
-  let _source_filename t s = line t.ppf "source_filename = \"%s\"" s
+  let source_filename t s = line t.ppf "source_filename = \"%s\"" s
 
   let machtyp_component (m : Cmm.machtype_component) =
     Llvm_typ.(of_machtyp_component m |> to_string)
@@ -201,7 +214,6 @@ module F = struct
 
   let block_label_with_predecessors t label preds =
     pp_label_def t t.ppf label;
-    (* XCR gyorsh: map label to unique ident *)
     if not (Misc.Stdlib.List.is_empty preds)
     then
       fprintf t.ppf
@@ -224,11 +236,12 @@ module F = struct
     fprintf ppf "%a" (pp_print_list ~pp_sep:pp_comma pp_print_string) attrs
 
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
-    line t.ppf "%a" pp_dbg fun_dbg;
+    pp_dbg_fun t.ppf fun_name fun_dbg;
     line t.ppf "define %a @%s(%a) %a {" pp_machtyp fun_ret_type fun_name
       pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
-    line t.ppf "}"
+    line t.ppf "}";
+    line t.ppf ""
 
   (* == LLVM instructions == *)
 
@@ -266,7 +279,7 @@ module F = struct
      instructions *)
 
   let terminator t (i : Cfg.terminator Cfg.instruction) =
-    line t.ppf "%a" pp_dbg_instr_terminator i;
+    pp_dbg_instr_terminator t.ppf i;
     match i.desc with
     | Never -> assert false
     | Always lbl -> ins_branch t lbl
@@ -291,7 +304,7 @@ module F = struct
     | Float_test _ | Int_test _ | Switch _ | Raise _ | Tailcall_self _
     | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
+        (asprintf "Llvmize: unimplemented instruction: %a" Cfg.print_instruction
            (`Terminator i))
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -307,7 +320,7 @@ module F = struct
     | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
     | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
+        (asprintf "Llvmize: unimplemented instruction: %a" Cfg.print_instruction
            (`Basic i))
 
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
@@ -320,7 +333,8 @@ module F = struct
       match sym_global with
       | Global -> ins_store_global t sym_name i.res.(0)
       | Local ->
-        Misc.fatal_error "Unimplemented instruction: local const symbol")
+        Misc.fatal_error
+          "Llvmize: unimplemented instruction: local const symbol")
     | Intop op -> int_op t i op
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
     | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
@@ -328,17 +342,17 @@ module F = struct
     | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
     | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
+        (asprintf "Llvmize: unimplemented instruction: %a" Cfg.print_instruction
            (`Basic i))
 
   let basic t (i : Cfg.basic Cfg.instruction) =
-    line t.ppf "%a" pp_dbg_instr_basic i;
+    pp_dbg_instr_basic t.ppf i;
     match i.desc with
     | Op op -> basic_op t i op
     | Prologue | Reloadretaddr -> ()
     | Poptrap _ | Pushtrap _ | Stack_check _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
+        (asprintf "Llvmize: unimplemented instruction: %a" Cfg.print_instruction
            (`Basic i))
 
   (* == Cfg data items == *)
@@ -353,8 +367,7 @@ module F = struct
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
-      Misc.fatal_error
-        "Unimplemented data item encountered in [Llvmize.typ_of_data_item]"
+      Misc.fatal_error "Llvmize.typ_of_data_item: not implemented"
 
   let pp_const_data_item ppf (d : Cmm.data_item) =
     match d with
@@ -363,14 +376,11 @@ module F = struct
     | Csymbol_address { sym_name; sym_global } -> (
       match sym_global with
       | Global -> pp_global ppf sym_name
-      | Local ->
-        Misc.fatal_error
-          "Unimplemented data item encountered in [Llvmize.pp_const_data_item]")
+      | Local -> Misc.fatal_error "Llvmize.pp_const_data_item: not implemented")
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
-      Misc.fatal_error
-        "Unimplemented data item encountered in [Llvmize.pp_const_data_item]"
+      Misc.fatal_error "Llvmize.pp_const_data_item: not implemented"
 
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
@@ -391,21 +401,36 @@ end
 
 let current_compilation_unit = ref None
 
+let get_current_compilation_unit msg =
+  match !current_compilation_unit with
+  | Some t -> t
+  | None ->
+    Misc.fatal_error
+      (Format.sprintf "Llvmize: current compilation unit not set (%s)" msg)
+
 let llvmir_to_assembly t =
   (* CR-someday gyorsh: add other optimization flags and control which passes to
      perform. *)
   let cmd =
     match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
   in
-  Ccomp.command
-    (String.concat " "
-       (cmd
-       :: [ "-o";
-            Filename.quote t.asm_filename;
-            "-O3";
-            "-S";
-            "-x ir";
-            Filename.quote t.llvmir_filename ]))
+  match t.asm_filename with
+  | None -> 0
+  | Some asm_filename ->
+    Ccomp.command
+      (String.concat " "
+         [ cmd;
+           "-o";
+           Filename.quote asm_filename;
+           "-O3";
+           "-S";
+           "-x ir";
+           Filename.quote t.llvmir_filename ])
+
+(* Create LLVM IR file for the current compilation unit. *)
+let init ~output_prefix ~ppf_dump =
+  let llvmir_filename = output_prefix ^ ".ll" in
+  current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
 let close_out () =
   match !current_compilation_unit with
@@ -415,10 +440,9 @@ let close_out () =
     Out_channel.close t.oc;
     current_compilation_unit := None
 
-let open_out ~asm_filename ~output_prefix =
-  (* Create LLVM IR file for the current compilation unit. *)
-  let llvmir_filename = output_prefix ^ ".ll" in
-  current_compilation_unit := Some (create ~llvmir_filename ~asm_filename)
+let open_out ~asm_filename =
+  let t = get_current_compilation_unit "open_out" in
+  t.asm_filename <- Some asm_filename
 
 let fun_attrs _t _codegen_options : string list =
   (* CR gyorsh: translate and communicate to llvm backend *)
@@ -451,7 +475,7 @@ let alloca_regs t cfg old_arg_idents =
   List.iter (fun (reg, old_ident) -> F.ins_store t old_ident reg) old_arg_idents
 
 let cfg (cl : CL.t) =
-  let t = Option.get !current_compilation_unit in
+  let t = get_current_compilation_unit "cfg" in
   reset_fun_info t;
   let layout = CL.layout cl in
   let cfg = CL.cfg cl in
@@ -481,7 +505,7 @@ let cfg (cl : CL.t) =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in
     if Label.equal entry_label label && not (Misc.Stdlib.List.is_empty preds)
-    then Misc.fatal_errorf "Entry label must not have predecessors";
+    then Misc.fatal_errorf "Llvmize: entry label must not have predecessors";
     F.block_label_with_predecessors t label preds;
     DLL.iter ~f:(F.basic t) block.body;
     F.terminator t block.terminator
@@ -500,7 +524,7 @@ let cfg (cl : CL.t) =
 
 (* CR yusumez: Implement this *)
 let data ds =
-  let t = Option.get !current_compilation_unit in
+  let t = get_current_compilation_unit "data" in
   t.data <- List.append t.data ds
 
 (* CR yusumez: We do this cumbersome list wrangling since we receive data
@@ -517,12 +541,12 @@ let emit_data t =
           | Global ->
             Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
             Some sym_name, []
-          | Local -> Misc.fatal_error "Local symbols not implemented")
+          | Local -> Misc.fatal_error "Llvmize: local symbols not implemented")
         | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
         | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
         | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
         | Calign _ ->
-          Misc.fatal_error "Unimplemented data item")
+          Misc.fatal_error "Llvmize: data item not implemented")
       (None, []) t.data
   in
   Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym
@@ -531,20 +555,21 @@ let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
   with Sys_error _msg -> ()
 
-let begin_assembly () =
-  let t = Option.get !current_compilation_unit in
-  (* CR yusumez: Source filename needs to get emitted here (it won't work at the
-     end), but we don't have access to it here. It isn't required for now. *)
-  (* Option.iter (F.source_filename t) sourcefile; *)
+let begin_assembly ~sourcefile =
+  let t = get_current_compilation_unit "begin_asm" in
+  (* Source filename needs to get emitted before *)
+  Option.iter (F.source_filename t) sourcefile;
   F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
+  Format.pp_print_newline t.ppf ();
   F.symbol_decl t "data_begin";
   F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
 let end_assembly ~sourcefile =
-  let t = Option.get !current_compilation_unit in
+  let t = get_current_compilation_unit "end_asm" in
   (* Emit data declarations *)
   emit_data t;
+  Format.pp_print_newline t.ppf ();
   F.symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
   F.symbol_decl t "frametable";
@@ -559,8 +584,7 @@ let end_assembly ~sourcefile =
          (Asm_generation
             ( Option.value ~default:"(no source file specified)" sourcefile,
               ret_code )));
-  (* CR yusumez: This should be a separate flag (like save_llvmir). *)
-  if not !Oxcaml_flags.dump_llvmir then remove_file t.llvmir_filename;
+  if not !Oxcaml_flags.keep_llvmir then remove_file t.llvmir_filename;
   current_compilation_unit := None
 
 (* CR-someday gyorsh: currently, llvm backend can be selected at the compilation

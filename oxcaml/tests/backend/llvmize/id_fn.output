@@ -1,0 +1,65 @@
+source_filename = "id_fn.ml"
+target triple = "x86_64-redhat-linux-gnu"
+
+@camlId_fn__data_begin = global i64 0
+define void @camlId_fn__code_begin() { ret void }
+
+; camlId_fn__f_0_1_code [ id_fn.ml:1,21--26 ]
+define i64 @camlId_fn__f_0_1_code(i64 %0)  {
+  %2 = alloca i64
+  %3 = alloca i64
+  store i64 %0, ptr %2
+  br label %4
+4:
+  ; prologue
+  ; goto 101
+  br label %5
+5:                                                ; preds = %4
+  ; x:V/29 := pin:anon:I/0[%rax]
+  %6 = load i64, ptr %2
+  store i64 %6, ptr %3
+  ; pin:anon:I/0[%rax] := x:V/29
+  %7 = load i64, ptr %3
+  store i64 %7, ptr %2
+  ; reload retaddr
+  ; Return pin:anon:I/0[%rax]
+  %8 = load i64, ptr %2
+  ret i64 %8
+}
+
+; camlId_fn__entry
+define i64 @camlId_fn__entry()  {
+  %1 = alloca i64
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  br label %6
+6:
+  ; prologue
+  ; goto 107
+  br label %7
+7:                                                ; preds = %6
+  ; anon:I/30 := "camlId_fn"
+  store ptr @camlId_fn, ptr %3
+  ; anon:I/31 := anon:I/30
+  %8 = load i64, ptr %3
+  store i64 %8, ptr %4
+  ; *ret*:V/29 := anon:I/31
+  %9 = load i64, ptr %4
+  store i64 %9, ptr %2
+  ; anon:I/32 := 1
+  store i64 1, ptr %5
+  ; pin:anon:I/0[%rax] := anon:I/32
+  %10 = load i64, ptr %5
+  store i64 %10, ptr %1
+  ; reload retaddr
+  ; Return pin:anon:I/0[%rax]
+  %11 = load i64, ptr %1
+  ret i64 %11
+}
+
+
+@camlId_fn__data_end = global i64 0
+define void @camlId_fn__code_end() { ret void }
+@camlId_fn__frametable = global i64 0

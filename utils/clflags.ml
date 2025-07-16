@@ -453,7 +453,7 @@ let unboxed_types = ref false
 
 (* This is used by the -save-ir-after and -save-ir-before options. *)
 module Compiler_ir = struct
-  type t = Linear | Cfg
+  type t = Linear | Cfg | Llvmir
 
   let all = [
     Linear; Cfg
@@ -462,6 +462,7 @@ module Compiler_ir = struct
   let to_string = function
     | Linear -> "linear"
     | Cfg -> "cfg"
+    | Llvmir -> "ll"
 
   let extension t = ".cmir-" ^ (to_string t)
 
@@ -541,7 +542,7 @@ module Compiler_pass = struct
   *)
   type t = Parsing | Typing | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
-         | Register_allocation
+         | Register_allocation | Llvmize
 
   let to_string = function
     | Parsing -> "parsing"
@@ -553,6 +554,7 @@ module Compiler_pass = struct
     | Simplify_cfg -> "simplify_cfg"
     | Selection -> "selection"
     | Register_allocation -> "register_allocation"
+    | Llvmize -> "llvmize"
 
   let of_string = function
     | "parsing" -> Some Parsing
@@ -564,6 +566,7 @@ module Compiler_pass = struct
     | "simplify_cfg" -> Some Simplify_cfg
     | "selection" -> Some Selection
     | "register_allocation" -> Some Register_allocation
+    | "llvmize" -> Some Llvmize
     | _ -> None
 
   let rank = function
@@ -572,6 +575,7 @@ module Compiler_pass = struct
     | Lambda -> 2
     | Middle_end -> 3
     | Selection -> 20
+    | Llvmize -> 25
     | Register_allocation -> 30
     | Simplify_cfg -> 49
     | Linearization -> 50
@@ -587,6 +591,7 @@ module Compiler_pass = struct
     Simplify_cfg;
     Selection;
     Register_allocation;
+    Llvmize
   ]
   let is_compilation_pass _ = true
   let is_native_only = function
@@ -597,6 +602,7 @@ module Compiler_pass = struct
     | Selection -> true
     | Register_allocation -> true
     | Parsing | Typing | Lambda -> false
+    | Llvmize -> true
 
   let enabled is_native t = not (is_native_only t) || is_native
   let can_save_ir_after = function
@@ -605,11 +611,12 @@ module Compiler_pass = struct
     | Selection -> true
     | Register_allocation -> false
     | Parsing | Typing | Lambda | Middle_end | Emit -> false
+    | Llvmize -> true
 
     let can_save_ir_before = function
     | Register_allocation -> true
     | Linearization | Simplify_cfg | Selection
-    | Parsing | Typing | Lambda | Middle_end | Emit -> false
+    | Parsing | Typing | Lambda | Middle_end | Emit | Llvmize -> false
 
   let available_pass_names ~filter ~native =
     passes
@@ -626,12 +633,14 @@ module Compiler_pass = struct
     | Simplify_cfg -> prefix ^ Compiler_ir.(extension Cfg)
     | Selection -> prefix ^ Compiler_ir.(extension Cfg) ^ "-sel"
     | Register_allocation ->  prefix ^ Compiler_ir.(extension Cfg) ^ "-regalloc"
+    | Llvmize -> prefix ^ Compiler_ir.(extension Llvmir)
     | Emit | Parsing | Typing | Lambda | Middle_end -> Misc.fatal_error "Not supported"
 
   let of_input_filename name =
     match Compiler_ir.extract_extension_with_pass name with
     | Some (Linear, _) -> Some Emit
     | Some (Cfg, _) -> None
+    | Some (Llvmir, _) -> Some Llvmize
     | None -> None
 end
 
