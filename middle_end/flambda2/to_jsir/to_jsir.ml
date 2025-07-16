@@ -114,7 +114,7 @@ and invalid ~env ~res msg =
   ignore (env, res, msg);
   failwith "unimplemented"
 
-let unit (* ~offsets:_ ~all_code:_ ~reachable_names:_ *) flambda_unit =
+let unit flambda_unit =
   let env = To_jsir_env.create () in
   let res = To_jsir_result.create () in
   ignore (expr ~env ~res (Flambda2_terms.Flambda_unit.body flambda_unit));
