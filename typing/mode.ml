@@ -1997,10 +1997,6 @@ module Lattice_Product (L : Lattice) = struct
   let min_with ax c = Axis.set ax c min
 
   let max_with ax c = Axis.set ax c max
-
-  let min_axis ax = Axis.proj ax min
-
-  let max_axis ax = Axis.proj ax max
 end
 
 module Comonadic_with (Areality : Areality) = struct
@@ -2024,13 +2020,40 @@ module Comonadic_with (Areality : Areality) = struct
     include C.Comonadic_with (Areality.Const)
     include Lattice_Product (C.Comonadic_with (Areality.Const))
 
-    let print_axis ax ppf a =
-      let obj = proj_obj ax in
-      C.print obj ppf a
+    module Per_axis = struct
+      let print ax ppf a =
+        let obj = proj_obj ax in
+        C.print obj ppf a
 
-    let le_axis ax a b =
-      let obj = proj_obj ax in
-      C.le obj a b
+      let le ax a b =
+        let obj = proj_obj ax in
+        C.le obj a b
+
+      let join ax a b =
+        let obj = proj_obj ax in
+        C.join obj a b
+
+      let meet ax a b =
+        let obj = proj_obj ax in
+        C.meet obj a b
+
+      let max ax =
+        let obj = proj_obj ax in
+        C.max obj
+
+      let min ax =
+        let obj = proj_obj ax in
+        C.min obj
+
+      let eq_obj ax0 ax1 =
+        let obj0 = proj_obj ax0 in
+        let obj1 = proj_obj ax1 in
+        C.eq_obj obj0 obj1
+
+      let print_obj ppf ax =
+        let obj = proj_obj ax in
+        C.print_obj ppf obj
+    end
 
     let lattice_of_axis (type a) (axis : (t, a) Axis.t) :
         (module Lattice with type t = a) =
@@ -2148,13 +2171,40 @@ module Monadic = struct
     include C.Monadic
     include Lattice_Product (C.Monadic)
 
-    let print_axis ax ppf a =
-      let obj = proj_obj ax in
-      C.print obj ppf a
+    module Per_axis = struct
+      let print ax ppf a =
+        let obj = proj_obj ax in
+        C.print obj ppf a
 
-    let le_axis ax a b =
-      let obj = proj_obj ax in
-      C.le obj b a
+      let le ax a b =
+        let obj = proj_obj ax in
+        C.le obj b a
+
+      let join ax a b =
+        let obj = proj_obj ax in
+        C.meet obj a b
+
+      let meet ax a b =
+        let obj = proj_obj ax in
+        C.join obj a b
+
+      let max ax =
+        let obj = proj_obj ax in
+        C.min obj
+
+      let min ax =
+        let obj = proj_obj ax in
+        C.max obj
+
+      let eq_obj ax0 ax1 =
+        let obj0 = proj_obj ax0 in
+        let obj1 = proj_obj ax1 in
+        C.eq_obj obj0 obj1
+
+      let print_obj ppf ax =
+        let obj = proj_obj ax in
+        C.print_obj ppf obj
+    end
 
     let lattice_of_axis (type a) (axis : (t, a) Axis.t) :
         (module Lattice with type t = a) =
@@ -2536,16 +2586,16 @@ module Value_with (Areality : Areality) = struct
     let le_axis : type a d0 d1. (a, d0, d1) Axis.t -> a -> a -> bool =
      fun ax m0 m1 ->
       match ax with
-      | Comonadic ax -> Comonadic.le_axis ax m0 m1
-      | Monadic ax -> Monadic.le_axis ax m0 m1
+      | Comonadic ax -> Comonadic.Per_axis.le ax m0 m1
+      | Monadic ax -> Monadic.Per_axis.le ax m0 m1
 
     let min_axis : type a d0 d1. (a, d0, d1) Axis.t -> a = function
-      | Comonadic ax -> Comonadic.min_axis ax
-      | Monadic ax -> Monadic.min_axis ax
+      | Comonadic ax -> Comonadic.Per_axis.min ax
+      | Monadic ax -> Monadic.Per_axis.min ax
 
     let max_axis : type a d0 d1. (a, d0, d1) Axis.t -> a = function
-      | Comonadic ax -> Comonadic.max_axis ax
-      | Monadic ax -> Monadic.max_axis ax
+      | Comonadic ax -> Comonadic.Per_axis.max ax
+      | Monadic ax -> Monadic.Per_axis.max ax
 
     let is_max : type a d0 d1. (a, d0, d1) Axis.t -> a -> bool =
      fun ax m -> le_axis ax (max_axis ax) m
@@ -3380,6 +3430,56 @@ module Crossing = struct
      then [f0 m0 <= f0 m1].
   *)
 
+  module Atom = struct
+    type 'a t = 'a Modality.raw
+
+    type packed = P : ('a, _, _) Value.Axis.t * 'a t -> packed
+
+    let print ax ppf t = Modality.print ppf (Atom (ax, t))
+
+    let min : _ Value.Axis.t -> _ t = function
+      | Monadic ax -> Join_with (Value.Monadic.Const.Per_axis.max ax)
+      | Comonadic ax -> Meet_with (Value.Comonadic.Const.Per_axis.min ax)
+
+    let max : _ Value.Axis.t -> _ t = function
+      | Monadic ax -> Join_with (Value.Monadic.Const.Per_axis.min ax)
+      | Comonadic ax -> Meet_with (Value.Comonadic.Const.Per_axis.max ax)
+
+    let le (ax : _ Value.Axis.t) (a : _ t) (b : _ t) =
+      match ax, a, b with
+      | Monadic ax, Join_with a, Join_with b ->
+        Value.Monadic.Const.Per_axis.le ax b a
+      | Comonadic ax, Meet_with a, Meet_with b ->
+        Value.Comonadic.Const.Per_axis.le ax a b
+      | _ -> assert false
+      [@@ocaml.warning "-4"]
+
+    let join (ax : _ Value.Axis.t) (a : _ t) (b : _ t) : _ t =
+      match ax, a, b with
+      | Monadic ax, Join_with a, Join_with b ->
+        Join_with (Value.Monadic.Const.Per_axis.meet ax a b)
+      | Comonadic ax, Meet_with a, Meet_with b ->
+        Meet_with (Value.Comonadic.Const.Per_axis.join ax a b)
+      | _ -> assert false
+      [@@ocaml.warning "-4"]
+
+    let meet (ax : _ Value.Axis.t) (a : _ t) (b : _ t) : _ t =
+      match ax, a, b with
+      | Monadic ax, Join_with a, Join_with b ->
+        Join_with (Value.Monadic.Const.Per_axis.join ax a b)
+      | Comonadic ax, Meet_with a, Meet_with b ->
+        Meet_with (Value.Comonadic.Const.Per_axis.meet ax a b)
+      | _ -> assert false
+      [@@ocaml.warning "-4"]
+
+    let print_obj ppf ax = Value.Axis.print ppf ax
+
+    let eq_obj ax0 ax1 =
+      let obj0 = Value.proj_obj ax0 in
+      let obj1 = Value.proj_obj ax1 in
+      C.eq_obj obj0 obj1
+  end
+
   module Monadic = struct
     module Modality = Modality.Monadic.Const
     module Mode = Value.Monadic
@@ -3405,6 +3505,10 @@ module Crossing = struct
     let top : t = Join_const Mode.Const.min
 
     let bot : t = Join_const Mode.Const.max
+
+    let proj = Modality.proj
+
+    let set = Modality.set
   end
 
   module Comonadic = struct
@@ -3434,6 +3538,10 @@ module Crossing = struct
     let top : t = Meet_const Mode.Const.max
 
     let bot : t = Meet_const Mode.Const.min
+
+    let proj = Modality.proj
+
+    let set = Modality.set
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
@@ -3508,4 +3616,20 @@ module Crossing = struct
         Value.Axis.all
     in
     Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
+
+  let proj (type a d0 d1) (ax : (a, d0, d1) Value.Axis.t) { comonadic; monadic }
+      =
+    match ax with
+    | Monadic ax -> Monadic.proj ax monadic
+    | Comonadic ax -> Comonadic.proj ax comonadic
+
+  let set (type a d0 d1) (ax : (a, d0, d1) Value.Axis.t) (a : a Atom.t)
+      { comonadic; monadic } =
+    match ax with
+    | Monadic ax ->
+      let monadic = Monadic.set ax a monadic in
+      { monadic; comonadic }
+    | Comonadic ax ->
+      let comonadic = Comonadic.set ax a comonadic in
+      { monadic; comonadic }
 end

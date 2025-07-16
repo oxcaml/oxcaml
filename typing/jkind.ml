@@ -1768,11 +1768,13 @@ module Const = struct
               match axis with
               | Monadic monadic ->
                 Atom
-                  (axis, Join_with (Mode.Value.Monadic.Const.max_axis monadic))
+                  ( axis,
+                    Join_with (Mode.Value.Monadic.Const.Per_axis.max monadic) )
               | Comonadic comonadic ->
                 Atom
                   ( axis,
-                    Meet_with (Mode.Value.Comonadic.Const.min_axis comonadic) )
+                    Meet_with
+                      (Mode.Value.Comonadic.Const.Per_axis.min comonadic) )
             in
             let (Atom (axis, a)) = t in
             Modality.Value.Const.set axis a acc

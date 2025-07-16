@@ -44,23 +44,14 @@ module type Lattice_product = sig
 
   type 'a axis
 
-  (** [min_axis ax] returns the [min] for the [ax] axis. *)
-  val min_axis : 'a axis -> 'a
-
-  (** [max_axis ax] returns the [max] for the [ax] axis. *)
-  val max_axis : 'a axis -> 'a
-
   (** [min_with ax elt] returns [min] but with the axis [ax] set to [elt]. *)
   val min_with : 'a axis -> 'a -> t
 
   (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
   val max_with : 'a axis -> 'a -> t
 
-  (** [le_axis ax] returns the [le] function for the [ax] axis. *)
-  val le_axis : 'a axis -> 'a -> 'a -> bool
-
-  (** [print_axis ax] returns the [print] function for the [ax] axis. *)
-  val print_axis : 'a axis -> Format.formatter -> 'a -> unit
+  module Per_axis :
+    Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
 end
 
 type equate_step =
@@ -747,13 +738,30 @@ module type S = sig
     end
   end
 
+  (** Some modes might be indistinguishable for values of some type, in which
+    case the actual/expected mode of values can be adjusted accordingly to make
+    more programs mode-check. The adjustment is called mode crossing. *)
   module Crossing : sig
-    (** The mode crossing capability pertaining to a type.
+    module Atom : sig
+      (** The mode crossing capability pertaining to a type, projected to an
+          axis whose carrier type is ['a]. *)
+      type 'a t
 
-    Some modes might be indistinguishable for values of some type, in which case
-    the actual/expected mode of values can be adjusted accordingly to make more
-    programs mode-check. The adjustment is called mode crossing. *)
+      type packed = P : ('a, _, _) Value.Axis.t * 'a t -> packed
+
+      include
+        Solver_intf.Lattices
+          with type 'a obj :=
+            ('a, disallowed * disallowed, disallowed * disallowed) Value.Axis.t
+           and type 'a elt := 'a t
+    end
+
+    (** The mode crossing capability pertaining to a type *)
     type t
+
+    val proj : ('a, _, _) Value.Axis.t -> t -> 'a Atom.t
+
+    val set : ('a, _, _) Value.Axis.t -> 'a Atom.t -> t -> t
 
     (* CR zqian: Complete the lattice structure of mode crossing. *)
 
