@@ -187,17 +187,17 @@ module Loc : sig
   val decr : int t @ contended local -> unit
 
   module Contended : sig
-    external get : ('a : value_or_null mod contended).
-      'a t @ contended local -> 'a = "%atomic_load_loc"
+    external get : ('a : value_or_null mod portable).
+      'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
 
-    external set : ('a : value_or_null mod portable).
-      'a t @ contended local -> 'a -> unit = "%atomic_set_loc"
+    external set : ('a : value_or_null mod contended).
+      'a t @ contended local -> 'a @ portable -> unit = "%atomic_set_loc"
 
     external exchange : ('a : value_or_null mod contended portable).
       'a t @ contended local -> 'a -> 'a = "%atomic_exchange_loc"
 
-    external compare_and_set : ('a : value_or_null mod portable).
-      'a t @ contended local -> 'a -> 'a -> bool = "%atomic_cas_loc"
+    external compare_and_set : ('a : value_or_null mod contended).
+      'a t @ contended local -> 'a -> 'a @ portable -> bool = "%atomic_cas_loc"
 
     external compare_exchange : ('a : value_or_null mod contended portable).
       'a t @ contended local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
