@@ -491,7 +491,14 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           | Mutable, is_atomic ->
               match record_form with
               | Legacy -> Mutable {
-                mode = Mode.Value.Comonadic.legacy;
+                mode =
+                  if is_atomic
+                  then
+                    (* CR aspsmith: extract this to a constant somewhere *)
+                    Mode.Value.Comonadic.of_const
+                      { Mode.Value.Comonadic.Const.legacy
+                         with portability = Portable }
+                  else Mode.Value.Comonadic.legacy;
                 atomic = if is_atomic then Atomic else Nonatomic
               }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
