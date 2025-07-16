@@ -93,5 +93,7 @@ let () =
   (diff ${output} ${output}.corrected)))
 |}
   in
-  print_test_llvmir "id_fn";
-  print_test_run ~bootstrap:"const_val_bootstrap" "const_val"
+  print_test_llvmir "id_fn"
+(* CR yusumez: Run tests fail on Github CI though they work locally. They are
+   disabled until this is resolved. *)
+(* print_test_run ~bootstrap:"const_val_bootstrap" "const_val" *)
