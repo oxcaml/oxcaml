@@ -359,6 +359,7 @@ module Pattern_matching_wildcard = struct
   let warning { x } = x
 
   let allowed { x; y = _ } = x
+  let also_allowed { x; _ } = x
 end
 [%%expect{|
 Line 5, characters 14-19:
@@ -367,16 +368,18 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound in this record pattern:
 y
 Either bind these labels explicitly or add '; _' to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/426"
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/430"
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
-     allowed = (function {nlocal = 0} param : int (field_int 0 param)))
-    (makeblock 0 warning allowed)))
+     allowed = (function {nlocal = 0} param : int (field_int 0 param))
+     also_allowed = (function {nlocal = 0} param : int (field_int 0 param)))
+    (makeblock 0 warning allowed also_allowed)))
 
 module Pattern_matching_wildcard :
   sig
     type t = { x : int; mutable y : int [@atomic]; }
     val warning : t -> int
     val allowed : t -> int
+    val also_allowed : t -> int
   end
 |}]
