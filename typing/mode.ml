@@ -3913,7 +3913,7 @@ let opt_sprint_const_hint : Hint.const -> string option = function
 let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
   let open Format in
   function
-  | None -> Some "emptymorphhint"
+  | None -> None
   | Close_over loc ->
     Some (asprintf "closes over something (at %a)" Location.print_loc loc)
   | Is_closed_by loc ->
@@ -3947,7 +3947,7 @@ let rec opt_sprint_axhint_chain :
   | Const (a, print_const, const_hint) ->
     Option.bind (opt_sprint_const_hint const_hint) (fun const_hint_str ->
         Some (asprintf "This is %a because it %s." print_const a const_hint_str))
-  | Empty _ -> Some "emptymorphchain"
+  | Empty _ -> None
 
 let report_submode_error ppf : submode_exn_error -> unit =
   let open Format in
