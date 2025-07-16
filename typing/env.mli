@@ -56,7 +56,7 @@ type summary =
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * Jkind.Sort.t array * int
+  | Adot of address * Jkind.Sort.t Jkind.Layout.t array * int
 
 type t
 
@@ -304,7 +304,7 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t -> item:lock_item ->
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
-  Path.t * Jkind.Sort.t array option list * value_description * mode_with_locks
+  Path.t * value_description * mode_with_locks
 val lookup_type:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * type_declaration
@@ -480,7 +480,7 @@ val open_signature:
     Asttypes.override_flag -> Longident.t Location.loc ->
     t -> Path.t * mode_with_locks * t
 
-val open_signature_by_path: Path.t -> Jkind.Sort.t array option list -> t -> t
+val open_signature_by_path: Path.t -> t -> t
 
 val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
 
@@ -674,7 +674,8 @@ val print_path: (Format.formatter -> Path.t -> unit) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
-val block_sorts_of_signature: (t -> Types.module_type -> Jkind.Sort.t array) ref
+val block_sorts_of_signature:
+  (t -> Types.module_type -> Jkind.Sort.t Jkind.Layout.t array) ref
 
 
 (** Folds *)

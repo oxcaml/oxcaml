@@ -78,7 +78,8 @@ let rec address path event = function
             not_found ()
         end
     end
-  | Env.Adot(root, pos) ->
+  | Env.Adot(root, _, pos) ->
+      (* CR jrayman: fix *)
       let v = address path event root in
       if not (Debugcom.Remote_value.is_block v) then
         raise(Error(Not_initialized_yet path));
