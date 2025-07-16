@@ -240,6 +240,10 @@ module type S = sig
   val axerror_get_consts_pair :
     ('a, 'lmorph, 'rmorph, 'const) axerror -> 'a * 'a
 
+  type submode_exn_error
+
+  exception Submode_exn of Location.t * submode_exn_error
+
   type changes
 
   val undo_changes : changes -> unit

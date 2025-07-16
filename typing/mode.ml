@@ -1651,6 +1651,13 @@ let axerror_get_right_const { left = _; right } = axhint_get_const right
 let axerror_get_consts_pair err =
   axerror_get_left_const err, axerror_get_right_const err
 
+type submode_exn_error =
+  | SubmodeError :
+      ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
+      -> submode_exn_error
+
+exception Submode_exn of Location.t * submode_exn_error
+
 (** Description of an input axis responsible for an output axis of a morphism *)
 type 'a responsible_axis =
   | NoneResponsible : 'a responsible_axis
@@ -3878,3 +3885,50 @@ module Crossing = struct
     in
     Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
 end
+
+let print_const_hint ppf : Hint.const -> unit =
+  let open Format in
+  function None -> fprintf ppf "it is"
+
+let print_morph_hint (type l r) ppf : (l * r) Hint.morph -> unit =
+  let open Format in
+  function
+  | None -> fprintf ppf "it is"
+  | Close_over loc ->
+    fprintf ppf "it closes over something (at %a)" Location.print_loc loc
+  | Is_closed_by loc ->
+    fprintf ppf "it is closed by something (at %a)" Location.print_loc loc
+  | Compose _ -> _
+
+let print_const (type a) ppf : a -> unit =
+  (* TODO - need to have way to print a const of any lattice *) _
+
+let rec print_axhint (type a l r) ppf
+    (hint : (a, (l * r) Hint.morph, Hint.const) axhint) =
+  let open Format in
+  match hint with
+  | Morph (a, morph_hint, b_hint) ->
+    fprintf ppf "It is %a because %a %a." print_const a print_morph_hint
+      morph_hint print_const (axhint_get_const b_hint)
+  | Const (a, const_hint) ->
+    fprintf ppf "It is %a because %a." print_const a print_const_hint const_hint
+  | Empty a -> fprintf ppf "It is %a." print_const a
+
+let report_submode_error ppf : submode_exn_error -> unit =
+  let open Format in
+  function
+  | SubmodeError { left; right } ->
+    fprintf ppf
+      {| %s is expected to be at most %a.
+%a
+
+However, %s is actually at least %a.
+%a |}
+      "TODO(left name)" print_const (axhint_get_const left) print_axhint left
+      "TODO(right name)" print_const (axhint_get_const right) print_axhint right
+
+let () =
+  Location.register_error_of_exn (function
+    | Submode_exn (loc, err) ->
+      Some (Location.error_of_printer ~loc report_submode_error err)
+    | _ -> None)
