@@ -1736,7 +1736,16 @@ and find_responsible_axis_prod :
       | NoneResponsible -> NoneResponsible
       | SourceIsSingle -> find_responsible_axis_single f
       | Axis c_ax -> find_responsible_axis_prod f c_ax)
-    | Id, _ | Meet_with _, _ | Imply _, _ | Map_comonadic _, _ -> SourceIsSingle
+    | Id, ax -> Axis ax
+    | Meet_with _, ax -> Axis ax
+    | Imply _, ax -> Axis ax
+    | Map_comonadic _, ax -> (
+      match ax with
+      | Areality -> Axis Areality
+      | Yielding -> Axis Yielding
+      | Linearity -> Axis Linearity
+      | Statefulness -> Axis Statefulness
+      | Portability -> Axis Portability)
     | Max_with m_ax, ax | Min_with m_ax, ax -> (
       match Axis.eq m_ax ax with
       | None -> NoneResponsible
@@ -3933,9 +3942,9 @@ let report_submode_error ppf : submode_exn_error -> unit =
 
 However, %s is actually at least %a.
 %a |}
-      "TODO(left name)" (axhint_get_printer left) (axhint_get_const left)
-      print_axhint left "TODO(right name)" (axhint_get_printer right)
-      (axhint_get_const right) print_axhint right
+      "TODO(right name)" (axhint_get_printer right) (axhint_get_const right)
+      print_axhint right "TODO(left name)" (axhint_get_printer left)
+      (axhint_get_const left) print_axhint left
 
 let () =
   Location.register_error_of_exn (function
