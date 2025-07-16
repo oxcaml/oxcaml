@@ -73,7 +73,7 @@ module Llvm_typ = struct
       (* Cfg allows vals to be assigned to ints and vice versa, so we do this to
          make LLVM happy for now. *)
     | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 ->
-      Misc.fatal_error "Not implemented [Llvm_typ.of_machtyp_component]"
+      Misc.fatal_error "[llvmize] Not implemented (of_machtyp_component)"
 
   let rec pp_t ppf t =
     let open Format in
@@ -122,7 +122,6 @@ let create ~llvmir_filename ~ppf_dump =
   let ppf = Format.formatter_of_out_channel oc in
   let current_fun_info = create_fun_info () in
   let data = [] in
-  print_endline "create";
   { llvmir_filename; asm_filename; oc; ppf; ppf_dump; current_fun_info; data }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
@@ -301,8 +300,8 @@ module F = struct
     | Float_test _ | Int_test _ | Switch _ | Raise _ | Tailcall_self _
     | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
-           (`Terminator i))
+        (asprintf "[llvmize] Unimplemented instruction: %a"
+           Cfg.print_instruction (`Terminator i))
 
   let int_op t (i : Cfg.basic Cfg.instruction)
       (op : Operation.integer_operation) =
@@ -317,8 +316,8 @@ module F = struct
     | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
     | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
-           (`Basic i))
+        (asprintf "[llvmize] Unimplemented instruction: %a"
+           Cfg.print_instruction (`Basic i))
 
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
@@ -330,7 +329,8 @@ module F = struct
       match sym_global with
       | Global -> ins_store_global t sym_name i.res.(0)
       | Local ->
-        Misc.fatal_error "Unimplemented instruction: local const symbol")
+        Misc.fatal_error
+          "[llvmize] Unimplemented instruction: local const symbol")
     | Intop op -> int_op t i op
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
     | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
@@ -338,8 +338,8 @@ module F = struct
     | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
     | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
-           (`Basic i))
+        (asprintf "[llvmize] Unimplemented instruction: %a"
+           Cfg.print_instruction (`Basic i))
 
   let basic t (i : Cfg.basic Cfg.instruction) =
     line t.ppf "%a" pp_dbg_instr_basic i;
@@ -348,8 +348,8 @@ module F = struct
     | Prologue | Reloadretaddr -> ()
     | Poptrap _ | Pushtrap _ | Stack_check _ ->
       Misc.fatal_error
-        (asprintf "Unimplemented instruction: %a" Cfg.print_instruction
-           (`Basic i))
+        (asprintf "[llvmize] Unimplemented instruction: %a"
+           Cfg.print_instruction (`Basic i))
 
   (* == Cfg data items == *)
 
@@ -363,8 +363,7 @@ module F = struct
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
-      Misc.fatal_error
-        "Unimplemented data item encountered in [Llvmize.typ_of_data_item]"
+      Misc.fatal_error "[llvmize] Not implemented (typ_of_data_item)"
 
   let pp_const_data_item ppf (d : Cmm.data_item) =
     match d with
@@ -374,13 +373,11 @@ module F = struct
       match sym_global with
       | Global -> pp_global ppf sym_name
       | Local ->
-        Misc.fatal_error
-          "Unimplemented data item encountered in [Llvmize.pp_const_data_item]")
+        Misc.fatal_error "[llvmize] Not implemented (pp_const_data_item)")
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
-      Misc.fatal_error
-        "Unimplemented data item encountered in [Llvmize.pp_const_data_item]"
+      Misc.fatal_error "[llvmize] Not implemented (pp_const_data_item)"
 
   let pp_typ_and_const ppf (d : Cmm.data_item) =
     fprintf ppf "%a %a" Llvm_typ.pp_t (typ_of_data_item d) pp_const_data_item d
@@ -404,7 +401,9 @@ let current_compilation_unit = ref None
 let get_current_compilation_unit msg =
   match !current_compilation_unit with
   | Some t -> t
-  | None -> Misc.fatal_error ("Current compilation unit not set: " ^ msg)
+  | None ->
+    Misc.fatal_error
+      (Format.sprintf "[llvmize] Current compilation unit not set (%s)" msg)
 
 let llvmir_to_assembly t =
   (* CR-someday gyorsh: add other optimization flags and control which passes to
@@ -431,7 +430,6 @@ let init ~output_prefix ~ppf_dump =
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
 let close_out () =
-  print_endline "close_out";
   match !current_compilation_unit with
   | None -> ()
   | Some t ->
@@ -440,7 +438,6 @@ let close_out () =
     current_compilation_unit := None
 
 let open_out ~asm_filename =
-  print_endline "open_out";
   let t = get_current_compilation_unit "open_out" in
   t.asm_filename <- Some asm_filename
 
@@ -505,7 +502,7 @@ let cfg (cl : CL.t) =
     let block = Label.Tbl.find blocks label in
     let preds = Cfg.predecessor_labels block in
     if Label.equal entry_label label && not (Misc.Stdlib.List.is_empty preds)
-    then Misc.fatal_errorf "Entry label must not have predecessors";
+    then Misc.fatal_errorf "[llvmize] Entry label must not have predecessors";
     F.block_label_with_predecessors t label preds;
     DLL.iter ~f:(F.basic t) block.body;
     F.terminator t block.terminator
@@ -541,12 +538,12 @@ let emit_data t =
           | Global ->
             Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
             Some sym_name, []
-          | Local -> Misc.fatal_error "Local symbols not implemented")
+          | Local -> Misc.fatal_error "[llvmize] Local symbols not implemented")
         | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
         | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
         | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
         | Calign _ ->
-          Misc.fatal_error "Unimplemented data item")
+          Misc.fatal_error "[llvmize] Data item not implemented")
       (None, []) t.data
   in
   Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym
@@ -556,7 +553,6 @@ let remove_file filename =
   with Sys_error _msg -> ()
 
 let begin_assembly ~sourcefile =
-  print_endline "begin_asm";
   let t = get_current_compilation_unit "begin_asm" in
   Option.iter (F.source_filename t) sourcefile;
   F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
@@ -565,7 +561,6 @@ let begin_assembly ~sourcefile =
   Format.pp_print_newline t.ppf ()
 
 let end_assembly ~sourcefile =
-  print_endline "end_asm";
   let t = get_current_compilation_unit "end_asm" in
   (* Emit data declarations *)
   emit_data t;
