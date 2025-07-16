@@ -1587,32 +1587,30 @@ module Hint = struct
   module Allow_disallow = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
 
-    let rec allow_left : type a l r. (allowed * r) morph -> (l * r) morph =
-      fun (type a l r) (h : (allowed * r) morph) : (l * r) morph ->
+    let rec allow_left : type l r. (allowed * r) morph -> (l * r) morph =
+      fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
        match h with
        | None -> None
        | Close_over l -> Close_over l
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
-    let rec allow_right : type a l r. (l * allowed) morph -> (l * r) morph =
-      fun (type a l r) (h : (l * allowed) morph) : (l * r) morph ->
+    let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
+      fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
        match h with
        | None -> None
        | Is_closed_by l -> Is_closed_by l
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
-    let rec disallow_left : type a l r. (l * r) morph -> (disallowed * r) morph
-        =
-      fun (type a l r) (h : (l * r) morph) : (disallowed * r) morph ->
+    let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
+      fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
        match h with
        | None -> None
        | Close_over l -> Close_over l
        | Is_closed_by l -> Is_closed_by l
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
 
-    let rec disallow_right : type a l r. (l * r) morph -> (l * disallowed) morph
-        =
-      fun (type a l r) (h : (l * r) morph) : (l * disallowed) morph ->
+    let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
+      fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
        match h with
        | None -> None
        | Close_over l -> Close_over l

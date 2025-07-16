@@ -11249,10 +11249,9 @@ let report_error ~loc env =
   | Param_mode_mismatch (s, Error (ax, {left; right})) ->
       let actual, expected =
         match s with
-        | Left_le_right -> left, right
-        | Right_le_left -> right, left
+        | Left_le_right -> axhint_get_const left, axhint_get_const right
+        | Right_le_left -> axhint_get_const right, axhint_get_const left
       in
-      let actual, expected = axhint_get_const actual, axhint_get_const expected in
       Location.errorf ~loc
         "@[This function takes a parameter which is %a,@ \
         but was expected to take a parameter which is %a.@]"
