@@ -5,7 +5,7 @@
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (ocamlopt_flags
-  (:standard -O3 -open Int_replace_polymorphic_compare))
+  (:standard -O3))
  (libraries
   ocamlcommon
   ocamloptcomp
