@@ -202,34 +202,39 @@ let should_use_linscan fd =
 
 let if_emit_do f x = if should_emit () then f x else ()
 
+(* CR yusumez: [Llvmize] uses [begin_assembly] and [end_assembly] to emit extra
+   things to its .ll file, so we need to call them as long as [llvm_backend] is
+   enabled. This will still generate an assembly file if -stop-after
+   simplify_cfg or -stop_after linearization are passed, which it shouldn't
+   do. *)
+
 let emit_begin_assembly ~sourcefile unix =
-  if_emit_do
-    (fun () ->
-      if !Oxcaml_flags.llvm_backend
-      then Llvmize.begin_assembly ~sourcefile
-      else Emit.begin_assembly unix)
-    ()
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.begin_assembly ~sourcefile
+  else if_emit_do (fun () -> Emit.begin_assembly unix) ()
 
 let emit_end_assembly ~sourcefile () =
-  if_emit_do
-    (fun () ->
-      if !Oxcaml_flags.llvm_backend
-      then Llvmize.end_assembly ~sourcefile
-      else
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.end_assembly ~sourcefile
+  else
+    if_emit_do
+      (fun () ->
         try Emit.end_assembly ()
         with Emitaux.Error e ->
           let sourcefile = Option.value ~default:"*none*" sourcefile in
           raise (Error (Asm_generation (sourcefile, e))))
-    ()
+      ()
 
 let emit_data dl =
-  if_emit_do (if !Oxcaml_flags.llvm_backend then Llvmize.data else Emit.data) dl
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.data dl
+  else if_emit_do Emit.data dl
 
 let emit_fundecl f =
+  if !Oxcaml_flags.llvm_backend
+  then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
-      if !Oxcaml_flags.llvm_backend
-      then Misc.fatal_error "Linear IR not supported with llvm backend";
       try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
       with Emitaux.Error e ->
         raise (Error (Asm_generation (fundecl.Linear.fun_name, e))))

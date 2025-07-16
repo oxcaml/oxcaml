@@ -1,15 +1,3 @@
-(* CR yusumez:
-
-   - context_name == main fails, so that was removed. also, do we need to
-   specify archtiecture?
-
-   - %{bin:ocamlopt.opt} tries building the entire compiler, which causes some
-   issues. We added boot_ocamlopt to the makefile under the bin section, though
-   that should not be pushed.
-
-   - we need to configure the assembler with CC=clang since llvm emits asm
-   directives gcc isn't happy with *)
-
 let print_test ~extra_dep ~extra_subst ~name ~buf rule_template =
   let enabled_if =
     {|(enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))|}
