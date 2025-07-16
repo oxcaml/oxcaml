@@ -100,8 +100,8 @@ type t =
     oc : Out_channel.t;
     ppf : Format.formatter;
     ppf_dump : Format.formatter;
-    mutable asm_filename : string option;
-        (* This gets provided when [begin_assembly] gets called *)
+    mutable sourcefile : string option; (* gets set in [begin_assembly] *)
+    mutable asm_filename : string option; (* gets set in [open_out] *)
     mutable current_fun_info : fun_info;
         (* Maintains the state of the current function (reset for every
            function) *)
@@ -117,12 +117,17 @@ let create_fun_info () =
   }
 
 let create ~llvmir_filename ~ppf_dump =
-  let asm_filename = None in
   let oc = Out_channel.open_text llvmir_filename in
   let ppf = Format.formatter_of_out_channel oc in
-  let current_fun_info = create_fun_info () in
-  let data = [] in
-  { llvmir_filename; asm_filename; oc; ppf; ppf_dump; current_fun_info; data }
+  { llvmir_filename;
+    asm_filename = None;
+    sourcefile = None;
+    oc;
+    ppf;
+    ppf_dump;
+    current_fun_info = create_fun_info ();
+    data = []
+  }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
 
@@ -557,6 +562,7 @@ let remove_file filename =
 
 let begin_assembly ~sourcefile =
   let t = get_current_compilation_unit "begin_asm" in
+  t.sourcefile <- sourcefile;
   (* Source filename needs to get emitted before *)
   Option.iter (F.source_filename t) sourcefile;
   F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
@@ -565,7 +571,12 @@ let begin_assembly ~sourcefile =
   F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
-let end_assembly ~sourcefile =
+(* CR yusumez: [begin_assembly] and [end_assembly] emit extra things to the .ll
+   file, so they always need to be called. However, this will still generate an
+   assembly file if -stop-after simplify_cfg or -stop_after linearization are
+   passed, which it shouldn't do. *)
+
+let end_assembly () =
   let t = get_current_compilation_unit "end_asm" in
   (* Emit data declarations *)
   emit_data t;
@@ -582,7 +593,7 @@ let end_assembly ~sourcefile =
     raise
       (Error
          (Asm_generation
-            ( Option.value ~default:"(no source file specified)" sourcefile,
+            ( Option.value ~default:"(no source file specified)" t.sourcefile,
               ret_code )));
   if not !Oxcaml_flags.keep_llvmir then remove_file t.llvmir_filename;
   current_compilation_unit := None

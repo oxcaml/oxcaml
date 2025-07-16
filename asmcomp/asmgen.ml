@@ -202,12 +202,6 @@ let should_use_linscan fd =
 
 let if_emit_do f x = if should_emit () then f x else ()
 
-(* CR yusumez: [Llvmize] uses [begin_assembly] and [end_assembly] to emit extra
-   things to its .ll file, so we need to call them as long as [llvm_backend] is
-   enabled. This will still generate an assembly file if -stop-after
-   simplify_cfg or -stop_after linearization are passed, which it shouldn't
-   do. *)
-
 let emit_begin_assembly ~sourcefile unix =
   if !Oxcaml_flags.llvm_backend
   then Llvmize.begin_assembly ~sourcefile
@@ -215,7 +209,7 @@ let emit_begin_assembly ~sourcefile unix =
 
 let emit_end_assembly ~sourcefile () =
   if !Oxcaml_flags.llvm_backend
-  then Llvmize.end_assembly ~sourcefile
+  then Llvmize.end_assembly ()
   else
     if_emit_do
       (fun () ->

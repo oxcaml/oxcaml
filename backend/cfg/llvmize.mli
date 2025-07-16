@@ -19,7 +19,7 @@ val data : Cmm.data_item list -> unit
 
 val begin_assembly : sourcefile:string option -> unit
 
-val end_assembly : sourcefile:string option -> unit
+val end_assembly : unit -> unit
 
 val close_out : unit -> unit
 
