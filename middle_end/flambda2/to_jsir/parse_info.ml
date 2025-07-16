@@ -20,7 +20,7 @@
  *)
 [@@@warning "-18"]
 
-open! Stdlib
+open! Jsoo_stdlib
 
 type t =
   { src : string option;
