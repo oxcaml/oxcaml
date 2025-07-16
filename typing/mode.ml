@@ -1679,6 +1679,9 @@ type 'a responsible_axis =
      definable. *)
 let rec find_responsible_axis_single :
     type a b l r. (a, b, l * r) C.morph -> a responsible_axis =
+  (* CR-someday pdsouza: add a parameter to this function as a proof that [b] is
+     a single axis. This will take some work to have it threaded through the rest of
+     the code. *)
   let open Lattices_mono in
   fun (type a b l r) (m : (a, b, l * r) morph) ->
     match m with
