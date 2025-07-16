@@ -113,11 +113,11 @@ let hard_float32_reg =
   Array.map (fun r -> {r with Reg.typ = Float32}) hard_float_reg
 
 let add_hard_vec256_regs list ~f =
-  if Arch.Extension.allow_vec256 ()
+  if Arch.Extension.enabled_vec256 ()
   then f hard_vec256_reg :: list else list
 
 let add_hard_vec512_regs list ~f =
-  if Arch.Extension.allow_vec512 ()
+  if Arch.Extension.enabled_vec512 ()
   then f hard_vec512_reg :: list else list
 
 let all_phys_regs =
@@ -711,10 +711,10 @@ let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
   | Creinterpret_cast V256_of_v256
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
-    Arch.Extension.allow_vec256 ()
+    Arch.Extension.enabled_vec256 ()
   | Creinterpret_cast V512_of_v512
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
-    Arch.Extension.allow_vec512 ()
+    Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -747,7 +747,7 @@ let expression_supported = function
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
   | Cexit _ -> true
-  | Cconst_vec256 _ -> Arch.Extension.allow_vec256 ()
-  | Cconst_vec512 _ -> Arch.Extension.allow_vec512 ()
+  | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
+  | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 
 let trap_size_in_bytes = 16

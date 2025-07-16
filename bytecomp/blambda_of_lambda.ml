@@ -691,16 +691,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
-    | Pstring_load_128 _ | Pbytes_load_128 _ | Pbytes_set_128 _
-    | Pbigstring_load_128 _ | Pbigstring_set_128 _ | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _ | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _ | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _ | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _ | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _ | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _ | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _ | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _ | Pbox_vector _ | Punbox_vector _ ->
+    | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
+    | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _ | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _ | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()

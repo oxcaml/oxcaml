@@ -43,6 +43,14 @@ module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
 
+module I = struct
+  include I
+
+  let simd simd args =
+    Arch.Extension.require_instruction simd;
+    I.simd simd args
+end
+
 (** Turn a Linear label into an assembly label. The section is checked against the
     section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
@@ -1473,7 +1481,9 @@ let assert_loc (loc : Simd.loc) arg =
   | None -> ()
 
 let check_simd_instr (simd : Simd.instr) imm instr =
-  assert (Bool.equal simd.imm (Option.is_some imm));
+  (match simd.imm with
+  | Imm_none | Imm_reg -> assert (Option.is_none imm)
+  | Imm_spec -> assert (Option.is_some imm));
   Array.iteri
     (fun j (arg : Simd.arg) -> assert_loc arg.loc instr.arg.(j))
     simd.args;
@@ -1509,7 +1519,7 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit; _ } -> args
+    | First_arg | Res { enc = Implicit | Immediate; _ } -> args
     | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
       match Simd.loc_is_pinned loc with
       | Some _ -> args

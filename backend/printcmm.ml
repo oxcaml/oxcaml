@@ -473,9 +473,10 @@ let fundecl ppf f =
       cases
   in
   with_location_mapping ~label:"Function" ~dbg:f.fun_dbg ppf (fun () ->
-      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a)@]@ @[%a@])@]@."
+      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
         (location f.fun_dbg) print_codegen_options f.fun_codegen_options
-        f.fun_name.sym_name print_cases f.fun_args sequence f.fun_body)
+        f.fun_name.sym_name print_cases f.fun_args machtype f.fun_ret_type
+        sequence f.fun_body)
 
 let data_item ppf = function
   | Cdefine_symbol { sym_name; sym_global = Local } ->

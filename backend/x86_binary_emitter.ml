@@ -904,9 +904,11 @@ let rd_of_reg = function
 let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   let open Amd64_simd_defs in
   let imm, args =
+    let n = Array.length args in
     match instr.imm with
-    | true -> Some args.(0), Array.sub args 1 (Array.length args - 1)
-    | false -> None, args
+    | Imm_spec | Imm_reg ->
+      Some args.(0), Array.sub args 1 (n - 1)
+    | Imm_none -> None, args
   in
   let enc i =
     match instr.res with

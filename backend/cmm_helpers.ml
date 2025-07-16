@@ -4077,7 +4077,9 @@ let fail_if_called_indirectly_function () =
       fun_codegen_options = [];
       fun_poll = Default_poll;
       fun_dbg = Debuginfo.none;
-      fun_ret_type = typ_val
+      fun_ret_type =
+        typ_void
+        (* This function never returns, so we can assume this return type *)
     }
   in
   [Cdata string_data; Cfunction fn]

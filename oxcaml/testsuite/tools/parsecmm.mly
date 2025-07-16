@@ -178,6 +178,8 @@ fundecl:
            else [ Reduce_code_size ];
          fun_poll = Lambda.Default_poll;
          fun_dbg = debuginfo ();
+         (* CR yusumez: Adding return types to the parser might require a lot
+            of changes, so we assume this for now. *)
          fun_ret_type = Cmm.typ_val } }
 ;
 fun_name:

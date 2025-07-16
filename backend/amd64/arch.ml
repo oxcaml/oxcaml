@@ -89,6 +89,7 @@ module Extension = struct
     | AVX512F -> "SkylakeXeon+"
 
   let enabled_by_default = function
+    (* CR-soon mslater: defaults should be determined by configure. *)
     | SSE3 | SSSE3 | SSE4_1 | SSE4_2
     | POPCNT | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 -> true
     | PREFETCHW | PREFETCHWT1 | AVX512F -> false
@@ -98,21 +99,36 @@ module Extension = struct
       [ POPCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2; CLMUL;
         LZCNT; BMI; BMI2; AVX; AVX2; AVX512F ]
 
+  let directly_implied_by e1 e2 =
+    match e1, e2 with
+    | SSE3, SSSE3
+    | SSSE3, SSE4_1
+    | SSE4_1, SSE4_2
+    | SSE4_2, AVX
+    | AVX, AVX2
+    | AVX2, AVX512F
+    | BMI, BMI2 -> true
+    | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
+      | SSE4_2 | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
+
+  let implication ext =
+    let rec fix set less =
+      let closure =
+        Set.filter (fun ext -> Set.exists (less ext) set) all
+        |> Set.union set
+      in
+      if Set.equal closure set then set
+      else fix closure less
+    in
+    let set = Set.singleton ext in
+    let implies = fix set directly_implied_by in
+    let implied_by = fix set (fun e1 e2 -> directly_implied_by e2 e1) in
+    implies, implied_by
+
   let config = ref (Set.filter enabled_by_default all)
 
   let enabled t = Set.mem t !config
   let disabled t = not (enabled t)
-
-  let allow_vec256 () = List.exists enabled [AVX; AVX2; AVX512F]
-  let allow_vec512 () = List.exists enabled [AVX512F]
-
-  let require_vec256 () =
-    if not (allow_vec256 ())
-    then Misc.fatal_error "AVX or AVX512 is required for 256-bit vectors"
-
-  let require_vec512 () =
-    if not (allow_vec512 ())
-    then Misc.fatal_error "AVX512 is required for 512-bit vectors"
 
   let args =
     let y t = "-f" ^ (name t |> String.lowercase_ascii) in
@@ -121,13 +137,42 @@ module Extension = struct
       let print_default b = if b then " (default)" else "" in
       let yd = print_default (enabled t) in
       let nd = print_default (disabled t) in
-      (y t, Arg.Unit (fun () -> config := Set.add t !config),
+      let implies, implied_by = implication t in
+      (y t, Arg.Unit (fun () ->
+        config := Set.union !config implies),
         Printf.sprintf "Enable %s instructions (%s)%s" (name t) (generation t) yd) ::
-      (n t, Arg.Unit (fun () -> config := Set.remove t !config),
+      (n t, Arg.Unit (fun () ->
+        config := Set.diff !config implied_by),
         Printf.sprintf "Disable %s instructions (%s)%s" (name t) (generation t) nd) :: acc)
     all []
 
-    let available () = Set.fold (fun t acc -> t :: acc) !config []
+  let available () = Set.fold (fun t acc -> t :: acc) !config []
+
+  let enabled_vec256 () = enabled AVX
+  let enabled_vec512 () = enabled AVX512F
+
+  let require_vec256 () =
+    if not (enabled AVX) then Misc.fatal_error
+      "Using 256-bit registers requires AVX, which is not enabled."
+
+  let require_vec512 () =
+    if not (enabled AVX512F) then Misc.fatal_error
+      "Using 512-bit registers requires AVX512F, which is not enabled."
+
+  let require_instruction (instr : Amd64_simd_instrs.instr) =
+    let enabled : Amd64_simd_defs.ext -> bool = function
+      | SSE | SSE2 -> true
+      | SSE3 -> enabled SSE3
+      | SSSE3 -> enabled SSSE3
+      | SSE4_1 -> enabled SSE4_1
+      | SSE4_2 -> enabled SSE4_2
+      | PCLMULQDQ -> enabled CLMUL
+      | BMI2 -> enabled BMI2
+      | AVX -> enabled AVX
+      | AVX2 -> enabled AVX2
+    in
+    if not (Array.for_all enabled instr.ext)
+    then Misc.fatal_errorf "Emitted %s, which is not enabled." instr.mnemonic
 end
 
 (* Emit elf notes with trap handling information. *)
