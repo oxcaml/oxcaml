@@ -226,13 +226,15 @@ let emit_end_assembly ~sourcefile () =
       ()
 
 let emit_data dl =
-  if_emit_do (if !Oxcaml_flags.llvm_backend then Llvmize.data else Emit.data) dl
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.data dl
+  else if_emit_do Emit.data dl
 
 let emit_fundecl f =
+  if !Oxcaml_flags.llvm_backend
+  then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
-      if !Oxcaml_flags.llvm_backend
-      then Misc.fatal_error "Linear IR not supported with llvm backend";
       try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
       with Emitaux.Error e ->
         raise (Error (Asm_generation (fundecl.Linear.fun_name, e))))
