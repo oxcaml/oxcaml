@@ -101,6 +101,7 @@ let make_ops_u name =
   (with-stdout-to
    ${name}_u.ml
    (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
    (cat "${name}.ml")))))
@@ -134,6 +135,12 @@ let () =
       "ops_int32x4";
       "ops_int16x8";
       "ops_int8x16";
+      "ops_float32x8";
+      "ops_float64x4";
+      "ops_int32x8";
+      "ops_int64x4";
+      "ops_int16x16";
+      "ops_int8x32";
       "sse_other_ops";
       "sse42_string_ops" ]
   in
@@ -172,7 +179,22 @@ let () =
       "callback256", enabled_if_main_amd64_not_macos;
       "test_callee_save_neon_regs", enabled_if_main;
       "probes", enabled_if_main_amd64_not_macos;
-      "probes256", enabled_if_main_amd64_not_macos ]
+      "consts256", enabled_if_main_amd64_not_macos;
+      "consts256_u", enabled_if_main_amd64_not_macos;
+      "probes256", enabled_if_main_amd64_not_macos;
+      "utils256", enabled_if_main_amd64_not_macos;
+      "ops_float32x8", enabled_if_main_amd64_not_macos;
+      "ops_float64x4", enabled_if_main_amd64_not_macos;
+      "ops_int32x8", enabled_if_main_amd64_not_macos;
+      "ops_int64x4", enabled_if_main_amd64_not_macos;
+      "ops_int16x16", enabled_if_main_amd64_not_macos;
+      "ops_int8x32", enabled_if_main_amd64_not_macos;
+      "ops_float32x8_u", enabled_if_main_amd64_not_macos;
+      "ops_float64x4_u", enabled_if_main_amd64_not_macos;
+      "ops_int32x8_u", enabled_if_main_amd64_not_macos;
+      "ops_int64x4_u", enabled_if_main_amd64_not_macos;
+      "ops_int16x16_u", enabled_if_main_amd64_not_macos;
+      "ops_int8x32_u", enabled_if_main_amd64_not_macos ]
   in
   List.iter print_test tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;

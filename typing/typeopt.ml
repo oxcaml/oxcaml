@@ -558,6 +558,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable Pintval
   | Tconstr(p, _, _) when Path.same p Predef.path_int16 ->
     num_nodes_visited, non_nullable Pintval
+  | Tconstr(p, _, _) when Path.same p Predef.path_floatarray ->
+    num_nodes_visited, non_nullable (Parrayval Pfloatarray)
   | Tconstr(p, _, _) when Path.same p Predef.path_float ->
     num_nodes_visited, non_nullable (Pboxedfloatval Boxed_float64)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32 ->
@@ -606,7 +608,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
-          || Path.same p Predef.path_floatarray) ->
+          || Path.same p Predef.path_iarray) ->
     (* CR layouts: [~elt_sort:None] here is bad for performance. To
        fix it, we need a place to store the sort on a [Tconstr]. *)
     let ak = array_type_kind ~elt_ty:(Some arg) ~elt_sort:None env loc ty in

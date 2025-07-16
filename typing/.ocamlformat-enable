@@ -17,3 +17,7 @@ jkind_axis.mli
 jkind_axis.ml
 allowance.mli
 allowance.ml
+vicuna_value_shapes.ml
+vicuna_value_shapes.mli
+vicuna_traverse_typed_tree.ml
+vicuna_traverse_typed_tree.mli

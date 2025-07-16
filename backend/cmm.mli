@@ -291,7 +291,9 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128 (* Converts between vector types of the same width. *)
+  | V128_of_v128
+  | V256_of_v256
+  | V512_of_v512 (* Converts between vector types of the same width. *)
 
 (* These casts may require a particular value-preserving operation, e.g.
    truncating a float to an int. *)
@@ -302,6 +304,10 @@ type static_cast =
   | Float32_of_float
   | V128_of_scalar of vec128_type
   | Scalar_of_v128 of vec128_type
+  | V256_of_scalar of vec256_type
+  | Scalar_of_v256 of vec256_type
+  | V512_of_scalar of vec512_type
+  | Scalar_of_v512 of vec512_type
 
 module Alloc_mode : sig
   type t =

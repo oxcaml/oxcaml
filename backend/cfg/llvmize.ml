@@ -103,7 +103,8 @@ type t =
     mutable asm_filename : string option;
         (* This gets provided when [begin_assembly] gets called *)
     mutable current_fun_info : fun_info;
-        (* Maintains the state of the current function *)
+        (* Maintains the state of the current function (reset for every
+           function) *)
     mutable data : Cmm.data_item list
         (* Collects data items as they come and processes them at the end *)
   }
