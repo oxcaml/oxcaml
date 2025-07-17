@@ -1435,6 +1435,41 @@ let rec patch_guarded patch = function
 
 (* Translate an access path *)
 
+let rec transl_mixed_product_element' (elt : Types.mixed_block_element) =
+  match elt with
+  | Value -> Value generic_value
+  | Float_boxed -> Float_boxed alloc_heap
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Word -> Word
+  | Product shapes ->
+    Product (Array.map transl_mixed_product_element' shapes)
+
+let rec mixed_block_of_sort' : Jkind.Sort.Const.t
+                      -> Types.mixed_block_element =
+  function
+  | Base Void -> fatal_error "Translmod.transl_structure: \
+    tried to convert Void to layout"
+  | Base Value -> Value
+  | Base Bits32 -> Bits32
+  | Base Bits64 -> Bits64
+  | Base Float32 -> Float32
+  | Base Float64 -> Float64
+  | Base Vec128 -> Vec128
+  | Base Vec256 -> Vec256
+  | Base Vec512 -> Vec512
+  | Base Word -> Word
+  | Product sorts ->
+    Product (Array.map mixed_block_of_sort' (Array.of_list sorts))
+
+let _ = mixed_block_of_sort'
+let _ = transl_mixed_product_element'
+
 let rec transl_address loc = function
   | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
   | Env.Alocal id ->
@@ -1447,12 +1482,19 @@ let rec transl_address loc = function
           Jkind.Layout.default_to_value_and_get layout
             |> Jkind.Layout.Const.get_sort
         with
-        | Some _sort -> failwith "TODO"
+        | Some sort ->
+          mixed_block_of_sort' sort |> transl_mixed_product_element'
         | None -> fatal_error "CR jrayman: write error"
       in
-      Lprim(Pmixedfield([pos],
-                        Array.map layout_to_mixed_block field_layouts,
-                        Reads_agree),
+      let mixed_blocks = Array.map layout_to_mixed_block field_layouts in
+      if Array.for_all (function
+        | Value _ -> true
+        | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
+        | Vec512 | Word | Product _ -> false) mixed_blocks
+      then
+      Lprim(Pfield(pos, Pointer, Reads_agree), [transl_address loc addr], loc)
+      else
+      Lprim(Pmixedfield([pos], mixed_blocks, Reads_agree),
                    [transl_address loc addr], loc)
 
 let transl_path find loc env path =
