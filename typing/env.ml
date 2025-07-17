@@ -213,10 +213,13 @@ let map_summary f = function
   | Env_value_unbound (s, u, r) -> Env_value_unbound (f s, u, r)
   | Env_module_unbound (s, u, r) -> Env_module_unbound (f s, u, r)
 
+(* CR mixed-modules: Rebase onto https://u/github/y1psLg *)
+
+(* CR mixed-modules: Put [block_sort] information here *)
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Jkind.Sort.t Jkind.Layout.t array * int
 
 module TycompTbl =
   struct
@@ -695,7 +698,12 @@ and functor_components = {
 }
 
 and address_unforced =
-  | Projection of { parent : address_lazy; pos : int; }
+  | Projection of
+    { parent : address_lazy;
+      field_layouts: Jkind.Sort.t Jkind.Layout.t list ref;
+      pos : int }
+    (* [field_layouts] is a [list] here because it is constructed with iterative
+       appending *)
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -874,6 +882,11 @@ let constrain_type_jkind = ref (fun _ _ _ -> assert false)
 
 let check_well_formed_module = ref (fun _ -> assert false)
 
+(* CR jrayman: make sure not unused *)
+let block_sorts_of_signature =
+  ref ((fun _ _ -> assert false):
+    t -> Types.module_type -> Jkind.Sort.t Jkind.Layout.t array)
+
 (* Helper to decide whether to report an identifier shadowing
    by some 'open'. For labels and constructors, we do not report
    if the two elements are from the same re-exported declaration.
@@ -1019,7 +1032,7 @@ let normalize_mda_mode mda =
 let rec print_address ppf = function
   | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
-  | Adot(a, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
+  | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
 type address_head =
   | AHunit of Compilation_unit.t
@@ -1028,7 +1041,7 @@ type address_head =
 let rec address_head = function
   | Aunit cu -> AHunit cu
   | Alocal id -> AHlocal id
-  | Adot (a, _) -> address_head a
+  | Adot (a, _, _) -> address_head a
 
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
@@ -1582,7 +1595,8 @@ and find_ident_module_address id env =
   get_address (find_ident_module id env).mda_address
 
 and force_address = function
-  | Projection { parent; pos } -> Adot(get_address parent, pos)
+  | Projection { parent; field_layouts; pos } ->
+    Adot(get_address parent, Array.of_list !field_layouts, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2129,9 +2143,12 @@ let rec components_of_module_maker
       in
       let env = ref cm_env in
       let pos = ref 0 in
-      let next_address () =
+      let field_layouts = ref [] in
+      let next_address layout =
+        field_layouts := layout :: !field_layouts;
         let addr : address_unforced =
-          Projection { parent = cm_addr; pos = !pos }
+          Projection
+            { parent = cm_addr; field_layouts; pos = !pos }
         in
         incr pos;
         Lazy_backtrack.create addr
@@ -2143,7 +2160,11 @@ let rec components_of_module_maker
             let addr =
               match decl.val_kind with
               | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
-              | _ -> next_address ()
+              | Val_reg layout -> next_address layout
+              | Val_ivar _ | Val_self _ | Val_anc _ ->
+                next_address (Jkind.Layout.Sort Jkind.Sort.value)
+              | Val_mut _ ->
+                Misc.fatal_error "Mutable variable found at the structure level"
             in
             let vda_shape = Shape.proj cm_shape (Shape.Item.value id) in
             let vda =
@@ -2217,7 +2238,7 @@ let rec components_of_module_maker
               Datarepr.extension_descr ~current_unit:(get_unit_name ()) path
                 ext'
             in
-            let addr = next_address () in
+            let addr = next_address (Jkind.Layout.Sort Jkind.Sort.value) in
             let cda_shape =
               Shape.proj cm_shape (Shape.Item.extension_constructor id)
             in
@@ -2241,7 +2262,7 @@ let rec components_of_module_maker
                       Lazy_backtrack.create (ModAlias {env = !env; path})
                   | _ -> assert false
                 end
-              | Mp_present -> next_address ()
+              | Mp_present -> next_address (Jkind.Layout.Sort Jkind.Sort.value)
             in
             let alerts =
               Builtin_attributes.alerts_of_attrs md.md_attributes
@@ -2280,7 +2301,7 @@ let rec components_of_module_maker
             env := store_modtype ~update_summary:false id decl shape !env
         | Sig_class(id, decl, _, _) ->
             let decl' = Subst.class_declaration sub decl in
-            let addr = next_address () in
+            let addr = next_address (Jkind.Layout.Sort Jkind.Sort.value) in
             let shape = Shape.proj cm_shape (Shape.Item.class_ id) in
             let clda =
               { clda_declaration = decl';
@@ -4225,7 +4246,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
       | Val_mut _, _ -> assert false
       (* Unreachable because only [type_pat] creates mutable variables
          and it checks that they are simple identifiers. *)
-      | ((Val_reg | Val_prim _ | Val_self _ | Val_anc _), _) ->
+      | ((Val_reg _ | Val_prim _ | Val_self _ | Val_anc _), _) ->
           lookup_error loc env (Not_a_settable_variable name)
     end
   | Ok (_, _, Val_unbound Val_unbound_instance_variable) ->

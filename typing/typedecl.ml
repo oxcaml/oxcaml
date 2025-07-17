@@ -3692,14 +3692,6 @@ let check_for_hidden_arrow env loc ty =
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modalities valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
-  (* CR layouts v5: relax this to check for representability. *)
-  begin match Ctype.constrain_type_jkind env cty.ctyp_type
-                (Jkind.Builtin.value_or_null ~why:Structure_element) with
-  | Ok () -> ()
-  | Error err ->
-    raise(Error(cty.ctyp_loc,
-                Non_value_in_sig(err,valdecl.pval_name.txt,cty.ctyp_type)))
-  end;
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with
@@ -3748,7 +3740,10 @@ let transl_value_decl env loc ~modalities valdecl =
         | Assume _ ->
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
-      { val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
+      { val_type = ty;
+        val_kind =
+          Val_reg (Ctype.type_jkind_purely env cty.ctyp_type).jkind.layout;
+        Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
