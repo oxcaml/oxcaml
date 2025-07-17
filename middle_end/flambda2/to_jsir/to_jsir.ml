@@ -40,7 +40,7 @@ let create_let_prim ~env ~res fvar prim dbg =
 (** Bind a fresh variable to the result of translating [const] into JSIR, and
     map [symbol] to this new variable in the environment.*)
 let create_let_block_like ~env ~res symbol const =
-  let expr, env, res = To_jsir_block_like.block_like ~env ~res const in
+  let expr, env, res = To_jsir_static_const.block_like ~env ~res const in
   bind_expr_to_symbol ~env ~res symbol expr
 
 let rec expr ~env ~res e =
@@ -125,7 +125,7 @@ and apply_cont ~env ~res apply_cont =
   let res =
     match Apply_cont.trap_action apply_cont with
     | None ->
-      let last =
+      let (last : Jsir.last) =
         match (continuation : To_jsir_env.continuation) with
         | Return ->
           if List.length args <> 1
