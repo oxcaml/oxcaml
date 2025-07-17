@@ -2613,20 +2613,19 @@ module Monadic = struct
 
   let legacy = of_const Const.legacy
 
-  type axis_with_proj_pair =
-    | Axis_with_proj_pair : 'a Axis.t * 'a * 'a -> axis_with_proj_pair
-
-  (* Given the left and right parts of a submoding error, return the offending axis,
-     but considering them on the opposite side. Also returns the projections of the
-     left and right constants in that axis, in the flipped order. *)
-  let flipped_axis_of_error (left : Obj.const) (right : Obj.const) :
-      axis_with_proj_pair =
+  (** Take a solver error and determine the problematic axis, assuming
+  the operation we were trying to do was [left <= right], then return an
+  [axerror] in that axis, as well as the axis itself. Before returning, since
+  the monadic fragment is flipped, this function will flip the error sides *)
+  let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
+    let left = err.left in
     let { uniqueness = uniqueness1;
           contention = contention1;
           visibility = visibility1
         } =
       left
     in
+    let right = err.right in
     let { uniqueness = uniqueness2;
           contention = contention2;
           visibility = visibility2
@@ -2639,19 +2638,14 @@ module Monadic = struct
       then
         if Visibility.Const.le visibility2 visibility1
         then assert false
-        else Axis_with_proj_pair (Visibility, visibility2, visibility1)
-      else Axis_with_proj_pair (Contention, contention2, contention1)
-    else Axis_with_proj_pair (Uniqueness, uniqueness2, uniqueness1)
-
-  (** Take a solver error and determine the problematic axis, assuming
-  the operation we were trying to do was [left <= right], then return an
-  [axerror] in that axis, as well as the axis itself. Before returning, since
-  the monadic fragment is flipped, this function will flip the error sides *)
-  let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
-    let left = err.left in
-    let right = err.right in
-    let (Axis_with_proj_pair (ax, _, _)) = flipped_axis_of_error left right in
-    Error (ax, flipped_solver_error_to_axerror Obj.obj ax err)
+        else
+          Error
+            (Visibility, flipped_solver_error_to_axerror Obj.obj Visibility err)
+      else
+        Error
+          (Contention, flipped_solver_error_to_axerror Obj.obj Contention err)
+    else
+      Error (Uniqueness, flipped_solver_error_to_axerror Obj.obj Uniqueness err)
 
   (* unlike for a single axis object, the below submoding and equality functions
      report the offending axis *)
@@ -3361,9 +3355,16 @@ module Modality = struct
           if Mode.Const.le c0 c1
           then Ok ()
           else
-            let (Axis_with_proj_pair (ax, left, right)) =
-              Mode.flipped_axis_of_error c0 c1
+            let (Error (ax, err)) =
+              Mode.flipped_axis_of_solver_error
+                { left = c0;
+                  left_hint = Const Hint.const_none;
+                  right = c1;
+                  right_hint = Const Hint.const_none
+                }
             in
+            let left = axerror_get_left_const err in
+            let right = axerror_get_right_const err in
             Error
               (Error
                  ( ax,
