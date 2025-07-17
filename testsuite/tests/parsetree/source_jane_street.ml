@@ -1503,15 +1503,13 @@ The following syntaxes are tested
 module type S = sig
   val concat :
     Stdlib.Option.?'sep:string -> string Stdlib.List.t -> string
-  val concat_2 : ?sep:string -> string Stdlib.List.t -> string
+    (* CR generic-optional : signature ascription for generic optional types *)
+  (*= val concat_2 : ?sep:string -> string Stdlib.List.t -> string *)
 end
 
 [%%expect{|
 module type S =
-  sig
-    val concat : ?sep:string -> string List.t -> string
-    val concat_2 : ?sep:string -> string List.t -> string
-  end
+  sig val concat : Stdlib.Option.?'sep:string -> string List.t -> string end
 |}]
 
 
@@ -1520,9 +1518,11 @@ module M : S = struct
   let rec concat Stdlib.Option.?'(sep : string = " ")
     (xs : string Stdlib.List.t) =
       String.concat sep xs
-  (* okay to omit type annotations *)
-  let concat_2 Stdlib.Option.?'(sep=" ") (xs : string Stdlib.List.t) =
-    String.concat sep xs
+  (*
+  CR generic-optional : signature ascriptions
+  okay to omit type annotations *)
+  (*= let concat_2 Stdlib.Option.?'(sep=" ") (xs : string Stdlib.List.t) =
+    String.concat sep xs *)
 end
 
 [%%expect{|
@@ -1559,7 +1559,8 @@ let chain_call Stdlib.Option.?'(sep : string option) arg =
 chain_call ["x"; "y"; "z"] ;;
 
 [%%expect{|
-val chain_call : ?sep:string -> string List.t -> string = <fun>
+val chain_call : Stdlib.Option.?'sep:string -> string List.t -> string =
+  <fun>
 - : string = "x y z"
 |}]
 
@@ -1568,7 +1569,8 @@ let chain_call Stdlib.Option.?'sep:(sep : string option) arg =
 chain_call Stdlib.Option.?'sep:(Some ",") ["x"; "y"; "z"] ;;
 
 [%%expect{|
-val chain_call : ?sep:string -> string List.t -> string = <fun>
+val chain_call : Stdlib.Option.?'sep:string -> string List.t -> string =
+  <fun>
 - : string = "x,y,z"
 |}]
 
@@ -1578,6 +1580,7 @@ let chain_call_2 Stdlib.Option.?'(sep) arg =
 chain_call_2 ?sep:(Some ",") ["x"; "y"; "z"] ;;
 
 [%%expect{|
-val chain_call_2 : ?sep:string -> string List.t -> string = <fun>
+val chain_call_2 : Stdlib.Option.?'sep:string -> string List.t -> string =
+  <fun>
 - : string = "x,y,z"
 |}]

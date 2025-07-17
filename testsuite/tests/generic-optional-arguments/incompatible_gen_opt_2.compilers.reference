@@ -1,0 +1,5 @@
+File "incompatible_gen_opt_2.ml", line 17, characters 31-32:
+17 | let g x = M.f Stdlib.Or_null.?'x ()
+                                    ^
+Error: The function applied to this argument has type ?x:int -> int
+This argument cannot be applied with label "Stdlib.Or_null.?'x"
