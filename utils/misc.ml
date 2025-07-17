@@ -1379,6 +1379,11 @@ let print_if ppf flag printer arg =
   if !flag then Format.fprintf ppf "%a@." printer arg;
   arg
 
+let print_if_all ppf flags printer arg =
+  if List.for_all (fun flag -> !flag) flags
+  then Format.fprintf ppf "%a@." printer arg;
+  arg
+
 let print_see_manual ppf manual_section =
   let open Format in
   fprintf ppf "(see manual section %a)"
