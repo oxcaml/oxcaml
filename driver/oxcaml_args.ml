@@ -258,7 +258,7 @@ let mk_dllvmir f =
   "-dllvmir", Arg.Unit f, " (undocumented)"
 
 let mk_keep_llvmir f =
-  "-keep-llvmir", Arg.Unit f, " Keep the LLVM IR file"
+  "-keep-llvmir", Arg.Unit f, " Keep the LLVM IR file produced by -llvm-backend"
 
 let mk_llvm_path f =
   "-llvm-path", Arg.String f, " Specify which LLVM compiler to use"

@@ -1,33 +1,53 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (targets id_fn.output.corrected)
- (deps (:ml id_fn.ml) filter.sh)
+ (targets id_fn_ir.output.corrected)
+ (deps id_fn_ir.ml filter.sh)
  (action
   (with-outputs-to
-   id_fn.output.corrected
+   id_fn_ir.output.corrected
    (pipe-outputs
     (run
-     %{bin:ocamlopt.opt} %{ml} -c -llvm-backend -stop-after llvmize -keep-llvmir)
-    (run cat id_fn.ll)
+     %{bin:ocamlopt.opt} id_fn_ir.ml -g -c -O3 -llvm-backend -stop-after llvmize -keep-llvmir)
+    (run cat id_fn_ir.ll)
     (run ./filter.sh)))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
  (alias runtest)
- (deps id_fn.output id_fn.output.corrected)
+ (deps id_fn_ir.output id_fn_ir.output.corrected)
  (action
-  (diff id_fn.output id_fn.output.corrected)))
+  (diff id_fn_ir.output id_fn_ir.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (targets const_val_ir.output.corrected)
+ (deps const_val_ir.ml filter.sh)
+ (action
+  (with-outputs-to
+   const_val_ir.output.corrected
+   (pipe-outputs
+    (run
+     %{bin:ocamlopt.opt} const_val_ir.ml -g -c -O3 -llvm-backend -stop-after llvmize -keep-llvmir)
+    (run cat const_val_ir.ll)
+    (run ./filter.sh)))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest)
+ (deps const_val_ir.output const_val_ir.output.corrected)
+ (action
+  (diff const_val_ir.output const_val_ir.output.corrected)))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
  (targets const_val.output.exe)
- (deps (:ml const_val_bootstrap.ml const_val.ml))
+ (deps const_val_main.ml const_val_test.ml)
  (action
-  (pipe-outputs
-   (run %{bin:ocamlopt.opt} const_val.ml -c -opaque -llvm-backend -llvm-path clang)
-   (run %{bin:ocamlopt.opt} const_val_bootstrap.ml -c -opaque)
-   (run %{bin:ocamlopt.opt} const_val.cmx const_val_bootstrap.cmx -opaque -o const_val.output.exe))))
+  (progn
+   (run %{bin:ocamlopt.opt} const_val_test.ml -c -g -O3 -opaque -llvm-backend -llvm-path clang -dno-asm-comments)
+   (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -opaque)
+   (run %{bin:ocamlopt.opt} const_val_test.cmx const_val_main.cmx -opaque -o const_val.output.exe))))
 
 (rule
  (deps const_val.output.exe)

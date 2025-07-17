@@ -118,8 +118,8 @@ type t =
     oc : Out_channel.t;
     ppf : Format.formatter;
     ppf_dump : Format.formatter;
-    mutable asm_filename : string option;
-        (* This gets provided when [begin_assembly] gets called *)
+    mutable sourcefile : string option; (* gets set in [begin_assembly] *)
+    mutable asm_filename : string option; (* gets set in [open_out] *)
     mutable current_fun_info : fun_info;
         (* Maintains the state of the current function (reset for every
            function) *)
@@ -135,12 +135,17 @@ let create_fun_info () =
   }
 
 let create ~llvmir_filename ~ppf_dump =
-  let asm_filename = None in
   let oc = Out_channel.open_text llvmir_filename in
   let ppf = Format.formatter_of_out_channel oc in
-  let current_fun_info = create_fun_info () in
-  let data = [] in
-  { llvmir_filename; asm_filename; oc; ppf; ppf_dump; current_fun_info; data }
+  { llvmir_filename;
+    asm_filename = None;
+    sourcefile = None;
+    oc;
+    ppf;
+    ppf_dump;
+    current_fun_info = create_fun_info ();
+    data = []
+  }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
 
@@ -182,28 +187,25 @@ module F = struct
 
      yusumez: Multiline comments don't work for some reason... *)
 
+  let do_if_comments_enabled f = if !Oxcaml_flags.dasm_comments then f ()
+
   let pp_dbg ppf dbg =
     if Debuginfo.is_none dbg
     then ()
     else fprintf ppf "[ %a ]" Debuginfo.print_compact dbg
 
-  let pp_dbg_fun ppf name dbg = line ppf "; %s %a" name pp_dbg dbg
+  let pp_dbg_fun ppf name dbg =
+    do_if_comments_enabled (fun () -> line ppf "; %s %a" name pp_dbg dbg)
 
   let pp_dbg_instr_basic ppf ins =
-    let ins_str =
-      asprintf "%a" Cfg.print_basic ins
-      |> String.map (function '\n' -> ' ' | ch -> ch)
-    in
-    pp_indent ppf ();
-    line ppf "; %s %a" ins_str pp_dbg ins.Cfg.dbg
+    do_if_comments_enabled (fun () ->
+        pp_indent ppf ();
+        line ppf "; %a %a" Cfg.print_basic ins pp_dbg ins.Cfg.dbg)
 
   let pp_dbg_instr_terminator ppf ins =
-    let ins_str =
-      asprintf "%a" Cfg.print_terminator ins
-      |> String.map (function '\n' -> ' ' | ch -> ch)
-    in
-    pp_indent ppf ();
-    line ppf "; %s %a" ins_str pp_dbg ins.Cfg.dbg
+    do_if_comments_enabled (fun () ->
+        pp_indent ppf ();
+        line ppf "; %a %a" Cfg.print_terminator ins pp_dbg ins.Cfg.dbg)
 
   let ins t =
     pp_indent t.ppf ();
@@ -574,25 +576,6 @@ let get_current_compilation_unit msg =
     Misc.fatal_error
       (Format.sprintf "Llvmize: current compilation unit not set (%s)" msg)
 
-let llvmir_to_assembly t =
-  (* CR-someday gyorsh: add other optimization flags and control which passes to
-     perform. *)
-  let cmd =
-    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
-  in
-  match t.asm_filename with
-  | None -> 0
-  | Some asm_filename ->
-    Ccomp.command
-      (String.concat " "
-         [ cmd;
-           "-o";
-           Filename.quote asm_filename;
-           "-O3";
-           "-S";
-           "-x ir";
-           Filename.quote t.llvmir_filename ])
-
 (* Create LLVM IR file for the current compilation unit. *)
 let init ~output_prefix ~ppf_dump =
   let llvmir_filename = output_prefix ^ ".ll" in
@@ -723,17 +706,55 @@ let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
   with Sys_error _msg -> ()
 
+let llvmir_to_assembly t =
+  (* CR-someday gyorsh: add other optimization flags and control which passes to
+     perform. *)
+  let cmd =
+    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
+  in
+  match t.asm_filename with
+  | None -> 0
+  | Some asm_filename ->
+    Ccomp.command
+      (String.concat " "
+         [ cmd;
+           "-o";
+           Filename.quote asm_filename;
+           "-O3";
+           "-S";
+           "-x ir";
+           Filename.quote t.llvmir_filename ])
+
+let assemble_file ~asm_filename ~obj_filename =
+  let cmd =
+    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
+  in
+  Ccomp.command
+    (String.concat " "
+       [ cmd;
+         "-c";
+         "-o";
+         Filename.quote obj_filename;
+         Filename.quote asm_filename ])
+
 let begin_assembly ~sourcefile =
   let t = get_current_compilation_unit "begin_asm" in
+  t.sourcefile <- sourcefile;
   (* Source filename needs to get emitted before *)
   Option.iter (F.source_filename t) sourcefile;
-  F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
+  (* CR yusumez: Get target triple *)
+  (* F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\""; *)
   Format.pp_print_newline t.ppf ();
   F.symbol_decl t "data_begin";
   F.empty_fun_decl t "code_begin";
   Format.pp_print_newline t.ppf ()
 
-let end_assembly ~sourcefile =
+(* CR yusumez: [begin_assembly] and [end_assembly] emit extra things to the .ll
+   file, so they always need to be called. However, this will still generate an
+   assembly file if -stop-after simplify_cfg or -stop_after linearization are
+   passed, which it shouldn't do. *)
+
+let end_assembly () =
   let t = get_current_compilation_unit "end_asm" in
   (* Emit data declarations *)
   emit_data t;
@@ -750,7 +771,7 @@ let end_assembly ~sourcefile =
     raise
       (Error
          (Asm_generation
-            ( Option.value ~default:"(no source file specified)" sourcefile,
+            ( Option.value ~default:"(no source file specified)" t.sourcefile,
               ret_code )));
   if not !Oxcaml_flags.keep_llvmir then remove_file t.llvmir_filename;
   current_compilation_unit := None
