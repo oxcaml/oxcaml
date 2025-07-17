@@ -18,6 +18,10 @@ val create : unit -> t
 (** Add a [Jsir.instr] to the current block. *)
 val add_instr : t -> Jsir.instr -> t
 
+(* CR selee: This is probably the wrong interface to handle blocks, because we
+   may have to create a new block while in the middle of a different block. Will
+   come back and modify *)
+
 (** Set the continuation of the current block to be the given [Jsir.last]. *)
 val set_last : t -> Jsir.last -> t
 
