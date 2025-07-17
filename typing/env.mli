@@ -537,8 +537,7 @@ val add_escape_lock : escaping_context -> t -> t
     `unique` variables beyond the lock can still be accessed, but will be
     relaxed to `shared` *)
 val add_share_lock : shared_context -> t -> t
-val add_closure_lock : closure_context
-  -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+val add_closure_lock : ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t

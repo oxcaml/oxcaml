@@ -189,7 +189,12 @@ end
 
 module type S = sig
   module Hint : sig
-    type const = None
+    type const =
+      | None
+      | Lazy
+      | Functor
+      | Function
+    (* TODO - add an argument to [Function] constructor for the locatlity context of the expected mode. *)
 
     type 'd morph =
       | None : (_ * _) morph
@@ -525,6 +530,8 @@ module type S = sig
          and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
+         and type 'a axhint := 'a axhint
+         and type 'a axerror := 'a axerror
 
     module Axis : sig
       (** Represents a mode axis in this product whose constant is ['a], and whose

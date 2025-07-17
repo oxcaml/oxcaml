@@ -397,9 +397,6 @@ type position_in_region =
 type expected_mode =
   { position : position_in_region;
 
-    locality_context : Env.locality_context option;
-    (** Explains why regionality axis of [mode] is low. *)
-
     contention_context : contention_context option;
     (** Explains why contention axis of [mode] is low. *)
 
@@ -488,7 +485,6 @@ let meet_regional mode =
 
 let mode_default mode =
   { position = RNontail;
-    locality_context = None;
     contention_context = None;
     visibility_context = None;
     mode = Value.disallow_left mode;
@@ -570,7 +566,7 @@ let mode_coerce mode expected_mode =
 let mode_lazy expected_mode =
   let expected_mode =
     mode_coerce
-      (Value.of_const { Value.Const.max with areality = Global; yielding = Unyielding })
+      (Value.of_const ~hint:Lazy { Value.Const.max with areality = Global; yielding = Unyielding })
       expected_mode
   in
   let mode_crossing =
@@ -5289,8 +5285,8 @@ let split_function_ty
     | false -> env
     | true ->
         let env =
+          (* TODO - pass through [expected_mode.locality_context] somewhere to be part of the const hint for the mode *)
           Env.add_closure_lock
-            (Function expected_mode.locality_context)
             (alloc_as_value alloc_mode).comonadic
             env
         in
@@ -6722,7 +6718,7 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      let env = Env.add_closure_lock Lazy closure_mode.comonadic env in
+      let env = Env.add_closure_lock closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
         exp_desc = Texp_lazy arg;

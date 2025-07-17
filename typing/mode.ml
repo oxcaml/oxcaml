@@ -1551,7 +1551,11 @@ module Lattices_mono = struct
 end
 
 module Hint = struct
-  type const = None
+  type const =
+    | None
+    | Lazy
+    | Functor
+    | Function
 
   let const_none = None
 
@@ -1656,6 +1660,9 @@ type 'a axerror =
 
 let opt_sprint_const_hint : Hint.const -> string option = function
   | None -> None
+  | Lazy -> Some "is used in a lazy expression"
+  | Functor -> Some "is used in a functor"
+  | Function -> Some "is used in a function"
 
 let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
   let open Format in
@@ -3104,27 +3111,6 @@ module Value_with (Areality : Areality) = struct
     { monadic; comonadic }, b0 || b1
 
   type error = Error : 'a Axis.t * 'a axerror -> error
-
-  let report_error ppf (Error (ax, err)) =
-    let open Format in
-    let right_obj = proj_obj ax in
-    let right_trace_str =
-      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    let left_obj = proj_obj ax in
-    let left_trace_str =
-      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    fprintf ppf
-      {| It is expected to be at most %a.%s
-
-However, it is actually at least %a.%s |}
-      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
-      left_trace_str
 
   let report_error ppf (Error (ax, err)) =
     let open Format in
