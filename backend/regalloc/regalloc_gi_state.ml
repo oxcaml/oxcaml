@@ -5,40 +5,41 @@ open! Regalloc_utils
 open! Regalloc_gi_utils
 
 type t =
-  { mutable assignments : Hardware_register.location Reg.Map.t;
-    mutable introduced_temporaries : Reg.Set.t;
+  { assignments : Hardware_register.location Reg.Tbl.t;
+    introduced_temporaries : unit Reg.Tbl.t;
     stack_slots : Regalloc_stack_slots.t;
     initial_temporaries : int
   }
 
 let[@inline] make ~initial_temporaries ~stack_slots =
-  let assignments = Reg.Map.empty in
-  let introduced_temporaries = Reg.Set.empty in
+  let assignments = Reg.Tbl.create initial_temporaries in
+  let introduced_temporaries = Reg.Tbl.create 17 in
   { assignments; introduced_temporaries; stack_slots; initial_temporaries }
 
 let[@inline] add_assignment state reg ~to_ =
-  state.assignments <- Reg.Map.add reg to_ state.assignments
+  Reg.Tbl.replace state.assignments reg to_
 
 let[@inline] remove_assignment state reg =
-  state.assignments <- Reg.Map.remove reg state.assignments
+  Reg.Tbl.remove state.assignments reg
 
-let[@inline] find_assignment state reg = Reg.Map.find_opt reg state.assignments
+let[@inline] find_assignment state reg =
+  Reg.Tbl.find_opt state.assignments reg
 
-let[@inline] clear_assignments state = state.assignments <- Reg.Map.empty
+let[@inline] clear_assignments state =
+  Reg.Tbl.clear state.assignments
 
 let[@inline] add_introduced_temporaries_list state l =
-  state.introduced_temporaries
-    <- List.fold_left l ~init:state.introduced_temporaries ~f:(fun set reg ->
-           Reg.Set.add reg set)
+  List.iter l ~f:(fun reg ->
+    Reg.Tbl.replace state.introduced_temporaries reg ())
 
 let[@inline] mem_introduced_temporaries state reg =
-  Reg.Set.mem reg state.introduced_temporaries
+  Reg.Tbl.mem state.introduced_temporaries reg
 
 let[@inline] iter_introduced_temporaries state ~f =
-  Reg.Set.iter f state.introduced_temporaries
+  Reg.Tbl.iter (fun reg _unit -> f reg)  state.introduced_temporaries
 
 let[@inline] introduced_temporary_count state =
-  Reg.Set.cardinal state.introduced_temporaries
+  Reg.Tbl.length state.introduced_temporaries
 
 let[@inline] initial_temporary_count state = state.initial_temporaries
 
