@@ -1692,6 +1692,14 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Class_type ->
       (IdTbl.find_same id env.cltypes).cltda_shape
 
+let find_uid_of_path env path =
+  (* We currently only support looking up debugging uids in the current
+     environment. Future versions will support looking up declarations in other
+     files via the shape mechanism in [shape.ml]. *)
+  match find_type path env with
+  | exception Not_found -> None
+  | type_ -> let uid = type_.type_uid in Some uid
+
 let shape_of_path ~namespace env =
   Shape.of_path ~namespace ~find_shape:(find_shape env)
 
@@ -2983,10 +2991,23 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
 
 (* Make the initial environment, without language extensions *)
 let initial =
-  Predef.build_initial_env
-    (add_type ~check:false)
-    (add_extension ~check:false ~rebind:false)
-    empty
+  (* We collect all the type declarations that are added to the initial
+     environment in a table. *)
+  let added_types = Ident.Tbl.create 16 in
+  let add_type_and_remember_decl (type_ident : Ident.t) decl env =
+    Ident.Tbl.add added_types type_ident decl;
+    add_type type_ident decl env ~check:false
+  in
+  let initial_env =
+    Predef.build_initial_env add_type_and_remember_decl
+      (add_extension ~check:false ~rebind:false) empty
+  in
+  (* We record the type declarations for the type shapes. *)
+  Ident.Tbl.iter (fun type_ident decl ->
+    Type_shape.add_to_type_decls (Pident type_ident) decl
+      (find_uid_of_path initial_env)
+  ) added_types;
+  initial_env
 
 let add_language_extension_types env =
   let add ext lvl f env  =

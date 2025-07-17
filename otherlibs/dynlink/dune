@@ -128,6 +128,7 @@
   value_rec_types
   btype
   lazy_backtrack
+  type_shape
   zero_alloc_utils
   subst
   signature_with_global_bindings
@@ -298,6 +299,8 @@
 
 (copy_files ../../typing/btype.ml)
 
+(copy_files ../../typing/type_shape.ml)
+
 (copy_files ../../typing/subst.ml)
 
 (copy_files ../../typing/signature_with_global_bindings.ml)
@@ -451,6 +454,8 @@
 (copy_files ../../typing/types.mli)
 
 (copy_files ../../typing/btype.mli)
+
+(copy_files ../../typing/type_shape.mli)
 
 (copy_files ../../typing/subst.mli)
 
@@ -617,6 +622,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Dll.cmo
@@ -713,6 +719,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Dll.cmx

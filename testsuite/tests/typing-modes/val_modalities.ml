@@ -726,7 +726,6 @@ end = struct
 end
 [%%expect{|
 module rec M : sig module N : sig val foo : 'a -> 'a @@ global many end end
-  @@ stateless
 |}]
 
 
@@ -1405,8 +1404,8 @@ end @ nonportable = struct
   let f = M0.f
 end
 [%%expect{|
-module rec M0 : sig val f : 'a -> 'a end @@ stateless
-and M1 : sig val f : 'a -> 'a @@ portable end @@ stateless nonportable
+module rec M0 : sig val f : 'a -> 'a end @@ portable
+and M1 : sig val f : 'a -> 'a @@ portable end
 |}]
 
 
@@ -1427,11 +1426,11 @@ Lines 8-10, characters 20-3:
 10 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ stateless nonportable end (* at nonportable *)
+         sig val f : 'a -> 'a end (* at nonportable *)
        is not included in
          sig val f : 'a -> 'a @@ portable end (* at nonportable *)
        Values do not match:
-         val f : 'a -> 'a @@ stateless nonportable (* in a structure at nonportable *)
+         val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a @@ portable (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".
@@ -1454,11 +1453,11 @@ Lines 3-5, characters 17-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'a @@ stateless nonportable end (* at nonportable *)
+         sig val f : 'a -> 'a end (* at nonportable *)
        is not included in
          sig val f : 'a -> 'a end (* at portable *)
        Values do not match:
-         val f : 'a -> 'a @@ stateless nonportable (* in a structure at nonportable *)
+         val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a (* in a structure at portable *)
        The first is "nonportable" but the second is "portable".

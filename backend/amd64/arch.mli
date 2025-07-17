@@ -96,7 +96,6 @@ type specific_operation =
   | Ilfence                            (* load fence *)
   | Isfence                            (* store fence *)
   | Imfence                            (* memory fence *)
-  | Ipause                             (* hint for spin-wait loops *)
   | Ipackf32                           (* UNPCKLPS on registers; see Cpackf32 *)
   | Isimd of Simd.operation            (* SIMD instruction set operations *)
   | Isimd_mem of Simd.Mem.operation * addressing_mode

@@ -546,7 +546,8 @@ type fundecl =
     fun_body : expression;
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
-    fun_dbg : Debuginfo.t
+    fun_dbg : Debuginfo.t;
+    fun_ret_type : machtype
   }
 
 (** When data items that are less than 64 bits wide occur in blocks, whose

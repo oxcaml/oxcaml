@@ -2960,6 +2960,12 @@ let transl_type_decl env rec_flag sdecl_list =
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env decls shapes env in
+  (* Save the shapes of the declarations in [Type_shape] for debug info. *)
+  List.iter (fun (id, decl) ->
+    Type_shape.add_to_type_decls
+      (Pident id) decl
+      (Env.find_uid_of_path final_env)
+  ) decls;
   (* Keep original declaration *)
   let final_decls =
     List.map2

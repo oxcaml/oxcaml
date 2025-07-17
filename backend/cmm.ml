@@ -561,7 +561,8 @@ type fundecl =
     fun_body : expression;
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
-    fun_dbg : Debuginfo.t
+    fun_dbg : Debuginfo.t;
+    fun_ret_type : machtype
   }
 
 type data_item =

@@ -1589,11 +1589,69 @@ and transl_tupled_function
             (transl_tupled_cases ~scopes return_sort pats_expr_list) partial
         in
         let region = region || not (may_allocate_in_region body) in
+        add_type_shapes_of_cases arg_sort cases;
+        (* CR sspies: Unsure whether this is the right place to grab the type
+           expressions. *)
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
+
+(* For the functions [add_type_shape_of_cases], [add_type_shapes_of_params], and
+   [add_type_shapes_of_patterns] to be correct, we must ensure that at the type
+   tree level, a [debug_uid] is never associated with more than one type
+   expression, because the type expressions determine the debug information we
+   emit for the bound variable associated with the debug uid.
+
+   For example, for:
+
+      let f (x: int list) = x
+
+   the functions below will associate the UID of [x] with [int list] as the type
+   expression.
+*)
+
+and add_type_shapes_of_pattern ~env sort pattern =
+  let var_list = Typedtree.pat_bound_idents_full sort pattern in
+  List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+    Type_shape.add_to_type_shapes var_uid type_expr var_sort
+      (Env.find_uid_of_path env))
+  var_list
+
+(** [add_type_shapes_of_cases] iterates through a given list of cases and
+    associates for each case, the debugging UID of the variable with the type
+    expression of the variable and its sort. *)
+and add_type_shapes_of_cases sort cases =
+  let add_case (case : Typedtree.value Typedtree.case) =
+    add_type_shapes_of_pattern ~env:case.c_lhs.pat_env sort case.c_lhs
+  in
+  List.iter add_case cases
+
+(** [add_type_shapes_of_params] iterates through the variables in a function
+    parameter and, for each variable, associates the debugging UID of the
+    variable with the type expression of the variable. *)
+and add_type_shapes_of_params params =
+    let add_param (param : Typedtree.function_param) =
+      let pattern = match param.fp_kind with
+                    | Tparam_pat p -> p
+                    | Tparam_optional_default (p, _, _) -> p
+      in
+      let sort = Jkind.Sort.default_for_transl_and_get param.fp_sort in
+      add_type_shapes_of_pattern ~env:pattern.pat_env sort pattern
+    in
+    List.iter add_param params
+
+(** [add_type_shapes_of_patterns] iterates through the variables in a value
+    binding and, for each variable, associates the debugging UID of the variable
+    with the type expression of the variable. *)
+and add_type_shapes_of_patterns patterns =
+  let add_case (value_binding : Typedtree.value_binding) =
+    let sort = Jkind.Sort.default_for_transl_and_get value_binding.vb_sort in
+    add_type_shapes_of_pattern ~env:value_binding.vb_expr.exp_env sort
+      value_binding.vb_pat
+  in
+  List.iter add_case patterns
 
 and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
@@ -1607,6 +1665,7 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_body _ -> param_curries
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
+  add_type_shapes_of_params params;
   let cases_param, body =
     match body with
     | Tfunction_body body ->
@@ -1627,6 +1686,7 @@ and transl_curried_function ~scopes loc repr params body
               layout_of_sort fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
+        add_type_shapes_of_cases fc_arg_sort fc_cases;
         let attributes =
           match fc_cases with
           | [ { c_lhs }] -> Translattribute.transl_param_attributes c_lhs
@@ -1870,6 +1930,7 @@ and transl_bound_exp ~scopes ~in_structure pat sort expr loc attrs =
 *)
 and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                rec_flag pat_expr_list =
+  add_type_shapes_of_patterns pat_expr_list;
   match rec_flag with
     Nonrecursive ->
       let rec transl = function

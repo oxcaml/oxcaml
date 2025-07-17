@@ -2139,7 +2139,6 @@ let emit_instr ~first ~fallthrough i =
     emit_simd_instr_with_memory_arg op i address
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
-  | Lop (Specific Ipause) -> I.pause ()
   | Lop (Specific (Icldemote addr)) ->
     let address = addressing addr QWORD i 0 in
     (* This isn't really a [Load] or a [Store], but it is closer to [Store]

@@ -43,7 +43,6 @@ let class_of_operation (op : Operation.t)
       Class (of_simd_class (Simd.class_of_operation op))
     | Isimd_mem (op,_addr) ->
       Class (of_simd_class (Simd.Mem.class_of_operation op))
-    | Ipause
     | Icldemote _
     | Iprefetch _ -> Class Op_other
     end
