@@ -1432,6 +1432,13 @@ module Const = struct
         name = "void"
       }
 
+    let void_mod_everything =
+      { jkind =
+          mk_jkind (Base Void) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "void mod everything"
+      }
+
     let immediate =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
@@ -1652,6 +1659,7 @@ module Const = struct
         sync_data;
         mutable_data;
         void;
+        void_mod_everything;
         immediate;
         immediate_or_null;
         immediate64;

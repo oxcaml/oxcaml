@@ -5,18 +5,12 @@
  {
    native;
  }{
-   bytecode;
- }{
-   flags = "-extension layouts_alpha";
+   flags = "-Oclassic";
    native;
  }{
-   flags = "-extension layouts_alpha";
-   bytecode;
- }{
-   flags = "-extension layouts_beta";
+   flags = "-O3";
    native;
  }{
-   flags = "-extension layouts_beta";
    bytecode;
  }
 *)
@@ -417,6 +411,25 @@ let test11 () =
   in
 
   assert (countdown 5 (void ()) 0 = 21);  (* 15 + 6 void contributions *)
+
+  let[@inline never] rec countdown_non_tail n v acc =
+    let contribution = use_void v in
+    if n = 0 then acc + contribution
+    else countdown_non_tail (n - 1) (void ()) (acc + n + contribution) [@nontail]
+  in
+
+  assert (countdown_non_tail 5 (void ()) 0 = 21);  (* 15 + 6 void contributions *)
+
+  let[@inline never] rec countdown_meaningfully_non_tail n v acc =
+    let contribution = use_void v in
+    if n = 0 then acc + contribution
+    else
+      1 +
+      countdown_meaningfully_non_tail
+        (n - 1) (void ()) (acc + n + contribution) [@nontail]
+  in
+
+  assert (countdown_meaningfully_non_tail 5 (void ()) 0 = 26);
 
   (* Mutual recursion *)
   let[@inline never] rec f1 n v =

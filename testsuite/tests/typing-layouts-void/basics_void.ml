@@ -4,7 +4,7 @@
 
 type unit_u : void mod everything
 [%%expect{|
-type unit_u : void mod global aliased many stateless immutable external_
+type unit_u : void mod everything
 |}]
 
 (* Variants whose constructor arguments are all void are immediates *)
@@ -53,9 +53,47 @@ Error: The kind of type "bad" is immediate with key
        But the kind of type "bad" must be a subkind of immediate
          because of the annotation on the declaration of the type bad.
 |}]
-type key_holder2 : immediate with key = A of #(unit_u * key r)
+type bad : immediate = A of #(unit_u * key r)
 [%%expect{|
-type key_holder2 = A of #(unit_u * key r)
+Line 1, characters 0-45:
+1 | type bad : immediate = A of #(unit_u * key r)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bad" is immediate with key with unit_u
+         because it's an enumeration variant type (all constructors are constant).
+       But the kind of type "bad" must be a subkind of immediate
+         because of the annotation on the declaration of the type bad.
+|}]
+
+
+type void_mod_global : void mod global
+type t : value mod global = A of void_mod_global
+type t2 : immediate with void_mod_global = A of void_mod_global
+[%%expect{|
+type void_mod_global : void mod global
+type t = A of void_mod_global
+type t2 = A of void_mod_global
+|}]
+
+type v1 : void
+type v2 : void
+type t : immediate with v1 with v2 =
+  A of v1 | B of #(unit_u * v2 r)
+[%%expect{|
+type v1 : void
+type v2 : void
+type t = A of v1 | B of #(unit_u * v2 r)
+|}]
+
+type bad : immediate with v1 =
+  A of v1 | B of #(unit_u * v2 r)
+[%%expect{|
+Lines 1-2, characters 0-33:
+1 | type bad : immediate with v1 =
+2 |   A of v1 | B of #(unit_u * v2 r)
+Error: The kind of type "bad" is immediate with unit_u with v1 with v2
+         because it's an enumeration variant type (all constructors are constant).
+       But the kind of type "bad" must be a subkind of immediate with v1
+         because of the annotation on the declaration of the type bad.
 |}]
 
 (* All-void records are not allowed *)
@@ -190,7 +228,7 @@ let f (a : unit_u array) = length a
 Line 1, characters 27-35:
 1 | let f (a : unit_u array) = length a
                                ^^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : #(int * unit_u) array) = length a
@@ -198,7 +236,7 @@ let f (a : #(int * unit_u) array) = length a
 Line 1, characters 36-44:
 1 | let f (a : #(int * unit_u) array) = length a
                                         ^^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : unit_u array) i = get a i
@@ -206,7 +244,7 @@ let f (a : unit_u array) i = get a i
 Line 1, characters 29-36:
 1 | let f (a : unit_u array) i = get a i
                                  ^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : #(int * unit_u) array) i = get a i
@@ -214,7 +252,7 @@ let f (a : #(int * unit_u) array) i = get a i
 Line 1, characters 38-45:
 1 | let f (a : #(int * unit_u) array) i = get a i
                                           ^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : u1 array) i = get a i
@@ -222,7 +260,7 @@ let f (a : u1 array) i = get a i
 Line 1, characters 25-32:
 1 | let f (a : u1 array) i = get a i
                              ^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : u2 array) i = get a i
@@ -230,7 +268,7 @@ let f (a : u2 array) i = get a i
 Line 1, characters 25-32:
 1 | let f (a : u2 array) i = get a i
                              ^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : u3 array) i = get a i
@@ -238,5 +276,5 @@ let f (a : u3 array) i = get a i
 Line 1, characters 25-32:
 1 | let f (a : u3 array) i = get a i
                              ^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
