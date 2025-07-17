@@ -1551,9 +1551,6 @@ module Lattices_mono = struct
 end
 
 module Hint = struct
-  (* This implementation is just temporary,
-     until we create a proper implementation which properly tracks hints *)
-
   type const = None
 
   let const_none = None
@@ -1639,6 +1636,24 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
+(** Hints for the mode solvers. These are axis-specific hints that contain a trace
+of the values in a single axis from an error. *)
+type 'a axhint =
+  | Morph :
+      'a * (Format.formatter -> 'a -> unit) * 'd Hint.morph * 'b axhint
+      -> 'a axhint
+  | Const : 'a * (Format.formatter -> 'a -> unit) * Hint.const -> 'a axhint
+  | Empty : 'a * (Format.formatter -> 'a -> unit) -> 'a axhint
+[@@ocaml.warning "-62"]
+
+(** Errors for the mode solvers. These are axis-specific processed versions of
+the errors returned by the solver, as the solver errors consider axis products.
+The hints in this error type are [axhint] values. *)
+type 'a axerror =
+  { left : 'a axhint;
+    right : 'a axhint
+  }
+
 let axhint_get_const = function
   | Morph (a, _, _, _) -> a
   | Const (a, _, _) -> a
@@ -1657,10 +1672,7 @@ let axerror_get_consts_pair err =
   axerror_get_left_const err, axerror_get_right_const err
 
 type submode_exn_error =
-  | SubmodeError :
-      Longident.t option
-      * ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
-      -> submode_exn_error
+  | SubmodeError : Longident.t option * 'a axerror -> submode_exn_error
 
 exception Submode_exn of Location.t * submode_exn_error
 
@@ -1814,7 +1826,7 @@ let rec shint_to_axhint :
     (r, left1 * right1) S.hint ->
     (r, a) Axis.t ->
     (left1, right1, left2, right2) shint_to_axhint_side ->
-    (a, (left1 * right1) Hint.morph, Hint.const) axhint =
+    a axhint =
   let open Lattices_mono in
   fun (type r a) (r_obj : r obj) (r : r) (r_shint : (r, left1 * right1) S.hint)
       (ax : (r, a) Axis.t) side ->
@@ -1858,7 +1870,7 @@ and single_axis_shint_to_axhint :
     a ->
     (a, left1 * right1) S.hint ->
     (left1, right1, left2, right2) shint_to_axhint_side ->
-    (a, (left1 * right1) Hint.morph, Hint.const) axhint =
+    a axhint =
   let open Lattices_mono in
   fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
       (a_shint : (a, left1 * right1) S.hint)
@@ -1894,18 +1906,13 @@ and single_axis_shint_to_axhint :
       in
       single_axis_shint_to_axhint a_obj chosen chosen_hint side
 
-let flip_axerror ({ left; right } : ('a, 'lmorph, 'rmorph, 'const) axerror) :
-    ('a, 'rmorph, 'lmorph, 'const) axerror =
+let flip_axerror ({ left; right } : 'a axerror) : 'a axerror =
   { left = right; right = left }
 
 (** Take a solver error for a product object, and an axis to project to, and
 convert the error to an [axerror] *)
 let solver_error_to_axerror :
-    type r a.
-    r Lattices_mono.obj ->
-    (r, a) Axis.t ->
-    r S.error ->
-    (a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror =
+    type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror =
  fun r_obj axis { left; left_hint; right; right_hint } ->
   let left_projected = shint_to_axhint r_obj left left_hint axis RightAdjoint in
   let right_projected =
@@ -1918,10 +1925,7 @@ let flipped_solver_error_to_axerror r_obj axis err =
 
 (** Take a solver error for a single axis object and convert it to an [axerror] *)
 let single_axis_solver_error_to_axerror :
-    type a.
-    a Lattices_mono.obj ->
-    a S.error ->
-    (a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror =
+    type a. a Lattices_mono.obj -> a S.error -> a axerror =
  fun a_obj { left; left_hint; right; right_hint } ->
   let left_projected =
     single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
@@ -2122,8 +2126,7 @@ module Comonadic_axis_gen (Obj : Obj) = struct
   open Obj
   include Comonadic_common_gen (Obj)
 
-  type error =
-    (const, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror
+  type error = const axerror
 
   type equate_error = equate_step * error
 
@@ -2146,8 +2149,7 @@ module Monadic_axis_gen (Obj : Obj) = struct
   open Obj
   include Monadic_common_gen (Obj)
 
-  type error =
-    (const, right_only Hint.morph, left_only Hint.morph, Hint.const) axerror
+  type error = const axerror
 
   type equate_error = equate_step * error
 
@@ -2421,11 +2423,7 @@ module Comonadic_with (Areality : Areality) = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error =
-    | Error :
-        'a Axis.t
-        * ('a, left_only Hint.morph, right_only Hint.morph, Hint.const) axerror
-        -> error
+  type error = Error : 'a Axis.t * 'a axerror -> error
 
   type equate_error = equate_step * error
 
@@ -2565,11 +2563,7 @@ module Monadic = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  type error =
-    | Error :
-        'a Axis.t
-        * ('a, right_only Hint.morph, left_only Hint.morph, Hint.const) axerror
-        -> error
+  type error = Error : 'a Axis.t * 'a axerror -> error
 
   type equate_error = equate_step * error
 
@@ -3030,11 +3024,7 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  type error =
-    | Error :
-        'a Axis.t
-        * ('a, ('l * 'r) Hint.morph, ('r * 'l) Hint.morph, Hint.const) axerror
-        -> error
+  type error = Error : 'a Axis.t * 'a axerror -> error
 
   type equate_error = equate_step * error
 
@@ -3338,7 +3328,12 @@ module Modality = struct
     type 'a axis = 'a Mode.Axis.t
 
     type error =
-      | Error : 'a axis * ('a raw, empty, empty, empty) axerror -> error
+      | Error :
+          (* For now, we don't use hints here, so using [disallowed * disallowed]
+             is just a placeholder allowance *)
+          'a axis
+          * 'a raw axerror
+          -> error
 
     module Const = struct
       type t = Join_const of Mode.Const.t
@@ -3484,7 +3479,9 @@ module Modality = struct
     type 'a axis = 'a Mode.Axis.t
 
     type error =
-      | Error : 'a axis * ('a raw, empty, empty, empty) axerror -> error
+      (* For now, we don't use hints here, so using [disallowed * disallowed]
+         is just a placeholder allowance *)
+      | Error : 'a axis * 'a raw axerror -> error
 
     module Const = struct
       type t = Meet_const of Mode.Const.t
@@ -3642,8 +3639,7 @@ module Modality = struct
   end
 
   module Value = struct
-    type error =
-      | Error : 'a Value.Axis.t * ('a raw, empty, empty, empty) axerror -> error
+    type error = Error : 'a Value.Axis.t * 'a raw axerror -> error
 
     type equate_error = equate_step * error
 
@@ -3951,9 +3947,8 @@ let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
         | None -> Some s1
         | Some s2 -> Some (sprintf "%s, which %s" s1 s2))
 
-let rec opt_sprint_axhint_chain :
-    type a l r. (a, (l * r) Hint.morph, Hint.const) axhint -> string option =
- fun (hint : (a, (l * r) Hint.morph, Hint.const) axhint) ->
+let rec opt_sprint_axhint_chain : type a. a axhint -> string option =
+ fun (hint : a axhint) ->
   let open Format in
   match hint with
   | Morph (a, print_const, morph_hint, b_hint) ->
