@@ -416,3 +416,15 @@ module type S =
     module rec M : sig module N : sig end end
   end
 |}]
+
+module rec Foo : sig
+    val bar : unit -> unit
+end = struct
+include (Foo : module type of struct
+    include Foo
+end)
+let (bar @ stateful) () = ()
+end
+[%%expect{|
+module rec Foo : sig val bar : unit -> unit end
+|}]
