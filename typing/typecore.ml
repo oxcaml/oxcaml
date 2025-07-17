@@ -7505,14 +7505,6 @@ and type_function
         match default_arg with
         | None -> ty_arg_mono, None
         | Some default ->
-            let str_arg_label =
-              match arg_label with
-              | Optional arg_label -> arg_label
-              (* CR generic-optional : CHECK THIS *)
-              | Generic_optional (_, arg_label) -> arg_label
-              | Nolabel | Labelled _ ->
-                Misc.fatal_error "[default] allowed only with optional argument"
-            in
             let default_arg_jkind, default_arg_sort =
               Jkind.of_new_sort_var ~why:Optional_arg_default
             in
@@ -7541,7 +7533,7 @@ and type_function
             let default_arg =
               type_expect env mode_legacy default (mk_expected ty_default_arg)
             in
-            ty_default_arg, Some (default_arg, str_arg_label, default_arg_sort)
+            ty_default_arg, Some (default_arg, arg_label, default_arg_sort)
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
@@ -7640,9 +7632,20 @@ and type_function
             let param, param_uid = name_pattern "param" [ pat ] in
             Tparam_pat pat, param, param_uid
         | Some (default_arg, arg_label, default_arg_sort) ->
-            let param = Ident.create_local ("*opt*" ^ arg_label) in
+            let str_arg_label =
+              match arg_label with
+              | Optional arg_label -> arg_label
+              (* CR generic-optional : CHECK THIS *)
+              | Generic_optional (_, arg_label) -> arg_label
+              | Nolabel | Labelled _ ->
+                Misc.fatal_error "[default] allowed only with optional argument"
+            in
+            let param = Ident.create_local ("*opt*" ^ str_arg_label) in
             let param_uid = Shape.Uid.internal_not_actually_unique in
-            Tparam_optional_default (pat, default_arg, default_arg_sort),
+            let path = match classify_optionality_parsetree arg_label with
+            | Not_optional_arg -> assert false
+            | Optional_arg path -> classify_module_path path in
+            Tparam_optional_default (pat, default_arg, default_arg_sort, path),
             param,
             param_uid
       in

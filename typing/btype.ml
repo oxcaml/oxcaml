@@ -632,6 +632,12 @@ let classify_optionality : Types.arg_label -> optionality = function
   | Generic_optional(path, _) -> Optional_arg (path.txt)
   | _ -> Not_optional_arg
 
+let classify_optionality_parsetree : Parsetree.arg_label -> optionality
+  = function
+  | Optional _ -> Optional_arg (Ldot (Lident "Stdlib", "Option"))
+  | Generic_optional(path, _) -> Optional_arg (path.txt)
+  | _ -> Not_optional_arg
+
 (* is_optional is really buggy when generic optionals are involved.
 Renaming it to prevent its use
 *)

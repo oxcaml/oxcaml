@@ -266,6 +266,7 @@ that [Position] are omittable (thus not required), but is not optional *)
                  | Not_optional_arg
 val is_optional_arg : arg_label -> bool
 val classify_optionality : arg_label -> optionality
+val classify_optionality_parsetree : Parsetree.arg_label -> optionality
 val is_position : arg_label -> bool
 val is_omittable : arg_label -> bool
 val label_name : arg_label -> label
