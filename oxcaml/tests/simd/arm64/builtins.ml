@@ -565,7 +565,7 @@ module Float64x2 = struct
   let cvtt_int32x4 : t -> int32x4 =
    (* Use saturating narrowing conversion here to match SSE intrinsics and C
       stubs behavior. *)
-   fun t -> cvtt_int64x2 |> Int64x2.cvt_int32x4_saturating
+   fun t -> t |> cvtt_int64x2 |> Int64x2.cvt_int32x4_saturating
 end
 
 module Int16x8 = struct
