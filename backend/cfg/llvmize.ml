@@ -76,6 +76,10 @@ module Llvm_typ = struct
 
   let i8 = Int { width_in_bits = 8 }
 
+  let float = Float
+
+  let double = Double
+
   let of_machtyp_component (c : Cmm.machtype_component) =
     match c with
     | Val | Addr | Int ->
@@ -308,6 +312,10 @@ module F = struct
     ins t "%a = zext %a %a to %a" pp_ident dst Llvm_typ.pp_t src_typ pp_ident
       src Llvm_typ.pp_t dst_typ
 
+  let ins_trunc t ~src ~dst ~src_typ ~dst_typ =
+    ins t "%a = trunc %a %a to %a" pp_ident dst Llvm_typ.pp_t src_typ pp_ident
+      src Llvm_typ.pp_t dst_typ
+
   let ins_binop t op arg1 arg2 res typ =
     ins t "%a = %s %a %a, %a" pp_ident res op Llvm_typ.pp_t typ pp_ident arg1
       pp_ident arg2
@@ -411,15 +419,28 @@ module F = struct
       (Llvm_typ.of_machtyp_component i.res.(0).typ);
     ins_store_reg t res i.res.(0)
 
-  let float_op _t (i : Cfg.basic Cfg.instruction) _width
+  let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
       (op : Operation.float_operation) =
-    match op with
-    | Inegf | Iabsf | Iaddf | Isubf | Imulf | Idivf | Icompf _ ->
-      not_implemented_basic i
+    let arg1 = load_reg_to_temp t i.arg.(0) in
+    let arg2 = load_reg_to_temp t i.arg.(1) in
+    let res = fresh_ident t in
+    let typ =
+      match width with Float32 -> Llvm_typ.float | Float64 -> Llvm_typ.double
+    in
+    let op_name =
+      match op with
+      | Iaddf -> "fadd"
+      | Isubf -> "fsub"
+      | Imulf -> "fmul"
+      | Idivf -> "fdiv"
+      | Inegf | Iabsf | Icompf _ -> not_implemented_basic i
+    in
+    ins_binop t op_name arg1 arg2 res typ;
+    ins_store_reg t res i.res.(0)
 
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
-    | Move ->
+    | Move | Opaque ->
       let temp = load_reg_to_temp t i.arg.(0) in
       ins_store_reg t temp i.res.(0)
     | Const_int n -> ins_store_nativeint t n i.res.(0)
@@ -432,14 +453,17 @@ module F = struct
       let src = load_addr t addressing_mode i 0 in
       let dst = get_ident_for_reg t i.res.(0) in
       let temp = fresh_ident t in
+      let temp2 = fresh_ident t in
       (* Q: can we always assume *)
       let signed typ =
         ins_load t ~src ~dst:temp typ;
-        ins_sext t ~src:temp ~dst ~src_typ:typ ~dst_typ:Llvm_typ.i64
+        ins_sext t ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
+        ins_store_reg t temp2 i.res.(0)
       in
       let unsigned typ =
         ins_load t ~src ~dst:temp typ;
-        ins_zext t ~src:temp ~dst ~src_typ:typ ~dst_typ:Llvm_typ.i64
+        ins_zext t ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
+        ins_store_reg t temp2 i.res.(0)
       in
       match memory_chunk with
       | Word_int | Word_val -> ins_load t ~src ~dst Llvm_typ.i64
@@ -457,14 +481,23 @@ module F = struct
       | Double ->
         not_implemented_basic i)
     | Store (chunk, addr, _is_modify) -> (
-      let src = get_ident_for_reg t i.arg.(0) in
       let dst = load_addr t addr i 1 in
+      let temp = fresh_ident t in
+      let store_int dst_typ =
+        let reg_typ = i.arg.(0).typ |> Llvm_typ.of_machtyp_component in
+        ins_load_reg t temp i.arg.(0);
+        if reg_typ <> dst_typ
+        then (
+          let truncated = fresh_ident t in
+          ins_trunc t ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
+          ins_store t ~src:truncated ~dst dst_typ)
+        else ins_store t ~src:temp ~dst dst_typ
+      in
       match chunk with
-      | Word_int | Word_val -> ins_store t ~src ~dst Llvm_typ.i64
-      | Byte_unsigned | Byte_signed -> ins_store t ~src ~dst Llvm_typ.i8
-      | Sixteen_unsigned | Sixteen_signed -> ins_store t ~src ~dst Llvm_typ.i16
-      | Thirtytwo_signed | Thirtytwo_unsigned ->
-        ins_store t ~src ~dst Llvm_typ.i32
+      | Word_int | Word_val -> store_int Llvm_typ.i64
+      | Byte_unsigned | Byte_signed -> store_int Llvm_typ.i8
+      | Sixteen_unsigned | Sixteen_signed -> store_int Llvm_typ.i16
+      | Thirtytwo_signed | Thirtytwo_unsigned -> store_int Llvm_typ.i32
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned
@@ -477,7 +510,7 @@ module F = struct
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
     | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_imm _
     | Intop_atomic _ | Csel _ | Reinterpret_cast _ | Static_cast _
-    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+    | Probe_is_enabled _ | Begin_region | End_region | Specific _
     | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ ->
       not_implemented_basic i
 
