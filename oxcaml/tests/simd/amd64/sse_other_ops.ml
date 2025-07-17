@@ -158,6 +158,20 @@ module Int32x4 = struct
 
   let () =
     Int32s.check_ints (fun l r ->
+        (failmsg := fun () -> Printf.printf "%08lx|%08lx mul_even\n%!" l r);
+        let v0 = Int32s.of_int32s l 1l r 3l in
+        let v1 = Int32s.of_int32s r 2l l 1l in
+        let result = mul_even v0 v1 in
+        let expect =
+          int64x2_of_int64s
+            Stdlib.Int64.(mul (of_int32 l) (of_int32 r))
+            Stdlib.Int64.(mul (of_int32 l) (of_int32 r))
+        in
+        eq (int64x2_low_int64 result)
+          (int64x2_high_int64 result)
+          (int64x2_low_int64 expect)
+          (int64x2_high_int64 expect));
+    Int32s.check_ints (fun l r ->
         (failmsg := fun () -> Printf.printf "%08lx|%08lx mulsign\n%!" l r);
         let v0 = Int32s.of_int32s l l r r in
         let v1 = Int32s.of_int32s l r l r in

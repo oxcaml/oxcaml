@@ -514,6 +514,7 @@ let select_operation_sse41 ~dbg op args =
       sse_or_avx mpsadbw vmpsadbw_X_X_Xm128 ~i args
     | "caml_sse41_int16x8_minpos_unsigned" ->
       sse_or_avx phminposuw vphminposuw args
+    | "caml_sse41_int32x4_mul_even" -> sse_or_avx pmuldq vpmuldq_X_X_Xm128 args
     | "caml_sse41_int32x4_mul_low" -> sse_or_avx pmulld vpmulld_X_X_Xm128 args
     | "caml_sse41_vec128_testz" -> seq_or_avx Seq.ptestz Seq.vptestz args
     | "caml_sse41_vec128_testc" -> seq_or_avx Seq.ptestc Seq.vptestc args
