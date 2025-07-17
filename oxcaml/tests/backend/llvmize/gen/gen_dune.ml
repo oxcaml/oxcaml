@@ -88,6 +88,7 @@ let () =
   (diff ${output} ${output}.corrected)))
 |}
   in
+  (* make run test check ir as well *)
   print_test_llvmir "id_fn_ir";
   print_test_llvmir "const_val_ir";
   print_test_run "const_val"
