@@ -18,8 +18,8 @@ val create : unit -> t
 (** Add a [Jsir.instr] to the current block. *)
 val add_instr : t -> Jsir.instr -> t
 
-(** Set the branch of the current block to be the given [Jsir.last]. *)
-val set_branch : t -> Jsir.last -> t
+(** Set the continuation of the current block to be the given [Jsir.last]. *)
+val set_last : t -> Jsir.last -> t
 
 (** Create a new block with the given params, and set it to be current.
 

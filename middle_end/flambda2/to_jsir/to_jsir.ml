@@ -1,41 +1,47 @@
 open! Flambda2_terms.Flambda.Import
 
-let reg_width_const const : Jsir.constant =
-  match Flambda2_identifiers.Reg_width_const.descr const with
-  | Naked_immediate targetint ->
-    let targetint = Flambda2_numbers.Targetint_31_63.to_targetint targetint in
-    (* Jsir.Int targetint; *)
-    failwith "hi"
-  | Tagged_immediate targetint -> failwith "???"
-  | Naked_float32 float32 ->
-    (* CR selee: check *)
-    Jsir.Float32
-      (Int64.of_int32
-         (Flambda2_numbers.Numeric_types.Float32_by_bit_pattern.to_bits float32))
-  | Naked_float float ->
-    Jsir.Float
-      (Flambda2_numbers.Numeric_types.Float_by_bit_pattern.to_bits float)
-  | Naked_int32 int32 -> Jsir.Int32 int32
-  | Naked_int64 int64 -> Jsir.Int64 int64
-  | Naked_nativeint nativeint ->
-    (* CR selee: check *)
-    Jsir.NativeInt (Flambda2_numbers.Targetint_32_64.to_int32 nativeint)
-  | Null -> Jsir.Null
-  | (Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _) as descr ->
-    Misc.fatal_errorf "Unsupported constant %a"
-      Flambda2_identifiers.Int_ids.Const.print const
-
-(** Bind a JSIR variable to the result of translating a [Simple] into JSIR. *)
-let simple ~env ~res fvar simple =
-  let expr =
-    Flambda2_term_basics.Simple.pattern_match' simple
-      ~var:(fun name ~coercion -> failwith "var")
-      ~symbol:(fun symbol ~coercion -> failwith "symbol")
-      ~const:(fun const -> Jsir.Constant (reg_width_const const))
-  in
+(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
+    environment. *)
+let bind_expr_to_var ~env ~res fvar expr =
   let jvar = Jsir.Var.fresh () in
   ( To_jsir_env.add_var env fvar jvar,
     To_jsir_result.add_instr res (Jsir.Let (jvar, expr)) )
+
+(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
+    environment. *)
+let bind_expr_to_symbol ~env ~res symbol expr =
+  let jvar = Jsir.Var.fresh () in
+  ( To_jsir_env.add_symbol env symbol jvar,
+    To_jsir_result.add_instr res (Jsir.Let (jvar, expr)) )
+
+(** Bind a fresh variable to the result of translating [simple] into JSIR, and
+    map [fvar] to this new variable in the environment. *)
+let create_let_simple ~env ~res fvar simple =
+  Flambda2_term_basics.Simple.pattern_match' simple
+    ~var:(fun name ~coercion:_ ->
+      let env = To_jsir_env.add_alias_of_var_exn env ~var:fvar ~alias_of:name in
+      env, res)
+    ~symbol:(fun symbol ~coercion:_ ->
+      (* CR selee: come back *)
+      let env =
+        To_jsir_env.add_alias_of_symbol_exn env ~var:fvar ~alias_of:symbol
+      in
+      env, res)
+    ~const:(fun const ->
+      let expr = Jsir.Constant (To_jsir_shared.reg_width_const const) in
+      bind_expr_to_var ~env ~res fvar expr)
+
+(** Bind a fresh variable to the result of translating [prim] into JSIR, and
+    map [fvar] to this new variable in the environment. *)
+let create_let_prim ~env ~res fvar prim dbg =
+  let expr, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
+  bind_expr_to_var ~env ~res fvar expr
+
+(** Bind a fresh variable to the result of translating [const] into JSIR, and
+    map [symbol] to this new variable in the environment.*)
+let create_let_block_like ~env ~res symbol const =
+  let expr, env, res = To_jsir_block_like.block_like ~env ~res const in
+  bind_expr_to_symbol ~env ~res symbol expr
 
 let rec expr ~env ~res e =
   match Expr.descr e with
@@ -66,26 +72,39 @@ and let_expr_normal ~env ~res e
     ~num_normal_occurrences_of_bound_vars ~body =
   (* CR selee: translate to [Let] *)
   ignore num_normal_occurrences_of_bound_vars;
-  match bound_pattern, Let.defining_expr e with
-  | Singleton v, Simple s ->
-    let fvar = Flambda2_bound_identifiers.Bound_var.var v in
-    let env, res = simple ~env ~res fvar s in
-    expr ~env ~res body
-  | Singleton v, Prim (p, dbg) ->
-    ignore (v, p, dbg);
-    failwith "unimplemented"
-  | Set_of_closures bound_vars, Set_of_closures soc ->
-    ignore (bound_vars, soc);
-    failwith "unimplemented"
-  | Static bound_static, Static_consts consts ->
-    ignore (bound_static, consts);
-    failwith "unimplemented"
-  | Singleton _, Rec_info _ -> expr ~env ~res body
-  | Singleton _, (Set_of_closures _ | Static_consts _)
-  | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
-  | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->
-    Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
-      Let.print e
+  let env, res =
+    match bound_pattern, Let.defining_expr e with
+    | Singleton v, Simple s ->
+      let fvar = Flambda2_bound_identifiers.Bound_var.var v in
+      create_let_simple ~env ~res fvar s
+    | Singleton v, Prim (p, dbg) ->
+      let fvar = Flambda2_bound_identifiers.Bound_var.var v in
+      create_let_prim ~env ~res fvar p dbg
+    | Set_of_closures bound_vars, Set_of_closures soc ->
+      ignore (bound_vars, soc);
+      failwith "unimplemented"
+    | Static bound_static, Static_consts consts ->
+      Static_const_group.match_against_bound_static consts bound_static
+        ~init:(env, res)
+        ~code:(fun (env, res) code_id code ->
+          ignore (env, res, code_id, code);
+          failwith "unimplemented")
+        ~deleted_code:(fun (env, res) code_id ->
+          ignore (env, res, code_id);
+          failwith "unimplemented")
+        ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
+          ignore (env, res, closure_symbols, soc);
+          failwith "unimplemented")
+        ~block_like:(fun (env, res) symbol static_const ->
+          create_let_block_like ~env ~res symbol static_const)
+    | Singleton _, Rec_info _ -> expr ~env ~res body
+    | Singleton _, (Set_of_closures _ | Static_consts _)
+    | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
+    | Static _, (Simple _ | Prim _ | Set_of_closures _ | Rec_info _) ->
+      Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
+        Let.print e
+  in
+  expr ~env ~res body
 
 and let_cont ~env ~res e =
   (* CR selee: probably make a new block *)
@@ -97,11 +116,33 @@ and apply_expr ~env ~res e =
   ignore (env, res, e);
   failwith "unimplemented"
 
-and apply_cont ~env ~res e =
-  (* CR selee: branching at the end of the block. if raising,
-     [Pushtrap]/[Posttrap] info comes from [Trap_action.t] *)
-  ignore (env, res, e);
-  failwith "unimplemented"
+and apply_cont ~env ~res apply_cont =
+  let continuation = Apply_cont.continuation apply_cont in
+  let args, res =
+    To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
+  in
+  let continuation = To_jsir_env.get_continuation_exn env continuation in
+  let res =
+    match Apply_cont.trap_action apply_cont with
+    | None ->
+      let last =
+        match (continuation : To_jsir_env.continuation) with
+        | Return ->
+          if List.length args <> 1
+          then Misc.fatal_error "Multiple return values not yet supported";
+          Jsir.Return (List.hd args)
+        | Exception -> failwith "unimplemented"
+        | Block addr -> Jsir.Branch (addr, args)
+      in
+      To_jsir_result.set_last res last
+    | Some (Push { exn_handler }) ->
+      ignore exn_handler;
+      failwith "unimplemented"
+    | Some (Pop { exn_handler; raise_kind }) ->
+      ignore (exn_handler, raise_kind);
+      failwith "unimplemented"
+  in
+  env, res
 
 and switch ~env ~res e =
   (* CR selee: translate to [Switch], but beware that flambda allows arbitrary
@@ -114,9 +155,16 @@ and invalid ~env ~res msg =
   ignore (env, res, msg);
   failwith "unimplemented"
 
-let unit flambda_unit =
-  let env = To_jsir_env.create () in
+let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+  let env =
+    To_jsir_env.create
+      ~return_continuation:
+        (Flambda2_terms.Flambda_unit.return_continuation flambda_unit)
+      ~exn_continuation:
+        (Flambda2_terms.Flambda_unit.exn_continuation flambda_unit)
+  in
   let res = To_jsir_result.create () in
-  ignore (expr ~env ~res (Flambda2_terms.Flambda_unit.body flambda_unit));
-  ignore flambda_unit;
-  failwith "unimplemented"
+  let _env, res =
+    expr ~env ~res (Flambda2_terms.Flambda_unit.body flambda_unit)
+  in
+  To_jsir_result.to_program_exn res

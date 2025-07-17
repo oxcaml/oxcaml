@@ -6,7 +6,7 @@
 type partial_block =
   { params : Jsir.Var.t list;
     body : Jsir.instr list;
-    branch : Jsir.last option
+    last : Jsir.last option
   }
 
 type t =
@@ -16,7 +16,7 @@ type t =
   }
 
 let create () =
-  let current_block = { params = []; body = []; branch = None } in
+  let current_block = { params = []; body = []; last = None } in
   { archived_blocks = Jsir.Addr.Map.empty;
     current_block;
     current_block_addr = Jsir.Addr.zero
@@ -28,16 +28,16 @@ let add_instr t instr =
   in
   { t with current_block }
 
-let set_branch t last =
-  let current_block = { t.current_block with branch = Some last } in
+let set_last t last =
+  let current_block = { t.current_block with last = Some last } in
   { t with current_block }
 
 let archive_block_exn ~archived_blocks ~current_block ~current_block_addr =
   let branch =
-    match current_block.branch with
+    match current_block.last with
     | None ->
       Misc.fatal_errorf
-        "To_jsir_result: tried to archive a block with an unknown branch"
+        "To_jsir_result: tried to archive a block with an unknown continuation"
     | Some b -> b
   in
   (* Reverse the list of instructions, since they were inserted head-first *)
@@ -59,7 +59,7 @@ let new_block_exn { archived_blocks; current_block; current_block_addr } params
   let current_block_addr =
     current_block_addr + List.length current_block.body
   in
-  let current_block = { params; body = []; branch = None } in
+  let current_block = { params; body = []; last = None } in
   { archived_blocks; current_block_addr; current_block }
 
 let to_program_exn { archived_blocks; current_block; current_block_addr } =
