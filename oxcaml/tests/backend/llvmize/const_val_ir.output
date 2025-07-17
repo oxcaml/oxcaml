@@ -1,6 +1,5 @@
 source_filename = "const_val_ir.ml"
 
-
 @camlConst_val_ir.data_begin = global i64 0
 define void @camlConst_val_ir.code_begin() { ret void }
 

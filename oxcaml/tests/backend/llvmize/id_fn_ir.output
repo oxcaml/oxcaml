@@ -1,6 +1,5 @@
 source_filename = "id_fn_ir.ml"
 
-
 @camlId_fn_ir.data_begin = global i64 0
 define void @camlId_fn_ir.code_begin() { ret void }
 

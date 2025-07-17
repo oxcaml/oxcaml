@@ -418,25 +418,6 @@ let get_current_compilation_unit msg =
     Misc.fatal_error
       (Format.sprintf "Llvmize: current compilation unit not set (%s)" msg)
 
-let llvmir_to_assembly t =
-  (* CR-someday gyorsh: add other optimization flags and control which passes to
-     perform. *)
-  let cmd =
-    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
-  in
-  match t.asm_filename with
-  | None -> 0
-  | Some asm_filename ->
-    Ccomp.command
-      (String.concat " "
-         [ cmd;
-           "-o";
-           Filename.quote asm_filename;
-           "-O3";
-           "-S";
-           "-x ir";
-           Filename.quote t.llvmir_filename ])
-
 (* Create LLVM IR file for the current compilation unit. *)
 let init ~output_prefix ~ppf_dump =
   let llvmir_filename = output_prefix ^ ".ll" in
@@ -565,12 +546,44 @@ let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
   with Sys_error _msg -> ()
 
+let llvmir_to_assembly t =
+  (* CR-someday gyorsh: add other optimization flags and control which passes to
+     perform. *)
+  let cmd =
+    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
+  in
+  match t.asm_filename with
+  | None -> 0
+  | Some asm_filename ->
+    Ccomp.command
+      (String.concat " "
+         [ cmd;
+           "-o";
+           Filename.quote asm_filename;
+           "-O3";
+           "-S";
+           "-x ir";
+           Filename.quote t.llvmir_filename ])
+
+let assemble_file ~asm_filename ~obj_filename =
+  let cmd =
+    match !Oxcaml_flags.llvm_path with Some path -> path | None -> Config.asm
+  in
+  Ccomp.command
+    (String.concat " "
+       [ cmd;
+         "-c";
+         "-o";
+         Filename.quote obj_filename;
+         Filename.quote asm_filename ])
+
 let begin_assembly ~sourcefile =
   let t = get_current_compilation_unit "begin_asm" in
   t.sourcefile <- sourcefile;
   (* Source filename needs to get emitted before *)
   Option.iter (F.source_filename t) sourcefile;
-  F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\"";
+  (* CR yusumez: Get target triple *)
+  (* F.line t.ppf "target triple = \"x86_64-redhat-linux-gnu\""; *)
   Format.pp_print_newline t.ppf ();
   F.symbol_decl t "data_begin";
   F.empty_fun_decl t "code_begin";

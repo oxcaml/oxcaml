@@ -25,4 +25,6 @@ val close_out : unit -> unit
 
 val open_out : asm_filename:string -> unit
 
+val assemble_file : asm_filename:string -> obj_filename:string -> int
+
 val init : output_prefix:string -> ppf_dump:Format.formatter -> unit
