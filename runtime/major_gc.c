@@ -1633,10 +1633,14 @@ static bool should_compact_from_stw_single(int compaction_mode)
   struct gc_stats s;
   caml_compute_gc_stats(&s);
 
-  uintnat heap_words = s.heap_stats.pool_words + s.heap_stats.large_words;
+  uintnat heap_words = s.global_stats.chunk_words + s.heap_stats.large_words;
 
-  if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize())
+  if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize()) {
+    CAML_GC_MESSAGE (POLICY,
+                     "Heap is only %"ARCH_INTNAT_PRINTF_FORMAT"u words: "
+                     "compaction off.\n", heap_words);
     return false;
+  }
 
   uintnat live_words = s.heap_stats.pool_live_words + s.heap_stats.large_words;
   uintnat free_words = heap_words - live_words;
@@ -1644,8 +1648,11 @@ static bool should_compact_from_stw_single(int compaction_mode)
 
   bool compacting = current_overhead >= caml_max_percent_free;
   CAML_GC_MESSAGE (POLICY, "Current overhead: %"
+                   ARCH_INTNAT_PRINTF_FORMAT "u/%"
+                   ARCH_INTNAT_PRINTF_FORMAT "u = %"
                    ARCH_INTNAT_PRINTF_FORMAT "u%% %s %"
                    ARCH_INTNAT_PRINTF_FORMAT "u%%: %scompacting.\n",
+                   free_words, live_words,
                    (uintnat) current_overhead,
                    compacting ? ">=" : "<",
                    caml_max_percent_free,
