@@ -830,8 +830,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         undo_changes !log;
         loop (C.join obj a lower)
     in
-    let lower = mlower obj mv in
-    loop lower
+    loop (mlower obj mv)
 
   (** Zaps a morphvar to its floor and returns the floor. [commit] could be
       [Some log], in which case the zapping is appended to [log]; it could also

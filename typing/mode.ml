@@ -1692,9 +1692,17 @@ type 'a responsible_axis =
      definable. *)
 let rec find_responsible_axis_single :
     type a b l r. (a, b, l * r) C.morph -> a responsible_axis =
-  (* CR-someday pdsouza: add a parameter to this function as a proof that [b] is
-     a single axis. This will take some work to have it threaded through the rest of
-     the code. *)
+  (* CR-someday pdsouza: add a parameter to this function for the output, [b], to
+     be able to disambiguate cases of a morphism being responsible or the input
+     being responsible. See notes below. This will take some work to have it
+     threaded through the rest of the code.
+     Really, what we are looking to output is one of three cases:
+     1. The input itself (one or all the axes) is solely responsible for the output. If
+         it isn't this case then we can skip the rest of the chain.
+     2. The morphism itself is solely responsible for the output. Beware, applying
+          [Meet_with c] on some [m] where [m <= c] is a nop, so behaves like [Id],
+          and so it is the input that is responsible here, not the morphism.
+     3. Both the input and the morphism are partly responsible for the output. *)
   let open Lattices_mono in
   fun (type a b l r) (m : (a, b, l * r) morph) ->
     match m with
@@ -1717,6 +1725,8 @@ output object of the morphism is a product object. *)
 and find_responsible_axis_prod :
     type a b b_ax l r.
     (a, b, l * r) C.morph -> (b, b_ax) Axis.t -> a responsible_axis =
+  (* CR pdsouza: should add a new parameter, something like "b" and/or "b_ax", so
+     that we can return NoneResponsible for certain cases of [Meet_with] and [Imply] *)
   let open Lattices_mono in
   (* fun (type a b b_ax l r) (m : (a, b, l * r) morph) (ax : (b, b_ax) Axis.t) -> *)
   fun m ax ->
@@ -3915,7 +3925,7 @@ let opt_sprint_const_hint : Hint.const -> string option = function
 let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
   let open Format in
   function
-  | None -> None
+  | None -> Some "emptymorphhint"
   | Close_over loc ->
     Some (asprintf "closes over something (at %a)" Location.print_loc loc)
   | Is_closed_by loc ->
