@@ -16,6 +16,26 @@
     The scalar types intrinsic to the OCaml compiler, and all of the
     primitive operations defined on them.
 
+    Overview: This module provides a comprehensive type system for scalar values in OCaml.
+
+    Type Hierarchy:
+    - Scalar.t
+      - Integral: Integer types
+        - Taggable (fits in word_size-1 bits): Int8, Int16, Int
+        - Boxable (requires boxing): Int32, Int64, Nativeint
+      - Floating: Float32, Float64
+
+    Representation Forms:
+    - Value: Tagged (small integers) or boxed representation
+    - Naked: Untagged (<=31 bits) or unboxed (>31 bits) representation
+
+    Operations:
+    - Unary: Negation, successor/predecessor, byte swap, static cast
+    - Binary: Arithmetic (add, sub, mul, div), bitwise (and, or, xor),
+             shift (lsl, asr, lsr), comparisons (integer and float)
+
+    The locality parameter tracks where boxed values are allocated.
+
     A [Scalar.t] represents a particular OCaml type that represents a scalar value. It
     might be tagged, boxed, or neither. There is also a type parameter for the locality of
     the scalar value, which represents the location in which that boxed values are
