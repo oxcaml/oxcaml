@@ -3,7 +3,12 @@ type t
 
 (* CR selee: probably we will end up needing to store more info *)
 
-(** Create a new environment. *)
+(** Create a new environment.
+
+    [return_continuation] and [exn_continuation] refer to the top-level
+    return/exception continuations, and does not change once the environment
+    is created.
+*)
 val create :
   return_continuation:Flambda2_identifiers.Continuation.t ->
   exn_continuation:Flambda2_identifiers.Continuation.t ->

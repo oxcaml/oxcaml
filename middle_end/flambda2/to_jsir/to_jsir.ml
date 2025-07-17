@@ -117,20 +117,28 @@ and apply_expr ~env ~res e =
   failwith "unimplemented"
 
 and apply_cont ~env ~res apply_cont =
-  let continuation = Apply_cont.continuation apply_cont in
   let args, res =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
-  let continuation = To_jsir_env.get_continuation_exn env continuation in
   let res =
     match Apply_cont.trap_action apply_cont with
     | None ->
+      let continuation = Apply_cont.continuation apply_cont in
+      let res_cont = To_jsir_env.get_continuation_exn env continuation in
       let (last : Jsir.last) =
-        match (continuation : To_jsir_env.continuation) with
-        | Return ->
-          if List.length args <> 1
-          then Misc.fatal_error "Multiple return values not yet supported";
-          Jsir.Return (List.hd args)
+        match (res_cont : To_jsir_env.continuation) with
+        | Return -> (
+          match Flambda2_identifiers.Continuation.sort continuation with
+          | Toplevel_return -> Jsir.Stop
+          | Return ->
+            if List.length args <> 1
+            then
+              Misc.fatal_error "Currently only one return argument is supported";
+            Jsir.Return (List.hd args)
+          | Normal_or_exn | Define_root_symbol ->
+            (* CR selee: seems odd, review later *)
+            Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
+              Flambda2_identifiers.Continuation.print continuation)
         | Exception -> failwith "unimplemented"
         | Block addr -> Jsir.Branch (addr, args)
       in
