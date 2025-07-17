@@ -1798,7 +1798,7 @@ let rec update_decl_jkind env dpath decl =
   let decl = { decl with type_unboxed_version } in
   let open struct
     (* For tracking what types appear in record blocks. All product layouts
-       count only as a [non_float64_unboxed_field], even if its a
+       count only as a [non_float64_unboxed_field], even if it's a
        [float64 & float64] or [void & void].
     *)
     type element_repr_summary =
@@ -1857,10 +1857,10 @@ let rec update_decl_jkind env dpath decl =
                repr_summary.voids <- true)
         reprs;
       let rep =
+        (* CR layouts: improve the readability of this match *)
         match repr_summary with
-        (* We store mixed float/float64 records as flat if there are no
-            non-float fields.
-        *)
+        (* We store floats flatly in mixed records if all fields are
+           float/float64/void. *)
         | { values = false; floats = true;
             float64s = true; non_float64_unboxed_fields = false }
            ->
@@ -1912,6 +1912,7 @@ let rec update_decl_jkind env dpath decl =
           Record_ufloat
         | { values = false; floats = false; float64s = false;
             non_float64_unboxed_fields = false; voids = _ }  ->
+          (* CR layouts v5: support all-void records *)
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
       lbls, rep, jkind

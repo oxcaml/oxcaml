@@ -3,16 +3,14 @@
  include stdlib_upstream_compatible;
  flambda2;
  {
-   flags = "-extension layouts_alpha";
-   native;
- } {
-   flags = "-extension layouts_alpha -Oclassic";
-   native;
- } {
-   flags = "-extension layouts_alpha -O3";
    native;
  }{
-   flags = "-extension layouts_alpha";
+   flags = "-Oclassic";
+   native;
+ }{
+   flags = "-O3";
+   native;
+ }{
    bytecode;
  }
 *)
@@ -177,6 +175,24 @@ let _ =
   assert (List.for_all2 (=) !r [10;9;8;7;6;5;4;3;2;1]);
   match magic_D with
   | D { x; z; _ } -> assert (x = 3 && z = 42)
+  | _ -> assert false
+;;
+
+type all_void_variant =
+  | C2 of void_rec * t_void
+  | D2 of t_void
+
+let all_void_id = function
+  | C2 (vr,v) -> cons_r 1; C2 ({v = (cons_r 3; vr).v}, (cons_r 2; v))
+  | D2 _ -> assert false
+
+let _ = r := []
+let magic_C = C2 (void_rec (), t_void ())
+let magic_C = all_void_id magic_C
+let _ =
+  assert (List.for_all2 (=) !r [3;2;1]);
+  match magic_C with
+  | C2 (_, _) -> ()
   | _ -> assert false
 ;;
 

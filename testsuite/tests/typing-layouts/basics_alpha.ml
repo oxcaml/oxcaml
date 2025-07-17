@@ -1152,7 +1152,7 @@ let x13 (VV v) = [| v |];;
 Line 1, characters 17-24:
 1 | let x13 (VV v) = [| v |];;
                      ^^^^^^^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}];;
 
 let x13 v =
@@ -1163,7 +1163,7 @@ let x13 v =
 Line 2, characters 8-9:
 2 |   match v with
             ^
-Error: Types whose layout contains [void] are yet supported in arrays.
+Error: Types whose layout contains [void] are not yet supported in arrays.
 |}];;
 
 (****************************************************************************)

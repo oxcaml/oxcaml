@@ -1235,7 +1235,7 @@ let report_error ppf = function
          products."
   | Unsupported_void_in_array ->
       fprintf ppf
-        "Types whose layout contains [void] are yet supported in arrays."
+        "Types whose layout contains [void] are not yet supported in arrays."
   | Mixed_product_array (const, elt_ty) ->
       fprintf ppf
         "An unboxed product array element must be formed from all@ \
