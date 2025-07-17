@@ -146,7 +146,7 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
 let register_allocation () =
   let m, _ =
     Alloc.(newvar_below
-      (max_with (Comonadic Areality) Locality.global))
+      (max_with_comonadic Areality Locality.global))
   in
   m, alloc_as_value m
 
