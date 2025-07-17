@@ -130,7 +130,7 @@ module Type_shape = struct
   let rec replace_tvar t ~(pairs : (t * t) list) =
     match
       List.find_map
-        (fun (from, to_) -> if t == from then Some to_ else None)
+        (fun (from, to_) -> if t = from then Some to_ else None)
         pairs
     with
     | Some new_type -> new_type
@@ -194,7 +194,7 @@ module Type_decl_shape = struct
     in
     { name; args }
 
-  let get_variant_constructors (cstr_args : Types.constructor_declaration)
+  let get_constructor_args (cstr_args : Types.constructor_declaration)
       uid_of_path =
     match cstr_args.cd_args with
     | Cstr_tuple list ->
@@ -236,8 +236,7 @@ module Type_decl_shape = struct
                 match is_empty_constructor_list cstr with
                 | true -> Left name
                 | false ->
-                  Right
-                    { name; args = get_variant_constructors cstr uid_of_path })
+                  Right { name; args = get_constructor_args cstr uid_of_path })
               cstr_list
           in
           Tds_variant { simple_constructors; complex_constructors }
