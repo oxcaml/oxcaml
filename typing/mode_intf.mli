@@ -176,6 +176,8 @@ module type Common_product = sig
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
+  val report_error : Format.formatter -> error -> unit
+
   include
     Common
       with type hint_const := hint_const
@@ -211,18 +213,11 @@ module type S = sig
       the errors returned by the solver, as the solver errors consider axis products.
       The hints in this error type are [axhint] values. *)
   type 'a axerror =
-    { left : 'a axhint;
-      right : 'a axhint
+    { left : 'a;
+      left_hint : 'a axhint;
+      right : 'a;
+      right_hint : 'a axhint
     }
-
-  val axhint_get_const : 'a axhint -> 'a
-
-  val axerror_get_consts_pair : 'a axerror -> 'a * 'a
-
-  type submode_exn_error =
-    | SubmodeError : Longident.t option * 'a axerror -> submode_exn_error
-
-  exception Submode_exn of Location.t * submode_exn_error
 
   type changes
 
@@ -615,6 +610,8 @@ module type S = sig
 
     type error = Error : 'a Axis.t * 'a axerror -> error
 
+    val report_error : Format.formatter -> error -> unit
+
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
     include
@@ -917,8 +914,4 @@ module type S = sig
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Format.formatter -> t -> unit
   end
-
-  val print_longident : (Format.formatter -> Longident.t -> unit) ref
-
-  val report_submode_error : Format.formatter -> submode_exn_error -> unit
 end

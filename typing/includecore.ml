@@ -336,7 +336,7 @@ let report_modality_sub_error first second ppf e =
     Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
   in
   let Modality.Value.Error(ax, err) = e in
-  let left, right = axerror_get_consts_pair err in
+  let left, right = err.left, err.right in
   Format.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
     (print_modality "empty") (Atom (ax, right) : Modality.t)
@@ -345,7 +345,7 @@ let report_modality_sub_error first second ppf e =
 
 let report_mode_sub_error got expected ppf e =
   let Mode.Value.Error(ax, err) = e in
-  let left, right = axerror_get_consts_pair err in
+  let left, right = err.left, err.right in
   match ax with
   | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
   | _ ->

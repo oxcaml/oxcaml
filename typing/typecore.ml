@@ -10447,7 +10447,7 @@ let escaping_hint (failure_reason : Value.error) submode_reason
       (context : Env.locality_context option) =
   begin match failure_reason, context with
   | Error (Comonadic Areality, e), Some h ->
-    begin match (axerror_get_consts_pair e), h with
+    begin match (e.left, e.right), h with
     | (Local, Regional), Return ->
       (* Only hint to use exclave_, when the user wants to return local, but
          expected mode is regional. If the expected mode is as strict as
@@ -11203,7 +11203,7 @@ let report_error ~loc env =
         | Error (Comonadic Areality, _) ->
             Format.dprintf "This value escapes its region."
         | Error (ax, err) ->
-          let left, right = axerror_get_consts_pair err in
+          let left, right = err.left, err.right in
             let pp_expectation ppf () =
               let open Contention.Const in
               match ax, right with
@@ -11244,12 +11244,12 @@ let report_error ~loc env =
       Location.errorf ~loc ~sub
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
-         (Alloc.Const.print_axis ax) (axhint_get_const left)
+         (Alloc.Const.print_axis ax) left
   | Param_mode_mismatch (s, Error (ax, {left; right})) ->
       let actual, expected =
         match s with
-        | Left_le_right -> axhint_get_const left, axhint_get_const right
-        | Right_le_left -> axhint_get_const right, axhint_get_const left
+        | Left_le_right -> left, right
+        | Right_le_left -> right, left
       in
       Location.errorf ~loc
         "@[This function takes a parameter which is %a,@ \
@@ -11263,7 +11263,7 @@ let report_error ~loc env =
             "This function or one of its parameters escape their region@ \
             when it is partially applied."
       | Error (ax, err) ->
-          let left, right = axerror_get_consts_pair err in
+          let left, right = err.left, err.right in
           Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."

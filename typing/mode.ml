@@ -1639,42 +1639,61 @@ module Axis = C.Axis
 (** Hints for the mode solvers. These are axis-specific hints that contain a trace
 of the values in a single axis from an error. *)
 type 'a axhint =
-  | Morph :
-      'a * (Format.formatter -> 'a -> unit) * 'd Hint.morph * 'b axhint
-      -> 'a axhint
-  | Const : 'a * (Format.formatter -> 'a -> unit) * Hint.const -> 'a axhint
-  | Empty : 'a * (Format.formatter -> 'a -> unit) -> 'a axhint
+  | Morph : 'd Hint.morph * 'b * 'b C.obj * 'b axhint -> 'a axhint
+  | Const : Hint.const -> 'a axhint
+  | Empty : 'a axhint
 [@@ocaml.warning "-62"]
 
 (** Errors for the mode solvers. These are axis-specific processed versions of
 the errors returned by the solver, as the solver errors consider axis products.
 The hints in this error type are [axhint] values. *)
 type 'a axerror =
-  { left : 'a axhint;
-    right : 'a axhint
+  { left : 'a;
+    left_hint : 'a axhint;
+    right : 'a;
+    right_hint : 'a axhint
   }
 
-let axhint_get_const = function
-  | Morph (a, _, _, _) -> a
-  | Const (a, _, _) -> a
-  | Empty (a, _) -> a
+let opt_sprint_const_hint : Hint.const -> string option = function
+  | None -> None
 
-let axhint_get_printer = function
-  | Morph (_, pp, _, _) -> pp
-  | Const (_, pp, _) -> pp
-  | Empty (_, pp) -> pp
+let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
+  let open Format in
+  function
+  | None -> Some "emptymorphhint"
+  | Close_over loc ->
+    Some (asprintf "closes over something (at %a)" Location.print_loc loc)
+  | Is_closed_by loc ->
+    Some (asprintf "is closed by something (at %a)" Location.print_loc loc)
+  | Compose (hint1, hint2) ->
+    Option.bind (opt_sprint_morph_hint hint1) (fun s1 ->
+        match opt_sprint_morph_hint hint2 with
+        | None -> Some s1
+        | Some s2 -> Some (sprintf "%s, which %s" s1 s2))
 
-let axerror_get_left_const { left; right = _ } = axhint_get_const left
-
-let axerror_get_right_const { left = _; right } = axhint_get_const right
-
-let axerror_get_consts_pair err =
-  axerror_get_left_const err, axerror_get_right_const err
-
-type submode_exn_error =
-  | SubmodeError : Longident.t option * 'a axerror -> submode_exn_error
-
-exception Submode_exn of Location.t * submode_exn_error
+let rec opt_sprint_axhint_chain :
+    type a. a -> a C.obj -> a axhint -> string option =
+ fun (a : a) (a_obj : a C.obj) (hint : a axhint) ->
+  let open Format in
+  match hint with
+  | Morph (morph_hint, b, b_obj, b_hint) ->
+    (* CR pdsouza: should probably have it so that if a morph has no good hint
+           message then just skip that morph but still continue down the chain,
+           instead of stopping the trace there *)
+    Option.bind (opt_sprint_morph_hint morph_hint) (fun morph_hint_str ->
+        let subchain_str =
+          match opt_sprint_axhint_chain b b_obj b_hint with
+          | None -> ""
+          | Some s -> sprintf "\n%s" s
+        in
+        Some
+          (asprintf "This is %a because it %s %a.%s" (C.print a_obj) a
+             morph_hint_str (C.print b_obj) b subchain_str))
+  | Const const_hint ->
+    Option.bind (opt_sprint_const_hint const_hint) (fun const_hint_str ->
+        Some
+          (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str))
+  | Empty -> None
 
 (** Description of an input axis responsible for an output axis of a morphism *)
 type 'a responsible_axis =
@@ -1826,7 +1845,7 @@ let rec shint_to_axhint :
     (r, left1 * right1) S.hint ->
     (r, a) Axis.t ->
     (left1, right1, left2, right2) shint_to_axhint_side ->
-    a axhint =
+    a * a axhint =
   let open Lattices_mono in
   fun (type r a) (r_obj : r obj) (r : r) (r_shint : (r, left1 * right1) S.hint)
       (ax : (r, a) Axis.t) side ->
@@ -1842,14 +1861,19 @@ let rec shint_to_axhint :
       in
       let b = apply b_obj morph_inv r in
       match find_responsible_axis_prod morph ax with
-      | NoneResponsible -> Empty (a, C.print a_obj)
+      | NoneResponsible -> a, Empty
       | SourceIsSingle ->
-        let b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        Morph (a, C.print a_obj, morph_hint, b_hint)
+        (* Note that unlike below, the returned [b] value will be the same as
+           the current [b], so we can discard it. *)
+        let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+        a, Morph (morph_hint, b, b_obj, b_hint)
       | Axis b_ax ->
-        let b_hint = shint_to_axhint b_obj b b_shint b_ax side in
-        Morph (a, C.print a_obj, morph_hint, b_hint))
-    | Const r_const_hint -> Const (a, C.print a_obj, r_const_hint)
+        (* Note that [ax_b] is different to [b] as it refers to a single-axis
+           value in [b] *)
+        let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+        let ax_b_obj = C.proj_obj b_ax b_obj in
+        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint))
+    | Const r_const_hint -> a, Const r_const_hint
     | Branch (x, x_hint, y, y_hint) ->
       let x_axval = Axis.proj ax x in
       let y_axval = Axis.proj ax y in
@@ -1870,7 +1894,7 @@ and single_axis_shint_to_axhint :
     a ->
     (a, left1 * right1) S.hint ->
     (left1, right1, left2, right2) shint_to_axhint_side ->
-    a axhint =
+    a * a axhint =
   let open Lattices_mono in
   fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
       (a_shint : (a, left1 * right1) S.hint)
@@ -1885,15 +1909,17 @@ and single_axis_shint_to_axhint :
       in
       let b = apply b_obj morph_inv a in
       match find_responsible_axis_single morph with
-      (* TODO - these match cases looks a bit duplicated from in [shint_to_axhint] *)
-      | NoneResponsible -> Empty (a, C.print a_obj)
+      | NoneResponsible -> a, Empty
       | SourceIsSingle ->
-        let b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        Morph (a, C.print a_obj, morph_hint, b_hint)
+        (* See notes above in [shint_to_axhint] regarding returned [b] value *)
+        let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+        a, Morph (morph_hint, b, b_obj, b_hint)
       | Axis b_ax ->
-        let b_hint = shint_to_axhint b_obj b b_shint b_ax side in
-        Morph (a, C.print a_obj, morph_hint, b_hint))
-    | Const a_const_hint -> Const (a, C.print a_obj, a_const_hint)
+        (* See notes above in [shint_to_axhint] regarding returned [b] value *)
+        let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+        let ax_b_obj = C.proj_obj b_ax b_obj in
+        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint))
+    | Const a_const_hint -> a, Const a_const_hint
     | Branch (x, x_hint, y, y_hint) ->
       let chosen, chosen_hint =
         if shint_to_axhint_side_le side a_obj x y
@@ -1906,19 +1932,26 @@ and single_axis_shint_to_axhint :
       in
       single_axis_shint_to_axhint a_obj chosen chosen_hint side
 
-let flip_axerror ({ left; right } : 'a axerror) : 'a axerror =
-  { left = right; right = left }
+let flip_axerror ({ left; left_hint; right; right_hint } : 'a axerror) :
+    'a axerror =
+  { left = right; left_hint = right_hint; right = left; right_hint = left_hint }
 
 (** Take a solver error for a product object, and an axis to project to, and
 convert the error to an [axerror] *)
 let solver_error_to_axerror :
     type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror =
  fun r_obj axis { left; left_hint; right; right_hint } ->
-  let left_projected = shint_to_axhint r_obj left left_hint axis RightAdjoint in
-  let right_projected =
+  let left', left'_hint =
+    shint_to_axhint r_obj left left_hint axis RightAdjoint
+  in
+  let right', right'_hint =
     shint_to_axhint r_obj right right_hint axis LeftAdjoint
   in
-  { left = left_projected; right = right_projected }
+  { left = left';
+    left_hint = left'_hint;
+    right = right';
+    right_hint = right'_hint
+  }
 
 let flipped_solver_error_to_axerror r_obj axis err =
   solver_error_to_axerror r_obj axis err |> flip_axerror
@@ -1927,13 +1960,17 @@ let flipped_solver_error_to_axerror r_obj axis err =
 let single_axis_solver_error_to_axerror :
     type a. a Lattices_mono.obj -> a S.error -> a axerror =
  fun a_obj { left; left_hint; right; right_hint } ->
-  let left_projected =
+  let left', left'_hint =
     single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
   in
-  let right_projected =
+  let right', right'_hint =
     single_axis_shint_to_axhint a_obj right right_hint LeftAdjoint
   in
-  { left = left_projected; right = right_projected }
+  { left = left';
+    left_hint = left'_hint;
+    right = right';
+    right_hint = right'_hint
+  }
 
 let flipped_single_axis_solver_error_to_axerror r_obj err =
   single_axis_solver_error_to_axerror r_obj err |> flip_axerror
@@ -2423,11 +2460,32 @@ module Comonadic_with (Areality : Areality) = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
+  let proj_obj ax = C.proj_obj ax Obj.obj
+
   type error = Error : 'a Axis.t * 'a axerror -> error
 
-  type equate_error = equate_step * error
+  let report_error ppf (Error (ax, err)) =
+    let open Format in
+    let right_obj = proj_obj ax in
+    let right_trace_str =
+      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    let left_obj = proj_obj ax in
+    let left_trace_str =
+      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    fprintf ppf
+      {| It is expected to be at most %a.%s
 
-  let proj_obj ax = C.proj_obj ax Obj.obj
+However, it is actually at least %a.%s |}
+      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
+      left_trace_str
+
+  type equate_error = equate_step * error
 
   module Const = struct
     include C.Comonadic_with (Areality.Const)
@@ -2563,11 +2621,32 @@ module Monadic = struct
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
+  let proj_obj ax = C.proj_obj ax Obj.obj
+
   type error = Error : 'a Axis.t * 'a axerror -> error
 
-  type equate_error = equate_step * error
+  let report_error ppf (Error (ax, err)) =
+    let open Format in
+    let right_obj = proj_obj ax in
+    let right_trace_str =
+      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    let left_obj = proj_obj ax in
+    let left_trace_str =
+      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    fprintf ppf
+      {| It is expected to be at most %a.%s
 
-  let proj_obj ax = C.proj_obj ax Obj.obj
+However, it is actually at least %a.%s |}
+      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
+      left_trace_str
+
+  type equate_error = equate_step * error
 
   module Const = struct
     include C.Monadic
@@ -3026,6 +3105,48 @@ module Value_with (Areality : Areality) = struct
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
+  let report_error ppf (Error (ax, err)) =
+    let open Format in
+    let right_obj = proj_obj ax in
+    let right_trace_str =
+      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    let left_obj = proj_obj ax in
+    let left_trace_str =
+      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    fprintf ppf
+      {| It is expected to be at most %a.%s
+
+However, it is actually at least %a.%s |}
+      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
+      left_trace_str
+
+  let report_error ppf (Error (ax, err)) =
+    let open Format in
+    let right_obj = proj_obj ax in
+    let right_trace_str =
+      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    let left_obj = proj_obj ax in
+    let left_trace_str =
+      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
+      | None -> ""
+      | Some s -> sprintf "\n%s" s
+    in
+    fprintf ppf
+      {| It is expected to be at most %a.%s
+
+However, it is actually at least %a.%s |}
+      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
+      left_trace_str
+
   type equate_error = equate_step * error
 
   let submode_log { monadic = monadic0; comonadic = comonadic0 }
@@ -3358,13 +3479,15 @@ module Modality = struct
                   right_hint = Const Hint.const_none
                 }
             in
-            let left = axerror_get_left_const err in
-            let right = axerror_get_right_const err in
+            let left = err.left in
+            let right = err.right in
             Error
               (Error
                  ( ax,
-                   { left = Empty (Join_with left, fun _ _ -> ());
-                     right = Empty (Join_with right, fun _ _ -> ())
+                   { left = Join_with left;
+                     left_hint = Empty;
+                     right = Join_with right;
+                     right_hint = Empty
                    } ))
 
       let concat ~then_ t =
@@ -3403,9 +3526,10 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left =
-                     Empty (Join_with (axhint_get_const left), fun _ _ -> ());
-                   right = Empty (Join_with (Axis.proj ax c), fun _ _ -> ())
+                 { left = Join_with left;
+                   left_hint = Empty;
+                   right = Join_with (Axis.proj ax c);
+                   right_hint = Empty
                  } )))
       | Diff (_, _m0), Diff (_, _m1) ->
         (* [m1] is a left mode so it cannot appear on the right. So we can't do
@@ -3504,8 +3628,10 @@ module Modality = struct
             Error
               (Error
                  ( ax,
-                   { left = Empty (Meet_with left, fun _ _ -> ());
-                     right = Empty (Meet_with right, fun _ _ -> ())
+                   { left = Meet_with left;
+                     left_hint = Empty;
+                     right = Meet_with right;
+                     right_hint = Empty
                    } ))
 
       let concat ~then_ t =
@@ -3548,9 +3674,10 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left =
-                     Empty (Meet_with (axhint_get_const left), fun _ _ -> ());
-                   right = Empty (Meet_with (Axis.proj ax c), fun _ _ -> ())
+                 { left = Meet_with left;
+                   left_hint = Empty;
+                   right = Meet_with (Axis.proj ax c);
+                   right_hint = Empty
                  } )))
       | Exactly (_, _m0), Exactly (_, _m1) ->
         (* [m1] is a left mode, so there is no good way to check.
@@ -3926,80 +4053,3 @@ module Crossing = struct
     in
     Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
 end
-
-let print_longident =
-  ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
-
-let opt_sprint_const_hint : Hint.const -> string option = function
-  | None -> None
-
-let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
-  let open Format in
-  function
-  | None -> Some "emptymorphhint"
-  | Close_over loc ->
-    Some (asprintf "closes over something (at %a)" Location.print_loc loc)
-  | Is_closed_by loc ->
-    Some (asprintf "is closed by something (at %a)" Location.print_loc loc)
-  | Compose (hint1, hint2) ->
-    Option.bind (opt_sprint_morph_hint hint1) (fun s1 ->
-        match opt_sprint_morph_hint hint2 with
-        | None -> Some s1
-        | Some s2 -> Some (sprintf "%s, which %s" s1 s2))
-
-let rec opt_sprint_axhint_chain : type a. a axhint -> string option =
- fun (hint : a axhint) ->
-  let open Format in
-  match hint with
-  | Morph (a, print_const, morph_hint, b_hint) ->
-    (* CR pdsouza: should probably have it so that if a morph has no good hint
-           message then just skip that morph but still continue down the chain,
-           instead of stopping the trace there *)
-    Option.bind (opt_sprint_morph_hint morph_hint) (fun morph_hint_str ->
-        let subchain_str =
-          match opt_sprint_axhint_chain b_hint with
-          | None -> ""
-          | Some s -> sprintf "\n%s" s
-        in
-        Some
-          (asprintf "This is %a because it %s %a.%s" print_const a
-             morph_hint_str
-             (axhint_get_printer b_hint)
-             (axhint_get_const b_hint) subchain_str))
-  | Const (a, print_const, const_hint) ->
-    Option.bind (opt_sprint_const_hint const_hint) (fun const_hint_str ->
-        Some (asprintf "This is %a because it %s." print_const a const_hint_str))
-  | Empty _ -> None
-
-let report_submode_error ppf : submode_exn_error -> unit =
-  let open Format in
-  function
-  | SubmodeError (lid_opt, { left; right }) ->
-    let print_lid ppf = function
-      | None -> fprintf ppf "The value"
-      | Some lid ->
-        fprintf ppf "%a" (Misc.Style.as_inline_code !print_longident) lid
-    in
-    let right_trace_str =
-      match opt_sprint_axhint_chain right with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    let left_trace_str =
-      match opt_sprint_axhint_chain left with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    fprintf ppf
-      {| %a is expected to be at most %a.%s
-
-However, %a is actually at least %a.%s |}
-      print_lid lid_opt (axhint_get_printer right) (axhint_get_const right)
-      right_trace_str print_lid lid_opt (axhint_get_printer left)
-      (axhint_get_const left) left_trace_str
-
-let () =
-  Location.register_error_of_exn (function
-    | Submode_exn (loc, err) ->
-      Some (Location.error_of_printer ~loc report_submode_error err)
-    | _ -> None)
