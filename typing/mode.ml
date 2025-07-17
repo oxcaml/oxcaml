@@ -1821,23 +1821,36 @@ let rec shint_to_axhint :
     (* This function is for when we have a solver hint (aka "shint") for a product lattice and
        wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
     let a_obj = proj_obj ax r_obj in
-    let proj = Proj (r_obj, ax) in
-    let a = apply a_obj proj r in
-    let a_shint : (a, left1 * right1) S.hint =
-      let rec compose_shint_with_proj = function
-        | S.Morph (morph_hint, morph, b_shint) ->
-          S.Morph (morph_hint, compose a_obj proj morph, b_shint)
-        | S.Const r_const_hint -> S.Const r_const_hint
-        | S.Branch (x, x_hint, y, y_hint) ->
-          S.Branch
-            ( apply a_obj proj x,
-              compose_shint_with_proj x_hint,
-              apply a_obj proj y,
-              compose_shint_with_proj y_hint )
+    let a = Axis.proj ax r in
+    match r_shint with
+    | Morph (morph_hint, morph, b_shint) -> (
+      let b_obj = src r_obj morph in
+      let morph_inv : (r, _, left2 * right2) morph =
+        shint_to_axhint_side_fn side r_obj morph
       in
-      compose_shint_with_proj r_shint
-    in
-    single_axis_shint_to_axhint a_obj a a_shint side
+      let b = apply b_obj morph_inv r in
+      match find_responsible_axis_prod morph ax with
+      | NoneResponsible -> Empty (a, C.print a_obj)
+      | SourceIsSingle ->
+        let b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+        Morph (a, C.print a_obj, morph_hint, b_hint)
+      | Axis b_ax ->
+        let b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+        Morph (a, C.print a_obj, morph_hint, b_hint))
+    | Const r_const_hint -> Const (a, C.print a_obj, r_const_hint)
+    | Branch (x, x_hint, y, y_hint) ->
+      let x_axval = Axis.proj ax x in
+      let y_axval = Axis.proj ax y in
+      let chosen, chosen_hint =
+        if shint_to_axhint_side_le side a_obj x_axval y_axval
+        then x, x_hint
+        else if shint_to_axhint_side_le side a_obj y_axval x_axval
+        then y, y_hint
+        else
+          (* As we are dealing with a single axis at a time, it should be totally-ordered, so this case should be impossible *)
+          assert false
+      in
+      shint_to_axhint r_obj chosen chosen_hint ax side
 
 and single_axis_shint_to_axhint :
     type a left1 right1 left2 right2.
@@ -1848,11 +1861,11 @@ and single_axis_shint_to_axhint :
     (a, (left1 * right1) Hint.morph, Hint.const) axhint =
   let open Lattices_mono in
   fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
-      (a_shint_inp : (a, left1 * right1) S.hint)
+      (a_shint : (a, left1 * right1) S.hint)
       (side : (left1, right1, left2, right2) shint_to_axhint_side) ->
     (* This function is for when we have a solver hint (aka "shint") for a
        single axis and wish to convert it to a mode "axhint". *)
-    match a_shint_inp with
+    match a_shint with
     | Morph (morph_hint, morph, b_shint) -> (
       let b_obj = src a_obj morph in
       let morph_inv : (a, _, left2 * right2) morph =
@@ -1860,6 +1873,7 @@ and single_axis_shint_to_axhint :
       in
       let b = apply b_obj morph_inv a in
       match find_responsible_axis_single morph with
+      (* TODO - these match cases looks a bit duplicated from in [shint_to_axhint] *)
       | NoneResponsible -> Empty (a, C.print a_obj)
       | SourceIsSingle ->
         let b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
