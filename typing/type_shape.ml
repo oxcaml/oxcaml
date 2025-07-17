@@ -100,7 +100,7 @@ module Type_shape = struct
     (* CR sspies: We should figure out pretty printing for shapes. For now, this
        verbose non-boxed version should be fine. *)
     | Ts_predef (predef, shapes) ->
-      Format.fprintf ppf "%s (%a)" (Predef.to_string predef)
+      Format.fprintf ppf "Ts_predef %s (%a)" (Predef.to_string predef)
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
            print)
@@ -272,6 +272,10 @@ module Type_decl_shape = struct
     in
     { path; definition; type_params }
 
+  (* We use custom strings as separators instead of pp_print_space, because the
+     latter introduces line breaks that can mess up the tables with all shapes.*)
+  let print_sep_string str ppf () = Format.pp_print_string ppf str
+
   let print_one_entry print_value ppf { field_name; field_value } =
     match field_name with
     | Some name ->
@@ -280,13 +284,13 @@ module Type_decl_shape = struct
     | None -> Format.fprintf ppf "%a" print_value field_value
 
   let print_complex_constructor print_value ppf { name; args } =
-    Format.fprintf ppf "(%a: %a)" Format.pp_print_string name
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space
+    Format.fprintf ppf "(%a of %a)" Format.pp_print_string name
+      (Format.pp_print_list ~pp_sep:(print_sep_string " * ")
          (print_one_entry print_value))
       args
 
   let print_field ppf (name, shape) =
-    Format.fprintf ppf "(%a: %a)" Format.pp_print_string name Type_shape.print
+    Format.fprintf ppf "%a: %a" Format.pp_print_string name Type_shape.print
       shape
 
   let print_tds ppf = function
@@ -295,15 +299,15 @@ module Type_decl_shape = struct
     | Tds_variant { simple_constructors; complex_constructors } ->
       Format.fprintf ppf
         "Tds_variant simple_constructors=%a complex_constructors=%a"
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (Format.pp_print_list ~pp_sep:(print_sep_string " | ")
            Format.pp_print_string)
         simple_constructors
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (Format.pp_print_list ~pp_sep:(print_sep_string " | ")
            (print_complex_constructor Type_shape.print))
         complex_constructors
     | Tds_record field_list ->
-      Format.fprintf ppf "Tds_record fields=%a"
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space print_field)
+      Format.fprintf ppf "Tds_record { %a }"
+        (Format.pp_print_list ~pp_sep:(print_sep_string "; ") print_field)
         field_list
     | Tds_alias type_shape ->
       Format.fprintf ppf "Tds_alias %a" Type_shape.print type_shape
@@ -402,3 +406,84 @@ let rec type_name (type_shape : Type_shape.t) =
       let args = type_arg_list_to_string (List.map type_name shapes) in
       let name = Path.name type_decl_shape.path in
       args ^ name)
+
+let print_table ppf (columns : (string * string list) list) =
+  if List.length columns = 0 then Misc.fatal_errorf "print_table: empty table";
+  let column_widths =
+    List.map
+      (fun (name, entries) ->
+        List.fold_left max (String.length name) (List.map String.length entries))
+      columns
+  in
+  let table_depth = List.hd columns |> snd |> List.length in
+  let table_width =
+    List.fold_left ( + ) 0 column_widths
+    + 4 (* boundary characters *)
+    + ((List.length column_widths - 1) * 3 (* inter column boundaries *))
+  in
+  let columns = List.combine column_widths columns in
+  let columns =
+    List.map
+      (fun (w, (name, entries)) -> w, name, Array.of_list entries)
+      columns
+  in
+  Format.fprintf ppf "%s\n" (String.make table_width '-');
+  let headers =
+    List.map
+      (fun (w, name, _) ->
+        Format.asprintf "%s%s" name (String.make (w - String.length name) ' '))
+      columns
+  in
+  Format.fprintf ppf "| %s |\n" (String.concat " | " headers);
+  Format.fprintf ppf "%s\n" (String.make table_width '-');
+  let print_row ppf i =
+    let row_strings =
+      List.map
+        (fun (w, _, entries) ->
+          Format.asprintf "%s%s" entries.(i)
+            (String.make (w - String.length entries.(i)) ' '))
+        columns
+    in
+    Format.fprintf ppf "| %s |\n" (String.concat " | " row_strings)
+  in
+  for i = 0 to table_depth - 1 do
+    print_row ppf i
+  done;
+  Format.fprintf ppf "%s\n" (String.make table_width '-')
+
+let print_table_all_type_decls ppf =
+  let entries = Uid.Tbl.to_list all_type_decls in
+  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
+  let entries =
+    List.map
+      (fun (k, v) ->
+        ( Format.asprintf "%a" Uid.print k,
+          Format.asprintf "%a" Type_decl_shape.print v ))
+      entries
+  in
+  let uids, decls = List.split entries in
+  print_table ppf ["UID", uids; "Type Declaration", decls]
+
+let print_table_all_type_shapes ppf =
+  let entries = Uid.Tbl.to_list all_type_shapes in
+  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
+  let entries =
+    List.map
+      (fun (k, { type_shape; type_sort }) ->
+        ( Format.asprintf "%a" Uid.print k,
+          ( Format.asprintf "%a" Type_shape.print type_shape,
+            Format.asprintf "%a" Jkind_types.Sort.Const.format type_sort ) ))
+      entries
+  in
+  let uids, rest = List.split entries in
+  let types, sorts = List.split rest in
+  print_table ppf ["UID", uids; "Type", types; "Sort", sorts]
+
+(* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
+let print_debug_uid_tables ppf =
+  if !Clflags.dump_debug_uids
+  then (
+    Format.fprintf ppf "\n";
+    print_table_all_type_decls ppf;
+    Format.fprintf ppf "\n";
+    print_table_all_type_shapes ppf)

@@ -283,8 +283,10 @@ let default_load ppf (program : Lambda.program) =
 
 let load_lambda ppf ~compilation_unit ~required_globals lam size =
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
+  if !Clflags.dump_rawlambda then Type_shape.print_debug_uid_tables ppf;
   let slam = Simplif.simplify_lambda lam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
+  if !Clflags.dump_lambda then Type_shape.print_debug_uid_tables ppf;
   let program =
     { Lambda.
       code = slam;

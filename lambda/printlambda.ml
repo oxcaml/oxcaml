@@ -1243,6 +1243,10 @@ let apply_kind name pos mode =
   in
   name ^ locality_kind mode
 
+let debug_uid ppf duid =
+  if !Clflags.dump_debug_uids then
+    fprintf ppf "%@{%a}" Shape.Uid.print duid
+
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
@@ -1322,11 +1326,11 @@ let rec lam ppf = function
         end
       in
       let rec letbody ~sp = function
-        | Llet(_, k, id, _duid, arg, body)
-        | Lmutlet(k, id, _duid, arg, body) as l ->
+        | Llet(_, k, id, duid, arg, body)
+        | Lmutlet(k, id, duid, arg, body) as l ->
            if sp then fprintf ppf "@ ";
-           fprintf ppf "@[<2>%a =%s%a@ %a@]"
-             Ident.print id (let_kind l) layout k lam arg;
+           fprintf ppf "@[<2>%a%a =%s%a@ %a@]"
+             Ident.print id debug_uid duid (let_kind l) layout k lam arg;
            letbody ~sp:true body
         | expr -> expr in
       fprintf ppf "@[<2>(let@ @[<hv 1>(";
@@ -1336,9 +1340,12 @@ let rec lam ppf = function
       let bindings ppf id_arg_list =
         let spc = ref false in
         List.iter
-          (fun { id; debug_uid=_; def } ->
+          (fun { id; debug_uid=duid; def } ->
             if !spc then fprintf ppf "@ " else spc := true;
-            fprintf ppf "@[<2>%a@ %a@]" Ident.print id lfunction def)
+            fprintf ppf "@[<2>%a%a@ %a@]"
+              Ident.print id
+              debug_uid duid
+              lfunction def)
           id_arg_list in
       fprintf ppf
         "@[<2>(letrec@ (@[<hv 1>%a@])@ %a)@]" bindings id_arg_list lam body
@@ -1399,14 +1406,15 @@ let rec lam ppf = function
         lam lbody i
         (fun ppf vars ->
            List.iter
-             (fun (x, _duid, k) -> fprintf ppf " %a%a" Ident.print x layout k)
+             (fun (x, duid, k) ->
+                fprintf ppf " %a%a%a" Ident.print x debug_uid duid layout k)
              vars
         )
         vars
         excl lam lhandler
-  | Ltrywith(lbody, param, _duid, lhandler, _kind) ->
-      fprintf ppf "@[<2>(try@ %a@;<1 -1>with %a@ %a)@]"
-        lam lbody Ident.print param lam lhandler
+  | Ltrywith(lbody, param, duid, lhandler, _kind) ->
+      fprintf ppf "@[<2>(try@ %a@;<1 -1>with %a%a@ %a)@]"
+        lam lbody Ident.print param debug_uid duid lam lhandler
   | Lifthenelse(lcond, lif, lelse, _kind) ->
       fprintf ppf "@[<2>(if@ %a@ %a@ %a)@]" lam lcond lam lif lam lelse
   | Lsequence(l1, l2) ->
@@ -1414,9 +1422,10 @@ let rec lam ppf = function
   | Lwhile {wh_cond; wh_body} ->
       fprintf ppf "@[<2>(while@ %a@ %a)@]"
         lam wh_cond lam wh_body
-  | Lfor {for_id; for_loc = _; for_from; for_to; for_dir; for_body} ->
-      fprintf ppf "@[<2>(for %a@ %a@ %s@ %a@ %a)@]"
-       Ident.print for_id lam for_from
+  | Lfor {for_id; for_debug_uid; for_loc = _;
+          for_from; for_to; for_dir; for_body} ->
+      fprintf ppf "@[<2>(for %a%a@ %a@ %s@ %a@ %a)@]"
+       Ident.print for_id debug_uid for_debug_uid lam for_from
        (match for_dir with Upto -> "to" | Downto -> "downto")
        lam for_to lam for_body
   | Lassign(id, expr) ->
@@ -1475,8 +1484,10 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
         fprintf ppf "@ {nlocal = %d}" nlocal;
         List.iter (fun (p : Lambda.lparam) ->
             let { unbox_param } = p.attributes in
-            fprintf ppf "@ %a%s%a%s"
-              Ident.print p.name (locality_kind p.mode) layout p.layout
+            fprintf ppf "@ %a%a%s%a%s"
+              Ident.print
+                p.name debug_uid p.debug_uid
+                (locality_kind p.mode) layout p.layout
               (if unbox_param then "[@unboxable]" else "")
           ) params
     | Tupled ->
@@ -1487,6 +1498,7 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
              let { unbox_param } = p.attributes in
              if !first then first := false else fprintf ppf ",@ ";
              Ident.print ppf p.name;
+             debug_uid ppf p.debug_uid;
              Format.fprintf ppf "%s" (locality_kind p.mode);
              layout ppf p.layout;
              if unbox_param then Format.fprintf ppf "[@unboxable]"
@@ -1502,7 +1514,9 @@ let structured_constant = struct_const
 
 let lambda = lam
 
-let program ppf { code } = lambda ppf code
+let program ppf { code } =
+  lambda ppf code
+
 
 let value_kind' = value_kind value_kind_non_null'
 

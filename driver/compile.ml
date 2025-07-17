@@ -47,8 +47,12 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
        Builtin_attributes.warn_unused ();
        lambda
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
+       |> print_if i.ppf_dump Clflags.dump_rawlambda
+          (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> Simplif.simplify_lambda
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
+       |> print_if i.ppf_dump Clflags.dump_lambda
+          (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> Blambda_of_lambda.blambda_of_lambda
        |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
        |> Bytegen.compile_implementation i.module_name
