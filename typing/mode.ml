@@ -2010,7 +2010,8 @@ module Comonadic_common_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_floor obj m)
 
-  let of_const : type l r. const -> (l * r) t = fun a -> Solver.of_const obj a
+  let of_const : type l r. ?hint:Hint.const -> const -> (l * r) t =
+   fun ?hint a -> Solver.of_const ?hint obj a
 
   let meet_const c m = Solver.apply obj (Meet_with c) m
 
@@ -2074,7 +2075,8 @@ module Monadic_common_gen (Obj : Obj) = struct
 
   let zap_to_floor m = with_log (Solver.zap_to_ceil obj m)
 
-  let of_const : type l r. const -> (l * r) t = fun a -> Solver.of_const obj a
+  let of_const : type l r. ?hint:Hint.const -> const -> (l * r) t =
+   fun ?hint a -> Solver.of_const ?hint obj a
 
   let join_const c m = Solver.apply Obj.obj (Meet_with c) m
 
@@ -2745,10 +2747,10 @@ module Value_with (Areality : Areality) = struct
       (Monadic.print ?verbose ())
       monadic
 
-  let of_const c =
+  let of_const ?hint c =
     let { monadic; comonadic } = split c in
-    let comonadic = Comonadic.of_const comonadic in
-    let monadic = Monadic.of_const monadic in
+    let comonadic = Comonadic.of_const ?hint comonadic in
+    let monadic = Monadic.of_const ?hint monadic in
     { comonadic; monadic }
 
   module Const = struct

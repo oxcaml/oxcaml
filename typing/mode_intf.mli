@@ -144,7 +144,7 @@ module type Common = sig
 
   val print : ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
 
-  val of_const : Const.t -> ('l * 'r) t
+  val of_const : ?hint:hint_const -> Const.t -> ('l * 'r) t
 
   val zap_to_ceil : ('l * allowed) t -> Const.t
 
