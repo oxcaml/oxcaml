@@ -4806,7 +4806,8 @@ let report_lookup_error _loc env ppf = function
         print_lock_item (item, lid)
         (string_of_shared_context context)
   | Value_used_in_closure (lid, err) ->
-    (* TODO - print context regarding lid *) let _ = lid in () ;
+    (* CR pdsouza: improve how this error message reads *)
+    fprintf ppf "@[%a cannot be used inside a closure as this breaks mode constraints as described below.@]\n" !print_longident lid;
     Mode.Value.Comonadic.report_error ppf err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
