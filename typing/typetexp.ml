@@ -671,23 +671,21 @@ let transl_label (label : Parsetree.arg_label)
       -> raise (Error (arg.ptyp_loc, Env.empty, Invalid_label_for_call_pos label))
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
-  | Generic_optional (mod_ident, l), _ -> (
+  | Generic_optional (path, l), _ -> (
     match Language_extension.is_enabled Generic_optional_arguments with
     | false ->
       raise
-        (Error (mod_ident.loc,
+        (Error (path.loc,
                 Env.empty,
                 Unsupported_extension Generic_optional_arguments));
     | true ->
-      match mod_ident with
-      | { txt = Longident.Ldot (Longident.Lident "Stdlib", "Option")
-        ; _ } -> Optional l
-      | { loc ; txt } ->  (
-        raise
-          (Error (loc,
-                  Env.empty,
-                  Invalid_generic_optional_argument_module_path txt))
-      )
+        if path.txt = Longident.Ldot (Lident "Stdlib", "Option") ||
+          path.txt = Longident.Ldot (Lident "Stdlib", "Or_null")
+        then
+          Generic_optional(path, l)
+        else
+          raise (Error (path.loc, Env.empty,
+            Invalid_generic_optional_argument_module_path path.txt))
   )
   | Nolabel, _ -> Nolabel
 
@@ -790,12 +788,20 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
           in
           let arg_ty =
-            if not (Btype.is_optional l) then arg_ty
+            if not (Btype.is_optional_arg l) then arg_ty
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
+              let path = match l with
+                | Optional _ -> Predef.path_option
+                | Generic_optional (path, _) ->
+                    (match Btype.classify_module_path path.txt with
+                    | Stdlib_option -> Predef.path_option
+                    | Stdlib_or_null -> Predef.path_or_null)
+                | _ -> assert false
+              in
               newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+                (newconstr path [Btype.tpoly_get_mono arg_ty])
             end
           in
           let arg_mode = Alloc.of_const arg_mode in

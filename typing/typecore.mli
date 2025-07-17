@@ -160,10 +160,11 @@ val type_argument:
         type_expr -> type_expr -> Typedtree.expression
 
 val type_option_some:
-        Env.t -> Parsetree.expression ->
+        Env.t -> Typedtree.arg_label -> Parsetree.expression ->
         type_expr-> type_expr -> Typedtree.expression
 val type_option_none:
-        Env.t -> type_expr -> Location.t -> Typedtree.expression
+        Env.t -> Typedtree.arg_label -> type_expr ->
+        Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
 val generalize_structure_exp: Typedtree.expression -> unit
 val reset_delayed_checks: unit -> unit

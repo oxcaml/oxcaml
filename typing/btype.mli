@@ -260,16 +260,26 @@ val backtrack: snapshot -> unit
 (**** Utilities for labels ****)
 
 val is_optional_parsetree : Parsetree.arg_label -> bool
-val is_optional : arg_label -> bool
+type optionality = Optional_arg of Longident.t
+(* The reason this is called [Not_optional_arg] instead of [Required_arg] is
+that [Position] are omittable (thus not required), but is not optional *)
+                 | Not_optional_arg
+val is_optional_arg : arg_label -> bool
+val classify_optionality : arg_label -> optionality
 val is_position : arg_label -> bool
 val is_omittable : arg_label -> bool
 val label_name : arg_label -> label
 
+(* CR generic-optional: temporary function, to remove *)
+type module_path = Stdlib_option | Stdlib_or_null
+val classify_module_path : Longident.t -> module_path
+
 (* Returns the label name with first character '?' or '~' as appropriate. *)
 val prefixed_label_name : arg_label -> label
 
+val arg_label_compatible : arg_label -> arg_label -> bool
 val extract_label :
-    label -> (arg_label * 'a) list ->
+    arg_label (* param label *) -> (arg_label * 'a) list ->
     (arg_label * 'a * bool * (arg_label * 'a) list) option
 (* actual label,
    value,

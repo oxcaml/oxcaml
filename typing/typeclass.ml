@@ -20,6 +20,7 @@ open Types
 open Typetexp
 open Format
 open Mode
+open Btype
 
 
 type 'a class_info = {
@@ -453,9 +454,16 @@ and class_type_aux env virt self_scope scty =
       in
       let ty = cty.ctyp_type in
       let ty =
-        if Btype.is_optional l
-        then Ctype.newty (Tconstr(Predef.path_option,[ty], ref Mnil))
-        else ty in
+        match l with
+        | Optional _ -> Ctype.newty (Tconstr(Predef.path_option,[ty], ref Mnil))
+        | Generic_optional (path, _) ->
+            let t_cons =
+              match classify_module_path path.txt with
+              | Stdlib_option -> Predef.path_option
+              | Stdlib_or_null -> Predef.path_or_null
+            in
+            Ctype.newty (Tconstr(t_cons,[ty], ref Mnil))
+        | Position _ | Labelled _ | Nolabel -> ty in
       let clty = class_type env virt self_scope scty in
       let typ = Cty_arrow (l, ty, clty.cltyp_type) in
       cltyp (Tcty_arrow (l, cty, clty)) typ
@@ -1308,7 +1316,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let rec nonopt_labels ls ty_fun =
         match ty_fun with
         | Cty_arrow (l, _, ty_res) ->
-            if Btype.is_optional l then nonopt_labels ls ty_res
+            if Btype.is_optional_arg l then nonopt_labels ls ty_res
             else nonopt_labels (l::ls) ty_res
         | _    -> ls
       in
@@ -1331,22 +1339,26 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         match ty_fun, ty_fun0 with
         | Cty_arrow (l, ty, ty_fun), Cty_arrow (_, ty0, ty_fun0)
           when sargs <> [] ->
-            let name = Btype.label_name l
-            and optional = Btype.is_optional l in
+            (* CR generic-optional:
+              This edit needs test cases.
+
+              - Classes with generic optional methods
+            *)
+            let optional = Btype.is_optional_arg l in
             let use_arg sarg l' =
               Arg (
-                if not optional || Btype.is_optional l' then
+                if not optional || Btype.is_optional_arg l' then
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
                   arg, Jkind.Sort.value
                 else
-                  Typecore.type_option_some val_env sarg ty ty0,
+                  Typecore.type_option_some val_env l sarg ty ty0,
                   (* CR layouts v5: Change the sort when options can hold
                      non-values. *)
                   Jkind.Sort.value
               )
             in
-            let eliminate_optional_arg () =
-              Arg (Typecore.type_option_none val_env ty0 Location.none,
+            let eliminate_optional_arg lbl =
+              Arg (Typecore.type_option_none val_env lbl ty0 Location.none,
                    (* CR layouts v5: Change the sort when options can hold
                       non-values. *)
                    Jkind.Sort.value
@@ -1362,22 +1374,23 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                 | [] -> assert false
                 | (l', sarg) :: remaining_sargs ->
                     let label_is_absent_in_remaining_args () =
-                      not (List.exists (fun (l, _) -> name = Btype.label_name l) remaining_sargs)
+                      not (List.exists (fun (l', _) ->
+                        Btype.arg_label_compatible l l') remaining_sargs)
                     in
-                    if name = Btype.label_name l' ||
+                    if Btype.arg_label_compatible l l' ||
                        (not optional && l' = Nolabel)
                     then
                       (remaining_sargs, use_arg sarg l')
                     else if optional && label_is_absent_in_remaining_args ()
-                    then (sargs, eliminate_optional_arg ())
+                    then (sargs, eliminate_optional_arg l)
                     else if Btype.is_position l && label_is_absent_in_remaining_args ()
                     then (sargs, eliminate_position_arg ())
                     else
                       raise(Error(sarg.pexp_loc, val_env, Apply_wrong_label l'))
               end else
-                match Btype.extract_label name sargs with
+                match Btype.extract_label l sargs with
                 | Some (l', sarg, _, remaining_sargs) ->
-                    if not optional && Btype.is_optional l' then (
+                    if not optional && Btype.is_optional_arg l' then (
                       let label = Printtyp.string_of_label l in
                       if Btype.is_position l then
                         raise
@@ -1392,8 +1405,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                 | None ->
                     let is_erased () = List.mem_assoc Nolabel sargs in
                     sargs,
-                    if Btype.is_optional l && is_erased () then
-                      eliminate_optional_arg ()
+                    if Btype.is_optional_arg l && is_erased () then
+                      eliminate_optional_arg l
                     else if Btype.is_position l && is_erased () then
                       eliminate_position_arg ()
                     else begin
@@ -1562,6 +1575,10 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
 let var_option =
   Predef.type_option (Btype.newgenvar Predef.option_argument_jkind)
 
+let var_or_null =
+  Predef.type_or_null
+    (Btype.newgenvar (Jkind.for_or_null_argument Predef.ident_or_null))
+
 let rec approx_declaration cl =
   match cl.pcl_desc with
     Pcl_fun (l, _, pat, cl) ->
@@ -1569,8 +1586,10 @@ let rec approx_declaration cl =
       let arg =
         match l with
         | Optional _ -> Ctype.instance var_option
-        (* CR generic-optional : change from var_option *)
-        | Generic_optional _ -> Ctype.instance var_option
+        | Generic_optional (path, _) ->
+            (match classify_module_path path.txt with
+            | Stdlib_option -> Ctype.instance var_option
+            | Stdlib_or_null -> Ctype.instance var_or_null)
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
@@ -1592,8 +1611,13 @@ let rec approx_description ct =
     Pcty_arrow (l, core_type, ct) ->
       let l = transl_label l (Some core_type) in
       let arg =
-        if Btype.is_optional l then Ctype.instance var_option
-        else Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
+        match classify_optionality l with
+        | Optional_arg (path) ->
+            (match classify_module_path path with
+            | Stdlib_option -> Ctype.instance var_option
+            | Stdlib_or_null -> Ctype.instance var_or_null)
+        | Not_optional_arg ->
+            Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we
            relax jkinds in classes *)
       in
