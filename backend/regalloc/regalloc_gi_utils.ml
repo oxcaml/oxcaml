@@ -251,14 +251,13 @@ module Interval = struct
   external option_unsafe_get : 'a option -> 'a = "%field0"
 
   let[@inline] is_before_or_alone : int option -> int option -> bool =
-    fun left right ->
-    (* CR xclerc for xclerc: we should get rid of this micro-optimization,
-       but the function is relatively high in profiles, so it is currently
-       worth doing. *)
-    if left == None || right == None then
-      true
-    else
-      (option_unsafe_get left) < (option_unsafe_get right)
+   fun left right ->
+    (* CR xclerc for xclerc: we should get rid of this micro-optimization, but
+       the function is relatively high in profiles, so it is currently worth
+       doing. *)
+    if left == None || right == None
+    then true
+    else option_unsafe_get left < option_unsafe_get right
 
   let[@inline] overlap : t -> t -> bool =
    fun left right ->
