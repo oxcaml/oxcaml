@@ -164,7 +164,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Sequence
           { id =
               ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
-              | Vpcompare_string _ );
+              | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz
+              | Vptestc | Vptestnzc );
             instr
           } ->
         instr

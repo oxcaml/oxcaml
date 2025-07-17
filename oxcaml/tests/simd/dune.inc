@@ -168,6 +168,18 @@
    (cat "sse_other_ops.ml")))))
 
 (rule
+ (targets sse41_test_ops_u.ml)
+ (deps sse41_test_ops.ml)
+ (action
+  (with-stdout-to
+   sse41_test_ops_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (cat "sse41_test_ops.ml")))))
+
+(rule
  (targets sse42_string_ops_u.ml)
  (deps sse42_string_ops.ml)
  (action

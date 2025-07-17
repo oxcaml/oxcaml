@@ -79,6 +79,12 @@ module Seq = struct
     | Roundsd
     | Pcompare_string of Pcompare_string.t
     | Vpcompare_string of Pcompare_string.t
+    | Ptestz
+    | Ptestc
+    | Ptestnzc
+    | Vptestz
+    | Vptestc
+    | Vptestnzc
 
   type nonrec t =
     { id : id;
@@ -153,6 +159,18 @@ module Seq = struct
   let vpcmpistrz =
     { id = Vpcompare_string Pcmpistrz; instr = Amd64_simd_instrs.vpcmpistri }
 
+  let ptestz = { id = Ptestz; instr = Amd64_simd_instrs.ptest }
+
+  let ptestc = { id = Ptestc; instr = Amd64_simd_instrs.ptest }
+
+  let ptestnzc = { id = Ptestnzc; instr = Amd64_simd_instrs.ptest }
+
+  let vptestz = { id = Vptestz; instr = Amd64_simd_instrs.vptest_X_Xm128 }
+
+  let vptestc = { id = Vptestc; instr = Amd64_simd_instrs.vptest_X_Xm128 }
+
+  let vptestnzc = { id = Vptestnzc; instr = Amd64_simd_instrs.vptest_X_Xm128 }
+
   let mnemonic ({ id; _ } : t) =
     match id with
     | Sqrtss -> "sqrtss"
@@ -161,6 +179,12 @@ module Seq = struct
     | Roundsd -> "roundsd"
     | Pcompare_string p -> Pcompare_string.mnemonic p
     | Vpcompare_string p -> "v" ^ Pcompare_string.mnemonic p
+    | Ptestz -> "ptestz"
+    | Ptestc -> "ptestc"
+    | Ptestnzc -> "ptestnzc"
+    | Vptestz -> "vptestz"
+    | Vptestc -> "vptestc"
+    | Vptestnzc -> "vptestnzc"
 
   let equal { id = id0; instr = instr0 } { id = id1; instr = instr1 } =
     let return_true () =
@@ -168,13 +192,23 @@ module Seq = struct
       true
     in
     match id0, id1 with
-    | Sqrtss, Sqrtss | Sqrtsd, Sqrtsd | Roundss, Roundss | Roundsd, Roundsd ->
+    | Sqrtss, Sqrtss
+    | Sqrtsd, Sqrtsd
+    | Roundss, Roundss
+    | Roundsd, Roundsd
+    | Ptestz, Ptestz
+    | Ptestc, Ptestc
+    | Ptestnzc, Ptestnzc
+    | Vptestz, Vptestz
+    | Vptestc, Vptestc
+    | Vptestnzc, Vptestnzc ->
       return_true ()
     | Pcompare_string p1, Pcompare_string p2
     | Vpcompare_string p1, Vpcompare_string p2 ->
       if Pcompare_string.equal p1 p2 then return_true () else false
     | ( ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
-        | Vpcompare_string _ ),
+        | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz | Vptestc
+        | Vptestnzc ),
         _ ) ->
       false
 end

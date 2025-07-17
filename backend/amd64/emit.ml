@@ -1633,6 +1633,18 @@ let emit_simd (op : Simd.operation) instr =
       in
       emit_simd_instr seq.instr imm instr;
       I.set cond (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestz | Vptestz ->
+      emit_simd_instr seq.instr imm instr;
+      I.set E (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestc | Vptestc ->
+      emit_simd_instr seq.instr imm instr;
+      I.set B (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Ptestnzc | Vptestnzc ->
+      emit_simd_instr seq.instr imm instr;
+      I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
 let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =

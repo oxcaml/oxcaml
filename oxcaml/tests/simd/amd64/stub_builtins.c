@@ -75,6 +75,8 @@ BUILTIN(caml_sse2_cvt_float64x2_int32x2);
 BUILTIN(caml_sse2_cvt_float64x2_float32x2);
 BUILTIN(caml_sse2_cvt_float32x4_int32x4);
 BUILTIN(caml_sse2_cvt_float32x4_float64x2);
+BUILTIN(caml_sse2_cvtt_float64x2_int32x2);
+BUILTIN(caml_sse2_cvtt_float32x4_int32x4);
 BUILTIN(caml_sse2_int16x8_sll);
 BUILTIN(caml_sse2_int32x4_sll);
 BUILTIN(caml_sse2_int64x2_sll);

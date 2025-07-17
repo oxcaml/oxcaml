@@ -142,6 +142,7 @@ let () =
       "ops_int16x16";
       "ops_int8x32";
       "sse_other_ops";
+      "sse41_test_ops";
       "sse42_string_ops" ]
   in
   List.iter make_ops_u ops;

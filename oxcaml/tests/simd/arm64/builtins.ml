@@ -450,6 +450,10 @@ module Float32x4 = struct
     = "caml_vec128_unreachable" "caml_neon_cvt_float32x4_to_int32x4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
+  external cvtt_int32x4 : t -> int32x4
+    = "caml_vec128_unreachable" "caml_neon_cvtt_float32x4_to_int32x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
   external cvt_float64x2 : t -> float64x2
     = "caml_vec128_unreachable" "caml_neon_cvt_float32x2_to_float64x2"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -537,6 +541,10 @@ module Float64x2 = struct
     = "caml_vec128_unreachable" "caml_neon_cvt_float64x2_to_int64x2"
     [@@noalloc] [@@unboxed] [@@builtin]
 
+  external cvtt_int64x2 : t -> int64x2
+    = "caml_vec128_unreachable" "caml_neon_cvtt_float64x2_to_int64x2"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
   external cvt_float32x4 : t -> float32x4
     = "caml_vec128_unreachable" "caml_neon_cvt_float64x2_to_float32x2"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -553,6 +561,11 @@ module Float64x2 = struct
    (* Use saturating narrowing conversion here to match SSE intrinsics and C
       stubs behavior. *)
    fun t -> t |> round_current |> cvt_int64x2 |> Int64x2.cvt_int32x4_saturating
+
+  let cvtt_int32x4 : t -> int32x4 =
+   (* Use saturating narrowing conversion here to match SSE intrinsics and C
+      stubs behavior. *)
+   fun t -> cvtt_int64x2 |> Int64x2.cvt_int32x4_saturating
 end
 
 module Int16x8 = struct

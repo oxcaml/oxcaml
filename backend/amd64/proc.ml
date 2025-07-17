@@ -520,7 +520,8 @@ let destroyed_by_simd_op (op : Simd.operation) =
     |> Array.append
       (match seq.id with
        | Sqrtss | Sqrtsd | Roundss | Roundsd
-       | Pcompare_string _ | Vpcompare_string _ -> [||])
+       | Pcompare_string _ | Vpcompare_string _
+       | Ptestz | Ptestc | Ptestnzc | Vptestz | Vptestc | Vptestnzc -> [||])
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
