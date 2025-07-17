@@ -284,8 +284,8 @@ module Jkind_mod_bounds = struct
      Separability.(le max (separability t)))
 
   let[@inline] is_max m =
-  m =
-{ locality = Locality.max;
+    m =
+      { locality = Locality.max;
         linearity = Linearity.max;
         uniqueness = Uniqueness.max;
         portability = Portability.max;
