@@ -923,9 +923,11 @@ let const_int size n =
 
 let lconst_int size n = Lconst (const_int size n)
 
-let const_unit = const_int Scalar.Integral.int 0
+let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
 
-let dummy_constant = Lconst (const_int Scalar.Integral.int (0xBBBB / 2))
+let const_unit = const_int int 0
+
+let dummy_constant = Lconst (const_int int (0xBBBB / 2))
 
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
@@ -964,8 +966,8 @@ let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
 let lambda_unit = Lconst const_unit
 
 let of_bool = function
-  | true -> Lconst (const_int Scalar.Integral.int 1)
-  | false -> Lconst (const_int Scalar.Integral.int 0)
+  | true -> Lconst (const_int int 1)
+  | false -> Lconst (const_int int 0)
 
 (* CR vlaviron: review the following cases *)
 let non_null_value raw_kind =
@@ -2551,7 +2553,6 @@ let mk_integral_binop op =
 let mk_integral_unop op =
   fun size x ~loc -> unary (Integral (size, op)) x ~loc
 
-let int = Scalar.Integral.int
 let succ = mk_integral_unop Succ
 let pred = mk_integral_unop Pred
 let add = mk_integral_binop Add

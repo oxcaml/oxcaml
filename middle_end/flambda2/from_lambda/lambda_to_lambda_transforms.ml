@@ -18,6 +18,10 @@ module Env = Lambda_to_flambda_env
 module L = Lambda
 module P = Flambda_primitive
 
+let int_scalar =
+  L.Scalar.Maybe_naked.Value
+    (L.Scalar.Integral.Width.Taggable L.Scalar.Integral.Taggable.Width.Int)
+
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
   | Transformed of L.lambda
@@ -74,14 +78,10 @@ let rec_catch_for_for_loop env loc ident start stop
     match dir with
     | Upto ->
       L.Lprim
-        ( Pscalar (Unary (Integral (L.Scalar.Integral.int, Succ))),
-          [L.Lvar ident],
-          loc )
+        (Pscalar (Unary (Integral (int_scalar, Succ))), [L.Lvar ident], loc)
     | Downto ->
       L.Lprim
-        ( Pscalar (Unary (Integral (L.Scalar.Integral.int, Pred))),
-          [L.Lvar ident],
-          loc )
+        (Pscalar (Unary (Integral (int_scalar, Pred))), [L.Lvar ident], loc)
   in
   let lam : L.lambda =
     (* Care needs to be taken here not to cause overflow if, for an incrementing
@@ -138,7 +138,7 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
             loc )
       in
       let length_is_greater_than_zero_and_is_one_mod_two =
-        let int = L.Scalar.Integral.int in
+        let int = int_scalar in
         L.Lprim
           ( Psequand,
             [ L.icmp ~loc Cgt L.int length (L.lconst_int int 0);

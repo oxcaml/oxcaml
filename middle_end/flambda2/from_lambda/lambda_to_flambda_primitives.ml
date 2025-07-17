@@ -1701,9 +1701,19 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           ~src:(Scalar.ignore_locality outer)
           ~dst:(integral_scalar width) ~current_region
       in
+      let int_scalar =
+        Scalar.Maybe_naked.Value
+          (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
+      in
+      let naked_int_scalar =
+        Scalar.Maybe_naked.Naked
+          (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
+      in
       let arg2 =
-        let src = match rhs with Int -> Scalar.int in
-        static_cast arg2 ~src ~dst:Scalar.naked_int ~current_region
+        let src = match rhs with Int -> Scalar.integral int_scalar in
+        static_cast arg2 ~src
+          ~dst:(Scalar.integral naked_int_scalar)
+          ~current_region
       in
       let maybe_wrap =
         static_cast ~src:(integral_scalar width) ~dst:outer ~current_region

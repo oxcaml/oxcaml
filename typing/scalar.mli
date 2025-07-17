@@ -88,58 +88,6 @@ end
 (* The following module types define convenient shorthand values for users of scalar.ml,
    so that they don't have to use the large variant constructors. *)
 
-module type Integral_width_shorthands := sig
-  type 'a t
-
-  val int8 : _ t
-
-  val int16 : _ t
-
-  val int32 : any_locality_mode t
-
-  val int64 : any_locality_mode t
-
-  val int : _ t
-
-  val nativeint : any_locality_mode t
-end
-
-module type Integral_shorthands := sig
-  type 'a t
-
-  include Integral_width_shorthands with type 'a t := 'a t
-
-  val naked_int8 : _ t
-
-  val naked_int16 : _ t
-
-  val naked_int32 : any_locality_mode t
-
-  val naked_int64 : any_locality_mode t
-
-  val naked_int : _ t
-
-  val naked_nativeint : any_locality_mode t
-end
-
-module type Float_width_shorthands := sig
-  type 'a t
-
-  val float32 : any_locality_mode t
-
-  val float : any_locality_mode t
-end
-
-module type Float_shorthands := sig
-  type 'a t
-
-  include Float_width_shorthands with type 'a t := 'a t
-
-  val naked_float32 : any_locality_mode t
-
-  val naked_float : any_locality_mode t
-end
-
 module Integral : sig
   module Taggable : sig
     module Width : sig
@@ -175,13 +123,9 @@ module Integral : sig
       | Boxable of 'mode Boxable.Width.t
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
-
-    include Integral_width_shorthands with type 'a t := 'a t
   end
 
   include S with type 'a width := 'a Width.t
-
-  include Integral_shorthands with type 'a t := 'a t
 end
 
 module Floating : sig
@@ -193,13 +137,9 @@ module Floating : sig
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val to_string : any_locality_mode t -> string
-
-    include Float_width_shorthands with type 'a t := 'a t
   end
 
   include S with type 'a width := 'a Width.t
-
-  include Float_shorthands with type 'a t := 'a t
 end
 
 module Width : sig
@@ -212,17 +152,9 @@ module Width : sig
   val to_string : any_locality_mode t -> string
 
   val ignore_locality : _ t -> any_locality_mode t
-
-  include Integral_width_shorthands with type 'a t := 'a t
-
-  include Float_width_shorthands with type 'a t := 'a t
 end
 
 include S with type 'a width := 'a Width.t
-
-include Integral_shorthands with type 'a t := 'a t
-
-include Float_shorthands with type 'a t := 'a t
 
 val integral : 'a Integral.t -> 'a t
 

@@ -2713,8 +2713,9 @@ let make_test_sequence value_kind loc fail size arg const_lambda_list =
 
 module SArg = struct
   type primitive = Lambda.primitive
+  let int_scalar = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
   let pintcomp cmp =
-    Pscalar (Binary (Icmp (Scalar.Integral.int, cmp)))
+    Pscalar (Binary (Icmp (int_scalar, cmp)))
 
   let eqint = Pphys_equal Eq
 
@@ -3157,17 +3158,17 @@ let combine_constant value_kind loc arg cst partial ctx def
         in
         let hs, sw, fail = share_actions_tree value_kind sw fail in
         hs (Lstringswitch (arg, sw, fail, loc, value_kind))
-    | Const_float _ -> make_scalar_test_sequence Scalar.float
+    | Const_float _ -> make_scalar_test_sequence (Scalar.floating (Value (Float64 Any_locality_mode)))
     | Const_float32 _ | Const_unboxed_float32 _ ->
         (* Should be caught in do_compile_matching. *)
         Misc.fatal_error "Found unexpected float32 literal pattern."
-    | Const_unboxed_float _ -> make_scalar_test_sequence Scalar.naked_float
-    | Const_int32 _ -> make_scalar_test_sequence Scalar.int32
-    | Const_int64 _ -> make_scalar_test_sequence Scalar.int64
-    | Const_nativeint _ -> make_scalar_test_sequence Scalar.nativeint
-    | Const_unboxed_int32 _ -> make_scalar_test_sequence Scalar.naked_int32
-    | Const_unboxed_int64 _ -> make_scalar_test_sequence Scalar.naked_int64
-    | Const_unboxed_nativeint _ -> make_scalar_test_sequence Scalar.naked_nativeint
+    | Const_unboxed_float _ -> make_scalar_test_sequence (Scalar.floating (Naked (Float64 Any_locality_mode)))
+    | Const_int32 _ -> make_scalar_test_sequence (Scalar.integral (Value (Boxable (Int32 Any_locality_mode))))
+    | Const_int64 _ -> make_scalar_test_sequence (Scalar.integral (Value (Boxable (Int64 Any_locality_mode))))
+    | Const_nativeint _ -> make_scalar_test_sequence (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
+    | Const_unboxed_int32 _ -> make_scalar_test_sequence (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
+    | Const_unboxed_int64 _ -> make_scalar_test_sequence (Scalar.integral (Naked (Boxable (Int64 Any_locality_mode))))
+    | Const_unboxed_nativeint _ -> make_scalar_test_sequence (Scalar.integral (Naked (Boxable (Nativeint Any_locality_mode))))
   in
   (lambda1, Jumps.union local_jumps total)
 

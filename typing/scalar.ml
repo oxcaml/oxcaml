@@ -142,45 +142,9 @@ module Integral = struct
     let naked_sort = function
       | Taggable t -> Taggable.Width.naked_sort t
       | Boxable b -> Boxable.Width.naked_sort b
-
-    let int8 = Taggable Int8
-
-    let int16 = Taggable Int16
-
-    let int32 = Boxable (Int32 Any_locality_mode)
-
-    let int64 = Boxable (Int64 Any_locality_mode)
-
-    let int = Taggable Int
-
-    let nativeint = Boxable (Nativeint Any_locality_mode)
   end
 
   include Maybe_naked.Make1 (Width)
-
-  let int8 : _ t = Value Width.int8
-
-  let int16 : _ t = Value Width.int16
-
-  let int32 : _ t = Value Width.int32
-
-  let int64 : _ t = Value Width.int64
-
-  let int : _ t = Value Width.int
-
-  let nativeint : _ t = Value Width.nativeint
-
-  let naked_int8 : _ t = Naked Width.int8
-
-  let naked_int16 : _ t = Naked Width.int16
-
-  let naked_int32 : _ t = Naked Width.int32
-
-  let naked_int64 : _ t = Naked Width.int32
-
-  let naked_int : _ t = Naked Width.int
-
-  let naked_nativeint : _ t = Naked Width.nativeint
 end
 
 module Floating = struct
@@ -203,21 +167,9 @@ module Floating = struct
     let naked_sort = function
       | Float32 Any_locality_mode -> Jkind_types.Sort.Const.float32
       | Float64 Any_locality_mode -> Jkind_types.Sort.Const.float64
-
-    let float32 = Float32 Any_locality_mode
-
-    let float = Float64 Any_locality_mode
   end
 
   include Maybe_naked.Make1 (Width)
-
-  let float32 : _ t = Value Width.float32
-
-  let float : _ t = Value Width.float
-
-  let naked_float32 : _ t = Naked Width.float32
-
-  let naked_float : _ t = Naked Width.float
 end
 
 module Width = struct
@@ -244,22 +196,6 @@ module Width = struct
   let to_string = function
     | Floating f -> Floating.Width.to_string f
     | Integral i -> Integral.Width.to_string i
-
-  let float32 = Floating Floating.Width.float32
-
-  let float = Floating Floating.Width.float
-
-  let int8 = Integral Integral.Width.int8
-
-  let int16 = Integral Integral.Width.int16
-
-  let int = Integral Integral.Width.int
-
-  let int32 = Integral Integral.Width.int32
-
-  let int64 = Integral Integral.Width.int64
-
-  let nativeint = Integral Integral.Width.nativeint
 end
 
 include Maybe_naked.Make1 (Width)
@@ -271,38 +207,6 @@ let integral : 'a Integral.t -> 'a t = function
 let floating : 'a Floating.t -> 'a t = function
   | Value f -> Value (Floating f)
   | Naked f -> Naked (Floating f)
-
-let int8 : _ t = Value Width.int8
-
-let int16 : _ t = Value Width.int16
-
-let int : _ t = Value Width.int
-
-let int32 : _ t = Value Width.int32
-
-let nativeint : _ t = Value Width.nativeint
-
-let int64 : _ t = Value Width.int64
-
-let float32 : _ t = Value Width.float32
-
-let float : _ t = Value Width.float
-
-let naked_int8 : _ t = Naked Width.int8
-
-let naked_int16 : _ t = Naked Width.int16
-
-let naked_int : _ t = Naked Width.int
-
-let naked_int32 : _ t = Naked Width.int32
-
-let naked_nativeint : _ t = Naked Width.nativeint
-
-let naked_int64 : _ t = Naked Width.int64
-
-let naked_float32 : _ t = Naked Width.float32
-
-let naked_float : _ t = Naked Width.float
 
 type 'a scalar = 'a t
 
@@ -637,7 +541,7 @@ module Intrinsic = struct
       | Icmp ((_ : any_locality_mode Integral.t), (_ : Integer_comparison.t))
       | Fcmp ((_ : any_locality_mode Floating.t), (_ : Float_comparison.t))
       | Three_way_compare (_ : any_locality_mode scalar) ->
-        { result = int; can_raise = false }
+        { result = integral (Value (Taggable Int)); can_raise = false }
   end
 
   type 'mode t =
