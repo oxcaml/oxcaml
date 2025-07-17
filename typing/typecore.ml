@@ -569,9 +569,8 @@ let mode_coerce mode expected_mode =
 
 let mode_lazy expected_mode =
   let expected_mode =
-    mode_coerce (
-      Value.max_with_comonadic Areality Regionality.global
-      |> Value.meet_with Yielding Yielding.Const.Unyielding)
+    mode_coerce
+      (Value.of_const { Value.Const.max with areality = Global; yielding = Unyielding })
       expected_mode
   in
   let mode_crossing =
