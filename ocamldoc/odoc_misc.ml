@@ -486,7 +486,7 @@ let create_index_lists elements string_of_ele =
 
 (*** for labels *)
 
-let is_optional = Btype.is_optional_arg
+let is_optional = Btype.is_optional
 let label_name = Btype.label_name
 
 let remove_option lbl typ =
@@ -497,8 +497,8 @@ let remove_option lbl typ =
       when Path.same path
             (match Btype.classify_optionality lbl with
             | Required_or_position_arg -> assert false
-            | Optional_arg path -> (
-                match Btype.classify_module_path path with
+            | Optional_arg mpath ->
+                (match mpath with
                 | Stdlib_option -> Predef.path_option
                 | Stdlib_or_null -> Predef.path_or_null))
         -> get_desc ty

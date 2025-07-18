@@ -454,9 +454,9 @@ and class_type_aux env virt self_scope scty =
       let ty = cty.ctyp_type in
       let ty =
         match Btype.classify_optionality l with
-        | Optional_arg path ->
+        | Optional_arg mpath ->
             let t_cons =
-              match Btype.classify_module_path path with
+              match mpath with
               | Stdlib_option -> Predef.path_option
               | Stdlib_or_null -> Predef.path_or_null
             in
@@ -1314,7 +1314,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let rec nonopt_labels ls ty_fun =
         match ty_fun with
         | Cty_arrow (l, _, ty_res) ->
-            if Btype.is_optional_arg l then nonopt_labels ls ty_res
+            if Btype.is_optional l then nonopt_labels ls ty_res
             else nonopt_labels (l::ls) ty_res
         | _    -> ls
       in
@@ -1342,25 +1342,31 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
 
               - Classes with generic optional methods
             *)
-            let optional = Btype.is_optional_arg l in
+            let optional = Btype.is_optional l in
             let use_arg sarg l' =
               Arg (
-                if not optional || Btype.is_optional_arg l' then
+                if not optional || Btype.is_optional l' then
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
                   arg, Jkind.Sort.value
                 else
-                  Typecore.type_option_some val_env l sarg ty ty0,
-                  (* CR layouts v5: Change the sort when options can hold
-                     non-values. *)
-                  Jkind.Sort.value
+                  (match Btype.classify_optionality l with
+                  | Optional_arg mpath ->
+                      Typecore.type_option_some val_env mpath sarg ty ty0,
+                      (* CR layouts v5: Change the sort when options can hold
+                        non-values. *)
+                      Jkind.Sort.value
+                  | Required_or_position_arg -> assert false)
               )
             in
             let eliminate_optional_arg lbl =
-              Arg (Typecore.type_option_none val_env lbl ty0 Location.none,
-                   (* CR layouts v5: Change the sort when options can hold
-                      non-values. *)
-                   Jkind.Sort.value
-                  )
+              (match Btype.classify_optionality lbl with
+              | Optional_arg mpath ->
+                  Arg
+                    (Typecore.type_option_none val_env mpath ty0 Location.none,
+                      (* CR layouts v5: Change the sort when options can hold
+                          non-values. *)
+                      Jkind.Sort.value)
+              | Required_or_position_arg -> assert false)
             in
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in
@@ -1388,7 +1394,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
               end else
                 match Btype.extract_label l sargs with
                 | Some (l', sarg, _, remaining_sargs) ->
-                    if not optional && Btype.is_optional_arg l' then (
+                    if not optional && Btype.is_optional l' then (
                       let label = Printtyp.string_of_label l in
                       if Btype.is_position l then
                         raise
@@ -1403,7 +1409,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                 | None ->
                     let is_erased () = List.mem_assoc Nolabel sargs in
                     sargs,
-                    if Btype.is_optional_arg l && is_erased () then
+                    if Btype.is_optional l && is_erased () then
                       eliminate_optional_arg l
                     else if Btype.is_position l && is_erased () then
                       eliminate_position_arg ()
@@ -1610,8 +1616,8 @@ let rec approx_description ct =
       let l = transl_label l (Some core_type) in
       let arg =
         match Btype.classify_optionality l with
-        | Optional_arg (path) ->
-            (match Btype.classify_module_path path with
+        | Optional_arg mpath ->
+            (match mpath with
             | Stdlib_option -> Ctype.instance var_option
             | Stdlib_or_null -> Ctype.instance var_or_null)
         | Required_or_position_arg ->
@@ -2239,7 +2245,7 @@ let report_error env ppf =
       let mark_label ppf = function
         | Nolabel -> fprintf ppf "without label"
         |  l -> fprintf ppf "with label %a"
-                  Style.inline_code (Btype.prefixed_label_name l)
+                  (Style.as_inline_code Btype.prefixed_label_name) l
       in
       fprintf ppf "This argument cannot be applied %a" mark_label l
   | Pattern_type_clash ty ->

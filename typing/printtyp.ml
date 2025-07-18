@@ -1509,7 +1509,7 @@ let rec tree_of_typexp mode alloc_mode ty =
            at legacy, we will be able to omit printing them. *)
         let arg_mode = Alloc.zap_to_legacy marg in
         let t1 =
-          if is_optional_arg l then
+          if is_optional l then
             match
               l, get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
             with
@@ -1522,6 +1522,8 @@ let rec tree_of_typexp mode alloc_mode ty =
                     | Stdlib_option -> Predef.path_option
                     | Stdlib_or_null -> Predef.path_or_null) ->
                 tree_of_typexp mode arg_mode ty
+            (* this case will show up when there is a bug in the compiler
+               when incorrect types are assigned to optional arguments *)
             | (Optional _ | Generic_optional _), _ -> Otyp_stuff "<hidden>"
             | _ -> assert false
           else

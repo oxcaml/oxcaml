@@ -4546,12 +4546,12 @@ let filter_arrow env t l ~force_tpoly =
     let ty_arg =
       if not force_tpoly then begin
         (* polymorphic arguments are never optional *)
-        assert (not (is_optional_arg l));
+        assert (not (is_optional l));
         newvar2 level k_arg
       end else begin
         let t1 =
           match classify_optionality l with
-          | Optional_arg path ->
+          | Optional_arg mpath ->
             (* CR: For generic optional arguments, we need to construct the
                 appropriate type based on the module path. e.g.
 
@@ -4563,7 +4563,7 @@ let filter_arrow env t l ~force_tpoly =
 
             *)
             let t_cons, arg_jkind =
-              match classify_module_path path with
+              match mpath with
               | Stdlib_option ->
                   Predef.path_option, Predef.option_argument_jkind
               | Stdlib_or_null ->
