@@ -39,6 +39,8 @@ module Singleton_mixed_block_element : sig
     | Float_boxed of 'a
     | Float64
     | Float32
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
