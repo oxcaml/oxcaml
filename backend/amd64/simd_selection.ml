@@ -768,10 +768,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           |> make_default ~arg_count ~res_count
       | W8 -> None)
     | Iand ->
-      sse_or_avx pand vpand_X_X_Xm128 |> make_default ~arg_count ~res_count
-    | Ior -> sse_or_avx por vpor_X_X_Xm128 |> make_default ~arg_count ~res_count
+      sse_or_avx andps vandps_X_X_Xm128 |> make_default ~arg_count ~res_count
+    | Ior ->
+      sse_or_avx orps vorps_X_X_Xm128 |> make_default ~arg_count ~res_count
     | Ixor ->
-      sse_or_avx pxor vpxor_X_X_Xm128 |> make_default ~arg_count ~res_count
+      sse_or_avx xorps vxorps_X_X_Xm128 |> make_default ~arg_count ~res_count
     | Ilsl ->
       let sse, avx =
         match width_type with
