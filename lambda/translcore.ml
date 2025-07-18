@@ -1656,9 +1656,14 @@ and transl_curried_function ~scopes loc repr params body
           match fp_kind with
           | Tparam_pat pat ->
               pat.pat_env, pat.pat_type, Translattribute.transl_param_attributes pat
-          | Tparam_optional_default (pat, expr, _) ->
-              expr.exp_env, Predef.type_option expr.exp_type, Translattribute.transl_param_attributes pat
+          | Tparam_optional_default (pat, expr, _, path) ->
+              expr.exp_env,
+              (match path with
+              | Stdlib_option -> Predef.type_option expr.exp_type
+              | Stdlib_or_null -> Predef.type_or_null expr.exp_type),
+              Translattribute.transl_param_attributes pat
         in
+        (* CR generic-optional: This also needs to change fp_sort *)
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout = layout arg_env fp_loc fp_sort arg_type in
         let arg_mode = transl_alloc_mode_l fp_mode in
