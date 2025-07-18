@@ -272,6 +272,11 @@ let parse_command_line () =
     [ ( "-regalloc",
         Arg.Symbol (List.map allocators ~f:fst, set_register_allocator),
         "  Choose register allocator" );
+      ( "-param",
+        Arg.String
+          (fun s ->
+            Oxcaml_flags.regalloc_params := s :: !Oxcaml_flags.regalloc_params),
+        " Pass a parameter to the register allocator" );
       "-validate", Arg.Set validate, "Enable validation";
       "-csv-output", Arg.Set csv_output, "Enable CSV output";
       "-debug-output", Arg.Set debug_output, "Enable debug output" ]
