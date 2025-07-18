@@ -400,7 +400,8 @@ let value_kind_of_value_jkind env jkind =
   let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
   let externality_upper_bound = Jkind.get_externality_upper_bound ~jkind_of_type jkind in
   match layout, externality_upper_bound with
-  | Base Value, (External | Byte_external) -> Pintval
+  | Base Value, External -> if !Clflags.native_code then Pintval else Pgenval
+  | Base Value, Byte_external -> Pintval
   | Base Value, External64 ->
     if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
   | Base Value, Internal -> Pgenval
