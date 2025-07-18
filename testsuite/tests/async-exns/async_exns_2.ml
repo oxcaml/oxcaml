@@ -33,7 +33,7 @@ let test1 () =
           (* Make nested fiber stacks, then continue allocating until the
              finaliser gets called *)
           let rec make_new_stacks num_stacks =
-            let _ = Sys.opaque_identity (42, Random.int 42) in
+            let _ @ global = Sys.opaque_identity (42, Random.int 42) in
             if num_stacks > fiber_stack_limit then
               make_new_stacks num_stacks
             else
