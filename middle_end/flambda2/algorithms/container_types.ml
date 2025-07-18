@@ -86,6 +86,103 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
         | Some datum1, Some datum2 -> Some (f key datum1 datum2))
       t1 t2
 
+  let union_sharing f t1 t2 =
+    let changed = ref false in
+    let t =
+      union
+        (fun key datum1 datum2 ->
+          match f key datum1 datum2 with
+          | None ->
+            changed := true;
+            None
+          | Some datum ->
+            if not (datum == datum1) then changed := true;
+            Some datum)
+        t1 t2
+    in
+    if !changed then t else t1
+
+  let union_shared f t1 t2 =
+    let changed = ref false in
+    let t =
+      union
+        (fun key datum1 datum2 ->
+          if datum1 == datum2
+          then Some datum1
+          else
+            match f key datum1 datum2 with
+            | None ->
+              changed := true;
+              None
+            | Some datum ->
+              if not (datum == datum1) then changed := true;
+              Some datum)
+        t1 t2
+    in
+    if !changed then t else t1
+
+  let diff f t1 t2 =
+    merge
+      (fun key datum1_opt datum2_opt ->
+        match datum1_opt, datum2_opt with
+        | None, None | None, Some _ -> None
+        | Some datum1, None -> Some datum1
+        | Some datum1, Some datum2 -> f key datum1 datum2)
+      t1 t2
+
+  let diff_sharing f t1 t2 =
+    let changed = ref false in
+    let t =
+      merge
+        (fun key datum1_opt datum2_opt ->
+          match datum1_opt, datum2_opt with
+          | None, None | None, Some _ -> None
+          | Some datum1, None -> Some datum1
+          | Some datum1, Some datum2 -> (
+            match f key datum1 datum2 with
+            | None ->
+              changed := true;
+              None
+            | Some datum ->
+              if not (datum == datum1) then changed := true;
+              Some datum))
+        t1 t2
+    in
+    if not !changed then t1 else t
+
+  let diff_shared f t1 t2 =
+    let changed = ref false in
+    let t =
+      merge
+        (fun key datum1_opt datum2_opt ->
+          match datum1_opt, datum2_opt with
+          | None, None | None, Some _ -> None
+          | Some datum1, None -> Some datum1
+          | Some datum1, Some datum2 -> (
+            if datum1 == datum2
+            then (
+              changed := true;
+              None)
+            else
+              match f key datum1 datum2 with
+              | None ->
+                changed := true;
+                None
+              | Some datum ->
+                if not (datum == datum1) then changed := true;
+                Some datum))
+        t1 t2
+    in
+    if not !changed then t1 else t
+
+  let update_many f t1 t2 =
+    merge
+      (fun key datum1_opt datum2_opt ->
+        match datum2_opt with
+        | None -> datum1_opt
+        | Some datum2 -> f key datum1_opt datum2)
+      t1 t2
+
   exception Found_common_element
 
   let inter_domain_is_non_empty t1 t2 =
@@ -174,6 +271,14 @@ struct
 
   let rec union_list ts =
     match ts with [] -> empty | t :: ts -> union t (union_list ts)
+
+  let union_sharing = union
+
+  let union_shared s1 s2 = if s1 == s2 then s1 else union s1 s2
+
+  let diff_sharing = diff
+
+  let diff_shared s1 s2 = if s1 == s2 then empty else diff_sharing s1 s2
 
   exception More_than_one_element
 
