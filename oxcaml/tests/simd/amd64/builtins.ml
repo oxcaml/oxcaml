@@ -507,6 +507,22 @@ end
 module SSE_Util = struct
   type t = int32x4
 
+  external bitwise_and : int64x2 -> int64x2 -> int64x2
+    = "caml_vec128_unreachable" "caml_sse_vec128_and"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external andnot : int64x2 -> int64x2 -> int64x2
+    = "caml_vec128_unreachable" "caml_sse_vec128_andnot"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bitwise_or : int64x2 -> int64x2 -> int64x2
+    = "caml_vec128_unreachable" "caml_sse_vec128_or"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bitwise_xor : int64x2 -> int64x2 -> int64x2
+    = "caml_vec128_unreachable" "caml_sse_vec128_xor"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
   external high_64_to_low_64 : t -> t -> t
     = "caml_vec128_unreachable" "caml_sse_vec128_high_64_to_low_64"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -534,22 +550,6 @@ module SSE_Util = struct
 end
 
 module SSE2_Util = struct
-  external bitwise_and : int64x2 -> int64x2 -> int64x2
-    = "caml_vec128_unreachable" "caml_sse2_vec128_and"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external andnot : int64x2 -> int64x2 -> int64x2
-    = "caml_vec128_unreachable" "caml_sse2_vec128_andnot"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external bitwise_or : int64x2 -> int64x2 -> int64x2
-    = "caml_vec128_unreachable" "caml_sse2_vec128_or"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external bitwise_xor : int64x2 -> int64x2 -> int64x2
-    = "caml_vec128_unreachable" "caml_sse2_vec128_xor"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
   external movemask_8 : (int8x16[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_sse2_vec128_movemask_8"
     [@@noalloc] [@@builtin]

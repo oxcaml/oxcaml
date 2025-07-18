@@ -123,6 +123,10 @@ let select_operation_sse ~dbg op args =
   | "caml_sse_float32x4_cmp" ->
     let i, args = extract_constant args ~max:7 op in
     sse_or_avx cmpps vcmpps_X_X_Xm128 ~i args
+  | "caml_sse_vec128_and" -> sse_or_avx andps vandps_X_X_Xm128 args
+  | "caml_sse_vec128_andnot" -> sse_or_avx andnps vandnps_X_X_Xm128 args
+  | "caml_sse_vec128_or" -> sse_or_avx orps vorps_X_X_Xm128 args
+  | "caml_sse_vec128_xor" -> sse_or_avx xorps vxorps_X_X_Xm128 args
   | "caml_sse_float32x4_add" -> sse_or_avx addps vaddps_X_X_Xm128 args
   | "caml_sse_float32x4_sub" -> sse_or_avx subps vsubps_X_X_Xm128 args
   | "caml_sse_float32x4_mul" -> sse_or_avx mulps vmulps_X_X_Xm128 args
@@ -194,10 +198,6 @@ let select_operation_sse2 ~dbg op args =
   | "caml_sse2_float64x2_min" -> sse_or_avx minpd vminpd_X_X_Xm128 args
   | "caml_sse2_float64x2_mul" -> sse_or_avx mulpd vmulpd_X_X_Xm128 args
   | "caml_sse2_float64x2_div" -> sse_or_avx divpd vdivpd_X_X_Xm128 args
-  | "caml_sse2_vec128_and" -> sse_or_avx pand vpand_X_X_Xm128 args
-  | "caml_sse2_vec128_andnot" -> sse_or_avx pandn vpandn_X_X_Xm128 args
-  | "caml_sse2_vec128_or" -> sse_or_avx por vpor_X_X_Xm128 args
-  | "caml_sse2_vec128_xor" -> sse_or_avx pxor vpxor_X_X_Xm128 args
   | "caml_sse2_vec128_movemask_8" ->
     sse_or_avx pmovmskb_r64_X vpmovmskb_r64_X args
   | "caml_sse2_vec128_movemask_64" -> sse_or_avx movmskpd vmovmskpd_r64_X args
