@@ -428,13 +428,13 @@ type expected_mode =
     (* CR-someday jcutler: This really should not be a part of the [expected_mode].
     There are a bunch of places (i.e. [mode_default]) where tying the current
     allocator to the expected mode is a potential source of confusion or even bugs. *)
-    (** The allocator to be used to allocate the expression that this mode is
-        expected for. *)
+
     allocator : allocator;
-    (** Indicates that the expression was directly annotated with [local], which
-    should force any allocations to be on the stack. No invariant between this
-    field and [mode]: this field being [true] while [mode] being [global] is
-    sensible, but not very useful as it will fail all expressions. *)
+    (** Indicates which allocator the expression was allocated with.  If
+        [stack_], this will be Allocator_stack. If [malloc_], this will be
+        Allocator_malloc. Otherwise Allocator_heap. The only invariant between
+        this field and [mode] is that if [allocator = Allocator_malloc],
+        [mode] should have externality at most [external_]. *)
 
     tuple_modes : Value.r list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
