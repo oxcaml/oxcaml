@@ -205,23 +205,6 @@ module Range = struct
       else overlap left_tl right_tl
     | [], _ | _, [] -> false
 
-  let rec is_live : t list -> pos:int -> bool =
-   fun l ~pos ->
-    match l with
-    | [] -> false
-    | hd :: tl ->
-      if pos < hd.begin_
-      then false
-      else if pos <= hd.end_
-      then true
-      else is_live tl ~pos
-
-  let rec remove_expired : t list -> pos:int -> t list =
-   fun l ~pos ->
-    match l with
-    | [] -> []
-    | hd :: tl -> if pos < hd.end_ then l else remove_expired tl ~pos
-
   (* CR xclerc for xclerc: assumes no overlap *)
   let rec merge : t list -> t list -> t list =
    fun left right ->
