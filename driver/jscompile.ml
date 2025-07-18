@@ -65,8 +65,8 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          Flambda2_to_jsir.To_jsir.unit ~offsets:program.offsets
            ~all_code:program.all_code ~reachable_names:program.reachable_names
            program.flambda
-         |> Flambda2_to_jsir.Jsir.Print.program Format.std_formatter (fun _ _ ->
-                ""))
+         |> print_if i.ppf_dump Clflags.dump_jsir
+              (fun ppf jsir -> Flambda2_to_jsir.Jsir.Print.program ppf (fun _ _ -> "") jsir))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   let argument_coercion =
