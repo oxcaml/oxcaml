@@ -4286,7 +4286,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                Alloc.newvar_above (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
-             register_allocation_mode ~loc ~env mode_closure Allocator_heap; (* CR jcutler fixme *)
+             register_allocation_mode ~loc ~env mode_closure Allocator_heap;
              let arg =
               Omitted {
                 mode_closure = Alloc.disallow_left mode_closure;
@@ -7111,7 +7111,7 @@ and type_expect_
         in
       let inner_ty = unify_as_mallocd ty_expected in
       let expected_mode = mode_coerce (Value.max_with (Comonadic Externality) Externality.external_) expected_mode in
-      let exp = type_expect env {expected_mode with allocator = Allocator_malloc} e {ty = inner_ty; explanation} in (* CR jcutler: fixme, what's the right explanation here? *)
+      let exp = type_expect env {expected_mode with allocator = Allocator_malloc} e {ty = inner_ty; explanation} in
 
       let exp_desc = Texp_alloc (exp,Allocator_malloc) in
       re {
@@ -7416,7 +7416,7 @@ and type_ident env ?(recarg=Rejected) lid =
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_allocation_mode ~loc:lid.loc ~env (Alloc.max_with (Comonadic Areality) mode) Allocator_heap (*CR jcutler: fixme *)
+           register_allocation_mode ~loc:lid.loc ~env (Alloc.max_with (Comonadic Areality) mode) Allocator_heap
        | _ -> ()
        end;
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
@@ -8764,7 +8764,6 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   if List.length sargs <> constr.cstr_arity then
     raise(Error(loc, env, Constructor_arity_mismatch
                             (lid.txt, constr.cstr_arity, List.length sargs)));
-  (* CR jcutler: what's this? *)
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let unify_as_construct ty_expected =
     with_local_level_if separate begin fun () ->
@@ -8819,8 +8818,6 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
         raise (Error(loc, env, Inlined_record_expected))
       end
   in
-  (* CR jcutler: careful with alloc mode here! If this isn't an ocaml allocation,
-  we neeed to make sure this is zero-alloc.. *)
   let (argument_mode, alloc_mode) =
     match constr.cstr_repr with
     | Variant_unboxed | Variant_with_null -> expected_mode, None

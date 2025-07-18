@@ -2678,7 +2678,6 @@ let to_unsafe_mode_crossing jkind =
 let all_except_externality =
   Axis_set.singleton (Modal (Comonadic Externality)) |> Axis_set.complement
 
-(* CR jcutler: can we get rid of this? *)
 let get_externality_upper_bound ~jkind_of_type jk =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
           (_ * allowed) jkind_desc),
