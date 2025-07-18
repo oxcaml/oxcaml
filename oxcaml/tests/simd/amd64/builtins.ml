@@ -726,6 +726,10 @@ module Sse_other_builtins = struct
     external avgu : t -> t -> t
       = "caml_vec128_unreachable" "caml_sse2_int16x8_avg_unsigned"
       [@@noalloc] [@@unboxed] [@@builtin]
+
+    external mul_round : t -> t -> t
+      = "caml_vec128_unreachable" "caml_ssse3_int16x8_mul_round"
+      [@@noalloc] [@@unboxed] [@@builtin]
   end
 
   module Int8x16 = struct

@@ -438,6 +438,10 @@ int64_t int16_mulsign(int64_t l, int64_t r) {
   int16_t x = l, y = r;
   return y == 0 ? 0 : y > 0 ? x : -x;
 }
+int64_t int16_mul_round(int64_t l, int64_t r) {
+  int16_t x = l, y = r;
+  return ((((int32_t)x * (int32_t)y) >> 14) + 1) >> 1;
+}
 int64_t int16_cmpeq(int64_t l, int64_t r) {
   if((int16_t)l == (int16_t)r) return 0xffff;
   return 0;

@@ -140,6 +140,7 @@ BUILTIN(caml_ssse3_int32x4_mulsign);
 BUILTIN(caml_ssse3_vec128_shuffle_8);
 BUILTIN(caml_ssse3_vec128_align_right_bytes);
 BUILTIN(caml_ssse3_int8x16_mul_unsigned_hadd_saturating_int16x8);
+BUILTIN(caml_ssse3_int16x8_mul_round);
 
 BUILTIN(caml_sse41_vec128_blend_16);
 BUILTIN(caml_sse41_vec128_blend_32);

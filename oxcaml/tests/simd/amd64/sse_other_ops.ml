@@ -240,6 +240,21 @@ module Int16x8 = struct
           (int16x8_low_int64 expect)
           (int16x8_high_int64 expect));
     Int16.check_ints (fun l r ->
+        (failmsg := fun () -> Printf.printf "%04x|%04x mul_round\n%!" l r);
+        let v0 = Int16.of_ints l l r r l l r r in
+        let v1 = Int16.of_ints l r l r l r l r in
+        let result = mul_round v0 v1 in
+        let mul_round x y = Int16.mul_round x y in
+        let expect =
+          Int16.of_ints (mul_round l l) (mul_round l r) (mul_round r l)
+            (mul_round r r) (mul_round l l) (mul_round l r) (mul_round r l)
+            (mul_round r r)
+        in
+        eq (int16x8_low_int64 result)
+          (int16x8_high_int64 result)
+          (int16x8_low_int64 expect)
+          (int16x8_high_int64 expect));
+    Int16.check_ints (fun l r ->
         (failmsg := fun () -> Printf.printf "%04x|%04x hsubs\n%!" l r);
         let v0 = Int16.of_ints l l r r l l r r in
         let v1 = Int16.of_ints r r l l r r l l in

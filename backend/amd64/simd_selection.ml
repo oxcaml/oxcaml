@@ -364,6 +364,8 @@ let select_operation_ssse3 ~dbg:_ op args =
       sse_or_avx palignr_X_Xm128 vpalignr_X_X_Xm128 ~i args
     | "caml_ssse3_int8x16_mul_unsigned_hadd_saturating_int16x8" ->
       sse_or_avx pmaddubsw_X_Xm128 vpmaddubsw_X_X_Xm128 args
+    | "caml_ssse3_int16x8_mul_round" ->
+      sse_or_avx pmulhrsw_X_Xm128 vpmulhrsw_X_X_Xm128 args
     | _ -> None
 
 let select_operation_sse41 ~dbg op args =
