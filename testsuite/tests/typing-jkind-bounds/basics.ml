@@ -280,7 +280,13 @@ type d : immediate = c
 type a : immediate
 type b = a
 type c : immediate
-type d = c
+Line 4, characters 0-22:
+4 | type d : immediate = c
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immediate
+         because of the definition of c at line 3, characters 0-89.
+       But the kind of type "c" must be a subkind of immediate
+         because of the definition of d at line 4, characters 0-22.
 |}]
 
 type a : immediate64

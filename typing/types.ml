@@ -44,7 +44,7 @@ module Jkind_mod_bounds = struct
   module Yielding = Mode.Yielding.Const
   module Statefulness = Mode.Statefulness.Const
   module Visibility = Mode.Visibility.Const_op
-  module Externality = Jkind_axis.Externality
+  module Externality = Mode.Externality.Const
   module Nullability = Jkind_axis.Nullability
   module Separability = Jkind_axis.Separability
 
@@ -157,7 +157,7 @@ module Jkind_mod_bounds = struct
       else t.visibility
     in
     let externality =
-      if mem max_axes (Nonmodal Externality)
+      if mem max_axes (Modal (Comonadic Externality))
       then Externality.max
       else t.externality
     in
@@ -230,7 +230,7 @@ module Jkind_mod_bounds = struct
       else t.visibility
     in
     let externality =
-      if mem min_axes (Nonmodal Externality)
+      if mem min_axes (Modal (Comonadic Externality))
       then Externality.min
       else t.externality
     in
@@ -276,26 +276,27 @@ module Jkind_mod_bounds = struct
      Statefulness.(le max (statefulness t))) &&
     (not (mem axes (Modal (Monadic Visibility))) ||
      Visibility.(le max (visibility t))) &&
-    (not (mem axes (Nonmodal Externality)) ||
+    (not (mem axes (Modal (Comonadic Externality))) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
      Nullability.(le max (nullability t))) &&
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
 
-  let[@inline] is_max = function
-    | { locality = Local;
-        linearity = Once;
-        uniqueness = Unique;
-        portability = Portable;
-        contention = Uncontended;
-        yielding = Yielding;
-        statefulness = Stateful;
-        visibility = Read_write;
-        externality = External;
-        nullability = Maybe_null;
-        separability = Maybe_separable } -> true
-    | _ -> false
+  let[@inline] is_max m =
+    m =  { locality = Locality.max;
+        linearity = Linearity.max;
+        uniqueness = Uniqueness.max;
+        portability = Portability.max;
+        contention = Contention.max;
+        yielding = Yielding.max;
+        statefulness = Statefulness.max;
+        visibility = Visibility.max;
+        externality = Externality.max;
+        nullability = Nullability.max;
+        separability = Separability.max}
+
+
 
   let debug_print ppf
         { locality;

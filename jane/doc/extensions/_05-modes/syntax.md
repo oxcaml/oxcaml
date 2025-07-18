@@ -10,7 +10,7 @@ A mode expression is a space-delimited list of modes.
 
 ```
 mode ::= locality | uniqueness | linearity | portability | contention
-       | yield | statefulness | visibility
+       | yield | statefulness | visibility | externality
 
 (* these are the modal axes: *)
 locality ::= `global` | `local`
@@ -21,6 +21,7 @@ contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
 statefulness ::= `stateless` | `observing` | `stateful`
 visibility ::= `read_write` | `read` | `immutable`
+externality ::= `external_` | `external64` | `internal`
 
 modes ::= mode
       |  mode modes
@@ -164,7 +165,7 @@ Modalities are used to describe the relationship between a container and an
 element in that container; for example, if you have a record field `x` with
 a `portable` modality, then `r.x` is `portable` even if `r` is `nonportable`.
 We say that the `portable` modality applied to the `nonportable` record mode
-produces the `portable` mode of the field. 
+produces the `portable` mode of the field.
 
 Modalities work differently on future axes vs. past axes. On a future axis, the
 modality imposes an upper bound on the mode (thus always lowering that
@@ -180,7 +181,7 @@ as the mode of the record.) For future axes, this would be the top mode; for
 past axes, this would be the bottom mode. These are the identity modalities:
 
 ```ocaml
-local unique once nonportable uncontended unyielding stateless immutable
+local unique once nonportable uncontended unyielding stateless immutable internal
 ```
 
 Note that a legacy mode might or might not be the same as the identity modality.
