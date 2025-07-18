@@ -455,15 +455,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
   | Unboxed_vec512_array | Unboxed_product_array ->
     Misc.fatal_error
-<<<<<<< HEAD
       "fexpr support for arrays of unboxed elements not yet implemented"
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128/unboxed \
-       product arrays not yet implemented"
-=======
-      "fexpr support for unboxed float32/intN/nativeint/vec128/unboxed product \
-       arrays not yet implemented"
->>>>>>> 0d7295ae7 (Added unboxed small integers)
 
 and variant_subkind consts non_consts : Fexpr.subkind =
   let consts =
@@ -641,15 +633,7 @@ let fexpr_of_array_kind : Flambda_primitive.Array_kind.t -> Fexpr.array_kind =
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
-<<<<<<< HEAD
       "fexpr support for arrays of unboxed elements not yet implemented"
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-      "fexpr support for unboxed float32/int32/64/nativeint/unboxed product \
-       arrays not yet implemented"
-=======
-      "fexpr support for unboxed float32/int/unboxed product arrays not yet \
-       implemented"
->>>>>>> 0d7295ae7 (Added unboxed small integers)
 
 let fexpr_of_array_set_kind env
     (array_set_kind : Flambda_primitive.Array_set_kind.t) : Fexpr.array_set_kind
@@ -791,15 +775,7 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
   | Immutable_vec128_array _ | Immutable_vec256_array _
   | Immutable_vec512_array _ ->
     Misc.fatal_error
-<<<<<<< HEAD
       "fexpr support for arrays of unboxed elements not yet implemented"
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128 arrays not \
-       yet implemented"
-=======
-      "fexpr support for unboxed float32/int/nativeint/vec128 arrays not yet \
-       implemented"
->>>>>>> 0d7295ae7 (Added unboxed small integers)
   | Empty_array array_kind -> Empty_array array_kind
   | Mutable_string { initial_value } -> Mutable_string { initial_value }
   | Immutable_string s -> Immutable_string s

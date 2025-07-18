@@ -131,18 +131,9 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
               Unbox
                 ( Unique_tag_and_size _ | Variant _ | Closure_single_entry _
                 | Number
-<<<<<<< HEAD
-                    ( ( Naked_float | Naked_float32 | Naked_int32 | Naked_int64
-                      | Naked_nativeint | Naked_vec128 | Naked_vec256
-                      | Naked_vec512 ),
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-                    ( ( Naked_float | Naked_float32 | Naked_int32 | Naked_int64
-                      | Naked_nativeint | Naked_vec128 ),
-=======
                     ( ( Naked_float | Naked_float32 | Naked_int8 | Naked_int16
                       | Naked_int32 | Naked_int64 | Naked_nativeint
-                      | Naked_vec128 ),
->>>>>>> 0d7295ae7 (Added unboxed small integers)
+                      | Naked_vec128 | Naked_vec256 | Naked_vec512 ),
                       _ ) );
             is_int = _
           } ->

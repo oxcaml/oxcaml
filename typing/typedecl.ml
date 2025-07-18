@@ -1730,7 +1730,7 @@ module Element_repr = struct
         | Float_element | Value_element -> acc + 1
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
-        | Float64 | Float32 | Bits32 | Bits64
+        | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word -> acc
         | Product l -> Array.fold_left count_boxed_in_t acc l
       in

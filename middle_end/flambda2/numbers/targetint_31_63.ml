@@ -60,17 +60,11 @@ module T0 = struct
 
   let min t1 t2 = if Targetint_32_64.compare t1 t2 < 0 then t1 else t2
 
-<<<<<<< HEAD
+  let of_int8 i = Targetint_32_64.of_int (Numeric_types.Int8.to_int i)
+
+  let of_int16 i = Targetint_32_64.of_int (Numeric_types.Int16.to_int i)
+
   let ( <= ) t1 t2 = Stdlib.( <= ) (Targetint_32_64.compare t1 t2) 0
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-  let max t1 t2 = if Int64.compare t1 t2 < 0 then t2 else t1
-=======
-  let of_int8 i = Int64.of_int (Numeric_types.Int8.to_int i)
-
-  let of_int16 i = Int64.of_int (Numeric_types.Int16.to_int i)
-
-  let max t1 t2 = if Int64.compare t1 t2 < 0 then t2 else t1
->>>>>>> 0d7295ae7 (Added unboxed small integers)
 
   let ( >= ) t1 t2 = Stdlib.( >= ) (Targetint_32_64.compare t1 t2) 0
 

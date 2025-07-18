@@ -1620,23 +1620,11 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         (Array.length flattened_reordered_shape);
     let args =
       List.mapi
-<<<<<<< HEAD
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
-          | Value _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-          | Vec512 | Word ->
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 
+          | Vec128 | Vec256 | Vec512 | Word ->
             arg
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-        (fun i arg ->
-          match Mixed_block_shape.get_reordered shape i with
-          | Value _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word -> arg
-=======
-        (fun i arg ->
-          match Mixed_block_shape.get_reordered shape i with
-          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Word ->
-            arg
->>>>>>> 0d7295ae7 (Added unboxed small integers)
           | Float_boxed _ -> unbox_float arg)
         args
     in
@@ -1902,7 +1890,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             ( Naked_vec128,
               Alloc_mode.For_allocations.from_lambda mode ~current_region ),
           arg ) ]
-<<<<<<< HEAD
   | Pbox_vector (Boxed_vec256, mode), [[arg]] ->
     [ Unary
         ( Box_number
@@ -1915,8 +1902,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             ( Naked_vec512,
               Alloc_mode.For_allocations.from_lambda mode ~current_region ),
           arg ) ]
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-=======
   | Puntag_int dst, [[arg]] ->
     [ Unary
         ( Num_conv
@@ -1931,7 +1916,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
               dst = Tagged_immediate
             },
           arg ) ]
->>>>>>> 0d7295ae7 (Added unboxed small integers)
   | Punbox_int bi, [[arg]] ->
     let kind = boxable_number_of_boxed_integer bi in
     [Unary (Unbox_number kind, arg)]
@@ -2177,65 +2161,16 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     [ Unary
         (Block_load { kind = block_access; mut = mutability; field = imm }, arg)
     ]
-<<<<<<< HEAD
   | Pmixedfield (field_path, shape, sem), [[arg]] ->
     if List.length field_path < 1
     then Misc.fatal_error "Pmixedfield: field_path must be non-empty";
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:Printlambda.locality_mode
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-  | Pmixedfield (field, shape, sem), [[arg]] -> (
-    let shape = Mixed_block_shape.of_mixed_block_elements shape in
-    let field = Mixed_block_shape.old_index_to_new_index shape field in
-    let imm = Targetint_31_63.of_int field in
-    check_non_negative_imm imm "Pmixedfield";
-    let mutability = convert_field_read_semantics sem in
-    let block_access : P.Block_access_kind.t =
-      let field_kind : P.Mixed_block_access_field_kind.t =
-        match Mixed_block_shape.get_reordered shape field with
-        | Value value_kind ->
-          Value_prefix
-            (convert_block_access_field_kind_from_value_kind value_kind)
-        | (Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word) as
-          mixed_block_element ->
-          Flat_suffix (K.Flat_suffix_element.from_lambda mixed_block_element)
-        | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
-      in
-      let shape =
-        K.Mixed_block_shape.from_lambda
-          (Mixed_block_shape.reordered_shape_unit shape)
-      in
-      Mixed { tag = Unknown; field_kind; shape; size = Unknown }
-=======
-  | Pmixedfield (field, shape, sem), [[arg]] -> (
-    let shape = Mixed_block_shape.of_mixed_block_elements shape in
-    let field = Mixed_block_shape.old_index_to_new_index shape field in
-    let imm = Targetint_31_63.of_int field in
-    check_non_negative_imm imm "Pmixedfield";
-    let mutability = convert_field_read_semantics sem in
-    let block_access : P.Block_access_kind.t =
-      let field_kind : P.Mixed_block_access_field_kind.t =
-        match Mixed_block_shape.get_reordered shape field with
-        | Value value_kind ->
-          Value_prefix
-            (convert_block_access_field_kind_from_value_kind value_kind)
-        | (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Word)
-          as mixed_block_element ->
-          Flat_suffix (K.Flat_suffix_element.from_lambda mixed_block_element)
-        | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
-      in
-      let shape =
-        K.Mixed_block_shape.from_lambda
-          (Mixed_block_shape.reordered_shape_unit shape)
-      in
-      Mixed { tag = Unknown; field_kind; shape; size = Unknown }
->>>>>>> 0d7295ae7 (Added unboxed small integers)
     in
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
     in
-<<<<<<< HEAD
     let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
     let new_indexes =
       Mixed_block_shape.lookup_path_producing_new_indexes shape field_path
@@ -2251,8 +2186,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             | Value value_kind ->
               Value_prefix
                 (convert_block_access_field_kind_from_value_kind value_kind)
-            | ( Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
-              | Word ) as mixed_block_element ->
+            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
+              | Vec256 | Vec512 | Word ) as mixed_block_element ->
               Flat_suffix
                 (K.Flat_suffix_element.from_singleton_mixed_block_element
                    mixed_block_element)
@@ -2269,24 +2204,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         match flattened_reordered_shape.(new_index) with
         | Float_boxed (mode : Lambda.locality_mode) ->
           box_float mode block_access ~current_region
-        | Value _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-        | Vec512 | Word ->
+        | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
+        | Vec256 | Vec512 | Word ->
           block_access)
       new_indexes
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-    match Mixed_block_shape.get_reordered shape field with
-    | Float_boxed (mode : Lambda.locality_mode) ->
-      [box_float mode block_access ~current_region]
-    | Value _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word ->
-      [block_access])
-=======
-    match Mixed_block_shape.get_reordered shape field with
-    | Float_boxed (mode : Lambda.locality_mode) ->
-      [box_float mode block_access ~current_region]
-    | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-    | Word ->
-      [block_access])
->>>>>>> 0d7295ae7 (Added unboxed small integers)
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
       [[block]; [value]] ) ->
     let field_kind = convert_block_access_field_kind immediate_or_pointer in
@@ -2322,7 +2243,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         ( Block_set { kind = block_access; init = init_or_assign; field = imm },
           block,
           value ) ]
-<<<<<<< HEAD
   | ( Psetmixedfield (field_path, shape, initialization_or_assignment),
       [[block]; values] ) ->
     if List.length field_path < 1
@@ -2330,76 +2250,9 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     let shape =
       Mixed_block_shape.of_mixed_block_elements shape
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-  | ( Psetmixedfield (field, shape, initialization_or_assignment),
-      [[block]; [value]] ) ->
-    let shape = Mixed_block_shape.of_mixed_block_elements shape in
-    let field = Mixed_block_shape.old_index_to_new_index shape field in
-    let imm = Targetint_31_63.of_int field in
-    check_non_negative_imm imm "Psetmixedfield";
-    let block_access : P.Block_access_kind.t =
-      Mixed
-        { field_kind =
-            (match Mixed_block_shape.get_reordered shape field with
-            | Value (value_kind : Lambda.value_kind) ->
-              P.Mixed_block_access_field_kind.Value_prefix
-                (convert_block_access_field_kind_from_value_kind value_kind)
-            | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128
-            | Word ->
-              Flat_suffix
-                (K.Flat_suffix_element.from_lambda
-                   (Mixed_block_shape.get_reordered shape field)));
-          shape =
-            K.Mixed_block_shape.from_lambda
-              (Mixed_block_shape.reordered_shape shape);
-          tag = Unknown;
-          size = Unknown
-        }
-=======
-  | ( Psetmixedfield (field, shape, initialization_or_assignment),
-      [[block]; [value]] ) ->
-    let shape = Mixed_block_shape.of_mixed_block_elements shape in
-    let field = Mixed_block_shape.old_index_to_new_index shape field in
-    let imm = Targetint_31_63.of_int field in
-    check_non_negative_imm imm "Psetmixedfield";
-    let block_access : P.Block_access_kind.t =
-      Mixed
-        { field_kind =
-            (match Mixed_block_shape.get_reordered shape field with
-            | Value (value_kind : Lambda.value_kind) ->
-              P.Mixed_block_access_field_kind.Value_prefix
-                (convert_block_access_field_kind_from_value_kind value_kind)
-            | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-            | Bits64 | Vec128 | Word ->
-              Flat_suffix
-                (K.Flat_suffix_element.from_lambda
-                   (Mixed_block_shape.get_reordered shape field)));
-          shape =
-            K.Mixed_block_shape.from_lambda
-              (Mixed_block_shape.reordered_shape shape);
-          tag = Unknown;
-          size = Unknown
-        }
->>>>>>> 0d7295ae7 (Added unboxed small integers)
     in
-<<<<<<< HEAD
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-    let init_or_assign = convert_init_or_assign initialization_or_assignment in
-    let value : H.simple_or_prim =
-      match Mixed_block_shape.get_reordered shape field with
-      | Value _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word -> value
-      | Float_boxed _ -> unbox_float value
-=======
-    let init_or_assign = convert_init_or_assign initialization_or_assignment in
-    let value : H.simple_or_prim =
-      match Mixed_block_shape.get_reordered shape field with
-      | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-      | Word ->
-        value
-      | Float_boxed _ -> unbox_float value
->>>>>>> 0d7295ae7 (Added unboxed small integers)
     in
     let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
     let new_indexes =
@@ -2424,8 +2277,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
                     Value_prefix
                       (convert_block_access_field_kind_from_value_kind
                          value_kind)
-                  | ( Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-                    | Vec512 | Word ) as mixed_block_element ->
+                  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
+                    | Vec256 | Vec512 | Word ) as mixed_block_element ->
                     Flat_suffix
                       (K.Flat_suffix_element.from_singleton_mixed_block_element
                          mixed_block_element)
@@ -2441,8 +2294,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           in
           let value : H.simple_or_prim =
             match flattened_reordered_shape.(new_index) with
-            | Value _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-            | Vec512 | Word ->
+            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 
+            | Vec128 | Vec256 | Vec512 | Word ->
               value
             | Float_boxed _ -> unbox_float value
           in
@@ -2915,17 +2768,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Pbox_float (_, _)
       | Punbox_vector _
       | Pbox_vector (_, _)
-<<<<<<< HEAD
-      | Punbox_int _ | Pbox_int _ | Punbox_unit | Punboxed_product_field _
-      | Pget_header _ | Pufloatfield _ | Pmixedfield _
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-      | Punbox_int _ | Pbox_int _ | Punboxed_product_field _ | Pget_header _
-      | Pufloatfield _ | Patomic_load _ | Pmixedfield _
-=======
-      | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _
-      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load _ | Pmixedfield _
->>>>>>> 0d7295ae7 (Added unboxed small integers)
+      | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _ | Punbox_unit 
+      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _ | Pmixedfield _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Parray_element_size_in_bytes _ | Ppeek _ | Pmakelazyblock _ ),

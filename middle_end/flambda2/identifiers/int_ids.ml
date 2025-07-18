@@ -173,8 +173,6 @@ module Const_data = struct
       | _, Naked_vec256 _ -> 1
       | Naked_vec512 _, _ -> -1
       | _, Naked_vec512 _ -> 1
-      | Null, _ -> -1
-      | _, Null -> 1
 
     let equal t1 t2 =
       if t1 == t2

@@ -1025,8 +1025,6 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
-  | Product _, _ -> -1
-  | _, Product _ -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2

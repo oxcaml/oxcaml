@@ -1559,14 +1559,16 @@ module Const = struct
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
     let bits8 =
-      { jkind = mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null;
+      { jkind = mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+          ~separability:Non_float;
         name = "bits8"
       }
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
     let kind_of_unboxed_int8 =
-      { jkind = mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null;
+      { jkind = mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+          ~separability:Non_float;
         name = "bits8 mod everything"
       }
 
@@ -1574,14 +1576,16 @@ module Const = struct
        [or_null array]s are implemented. *)
     let bits16 =
       { jkind =
-          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits16"
       }
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
     let kind_of_unboxed_int16 =
-      { jkind = mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null;
+      { jkind = mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+          ~separability:Non_float;
         name = "bits16 mod everything"
       }
 

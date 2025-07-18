@@ -149,14 +149,8 @@ let extra_args_for_const_ctor_of_variant
             ( Unique_tag_and_size _ | Variant _ | Closure_single_entry _
             | Number
                 ( ( Naked_float | Naked_float32 | Naked_int32 | Naked_int64
-<<<<<<< HEAD
-                  | Naked_nativeint | Naked_vec128 | Naked_vec256 | Naked_vec512
-                    ),
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-                  | Naked_nativeint | Naked_vec128 ),
-=======
-                  | Naked_int8 | Naked_int16 | Naked_nativeint | Naked_vec128 ),
->>>>>>> 0d7295ae7 (Added unboxed small integers)
+                  | Naked_int8 | Naked_int16 | Naked_nativeint | Naked_vec128 
+                  | Naked_vec256 | Naked_vec512 ),
                   _ ) );
         is_int = _
       } ->
@@ -497,18 +491,9 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
                 Unbox
                   ( Unique_tag_and_size _ | Variant _ | Closure_single_entry _
                   | Number
-<<<<<<< HEAD
-                      ( ( Naked_float32 | Naked_float | Naked_int32
-                        | Naked_int64 | Naked_vec128 | Naked_vec256
-                        | Naked_vec512 | Naked_nativeint ),
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-                      ( ( Naked_float32 | Naked_float | Naked_int32
-                        | Naked_int64 | Naked_vec128 | Naked_nativeint ),
-=======
                       ( ( Naked_float32 | Naked_float | Naked_int32 | Naked_int8
-                        | Naked_int16 | Naked_int64 | Naked_vec128
-                        | Naked_nativeint ),
->>>>>>> 0d7295ae7 (Added unboxed small integers)
+                        | Naked_int16 | Naked_int64 | Naked_vec128 | Naked_vec256
+                        | Naked_vec512 | Naked_nativeint ),
                         _ ) );
               is_int = _
             } ->

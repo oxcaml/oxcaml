@@ -1748,16 +1748,9 @@ and join_expanded_head env kind (expanded1 : ET.t) (expanded2 : ET.t) : ET.t =
         let>+ head = join_head_of_kind_region env head1 head2 in
         ET.create_region head
       | ( ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
-<<<<<<< HEAD
-          | Naked_int32 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-          | Naked_int64 _ | Naked_nativeint _ | Rec_info _ | Region _ ),
-||||||| parent of 0d7295ae7 (Added unboxed small integers)
-          | Naked_int32 _ | Naked_vec128 _ | Naked_int64 _ | Naked_nativeint _
+          | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_vec128 _ 
+          | Naked_vec256 _ | Naked_vec512 _ | Naked_int64 _ | Naked_nativeint _ 
           | Rec_info _ | Region _ ),
-=======
-          | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_vec128 _
-          | Naked_int64 _ | Naked_nativeint _ | Rec_info _ | Region _ ),
->>>>>>> 0d7295ae7 (Added unboxed small integers)
           _ ) ->
         assert false
     in

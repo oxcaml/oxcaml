@@ -2494,7 +2494,7 @@ let rec project_variables_out ~to_project ~expand t =
       | Naked_int8 ty -> ty
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
         | Naked_int32 _ | Naked_int16 _ | Naked_int64 _ | Naked_vec128 _
-        | Naked_nativeint _ | Rec_info _ | Region _ ) as ty ->
+        | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _ ) as ty ->
         Misc.fatal_errorf
           "Wrong kind while expanding %a: expecting [Naked_int8], got type %a"
           Variable.print var print ty
@@ -2513,7 +2513,7 @@ let rec project_variables_out ~to_project ~expand t =
       | Naked_int16 ty -> ty
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
         | Naked_int8 _ | Naked_int64 _ | Naked_int32 _ | Naked_vec128 _
-        | Naked_nativeint _ | Rec_info _ | Region _ ) as ty ->
+        | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _ ) as ty ->
         Misc.fatal_errorf
           "Wrong kind while expanding %a: expecting [Naked_int16], got type %a"
           Variable.print var print ty
@@ -2612,7 +2612,7 @@ let rec project_variables_out ~to_project ~expand t =
       match apply_coercion (expand var) coercion with
       | Naked_vec256 ty -> ty
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
-        | Naked_int32 _ | Naked_nativeint _ | Naked_int64 _ | Naked_vec128 _
+        | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_nativeint _ | Naked_int64 _ | Naked_vec128 _
         | Naked_vec512 _ | Rec_info _ | Region _ ) as ty ->
         Misc.fatal_errorf
           "Wrong kind while expanding %a: expecting [Naked_vec256], got type %a"
@@ -2631,7 +2631,7 @@ let rec project_variables_out ~to_project ~expand t =
       match apply_coercion (expand var) coercion with
       | Naked_vec512 ty -> ty
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
-        | Naked_int32 _ | Naked_nativeint _ | Naked_int64 _ | Naked_vec128 _
+        | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_nativeint _ | Naked_int64 _ | Naked_vec128 _
         | Naked_vec256 _ | Rec_info _ | Region _ ) as ty ->
         Misc.fatal_errorf
           "Wrong kind while expanding %a: expecting [Naked_vec512], got type %a"
@@ -3726,7 +3726,7 @@ let tag_int8 (t : t) : t =
            }))
   | Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [tag_int8]: %a" print t
 
 let tag_int16 (t : t) : t =
@@ -3758,7 +3758,7 @@ let tag_int16 (t : t) : t =
            }))
   | Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
   | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
-  | Rec_info _ | Region _ ->
+  | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [tag_int16]: %a" print t
 
 let box_int32 (t : t) alloc_mode : t =
@@ -3796,16 +3796,16 @@ let box_vec128 (t : t) alloc_mode : t =
 let box_vec256 (t : t) alloc_mode : t =
   match t with
   | Naked_vec256 _ -> non_null_value (Boxed_vec256 (t, alloc_mode))
-  | Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
-  | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
+  | Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
   | Naked_vec512 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [box_vec256]: %a" print t
 
 let box_vec512 (t : t) alloc_mode : t =
   match t with
   | Naked_vec512 _ -> non_null_value (Boxed_vec512 (t, alloc_mode))
-  | Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
-  | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
+  | Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
   | Naked_vec256 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [box_vec512]: %a" print t
 

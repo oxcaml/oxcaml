@@ -1952,7 +1952,7 @@ let project_from_mixed_block_shape
           project_from_mixed_block_element_by_path shape.(field) path
         | Value _
         | Float_boxed _
-        | Float64 | Float32 | Bits32 | Bits64 | Word
+        | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
         | Vec128 | Vec256 | Vec512 ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
@@ -2491,9 +2491,6 @@ let primitive_result_layout (p : primitive) =
   | Pstring_load_64 { boxed = true; _ } | Pbytes_load_64 { boxed = true; _ }
   | Pbigstring_load_64 { boxed = true; _ } ->
     layout_boxed_int Boxed_int64
-  | Pstring_load_128 { boxed = true; _ } | Pbytes_load_128 { boxed = true; _ }
-  | Pbigstring_load_128 { boxed = true; _ } ->
-    layout_boxed_vector Boxed_vec128
   | Pbigstring_load_32 { boxed = false; _ }
   | Pstring_load_32 { boxed = false; _ }
   | Pbytes_load_32 { boxed = false; _ } -> layout_unboxed_int Unboxed_int32
@@ -2503,9 +2500,6 @@ let primitive_result_layout (p : primitive) =
   | Pbigstring_load_64 { boxed = false; _ }
   | Pstring_load_64 { boxed = false; _ }
   | Pbytes_load_64 { boxed = false; _ } -> layout_unboxed_int Unboxed_int64
-  | Pstring_load_128 { boxed = false; _ } | Pbytes_load_128 { boxed = false; _ }
-  | Pbigstring_load_128 { boxed = false; _ } ->
-    layout_unboxed_vector Unboxed_vec128
   | Pstring_load_vec { size; boxed = false; _ }
   | Pbytes_load_vec { size; boxed = false; _ }
   | Pbigstring_load_vec { size; boxed = false; _ }
@@ -2530,24 +2524,6 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_nativeint_array_load_vec { size; boxed = true; _ }
   | Punboxed_int32_array_load_vec { size; boxed = true; _ } ->
     layout_boxed_vector size
-  | Pfloatarray_load_128 { boxed = true; _ }
-  | Pfloat_array_load_128 { boxed = true; _ }
-  | Punboxed_float_array_load_128 { boxed = true; _ }
-  | Punboxed_float32_array_load_128 { boxed = true; _ }
-  | Pint_array_load_128 { boxed = true; _ }
-  | Punboxed_int64_array_load_128 { boxed = true; _ }
-  | Punboxed_nativeint_array_load_128 { boxed = true; _ }
-  | Punboxed_int32_array_load_128 { boxed = true; _ } ->
-    layout_boxed_vector Boxed_vec128
-  | Pfloatarray_load_128 { boxed = false; _ }
-  | Pfloat_array_load_128 { boxed = false; _ }
-  | Punboxed_float_array_load_128 { boxed = false; _ }
-  | Punboxed_float32_array_load_128 { boxed = false; _ }
-  | Pint_array_load_128 { boxed = false; _ }
-  | Punboxed_int64_array_load_128 { boxed = false; _ }
-  | Punboxed_nativeint_array_load_128 { boxed = false; _ }
-  | Punboxed_int32_array_load_128 { boxed = false; _ } ->
-    layout_unboxed_vector Unboxed_vec128
   | Pbigarrayref (_, _, kind, _) ->
     begin match kind with
     | Pbigarray_unknown -> layout_any_value
