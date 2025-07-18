@@ -413,8 +413,13 @@ let rewrite :
    seems to be fine with 4 *)
 let max_rounds = 50
 
+module For_testing = struct
+  let rounds = ref (-1)
+end
+
 let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
  fun ~round state cfg_with_infos ->
+  For_testing.rounds := round;
   if round > max_rounds
   then
     fatal "register allocation was not succesful after %d rounds (%s)"

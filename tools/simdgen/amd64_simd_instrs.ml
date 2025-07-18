@@ -782,8 +782,8 @@ type id =
   | Vpsubusw_Y_Y_Ym256
   | Vpsubw_X_X_Xm128
   | Vpsubw_Y_Y_Ym256
-  | Vptest_X_Xm128
-  | Vptest_Y_Ym256
+  | Vptest_r64_X_Xm128
+  | Vptest_r64_Y_Ym256
   | Vpunpckhbw_X_X_Xm128
   | Vpunpckhbw_Y_Y_Ym256
   | Vpunpckhdq_X_X_Xm128
@@ -3326,7 +3326,7 @@ let ptest = {
     id = Ptest
   ; ext = [|SSE4_1|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res { loc = Temp [|R64|]; enc = Implicit }
   ; imm = Imm_none
   ; mnemonic = "ptest"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 23 }
@@ -7867,20 +7867,20 @@ let vpsubw_Y_Y_Ym256 = {
   ; mnemonic = "vpsubw"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 249 }
 }
-let vptest_X_Xm128 = {
-    id = Vptest_X_Xm128
+let vptest_r64_X_Xm128 = {
+    id = Vptest_r64_X_Xm128
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res { loc = Temp [|R64|]; enc = Implicit }
   ; imm = Imm_none
   ; mnemonic = "vptest"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 23 }
 }
-let vptest_Y_Ym256 = {
-    id = Vptest_Y_Ym256
+let vptest_r64_Y_Ym256 = {
+    id = Vptest_r64_Y_Ym256
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res { loc = Temp [|R64|]; enc = Implicit }
   ; imm = Imm_none
   ; mnemonic = "vptest"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 23 }

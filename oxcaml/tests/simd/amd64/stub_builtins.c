@@ -185,6 +185,9 @@ BUILTIN(caml_sse41_int8x16_multi_sad_unsigned);
 BUILTIN(caml_sse41_int16x8_minpos_unsigned);
 BUILTIN(caml_sse41_int32x4_mul_low);
 BUILTIN(caml_sse41_int32x4_mul_even);
+BUILTIN(caml_sse41_vec128_testz);
+BUILTIN(caml_sse41_vec128_testc);
+BUILTIN(caml_sse41_vec128_testnzc);
 
 BUILTIN(caml_sse42_int64x2_cmpgt);
 BUILTIN(caml_sse42_vec128_cmpestrm);

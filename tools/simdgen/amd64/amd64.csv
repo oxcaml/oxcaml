@@ -2116,9 +2116,9 @@ PREFETCHWT1 m8,0F 0D /2,PREFETCHWT1,,,,
 "VPSUBUSB zmm1 {k1}{z}, zmm2, zmm3/m512",EVEX.NDS.512.66.0F.WIG D8 /r,AVX512BW,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
 "VPSUBUSW xmm1 {k1}{z}, xmm2, xmm3/m128",EVEX.NDS.128.66.0F.WIG D9 /r,AVX512VL AVX512BW,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
 "VPSUBUSW ymm1 {k1}{z}, ymm2, ymm3/m256",EVEX.NDS.256.66.0F.WIG D9 /r,AVX512VL AVX512BW,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
-"PTEST xmm1, xmm2/m128",66 0F 38 17 /r,SSE4_1,ModRM:reg (r),ModRM:r/m (r),NA,NA
-"VPTEST xmm1, xmm2/m128",VEX.128.66.0F38.WIG 17 /r,AVX,ModRM:reg (r),ModRM:r/m (r),NA,NA
-"VPTEST ymm1, ymm2/m256",VEX.256.66.0F38.WIG 17 /r,AVX,ModRM:reg (r),ModRM:r/m (r),NA,NA
+"PTEST r64, xmm1, xmm2/m128",66 0F 38 17 /r,SSE4_1,NA (w),ModRM:reg (r),ModRM:r/m (r),NA,NA
+"VPTEST r64, xmm1, xmm2/m128",VEX.128.66.0F38.WIG 17 /r,AVX,NA (w),ModRM:reg (r),ModRM:r/m (r),NA,NA
+"VPTEST r64, ymm1, ymm2/m256",VEX.256.66.0F38.WIG 17 /r,AVX,NA (w),ModRM:reg (r),ModRM:r/m (r),NA,NA
 PTWRITE r64/m64,F3 REX.W 0F AE /4,,ModRM:rm (r),NA,NA,NA
 PTWRITE r32/m32,F3 0F AE /4,,ModRM:rm (r),NA,NA,NA
 "PUNPCKHBW mm, mm/m64",NP 0F 68 /r,MMX,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
