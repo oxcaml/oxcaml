@@ -72,12 +72,10 @@ let emit_jsir i jsir_program =
   Misc.try_finally
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () ->
-       Misc.remove_file (Unit_info.Artifact.filename cmj)
-    )
+      Misc.remove_file (Unit_info.Artifact.filename cmj))
     (fun () ->
-       output_string oc Config.cmj_magic_number;
-       output_value oc jsir_program
-    )
+      output_string oc Config.cmj_magic_number;
+      output_value oc jsir_program)
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   let argument_coercion =
