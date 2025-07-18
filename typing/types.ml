@@ -283,19 +283,21 @@ module Jkind_mod_bounds = struct
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
 
-  let[@inline] is_max = function
-    | { locality = Local;
-        linearity = Once;
-        uniqueness = Unique;
-        portability = Portable;
-        contention = Uncontended;
-        yielding = Yielding;
-        statefulness = Stateful;
-        visibility = Read_write;
-        externality = External;
-        nullability = Maybe_null;
-        separability = Maybe_separable } -> true
-    | _ -> false
+  let max =
+      { locality = Locality.max;
+        linearity = Linearity.max;
+        uniqueness = Uniqueness.max;
+        portability = Portability.max;
+        contention = Contention.max;
+        yielding = Yielding.max;
+        statefulness = Statefulness.max;
+        visibility = Visibility.max;
+        externality = Externality.max;
+        nullability = Nullability.max;
+        separability = Separability.max}
+
+  let[@inline] is_max m = m = max
+
 
   let debug_print ppf
         { locality;
