@@ -1,20 +1,24 @@
 module FI = Flambda2_identifiers
 
 type t =
-  { return_continuation : FI.Continuation.t;
+  { module_symbol : FI.Symbol.t;
+    return_continuation : FI.Continuation.t;
     exn_continuation : FI.Continuation.t;
     continuations : Jsir.Addr.t FI.Continuation.Map.t;
     vars : Jsir.Var.t FI.Variable.Map.t;
     symbols : Jsir.Var.t FI.Symbol.Map.t
   }
 
-let create ~return_continuation ~exn_continuation =
-  { return_continuation;
+let create ~module_symbol ~return_continuation ~exn_continuation =
+  { module_symbol;
+    return_continuation;
     exn_continuation;
     continuations = FI.Continuation.Map.empty;
     vars = FI.Variable.Map.empty;
     symbols = FI.Symbol.Map.empty
   }
+
+let module_symbol t = t.module_symbol
 
 let add_continuation t cont addr =
   { t with continuations = FI.Continuation.Map.add cont addr t.continuations }

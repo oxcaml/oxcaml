@@ -122,27 +122,53 @@ and apply_cont ~env ~res apply_cont =
   in
   let res =
     match Apply_cont.trap_action apply_cont with
-    | None ->
+    | None -> (
       let continuation = Apply_cont.continuation apply_cont in
       let res_cont = To_jsir_env.get_continuation_exn env continuation in
-      let (last : Jsir.last) =
-        match (res_cont : To_jsir_env.continuation) with
-        | Return -> (
-          match Flambda2_identifiers.Continuation.sort continuation with
-          | Toplevel_return -> Jsir.Stop
-          | Return ->
-            if List.length args <> 1
-            then
-              Misc.fatal_error "Currently only one return argument is supported";
-            Jsir.Return (List.hd args)
-          | Normal_or_exn | Define_root_symbol ->
-            (* CR selee: seems odd, review later *)
-            Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
-              Flambda2_identifiers.Continuation.print continuation)
-        | Exception -> failwith "unimplemented"
-        | Block addr -> Jsir.Branch (addr, args)
-      in
-      To_jsir_result.set_last res last
+      match (res_cont : To_jsir_env.continuation) with
+      | Return -> (
+        match Flambda2_identifiers.Continuation.sort continuation with
+        | Toplevel_return ->
+          assert (List.length args = 1);
+          (* CR selee: This is a hack, but I can't find a way to trigger any
+             behaviour that isn't calling [caml_register_global] on the toplevel
+             module. I suspect for single-file compilation this is always fine.
+             Will come back and review later. *)
+          let compilation_unit =
+            To_jsir_env.module_symbol env
+            |> Flambda2_identifiers.Symbol.compilation_unit
+          in
+          let module_name =
+            Compilation_unit.name compilation_unit
+            |> Compilation_unit.Name.to_string
+          in
+          let var = Jsir.Var.fresh () in
+          let res =
+            To_jsir_result.add_instr res
+              (Jsir.Let
+                 ( var,
+                   Prim
+                     ( Extern "caml_register_global",
+                       [ Pc (Int (Targetint.of_int_exn 0));
+                         Pv (List.hd args);
+                         Pc
+                           (* CR selee: this assumes javascript, WASM needs just
+                              String *)
+                           (NativeString
+                              (Jsir.Native_string.of_string module_name)) ] ) ))
+          in
+          To_jsir_result.set_last res Jsir.Stop
+        | Return ->
+          if List.length args <> 1
+          then
+            Misc.fatal_error "Currently only one return argument is supported";
+          To_jsir_result.set_last res (Jsir.Return (List.hd args))
+        | Normal_or_exn | Define_root_symbol ->
+          (* CR selee: seems odd, review later *)
+          Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
+            Flambda2_identifiers.Continuation.print continuation)
+      | Exception -> failwith "unimplemented"
+      | Block addr -> To_jsir_result.set_last res (Jsir.Branch (addr, args)))
     | Some (Push { exn_handler }) ->
       ignore exn_handler;
       failwith "unimplemented"
@@ -166,6 +192,7 @@ and invalid ~env ~res msg =
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let env =
     To_jsir_env.create
+      ~module_symbol:(Flambda2_terms.Flambda_unit.module_symbol flambda_unit)
       ~return_continuation:
         (Flambda2_terms.Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:

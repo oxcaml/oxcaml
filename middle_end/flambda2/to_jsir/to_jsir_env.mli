@@ -10,9 +10,13 @@ type t
     is created.
 *)
 val create :
+  module_symbol:Flambda2_identifiers.Symbol.t ->
   return_continuation:Flambda2_identifiers.Continuation.t ->
   exn_continuation:Flambda2_identifiers.Continuation.t ->
   t
+
+(** Symbol corresponding to the module currently compiling. *)
+val module_symbol : t -> Flambda2_identifiers.Symbol.t
 
 (** Map a Flambda2 continuation to a JSIR block address. *)
 val add_continuation :
