@@ -1556,13 +1556,23 @@ module Hint = struct
     | Lazy
     | Functor
     | Function
+    | Tailcall_function
+    | Tailcall_argument
+    | Read_mutable
+    | Write_mutable
+    | Force_lazy
+    | Return
+    | Stack
 
   let const_none = None
 
   type 'd morph =
     | None : (_ * _) morph
+    | Skip : (_ * _) morph
     | Close_over : Location.t -> ('l * disallowed) morph
     | Is_closed_by : Location.t -> (disallowed * 'r) morph
+    | Partial_application : (disallowed * 'r) morph
+    | Adj_partial_application : ('l * disallowed) morph
     | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
@@ -1574,13 +1584,17 @@ module Hint = struct
   let rec left_adjoint :
       type l. (l * allowed) morph -> (allowed * disallowed) morph = function
     | None -> None
+    | Skip -> Skip
     | Is_closed_by l -> Close_over l
+    | Partial_application -> Adj_partial_application
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
 
   let rec right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
     | None -> None
+    | Skip -> Skip
     | Close_over l -> Is_closed_by l
+    | Adj_partial_application -> Partial_application
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
   let compose x y = Compose (x, y)
@@ -1592,30 +1606,40 @@ module Hint = struct
       fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
        match h with
        | None -> None
+       | Skip -> Skip
        | Close_over l -> Close_over l
+       | Adj_partial_application -> Adj_partial_application
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
        match h with
        | None -> None
+       | Skip -> Skip
        | Is_closed_by l -> Is_closed_by l
+       | Partial_application -> Partial_application
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
        match h with
        | None -> None
+       | Skip -> Skip
        | Close_over l -> Close_over l
        | Is_closed_by l -> Is_closed_by l
+       | Partial_application -> Partial_application
+       | Adj_partial_application -> Adj_partial_application
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
        match h with
        | None -> None
+       | Skip -> Skip
        | Close_over l -> Close_over l
        | Is_closed_by l -> Is_closed_by l
+       | Partial_application -> Partial_application
+       | Adj_partial_application -> Adj_partial_application
        | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
   end)
 end
@@ -1658,48 +1682,62 @@ type 'a axerror =
     right_hint : 'a axhint
   }
 
-let opt_sprint_const_hint : Hint.const -> string option = function
-  | None -> None
-  | Lazy -> Some "is used in a lazy expression"
-  | Functor -> Some "is used in a functor"
-  | Function -> Some "is used in a function"
+let res_sprint_const_hint : Hint.const -> (string, unit) result = function
+  | None -> Error ()
+  | Lazy -> Ok "is the result of a lazy expression"
+  | Functor -> Ok "is used in a functor"
+  | Function -> Ok "is used in a function"
+  | Tailcall_function -> Ok "is the function in a tail call"
+  | Tailcall_argument -> Ok "is an argument in a tail call"
+  | Read_mutable -> Ok "has a mutable field read from"
+  | Write_mutable -> Ok "has a mutable field written to"
+  | Force_lazy -> Ok "has a lazy expression forced"
+  | Return -> Ok "is a local value returned without an exclave annotation"
+  | Stack -> Ok "is in a stack expression"
 
-let rec opt_sprint_morph_hint : type l r. (l * r) Hint.morph -> string option =
+let rec res_sprint_morph_hint :
+    type l r. (l * r) Hint.morph -> (string, [`Stop | `Skip]) result =
   let open Format in
   function
-  | None -> Some "emptymorphhint"
+  | None -> Error `Stop
+  | Skip -> Error `Skip
   | Close_over loc ->
-    Some (asprintf "closes over something (at %a)" Location.print_loc loc)
+    Ok (asprintf "closes over something (at %a)" Location.print_loc loc)
   | Is_closed_by loc ->
-    Some (asprintf "is closed by something (at %a)" Location.print_loc loc)
+    Ok (asprintf "is closed by something (at %a)" Location.print_loc loc)
+  | Partial_application -> Ok "is captured by a partial application"
+  | Adj_partial_application -> Ok "has a partial application capturing a value"
   | Compose (hint1, hint2) ->
-    Option.bind (opt_sprint_morph_hint hint1) (fun s1 ->
-        match opt_sprint_morph_hint hint2 with
-        | None -> Some s1
-        | Some s2 -> Some (sprintf "%s, which %s" s1 s2))
+    Result.bind (res_sprint_morph_hint hint1) (fun s1 ->
+        match res_sprint_morph_hint hint2 with
+        | Error `Stop -> Error `Stop
+        | Error `Skip -> Ok (sprintf "%s" s1)
+        | Ok s2 -> Ok (sprintf "%s, which %s" s1 s2))
 
 let rec opt_sprint_axhint_chain :
     type a. a -> a C.obj -> a axhint -> string option =
  fun (a : a) (a_obj : a C.obj) (hint : a axhint) ->
   let open Format in
   match hint with
-  | Morph (morph_hint, b, b_obj, b_hint) ->
-    (* CR pdsouza: should probably have it so that if a morph has no good hint
-           message then just skip that morph but still continue down the chain,
-           instead of stopping the trace there *)
-    Option.bind (opt_sprint_morph_hint morph_hint) (fun morph_hint_str ->
-        let subchain_str =
-          match opt_sprint_axhint_chain b b_obj b_hint with
-          | None -> ""
-          | Some s -> sprintf "\n%s" s
-        in
-        Some
-          (asprintf "This is %a because it %s %a.%s" (C.print a_obj) a
-             morph_hint_str (C.print b_obj) b subchain_str))
-  | Const const_hint ->
-    Option.bind (opt_sprint_const_hint const_hint) (fun const_hint_str ->
-        Some
-          (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str))
+  | Morph (morph_hint, b, b_obj, b_hint) -> (
+    match res_sprint_morph_hint morph_hint with
+    | Error `Stop -> None
+    | Error `Skip -> opt_sprint_axhint_chain b b_obj b_hint
+    | Ok morph_hint_str ->
+      let subchain_str =
+        match opt_sprint_axhint_chain b b_obj b_hint with
+        | None -> ""
+        | Some s -> sprintf "\n%s" s
+      in
+      Some
+        (asprintf "This is %a because it %s %a.%s" (C.print a_obj) a
+           morph_hint_str (C.print b_obj) b subchain_str))
+  | Const const_hint -> (
+    match res_sprint_const_hint const_hint with
+    | Error () -> None
+    | Ok const_hint_str ->
+      Some
+        (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str))
   | Empty -> None
 
 (** Description of an input axis responsible for an output axis of a morphism *)
@@ -3330,9 +3368,9 @@ let comonadic_regional_to_local ?hint comonadic =
   S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
     comonadic
 
-let alloc_as_value ?hint m =
+let alloc_as_value m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_locality_as_regionality ?hint comonadic in
+  let comonadic = comonadic_locality_as_regionality ~hint:Skip comonadic in
   { comonadic; monadic }
 
 let alloc_to_value_l2r ?hint m =

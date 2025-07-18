@@ -194,12 +194,25 @@ module type S = sig
       | Lazy
       | Functor
       | Function
-    (* TODO - add an argument to [Function] constructor for the locatlity context of the expected mode. *)
+      | Tailcall_function
+      | Tailcall_argument
+      | Read_mutable
+      | Write_mutable
+      | Force_lazy
+      | Return
+      | Stack
 
     type 'd morph =
       | None : (_ * _) morph
+          (** An empty morphism hint. The error reporter should terminate the
+            trace on seeing this. *)
+      | Skip : (_ * _) morph
+          (** An empty morphism hint, but telling the error reporter to continue the trace,
+            instead of terminating it there, as it would for [None]. *)
       | Close_over : Location.t -> ('l * disallowed) morph
       | Is_closed_by : Location.t -> (disallowed * 'r) morph
+      | Partial_application : (disallowed * 'r) morph
+      | Adj_partial_application : ('l * disallowed) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
@@ -656,7 +669,7 @@ module type S = sig
 
     val meet_with :
       ?hint:('l0 * 'r0) Hint.morph ->
-      'a Axis'.t ->
+      'a Comonadic.Axis.t ->
       'a ->
       ('l0 * 'r0) t ->
       ('l0 * 'r0) t
@@ -719,8 +732,7 @@ module type S = sig
     ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
-  val alloc_as_value :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+  val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r :
