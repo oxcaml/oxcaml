@@ -720,10 +720,7 @@ module type S = sig
     ('l * 'r) Locality.t
 
   (** Inject locality into regionality *)
-  val locality_as_regionality :
-    ?hint:('l * 'r) Hint.morph ->
-    ('l * 'r) Locality.t ->
-    ('l * 'r) Regionality.t
+  val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
 
   (** Converts regional to global, identity otherwise *)
   val regional_to_global :

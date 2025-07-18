@@ -1699,8 +1699,8 @@ let rec res_sprint_morph_hint :
     type l r. (l * r) Hint.morph -> (string, [`Stop | `Skip]) result =
   let open Format in
   function
-  | None -> Error `Stop
-  | Skip -> Error `Skip
+  | None -> Ok "emptymorphhint"
+  | Skip -> Ok "skipmorphhint"
   | Close_over loc ->
     Ok (asprintf "closes over something (at %a)" Location.print_loc loc)
   | Is_closed_by loc ->
@@ -2460,8 +2460,8 @@ end
 let regional_to_local ?hint m =
   S.apply ?hint Locality.Obj.obj C.Regional_to_local m
 
-let locality_as_regionality ?hint m =
-  S.apply ?hint Regionality.Obj.obj C.Locality_as_regionality m
+let locality_as_regionality m =
+  S.apply ~hint:Skip Regionality.Obj.obj C.Locality_as_regionality m
 
 let regional_to_global ?hint m =
   S.apply ?hint Locality.Obj.obj C.Regional_to_global m
@@ -2558,7 +2558,7 @@ However, it is actually at least %a.%s |}
       | Statefulness -> (module Statefulness.Const)
   end
 
-  let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   let min_with ax m =
     Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
@@ -2719,7 +2719,7 @@ However, it is actually at least %a.%s |}
 
   module Const_op = C.Monadic_op
 
-  let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
+  let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   (* The monadic fragment is inverted. *)
 
@@ -3169,9 +3169,9 @@ module Value_with (Areality : Areality) = struct
       | Some s -> sprintf "\n%s" s
     in
     fprintf ppf
-      {| It is expected to be at most %a.%s
+      {|@[It is expected to be %a.%s
 
-However, it is actually at least %a.%s |}
+However, it is actually %a.%s@] |}
       (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
       left_trace_str
 
