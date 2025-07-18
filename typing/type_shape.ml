@@ -586,9 +586,8 @@ module Type_decl_shape = struct
     let constructor_repr =
       match constructor_repr with
       | Constructor_mixed shapes ->
-        let shapes_and_fields = List.combine (Array.to_list shapes) args in
-        List.iter
-          (fun (mix_shape, { field_name = _; field_value = _, ly }) ->
+        List.iter2
+          (fun mix_shape { field_name = _; field_value = _, ly } ->
             let ly2 = mixed_block_shape_to_layout mix_shape in
             if not (Layout.equal ly ly2)
             then
@@ -596,7 +595,7 @@ module Type_decl_shape = struct
                 "Type_shape: variant constructor with mismatched layout, has \
                  %a but expected %a"
                 Layout.format ly Layout.format ly2)
-          shapes_and_fields;
+          (Array.to_list shapes) args;
         Array.map mixed_block_shape_to_layout shapes
       | Constructor_uniform_value ->
         let lys =
