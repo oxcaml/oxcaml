@@ -283,8 +283,7 @@ module Jkind_mod_bounds = struct
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
 
-  let[@inline] is_max m =
-    m =
+  let max =
       { locality = Locality.max;
         linearity = Linearity.max;
         uniqueness = Uniqueness.max;
@@ -296,6 +295,9 @@ module Jkind_mod_bounds = struct
         externality = Externality.max;
         nullability = Nullability.max;
         separability = Separability.max}
+
+  let[@inline] is_max m = m = max
+
 
   let debug_print ppf
         { locality;
