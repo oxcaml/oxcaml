@@ -64,9 +64,20 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          |> fun (program : Flambda2.flambda_result) ->
          Flambda2_to_jsir.To_jsir.unit ~offsets:program.offsets
            ~all_code:program.all_code ~reachable_names:program.reachable_names
-           program.flambda
-         |> Flambda2_to_jsir.Jsir.Print.program Format.std_formatter (fun _ _ ->
-                ""))
+           program.flambda)
+
+let emit_jsir i jsir_program =
+  let cmj = Unit_info.cmj i.target in
+  let oc = open_out_bin (Unit_info.Artifact.filename cmj) in
+  Misc.try_finally
+    ~always:(fun () -> close_out oc)
+    ~exceptionally:(fun () ->
+       Misc.remove_file (Unit_info.Artifact.filename cmj)
+    )
+    (fun () ->
+       output_string oc Config.cmj_magic_number;
+       output_value oc jsir_program
+    )
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   let argument_coercion =
@@ -109,8 +120,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         |> Option.map Global_module.Parameter_name.of_string
       in
       let jsir = to_jsir info typed ~as_arg_for in
-      (* CR selee: emit JSIR *)
-      ignore jsir
+      emit_jsir info jsir
     in
     Compile_common.implementation
       ~hook_parse_tree:(fun _ -> ())
@@ -133,8 +143,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         ~main_module_block_size ~arg_block_idx ~style:Plain_block
     in
     let jsir = raw_lambda_to_jsir info impl ~as_arg_for in
-    (* CR selee: emit JSIR *)
-    ignore jsir
+    emit_jsir info jsir
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in
