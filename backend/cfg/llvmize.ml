@@ -22,12 +22,14 @@ type error = Asm_generation of (string * int)
 exception Error of error
 
 module Ident : sig
-  (** Unnamed LLVM identifiers that start with "%".  This includes
-      basic blocks, unnamed function parameters, and temporaries
-      (virtual registers).  *)
+  (** LLVM identifiers that start with "%".  This includes
+      basic blocks, function parameters, and temporaries
+      (virtual registers). They can be unnamed or named.  *)
   type t
 
   val print : Format.formatter -> t -> unit
+
+  val named : string -> t
 
   module Gen : sig
     (** per-function counter for generating identifiers *)
@@ -40,14 +42,21 @@ module Ident : sig
     val get_fresh : t -> ident
   end
 end = struct
-  type t = int
+  type t =
+    | Unnamed of int
+    | Named of string
 
-  let print fmt t = Format.fprintf fmt "%d" t
+  let named s = Named s
+
+  let print fmt t =
+    match t with
+    | Unnamed n -> Format.fprintf fmt "%d" n
+    | Named s -> Format.fprintf fmt "%s" s
 
   module Gen = struct
     type ident = t
 
-    type t = { mutable next : ident }
+    type t = { mutable next : int }
 
     (* Local identifiers are only valid within function scope, so we can reset
        it to 0 every time *)
@@ -56,7 +65,7 @@ end = struct
     let get_fresh t =
       let res = t.next in
       t.next <- succ res;
-      res
+      Unnamed res
   end
 end
 
@@ -130,8 +139,10 @@ type t =
            function) *)
     mutable data : Cmm.data_item list;
         (* Collects data items as they come and processes them at the end *)
-    mutable defined_symbols : String.Set.t
+    mutable defined_symbols : String.Set.t;
         (* Keeps track of all function symbols so far *)
+    mutable referenced_symbols : String.Set.t
+        (* Keeps track of all global symbols referenced so far *)
   }
 
 let create_fun_info () =
@@ -152,27 +163,29 @@ let create ~llvmir_filename ~ppf_dump =
     ppf_dump;
     current_fun_info = create_fun_info ();
     data = [];
-    defined_symbols = String.Set.empty
+    defined_symbols = String.Set.empty;
+    referenced_symbols = String.Set.empty
   }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
 
-let get_ident_aux t table key ~find_opt ~add =
-  let fun_info = t.current_fun_info in
+let get_ident_aux table key ~get_ident ~find_opt ~add =
   match find_opt table key with
   | Some ident -> ident
   | None ->
-    let ident = Ident.Gen.get_fresh fun_info.ident_gen in
+    let ident = get_ident key in
     add table key ident;
     ident
 
 let get_ident_for_label t label =
-  get_ident_aux t t.current_fun_info.label2ident label
+  get_ident_aux t.current_fun_info.label2ident label
+    ~get_ident:(fun label -> "L" ^ Label.to_string label |> Ident.named)
     ~find_opt:Label.Tbl.find_opt ~add:Label.Tbl.add
 
-let get_ident_for_reg t label =
-  get_ident_aux t t.current_fun_info.reg2ident label ~find_opt:Reg.Tbl.find_opt
-    ~add:Reg.Tbl.add
+let get_ident_for_reg t reg =
+  get_ident_aux t.current_fun_info.reg2ident reg
+    ~get_ident:(fun _ -> Ident.Gen.get_fresh t.current_fun_info.ident_gen)
+    ~find_opt:Reg.Tbl.find_opt ~add:Reg.Tbl.add
 
 let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 
@@ -202,8 +215,11 @@ module F = struct
     then ()
     else fprintf ppf "[ %a ]" Debuginfo.print_compact dbg
 
-  let pp_dbg_fun ppf name dbg =
-    do_if_comments_enabled (fun () -> line ppf "; %s %a" name pp_dbg dbg)
+  let pp_dbg_comment ?(newline = true) ppf name dbg =
+    do_if_comments_enabled (fun () ->
+        match newline with
+        | true -> line ppf "; %s %a" name pp_dbg dbg
+        | false -> fprintf ppf "; %s %a" name pp_dbg dbg)
 
   let pp_dbg_instr_aux pp_instr ppf ins =
     do_if_comments_enabled (fun () ->
@@ -275,7 +291,7 @@ module F = struct
     fprintf ppf "%a" (pp_print_list ~pp_sep:pp_comma pp_print_string) attrs
 
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
-    pp_dbg_fun t.ppf fun_name fun_dbg;
+    pp_dbg_comment t.ppf fun_name fun_dbg;
     line t.ppf "define %a @%s(%a) %a {" pp_machtyp fun_ret_type fun_name
       pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
@@ -311,11 +327,21 @@ module F = struct
 
   let ins_branch t label = ins t "br %a" (pp_label t) label
 
-  let ins_alloca t (reg : Reg.t) =
-    ins t "%a = alloca %a" (pp_reg_ident t) reg pp_machtyp_component reg.typ
+  let ins_alloca ?dbg t (reg : Reg.t) =
+    let pp_my_dbg ppf () =
+      match dbg with
+      | None -> ()
+      | Some dbg -> pp_dbg_comment ~newline:false ppf dbg Debuginfo.none
+    in
+    ins t "%a = alloca %a %a" (pp_reg_ident t) reg pp_machtyp_component reg.typ
+      pp_my_dbg ()
 
   let ins_branch_cond t cond ifso ifnot =
     ins t "br i1 %a, %a, %a" pp_ident cond (pp_label t) ifso (pp_label t) ifnot
+
+  let ins_branch_cond_ident t cond ifso ifnot =
+    ins t "br i1 %a, label %a, label %a" pp_ident cond pp_ident ifso pp_ident
+      ifnot
 
   let ins_zext t ~src ~dst ~src_typ ~dst_typ =
     ins t "%a = zext %a %a to %a" pp_ident dst Llvm_typ.pp_t src_typ pp_ident
@@ -360,13 +386,9 @@ module F = struct
      [addr]. Starts counting arguments of [i] from [n] *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
     match addr with
-    | Ibased (sym_name, sym_global, offset) ->
-      let base_sym =
-        match sym_global with
-        | Global -> asprintf "%a" pp_global sym_name
-        | Local ->
-          Misc.fatal_error "Llvmize.load_addr: local symbols not implemented"
-      in
+    | Ibased (sym_name, _sym_global, offset) ->
+      t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
+      let base_sym = asprintf "%a" pp_global sym_name in
       let base_addr = fresh_ident t in
       let offset_addr = fresh_ident t in
       let offset_ptr = fresh_ident t in
@@ -376,19 +398,37 @@ module F = struct
         offset_addr;
       offset_ptr
     | Iindexed offset ->
-      let base_addr = load_reg_to_temp t i.arg.(n) in
-      let offset_addr = fresh_ident t in
-      let offset_ptr = fresh_ident t in
-      ins t "%a = add i64 %d, %a" pp_ident offset_addr offset pp_ident base_addr;
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident offset_ptr pp_ident
-        offset_addr;
-      offset_ptr
-    | Iindexed2 _ | Iscaled _ | Iindexed2scaled _ ->
+      let arg = load_reg_to_temp t i.arg.(n) in
+      let temp = fresh_ident t in
+      let res = fresh_ident t in
+      ins t "%a = add i64 %d, %a" pp_ident temp offset pp_ident arg;
+      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident temp;
+      res
+    | Iindexed2 offset ->
+      let arg1 = load_reg_to_temp t i.arg.(n) in
+      let arg2 = load_reg_to_temp t i.arg.(n + 1) in
+      let temp1 = fresh_ident t in
+      let temp2 = fresh_ident t in
+      let res = fresh_ident t in
+      ins t "%a = add i64 %a, %a" pp_ident temp1 pp_ident arg1 pp_ident arg2;
+      ins t "%a = add i64 %d, %a" pp_ident temp2 offset pp_ident temp1;
+      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident temp2;
+      res
+    | Iscaled (scale, offset) ->
+      let arg = load_reg_to_temp t i.arg.(n) in
+      let temp1 = fresh_ident t in
+      let temp2 = fresh_ident t in
+      let res = fresh_ident t in
+      ins t "%a = mul i64 %d, %a" pp_ident temp1 scale pp_ident arg;
+      ins t "%a = add i64 %d, %a" pp_ident temp2 offset pp_ident temp1;
+      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident temp2;
+      res
+    | Iindexed2scaled _ ->
       Misc.fatal_error "Llvmize.load_addr: addressing mode not implemented"
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
-    let typ = Llvm_typ.of_machtyp_component i.res.(0).typ in
+    let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
     let comp_name =
       match comp with
       | Isigned Ceq | Iunsigned Ceq -> "eq"
@@ -417,7 +457,7 @@ module F = struct
 
   let float_comp t (comp : Operation.float_comparison) (i : 'a Cfg.instruction)
       =
-    let typ = Llvm_typ.of_machtyp_component i.res.(0).typ in
+    let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
     let comp_name =
       (* CR yusumez: is not (ordered cond) == unordered (not cond)? *)
       match comp with
@@ -476,8 +516,24 @@ module F = struct
     | Return ->
       let temp = load_reg_to_temp t i.arg.(0) in
       ins t "ret %a %a" pp_machtyp_component i.arg.(0).typ pp_ident temp
-    | Float_test _ | Int_test _ | Switch _ | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+    | Int_test { lt; eq; gt; is_signed; imm } ->
+      let make_comp comp =
+        match is_signed with
+        | true -> Operation.Isigned comp
+        | false -> Operation.Iunsigned comp
+      in
+      let is_lt = int_comp t (make_comp Cmm.Clt) i ~imm in
+      let ge = fresh_ident t in
+      ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
+      line t.ppf "%a:" Ident.print ge;
+      let is_gt = int_comp t (make_comp Cmm.Cgt) i ~imm in
+      ins_branch_cond t is_gt gt eq
+    | Raise _ ->
+      (* CR yusumez: Implement this *)
+      ins t "call void @llvm.trap()";
+      ins t "unreachable"
+    | Float_test _ | Switch _ | Tailcall_self _ | Tailcall_func _
+    | Call_no_return _ | Call _ | Prim _ ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -557,10 +613,9 @@ module F = struct
       let temp = load_reg_to_temp t i.arg.(0) in
       ins_store_reg t temp i.res.(0)
     | Const_int n -> ins_store_nativeint t n i.res.(0)
-    | Const_symbol { sym_name; sym_global } -> (
-      match sym_global with
-      | Global -> ins_store_global t sym_name i.res.(0)
-      | Local -> not_implemented_basic i)
+    | Const_symbol { sym_name; sym_global = _ } ->
+      t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
+      ins_store_global t sym_name i.res.(0)
     | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } -> (
       (* Q: what do we do with mutability / is_atomic / is_modify? *)
       let src = load_addr t addressing_mode i 0 in
@@ -660,10 +715,7 @@ module F = struct
     match d with
     | Cdefine_symbol _ -> assert false (* cannot happen *)
     | Cint n -> fprintf ppf "%s" (Nativeint.to_string n)
-    | Csymbol_address { sym_name; sym_global } -> (
-      match sym_global with
-      | Global -> pp_global ppf sym_name
-      | Local -> Misc.fatal_error "Llvmize.pp_const_data_item: not implemented")
+    | Csymbol_address { sym_name; sym_global = _ } -> pp_global ppf sym_name
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
@@ -742,8 +794,11 @@ let alloca_regs t cfg old_arg_idents =
   let arg_regs = List.map fst old_arg_idents |> Reg.Set.of_list in
   let body_regs = collect_body_regs cfg in
   let temp_regs = Reg.Set.diff body_regs arg_regs in
-  Reg.Set.iter (F.ins_alloca t) arg_regs;
-  Reg.Set.iter (F.ins_alloca t) temp_regs;
+  let alloca (reg : Reg.t) =
+    F.ins_alloca ~dbg:(Format.asprintf "%a" Printreg.reg reg) t reg
+  in
+  Reg.Set.iter alloca arg_regs;
+  Reg.Set.iter alloca temp_regs;
   List.iter
     (fun (reg, old_ident) -> F.ins_store_reg t old_ident reg)
     old_arg_idents
@@ -828,6 +883,7 @@ let emit_data_extern t =
           None)
       t.data
     |> String.Set.of_list
+    |> String.Set.union t.referenced_symbols
   in
   String.Set.diff referenced_symbols defined_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
@@ -841,12 +897,9 @@ let emit_data t =
     List.fold_left
       (fun (cur_sym, ds) (d : Cmm.data_item) ->
         match d with
-        | Cdefine_symbol { sym_name; sym_global } -> (
-          match sym_global with
-          | Global ->
-            Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-            Some sym_name, []
-          | Local -> Misc.fatal_error "Llvmize: local symbols not implemented")
+        | Cdefine_symbol { sym_name; sym_global = _ } ->
+          Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
+          Some sym_name, []
         | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
         | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
         | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
@@ -948,6 +1001,7 @@ let end_assembly () =
    section. However, we currently don't have control over where they end up in
    the asm file. *)
 (* CR gyorsh: assume 64-bit architecture *)
+(* CR yusumez: We ignore whether symbols are local/global. *)
 
 (* Error report *)
 
