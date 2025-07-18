@@ -76,6 +76,9 @@ let emit_jsir i jsir_program =
     ~exceptionally:(fun () ->
       Misc.remove_file (Unit_info.Artifact.filename cmj))
     (fun () ->
+      (* CR selee: it's fairly likely that we will have to include more metadata
+         - for example [Cmo_format] includes [Compilation_unit] to get the linkage
+         name etc. *)
       output_string oc Config.cmj_magic_number;
       output_value oc jsir_program)
 
