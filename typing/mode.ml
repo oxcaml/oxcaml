@@ -2085,9 +2085,10 @@ module Comonadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
-  let meet_const c m = Solver.apply obj (Meet_with c) m
+  let meet_const ?hint c m = Solver.apply obj ?hint (Meet_with c) m
 
-  let imply c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
+  let imply ?hint c m =
+    Solver.apply obj ?hint (Imply c) (Solver.disallow_left m)
 
   let apply_hint (type l r) (morph_hint : (l * r) Hint.morph) :
       (l * r) t -> (l * r) t =
@@ -2150,9 +2151,10 @@ module Monadic_common_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
-  let join_const c m = Solver.apply Obj.obj (Meet_with c) m
+  let join_const ?hint c m = Solver.apply Obj.obj ?hint (Meet_with c) m
 
-  let subtract c m = Solver.apply obj (Imply c) (Solver.disallow_left m)
+  let subtract ?hint c m =
+    Solver.apply obj ?hint (Imply c) (Solver.disallow_left m)
 
   let apply_hint (type l r) (morph_hint : (r * l) Hint.morph) :
       (l * r) t -> (l * r) t =
@@ -2417,12 +2419,14 @@ module Yielding = struct
     match global with true -> zap_to_floor | false -> zap_to_ceil
 end
 
-let regional_to_local m = S.apply Locality.Obj.obj C.Regional_to_local m
+let regional_to_local ?hint m =
+  S.apply ?hint Locality.Obj.obj C.Regional_to_local m
 
-let locality_as_regionality m =
-  S.apply Regionality.Obj.obj C.Locality_as_regionality m
+let locality_as_regionality ?hint m =
+  S.apply ?hint Regionality.Obj.obj C.Locality_as_regionality m
 
-let regional_to_global m = S.apply Locality.Obj.obj C.Regional_to_global m
+let regional_to_global ?hint m =
+  S.apply ?hint Locality.Obj.obj C.Regional_to_global m
 
 module type Areality = sig
   module Const : C.Areality
@@ -2524,7 +2528,7 @@ However, it is actually at least %a.%s |}
   let max_with ax m =
     Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
 
-  let meet_with ax c m = meet_const (Const.max_with ax c) m
+  let meet_with ?hint ax c m = meet_const ?hint (Const.max_with ax c) m
 
   let zap_to_legacy m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy in
@@ -2681,7 +2685,7 @@ However, it is actually at least %a.%s |}
 
   (* The monadic fragment is inverted. *)
 
-  let join_with ax c m = join_const (Const.min_with ax c) m
+  let join_with ?hint ax c m = join_const ?hint (Const.min_with ax c) m
 
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
@@ -3181,8 +3185,8 @@ However, it is actually at least %a.%s |}
     let monadic = Monadic.join_with ax c monadic in
     { monadic; comonadic }
 
-  let meet_with ax c { monadic; comonadic } =
-    let comonadic = Comonadic.meet_with ax c comonadic in
+  let meet_with ?hint ax c { monadic; comonadic } =
+    let comonadic = Comonadic.meet_with ?hint ax c comonadic in
     { comonadic; monadic }
 
   let join l =
@@ -3214,8 +3218,8 @@ However, it is actually at least %a.%s |}
   let monadic_to_comonadic_min m =
     S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
 
-  let meet_const c { comonadic; monadic } =
-    let comonadic = Comonadic.meet_const c comonadic in
+  let meet_const ?hint c { comonadic; monadic } =
+    let comonadic = Comonadic.meet_const ?hint c comonadic in
     { monadic; comonadic }
 
   let join_const c { comonadic; monadic } =
@@ -3318,36 +3322,40 @@ module Const = struct
   let locality_as_regionality = C.locality_as_regionality
 end
 
-let comonadic_locality_as_regionality comonadic =
-  S.apply Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
+let comonadic_locality_as_regionality ?hint comonadic =
+  S.apply ?hint Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
     comonadic
 
-let comonadic_regional_to_local comonadic =
-  S.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local) comonadic
+let comonadic_regional_to_local ?hint comonadic =
+  S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+    comonadic
 
-let alloc_as_value m =
+let alloc_as_value ?hint m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_locality_as_regionality comonadic in
+  let comonadic = comonadic_locality_as_regionality ?hint comonadic in
   { comonadic; monadic }
 
-let alloc_to_value_l2r m =
+let alloc_to_value_l2r ?hint m =
   let { comonadic; monadic } = Alloc.disallow_right m in
   let comonadic =
-    S.apply Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional) comonadic
+    S.apply ?hint Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+      comonadic
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2g : type l r. (l * r) Value.t -> (l * r) Alloc.t =
- fun m ->
+let value_to_alloc_r2g :
+    type l r. ?hint:(l * r) Hint.morph -> (l * r) Value.t -> (l * r) Alloc.t =
+ fun ?hint m ->
   let { comonadic; monadic } = m in
   let comonadic =
-    S.apply Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global) comonadic
+    S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
+      comonadic
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2l m =
+let value_to_alloc_r2l ?hint m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_regional_to_local comonadic in
+  let comonadic = comonadic_regional_to_local ?hint comonadic in
   { comonadic; monadic }
 
 module Modality = struct
