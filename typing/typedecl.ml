@@ -141,6 +141,7 @@ type error =
   | Unsafe_mode_crossing_on_invalid_type_kind
   | Illegal_baggage of jkind_l
   | No_unboxed_version of Path.t
+  | Atomic_field_must_be_mutable of string
 
 open Typedtree
 
@@ -481,12 +482,18 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
+         let is_atomic = Builtin_attributes.has_atomic attrs in
          let mut : mutability =
-          match mut with
-          | Immutable -> Immutable
-          | Mutable ->
+          match mut, is_atomic with
+          | Immutable, false -> Immutable
+          | Immutable, true ->
+            raise (Error (loc, Atomic_field_must_be_mutable name.txt))
+          | Mutable, is_atomic ->
               match record_form with
-              | Legacy -> Mutable Mode.Value.Comonadic.legacy
+              | Legacy -> Mutable {
+                mode = Mode.Value.Comonadic.legacy;
+                atomic = if is_atomic then Atomic else Nonatomic
+              }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
          let modalities =
@@ -1666,8 +1673,9 @@ module Element_repr = struct
        don't give us enough information to do this reliably, and you could just
        use unboxed floats instead. *)
 
-  let classify env loc ty jkind =
-    if is_float env ty then Float_element
+  let classify env loc ty jkind mut =
+    if is_float env ty && not (is_atomic mut)
+    then Float_element
     else
       let layout = Jkind.get_layout_defaulting_to_value jkind in
       let sort =
@@ -1748,15 +1756,17 @@ let update_constructor_representation
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            Element_repr.classify env loc arg_type arg_jkind, arg_type)
+            Element_repr.classify env loc arg_type arg_jkind Immutable,
+            arg_type)
             arg_types_and_modes arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_tuple
     | Cstr_record fields ->
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
-              Element_repr.classify env loc ld.Types.ld_type arg_jkind,
-              ld.Types.ld_type)
+            Element_repr.classify env loc ld.Types.ld_type arg_jkind
+              ld.Types.ld_mutable,
+            ld.Types.ld_type)
             fields arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
@@ -1801,7 +1811,7 @@ let rec update_decl_jkind env dpath decl =
       {  mutable values : bool; (* includes immediates. *)
          mutable floats: bool;
          (* For purposes of this record, [floats] tracks whether any field
-            has layout value and is known to be a float.
+            has layout value and is known to be a non-atomic float.
          *)
          mutable float64s : bool;
          mutable non_float64_unboxed_fields : bool;
@@ -1829,8 +1839,9 @@ let rec update_decl_jkind env dpath decl =
       let reprs =
         List.map2
           (fun lbl jkind ->
-             Element_repr.classify env loc lbl.Types.ld_type jkind,
-             lbl.Types.ld_type)
+             Element_repr.classify env loc lbl.Types.ld_type jkind
+               lbl.Types.ld_mutable,
+             lbl.Types.ld_type )
           lbls jkinds
       in
       let repr_summary =
@@ -1889,9 +1900,11 @@ let rec update_decl_jkind env dpath decl =
             in
             Record_mixed shape
         (* value-only records are stored as boxed records *)
-        | { values = true; float64s = false; non_float64_unboxed_fields = false }
+        | { values = true; float64s = false;
+            non_float64_unboxed_fields = false }
           -> rep
-        (* All-float and all-float64 records are stored as flat float records.
+        (* All-nonatomic-float and all-nonatomic-float64 records are stored as
+           flat float records.
         *)
         | { values = false; floats = true ; float64s = false;
             non_float64_unboxed_fields = false } ->
@@ -4728,6 +4741,10 @@ let report_error ppf = function
   | No_unboxed_version p ->
       fprintf ppf "@[The type %a@ has no unboxed version.@]"
         (Style.as_inline_code Printtyp.path) p
+  | Atomic_field_must_be_mutable name ->
+      fprintf ppf
+        "@[The label %a must be mutable to be declared atomic.@]"
+        Style.inline_code name
 
 let () =
   Location.register_error_of_exn
