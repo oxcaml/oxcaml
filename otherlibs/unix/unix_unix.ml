@@ -197,7 +197,7 @@ external unsafe_environment : unit -> string array @@ portable
                             = "caml_unix_environment_unsafe"
 external getenv: string -> string @@ portable = "caml_sys_getenv"
 external unsafe_getenv: string -> string @@ portable = "caml_sys_unsafe_getenv"
-external putenv: string -> string -> unit @@ portable = "caml_unix_putenv"
+external putenv: string -> string -> unit = "caml_unix_putenv"
 
 type process_status =
     WEXITED of int
@@ -215,7 +215,7 @@ external execvp : string -> string array -> 'a @@ portable = "caml_unix_execvp"
 external execvpe : string -> string array -> string array -> 'a @@ portable
                  = "caml_unix_execvpe"
 
-external fork : unit -> int @@ portable = "caml_unix_fork"
+external fork : unit -> int = "caml_unix_fork"
 external wait : unit -> int * process_status @@ portable = "caml_unix_wait"
 external waitpid : wait_flag list -> int -> int * process_status @@ portable
    = "caml_unix_waitpid"
@@ -550,11 +550,11 @@ type group_entry =
     gr_mem : string array }
 
 
-external getlogin : unit -> string @@ portable = "caml_unix_getlogin"
-external getpwnam : string -> passwd_entry @@ portable = "caml_unix_getpwnam"
-external getgrnam : string -> group_entry @@ portable = "caml_unix_getgrnam"
-external getpwuid : int -> passwd_entry @@ portable = "caml_unix_getpwuid"
-external getgrgid : int -> group_entry @@ portable = "caml_unix_getgrgid"
+external getlogin : unit -> string = "caml_unix_getlogin"
+external getpwnam : string -> passwd_entry = "caml_unix_getpwnam"
+external getgrnam : string -> group_entry = "caml_unix_getgrnam"
+external getpwuid : int -> passwd_entry = "caml_unix_getpwuid"
+external getgrgid : int -> group_entry = "caml_unix_getgrgid"
 
 (* Internet addresses *)
 
