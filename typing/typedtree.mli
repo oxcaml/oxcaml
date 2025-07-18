@@ -1228,7 +1228,6 @@ and core_type_desc =
 and package_type = {
   tpt_path : Path.t;
   tpt_cstrs : (Longident.t loc * core_type) list;
-  tpt_type : Types.module_type;
   tpt_txt : Longident.t loc;
 }
 

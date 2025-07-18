@@ -1297,14 +1297,10 @@ module Merge = struct
 
   let check_package_with_type_constraints loc env mty constraints =
     let sg = extract_sig env loc mty in
-    let sg =
-      List.fold_left
-        (fun sg (lid, cty) ->
-           merge_package env loc sg lid cty)
-        sg constraints
-    in
-    let scope = Ctype.create_scope () in
-    Mtype.freshen ~scope (Mty_signature sg)
+    ignore (List.fold_left
+                (fun sg (lid, cty) ->
+                  merge_package env loc sg lid cty)
+                sg constraints)
 
   let () =
     Typetexp.check_package_with_type_constraints :=

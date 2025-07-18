@@ -1206,7 +1206,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package ptyp ->
-      let path, mty, ptys = transl_package env ~policy ~row_context ptyp in
+      let path, ptys = transl_package env ~policy ~row_context ptyp in
       let ty = newty (Tpackage {
           pack_path = path;
           pack_cstrs = List.map (fun (s, cty) ->
@@ -1214,7 +1214,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp (Ttyp_package {
             tpt_path = path;
-            tpt_type = mty;
             tpt_cstrs = ptys;
             tpt_txt = ptyp.ppt_path;
            }) ty
@@ -1547,13 +1546,10 @@ and transl_package env ~policy ~row_context ptyp =
          s, transl_type env ~policy ~row_context Alloc.Const.legacy pty)
       l
   in
-  let mty =
-    if ptys <> [] then
-      !check_package_with_type_constraints loc env mty.mty_type ptys
-    else mty.mty_type
-  in
+  if ptys <> [] then
+    !check_package_with_type_constraints loc env mty.mty_type ptys;
   let path = !transl_modtype_longident loc env ptyp.ppt_path.txt in
-  path, mty, ptys
+  path, ptys
 
 (* Make the rows "fixed" in this type, to make universal check easier *)
 let rec make_fixed_univars mark ty =

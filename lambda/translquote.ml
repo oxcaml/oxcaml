@@ -2862,7 +2862,6 @@ let type_for_annotation ~env ~loc typ =
                   (fun (parts, ty) ->
                     mkloc (Longident.unflatten parts |> Option.get) loc, go ty)
                   pack_cstrs;
-              tpt_type = Mty_ident pack_path;
               tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
         | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
@@ -3162,7 +3161,7 @@ and quote_core_type ~scopes ty =
     without_idents_poly names;
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
   | Ttyp_package package ->
-    let { tpt_path; tpt_cstrs; tpt_type = _; tpt_txt = _ } = package in
+    let { tpt_path; tpt_cstrs; tpt_txt = _ } = package in
     let mod_type = module_type_for_path loc env tpt_path
     and with_types =
       List.map
