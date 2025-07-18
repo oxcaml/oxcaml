@@ -97,6 +97,7 @@ Error: This value is "internal" but expected to be "external64".
    the legacy mode is top, you are allowed to do this. Similarly you can write a
    nonportable thing into a portable record.  You're just prevented from
    creating a portable record with a mutable field not marked as @@ portable.
+   (see tests in [malloc.ml])
  *)
 
 type 'a t = {mutable f : 'a}
