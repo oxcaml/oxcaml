@@ -425,7 +425,11 @@ type expected_mode =
     mode : Value.r;
     (** The upper bound, hence r (right) *)
 
-    (* CR jcutler: change this to be ... *)
+    (* CR-someday jcutler: This really should not be a part of the [expected_mode].
+    There are a bunch of places (i.e. [mode_default]) where tying the current
+    allocator to the expected mode is a potential source of confusion or even bugs. *)
+    (** The allocator to be used to allocate the expression that this mode is
+        expected for. *)
     allocator : allocator;
     (** Indicates that the expression was directly annotated with [local], which
     should force any allocations to be on the stack. No invariant between this
@@ -503,10 +507,6 @@ let meet_regional mode =
   let mode = Value.disallow_left mode in
   Value.meet_with Areality Regionality.Const.Regional mode
 
-(* CR jcutler: threading the allocator through the expected moe feels *really
-   bad* (especially right here), and this feels like a huge source of potential
-   bugs. I think we should try to decouple allocators from expected modes
-   asap... *)
 let mode_default ?(allocator = Allocator_heap) mode =
   { position = RNontail;
     locality_context = None;
@@ -1055,7 +1055,6 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
     would be allowed. This applies to mutable arrays similarly. *)
-(*CR jcutler:this has to interact with the allocator in some way I don't understand. *)
 let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
@@ -5279,7 +5278,6 @@ let split_function_ty
       let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
       fst (register_allocation_value_mode ~loc ~env mode Allocator_heap) (* CR jcutler: fixme *)
   in
-  (* CR jcutler: does this have a heap allocator condition? *)
   if expected_mode.allocator = Allocator_stack then
     Locality.submode_exn Locality.local (Alloc.proj (Comonadic Areality) alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
@@ -7088,7 +7086,7 @@ and type_expect_
         raise (Error (e.pexp_loc, env, Not_allocation))
       in
       (* If we do the same thing as Pexp_stack here and typecheck *anything*
-         before checkinf if it's actually malloc-able, we get worse error
+         before checking if it's actually malloc-able, we get worse error
          messages. Better to prune based on syntax first, and then type errors. *)
        (match e.pexp_desc with
        | Pexp_function _ -> unsupported Function
@@ -8110,7 +8108,6 @@ and type_label_exp
      - first try: we try with [ty_arg] as expected type;
      - second try; if that fails, we backtrack and try without
   *)
-    (* CR jcutler: ty_Arg is the expected? real? type of the argument *)
   let (vars, ty_arg, snap, arg) =
     (* try the first approach *)
     with_local_level begin fun () ->
@@ -8623,8 +8620,11 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     | Some tuple_modes ->
         (* If the pattern and the expression have different tuple length, it
           should be an type error. Here, we give the sound mode anyway. *)
-        let tuple_modes = (* CR jcutler: fixme! *)
+        let tuple_modes =
           List.map (fun mode -> snd (register_allocation_value_mode ~loc ~env mode Allocator_heap)) tuple_modes
+          (* CR jcutler: Should this be allocator_heap or
+             argument_mode.allocator? See if you can write a test to exhibit
+             this. *)
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
