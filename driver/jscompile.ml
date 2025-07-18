@@ -64,7 +64,9 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          |> fun (program : Flambda2.flambda_result) ->
          Flambda2_to_jsir.To_jsir.unit ~offsets:program.offsets
            ~all_code:program.all_code ~reachable_names:program.reachable_names
-           program.flambda)
+           program.flambda
+         |> print_if i.ppf_dump Clflags.dump_jsir (fun ppf jsir ->
+                Flambda2_to_jsir.Jsir.Print.program ppf (fun _ _ -> "") jsir))
 
 let emit_jsir i jsir_program =
   let cmj = Unit_info.cmj i.target in

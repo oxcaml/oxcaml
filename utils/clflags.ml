@@ -130,6 +130,7 @@ and dump_rawflambda = ref false            (* -drawflambda *)
 and dump_flambda = ref false            (* -dflambda *)
 and dump_flambda_let = ref (None : int option) (* -dflambda-let=... *)
 and dump_flambda_verbose = ref false    (* -dflambda-verbose *)
+and dump_jsir = ref false               (* -djsir *)
 and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
