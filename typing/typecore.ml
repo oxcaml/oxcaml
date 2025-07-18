@@ -7107,10 +7107,53 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
-  | Pexp_as (exp, ty) ->
-    let typed_exp = type_exp env expected_mode exp in
-    match typed_exp.exp_type.desc with
-    | _ -> failwith "TODO"
+  | Pexp_as (exp, to_ty) ->
+    let of_ty = get_desc (type_exp env expected_mode exp).exp_type in
+    let to_ty = Typetexp.transl_type_scheme env to_ty in
+    unify_exp_types loc env (instance to_ty.ctyp_type) (instance ty_expected);
+    begin match of_ty with
+    | Tvar _ -> fatal_error "Tvar"
+    | Tconstr (Pident of_ty_ident, _, _) ->
+      begin match Ident.name of_ty_ident with
+      | "int" ->
+        begin match to_ty.ctyp_desc with
+        | Ttyp_constr (_, to_ty_ident, []) ->
+          begin match to_ty_ident.txt with
+          | Lident "float" ->
+            type_expect env expected_mode
+              {sexp with
+               pexp_desc = Pexp_apply({
+                 pexp_desc =
+                   Pexp_ident ({
+                     txt = Lident "float_of_int";
+                     loc = sexp.pexp_loc
+                   });
+                 pexp_loc = sexp.pexp_loc;
+                 pexp_loc_stack = sexp.pexp_loc_stack;
+                 pexp_attributes = []
+               }, [Nolabel, exp]) }
+              { ty = to_ty.ctyp_type; explanation = None }
+          | _ -> fatal_error "Unsupported conversion"
+          end
+        | _ -> fatal_error "Unsupported"
+        end
+      | name -> fatal_error ("Unsupported conversion " ^ name)
+      end
+    | Tconstr _
+    | Tarrow _
+    | Ttuple _
+    | Tunboxed_tuple _
+    | Tobject _
+    | Tfield _
+    | Tnil
+    | Tlink _
+    | Tsubst _
+    | Tvariant _
+    | Tunivar _
+    | Tpoly _
+    | Tpackage _
+    | Tof_kind _ -> fatal_error "Unsupported"
+    end
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
