@@ -20,7 +20,6 @@ open Types
 open Typetexp
 open Format
 open Mode
-open Btype
 
 
 type 'a class_info = {
@@ -454,16 +453,15 @@ and class_type_aux env virt self_scope scty =
       in
       let ty = cty.ctyp_type in
       let ty =
-        match l with
-        | Optional _ -> Ctype.newty (Tconstr(Predef.path_option,[ty], ref Mnil))
-        | Generic_optional (path, _) ->
+        match Btype.classify_optionality l with
+        | Optional_arg path ->
             let t_cons =
-              match classify_module_path path.txt with
+              match Btype.classify_module_path path with
               | Stdlib_option -> Predef.path_option
               | Stdlib_or_null -> Predef.path_or_null
             in
             Ctype.newty (Tconstr(t_cons,[ty], ref Mnil))
-        | Position _ | Labelled _ | Nolabel -> ty in
+        | Required_or_position_arg -> ty in
       let clty = class_type env virt self_scope scty in
       let typ = Cty_arrow (l, ty, clty.cltyp_type) in
       cltyp (Tcty_arrow (l, cty, clty)) typ
@@ -1587,7 +1585,7 @@ let rec approx_declaration cl =
         match l with
         | Optional _ -> Ctype.instance var_option
         | Generic_optional (path, _) ->
-            (match classify_module_path path.txt with
+            (match Btype.classify_module_path path.txt with
             | Stdlib_option -> Ctype.instance var_option
             | Stdlib_or_null -> Ctype.instance var_or_null)
         | Position _ -> Ctype.instance Predef.type_lexing_position
@@ -1611,12 +1609,12 @@ let rec approx_description ct =
     Pcty_arrow (l, core_type, ct) ->
       let l = transl_label l (Some core_type) in
       let arg =
-        match classify_optionality l with
+        match Btype.classify_optionality l with
         | Optional_arg (path) ->
-            (match classify_module_path path with
+            (match Btype.classify_module_path path with
             | Stdlib_option -> Ctype.instance var_option
             | Stdlib_or_null -> Ctype.instance var_or_null)
-        | Not_optional_arg ->
+        | Required_or_position_arg ->
             Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we
            relax jkinds in classes *)

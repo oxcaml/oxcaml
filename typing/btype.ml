@@ -625,17 +625,18 @@ let is_optional_parsetree : Parsetree.arg_label -> bool = function
   | _ -> false
 
 type optionality = Optional_arg of Longident.t
-                 | Not_optional_arg
+                 | Required_or_position_arg
 
 let classify_optionality : Types.arg_label -> optionality = function
   | Optional _ -> Optional_arg (Ldot (Lident "Stdlib", "Option"))
   | Generic_optional(path, _) -> Optional_arg (path.txt)
-  | _ -> Not_optional_arg
+  | _ -> Required_or_position_arg
 
 (* is_optional is really buggy when generic optionals are involved.
 Renaming it to prevent its use
 *)
-let is_optional_arg arg = not (classify_optionality arg = Not_optional_arg)
+let is_optional_arg arg =
+  not (classify_optionality arg = Required_or_position_arg)
 
 let is_position = function Position _ -> true | _ -> false
 
@@ -664,28 +665,23 @@ let prefixed_label_name = function
   | Labelled s | Position s -> "~" ^ s
   | Optional s -> "?" ^ s
   | Generic_optional (path, s) ->
-    (
-      match classify_module_path path.txt with
+    (match classify_module_path path.txt with
       | Stdlib_option -> "Stdlib.Option"
-      | Stdlib_or_null -> "Stdlib.Or_null"
-    )
+      | Stdlib_or_null -> "Stdlib.Or_null")
     ^ ".?'" ^ s
-
 
 let arg_label_compatible param_label arg_label =
   match param_label, arg_label with
   | Nolabel, Nolabel -> true
   | (Labelled s | Optional s | Generic_optional(_, s)), Labelled s' -> s = s'
-  | _ -> (
-    match classify_optionality param_label, classify_optionality arg_label with
+  | _ ->
+    (match classify_optionality param_label, classify_optionality arg_label with
     | Optional_arg l_path, Optional_arg l_path' ->
         l_path = l_path' && (label_name param_label = label_name arg_label)
-    | _ -> (
+    | _ ->
       (* when positional labels are involved,
         we only care whether label names are equal*)
-      label_name param_label = label_name arg_label
-    )
-  )
+      label_name param_label = label_name arg_label)
 
 
 let rec extract_label_aux hd l (* param label*) = function

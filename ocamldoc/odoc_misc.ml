@@ -494,14 +494,13 @@ let remove_option lbl typ =
   let rec trim t =
     match t with
     | Tconstr(path, [ty], _)
-        when Path.same path
-              (match Btype.classify_optionality lbl with
-              | Not_optional_arg -> assert false
-              | Optional_arg path -> (
-                  match Btype.classify_module_path path with
-                  | Stdlib_option -> Predef.path_option
-                  | Stdlib_or_null -> Predef.path_or_null
-              ))
+      when Path.same path
+            (match Btype.classify_optionality lbl with
+            | Required_or_position_arg -> assert false
+            | Optional_arg path -> (
+                match Btype.classify_module_path path with
+                | Stdlib_option -> Predef.path_option
+                | Stdlib_or_null -> Predef.path_or_null))
         -> get_desc ty
     | Tconstr _
     | Tvar _

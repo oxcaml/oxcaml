@@ -888,12 +888,10 @@ let constant_or_raise env loc cst =
 let predef_path_of_arg_label arg_label =
   match classify_optionality arg_label with
   | Optional_arg path ->
-    (
-      match classify_module_path path with
-      | Stdlib_option -> Predef.path_option
-      | Stdlib_or_null -> Predef.path_or_null
-    )
-  | Not_optional_arg ->
+      (match classify_module_path path with
+        | Stdlib_option -> Predef.path_option
+        | Stdlib_or_null -> Predef.path_or_null)
+  | Required_or_position_arg ->
       failwith "predef_path_of_arg_label expects optional label"
 
 (* Specific version of type_option, using newty rather than newgenty *)
@@ -909,7 +907,7 @@ let type_option_none env lbl ty loc =
   let lid = Longident.Lident "None" in
   let cnone =
     match classify_optionality lbl with
-    | Not_optional_arg ->
+    | Required_or_position_arg ->
         failwith "type_option_none expects optional label"
     | Optional_arg path ->
         match classify_module_path path with
@@ -4522,13 +4520,12 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
       match classify_optionality p with
-      | Optional_arg path -> (
-        match classify_module_path path with
-        | Stdlib_option ->  newvar Predef.option_argument_jkind
-        | Stdlib_or_null ->
-          newvar (Jkind.for_or_null_argument Predef.ident_or_null)
-      )
-      | Not_optional_arg ->
+      | Optional_arg path ->
+         (match classify_module_path path with
+          | Stdlib_option ->  newvar Predef.option_argument_jkind
+          | Stdlib_or_null ->
+            newvar (Jkind.for_or_null_argument Predef.ident_or_null))
+      | Required_or_position_arg ->
       begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
@@ -4549,13 +4546,11 @@ let rec approx_type env sty =
       let arg =
         match classify_optionality p with
         | Optional_arg path ->
-          (
-            match classify_module_path path with
-            | Stdlib_option -> newvar Predef.option_argument_jkind
-            | Stdlib_or_null ->
-                newvar (Jkind.for_or_null_argument Predef.ident_or_null)
-          )
-        | Not_optional_arg ->
+            (match classify_module_path path with
+              | Stdlib_option -> newvar Predef.option_argument_jkind
+              | Stdlib_or_null ->
+                  newvar (Jkind.for_or_null_argument Predef.ident_or_null))
+        | Required_or_position_arg ->
             newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
@@ -8053,13 +8048,11 @@ and type_option_some env lbl expected_mode sarg ty ty0 =
   let lid, csome = (
     match classify_optionality lbl with
     | Optional_arg path ->
-      (
-        match classify_module_path path with
-        | Stdlib_option -> (Longident.Lident "Some",
-          Env.find_ident_constructor Predef.ident_some env)
-        | Stdlib_or_null -> (Longident.Lident "This",
-          Env.find_ident_constructor Predef.ident_this env)
-      )
+        (match classify_module_path path with
+          | Stdlib_option -> (Longident.Lident "Some",
+            Env.find_ident_constructor Predef.ident_some env)
+          | Stdlib_or_null -> (Longident.Lident "This",
+            Env.find_ident_constructor Predef.ident_this env))
     | _ -> failwith "type_option_some expected Optional or Generic_optional"
   ) in
   mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
@@ -8403,8 +8396,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
             | Stdlib_or_null ->
                 unify_exp env arg
                   (type_option lbl
-                    (newvar (Jkind.for_or_null_argument Predef.ident_or_null)))
-           )
+                    (newvar (Jkind.for_or_null_argument Predef.ident_or_null))))
        | Position _ ->
            unify_exp env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg))
