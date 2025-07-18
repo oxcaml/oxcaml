@@ -165,7 +165,7 @@ module Int32x4 = struct
         let expect =
           int64x2_of_int64s
             Stdlib.Int64.(mul (of_int32 l) (of_int32 r))
-            Stdlib.Int64.(mul (of_int32 l) (of_int32 r))
+            Stdlib.Int64.(mul (of_int32 r) (of_int32 l))
         in
         eq (int64x2_low_int64 result)
           (int64x2_high_int64 result)
@@ -185,8 +185,8 @@ module Int32x4 = struct
                 (logand (of_int32 r) 0xffffffffL))
             Stdlib.Int64.(
               mul
-                (logand (of_int32 l) 0xffffffffL)
-                (logand (of_int32 r) 0xffffffffL))
+                (logand (of_int32 r) 0xffffffffL)
+                (logand (of_int32 l) 0xffffffffL))
         in
         eq (int64x2_low_int64 result)
           (int64x2_high_int64 result)

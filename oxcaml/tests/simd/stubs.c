@@ -98,7 +98,7 @@ static inline simd_float32x4_t simd_float32x4_round_near(simd_float32x4_t v)
 static inline simd_int32x4_t simd_float64x2_to_int32x2_trunc(simd_float64x2_t v)
 {
   int32x2_t i32 = vqmovn_s64(vcvtq_s64_f64(v));
-  return vcombine_s32(i32, i32);
+  return vcombine_s32(i32, vdup_n_s32(0));
 }
 
 int64x2_t vec128_of_int64s(int64_t low, int64_t high)

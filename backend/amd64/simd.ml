@@ -165,11 +165,12 @@ module Seq = struct
 
   let ptestnzc = { id = Ptestnzc; instr = Amd64_simd_instrs.ptest }
 
-  let vptestz = { id = Vptestz; instr = Amd64_simd_instrs.vptest_X_Xm128 }
+  let vptestz = { id = Vptestz; instr = Amd64_simd_instrs.vptest_r64_X_Xm128 }
 
-  let vptestc = { id = Vptestc; instr = Amd64_simd_instrs.vptest_X_Xm128 }
+  let vptestc = { id = Vptestc; instr = Amd64_simd_instrs.vptest_r64_X_Xm128 }
 
-  let vptestnzc = { id = Vptestnzc; instr = Amd64_simd_instrs.vptest_X_Xm128 }
+  let vptestnzc =
+    { id = Vptestnzc; instr = Amd64_simd_instrs.vptest_r64_X_Xm128 }
 
   let mnemonic ({ id; _ } : t) =
     match id with
