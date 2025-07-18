@@ -276,6 +276,7 @@ module type Jscomp_options = sig
   val _dflambda_let : int -> unit
   val _dflambda_no_invariants : unit -> unit
   val _dflambda_verbose : unit -> unit
+  val _djsir : unit -> unit
   val _drawflambda : unit -> unit
 end
 

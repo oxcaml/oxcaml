@@ -43,5 +43,4 @@ val to_jsir :
   Compile_common.info ->
   Typedtree.implementation ->
   as_arg_for:Global_module.Parameter_name.t option ->
-  (* CR selee: replace return type with JSIR type *)
-  unit
+  Flambda2_to_jsir.Jsir.program
