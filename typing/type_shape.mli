@@ -64,7 +64,7 @@ module Type_shape : sig
 
     val unboxed_type_to_layout : unboxed -> Jkind_types.Sort.base
 
-    val predef_to_layout : t -> Layout.t
+    val to_layout : t -> Layout.t
   end
 
   (* Type shapes are abstract representations of type expressions. We define
@@ -168,7 +168,7 @@ module Type_decl_shape : sig
 
   (* Unlike in [types.ml], we use [Layout.t] entries here, because we can
      represent flattened floats simply as float64 in the debugger. *)
-  and constructor_representation = Constructor_mixed of mixed_product_shape
+  and constructor_representation = mixed_product_shape
 
   and mixed_product_shape = Layout.t array
 
@@ -218,4 +218,4 @@ val add_to_type_shapes :
 
 val find_in_type_decls : Uid.t -> Type_decl_shape.tds option
 
-val type_name : 'a. 'a Type_shape.ts -> string
+val type_name : _ Type_shape.ts -> string

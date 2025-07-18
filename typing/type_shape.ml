@@ -207,23 +207,23 @@ module Type_shape = struct
       | Unboxed_int32 -> Bits32
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
-    let predef_to_layout : t -> Layout.t = function
-      | Array -> Layout.Base Value
-      | Bytes -> Layout.Base Value
-      | Char -> Layout.Base Value
-      | Extension_constructor -> Layout.Base Value
-      | Float -> Layout.Base Value
-      | Float32 -> Layout.Base Value
-      | Floatarray -> Layout.Base Value
-      | Int -> Layout.Base Value
-      | Int32 -> Layout.Base Value
-      | Int64 -> Layout.Base Value
-      | Lazy_t -> Layout.Base Value
-      | Nativeint -> Layout.Base Value
-      | String -> Layout.Base Value
-      | Simd _ -> Layout.Base Value
-      | Exception -> Layout.Base Value
-      | Unboxed u -> Layout.Base (unboxed_type_to_layout u)
+    let to_layout : t -> Layout.t = function
+      | Array -> Base Value
+      | Bytes -> Base Value
+      | Char -> Base Value
+      | Extension_constructor -> Base Value
+      | Float -> Base Value
+      | Float32 -> Base Value
+      | Floatarray -> Base Value
+      | Int -> Base Value
+      | Int32 -> Base Value
+      | Int64 -> Base Value
+      | Lazy_t -> Base Value
+      | Nativeint -> Base Value
+      | String -> Base Value
+      | Simd _ -> Base Value
+      | Exception -> Base Value
+      | Unboxed u -> Base (unboxed_type_to_layout u)
   end
 
   type without_layout = Layout_to_be_determined
@@ -250,15 +250,15 @@ module Type_shape = struct
       (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
       pvs
 
-  let rec shape_layout (sh : Layout.t ts) =
+  let rec shape_layout (sh : Layout.t ts) : Layout.t =
     match sh with
     | Ts_constr ((_, _, ly), _) -> ly
-    | Ts_tuple _ -> Layout.Base Value
-    | Ts_unboxed_tuple shapes -> Layout.Product (List.map shape_layout shapes)
+    | Ts_tuple _ -> Base Value
+    | Ts_unboxed_tuple shapes -> Product (List.map shape_layout shapes)
     | Ts_var (_, ly) -> ly
-    | Ts_predef (predef, _) -> Predef.predef_to_layout predef
-    | Ts_arrow _ -> Layout.Base Value
-    | Ts_variant _ -> Layout.Base Value
+    | Ts_predef (predef, _) -> Predef.to_layout predef
+    | Ts_arrow _ -> Base Value
+    | Ts_variant _ -> Base Value
     | Ts_other ly -> ly
 
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
@@ -343,10 +343,10 @@ module Type_shape = struct
     | Ts_constr ((uid, path, Layout_to_be_determined), shapes), _ ->
       Ts_constr ((uid, path, layout), shapes)
     | Ts_tuple shapes, Base Value ->
-      let layouted_shapes =
+      let shapes_with_layout =
         List.map (shape_with_layout ~layout:(Layout.Base Value)) shapes
       in
-      Ts_tuple layouted_shapes
+      Ts_tuple shapes_with_layout
     | ( Ts_tuple _,
         ( Product _
         | Base
@@ -357,12 +357,12 @@ module Type_shape = struct
     | Ts_unboxed_tuple shapes, Product lys
       when List.length shapes = List.length lys ->
       let shapes_and_layouts = List.combine shapes lys in
-      let layouted_shapes =
+      let shapes_with_layout =
         List.map
           (fun (shape, layout) -> shape_with_layout ~layout shape)
           shapes_and_layouts
       in
-      Ts_unboxed_tuple layouted_shapes
+      Ts_unboxed_tuple shapes_with_layout
     | Ts_unboxed_tuple shapes, Product lys ->
       Misc.fatal_errorf "unboxed tuple shape has %d shapes, but %d layouts"
         (List.length shapes) (List.length lys)
@@ -378,13 +378,12 @@ module Type_shape = struct
     | Ts_arrow _, _ ->
       Misc.fatal_errorf "function type shape must have layout value"
     | Ts_predef (predef, shapes), _
-      when Layout.equal (Predef.predef_to_layout predef) layout ->
+      when Layout.equal (Predef.to_layout predef) layout ->
       Ts_predef (predef, shapes)
     | Ts_predef (predef, _), _ ->
       Misc.fatal_errorf
         "predef %s has layout %a, but is expected to have layout %a"
-        (Predef.to_string predef) Layout.format
-        (Predef.predef_to_layout predef)
+        (Predef.to_string predef) Layout.format (Predef.to_layout predef)
         Layout.format layout
     | Ts_variant fields, Base Value ->
       let fields =
@@ -520,7 +519,7 @@ module Type_decl_shape = struct
       field_value : 'a
     }
 
-  and constructor_representation = Constructor_mixed of mixed_product_shape
+  and constructor_representation = mixed_product_shape
 
   and mixed_product_shape = Layout.t array
 
@@ -598,7 +597,7 @@ module Type_decl_shape = struct
                  %a but expected %a"
                 Layout.format ly Layout.format ly2)
           shapes_and_fields;
-        Constructor_mixed (Array.map mixed_block_shape_to_layout shapes)
+        Array.map mixed_block_shape_to_layout shapes
       | Constructor_uniform_value ->
         let lys =
           List.map
@@ -614,7 +613,7 @@ module Type_decl_shape = struct
               else ly)
             args
         in
-        Constructor_mixed (Array.of_list lys)
+        Array.of_list lys
     in
     { name; kind = constructor_repr; args }
 
