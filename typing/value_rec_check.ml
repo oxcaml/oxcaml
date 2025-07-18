@@ -257,7 +257,7 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-
+    | Texp_alloc _ -> Static
     | Texp_new _
     | Texp_instvar _
     | Texp_object _
@@ -273,9 +273,6 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_override _
     | Texp_letop _ ->
         Dynamic
-    | Texp_alloc (e,_allocator) ->
-      (* CR jcutler: is this right? *)
-        classify_expression env e
   and classify_value_bindings rec_flag env bindings =
     (* We use a non-recursive classification, classifying each
         binding with respect to the old environment

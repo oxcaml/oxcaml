@@ -135,7 +135,7 @@ module Transled_modifiers = struct
       yielding = None;
       statefulness = None;
       visibility = None;
-      externality_mod = None;
+      externality = None;
       nullability = None;
       separability = None
     }
@@ -277,7 +277,7 @@ let transl_mod_bounds annots =
   in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
-      modifiers.externality_mod
+      modifiers.externality
   in
   let nullability =
     Option.fold ~some:Location.get_txt ~none:Nullability.max

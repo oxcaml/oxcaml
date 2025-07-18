@@ -231,11 +231,7 @@ module Jkind_mod_bounds = struct
     in
     let externality =
       if mem min_axes (Modal (Comonadic Externality))
-<<<<<<< HEAD
       then Externality.min
-=======
-      then Externality.max
->>>>>>> f00868c8d9 (add externality modal axis)
       else t.externality
     in
 

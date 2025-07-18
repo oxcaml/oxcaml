@@ -93,18 +93,7 @@ let is_always_gc_ignorable env ty =
        platform independent. *)
     if !Clflags.native_code && Sys.word_size = 64 then External64 else External
   in
-<<<<<<< HEAD
   Ctype.check_type_externality env ty externality
-=======
-  let upper_bound =
-    Jkind.set_externality_upper_bound
-      (Jkind.Builtin.any ~why:Dummy_jkind)
-      externality
-  in
-  match Ctype.check_type_jkind env ty upper_bound with
-  | Ok () -> true
-  | Error _ -> false
->>>>>>> f00868c8d9 (add externality modal axis)
 
 type classification =
   | Int (* any immediate type *)
