@@ -235,6 +235,14 @@ module TyVarEnv : sig
       Reading Note [Global type variables] may also be helpful.
    *)
 
+   val mark_rigid : string -> jkind_lr -> type_expr -> Location.t -> unit
+   (* [mark_rigid name jkind ty loc] marks the corresponding variable [name]
+      as rigid, checking that its jkind remains equal to [jkind]. *)
+
+   val check_rigid_variables : Env.t -> unit
+   (* [check_rigid_variables env] checks that all rigid variables still have
+      their expected jkinds. Raises an error if any rigid variable's jkind
+      has changed. *)
 end = struct
   (** Map indexed by type variable names. *)
   module TyVarMap = Misc.Stdlib.String.Map
@@ -257,6 +265,16 @@ end = struct
      univars.
   *)
   let pre_univars = ref ([] : type_expr list)
+
+  type rigid_info = {
+    jkind : jkind_lr;
+    ty : type_expr;
+    loc : Location.t;
+  }
+
+  (* These are variables with fixed jkinds.  *)
+
+  let rigid_variables = ref (TyVarMap.empty : rigid_info TyVarMap.t)
 
   let reset () =
     reset_global_level ();
@@ -427,7 +445,8 @@ end = struct
   let reset_locals ?univars:(uvs=[]) () =
     assert_univars uvs;
     univars := uvs;
-    used_variables := TyVarMap.empty
+    used_variables := TyVarMap.empty;
+    rigid_variables := TyVarMap.empty
 
   let associate row_context p =
     let add l x = if List.memq x l then l else x :: l in
@@ -538,6 +557,25 @@ end = struct
           try unify env t1 t2 with Unify err ->
             raise (Error(loc, env, Type_mismatch err)))
         !r
+
+  let mark_rigid name jkind ty loc =
+    let info = { jkind; ty; loc } in
+    rigid_variables := TyVarMap.add name info !rigid_variables
+
+  let check_rigid_variables env =
+    TyVarMap.iter
+      (fun name rigid_info ->
+        match get_desc rigid_info.ty with
+        | Tvar { name = _; jkind = inferred_jkind } ->
+          if not (Jkind.equate inferred_jkind rigid_info.jkind) then
+            let reason = Bad_univar_jkind { name; jkind_info =
+              { original_jkind = rigid_info.jkind; defaulted = true }
+              ; inferred_jkind }
+            in
+            raise (Error(rigid_info.loc, env, reason))
+        | _ -> assert false)
+      !rigid_variables;
+    rigid_variables := TyVarMap.empty
 end
 
 (* Support for first-class modules. *)
@@ -594,9 +632,14 @@ let transl_type_param_var env loc attrs name_opt
 let transl_type_param env path jkind_default styp =
   let loc = styp.ptyp_loc in
   let transl_jkind_and_annot_opt jkind_annot name =
-    match jkind_annot with
-    | None -> jkind_default, None
-    | Some jkind_annot ->
+    match jkind_annot, name with
+    | None, None -> jkind_default, None
+    | None, Some var_name ->
+        begin match Env.find_variable_default var_name env with
+        | Some jkind -> jkind, None
+        | None -> jkind_default, None
+        end
+    | Some jkind_annot, _ ->
       Jkind.of_annotation ~context:(Type_parameter (path, name)) jkind_annot,
       Some jkind_annot
   in
@@ -1093,14 +1136,18 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   let ty = try
       TyVarEnv.lookup_local ~row_context name
     with Not_found ->
-      let jkind =
-        (* See Note [Global type variables] *)
-        try TyVarEnv.lookup_global_jkind name
-        with Not_found -> TyVarEnv.new_jkind ~is_named:true policy
-      in
-      let ty = TyVarEnv.new_var ~name jkind policy in
-      TyVarEnv.remember_used name ty loc;
-      ty
+        let jkind, rigid =
+          (* See Note [Global type variables] *)
+          try TyVarEnv.lookup_global_jkind name, false
+          with Not_found ->
+            match Env.find_variable_default name env with
+            | Some jkind -> jkind, true
+            | None -> TyVarEnv.new_jkind ~is_named:true policy, false
+        in
+        let ty = TyVarEnv.new_var ~name jkind policy in
+        TyVarEnv.remember_used name ty loc;
+        if rigid then TyVarEnv.mark_rigid name jkind ty loc;
+        ty
   in
   let jkind_annot =
     match jkind_annot_opt with
@@ -1356,6 +1403,7 @@ let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
   TyVarEnv.reset_locals ?univars ();
   let policy = TyVarEnv.make_policy policy new_var_jkind in
   let typ = transl_type env policy mode styp in
+  TyVarEnv.check_rigid_variables env;
   TyVarEnv.globalize_used_variables policy env ();
   make_fixed_univars typ.ctyp_type;
   typ
@@ -1371,6 +1419,7 @@ let transl_simple_type_univars env styp =
       with_local_level ~post:generalize_ctyp begin fun () ->
         let policy = TyVarEnv.univars_policy in
         let typ = transl_type env policy Alloc.Const.legacy styp in
+        TyVarEnv.check_rigid_variables env;
         TyVarEnv.globalize_used_variables policy env ();
         typ
       end
@@ -1386,6 +1435,7 @@ let transl_simple_type_delayed env mode styp =
       let policy = TyVarEnv.make_policy Open Any in
       let typ = transl_type env policy mode styp in
       make_fixed_univars typ.ctyp_type;
+      TyVarEnv.check_rigid_variables env;
       (* This brings the used variables to the global level, but doesn't link
          them to their other occurrences just yet. This will be done when
          [force] is  called. *)
