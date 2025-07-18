@@ -944,6 +944,7 @@ type runtime_param =
    compiled to an [Mb_instantiating_functor]. *)
 type main_module_block_format =
   | Mb_struct of { mb_size : int }        (* A block with [mb_size] fields *)
+    (* CR jrayman: Mb_struct is wrong *)
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
         mb_returned_size : int;
