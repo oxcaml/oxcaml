@@ -133,7 +133,7 @@ val cms_magic_number: string
 (** Magic number for compiled shapes files *)
 
 val cmj_magic_number: string
-(** Magic number for JavaScript IR files *)
+(** Magic number for Js_of_ocaml IR files *)
 
 val linear_magic_number: string
 (** Magic number for Linear internal representation files *)
