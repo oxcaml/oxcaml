@@ -307,6 +307,8 @@ let select_operation_sse2 ~dbg op args =
   | "caml_sse2_int16x8_mul_low" -> sse_or_avx pmullw vpmullw_X_X_Xm128 args
   | "caml_sse2_int16x8_mul_hadd_int32x4" ->
     sse_or_avx pmaddwd vpmaddwd_X_X_Xm128 args
+  | "caml_sse2_int32x4_mul_even_unsigned" ->
+    sse_or_avx pmuludq_X_Xm128 vpmuludq_X_X_Xm128 args
   | _ -> None
 
 let select_operation_sse3 ~dbg:_ op args =

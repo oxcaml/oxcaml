@@ -678,6 +678,10 @@ module Sse_other_builtins = struct
     external mul_even : t -> t -> int64x2
       = "caml_vec128_unreachable" "caml_sse41_int32x4_mul_even"
       [@@noalloc] [@@unboxed] [@@builtin]
+
+    external mul_even_unsigned : t -> t -> int64x2
+      = "caml_vec128_unreachable" "caml_sse2_int32x4_mul_even_unsigned"
+      [@@noalloc] [@@unboxed] [@@builtin]
   end
 
   module Int64 = struct

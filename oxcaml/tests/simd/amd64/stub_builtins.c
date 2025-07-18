@@ -113,6 +113,7 @@ BUILTIN(caml_sse2_int16x8_mul_high);
 BUILTIN(caml_sse2_int16x8_mul_high_unsigned);
 BUILTIN(caml_sse2_int16x8_mul_low);
 BUILTIN(caml_sse2_int16x8_mul_hadd_int32x4);
+BUILTIN(caml_sse2_int32x4_mul_even_unsigned);
 
 BUILTIN(caml_sse3_float32x4_addsub);
 BUILTIN(caml_sse3_float64x2_addsub);
