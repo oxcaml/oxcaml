@@ -71,6 +71,10 @@ module Type_shape : sig
      them with a placeholder 'a for the layout inside. This allows one to
      first create shapes without a type by picking [without_layout] for 'a
      and then later substituting in a layout of type [Layout.t]. *)
+  (* CR sspies: The layout merged into the type shapes is confusing and will
+     cause trouble when the type shapes are integrated into shapes. Move them
+     back out again in a subsequent PR and instead recurse over layout and shape
+     in the DWARF emission code. *)
   type without_layout = Layout_to_be_determined
 
   type 'a ts =
