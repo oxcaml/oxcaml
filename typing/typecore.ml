@@ -5276,7 +5276,7 @@ let split_function_ty
          function deserves a separate allocation mode.
       *)
       let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
-      fst (register_allocation_value_mode ~loc ~env mode Allocator_heap) (* CR jcutler: fixme *)
+      fst (register_allocation_value_mode ~loc ~env mode Allocator_heap)
   in
   if expected_mode.allocator = Allocator_stack then
     Locality.submode_exn Locality.local (Alloc.proj (Comonadic Areality) alloc_mode);

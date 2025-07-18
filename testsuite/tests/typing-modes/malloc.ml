@@ -2,6 +2,39 @@
  expect;
 *)
 
+type t : bits64 = int mallocd
+[%%expect {|
+type t = int mallocd
+|}]
+
+type t : bits64 mod external_ = int mallocd
+[%%expect {|
+Line 1, characters 0-43:
+1 | type t : bits64 mod external_ = int mallocd
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int mallocd" is bits64
+         because it is the primitive type mallocd.
+       But the kind of type "int mallocd" must be a subkind of
+           bits64 mod external_
+         because of the definition of t at line 1, characters 0-43.
+|}]
+
+type t = float# mallocd
+[%%expect {|
+Line 1, characters 9-15:
+1 | type t = float# mallocd
+             ^^^^^^
+Error: This type "float#" should be an instance of type "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a sublayout of value
+         because the type argument of mallocd has layout value_or_null.
+|}]
+
+type t = int or_null mallocd
+[%%expect {|
+type t = int or_null mallocd
+|}]
 
 let foo () = malloc_ (1,2)
 [%%expect {|
@@ -203,6 +236,15 @@ let f () = malloc_ (`Apple (1,2,3))
 val f : unit -> [> `Apple of int * int * int ] mallocd = <fun>
 |}]
 
+let f () = malloc_ (`Apple {a = 1; b = 3})
+[%%expect {|
+Line 1, characters 28-29:
+1 | let f () = malloc_ (`Apple {a = 1; b = 3})
+                                ^
+Error: Unbound record field "a"
+|}]
+
+
 let f () = malloc_ #(1,2)
 [%%expect {|
 Line 1, characters 19-25:
@@ -222,6 +264,31 @@ Line 2, characters 19-36:
 Error: This expression is not an allocation site.
 |}]
 
+let obj () = malloc_ (object method x () = 42 end)
+[%%expect{|
+Line 1, characters 21-50:
+1 | let obj () = malloc_ (object method x () = 42 end)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Externally allocating objects is not supported yet.
+|}]
+
+
+exception Exn of int
+let exn () = malloc_ (Exn 2)
+[%%expect{|
+exception Exn of int
+val exn : unit -> exn mallocd = <fun>
+|}]
+
+let exn () = malloc_ (raise (Exn 2))
+[%%expect{|
+Line 1, characters 21-36:
+1 | let exn () = malloc_ (raise (Exn 2))
+                         ^^^^^^^^^^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+
 let flarb () =
   malloc_ (1,
     let f x = (x,x) in
@@ -230,4 +297,13 @@ let flarb () =
   )
 [%%expect {|
 val flarb : unit -> (int * int) mallocd = <fun>
+|}]
+
+
+let malloc_not_deep () = malloc_ (1,(2,3))
+[%%expect{|
+Line 1, characters 36-41:
+1 | let malloc_not_deep () = malloc_ (1,(2,3))
+                                        ^^^^^
+Error: This value is "internal" but expected to be "external_".
 |}]
