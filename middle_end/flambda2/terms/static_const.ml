@@ -53,11 +53,7 @@ type t =
 
 let set_of_closures set = Set_of_closures set
 
-let block tag mutability shape fields =
-  Format.printf "ABCD %a" Flambda_kind.Scannable_block_shape.print shape;
-  List.iter (fun f -> Format.printf " %a" Simple.With_debuginfo.print f) fields;
-  Format.printf "\n";
-  Block (tag, mutability, shape, fields)
+let block tag mutability shape fields = Block (tag, mutability, shape, fields)
 
 let boxed_float32 or_var = Boxed_float32 or_var
 
