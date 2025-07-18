@@ -100,7 +100,7 @@ module Type_shape = struct
     (* CR sspies: We should figure out pretty printing for shapes. For now, this
        verbose non-boxed version should be fine. *)
     | Ts_predef (predef, shapes) ->
-      Format.fprintf ppf "%s (%a)" (Predef.to_string predef)
+      Format.fprintf ppf "Ts_predef %s (%a)" (Predef.to_string predef)
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
            print)
@@ -272,6 +272,10 @@ module Type_decl_shape = struct
     in
     { path; definition; type_params }
 
+  (* We use custom strings as separators instead of pp_print_space, because the
+     latter introduces line breaks that can mess up the tables with all shapes.*)
+  let print_sep_string str ppf () = Format.pp_print_string ppf str
+
   let print_one_entry print_value ppf { field_name; field_value } =
     match field_name with
     | Some name ->
@@ -280,13 +284,13 @@ module Type_decl_shape = struct
     | None -> Format.fprintf ppf "%a" print_value field_value
 
   let print_complex_constructor print_value ppf { name; args } =
-    Format.fprintf ppf "(%a: %a)" Format.pp_print_string name
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space
+    Format.fprintf ppf "(%a of %a)" Format.pp_print_string name
+      (Format.pp_print_list ~pp_sep:(print_sep_string " * ")
          (print_one_entry print_value))
       args
 
   let print_field ppf (name, shape) =
-    Format.fprintf ppf "(%a: %a)" Format.pp_print_string name Type_shape.print
+    Format.fprintf ppf "%a: %a" Format.pp_print_string name Type_shape.print
       shape
 
   let print_tds ppf = function
@@ -295,15 +299,15 @@ module Type_decl_shape = struct
     | Tds_variant { simple_constructors; complex_constructors } ->
       Format.fprintf ppf
         "Tds_variant simple_constructors=%a complex_constructors=%a"
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (Format.pp_print_list ~pp_sep:(print_sep_string " | ")
            Format.pp_print_string)
         simple_constructors
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (Format.pp_print_list ~pp_sep:(print_sep_string " | ")
            (print_complex_constructor Type_shape.print))
         complex_constructors
     | Tds_record field_list ->
-      Format.fprintf ppf "Tds_record fields=%a"
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space print_field)
+      Format.fprintf ppf "Tds_record { %a }"
+        (Format.pp_print_list ~pp_sep:(print_sep_string "; ") print_field)
         field_list
     | Tds_alias type_shape ->
       Format.fprintf ppf "Tds_alias %a" Type_shape.print type_shape
@@ -402,3 +406,153 @@ let rec type_name (type_shape : Type_shape.t) =
       let args = type_arg_list_to_string (List.map type_name shapes) in
       let name = Path.name type_decl_shape.path in
       args ^ name)
+
+type table =
+  { columns : column array;
+    num_rows : int
+  }
+
+and column =
+  { mutable header : string;
+    entries : cell array;
+    mutable char_width : int
+  }
+
+and cell = string list
+
+(* Initialize a table by storing the original column string in the cells. *)
+let make_table (columns : (string * string list) list) =
+  match columns with
+  | [] -> Misc.fatal_errorf "make_table: empty table"
+  | (_, col) :: _ ->
+    let num_rows = List.length col in
+    let columns =
+      List.map
+        (fun (header, col) ->
+          let char_width, entries =
+            List.fold_right
+              (fun cell (width, acc) ->
+                let char_width = max width (String.length cell) in
+                char_width, [cell] :: acc)
+              col
+              (String.length header, [])
+          in
+          { header; entries = Array.of_list entries; char_width })
+        columns
+    in
+    { columns = Array.of_list columns; num_rows }
+
+(* Splits all cells based on new lines,
+   and expands the cells with white space to be all of the same length. *)
+let expand_table t =
+  let pad_string desired_length s =
+    s ^ String.make (desired_length - String.length s) ' '
+  in
+  let pad_row_cell desired_depth cell =
+    cell @ List.init (desired_depth - List.length cell) (fun _ -> "")
+  in
+  (* split based on new lines and adjust column width *)
+  for i = 0 to Array.length t.columns - 1 do
+    let column = t.columns.(i) in
+    column.char_width <- String.length column.header;
+    for j = 0 to Array.length column.entries - 1 do
+      let cell_strings = column.entries.(j) in
+      let cell_strings =
+        List.concat_map (String.split_on_char '\n') cell_strings
+      in
+      let cell_max_width =
+        List.fold_left max 0 (List.map String.length cell_strings)
+      in
+      column.char_width <- max column.char_width cell_max_width;
+      column.entries.(j) <- cell_strings
+    done
+  done;
+  (* add empty strings for rows with different depths *)
+  for j = 0 to t.num_rows - 1 do
+    let max_depth = ref 1 in
+    for i = 0 to Array.length t.columns - 1 do
+      max_depth := max !max_depth (List.length t.columns.(i).entries.(j))
+    done;
+    for i = 0 to Array.length t.columns - 1 do
+      t.columns.(i).entries.(j)
+        <- pad_row_cell !max_depth t.columns.(i).entries.(j)
+    done
+  done;
+  (* expand all strings to be of the correct width *)
+  for i = 0 to Array.length t.columns - 1 do
+    let column = t.columns.(i) in
+    column.header <- pad_string column.char_width column.header;
+    for j = 0 to Array.length column.entries - 1 do
+      column.entries.(j)
+        <- List.map (pad_string column.char_width) column.entries.(j)
+    done
+  done
+
+let print_separator fmt table_width =
+  Format.fprintf fmt "|%s|\n" (String.make (table_width - 2) '-')
+
+(* prints a single row of [num_cols] columns *)
+let print_row ppf num_cols f =
+  for i = 0 to num_cols - 1 do
+    Format.fprintf ppf "| %s " (f i)
+  done;
+  Format.fprintf ppf "|\n"
+
+let print_table ppf (columns : (string * string list) list) =
+  if List.length columns = 0 then Misc.fatal_errorf "print_table: empty table";
+  let table = make_table columns in
+  expand_table table;
+  let table_width =
+    Array.fold_left (fun acc column -> acc + column.char_width) 0 table.columns
+    + 4 (* boundary characters *)
+    + ((Array.length table.columns - 1) * 3 (* inter column boundaries *))
+  in
+  print_separator ppf table_width;
+  print_row ppf (Array.length table.columns) (fun i -> table.columns.(i).header);
+  print_separator ppf table_width;
+  for j = 0 to table.num_rows - 1 do
+    let head_column_cell = table.columns.(0).entries.(j) in
+    let depth = List.length head_column_cell in
+    for k = 0 to depth - 1 do
+      print_row ppf (Array.length table.columns) (fun i ->
+          List.nth table.columns.(i).entries.(j) k)
+    done;
+    print_separator ppf table_width
+  done
+
+let print_table_all_type_decls ppf =
+  let entries = Uid.Tbl.to_list all_type_decls in
+  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
+  let entries =
+    List.map
+      (fun (k, v) ->
+        ( Format.asprintf "%a" Uid.print k,
+          Format.asprintf "%a" Type_decl_shape.print v ))
+      entries
+  in
+  let uids, decls = List.split entries in
+  print_table ppf ["UID", uids; "Type Declaration", decls]
+
+let print_table_all_type_shapes ppf =
+  let entries = Uid.Tbl.to_list all_type_shapes in
+  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
+  let entries =
+    List.map
+      (fun (k, { type_shape; type_sort }) ->
+        ( Format.asprintf "%a" Uid.print k,
+          ( Format.asprintf "%a" Type_shape.print type_shape,
+            Format.asprintf "%a" Jkind_types.Sort.Const.format type_sort ) ))
+      entries
+  in
+  let uids, rest = List.split entries in
+  let types, sorts = List.split rest in
+  print_table ppf ["UID", uids; "Type", types; "Sort", sorts]
+
+(* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
+let print_debug_uid_tables ppf =
+  if !Clflags.dump_debug_uids
+  then (
+    Format.fprintf ppf "\n";
+    print_table_all_type_decls ppf;
+    Format.fprintf ppf "\n";
+    print_table_all_type_shapes ppf)

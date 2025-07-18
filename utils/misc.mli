@@ -775,7 +775,19 @@ end
 
 val print_if :
   Format.formatter -> bool ref -> (Format.formatter -> 'a -> unit) -> 'a -> 'a
-(** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf] if [b] is true. *)
+(** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf]
+    if [flag] is true. *)
+
+val print_if_all :
+  Format.formatter ->
+  bool ref list ->
+  (Format.formatter -> 'a -> unit) ->
+  'a ->
+  'a
+(** [print_if ppf flags fmt x] prints [x] with [fmt] on [ppf]
+    if all references in [flags] are true. *)
+
+
 
 val pp_two_columns :
   ?sep:string -> ?max_lines:int ->

@@ -43,6 +43,8 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
   raw_lambda
   |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
+  |> print_if_all i.ppf_dump [Clflags.dump_rawlambda; Clflags.dump_debug_uids]
+        (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
   |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
   |> Profile.(record generate)
    (fun (program : Lambda.program) ->
@@ -50,6 +52,8 @@ let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
       let code = Simplif.simplify_lambda program.Lambda.code in
       { program with Lambda.code }
       |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
+      |> print_if_all i.ppf_dump [Clflags.dump_lambda; Clflags.dump_debug_uids]
+        (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
       |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda
       |> (fun (program : Lambda.program) ->
            if Clflags.(should_stop_after Compiler_pass.Lambda) then ()
