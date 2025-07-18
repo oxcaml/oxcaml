@@ -11047,9 +11047,9 @@ let report_error ~loc env =
       | Error (Comonadic Areality, _) -> escaping_submode_reason_hint reason
       | _ -> []
     in
-    Location.errorf ~sub "%a" Value.report_error fail_reason
+    Location.errorf ~loc ~sub "%a" Value.report_error fail_reason
   | Submode_failed_alloc(fail_reason) ->
-    Location.errorf "%a" Alloc.report_error fail_reason
+    Location.errorf ~loc "%a" Alloc.report_error fail_reason
   | Curried_application_complete (lbl, Error (ax, {left; _}), loc_kind) ->
       let sub =
         match loc_kind with

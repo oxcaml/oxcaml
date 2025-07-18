@@ -4805,8 +4805,8 @@ let report_lookup_error _loc env ppf = function
         (string_of_shared_context context)
   | Value_used_in_closure (lid, err) ->
     (* CR pdsouza: improve how this error message reads *)
-    fprintf ppf "@[%a cannot be used inside a closure as this breaks mode constraints as described below.@]\n" !print_longident lid;
-    Mode.Value.Comonadic.report_error ppf err
+    fprintf ppf "@[%a cannot be used inside a closure as this breaks mode constraints as described below.@]\n%a"
+      !print_longident lid Mode.Value.Comonadic.report_error err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"
