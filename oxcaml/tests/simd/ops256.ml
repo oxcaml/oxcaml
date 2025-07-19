@@ -1,6 +1,5 @@
 [@@@ocaml.warning "-unused-module"]
 
-open Utils
 open Utils256
 
 let word0_32 = int32x8_fourth_int64
@@ -213,18 +212,29 @@ module AVX_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "vzeroall/vzeroupper");
-    let vec256 = make64 0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L 0x0123456789abcdefL in
+    let vec256 =
+      make64 0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L
+        0x0123456789abcdefL
+    in
     let vec128 = int64x2_of_int64s 0xaaaaaaaabbbbbbbbL 0xccccccccddddddddL in
     let f32 = 1.25s in
     let f64 = 2.5 in
     vzeroupper ();
-    eq4 (word0 vec256) (word1 vec256) (word2 vec256) (word3 vec256) 0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L 0x0123456789abcdefL;
-    Utils.eq (int64x2_low_int64 vec128) (int64x2_high_int64 vec128) 0xaaaaaaaabbbbbbbbL 0xccccccccddddddddL;
+    eq4 (word0 vec256) (word1 vec256) (word2 vec256) (word3 vec256)
+      0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L
+      0x0123456789abcdefL;
+    Utils.eq (int64x2_low_int64 vec128)
+      (int64x2_high_int64 vec128)
+      0xaaaaaaaabbbbbbbbL 0xccccccccddddddddL;
     eqf32 f32 f32 1.25s 1.25s;
     eqf f64 f64 2.5 2.5;
     vzeroall ();
-    eq4 (word0 vec256) (word1 vec256) (word2 vec256) (word3 vec256) 0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L 0x0123456789abcdefL;
-    Utils.eq (int64x2_low_int64 vec128) (int64x2_high_int64 vec128) 0xaaaaaaaabbbbbbbbL 0xccccccccddddddddL;
+    eq4 (word0 vec256) (word1 vec256) (word2 vec256) (word3 vec256)
+      0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L
+      0x0123456789abcdefL;
+    Utils.eq (int64x2_low_int64 vec128)
+      (int64x2_high_int64 vec128)
+      0xaaaaaaaabbbbbbbbL 0xccccccccddddddddL;
     eqf32 f32 f32 1.25s 1.25s;
     eqf f64 f64 2.5 2.5
 end

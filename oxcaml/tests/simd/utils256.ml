@@ -1,5 +1,7 @@
 [@@@ocaml.warning "-unused-module"]
 
+include Utils
+
 external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4
   = "" "vec256_of_int64s"
   [@@noalloc] [@@unboxed]
@@ -383,4 +385,54 @@ module Vector256_casts = struct
     eq a b c d 13L 14L 15L 16L;
     let a, b, c, d = int64x4_to_quadruple _4 in
     eq a b c d 17L 18L 19L 20L
+end
+
+module Int8 = struct
+  include Int8
+
+  let to_int8x32 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 b0 b1 b2
+      b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
+    let i0 = pack8 a0 a1 a2 a3 a4 a5 a6 a7 in
+    let i1 = pack8 a8 a9 a10 a11 a12 a13 a14 a15 in
+    let i2 = pack8 b0 b1 b2 b3 b4 b5 b6 b7 in
+    let i3 = pack8 b8 b9 b10 b11 b12 b13 b14 b15 in
+    int8x32_of_int64s i0 i1 i2 i3
+end
+
+module Int16 = struct
+  include Int16
+
+  let to_int16x16 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 =
+    let i0 = pack4 a0 a1 a2 a3 in
+    let i1 = pack4 a4 a5 a6 a7 in
+    let i2 = pack4 a8 a9 a10 a11 in
+    let i3 = pack4 a12 a13 a14 a15 in
+    int16x16_of_int64s i0 i1 i2 i3
+end
+
+module Int32s = struct
+  include Int32s
+
+  let to_int32x8 a b c d e f g h =
+    let low = to_int32x4 a b c d in
+    let high = to_int32x4 e f g h in
+    int32x8_of_int32x4s low high
+end
+
+module Float32 = struct
+  include Float32
+
+  let to_float32x8 a b c d e f g h =
+    let low = to_float32x4 a b c d in
+    let high = to_float32x4 e f g h in
+    float32x8_of_float32x4s low high
+end
+
+module Float64 = struct
+  include Float64
+
+  let to_float64x4 a b c d =
+    let low = to_float64x2 a b in
+    let high = to_float64x2 c d in
+    float64x4_of_float64x2s low high
 end

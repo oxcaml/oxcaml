@@ -575,11 +575,6 @@ module Int32s = struct
       Int64.(logor (shift_left b 32) a)
       Int64.(logor (shift_left d 32) c)
 
-  let to_int32x8 a b c d e f g h =
-    let low = to_int32x4 a b c d in
-    let high = to_int32x4 e f g h in
-    int32x8_of_int32x4s low high
-
   let check_ints f =
     let open Int32 in
     Random.set_state (Random.State.make [| 1234567890 |]);
@@ -723,13 +718,6 @@ module Int16 = struct
     let high = pack4 e f g h in
     int16x8_of_int64s low high
 
-  let to_int16x16 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 =
-    let i0 = pack4 a0 a1 a2 a3 in
-    let i1 = pack4 a4 a5 a6 a7 in
-    let i2 = pack4 a8 a9 a10 a11 in
-    let i3 = pack4 a12 a13 a14 a15 in
-    Utils256.int16x16_of_int64s i0 i1 i2 i3
-
   let max_int = 0x7fff
 
   let min_int = 0x8000
@@ -856,14 +844,6 @@ module Int8 = struct
   let to_int8x16 a b c d e f g h =
     let i = pack8 a b c d e f g h in
     int8x16_of_int64s i i
-
-  let to_int8x32 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 b0 b1 b2
-      b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
-    let i0 = pack8 a0 a1 a2 a3 a4 a5 a6 a7 in
-    let i1 = pack8 a8 a9 a10 a11 a12 a13 a14 a15 in
-    let i2 = pack8 b0 b1 b2 b3 b4 b5 b6 b7 in
-    let i3 = pack8 b8 b9 b10 b11 b12 b13 b14 b15 in
-    Utils256.int8x32_of_int64s i0 i1 i2 i3
 
   let check_ints f =
     Random.set_state (Random.State.make [| 1234567890 |]);

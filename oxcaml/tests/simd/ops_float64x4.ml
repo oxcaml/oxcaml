@@ -1,4 +1,3 @@
-open Utils
 open Utils256
 include Builtins.Float64x4
 
