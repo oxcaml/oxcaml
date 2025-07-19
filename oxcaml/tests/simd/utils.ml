@@ -474,11 +474,6 @@ module Float32 = struct
     let i0 = Int64.logor (Int64.shift_left i1 32) i0 in
     let i1 = Int64.logor (Int64.shift_left i3 32) i2 in
     float32x4_of_int64s i0 i1
-
-  let to_float32x8 a b c d e f g h =
-    let low = to_float32x4 a b c d in
-    let high = to_float32x4 e f g h in
-    float32x8_of_float32x4s low high
 end
 
 module Float64 = struct
@@ -491,11 +486,6 @@ module Float64 = struct
   let to_float64x2 f0 f1 =
     let v0, v1 = Int64.bits_of_float f0, Int64.bits_of_float f1 in
     float64x2_of_int64s v0 v1
-
-  let to_float64x4 a b c d =
-    let low = to_float64x2 a b in
-    let high = to_float64x2 c d in
-    float64x4_of_float64x2s low high
 
   module Tests = struct
     let () =
