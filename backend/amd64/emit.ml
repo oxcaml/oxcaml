@@ -1331,8 +1331,8 @@ end = struct
      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
      I'd recommend reading that first for reference before touching this
      function. *)
-  let emit_sanitize ?(dependencies = [||]) ?(offset = 0) ~address
-      (memory_chunk : Cmm.memory_chunk) (memory_access : memory_access) =
+  let emit_sanitize ?(dependencies = [||]) ?(offset = 0) ~address ~report
+      (memory_chunk : Cmm.memory_chunk) =
     let[@inline always] need_to_save_register register =
       uses_register register address
       || Array.exists (uses_register register) dependencies
@@ -1396,12 +1396,13 @@ end = struct
         (* [push rax] is a single-byte instruction, as opposed to something like
            [push 0] which is a 2-byte instruction. *)
         push rax;
+      (* CR mslater: need to save wider simd registers *)
       (* The asan report wrappers use a special calling convention via the C
          attribute [__attribute__((preserve_all))] so that all registers except
          for [r11] (which is clobbered) are callee-saved, in order to minimize
          the amount of spilling we have to do here. [address] is already in
          [rdi], and this function accepts just a single argument. *)
-      I.call (asan_report_function memory_chunk_size memory_access);
+      I.call report;
       if need_to_align_stack then pop rax
     in
     D.define_label asan_check_succeded_label;
@@ -1423,23 +1424,25 @@ end = struct
          provided directly by the runtime and guaranteed to be safe to use. *)
       | Store_initialize -> ()
       | Load | Store_modify -> (
+        let report =
+          asan_report_function
+            (Memory_chunk_size.of_memory_chunk memory_chunk)
+            memory_access
+        in
         match memory_chunk with
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
         | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
         | Double | Onetwentyeight_aligned ->
-          emit_sanitize ?dependencies ~address memory_chunk memory_access
+          emit_sanitize ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
-          emit_sanitize ?dependencies ~address memory_chunk memory_access;
-          emit_sanitize ?dependencies ~offset:15 ~address memory_chunk
-            memory_access
+          emit_sanitize ?dependencies ~address ~report Byte_unsigned;
+          emit_sanitize ?dependencies ~offset:15 ~address ~report Byte_unsigned
         | Twofiftysix_unaligned | Twofiftysix_aligned ->
-          emit_sanitize ?dependencies ~address memory_chunk memory_access;
-          emit_sanitize ?dependencies ~offset:31 ~address memory_chunk
-            memory_access
+          emit_sanitize ?dependencies ~address ~report Byte_unsigned;
+          emit_sanitize ?dependencies ~offset:31 ~address ~report Byte_unsigned
         | Fivetwelve_unaligned | Fivetwelve_aligned ->
-          emit_sanitize ?dependencies ~address memory_chunk memory_access;
-          emit_sanitize ?dependencies ~offset:63 ~address memory_chunk
-            memory_access)
+          emit_sanitize ?dependencies ~address ~report Byte_unsigned;
+          emit_sanitize ?dependencies ~offset:63 ~address ~report Byte_unsigned)
 end
 
 let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
