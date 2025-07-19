@@ -131,34 +131,12 @@ external float32x4_extract :
   = "caml_vec128_unreachable" "test_simd_vec128_extract_ps"
   [@@noalloc]
 
-external extract_128_f32 :
-  (int[@untagged]) -> (float32x8[@unboxed]) -> (float32x4[@unboxed])
-  = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
-  [@@noalloc] [@@builtin]
-
-external extract_128_f64 :
-  (int[@untagged]) -> (float64x4[@unboxed]) -> (float64x2[@unboxed])
-  = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
-  [@@noalloc] [@@builtin]
-
-external int32x8_of_int32x4s : int32x4 -> int32x4 -> int32x8
-  = "" "vec256_of_vec128s"
-  [@@noalloc] [@@unboxed]
-
 let eq_float32x4 ~result ~expect =
   for i = 0 to 3 do
     let r = float32x4_extract result i |> Int32.float_of_bits in
     let e = float32x4_extract expect i |> Int32.float_of_bits in
     eqf' r e
   done
-
-let eq_float32x8 ~result ~expect =
-  let result_low = extract_128_f32 0 result in
-  let result_high = extract_128_f32 1 result in
-  let expect_low = extract_128_f32 0 expect in
-  let expect_high = extract_128_f32 1 expect in
-  eq_float32x4 ~result:result_low ~expect:expect_low;
-  eq_float32x4 ~result:result_high ~expect:expect_high
 
 let eq_float64x2 ~result ~expect =
   let lv = float64x2_low_int64 result |> Int64.float_of_bits in
@@ -168,14 +146,6 @@ let eq_float64x2 ~result ~expect =
   eqf' lv l;
   eqf' hv h;
   ()
-
-let eq_float64x4 ~result ~expect =
-  let result_low = extract_128_f64 0 result in
-  let result_high = extract_128_f64 1 result in
-  let expect_low = extract_128_f64 0 expect in
-  let expect_high = extract_128_f64 1 expect in
-  eq_float64x2 ~result:result_low ~expect:expect_low;
-  eq_float64x2 ~result:result_high ~expect:expect_high
 
 let () =
   (failmsg := fun () -> Printf.printf "basic_checks!");

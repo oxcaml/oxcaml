@@ -98,6 +98,36 @@ external int8x32_third_int64 : int8x32 -> int64 = "" "vec256_third_int64"
 external int8x32_fourth_int64 : int8x32 -> int64 = "" "vec256_fourth_int64"
   [@@noalloc] [@@unboxed]
 
+external int32x8_of_int32x4s : int32x4 -> int32x4 -> int32x8
+  = "" "vec256_of_vec128s"
+  [@@noalloc] [@@unboxed]
+
+external extract_128_f32 :
+  (int[@untagged]) -> (float32x8[@unboxed]) -> (float32x4[@unboxed])
+  = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
+  [@@noalloc] [@@builtin]
+
+external extract_128_f64 :
+  (int[@untagged]) -> (float64x4[@unboxed]) -> (float64x2[@unboxed])
+  = "caml_vec256_unreachable" "caml_avx_vec256_extract_128"
+  [@@noalloc] [@@builtin]
+
+let eq_float32x8 ~result ~expect =
+  let result_low = extract_128_f32 0 result in
+  let result_high = extract_128_f32 1 result in
+  let expect_low = extract_128_f32 0 expect in
+  let expect_high = extract_128_f32 1 expect in
+  eq_float32x4 ~result:result_low ~expect:expect_low;
+  eq_float32x4 ~result:result_high ~expect:expect_high
+
+let eq_float64x4 ~result ~expect =
+  let result_low = extract_128_f64 0 result in
+  let result_high = extract_128_f64 1 result in
+  let expect_low = extract_128_f64 0 expect in
+  let expect_high = extract_128_f64 1 expect in
+  eq_float64x2 ~result:result_low ~expect:expect_low;
+  eq_float64x2 ~result:result_high ~expect:expect_high
+
 module Vector256_casts = struct
   let eq a b c d e f g h =
     if a <> e || b <> f || c <> g || d <> h
