@@ -98,6 +98,14 @@ external int8x32_third_int64 : int8x32 -> int64 = "" "vec256_third_int64"
 external int8x32_fourth_int64 : int8x32 -> int64 = "" "vec256_fourth_int64"
   [@@noalloc] [@@unboxed]
 
+external float32x8_of_float32x4s : float32x4 -> float32x4 -> float32x8
+  = "" "vec256_of_vec128s"
+  [@@noalloc] [@@unboxed]
+
+external float64x4_of_float64x2s : float64x2 -> float64x2 -> float64x4
+  = "" "vec256_of_vec128s"
+  [@@noalloc] [@@unboxed]
+
 external int32x8_of_int32x4s : int32x4 -> int32x4 -> int32x8
   = "" "vec256_of_vec128s"
   [@@noalloc] [@@unboxed]

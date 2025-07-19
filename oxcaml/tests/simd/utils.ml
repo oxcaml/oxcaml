@@ -432,10 +432,6 @@ end
 module Float32 = struct
   include Float32_reference
 
-  external float32x8_of_float32x4s : float32x4 -> float32x4 -> float32x8
-    = "" "vec256_of_vec128s"
-    [@@noalloc] [@@unboxed]
-
   let to_float32x4 t0 t1 t2 t3 =
     let i0 = Int64.of_int32 t0 |> Int64.logand 0xffffffffL in
     let i1 = Int64.of_int32 t1 |> Int64.logand 0xffffffffL in
@@ -448,10 +444,6 @@ end
 
 module Float64 = struct
   include Float64_reference
-
-  external float64x4_of_float64x2s : float64x2 -> float64x2 -> float64x4
-    = "" "vec256_of_vec128s"
-    [@@noalloc] [@@unboxed]
 
   let to_float64x2 f0 f1 =
     let v0, v1 = Int64.bits_of_float f0, Int64.bits_of_float f1 in
