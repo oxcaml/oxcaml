@@ -501,16 +501,32 @@ let destroyed_at_single_float64_store =
     (destroy_xmm 15)
 ;;
 
+let all_256bit_regs = []
+  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  |> add_hard_vec512_regs ~f:(fun regs -> regs)
+  |> Array.concat
+
+let all_simd_regs =
+  [hard_float32_reg; hard_float_reg; hard_vec128_reg]
+  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  |> add_hard_vec512_regs ~f:(fun regs -> regs)
+  |> Array.concat
+
 let destroyed_by_simd_instr (instr : Simd.instr) =
-  match instr.res with
-  | First_arg -> [||]
-  | Res { loc; _ } ->
-    match Simd.loc_is_pinned loc with
-    | Some RAX -> [|rax|]
-    | Some RCX -> [|rcx|]
-    | Some RDX -> [|rdx|]
-    | Some XMM0 -> destroy_xmm 0
-    | None -> [||]
+  (* CR mslater: (SIMD) these don't effect regs 16-31 *)
+  match[@warning "-4"] instr.id with
+  | Vzeroupper -> all_256bit_regs
+  | Vzeroall -> all_simd_regs
+  | _ ->
+    match instr.res with
+    | First_arg -> [||]
+    | Res { loc; _ } ->
+      match Simd.loc_is_pinned loc with
+      | Some RAX -> [|rax|]
+      | Some RCX -> [|rcx|]
+      | Some RDX -> [|rdx|]
+      | Some XMM0 -> destroy_xmm 0
+      | None -> [||]
 
 let destroyed_by_simd_op (op : Simd.operation) =
   match op.instr with
@@ -521,7 +537,9 @@ let destroyed_by_simd_op (op : Simd.operation) =
       (match seq.id with
        | Sqrtss | Sqrtsd | Roundss | Roundsd
        | Pcompare_string _ | Vpcompare_string _
-       | Ptestz | Ptestc | Ptestnzc | Vptestz | Vptestc | Vptestnzc -> [||])
+       | Ptestz | Ptestc | Ptestnzc
+       | Vptestz_X  | Vptestc_X  | Vptestnzc_X
+       | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y -> [||])
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with

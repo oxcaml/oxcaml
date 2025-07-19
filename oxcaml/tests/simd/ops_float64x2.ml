@@ -28,8 +28,8 @@ let check_cmp msg scalar vector f0 f1 =
   let r1, m1 = if scalar f1 f0 then 0xffffffffffffffffL, 1 else 0L, 0 in
   let expect = int64x2_of_int64s r0 r1 in
   let expect_mask = m0 lor (m1 lsl 1) in
-  let v1 = to_float64x2 f0 f1 in
-  let v2 = to_float64x2 f1 f0 in
+  let v1 = Float64.to_float64x2 f0 f1 in
+  let v2 = Float64.to_float64x2 f1 f0 in
   let result = vector v1 v2 in
   let mask = Builtins.SSE2_Util.movemask_64 result in
   eqi mask mask expect_mask (Builtins.SSE2_Util.movemask_64 expect);
@@ -77,9 +77,9 @@ let check_binop msg scalar vector f0 f1 =
   (failmsg := fun () -> Printf.printf "%s: %f | %f\n%!" msg f0 f1);
   let r0 = scalar f0 f1 in
   let r1 = scalar f1 f0 in
-  let expect = to_float64x2 r0 r1 in
-  let v1 = to_float64x2 f0 f1 in
-  let v2 = to_float64x2 f1 f0 in
+  let expect = Float64.to_float64x2 r0 r1 in
+  let v1 = Float64.to_float64x2 f0 f1 in
+  let v2 = Float64.to_float64x2 f1 f0 in
   let result = vector v1 v2 in
   eq_float64x2 ~result ~expect
 
@@ -90,7 +90,7 @@ let () =
   Float64.check_floats (check_binop "div" Float.div div);
   Float64.check_floats (fun f0 f1 ->
       (failmsg := fun () -> Printf.printf "sqrt %f | %f\n%!" f0 f1);
-      let fv = to_float64x2 f0 f1 in
+      let fv = Float64.to_float64x2 f0 f1 in
       let res = sqrt fv in
       eq (float64x2_low_int64 res) (float64x2_high_int64 res)
         (Int64.bits_of_float (Float.sqrt f0))
@@ -111,25 +111,27 @@ let () =
       in
       let ii = Int64.(logor (shift_left i1 32) i0) in
       let iv = float32x4_of_int64s ii 0L in
-      let fv = to_float64x2 f0 f1 in
+      let fv = Float64.to_float64x2 f0 f1 in
       let res = cvt_float32x4 fv in
       eq_float32x4 ~result:res ~expect:iv)
 
 let () =
   Float64.check_floats (fun f0 f1 ->
       (failmsg := fun () -> Printf.printf "hadd: %f | %f\n%!" f0 f1);
-      let fv0 = to_float64x2 f0 f0 in
-      let fv1 = to_float64x2 f1 f1 in
+      let fv0 = Float64.to_float64x2 f0 f0 in
+      let fv1 = Float64.to_float64x2 f1 f1 in
       let result = hadd fv0 fv1 in
-      let expect = to_float64x2 (f0 +. f0) (f1 +. f1) in
+      let expect = Float64.to_float64x2 (f0 +. f0) (f1 +. f1) in
       eq_float64x2 ~result ~expect)
 
 let () =
   Float64.check_floats (fun f0 f1 ->
       (failmsg := fun () -> Printf.printf "roundf64 %f %f\n%!" f0 f1);
-      let fv = to_float64x2 f0 f1 in
+      let fv = Float64.to_float64x2 f0 f1 in
       let result = round_near fv in
-      let expect = to_float64x2 (Float64.c_round f0) (Float64.c_round f1) in
+      let expect =
+        Float64.to_float64x2 (Float64.c_round f0) (Float64.c_round f1)
+      in
       eq_float64x2 ~result ~expect)
 
 let () =
@@ -145,7 +147,7 @@ let () =
       in
       let ii = Int64.(logor (shift_left i1 32) i0) in
       let iv = int32x4_of_int64s ii 0L in
-      let fv = to_float64x2 f0 f1 in
+      let fv = Float64.to_float64x2 f0 f1 in
       let res = cvt_int32x4 fv in
       eq (int32x4_low_int64 res) (int32x4_high_int64 res) (int32x4_low_int64 iv)
         (int32x4_high_int64 iv))
@@ -161,7 +163,7 @@ let () =
       in
       let ii = Int64.(logor (shift_left i1 32) i0) in
       let iv = int32x4_of_int64s ii 0L in
-      let fv = to_float64x2 f0 f1 in
+      let fv = Float64.to_float64x2 f0 f1 in
       let res = cvtt_int32x4 fv in
       eq (int32x4_low_int64 res) (int32x4_high_int64 res) (int32x4_low_int64 iv)
         (int32x4_high_int64 iv))

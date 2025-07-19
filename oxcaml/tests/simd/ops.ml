@@ -91,19 +91,19 @@ module SSE2_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "movemask_8");
-    let v0 = Int8.of_ints 0xff 0x7f 0x80 0x0 0x1 0xcc 0x33 0x55 in
+    let v0 = Int8.to_int8x16 0xff 0x7f 0x80 0x0 0x1 0xcc 0x33 0x55 in
     let i0 = movemask_8 v0 in
     eqi i0 0 0b0010_0101_0010_0101 0
 
   let () =
-    let v0 = Int8.of_ints 0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 in
+    let v0 = Int8.to_int8x16 0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 in
     let v1 = shift_left_bytes 1 v0 in
     eq (int8x16_low_int64 v1) (int8x16_high_int64 v1) 0x0605040302010000L
       0x0605040302010007L;
     ()
 
   let () =
-    let v0 = Int8.of_ints 0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 in
+    let v0 = Int8.to_int8x16 0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7 in
     let v2 = shift_right_bytes 1 v0 in
     eq (int8x16_low_int64 v2) (int8x16_high_int64 v2) 0x07060504030201L
       0x0007060504030201L
@@ -121,7 +121,7 @@ module SSE2_Util = struct
     eq (int64x2_low_int64 v3) (int64x2_high_int64 v3) 2L 4L
 
   let () =
-    let v0 = Int16.of_ints 1 2 3 4 5 6 7 8 in
+    let v0 = Int16.to_int16x8 1 2 3 4 5 6 7 8 in
     let s0 = shuffle_high_16 0 v0 in
     let s1 = shuffle_high_16 0b01010101 v0 in
     let s2 = shuffle_high_16 0b10101010 v0 in
@@ -149,8 +149,8 @@ module SSE2_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "interleave_8");
-    let v0 = Int8.of_ints 0 1 2 3 4 5 6 7 in
-    let v1 = Int8.of_ints 8 9 0xa 0xb 0xc 0xd 0xe 0xf in
+    let v0 = Int8.to_int8x16 0 1 2 3 4 5 6 7 in
+    let v1 = Int8.to_int8x16 8 9 0xa 0xb 0xc 0xd 0xe 0xf in
     let i0 = interleave_high_8 v0 v1 in
     let i1 = interleave_low_8 v0 v1 in
     eq (int8x16_low_int64 i0) (int8x16_high_int64 i0) 0x0b030a0209010800L
@@ -161,8 +161,8 @@ module SSE2_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "interleave_16");
-    let v0 = Int16.of_ints 0 1 2 3 4 5 6 7 in
-    let v1 = Int16.of_ints 8 9 0xa 0xb 0xc 0xd 0xe 0xf in
+    let v0 = Int16.to_int16x8 0 1 2 3 4 5 6 7 in
+    let v1 = Int16.to_int16x8 8 9 0xa 0xb 0xc 0xd 0xe 0xf in
     let i0 = interleave_high_16 v0 v1 in
     let i1 = interleave_low_16 v0 v1 in
     eq (int16x8_low_int64 i0) (int16x8_high_int64 i0) 0x000d_0005_000c_0004L
@@ -188,7 +188,7 @@ module SSE3_Util = struct
     let v0 = int64x2_of_int64s 1L 2L in
     let d0 = dup_low_64 v0 in
     eq (int64x2_low_int64 d0) (int64x2_high_int64 d0) 1L 1L;
-    let v0 = Int32s.of_int32s 1l 2l 3l 4l in
+    let v0 = Int32s.to_int32x4 1l 2l 3l 4l in
     let d0 = dup_odd_32 v0 in
     let d1 = dup_even_32 v0 in
     eq (int32x4_low_int64 d0) (int32x4_high_int64 d0) 0x0000000200000002L
