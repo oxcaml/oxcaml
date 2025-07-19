@@ -501,7 +501,7 @@ let destroyed_at_single_float64_store =
     (destroy_xmm 15)
 ;;
 
-let all_256bit_Regs = []
+let all_256bit_regs = []
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> Array.concat
@@ -515,7 +515,7 @@ let all_simd_regs =
 let destroyed_by_simd_instr (instr : Simd.instr) =
   (* CR mslater: (SIMD) these don't effect regs 16-31 *)
   match[@warning "-4"] instr.id with
-  | Vzeroupper -> all_256bit_Regs
+  | Vzeroupper -> all_256bit_regs
   | Vzeroall -> all_simd_regs
   | _ ->
     match instr.res with

@@ -1091,6 +1091,13 @@ module AVX = struct
   external interleave_low_32 : int32x8 -> int32x8 -> int32x8
     = "caml_vec256_unreachable" "caml_avx_vec128x2_interleave_low_32"
     [@@noalloc] [@@unboxed] [@@builtin]
+
+  external vzeroall : unit -> unit = "caml_simd_unreachable" "caml_avx_zeroall"
+    [@@noalloc] [@@builtin]
+
+  external vzeroupper : unit -> unit
+    = "caml_simd_unreachable" "caml_avx_zeroupper"
+    [@@noalloc] [@@builtin]
 end
 
 module AVX2 = struct
