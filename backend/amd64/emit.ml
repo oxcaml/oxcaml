@@ -1634,15 +1634,15 @@ let emit_simd (op : Simd.operation) instr =
       emit_simd_instr seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz ->
+    | Ptestz | Vptestz_X | Vptestz_Y ->
       emit_simd_instr seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc ->
+    | Ptestc | Vptestc_X | Vptestc_Y ->
       emit_simd_instr seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestnzc | Vptestnzc ->
+    | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
       emit_simd_instr seq.instr imm instr;
       I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))

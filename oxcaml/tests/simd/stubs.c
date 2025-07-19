@@ -124,6 +124,9 @@ int64_t int16_su8(int64_t i) {
 #else /* __ARM_NEON */
 #if defined(__SSE4_2__)
 #include <smmintrin.h>
+#ifdef __AVX__
+#include <immintrin.h>
+#endif
 
 typedef __m128 simd_poly128_t;
 typedef __m128 simd_float32x4_t;

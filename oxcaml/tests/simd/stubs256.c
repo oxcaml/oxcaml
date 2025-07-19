@@ -64,6 +64,11 @@ __m256i vec256_of_int64s(int64_t w0, int64_t w1, int64_t w2, int64_t w3)
     return _mm256_set_epi64x(w0, w1, w2, w3);
 }
 
+__m256i vec256_of_vec128s(__m128i low, __m128i high)
+{
+    return _mm256_set_m128i(high, low);
+}
+
 value boxed_combine256(value v0, value v1)
 {
     CAMLparam2(v0, v1);

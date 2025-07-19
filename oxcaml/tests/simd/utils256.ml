@@ -36,17 +36,77 @@ external int64x4_third_int64 : int64x4 -> int64 = "" "vec256_third_int64"
 external int64x4_fourth_int64 : int64x4 -> int64 = "" "vec256_fourth_int64"
   [@@noalloc] [@@unboxed]
 
-let eq a b c d e f g h =
-  if a <> e || b <> f || c <> g || d <> h
-  then Printf.printf "%Ld,%Ld,%Ld,%Ld <> %Ld,%Ld,%Ld,%Ld\n" a b c d e f g h
+external int32x8_first_int64 : int32x8 -> int64 = "" "vec256_first_int64"
+  [@@noalloc] [@@unboxed]
 
-let int64x4_to_quadruple v =
-  ( int64x4_first_int64 v,
-    int64x4_second_int64 v,
-    int64x4_third_int64 v,
-    int64x4_fourth_int64 v )
+external int32x8_second_int64 : int32x8 -> int64 = "" "vec256_second_int64"
+  [@@noalloc] [@@unboxed]
+
+external int32x8_third_int64 : int32x8 -> int64 = "" "vec256_third_int64"
+  [@@noalloc] [@@unboxed]
+
+external int32x8_fourth_int64 : int32x8 -> int64 = "" "vec256_fourth_int64"
+  [@@noalloc] [@@unboxed]
+
+external float32x8_first_int64 : float32x8 -> int64 = "" "vec256_first_int64"
+  [@@noalloc] [@@unboxed]
+
+external float32x8_second_int64 : float32x8 -> int64 = "" "vec256_second_int64"
+  [@@noalloc] [@@unboxed]
+
+external float32x8_third_int64 : float32x8 -> int64 = "" "vec256_third_int64"
+  [@@noalloc] [@@unboxed]
+
+external float32x8_fourth_int64 : float32x8 -> int64 = "" "vec256_fourth_int64"
+  [@@noalloc] [@@unboxed]
+
+external float64x4_first_int64 : float64x4 -> int64 = "" "vec256_first_int64"
+  [@@noalloc] [@@unboxed]
+
+external float64x4_second_int64 : float64x4 -> int64 = "" "vec256_second_int64"
+  [@@noalloc] [@@unboxed]
+
+external float64x4_third_int64 : float64x4 -> int64 = "" "vec256_third_int64"
+  [@@noalloc] [@@unboxed]
+
+external float64x4_fourth_int64 : float64x4 -> int64 = "" "vec256_fourth_int64"
+  [@@noalloc] [@@unboxed]
+
+external int16x16_first_int64 : int16x16 -> int64 = "" "vec256_first_int64"
+  [@@noalloc] [@@unboxed]
+
+external int16x16_second_int64 : int16x16 -> int64 = "" "vec256_second_int64"
+  [@@noalloc] [@@unboxed]
+
+external int16x16_third_int64 : int16x16 -> int64 = "" "vec256_third_int64"
+  [@@noalloc] [@@unboxed]
+
+external int16x16_fourth_int64 : int16x16 -> int64 = "" "vec256_fourth_int64"
+  [@@noalloc] [@@unboxed]
+
+external int8x32_first_int64 : int8x32 -> int64 = "" "vec256_first_int64"
+  [@@noalloc] [@@unboxed]
+
+external int8x32_second_int64 : int8x32 -> int64 = "" "vec256_second_int64"
+  [@@noalloc] [@@unboxed]
+
+external int8x32_third_int64 : int8x32 -> int64 = "" "vec256_third_int64"
+  [@@noalloc] [@@unboxed]
+
+external int8x32_fourth_int64 : int8x32 -> int64 = "" "vec256_fourth_int64"
+  [@@noalloc] [@@unboxed]
 
 module Vector256_casts = struct
+  let eq a b c d e f g h =
+    if a <> e || b <> f || c <> g || d <> h
+    then Printf.printf "%Ld,%Ld,%Ld,%Ld <> %Ld,%Ld,%Ld,%Ld\n" a b c d e f g h
+
+  let int64x4_to_quadruple v =
+    ( int64x4_first_int64 v,
+      int64x4_second_int64 v,
+      int64x4_third_int64 v,
+      int64x4_fourth_int64 v )
+
   external int64x4_of_int32x8 : int32x8 -> int64x4
     = "caml_vec256_unreachable" "caml_vec256_cast"
     [@@noalloc] [@@unboxed] [@@builtin]

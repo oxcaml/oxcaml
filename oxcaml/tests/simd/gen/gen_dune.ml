@@ -104,6 +104,7 @@ let make_ops_u name =
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "${name}.ml")))))
 |}
 
@@ -129,6 +130,7 @@ let print_test ?extra_flag (name, enabled_if) =
 let () =
   let ops =
     [ "ops";
+      "ops256";
       "ops_float32x4";
       "ops_float64x2";
       "ops_int64x2";
@@ -142,6 +144,7 @@ let () =
       "ops_int16x16";
       "ops_int8x32";
       "sse_other_ops";
+      "avx_test_ops";
       "sse41_test_ops";
       "sse42_string_ops" ]
   in
@@ -167,10 +170,14 @@ let () =
       "ops_int8x16_u", enabled_if_main;
       "ops", enabled_if_main;
       "ops_u", enabled_if_main;
+      "ops256", enabled_if_main_amd64_not_macos;
+      "ops256_u", enabled_if_main_amd64_not_macos;
       "sse_other_ops", enabled_if_main_amd64_not_macos;
       "sse_other_ops_u", enabled_if_main_amd64_not_macos;
       "sse41_test_ops", enabled_if_main_amd64_not_macos;
       "sse41_test_ops_u", enabled_if_main_amd64_not_macos;
+      "avx_test_ops", enabled_if_main_amd64_not_macos;
+      "avx_test_ops_u", enabled_if_main_amd64_not_macos;
       "sse42_string_ops", enabled_if_main_amd64_not_macos;
       "sse42_string_ops_u", enabled_if_main_amd64_not_macos;
       "arrays", enabled_if_main;
@@ -187,7 +194,6 @@ let () =
       "consts256", enabled_if_main_amd64_not_macos;
       "consts256_u", enabled_if_main_amd64_not_macos;
       "probes256", enabled_if_main_amd64_not_macos;
-      "utils256", enabled_if_main_amd64_not_macos;
       "ops_float32x8", enabled_if_main_amd64_not_macos;
       "ops_float64x4", enabled_if_main_amd64_not_macos;
       "ops_int32x8", enabled_if_main_amd64_not_macos;
