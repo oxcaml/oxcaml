@@ -852,17 +852,38 @@ G(caml_absf32_mask):
 .extern __asan_report_load_n_noabort
 .extern __asan_report_store_n_noabort
 
-#define Make_report_fun(kind, bytes, regs, simd)                    \
+#define Make_report_fun(kind, bytes, regs, simd) \
 FUNCTION(G(caml_asan_report_ ## kind ## bytes ## _noabort ## simd)) \
-CFI_STARTPROC;                                                      \
-        ENTER_FUNCTION;                                             \
-        SAVE_ALL_REGS(regs);                                        \
-        movq $bytes, %rsi;                                          \
-        call __asan_report_ ## kind ## _n_noabort;                  \
-        RESTORE_ALL_REGS(regs);                                     \
-        LEAVE_FUNCTION;                                             \
-        ret;                                                        \
-CFI_ENDPROC;                                                        \
+CFI_STARTPROC; \
+        /* Touch the stack to trigger a recoverable segfault \
+           if insufficient space remains */ \
+        subq    $(STACK_PROBE_SIZE), %rsp; CFI_ADJUST(STACK_PROBE_SIZE); \
+        movq    %r11, 0(%rsp); \
+        addq    $(STACK_PROBE_SIZE), %rsp; CFI_ADJUST(-STACK_PROBE_SIZE); \
+        ENTER_FUNCTION; \
+        pushq   %r10; CFI_ADJUST (8); \
+        pushq   %r9; CFI_ADJUST (8); \
+        pushq   %r8; CFI_ADJUST (8); \
+        pushq   %rdi; CFI_ADJUST (8); \
+        pushq   %rsi; CFI_ADJUST (8); \
+        pushq   %rdx; CFI_ADJUST (8); \
+        pushq   %rcx; CFI_ADJUST (8); \
+        pushq   %rax; CFI_ADJUST (8); \
+        SAVE_SIMD_REGS(regs); \
+        movq $bytes, %rsi; \
+        call __asan_report_ ## kind ## _n_noabort; \
+        RESTORE_SIMD_REGS(regs); \
+        popq    %rax; CFI_ADJUST(-8); \
+        popq    %rcx; CFI_ADJUST(-8); \
+        popq    %rdx; CFI_ADJUST(-8); \
+        popq    %rsi; CFI_ADJUST(-8); \
+        popq    %rdi; CFI_ADJUST(-8); \
+        popq    %r8; CFI_ADJUST(-8); \
+        popq    %r9; CFI_ADJUST(-8); \
+        popq    %r10; CFI_ADJUST(-8); \
+        LEAVE_FUNCTION; \
+        ret; \
+CFI_ENDPROC; \
 ENDFUNCTION(G(caml_asan_report_ ## kind ## bytes ## _noabort ## simd));
 
 #define Make_report_funs(bytes)            \
