@@ -1207,5 +1207,21 @@ CREATE_ASAN_REPORT_WRAPPER(store, 4)
 CREATE_ASAN_REPORT_WRAPPER(store, 8)
 CREATE_ASAN_REPORT_WRAPPER(store, 16)
 
+void __asan_report_load_n_noabort(const void* addr, size_t size);
+void __asan_report_store_n_noabort(const void* addr, size_t size);
+
+CAMLexport void __attribute__((preserve_all)) caml_asan_report_load32_noabort(const void* addr) {
+  return __asan_report_load_n_noabort(addr, 32);
+}
+CAMLexport void __attribute__((preserve_all)) caml_asan_report_store32_noabort(const void* addr) {
+  return __asan_report_store_n_noabort(addr, 32);
+}
+CAMLexport void __attribute__((preserve_all)) caml_asan_report_load64_noabort(const void* addr) {
+  return __asan_report_load_n_noabort(addr, 64);
+}
+CAMLexport void __attribute__((preserve_all)) caml_asan_report_store64_noabort(const void* addr) {
+  return __asan_report_store_n_noabort(addr, 64);
+}
+
 #undef CREATE_ASAN_REPORT_WRAPPER
 #endif

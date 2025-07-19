@@ -1258,21 +1258,28 @@ end = struct
       | I64 | I128 | I256 | I512 -> false
   end
 
-  let mov_address src dest =
-    match (src : X86_ast.arg) with
-    | Mem
-        { scale = 1;
-          base = None;
-          sym = None;
-          displ = 0;
-          idx;
-          arch = _;
-          typ = _
-        } ->
+  let mov_address ~offset src dest =
+    match (src : X86_ast.arg), offset with
+    | ( Mem
+          { scale = 1;
+            base = None;
+            sym = None;
+            displ = 0;
+            idx;
+            arch = _;
+            typ = _
+          },
+        0 ) ->
       I.mov (Reg64 idx) dest
-    | Mem _ | Mem64_RIP _ | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _
-    | Reg32 _ | Reg64 _ | Regf _ ->
-      I.lea src dest
+    | Mem mem, offset ->
+      I.lea (Mem { mem with displ = mem.displ + offset }) dest
+    | Mem64_RIP (ty, sym, displ), offset ->
+      I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
+    | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+        | Regf _ ),
+        offset ) ->
+      I.lea src dest;
+      if offset <> 0 then I.add (Imm (Int64.of_int offset)) dest
 
   let[@inline always] is_stack_16_byte_aligned () =
     (* Yes, sadly this does result in materially better assembly than
@@ -1301,13 +1308,11 @@ end = struct
     | 7 -> Sym "caml_asan_report_store8_noabort"
     | 8 -> Sym "caml_asan_report_load16_noabort"
     | 9 -> Sym "caml_asan_report_store16_noabort"
-    | _ ->
-      (* CR-soon mslater: this is wrong, 32/64-byte operations should be routed
-         to [__asan_report_load_n_noabort]. Also, unaligned 16-byte operations
-         need a second check that the last byte's address is valid. *)
-      if access = 0
-      then Sym "caml_asan_report_load16_noabort"
-      else Sym "caml_asan_report_store16_noabort"
+    | 10 -> Sym "caml_asan_report_load32_noabort"
+    | 11 -> Sym "caml_asan_report_store32_noabort"
+    | 12 -> Sym "caml_asan_report_load64_noabort"
+    | 13 -> Sym "caml_asan_report_store64_noabort"
+    | _ -> assert false
 
   (* CR-soon ksvetlitski: find a way to accomplish this without breaking the
      abstraction barrier of [X86_ast]. *)
@@ -1326,7 +1331,7 @@ end = struct
      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
      I'd recommend reading that first for reference before touching this
      function. *)
-  let emit_sanitize ?(dependencies = [||]) ~address
+  let emit_sanitize ?(dependencies = [||]) ?(offset = 0) ~address
       (memory_chunk : Cmm.memory_chunk) (memory_access : memory_access) =
     let[@inline always] need_to_save_register register =
       uses_register register address
@@ -1343,7 +1348,7 @@ end = struct
        You could do this at the end of the prologue if you wanted to; the point
        is just that you have to do this before you modify the contents of any
        registers (other than [rsp]). *)
-    mov_address address rdi;
+    mov_address ~offset address rdi;
     let need_to_save_r11 = need_to_save_register R11 in
     if need_to_save_r11 then push r11;
     let need_to_save_r10 =
@@ -1404,8 +1409,8 @@ end = struct
     if need_to_save_r11 then pop r11;
     if need_to_save_rdi then pop rdi
 
-  let[@inline always] emit_sanitize ?dependencies ~address memory_chunk
-      memory_access =
+  let[@inline always] emit_sanitize ?dependencies ~address
+      (memory_chunk : Cmm.memory_chunk) memory_access =
     (* Checking [Config.with_address_sanitizer] is redundant, but we do it
        because it's a compile-time constant, so it enables the compiler to
        completely optimize-out the AddressSanitizer code when the compiler was
@@ -1417,8 +1422,24 @@ end = struct
          on the grounds that the backing memory for freshly allocated records is
          provided directly by the runtime and guaranteed to be safe to use. *)
       | Store_initialize -> ()
-      | Load | Store_modify ->
-        emit_sanitize ?dependencies ~address memory_chunk memory_access
+      | Load | Store_modify -> (
+        match memory_chunk with
+        | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
+        | Double | Onetwentyeight_aligned ->
+          emit_sanitize ?dependencies ~address memory_chunk memory_access
+        | Onetwentyeight_unaligned ->
+          emit_sanitize ?dependencies ~address memory_chunk memory_access;
+          emit_sanitize ?dependencies ~offset:15 ~address memory_chunk
+            memory_access
+        | Twofiftysix_unaligned | Twofiftysix_aligned ->
+          emit_sanitize ?dependencies ~address memory_chunk memory_access;
+          emit_sanitize ?dependencies ~offset:31 ~address memory_chunk
+            memory_access
+        | Fivetwelve_unaligned | Fivetwelve_aligned ->
+          emit_sanitize ?dependencies ~address memory_chunk memory_access;
+          emit_sanitize ?dependencies ~offset:63 ~address memory_chunk
+            memory_access)
 end
 
 let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
