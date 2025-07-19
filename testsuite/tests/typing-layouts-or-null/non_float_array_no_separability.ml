@@ -16,7 +16,7 @@ let get_gen (xs : 'a array) i = xs.(i)
 [%%expect{|
 (let
   (get_gen =
-     (function {nlocal = 0} xs[genarray] i[int]
+     (function {nlocal = 0} xs[value<genarray>] i[value<int>]
        (array.get[gen indexed by int] xs i)))
   (apply (field_imm 1 (global Toploop!)) "get_gen" get_gen))
 val get_gen : 'a array -> int -> 'a = <fun>
@@ -26,7 +26,7 @@ let set_gen (xs : 'a array) x i = xs.(i) <- x
 [%%expect{|
 (let
   (set_gen =
-     (function {nlocal = 0} xs[genarray] x i[int] : int
+     (function {nlocal = 0} xs[value<genarray>] x i[value<int>] : int
        (array.set[gen indexed by int] xs i x)))
   (apply (field_imm 1 (global Toploop!)) "set_gen" set_gen))
 val set_gen : 'a array -> 'a -> int -> unit = <fun>
@@ -48,7 +48,7 @@ let get (type t : value mod non_float) (xs : t array) i = xs.(i)
 [%%expect{|
 (let
   (get =
-     (function {nlocal = 0} xs[genarray] i[int]
+     (function {nlocal = 0} xs[value<genarray>] i[value<int>]
        (array.get[gen indexed by int] xs i)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
 val get : ('t : value mod non_float). 't array -> int -> 't = <fun>
@@ -59,7 +59,7 @@ let set (type t : value mod non_float) (xs : t array) x i = xs.(i) <- x
 [%%expect{|
 (let
   (set =
-     (function {nlocal = 0} xs[genarray] x i[int] : int
+     (function {nlocal = 0} xs[value<genarray>] x i[value<int>] : int
        (array.set[gen indexed by int] xs i x)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
 val set : ('t : value mod non_float). 't array -> 't -> int -> unit = <fun>
@@ -82,8 +82,10 @@ end
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "X/371"
   (let
-    (x1 =[(consts ()) (non_consts ([0: *, [int]]))] [0: "first" 1]
-     x2 =[(consts ()) (non_consts ([0: *, [int]]))] [0: "second" 2])
+    (x1 =[value<(consts ()) (non_consts ([0: *, value<int>]))>]
+       [0: "first" 1]
+     x2 =[value<(consts ()) (non_consts ([0: *, value<int>]))>]
+       [0: "second" 2])
     (makeblock 0 x1 x2)))
 module X : sig type t : immutable_data val x1 : t val x2 : t end
 |}]
@@ -101,9 +103,9 @@ let () =
 
 [%%expect{|
 (let
-  (X = (apply (field_imm 0 (global Toploop!)) "X/371")
-   *match* =[int]
-     (let (xs =[genarray] (caml_make_vect 4 (field_imm 0 X)))
+  (X =? (apply (field_imm 0 (global Toploop!)) "X/371")
+   *match* =[value<int>]
+     (let (xs =[value<genarray>] (caml_make_vect 4 (field_imm 0 X)))
        (seq (array.set[gen indexed by int] xs 1 (field_imm 1 X))
          (array.set[gen indexed by int] xs 2 (field_imm 1 X))
          (if
