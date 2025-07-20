@@ -798,3 +798,13 @@ val zap_modalities_to_floor_if_at_least :
   Language_extension.maturity ->
   Mode.Modality.Value.t ->
   Mode.Modality.Value.Const.t
+
+type 'res constructor_crossing_kind =
+  | Creation : Mode.Value.r constructor_crossing_kind
+  | Destruction : Mode.Value.l constructor_crossing_kind
+  | Rebinding : unit constructor_crossing_kind
+
+val check_constructor_crossing :
+  'ok constructor_crossing_kind -> Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> ('ok, Mode.Value.error) result
