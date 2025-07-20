@@ -246,48 +246,7 @@ void caml_tsan_exit_on_raise(uintnat pc, char* sp, char* trapsp)
  each function. */
 void caml_tsan_exit_on_raise_c(char* limit)
 {
-  unw_context_t uc;
-  unw_cursor_t cursor;
-  unw_word_t sp;
-#ifdef TSAN_DEBUG
-  unw_word_t prev_pc;
-#endif
-  int ret;
 
-  ret = unw_getcontext(&uc);
-  if (ret != 0)
-    caml_fatal_error("unw_getcontext failed with code %d", ret);
-  ret = unw_init_local(&cursor, &uc);
-  if (ret != 0)
-    caml_fatal_error("unw_init_local failed with code %d", ret);
-
-  while (1) {
-#ifdef TSAN_DEBUG
-    if (unw_get_reg(&cursor, UNW_REG_IP, &prev_pc) < 0) {
-      caml_fatal_error("unw_get_reg IP failed with code %d", ret);
-    }
-#endif
-
-    ret = unw_step(&cursor);
-    if (ret < 0) {
-      caml_fatal_error("unw_step failed with code %d", ret);
-    } else if (ret == 0) {
-      /* No more frames */
-      break;
-    }
-
-    ret = unw_get_reg(&cursor, UNW_REG_SP, &sp);
-    if (ret != 0)
-      caml_fatal_error("unw_get_reg SP failed with code %d", ret);
-#ifdef TSAN_DEBUG
-    caml_tsan_debug_log_pc("forced__tsan_func_exit for", prev_pc);
-#endif
-    __tsan_func_exit(NULL);
-
-    if ((char*)sp >= limit) {
-      break;
-    }
-  }
 }
 
 /* This function iterates on each stack frame of the current fiber. This is

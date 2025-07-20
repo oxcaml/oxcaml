@@ -94,6 +94,7 @@ void caml_raise(value v)
   unwind_local_roots(limit_of_current_c_stack_chunk);
 
 #if defined(WITH_THREAD_SANITIZER)
+  char* exception_pointer = (char*)Caml_state->c_stack;
   caml_tsan_exit_on_raise_c(exception_pointer);
 #endif
 

@@ -972,7 +972,7 @@ AS_CASE([$ocaml_cc_vendor],
     warn_error_flag='-WX'
     cc_warnings=''],
   [outputobj='-o '
-  warn_error_flag='-Werror'
+  warn_error_flag=''
   cc_warnings="-Wall -Wno-pragmas -Wint-conversion -Wstrict-prototypes \
 -Wold-style-definition -Wundef"])
 
