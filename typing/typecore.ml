@@ -5138,8 +5138,12 @@ let with_explanation explanation f =
         raise (Error (loc', env', err))
 
 let unique_use ~loc ~env mode_l mode_r  =
-  let uniqueness = Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r) in
-  let linearity = Linearity.disallow_right (Value.proj_comonadic Linearity mode_l) in
+  let uniqueness =
+    Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r)
+  in
+  let linearity =
+    Linearity.disallow_right (Value.proj_comonadic Linearity mode_l)
+  in
   if not (Language_extension.is_at_least Unique
             Language_extension.maturity_of_unique_for_drf) then begin
     (* if unique extension is not enabled, we will not run uniqueness analysis;
@@ -5241,7 +5245,8 @@ let split_function_ty
       fst (register_allocation_value_mode mode)
   in
   if expected_mode.strictly_local then
-    Locality.submode_exn Locality.local (Alloc.proj_comonadic Areality alloc_mode);
+    Locality.submode_exn Locality.local
+      (Alloc.proj_comonadic Areality alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
@@ -6003,7 +6008,8 @@ and type_expect_
             type_expect ~recarg new_env mode' sbody ty_expected_explained
           in
           submode ~loc ~env ~reason:Other
-            (Value.min_with_comonadic Areality Regionality.regional) expected_mode;
+            (Value.min_with_comonadic Areality Regionality.regional)
+            expected_mode;
           { exp_desc = Texp_exclave exp;
             exp_loc = loc;
             exp_extra = [];
