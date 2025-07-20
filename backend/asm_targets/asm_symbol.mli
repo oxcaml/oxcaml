@@ -48,6 +48,10 @@ module Predef : sig
 
   val caml_c_call : t
 
+  val caml_c_call_avx : t
+
+  val caml_c_call_avx512 : t
+
   val caml_allocN : t
 
   val caml_allocN_avx : t
@@ -71,10 +75,6 @@ module Predef : sig
   val caml_alloc3_avx : t
 
   val caml_alloc3_avx512 : t
-
-  val caml_ml_array_bound_error : t
-
-  val caml_ml_array_align_error : t
 
   val caml_raise_exn : t
 

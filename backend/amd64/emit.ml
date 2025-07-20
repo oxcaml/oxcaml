@@ -452,6 +452,29 @@ let must_save_simd_regs live =
     Save_ymm)
   else Save_xmm
 
+let func_with_simd =
+  if Config.tsan
+  then
+    fun i (func : Cmm.symbol) ->
+    match func.sym_name with
+    | "caml_perform" -> (
+      match must_save_simd_regs i.live with
+      | Save_xmm -> func
+      | Save_ymm -> { func with sym_name = "caml_perform_avx" }
+      | Save_zmm -> { func with sym_name = "caml_perform_avx512" })
+    | "caml_reperform" -> (
+      match must_save_simd_regs i.live with
+      | Save_xmm -> func
+      | Save_ymm -> { func with sym_name = "caml_reperform_avx" }
+      | Save_zmm -> { func with sym_name = "caml_reperform_avx512" })
+    | "caml_resume" -> (
+      match must_save_simd_regs i.live with
+      | Save_xmm -> func
+      | Save_ymm -> { func with sym_name = "caml_resume_avx" }
+      | Save_zmm -> { func with sym_name = "caml_resume_avx512" })
+    | _ -> func
+  else fun _ f -> f
+
 (* CR sspies: Consider whether more of [record_frame_label] can be shared with
    the Arm backend. *)
 
@@ -541,57 +564,6 @@ let emit_local_realloc lr =
   | Save_ymm -> emit_call (Cmm.global_symbol "caml_call_local_realloc_avx")
   | Save_zmm -> emit_call (Cmm.global_symbol "caml_call_local_realloc_avx512"));
   I.jmp (emit_asm_label_arg lr.lr_return_lbl)
-
-(* Record calls to caml_ml_array_bound_error and caml_ml_array_align_error. In
-   -g mode we maintain one call per bound check site. Without -g, we can share a
-   single call. *)
-
-type safety_check =
-  | Bound_check
-  | Align_check
-
-type safety_check_failure =
-  { sc_lbl : L.t; (* Entry label *)
-    sc_frame : L.t; (* Label of frame descriptor *)
-    sc_dbg : Debuginfo.t (* As for [gc_call]. *)
-  }
-
-type safety_check_sites =
-  { mutable sc_sites : safety_check_failure list;
-    mutable sc_call : L.t option
-  }
-
-let bound_checks = { sc_sites = []; sc_call = None }
-
-let align_checks = { sc_sites = []; sc_call = None }
-
-let emit_call_safety_error kind sc =
-  D.define_label sc.sc_lbl;
-  emit_debug_info sc.sc_dbg;
-  (match kind with
-  | Bound_check -> emit_call (Cmm.global_symbol "caml_ml_array_bound_error")
-  | Align_check -> emit_call (Cmm.global_symbol "caml_ml_array_align_error"));
-  D.define_label sc.sc_frame
-
-let clear_safety_checks () =
-  bound_checks.sc_sites <- [];
-  bound_checks.sc_call <- None;
-  align_checks.sc_sites <- [];
-  align_checks.sc_call <- None
-
-let emit_call_safety_errors () =
-  List.iter (emit_call_safety_error Bound_check) bound_checks.sc_sites;
-  (match bound_checks.sc_call with
-  | None -> ()
-  | Some sc_call ->
-    D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_bound_error"));
-  List.iter (emit_call_safety_error Align_check) align_checks.sc_sites;
-  match align_checks.sc_call with
-  | None -> ()
-  | Some sc_call ->
-    D.define_label sc_call;
-    emit_call (Cmm.global_symbol "caml_ml_array_align_error")
 
 (* Stack reallocation *)
 type stack_realloc =
@@ -1813,11 +1785,13 @@ let emit_instr ~first ~fallthrough i =
     I.call (arg i 0);
     record_frame i.live (Dbg_other i.dbg)
   | Lcall_op (Lcall_imm { func }) ->
+    let func = func_with_simd i func in
     add_used_symbol func.sym_name;
     emit_call func;
     record_frame i.live (Dbg_other i.dbg)
   | Lcall_op Ltailcall_ind -> output_epilogue (fun () -> I.jmp (arg i 0))
   | Lcall_op (Ltailcall_imm { func }) ->
+    let func = func_with_simd i func in
     if String.equal func.sym_name !function_name
     then
       match !tailrec_entry_point with
@@ -1845,7 +1819,13 @@ let emit_instr ~first ~fallthrough i =
     else if alloc
     then (
       load_symbol_addr (Cmm.global_symbol func) rax;
-      emit_call (Cmm.global_symbol "caml_c_call");
+      if Config.tsan
+      then
+        match must_save_simd_regs i.live with
+        | Save_xmm -> emit_call (Cmm.global_symbol "caml_c_call")
+        | Save_ymm -> emit_call (Cmm.global_symbol "caml_c_call_avx")
+        | Save_zmm -> emit_call (Cmm.global_symbol "caml_c_call_avx512")
+      else emit_call (Cmm.global_symbol "caml_c_call");
       record_frame i.live (Dbg_other i.dbg);
       if (not Config.runtime5) && not (is_win64 system)
       then
@@ -2414,7 +2394,6 @@ let fundecl fundecl =
   stack_offset := 0;
   call_gc_sites := [];
   local_realloc_sites := [];
-  clear_safety_checks ();
   clear_stack_realloc ();
   Stack_class.Tbl.copy_values ~from:fundecl.fun_num_stack_slots
     ~to_:num_stack_slots;
@@ -2455,7 +2434,6 @@ let fundecl fundecl =
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
-  emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
   then
@@ -2565,6 +2543,8 @@ let begin_assembly unix =
     D.extrn S.Predef.caml_call_gc_avx;
     D.extrn S.Predef.caml_call_gc_avx512;
     D.extrn S.Predef.caml_c_call;
+    D.extrn S.Predef.caml_c_call_avx;
+    D.extrn S.Predef.caml_c_call_avx512;
     D.extrn S.Predef.caml_allocN;
     D.extrn S.Predef.caml_allocN_avx;
     D.extrn S.Predef.caml_allocN_avx512;
@@ -2577,8 +2557,6 @@ let begin_assembly unix =
     D.extrn S.Predef.caml_alloc3;
     D.extrn S.Predef.caml_alloc3_avx;
     D.extrn S.Predef.caml_alloc3_avx512;
-    D.extrn S.Predef.caml_ml_array_bound_error;
-    D.extrn S.Predef.caml_ml_array_align_error;
     D.extrn S.Predef.caml_raise_exn);
   if !Clflags.dlcode || Arch.win64
   then (

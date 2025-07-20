@@ -111,6 +111,10 @@ module Predef = struct
 
   let caml_c_call = create_without_encoding "caml_c_call"
 
+  let caml_c_call_avx = create_without_encoding "caml_c_call_avx"
+
+  let caml_c_call_avx512 = create_without_encoding "caml_c_call_avx512"
+
   let caml_allocN = create_without_encoding "caml_allocN"
 
   let caml_allocN_avx = create_without_encoding "caml_allocN_avx"
@@ -134,12 +138,6 @@ module Predef = struct
   let caml_alloc3_avx = create_without_encoding "caml_alloc3_avx"
 
   let caml_alloc3_avx512 = create_without_encoding "caml_alloc3_avx512"
-
-  let caml_ml_array_bound_error =
-    create_without_encoding "caml_ml_array_bound_error"
-
-  let caml_ml_array_align_error =
-    create_without_encoding "caml_ml_array_align_error"
 
   let caml_raise_exn = create_without_encoding "caml_raise_exn"
 
