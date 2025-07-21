@@ -1233,7 +1233,7 @@ let datalog_rules =
        filter_field
          (fun (f : Field.t) ->
            match[@ocaml.warning "-4"] f with
-           | Apply (Indirect_code_pointer, _) -> true
+           | Apply (Unknown_arity_code_pointer, _) -> true
            | _ -> false)
          relation;
        constructor_rel set_of_closures coderel call_witness;
@@ -1262,7 +1262,7 @@ let datalog_rules =
        filter
          (fun [f] ->
            match[@ocaml.warning "-4"] CoField.decode f with
-           | Param (Indirect_code_pointer, _) -> true
+           | Param (Unknown_arity_code_pointer, _) -> true
            | _ -> false)
          [relation];
        constructor_rel set_of_closures coderel call_witness;

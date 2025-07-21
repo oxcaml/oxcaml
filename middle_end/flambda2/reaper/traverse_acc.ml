@@ -211,20 +211,20 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
         for i = 0 to num_returns - 1 do
           Graph.add_constructor_dep t.deps
             ~base:(Code_id_or_name.name name)
-            (Apply (Direct_code_pointer, Normal i))
+            (Apply (Known_arity_code_pointer, Normal i))
             ~from:(Code_id_or_name.name le_monde_exterieur);
           Graph.add_constructor_dep t.deps
             ~base:(Code_id_or_name.name name)
-            (Apply (Indirect_code_pointer, Normal i))
+            (Apply (Unknown_arity_code_pointer, Normal i))
             ~from:(Code_id_or_name.name le_monde_exterieur)
         done;
         Graph.add_constructor_dep t.deps
           ~base:(Code_id_or_name.name name)
-          (Apply (Direct_code_pointer, Exn))
+          (Apply (Known_arity_code_pointer, Exn))
           ~from:(Code_id_or_name.name le_monde_exterieur);
         Graph.add_constructor_dep t.deps
           ~base:(Code_id_or_name.name name)
-          (Apply (Indirect_code_pointer, Exn))
+          (Apply (Unknown_arity_code_pointer, Exn))
           ~from:(Code_id_or_name.name le_monde_exterieur);
         let params_unarized =
           Flambda_arity.unarize_per_parameter
@@ -243,13 +243,13 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
         for i = 0 to num_direct_params - 1 do
           Graph.add_coconstructor_dep t.deps
             ~base:(Code_id_or_name.name name)
-            (Param (Direct_code_pointer, i))
+            (Param (Known_arity_code_pointer, i))
             ~from:(Code_id_or_name.var always_used)
         done;
         for i = 0 to num_indirect_params - 1 do
           Graph.add_coconstructor_dep t.deps
             ~base:(Code_id_or_name.name name)
-            (Param (Indirect_code_pointer, i))
+            (Param (Unknown_arity_code_pointer, i))
             ~from:(Code_id_or_name.var always_used)
         done
       | code_dep ->
@@ -260,19 +260,19 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           (fun i v ->
             Graph.add_constructor_dep t.deps
               ~base:(Code_id_or_name.name name)
-              (Apply (Direct_code_pointer, Normal i))
+              (Apply (Known_arity_code_pointer, Normal i))
               ~from:(Code_id_or_name.var v))
           code_dep.return;
         List.iteri
           (fun i v ->
             Graph.add_coconstructor_dep t.deps
               ~base:(Code_id_or_name.name name)
-              (Param (Direct_code_pointer, i))
+              (Param (Known_arity_code_pointer, i))
               ~from:(Code_id_or_name.var v))
           code_dep.params;
         Graph.add_constructor_dep t.deps
           ~base:(Code_id_or_name.name name)
-          (Apply (Direct_code_pointer, Exn))
+          (Apply (Known_arity_code_pointer, Exn))
           ~from:(Code_id_or_name.var code_dep.exn);
         let call_witnesses = code_dep.call_witnesses in
         if code_dep.is_tupled
@@ -281,13 +281,13 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           let call_witness = List.hd call_witnesses in
           Graph.add_constructor_dep t.deps
             ~base:(Code_id_or_name.name name)
-            (Apply (Indirect_code_pointer, Exn))
+            (Apply (Unknown_arity_code_pointer, Exn))
             ~from:(Code_id_or_name.var code_dep.exn);
           List.iteri
             (fun i return_arg ->
               Graph.add_constructor_dep t.deps
                 ~from:(Code_id_or_name.var return_arg)
-                (Apply (Indirect_code_pointer, Normal i))
+                (Apply (Unknown_arity_code_pointer, Normal i))
                 ~base:(Code_id_or_name.name name))
             code_dep.return;
           Graph.add_constructor_dep t.deps ~from:call_witness Code_of_closure
@@ -295,7 +295,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           let untuple_var = Variable.create "untuple_var" Flambda_kind.value in
           Graph.add_coconstructor_dep t.deps
             ~from:(Code_id_or_name.var untuple_var)
-            (Param (Indirect_code_pointer, 0))
+            (Param (Unknown_arity_code_pointer, 0))
             ~base:(Code_id_or_name.name name);
           List.iteri
             (fun i v ->
@@ -312,7 +312,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
                 (fun i arg ->
                   Graph.add_coconstructor_dep t.deps
                     ~from:(Code_id_or_name.var arg)
-                    (Param (Indirect_code_pointer, i))
+                    (Param (Unknown_arity_code_pointer, i))
                     ~base:func)
                 first;
               Graph.add_constructor_dep t.deps ~from:witness Code_of_closure
@@ -320,19 +320,19 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
               match rest with
               | [] ->
                 Graph.add_constructor_dep t.deps ~base:func
-                  (Apply (Indirect_code_pointer, Exn))
+                  (Apply (Unknown_arity_code_pointer, Exn))
                   ~from:(Code_id_or_name.var code_dep.exn);
                 List.iteri
                   (fun i return_arg ->
                     Graph.add_constructor_dep t.deps
                       ~from:(Code_id_or_name.var return_arg)
-                      (Apply (Indirect_code_pointer, Normal i))
+                      (Apply (Unknown_arity_code_pointer, Normal i))
                       ~base:func)
                   code_dep.return
               | _ :: _ ->
                 let v = Variable.create "partial_apply" Flambda_kind.value in
                 Graph.add_constructor_dep t.deps ~from:(Code_id_or_name.var v)
-                  (Apply (Indirect_code_pointer, Normal 0))
+                  (Apply (Unknown_arity_code_pointer, Normal 0))
                   ~base:func;
                 add_deps (Code_id_or_name.var v) rest)
           in

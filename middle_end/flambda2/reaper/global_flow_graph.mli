@@ -14,8 +14,8 @@
 (**************************************************************************)
 
 type closure_entry_point =
-  | Indirect_code_pointer
-  | Direct_code_pointer
+  | Unknown_arity_code_pointer
+  | Known_arity_code_pointer
 
 module Field : sig
   type return_kind =
