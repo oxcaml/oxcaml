@@ -1684,7 +1684,8 @@ and transl_curried_function ~scopes loc repr params body
                 fp_partial
                 ~arg_sort:fp_sort ~arg_layout
                 ~return_layout
-          | Tparam_optional_default (pat, default_arg, default_arg_sort, mpath) ->
+          | Tparam_optional_default
+              (pat, default_arg, default_arg_sort, mpath) ->
               (* CR generic-optional : CHECK THIS *)
               let default_arg_sort = Jkind.Sort.default_for_transl_and_get default_arg_sort in
               let default_arg =
