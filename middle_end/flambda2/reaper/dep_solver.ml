@@ -833,12 +833,14 @@ let get_all_usages :
        in
        [ out x;
          rev_accessor_rel x
-           (Term.constant (Field.encode Code_of_closure))
+           (Term.constant
+              (Field.encode (Code_of_closure Known_arity_code_pointer)))
            indirect_call_witness;
          sources_rel indirect_call_witness indirect;
          constructor_rel indirect code_id_of_witness code_id;
-         (* CR ncourant: this only works because this can only correspond to a
-            full application, otherwise we wouldn't have unboxed! *)
+         (* Note ncourant: this only works because this can only correspond to a
+            full application, otherwise we wouldn't have unboxed! We should
+            probably check that [Unknown_arity_code_pointer] never occurs. *)
          code_id_my_closure_rel code_id my_closure_of_code_id;
          usages_rel my_closure_of_code_id y ]
        ==> out y),
@@ -1043,20 +1045,13 @@ let to_change_representation = rel1 "to_change_representation" Cols.[n]
 let datalog_rules =
   let open! Syntax in
   let open! Global_flow_graph in
-  (* let field_cannot_be_destructured (i : Field.t) = match[@ocaml.warning "-4"]
-     i with | Code_of_closure | Apply _ | Code_id_of_call_witness _ -> true | _
-     -> false in *)
   let real_field (i : Field.t) =
     match[@ocaml.warning "-4"] i with
-    | Code_of_closure | Apply _ | Code_id_of_call_witness _ -> false
+    | Code_of_closure _ | Apply _ | Code_id_of_call_witness _ -> false
     | _ -> true
   in
-  (* let relation_prevents_unboxing : Field.t -> _ = function | Block _ |
-     Value_slot _ -> false | Function_slot _ -> false (* todo *) |
-     Code_of_closure | Is_int | Get_tag -> true | Apply _ -> true (* todo? *)
-     in *)
   let is_code_field : Field.t -> _ = function[@ocaml.warning "-4"]
-    | Code_of_closure -> true
+    | Code_of_closure _ -> true
     | _ -> false
   in
   let is_apply_field : Field.t -> _ = function[@ocaml.warning "-4"]
@@ -1080,6 +1075,9 @@ let datalog_rules =
        usages_rel base usage;
        field_usages_rel usage relation _v ]
      ==> field_of_constructor_is_used base relation);
+    (* CR ncourant: this marks any [Apply] field as
+       [field_of_constructor_is_used], as long as the function is called.
+       Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
     (let$ [base; relation; from; coderel; indirect_call_witness] =
        ["base"; "relation"; "from"; "coderel"; "indirect_call_witness"]
      in
@@ -1089,8 +1087,16 @@ let datalog_rules =
        any_usage_pred indirect_call_witness;
        filter_field is_code_field coderel ]
      ==> field_of_constructor_is_used base relation);
+    (* If any usage is possible, do not change the representation. Note that
+       this rule will change in the future, when local value slots are properly
+       tracked: a closure will only local value slots that has any_use will
+       still be able to have its representation changed. *)
     (let$ [x] = ["x"] in
      [any_usage_pred x] ==> cannot_change_representation0 x);
+    (* If there exists an alias which has another source, and which uses any
+       real field of our allocation, we cannot change the representation. This
+       currently requires 4 rules due to the absence of disjunction in the
+       datalog engine. *)
     (let$ [allocation_id; alias; alias_source; field; _v] =
        ["allocation_id"; "alias"; "alias_source"; "field"; "_v"]
      in
@@ -1123,11 +1129,15 @@ let datalog_rules =
        filter_field real_field field;
        field_usages_top_rel alias field ]
      ==> cannot_change_representation0 allocation_id);
+    (* If the allocation has a source distinct from itself, its representation
+       cannot be changed (in fact, in that case, it shouldn't even be an
+       allocation). *)
     (let$ [allocation_id; source] = ["allocation_id"; "source"] in
      [sources_rel allocation_id source; distinct Cols.n source allocation_id]
      ==> cannot_change_representation0 allocation_id);
     (* Used but not its own source: either from any source, or it has no source
-       at all and it is dead code. In either case, do not unbox *)
+       at all and it is dead code. In either case, do not unbox or change the
+       representation. *)
     (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
      [ usages_rel allocation_id usage;
        not (sources_rel allocation_id allocation_id) ]
@@ -1186,6 +1196,9 @@ let datalog_rules =
     (let$ [allocation_id] = ["allocation_id"] in
      [any_source_pred allocation_id]
      ==> cannot_change_closure_calling_convention allocation_id);
+    (* If the calling convention of a closure cannot be changed, the calling
+       convention of its code_id cannot be either. From now on,
+       [cannot_change_closure_calling_convention] should no longer be used. *)
     (let$ [ set_of_closures;
             coderel;
             indirect_call_witness;
@@ -1204,13 +1217,12 @@ let datalog_rules =
        cannot_change_closure_calling_convention set_of_closures ]
      ==> cannot_change_calling_convention code_id);
     (* CR ncourant: we're preventing changing the calling convention of
-       functions called with indirect_unknown_arity. This could be improved
-       later, but will require wrappers for over- and partial applications, as
-       well as untupling. *)
-    (* CR ncourant: this is currently wrong for functions which take no
-       arguments and return no values! Fixing this would require making the
-       distinction Direct/Indirect for code_of_closure, which wouldn't be a bad
-       thing to do but is not done yet. *)
+       functions called with Indirect_unknown_arity. The two commented rules
+       below could allow to transform some Indirect_unknown_arity calls to
+       direct calls and not taking them into account here, but this would
+       require wrappers for over- and partial applications, as well as
+       untupling. As these wrappers are complex to write correctly, this is not
+       done yet. *)
     (let$ [ set_of_closures;
             usage;
             relation;
@@ -1233,38 +1245,9 @@ let datalog_rules =
        filter_field
          (fun (f : Field.t) ->
            match[@ocaml.warning "-4"] f with
-           | Apply (Unknown_arity_code_pointer, _) -> true
+           | Code_of_closure Unknown_arity_code_pointer -> true
            | _ -> false)
          relation;
-       constructor_rel set_of_closures coderel call_witness;
-       filter_field is_code_field coderel;
-       constructor_rel call_witness code_id_of_witness codeid ]
-     ==> cannot_change_calling_convention codeid);
-    (let$ [ set_of_closures;
-            usage;
-            relation;
-            _v;
-            coderel;
-            call_witness;
-            code_id_of_witness;
-            codeid ] =
-       [ "set_of_closures";
-         "usage";
-         "relation";
-         "_v";
-         "coderel";
-         "call_witness";
-         "code_id_of_witness";
-         "codeid" ]
-     in
-     [ usages_rel set_of_closures usage;
-       rev_coaccessor_rel usage relation _v;
-       filter
-         (fun [f] ->
-           match[@ocaml.warning "-4"] CoField.decode f with
-           | Param (Unknown_arity_code_pointer, _) -> true
-           | _ -> false)
-         [relation];
        constructor_rel set_of_closures coderel call_witness;
        filter_field is_code_field coderel;
        constructor_rel call_witness code_id_of_witness codeid ]
@@ -1299,6 +1282,9 @@ let datalog_rules =
              ~code_id:(fun _ -> false))
          [x] ]
      ==> cannot_change_representation0 x);
+    (* If the representation of any closure in a set of closures cannot be
+       changed, the representation of all the closures in the set cannot be
+       changed. *)
     (let$ [x] = ["x"] in
      [cannot_change_representation0 x] ==> cannot_change_representation1 x);
     (let$ [x; field; y] = ["x"; "field"; "y"] in
@@ -1308,27 +1294,37 @@ let datalog_rules =
      ==> cannot_change_representation1 y);
     (let$ [x] = ["x"] in
      [cannot_change_representation1 x] ==> cannot_change_representation x);
-    (* Due to value_kinds not taking representation changes into account for
-       now, blocks cannot have their representation changed, so we prevent it
-       here. *)
+    (* Due to value_kinds rewriting not taking representation changes into
+       account for now, blocks cannot have their representation changed, so we
+       prevent it here. *)
     (let$ [x; field; y] = ["x"; "field"; "y"] in
      [ constructor_rel x field y;
        filter_field
          (fun (f : Field.t) ->
            match f with
            | Block _ | Is_int | Get_tag -> true
-           | Value_slot _ | Function_slot _ | Code_of_closure | Apply _
+           | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
            | Code_id_of_call_witness _ ->
              false)
          field ]
      ==> cannot_change_representation x);
+    (* The use of [cannot_change_representation1] is here to still allow
+       unboxing of blocks, even if we cannot change their representation due to
+       the value_kind limitation. *)
     (let$ [x] = ["x"] in
      [cannot_change_representation1 x] ==> cannot_unbox0 x);
+    (* This is repeated from the earlier occurrence in
+       [cannot_change_representation0]. It is here because in the future, when
+       we want to allow the changing of the representation of local value slots,
+       it will remain necessary. *)
     (let$ [x] = ["x"] in
      [any_usage_pred x] ==> cannot_unbox0 x);
     (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
        field; filter_field field_cannot_be_destructured field ] ==>
        cannot_unbox0 x); *)
+    (* Unboxing a closure requires changing its calling convention, as we must
+       pass the value slots as extra arguments. Thus, we prevent unboxing of
+       closures if their calling convention cannot be changed. *)
     (let$ [x; coderel; call_witness; code_id_of_witness; codeid] =
        ["x"; "coderel"; "call_witness"; "code_id_of_witness"; "codeid"]
      in
@@ -1337,6 +1333,8 @@ let datalog_rules =
        constructor_rel call_witness code_id_of_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 x);
+    (* An allocation that is one of the results of a function can only be
+       unboxed if the function's calling conventation can be changed. *)
     (let$ [ alias;
             allocation_id;
             relation;
@@ -1365,11 +1363,13 @@ let datalog_rules =
        constructor_rel call_witness code_id_of_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 allocation_id);
+    (* Likewise, an allocation passed as a parameter of a function can only be
+       unboxed if the function's calling convention can be changed. *)
     (* CR ncourant: note that this can fail to trigger if the alias is
        any_source but has no use! This is not a problem but makes it necessary
-       to delete unused params in calls. In the future, we could modify this
-       check to ensure it only triggers if the variable is indeed used, allowing
-       slightly more unboxing. *)
+       to replace unused params in calls with poison values. In the future, we
+       could modify this check to ensure it only triggers if the variable is
+       indeed used, allowing slightly more unboxing. *)
     (let$ [ alias;
             allocation_id;
             relation;
@@ -1408,14 +1408,22 @@ let datalog_rules =
            | Param (Known_arity_code_pointer, _) -> false)
          [relation] ]
      ==> cannot_unbox0 allocation_id);
+    (* An allocation that is stored in another can only be unboxed if either the
+       representation of the other allocation can be changed, of it the field it
+       is stored in is never read, as in that case a poison value will be stored
+       instead. *)
     (let$ [alias; allocation_id; relation; to_] =
        ["alias"; "allocation_id"; "relation"; "to_"]
      in
      [ sources_rel alias allocation_id;
        rev_constructor_rel alias relation to_;
        field_of_constructor_is_used to_ relation;
+       filter_field real_field relation;
+       (* ^ XXX check *)
        cannot_change_representation to_ ]
      ==> cannot_unbox0 allocation_id);
+    (* As previously: if any closure of a set of closures cannot be unboxed,
+       then every closure in the set cannot be unboxed. *)
     (let$ [x] = ["x"] in
      [cannot_unbox0 x] ==> cannot_unbox x);
     (let$ [x; field; y] = ["x"; "field"; "y"] in
@@ -1423,6 +1431,8 @@ let datalog_rules =
        constructor_rel x field y;
        filter_field is_function_slot field ]
      ==> cannot_unbox y);
+    (* Compute allocations to unbox or to change representation. This requires
+       the rules to be executed in order. *)
     (let$ [x] = ["x"] in
      [any_usage_pred x; not (cannot_unbox x)] ==> to_unbox x);
     (let$ [x; _y] = ["x"; "_y"] in
@@ -1558,7 +1568,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
     (fun field field_use ->
       match field with
       | Function_slot _ | Code_id_of_call_witness _ -> assert false
-      | Apply _ | Code_of_closure -> None
+      | Apply _ | Code_of_closure _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
         let new_name =
           Flambda_colours.without_colours ~f:(fun () ->
@@ -1827,16 +1837,28 @@ let cannot_change_calling_convention uses v =
 
 let code_id_actually_called_query =
   let open Syntax in
-  let open Global_flow_graph in
+  let open! Global_flow_graph in
   compile [] (fun [] ->
-      with_parameters ["set_of_closures"; "coderel"]
-        (fun [set_of_closres; coderel] ->
+      with_parameters ["set_of_closures"] (fun [set_of_closures] ->
           foreach
-            ["indirect_call_witness"; "indirect"; "code_id_of_witness"; "codeid"]
-            (fun [indirect_call_witness; indirect; code_id_of_witness; codeid]
+            [ "coderel";
+              "indirect_call_witness";
+              "indirect";
+              "code_id_of_witness";
+              "codeid" ]
+            (fun
+              [ coderel;
+                indirect_call_witness;
+                indirect;
+                code_id_of_witness;
+                codeid ]
             ->
               where
-                [ rev_accessor_rel set_of_closres coderel indirect_call_witness;
+                [ filter_field
+                    (function[@warning "-4"]
+                      | (Code_of_closure _ : Field.t) -> true | _ -> false)
+                    coderel;
+                  rev_accessor_rel set_of_closures coderel indirect_call_witness;
                   sources_rel indirect_call_witness indirect;
                   any_usage_pred indirect_call_witness;
                   constructor_rel indirect code_id_of_witness codeid ]
@@ -1849,16 +1871,28 @@ let code_id_actually_called uses v =
   then None
   else if exists_with_parameters
             cannot_change_calling_convention_of_called_closure_query1
-            [Code_id_or_name.name v; Field.encode Code_of_closure]
+            [ Code_id_or_name.name v;
+              Field.encode (Code_of_closure Known_arity_code_pointer) ]
             uses.db
           || exists_with_parameters
                cannot_change_calling_convention_of_called_closure_query2
-               [Code_id_or_name.name v; Field.encode Code_of_closure]
+               [ Code_id_or_name.name v;
+                 Field.encode (Code_of_closure Known_arity_code_pointer) ]
+               uses.db
+          || exists_with_parameters
+               cannot_change_calling_convention_of_called_closure_query1
+               [ Code_id_or_name.name v;
+                 Field.encode (Code_of_closure Unknown_arity_code_pointer) ]
+               uses.db
+          || exists_with_parameters
+               cannot_change_calling_convention_of_called_closure_query2
+               [ Code_id_or_name.name v;
+                 Field.encode (Code_of_closure Unknown_arity_code_pointer) ]
                uses.db
   then None
   else
     Datalog.Cursor.fold_with_parameters code_id_actually_called_query
-      [Code_id_or_name.name v; Field.encode Code_of_closure]
+      [Code_id_or_name.name v]
       uses.db ~init:None
       ~f:(fun [code_id_of_witness; codeid] acc ->
         let num_already_applied_params =

@@ -26,7 +26,7 @@ module Field : sig
     | Block of int * Flambda_kind.t (* nth field of a block *)
     | Value_slot of Value_slot.t
     | Function_slot of Function_slot.t
-    | Code_of_closure (* code_id in a set of closurse *)
+    | Code_of_closure of closure_entry_point (* code_id in a set of closurse *)
     | Is_int (* value checked for [Is_int] *)
     | Get_tag (* tag of the value is read *)
     | Apply of closure_entry_point * return_kind

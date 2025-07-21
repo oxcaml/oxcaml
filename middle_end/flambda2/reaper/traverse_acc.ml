@@ -201,7 +201,11 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
            Besides, return values can be anything. *)
         Graph.add_constructor_dep t.deps
           ~base:(Code_id_or_name.name name)
-          Code_of_closure
+          (Code_of_closure Unknown_arity_code_pointer)
+          ~from:(Code_id_or_name.name name);
+        Graph.add_constructor_dep t.deps
+          ~base:(Code_id_or_name.name name)
+          (Code_of_closure Known_arity_code_pointer)
           ~from:(Code_id_or_name.name name);
         let code_metadata = get_code_metadata code_id in
         let num_returns =
@@ -256,6 +260,10 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
         Graph.add_alias t.deps
           ~to_:(Code_id_or_name.var code_dep.my_closure)
           ~from:(Code_id_or_name.name name);
+        let call_witnesses = code_dep.call_witnesses in
+        Graph.add_constructor_dep t.deps ~from:(List.hd call_witnesses)
+          (Code_of_closure Known_arity_code_pointer)
+          ~base:(Code_id_or_name.name name);
         List.iteri
           (fun i v ->
             Graph.add_constructor_dep t.deps
@@ -274,7 +282,6 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           ~base:(Code_id_or_name.name name)
           (Apply (Known_arity_code_pointer, Exn))
           ~from:(Code_id_or_name.var code_dep.exn);
-        let call_witnesses = code_dep.call_witnesses in
         if code_dep.is_tupled
         then (
           assert (List.compare_length_with call_witnesses 1 = 0);
@@ -290,7 +297,8 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
                 (Apply (Unknown_arity_code_pointer, Normal i))
                 ~base:(Code_id_or_name.name name))
             code_dep.return;
-          Graph.add_constructor_dep t.deps ~from:call_witness Code_of_closure
+          Graph.add_constructor_dep t.deps ~from:call_witness
+            (Code_of_closure Unknown_arity_code_pointer)
             ~base:(Code_id_or_name.name name);
           let untuple_var = Variable.create "untuple_var" Flambda_kind.value in
           Graph.add_coconstructor_dep t.deps
@@ -315,8 +323,8 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
                     (Param (Unknown_arity_code_pointer, i))
                     ~base:func)
                 first;
-              Graph.add_constructor_dep t.deps ~from:witness Code_of_closure
-                ~base:func;
+              Graph.add_constructor_dep t.deps ~from:witness
+                (Code_of_closure Unknown_arity_code_pointer) ~base:func;
               match rest with
               | [] ->
                 Graph.add_constructor_dep t.deps ~base:func
