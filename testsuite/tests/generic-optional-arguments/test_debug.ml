@@ -16,3 +16,8 @@ let _ = f_or_null  ()
 val f_or_null : Stdlib.Or_null.?'x:int -> unit -> int or_null = <fun>
 - : int or_null = This 1
 |}] *)
+
+[%%expect{|
+val f_or_null : Stdlib.Or_null.?'x:int -> unit -> int = <fun>
+- : int = 35
+|}]

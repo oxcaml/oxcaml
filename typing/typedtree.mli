@@ -563,11 +563,11 @@ and function_param_kind =
   | Tparam_pat of pattern
   (** [Tparam_pat p] is a non-optional argument with pattern [p]. *)
   | Tparam_optional_default of
-      pattern * expression * Jkind.sort * Btype.module_path
-  (** [Tparam_optional_default (p, e, sort, path)] is an optional argument [p]
+      pattern * expression * Jkind.sort * Btype.optional_module_path
+  (** [Tparam_optional_default (p, e, sort, mpath)] is an optional argument [p]
       with default value [e], i.e. [?x:(p = e)]. If the parameter is of type
       [a option], the pattern and expression are of type [a]. [sort] is the
-      sort of [e]. [path] is the generic optioal module path *)
+      sort of [e]. [mpath] is the generic optioal module path *)
 
 and function_body =
   | Tfunction_body of expression

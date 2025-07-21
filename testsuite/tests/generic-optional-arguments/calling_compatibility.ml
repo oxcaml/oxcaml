@@ -9,14 +9,14 @@ flags = "-extension-universe alpha ";
 (* Three function definitions *)
 let f_vanilla ?(x : int option) () = match x with None -> 0 | Some v -> v
 let f_option Stdlib.Option.?'(x = 0) () = x
-let f_or_null Stdlib.Or_null.?'(x: int or_null) () = x
+(*= let f_or_null Stdlib.Or_null.?'(x: int or_null) () = x *)
 (* CR generic-optional: This seg faults *)
-(*= let f_or_null Stdlib.Or_null.?'(x = 0) () = x *)
+let f_or_null Stdlib.Or_null.?'(x = 0) () = x
 
 [%%expect{|
 val f_vanilla : ?x:int -> unit -> int = <fun>
 val f_option : Stdlib.Option.?'x:int -> unit -> int = <fun>
-val f_or_null : Stdlib.Or_null.?'x:int -> unit -> int or_null = <fun>
+val f_or_null : Stdlib.Or_null.?'x:int -> unit -> int = <fun>
 |}]
 
 (* ===================================================================== *)
@@ -154,7 +154,7 @@ This argument cannot be applied with label "Stdlib.Or_null.?'x"
 (* 1. f_or_null with ~x:1 *)
 let _ = f_or_null ~x:1 ()
 [%%expect{|
-- : int or_null = This 1
+- : int = 1
 |}]
 
 (* 2. f_or_null with ?x:(Some 1) *)
@@ -164,7 +164,7 @@ Line 1, characters 21-29:
 1 | let _ = f_or_null ?x:(Some 1) ()
                          ^^^^^^^^
 Error: The function applied to this argument has type
-         Stdlib.Or_null.?'x:int -> int or_null
+         Stdlib.Or_null.?'x:int -> int
 This argument cannot be applied with label "?x"
 |}]
 
@@ -175,7 +175,7 @@ Line 1, characters 21-29:
 1 | let _ = f_or_null ?x:(This 1) ()
                          ^^^^^^^^
 Error: The function applied to this argument has type
-         Stdlib.Or_null.?'x:int -> int or_null
+         Stdlib.Or_null.?'x:int -> int
 This argument cannot be applied with label "?x"
 |}]
 
@@ -186,7 +186,7 @@ Line 1, characters 36-44:
 1 | let _ = f_or_null Stdlib.Option.?'x:(Some 1) ()
                                         ^^^^^^^^
 Error: The function applied to this argument has type
-         Stdlib.Or_null.?'x:int -> int or_null
+         Stdlib.Or_null.?'x:int -> int
 This argument cannot be applied with label "Stdlib.Option.?'x"
 |}]
 
@@ -198,7 +198,7 @@ Line 1, characters 36-44:
 1 | let _ = f_or_null Stdlib.Option.?'x:(This 1) ()
                                         ^^^^^^^^
 Error: The function applied to this argument has type
-         Stdlib.Or_null.?'x:int -> int or_null
+         Stdlib.Or_null.?'x:int -> int
 This argument cannot be applied with label "Stdlib.Option.?'x"
 |}]
 
@@ -217,5 +217,5 @@ Error: This variant expression is expected to have type "int or_null"
 (* 7. f_or_null with Stdlib.Or_null.?'x:(This 1) *)
 let _ = f_or_null Stdlib.Or_null.?'x:(This 1) ()
 [%%expect{|
-- : int or_null = This 1
+- : int = 1
 |}]

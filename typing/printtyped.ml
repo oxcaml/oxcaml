@@ -694,7 +694,7 @@ and binding_op i ppf x =
     fmt_location x.bop_loc;
   expression i ppf x.bop_exp
 
-and optional_module_path i ppf (x : Btype.module_path) =
+and optional_module_path i ppf (x : Btype.optional_module_path) =
   match x with
   | Stdlib_option -> line i ppf "Stdlib.Option\n"
   | Stdlib_or_null -> line i ppf "Stdlib.Or_null\n"

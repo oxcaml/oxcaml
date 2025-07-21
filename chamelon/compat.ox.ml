@@ -147,7 +147,7 @@ let mkTexp_function ?(id = texp_function_defaults)
                     let mpath =
                       match Btype.classify_optionality arg_label with
                       | Optional_arg mpath -> mpath
-                      | Not_optional_arg -> assert false
+                      | Required_or_position_arg -> assert false
                     in
                     Tparam_optional_default
                       (pattern, default, id.param_sort, mpath));
@@ -243,7 +243,7 @@ let view_texp (e : expression_desc) =
           (fun param ->
             let pattern, optional_default =
               match param.fp_kind with
-              | Tparam_optional_default (pattern, optional_default, _) ->
+              | Tparam_optional_default (pattern, optional_default, _, _) ->
                   (pattern, Some optional_default)
               | Tparam_pat pattern -> (pattern, None)
             in
