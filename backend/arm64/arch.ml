@@ -115,7 +115,9 @@ let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
 
-let addressing_displacement_for_llvmize = Misc.fatal_error "Llvmize doesn't support arm64"
+let addressing_displacement_for_llvmize = function
+  | Iindexed d -> d
+  | Ibased (_, d) -> d
 
 (* Printing operations and addressing modes *)
 

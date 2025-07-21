@@ -108,6 +108,7 @@ let () =
   (diff ${ir_output} ${ir_output}.corrected)))
 
 (rule
+ ${enabled_if}
  (deps ${output}.exe)
  (targets ${output}.corrected)
  (action
