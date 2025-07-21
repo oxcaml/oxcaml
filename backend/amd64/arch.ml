@@ -325,7 +325,7 @@ let addressing_displacement_for_llvmize = function
   | Iscaled _
   | Iindexed2scaled _ ->
       Misc.fatal_error
-        "Arch.get_displacement_addressing_for_llvmize: unexpected addressing mode"
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
 
 (* Printing operations and addressing modes *)
 
