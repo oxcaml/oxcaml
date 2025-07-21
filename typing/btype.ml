@@ -624,24 +624,28 @@ let is_optional_parsetree : Parsetree.arg_label -> bool = function
   | Generic_optional _ -> true
   | _ -> false
 
-type optionality = Optional_arg of Longident.t
-                 | Not_optional_arg
+(* CR generic-optional: temporary function, to remove *)
+type optional_module_path = Stdlib_option | Stdlib_or_null
+let classify_module_path : Longident.t -> optional_module_path = function
+  | Ldot(Lident "Stdlib", "Option") -> Stdlib_option
+  | Ldot(Lident "Stdlib", "Or_null") -> Stdlib_or_null
+  | _ -> failwith "Only expected Stdlib.Option and Stdlib.Or_null"
 
-let classify_optionality : Types.arg_label -> optionality = function
-  | Optional _ -> Optional_arg (Ldot (Lident "Stdlib", "Option"))
-  | Generic_optional(path, _) -> Optional_arg (path.txt)
-  | _ -> Not_optional_arg
+type optionality = Optional_arg of optional_module_path
+                 | Required_or_position_arg
 
-let classify_optionality_parsetree : Parsetree.arg_label -> optionality
-  = function
-  | Optional _ -> Optional_arg (Ldot (Lident "Stdlib", "Option"))
-  | Generic_optional(path, _) -> Optional_arg (path.txt)
-  | _ -> Not_optional_arg
+let classify_optionality (lbl: Types.arg_label) = match lbl with
+  | Optional _ -> Optional_arg Stdlib_option
+  | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
+  | _ -> Required_or_position_arg
 
-(* is_optional is really buggy when generic optionals are involved.
-Renaming it to prevent its use
-*)
-let is_optional_arg arg = not (classify_optionality arg = Not_optional_arg)
+let classify_optionality_parsetree (lbl : Parsetree.arg_label) = match lbl with
+  | Optional _ -> Optional_arg Stdlib_option
+  | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
+  | _ -> Required_or_position_arg
+
+let is_optional arg =
+  not (classify_optionality arg = Required_or_position_arg)
 
 let is_position = function Position _ -> true | _ -> false
 
@@ -658,41 +662,27 @@ let label_name = function
   | Position s -> s
   | Generic_optional (_, s) -> s
 
-(* CR generic-optional: temporary function, to remove *)
-type module_path = Stdlib_option | Stdlib_or_null
-let classify_module_path : Longident.t -> module_path = function
-  | Ldot(Lident "Stdlib", "Option") -> Stdlib_option
-  | Ldot(Lident "Stdlib", "Or_null") -> Stdlib_or_null
-  | _ -> failwith "Only expected Stdlib.Option and Stdlib.Or_null"
-
-let prefixed_label_name = function
-    Nolabel -> ""
-  | Labelled s | Position s -> "~" ^ s
-  | Optional s -> "?" ^ s
+let prefixed_label_name ppf l =
+  let open Format in
+  match l with
+    Nolabel -> fprintf ppf  ""
+  | Labelled s | Position s -> fprintf ppf "~%s" s
+  | Optional s -> fprintf ppf "?%s" s
   | Generic_optional (path, s) ->
-    (
-      match classify_module_path path.txt with
-      | Stdlib_option -> "Stdlib.Option"
-      | Stdlib_or_null -> "Stdlib.Or_null"
-    )
-    ^ ".?'" ^ s
-
+      fprintf ppf "%a.?'%s" Pprintast.longident path.txt s
 
 let arg_label_compatible param_label arg_label =
   match param_label, arg_label with
   | Nolabel, Nolabel -> true
   | (Labelled s | Optional s | Generic_optional(_, s)), Labelled s' -> s = s'
-  | _ -> (
-    match classify_optionality param_label, classify_optionality arg_label with
+  | _ ->
+    (match classify_optionality param_label, classify_optionality arg_label with
     | Optional_arg l_path, Optional_arg l_path' ->
         l_path = l_path' && (label_name param_label = label_name arg_label)
-    | _ -> (
+    | _ ->
       (* when positional labels are involved,
         we only care whether label names are equal*)
-      label_name param_label = label_name arg_label
-    )
-  )
-
+      label_name param_label = label_name arg_label)
 
 let rec extract_label_aux hd l (* param label*) = function
   | [] -> None

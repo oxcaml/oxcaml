@@ -788,17 +788,15 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
           in
           let arg_ty =
-            if not (Btype.is_optional_arg l) then arg_ty
+            if not (Btype.is_optional l) then arg_ty
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              let path = match l with
-                | Optional _ -> Predef.path_option
-                | Generic_optional (path, _) ->
-                    (match Btype.classify_module_path path.txt with
+              let path = match Btype.classify_optionality l with
+                | Optional_arg mpath -> (match mpath with
                     | Stdlib_option -> Predef.path_option
                     | Stdlib_or_null -> Predef.path_or_null)
-                | _ -> assert false
+                | Required_or_position_arg -> assert false
               in
               newmono
                 (newconstr path [Btype.tpoly_get_mono arg_ty])

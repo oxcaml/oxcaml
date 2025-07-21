@@ -3315,12 +3315,9 @@ let rec expands_to_datatype env ty =
 let arg_label_equal l1 l2 =
   match l1, l2 with
   | Generic_optional(path1, str1), Generic_optional(path2, str2) ->
-      str1 = str2 && (
-        classify_module_path path1.txt = classify_module_path path2.txt
-      )
+      str1 = str2 &&
+        (classify_module_path path1.txt = classify_module_path path2.txt)
   | _ -> l1 = l2
-
-
 
 let equivalent_with_nolabels l1 l2 =
   arg_label_equal l1 l2 || (match l1, l2 with
@@ -4547,59 +4544,43 @@ let filter_arrow env t l ~force_tpoly =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let ty_arg =
-      match force_tpoly with
-      | false ->
-          begin
-            (* polymorphic arguments are never optional *)
-            assert (not (is_optional_arg l));
-            newvar2 level k_arg
-          end
-      | true ->
-          let t1 =
-            match classify_optionality l with
-              (* CR layouts v5: Change the Jkind.Builtin.value when option
-                      can hold non-values.
-                {v
-                  match l with
-                  | Optional _ ->
-                    newty2 ~level
-                      (Tconstr(Predef.path_option,
-                              [newvar2 level Predef.option_argument_jkind],
-                              ref Mnil))
-                v}
+      if not force_tpoly then begin
+        (* polymorphic arguments are never optional *)
+        assert (not (is_optional l));
+        newvar2 level k_arg
+      end else begin
+        let t1 =
+          match classify_optionality l with
+          | Optional_arg mpath ->
+            (* CR: For generic optional arguments, we need to construct the
+                appropriate type based on the module path. e.g.
 
-                zhichen: This CR is from outdated code for handling optional
-                          arg.
+              {v
+              let type_ident : Longident.t
+                = Ldot (Ldot (path.txt, "Opt_syntax"), "t") in
+              let (path, _) = Env.lookup_type ~loc:path.loc type_ident env in
+              v}
+
             *)
-            | Optional_arg path ->
-              (* CR: For generic optional arguments, we need to construct the
-                  appropriate type based on the module path. e.g.
-
-                {v
-                let type_ident : Longident.t
-                  = Ldot (Ldot (path.txt, "Opt_syntax"), "t") in
-                let (path, _) = Env.lookup_type ~loc:path.loc type_ident env in
-                v}
-
-              *)
-              let t_cons, arg_jkind =
-                match classify_module_path path with
-                | Stdlib_option ->
-                    Predef.path_option, Predef.option_argument_jkind
-                | Stdlib_or_null ->
-                    Predef.path_or_null,
-                      Jkind.for_or_null_argument Predef.ident_or_null
-              in
-              newty2 ~level (Tconstr(t_cons,
-                [newvar2 level arg_jkind], ref Mnil))
-            | _ ->
-              if is_position l then
-                newty2 ~level
-                  (Tconstr (Predef.path_lexing_position, [], ref Mnil))
-              else
-                newvar2 level k_arg
-          in
-          newty2 ~level (Tpoly(t1, []))
+            let t_cons, arg_jkind =
+              match mpath with
+              | Stdlib_option ->
+                  Predef.path_option, Predef.option_argument_jkind
+              | Stdlib_or_null ->
+                  Predef.path_or_null,
+                    Jkind.for_or_null_argument Predef.ident_or_null
+            in
+            newty2 ~level (Tconstr(t_cons,
+              [newvar2 level arg_jkind], ref Mnil))
+          | _ ->
+            if is_position l then
+              newty2 ~level
+                (Tconstr (Predef.path_lexing_position, [], ref Mnil))
+            else
+              newvar2 level k_arg
+        in
+        newty2 ~level (Tpoly(t1, []))
+      end
     in
     let ty_ret = newvar2 level k_res in
     let arg_mode = Alloc.newvar () in
