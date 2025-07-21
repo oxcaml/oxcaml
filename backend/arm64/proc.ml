@@ -340,7 +340,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Poptrap _ | Prologue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
-                          Float32_of_int32 | Int32_of_float32 | V128_of_vec Vec128))
+                          Float32_of_int32 | Int32_of_float32 |
+                          V128_of_vec Vec128))
     -> [||]
   | Stack_check _ -> assert false (* not supported *)
   | Op (Const_vec256 _ | Const_vec512 _)
