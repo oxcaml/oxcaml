@@ -354,7 +354,7 @@ L161:                                                ; preds = %L154
   %51 = load i64, ptr %15
   store i64 %51, ptr %16
   %52 = load i64, ptr %16
-  %53 = ashr i64 %52, 1
+  %53 = add i64 %52, 1
   store i64 %53, ptr %16
   %54 = load i64, ptr %16
   store i64 %54, ptr %2
@@ -530,24 +530,19 @@ L198:                                                ; preds = %L1
   %12 = load i64, ptr %11
   store i64 %12, ptr %5
   %13 = load i64, ptr %5
-  %14 = add i64 %13, 0
-  %15 = inttoptr i64 %14 to ptr
-  %16 = load i64, ptr %15
-  store i64 %16, ptr %6
-  %17 = load i64, ptr %6
-  store i64 %17, ptr %7
-  %18 = load i64, ptr %7
-  %19 = xor i64 %18, -1
-  store i64 %19, ptr %7
-  %20 = load i64, ptr %7
-  store i64 %20, ptr %8
-  %21 = load i64, ptr %8
-  %22 = or i64 %21, 1
-  store i64 %22, ptr %8
-  %23 = load i64, ptr %8
-  store i64 %23, ptr %2
-  %24 = load i64, ptr %2
-  ret i64 %24
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = xor i64 %14, -1
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = or i64 %17, 1
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
 }
 
 define i64 @camlInt_ops__lsl__9_32_code(i64 %0)  {
