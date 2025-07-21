@@ -1,17 +1,17 @@
 let static_const_not_supported () =
   Misc.fatal_error "This static_const is not yet supported."
 
-let block_like ~env ~res (const : Flambda2_terms.Static_const.t) :
+let block_like ~env ~res (const : Static_const.t) :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =
   match const with
   | Set_of_closures _closures ->
     Misc.fatal_errorf
       "Cannot translate %a: expected a block-like static const, instead found \
        Set_of_closures"
-      Flambda2_terms.Static_const.print const
+      Static_const.print const
   | Block (tag, mut, _shape, fields) ->
     (* CR selee: is it ok to ignore shape? *)
-    let tag = Flambda2_kinds.Tag.Scannable.to_int tag in
+    let tag = Tag.Scannable.to_int tag in
     let mutability =
       match mut with
       | Mutable -> Jsir.Maybe_mutable
@@ -22,7 +22,7 @@ let block_like ~env ~res (const : Flambda2_terms.Static_const.t) :
     in
     let fields, res =
       To_jsir_shared.simples ~env ~res
-        (List.map Flambda2_term_basics.Simple.With_debuginfo.simple fields)
+        (List.map Simple.With_debuginfo.simple fields)
     in
     Block (tag, Array.of_list fields, NotArray, mutability), env, res
   | Boxed_float32 value ->

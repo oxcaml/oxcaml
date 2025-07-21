@@ -4,6 +4,30 @@
  (name flambda2_to_jsir)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
+ (flags
+  (:standard
+   -open
+   Flambda2_bound_identifiers
+   -open
+   Flambda2_cmx
+   -open
+   Flambda2_identifiers
+   -open
+   Flambda2_kinds
+   -open
+   Flambda2_lattices
+   -open
+   Flambda2_numbers
+   -open
+   Flambda2_nominal
+   -open
+   Flambda2_term_basics
+   -open
+   Flambda2_terms
+   -open
+   Flambda2_simplify_shared
+   -open
+   Flambda2_ui))
  (ocamlopt_flags
   (:standard -O3))
  (libraries

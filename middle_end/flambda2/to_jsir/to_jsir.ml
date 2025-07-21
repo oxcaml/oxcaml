@@ -1,4 +1,4 @@
-open! Flambda2_terms.Flambda.Import
+open! Flambda.Import
 
 (** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
     environment. *)
@@ -17,7 +17,7 @@ let bind_expr_to_symbol ~env ~res symbol expr =
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
-  Flambda2_term_basics.Simple.pattern_match' simple
+  Simple.pattern_match' simple
     ~var:(fun name ~coercion:_ ->
       let env = To_jsir_env.add_alias_of_var_exn env ~var:fvar ~alias_of:name in
       env, res)
@@ -56,9 +56,7 @@ and let_expr ~env ~res e =
   Let.pattern_match' e
     ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
       ignore num_normal_occurrences_of_bound_vars;
-      match
-        Flambda2_bound_identifiers.Bound_pattern.name_mode bound_pattern
-      with
+      match Bound_pattern.name_mode bound_pattern with
       | Normal ->
         let_expr_normal ~env ~res e ~bound_pattern
           ~num_normal_occurrences_of_bound_vars ~body
@@ -67,18 +65,17 @@ and let_expr ~env ~res e =
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
           Let.print e)
 
-and let_expr_normal ~env ~res e
-    ~(bound_pattern : Flambda2_bound_identifiers.Bound_pattern.t)
+and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     ~num_normal_occurrences_of_bound_vars ~body =
   (* CR selee: translate to [Let] *)
   ignore num_normal_occurrences_of_bound_vars;
   let env, res =
     match bound_pattern, Let.defining_expr e with
     | Singleton v, Simple s ->
-      let fvar = Flambda2_bound_identifiers.Bound_var.var v in
+      let fvar = Bound_var.var v in
       create_let_simple ~env ~res fvar s
     | Singleton v, Prim (p, dbg) ->
-      let fvar = Flambda2_bound_identifiers.Bound_var.var v in
+      let fvar = Bound_var.var v in
       create_let_prim ~env ~res fvar p dbg
     | Set_of_closures bound_vars, Set_of_closures soc ->
       ignore (bound_vars, soc);
@@ -127,7 +124,7 @@ and apply_cont ~env ~res apply_cont =
       let res_cont = To_jsir_env.get_continuation_exn env continuation in
       match (res_cont : To_jsir_env.continuation) with
       | Return -> (
-        match Flambda2_identifiers.Continuation.sort continuation with
+        match Continuation.sort continuation with
         | Toplevel_return ->
           assert (List.length args = 1);
           (* CR selee: This is a hack, but I can't find a way to trigger any
@@ -135,8 +132,7 @@ and apply_cont ~env ~res apply_cont =
              module. I suspect for single-file compilation this is always fine.
              Will come back and review later. *)
           let compilation_unit =
-            To_jsir_env.module_symbol env
-            |> Flambda2_identifiers.Symbol.compilation_unit
+            To_jsir_env.module_symbol env |> Symbol.compilation_unit
           in
           let module_name =
             Compilation_unit.name compilation_unit
@@ -166,7 +162,7 @@ and apply_cont ~env ~res apply_cont =
         | Normal_or_exn | Define_root_symbol ->
           (* CR selee: seems odd, review later *)
           Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
-            Flambda2_identifiers.Continuation.print continuation)
+            Continuation.print continuation)
       | Exception -> failwith "unimplemented"
       | Block addr -> To_jsir_result.set_last res (Jsir.Branch (addr, args)))
     | Some (Push { exn_handler }) ->
@@ -192,14 +188,10 @@ and invalid ~env ~res msg =
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let env =
     To_jsir_env.create
-      ~module_symbol:(Flambda2_terms.Flambda_unit.module_symbol flambda_unit)
-      ~return_continuation:
-        (Flambda2_terms.Flambda_unit.return_continuation flambda_unit)
-      ~exn_continuation:
-        (Flambda2_terms.Flambda_unit.exn_continuation flambda_unit)
+      ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
+      ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
+      ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
   let res = To_jsir_result.create () in
-  let _env, res =
-    expr ~env ~res (Flambda2_terms.Flambda_unit.body flambda_unit)
-  in
+  let _env, res = expr ~env ~res (Flambda_unit.body flambda_unit) in
   To_jsir_result.to_program_exn res

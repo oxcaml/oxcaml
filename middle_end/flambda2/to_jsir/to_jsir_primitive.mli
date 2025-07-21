@@ -3,6 +3,6 @@
 val primitive :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
-  Flambda2_terms.Flambda_primitive.t ->
+  Flambda_primitive.t ->
   Debuginfo.t ->
   Jsir.expr * To_jsir_env.t * To_jsir_result.t
