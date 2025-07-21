@@ -20,6 +20,8 @@
 module Expanded_type : sig
   type t
 
+  val create_const : Reg_width_const.t -> t
+
   val create_value : Type_grammar.head_of_kind_value -> t
 
   val create_naked_immediate : Type_grammar.head_of_kind_naked_immediate -> t
