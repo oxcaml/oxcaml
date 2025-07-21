@@ -993,14 +993,14 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   | Base Void when Language_extension.(is_at_least Layouts Alpha) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
-    (* CR layouts v7.1: assess whether it is important for performance to support
-       deep value_kinds here *)
+    (* CR layouts v7.1: assess whether it is important for performance to
+       support deep value_kinds here *)
     Lambda.Punboxed_product
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
-  | ((  Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
+  | ((  Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+             | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const
 
@@ -1019,7 +1019,8 @@ let layout env loc sort ty =
       | Base (Vec128 | Vec256 | Vec512) as const ->
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | (Base (Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64) | Product _) as const ->
+      | (Base (Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64) | Product _)
+        as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
@@ -1039,7 +1040,8 @@ let layout_of_sort loc sort =
     | Base (Vec128 | Vec256 | Vec512) as const ->
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | (Base (Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64) | Product _) as const ->
+    | (Base (Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64) | Product _)
+      as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
     )

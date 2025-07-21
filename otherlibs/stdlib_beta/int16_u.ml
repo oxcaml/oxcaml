@@ -54,19 +54,23 @@ let[@inline always] pred x = of_int16 (Int16.pred (to_int16 x))
 
 let[@inline always] abs x = of_int16 (Int16.abs (to_int16 x))
 
-let[@inline always] logand x y = of_int16 (Int16.logand (to_int16 x) (to_int16 y))
+let[@inline always] logand x y =
+  of_int16 (Int16.logand (to_int16 x) (to_int16 y))
 
 let[@inline always] logor x y = of_int16 (Int16.logor (to_int16 x) (to_int16 y))
 
-let[@inline always] logxor x y = of_int16 (Int16.logxor (to_int16 x) (to_int16 y))
+let[@inline always] logxor x y =
+  of_int16 (Int16.logxor (to_int16 x) (to_int16 y))
 
 let[@inline always] lognot x = of_int16 (Int16.lognot (to_int16 x))
 
 let[@inline always] shift_left x y = of_int16 (Int16.shift_left (to_int16 x) y)
 
-let[@inline always] shift_right x y = of_int16 (Int16.shift_right (to_int16 x) y)
+let[@inline always] shift_right x y =
+  of_int16 (Int16.shift_right (to_int16 x) y)
 
-let[@inline always] shift_right_logical x y = of_int16 (Int16.shift_right_logical (to_int16 x) y)
+let[@inline always] shift_right_logical x y =
+  of_int16 (Int16.shift_right_logical (to_int16 x) y)
 
 let[@inline always] equal x y = Int16.equal (to_int16 x) (to_int16 y)
 

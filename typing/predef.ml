@@ -412,8 +412,8 @@ let mk_add_extension add_extension id args =
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind.Sort.Const.t) with
       | Base Value -> ()
-      | Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
+      | Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+             | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _ -> raise_error ())
     args;
   add_extension id

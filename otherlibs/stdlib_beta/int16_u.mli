@@ -128,7 +128,8 @@ val equal : int16# -> int16# -> bool
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 val compare : int16# -> int16# -> int
 
-(** Same as {!compare}, except that arguments are interpreted as {e unsigned} integers. *)
+(** Same as {!compare}, except that arguments are interpreted as {e unsigned}
+    integers. *)
 val unsigned_compare : t -> t -> int
 
 (** Return the smaller of the two arguments. *)

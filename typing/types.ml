@@ -990,8 +990,8 @@ let rec equal_mixed_block_element e1 e2 =
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32 | Bits64
-    | Vec128 | Vec256 | Vec512 | Product _ ), _
+  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32
+    | Bits64 | Vec128 | Vec256 | Vec512 | Product _ ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
