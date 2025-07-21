@@ -206,9 +206,9 @@ let oper_result_type = function
   | Cpackf32 -> typ_float
   | Ccsel ty -> ty
   | Creinterpret_cast Value_of_int -> typ_val
-  | Creinterpret_cast V128_of_v128 -> typ_vec128
-  | Creinterpret_cast V256_of_v256 -> typ_vec256
-  | Creinterpret_cast V512_of_v512 -> typ_vec512
+  | Creinterpret_cast (V128_of_vec _) -> typ_vec128
+  | Creinterpret_cast (V256_of_vec _) -> typ_vec256
+  | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->

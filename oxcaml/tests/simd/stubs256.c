@@ -12,6 +12,8 @@
 
 BUILTIN(caml_vec256_unreachable);
 BUILTIN(caml_vec256_cast);
+BUILTIN(caml_vec256_low_of_vec128);
+BUILTIN(caml_vec256_low_to_vec128);
 BUILTIN(caml_float32x8_low_of_float32);
 BUILTIN(caml_float32x8_low_to_float32);
 BUILTIN(caml_float64x4_low_of_float);
