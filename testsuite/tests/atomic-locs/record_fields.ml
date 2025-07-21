@@ -141,6 +141,13 @@ module Float_records = struct
   let get v = v.y
 end
 [%%expect{|
+Line 3, characters 2-53:
+3 |   type t = { x : float; mutable y : float [@atomic] }
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
 (apply (field_imm 1 (global Toploop!)) "Float_records/347"
   (let
     (mk_flat =
@@ -150,6 +157,7 @@ end
          (makemutable 0 (float,float) x y))
      get = (function {nlocal = 0} v : float (field_mut 1 v)))
     (makeblock 0 mk_flat mk_t get)))
+
 module Float_records :
   sig
     type flat = { x : float; mutable y : float; }
@@ -158,4 +166,155 @@ module Float_records :
     val mk_t : float -> float -> t
     val get : t -> float
   end
+|}];;
+
+(* Tests for Warning 214: Atomic float record boxing *)
+
+(* This should trigger warning 214 - all atomic float fields *)
+type all_atomic_floats = {
+  mutable x : float [@atomic];
+  mutable y : float [@atomic];
+  mutable z : float [@atomic];
+}
+[%%expect{|
+Lines 1-5, characters 0-1:
+1 | type all_atomic_floats = {
+2 |   mutable x : float [@atomic];
+3 |   mutable y : float [@atomic];
+4 |   mutable z : float [@atomic];
+5 | }
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
+0
+
+type all_atomic_floats = {
+  mutable x : float [@atomic];
+  mutable y : float [@atomic];
+  mutable z : float [@atomic];
+}
+|}];;
+
+(* This should trigger warning 214 - mix of atomic and non-atomic float fields *)
+type mixed_atomic_floats = {
+  mutable a : float;
+  mutable b : float [@atomic];
+  mutable c : float;
+  mutable d : float [@atomic];
+}
+[%%expect{|
+Lines 1-6, characters 0-1:
+1 | type mixed_atomic_floats = {
+2 |   mutable a : float;
+3 |   mutable b : float [@atomic];
+4 |   mutable c : float;
+5 |   mutable d : float [@atomic];
+6 | }
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
+0
+
+type mixed_atomic_floats = {
+  mutable a : float;
+  mutable b : float [@atomic];
+  mutable c : float;
+  mutable d : float [@atomic];
+}
+|}];;
+
+(* This should NOT trigger warning 214 - has non-float fields *)
+type atomic_float_with_int = {
+  mutable f : float [@atomic];
+  mutable i : int;
+  mutable g : float;
+}
+[%%expect{|
+0
+type atomic_float_with_int = {
+  mutable f : float [@atomic];
+  mutable i : int;
+  mutable g : float;
+}
+|}];;
+
+(* This should NOT trigger warning 214 - no atomic fields *)
+type regular_float_record = {
+  mutable p : float;
+  mutable q : float;
+  mutable r : float;
+}
+[%%expect{|
+0
+type regular_float_record = {
+  mutable p : float;
+  mutable q : float;
+  mutable r : float;
+}
+|}];;
+
+(* This should NOT trigger warning 214 - immutable float fields (can't be atomic) *)
+type immutable_float_record = {
+  x : float;
+  y : float;
+  z : float;
+}
+[%%expect{|
+0
+type immutable_float_record = { x : float; y : float; z : float; }
+|}];;
+
+(* This should trigger warning 214 - single atomic float field *)
+type single_atomic_float = {
+  mutable value : float [@atomic];
+}
+[%%expect{|
+Lines 1-3, characters 0-1:
+1 | type single_atomic_float = {
+2 |   mutable value : float [@atomic];
+3 | }
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
+0
+
+type single_atomic_float = { mutable value : float [@atomic]; }
+|}];;
+
+(* Test warning suppression with [@@@warning "-214"] *)
+[@@@warning "-214"]
+type suppressed_atomic_float = {
+  mutable x : float [@atomic];
+  mutable y : float [@atomic];
+}
+[%%expect{|
+0
+0
+type suppressed_atomic_float = {
+  mutable x : float [@atomic];
+  mutable y : float [@atomic];
+}
+|}];;
+
+(* Re-enable the warning *)
+[@@@warning "+214"]
+type not_suppressed_atomic_float = {
+  mutable a : float [@atomic];
+}
+[%%expect{|
+0
+Lines 2-4, characters 0-1:
+2 | type not_suppressed_atomic_float = {
+3 |   mutable a : float [@atomic];
+4 | }
+Warning 214 [atomic-float-record-boxed]: This record contains atomic
+float fields, which prevents the float record optimization. The
+fields of this record will be boxed instead of being
+represented as a flat float array.
+0
+
+type not_suppressed_atomic_float = { mutable a : float [@atomic]; }
 |}];;

@@ -1673,8 +1673,8 @@ module Element_repr = struct
        don't give us enough information to do this reliably, and you could just
        use unboxed floats instead. *)
 
-  let classify env loc ty jkind mut =
-    if is_float env ty && not (is_atomic mut)
+  let classify env loc ty jkind =
+    if is_float env ty
     then Float_element
     else
       let layout = Jkind.get_layout_defaulting_to_value jkind in
@@ -1756,7 +1756,7 @@ let update_constructor_representation
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            Element_repr.classify env loc arg_type arg_jkind Immutable,
+            Element_repr.classify env loc arg_type arg_jkind,
             arg_type)
             arg_types_and_modes arg_jkinds
         in
@@ -1764,8 +1764,7 @@ let update_constructor_representation
     | Cstr_record fields ->
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
-            Element_repr.classify env loc ld.Types.ld_type arg_jkind
-              ld.Types.ld_mutable,
+            Element_repr.classify env loc ld.Types.ld_type arg_jkind,
             ld.Types.ld_type)
             fields arg_jkinds
         in
@@ -1811,8 +1810,9 @@ let rec update_decl_jkind env dpath decl =
       {  mutable values : bool; (* includes immediates. *)
          mutable floats: bool;
          (* For purposes of this record, [floats] tracks whether any field
-            has layout value and is known to be a non-atomic float.
+            has layout value and is known to be a float.
          *)
+         mutable atomic_floats : bool;
          mutable float64s : bool;
          mutable non_float64_unboxed_fields : bool;
       }
@@ -1839,33 +1839,41 @@ let rec update_decl_jkind env dpath decl =
       let reprs =
         List.map2
           (fun lbl jkind ->
-             Element_repr.classify env loc lbl.Types.ld_type jkind
-               lbl.Types.ld_mutable,
+             Element_repr.classify env loc lbl.Types.ld_type jkind,
              lbl.Types.ld_type )
           lbls jkinds
       in
       let repr_summary =
-        { values = false; floats = false; float64s = false;
-          non_float64_unboxed_fields = false;
+        { values = false; floats = false; atomic_floats = false;
+          float64s = false; non_float64_unboxed_fields = false;
         }
       in
-      List.iter
-        (fun ((repr : Element_repr.t), _lbl) ->
+      List.iter2
+        (fun ((repr : Element_repr.t), _) lbl ->
            match repr with
-           | Float_element -> repr_summary.floats <- true
+           | Float_element ->
+               repr_summary.floats <- true;
+               (* Check if this float field is atomic *)
+               if Types.is_atomic lbl.Types.ld_mutable
+               then repr_summary.atomic_floats <- true;
            | Unboxed_element Float64 -> repr_summary.float64s <- true
            | Unboxed_element ( Float32 | Bits32 | Bits64
                              | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
-           | Value_element -> repr_summary.values <- true
+           | Value_element ->
+               repr_summary.values <- true;
+               (* Check if this value field is atomic and float *)
+               if Types.is_atomic lbl.Types.ld_mutable
+               && is_float env lbl.Types.ld_type
+               then repr_summary.atomic_floats <- true
            | Element_without_runtime_component _ -> ())
-        reprs;
+        reprs lbls;
       let rep =
         match repr_summary with
         (* We store mixed float/float64 records as flat if there are no
             non-float fields.
         *)
-        | { values = false; floats = true;
+        | { values = false; floats = true; atomic_floats = false;
             float64s = true; non_float64_unboxed_fields = false; }
           [@warning "+9"] ->
             let shape =
@@ -1888,8 +1896,8 @@ let rec update_decl_jkind env dpath decl =
         (* For other mixed blocks, float fields are stored as flat
            only when they're unboxed.
         *)
-        | { values = true; float64s = true }
-        | { non_float64_unboxed_fields = true } ->
+        | { values = true; float64s = true; _ }
+        | { non_float64_unboxed_fields = true; _ } ->
             let shape =
               Element_repr.mixed_product_shape loc reprs Record
             in
@@ -1901,22 +1909,35 @@ let rec update_decl_jkind env dpath decl =
             Record_mixed shape
         (* value-only records are stored as boxed records *)
         | { values = true; float64s = false;
-            non_float64_unboxed_fields = false }
+            non_float64_unboxed_fields = false; _ }
           -> rep
         (* All-nonatomic-float and all-nonatomic-float64 records are stored as
            flat float records.
         *)
-        | { values = false; floats = true ; float64s = false;
-            non_float64_unboxed_fields = false } ->
+        | { values = false; floats = true ; atomic_floats = false;
+            float64s = false; non_float64_unboxed_fields = false } ->
           Record_float
-        | { values = false; floats = false; float64s = true;
-            non_float64_unboxed_fields = false } ->
+        | { values = false; floats = false; atomic_floats = false;
+            float64s = true; non_float64_unboxed_fields = false } ->
           Record_ufloat
-        | { values = false; floats = false; float64s = false;
-            non_float64_unboxed_fields = false }
+        (* Records with atomic float fields cannot use flat representation *)
+        | { atomic_floats = true; _ } ->
+          rep
+        | { values = false; floats = false; atomic_floats = false;
+            float64s = false; non_float64_unboxed_fields = false }
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
+      (* Emit warning if atomic float fields prevented float record
+         optimization *)
+      if repr_summary.atomic_floats then begin
+        (* Check if all fields are floats (atomic or not) *)
+        let all_float_fields =
+          List.for_all (fun lbl -> is_float env lbl.Types.ld_type) lbls
+        in
+        if all_float_fields then
+          Location.prerr_warning loc Warnings.Atomic_float_record_boxed
+      end;
       lbls, rep, jkind
     | _, ( Record_inlined _ | Record_float | Record_ufloat
          | Record_mixed _)
