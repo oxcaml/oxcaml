@@ -8,13 +8,11 @@ type base_layout = Jkind_types.Sort.base
    in from [t] to [ts] (for type shape) and [tds] (for type declaration shape).*)
 
 module Type_shape : sig
-
   val of_type_expr :
     Types.type_expr -> (Path.t -> Uid.t option) -> Shape.without_layout Shape.ts
 end
 
 module Type_decl_shape : sig
-
   val of_type_declaration :
     Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> Shape.tds
 end
