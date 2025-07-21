@@ -57,13 +57,13 @@
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
  (targets int_ops.output.exe int_ops_ir.output.corrected)
- (deps  int_ops_main.ml int_ops.ml)
+ (deps int_ops_data.ml int_ops_main.ml int_ops.ml)
  (action
   (progn
-   
+   (run %{bin:ocamlopt.opt} int_ops_data.ml -g -c -O3 -opaque)
    (run %{bin:ocamlopt.opt} int_ops.ml -c -g -O3 -opaque -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments)
    (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -opaque)
-   (run %{bin:ocamlopt.opt}  int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe)
+   (run %{bin:ocamlopt.opt} int_ops_data.cmx int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe)
    (run mv int_ops.ll int_ops_ir.output.corrected))))
 
 (rule

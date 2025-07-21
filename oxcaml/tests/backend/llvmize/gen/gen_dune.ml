@@ -127,7 +127,7 @@ let () =
   (* make run test check ir as well *)
   print_test_ir_only "id_fn";
   print_test_ir_and_run "const_val";
-  print_test_ir_and_run "int_ops";
+  print_test_ir_and_run ~extra_dep_suffix:"data" "int_ops";
   print_test_ir_and_run ~extra_dep_suffix:"data" "gcd";
   print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev";
   print_test_ir_and_run "float_ops"
