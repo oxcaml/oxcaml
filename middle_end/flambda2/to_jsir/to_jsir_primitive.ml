@@ -3,7 +3,7 @@ let primitive_not_supported () =
 
 (** Convert a [Simple.t] into a [Jsir.prim_arg]. *)
 let prim_arg ~env simple =
-  Flambda2_term_basics.Simple.pattern_match' simple
+  Simple.pattern_match' simple
     ~var:(fun name ~coercion:_ -> Jsir.Pv (To_jsir_env.get_var_exn env name))
     ~symbol:(fun symbol ~coercion:_ ->
       Jsir.Pv (To_jsir_env.get_symbol_exn env symbol))
@@ -13,8 +13,7 @@ type result = Jsir.expr * To_jsir_env.t * To_jsir_result.t
 
 (* CR selee: implement primitives *)
 
-let nullary ~env ~res (f : Flambda2_terms.Flambda_primitive.nullary_primitive) :
-    result =
+let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) : result =
   ignore (env, res);
   match f with
   | Invalid kind ->
@@ -33,8 +32,7 @@ let nullary ~env ~res (f : Flambda2_terms.Flambda_primitive.nullary_primitive) :
   | Poll -> primitive_not_supported ()
   | Cpu_relax -> primitive_not_supported ()
 
-let unary ~env ~res (f : Flambda2_terms.Flambda_primitive.unary_primitive) x :
-    result =
+let unary ~env ~res (f : Flambda_primitive.unary_primitive) x : result =
   ignore (env, res, x);
   match f with
   | Block_load { kind; mut; field } ->
@@ -113,8 +111,7 @@ let unary ~env ~res (f : Flambda2_terms.Flambda_primitive.unary_primitive) x :
     ignore tag;
     primitive_not_supported ()
 
-let binary ~env ~res (f : Flambda2_terms.Flambda_primitive.binary_primitive) x y
-    : result =
+let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y : result =
   match f with
   | Block_set { kind; init; field } ->
     ignore (kind, init, field);
@@ -165,8 +162,7 @@ let binary ~env ~res (f : Flambda2_terms.Flambda_primitive.binary_primitive) x y
     ignore kind;
     primitive_not_supported ()
 
-let ternary ~env ~res (f : Flambda2_terms.Flambda_primitive.ternary_primitive) x
-    y z : result =
+let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z : result =
   ignore (env, res, x, y, z);
   match f with
   | Array_set (kind, set_kind) ->
@@ -185,8 +181,7 @@ let ternary ~env ~res (f : Flambda2_terms.Flambda_primitive.ternary_primitive) x
     ignore (atomic_kind, args_kind);
     primitive_not_supported ()
 
-let variadic ~env ~res (f : Flambda2_terms.Flambda_primitive.variadic_primitive)
-    xs : result =
+let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs : result =
   ignore (env, res, xs);
   match f with
   | Begin_region { ghost } ->
@@ -202,7 +197,7 @@ let variadic ~env ~res (f : Flambda2_terms.Flambda_primitive.variadic_primitive)
     ignore (kind, mut, mode);
     primitive_not_supported ()
 
-let primitive ~env ~res (prim : Flambda2_terms.Flambda_primitive.t) _dbg =
+let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   match prim with
   | Nullary f -> nullary ~env ~res f
   | Unary (f, x) -> unary ~env ~res f (prim_arg ~env x)
