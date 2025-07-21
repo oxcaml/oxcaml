@@ -1992,8 +1992,6 @@ end
 module Lattice_Product (L : Lattice) = struct
   open L
 
-  type 'a axis = (t, 'a) Axis.t
-
   let min_with ax c = Axis.set ax c min
 
   let max_with ax c = Axis.set ax c max
@@ -2012,9 +2010,21 @@ module Comonadic_with (Areality : Areality) = struct
 
   include Comonadic_gen (Obj)
 
-  type 'a axis = (Obj.const, 'a) C.Axis.t
+  module Axis = struct
+    type 'a t = (Obj.const, 'a) Axis.t
 
-  type error = Error : 'a axis * 'a Solver.error -> error
+    type packed = P : 'a t -> packed
+
+    let print = Axis.print
+
+    let compare = Axis.compare
+
+    let all =
+      [P Areality; P Linearity; P Portability; P Yielding; P Statefulness]
+      |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
+  end
+
+  type error = Error : 'a Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -2032,7 +2042,7 @@ module Comonadic_with (Areality : Areality) = struct
       let obj = proj_obj ax in
       C.le obj a b
 
-    let lattice_of_axis (type a) (axis : (t, a) Axis.t) :
+    let lattice_of_axis (type a) (axis : a Axis.t) :
         (module Lattice with type t = a) =
       match axis with
       | Areality -> (module Areality.Const)
@@ -2136,9 +2146,21 @@ module Monadic = struct
 
   include Monadic_gen (Obj)
 
-  type 'a axis = (Obj.const, 'a) C.Axis.t
+  module Axis = struct
+    type 'a t = (Obj.const, 'a) C.Axis.t
 
-  type error = Error : 'a axis * 'a Solver.error -> error
+    type packed = P : 'a t -> packed
+
+    let compare = Axis.compare
+
+    let print = Axis.print
+
+    let all =
+      [P Uniqueness; P Contention; P Visibility]
+      |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
+  end
+
+  type error = Error : 'a Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -2156,7 +2178,7 @@ module Monadic = struct
       let obj = proj_obj ax in
       C.le obj b a
 
-    let lattice_of_axis (type a) (axis : (t, a) Axis.t) :
+    let lattice_of_axis (type a) (axis : a Axis.t) :
         (module Lattice with type t = a) =
       match axis with
       | Uniqueness -> (module Uniqueness.Const_op)
@@ -2169,12 +2191,6 @@ module Monadic = struct
   let proj ax m = Solver.apply (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   (* The monadic fragment is inverted. *)
-
-  let max_with ax m =
-    Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
-
-  let min_with ax m =
-    Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
 
   let join_with ax c m = join_const (Const.min_with ax c) m
 
@@ -2251,38 +2267,34 @@ module Value_with (Areality : Areality) = struct
   type lr = (allowed * allowed) t
 
   module Axis = struct
-    type ('a, 'd0, 'd1) t =
-      | Monadic : (Monadic.Const.t, 'a) Axis.t -> ('a, 'd, 'd neg) t
-      | Comonadic : (Comonadic.Const.t, 'a) Axis.t -> ('a, 'd, 'd pos) t
+    type 'a t =
+      | Monadic : 'a Monadic.Axis.t -> 'a t
+      | Comonadic : 'a Comonadic.Axis.t -> 'a t
 
-    let compare : type a d0 d1 b e0 e1. (a, d0, d1) t -> (b, e0, e1) t -> int =
+    let compare : type a b. a t -> b t -> int =
      fun t0 t1 ->
       match t0, t1 with
       | Monadic t0, Monadic t1 -> Axis.compare t0 t1
-      | Monadic _, Comonadic _ -> 1
-      | Comonadic _, Monadic _ -> -1
+      | Monadic t0, Comonadic t1 -> Axis.compare t0 t1
+      | Comonadic t0, Monadic t1 -> Axis.compare t0 t1
       | Comonadic t0, Comonadic t1 -> Axis.compare t0 t1
 
-    type packed = P : (_, _, _) t -> packed
+    type packed = P : 'a t -> packed
 
-    let print (type a d0 d1) ppf (t : (a, d0, d1) t) =
+    let print (type a) ppf (t : a t) =
       match t with
       | Monadic ax -> Axis.print ppf ax
       | Comonadic ax -> Axis.print ppf ax
 
     let all =
-      [ P (Comonadic Areality);
-        P (Comonadic Linearity);
-        P (Monadic Uniqueness);
-        P (Comonadic Portability);
-        P (Monadic Contention);
-        P (Comonadic Yielding);
-        P (Comonadic Statefulness);
-        P (Monadic Visibility) ]
+      List.map (fun (Monadic.Axis.P ax) -> P (Monadic ax)) Monadic.Axis.all
+      @ List.map
+          (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
+          Comonadic.Axis.all
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
   end
 
-  let proj_obj : type a d0 d1. (a, d0, d1) Axis.t -> a C.obj = function
+  let proj_obj : type a. a Axis.t -> a C.obj = function
     | Monadic ax -> Monadic.proj_obj ax
     | Comonadic ax -> Comonadic.proj_obj ax
 
@@ -2393,7 +2405,7 @@ module Value_with (Areality : Areality) = struct
       let comonadic = Comonadic.join m0.comonadic m1.comonadic in
       merge { monadic; comonadic }
 
-    let lattice_of_axis (type a d0 d1) (axis : (a, d0, d1) Axis.t) :
+    let lattice_of_axis (type a) (axis : a Axis.t) :
         (module Lattice with type t = a) =
       match axis with
       | Comonadic ax -> Comonadic.lattice_of_axis ax
@@ -2528,29 +2540,29 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.min in
       merge { comonadic; monadic }
 
-    let print_axis : type a. (a, _, _) Axis.t -> _ -> a -> unit =
+    let print_axis : type a. a Axis.t -> _ -> a -> unit =
      fun ax ppf a ->
       let obj = proj_obj ax in
       C.print obj ppf a
 
-    let le_axis : type a d0 d1. (a, d0, d1) Axis.t -> a -> a -> bool =
+    let le_axis : type a. a Axis.t -> a -> a -> bool =
      fun ax m0 m1 ->
       match ax with
       | Comonadic ax -> Comonadic.le_axis ax m0 m1
       | Monadic ax -> Monadic.le_axis ax m0 m1
 
-    let min_axis : type a d0 d1. (a, d0, d1) Axis.t -> a = function
+    let min_axis : type a. a Axis.t -> a = function
       | Comonadic ax -> Comonadic.min_axis ax
       | Monadic ax -> Monadic.min_axis ax
 
-    let max_axis : type a d0 d1. (a, d0, d1) Axis.t -> a = function
+    let max_axis : type a. a Axis.t -> a = function
       | Comonadic ax -> Comonadic.max_axis ax
       | Monadic ax -> Monadic.max_axis ax
 
-    let is_max : type a d0 d1. (a, d0, d1) Axis.t -> a -> bool =
+    let is_max : type a. a Axis.t -> a -> bool =
      fun ax m -> le_axis ax (max_axis ax) m
 
-    let is_min : type a d0 d1. (a, d0, d1) Axis.t -> a -> bool =
+    let is_min : type a. a Axis.t -> a -> bool =
      fun ax m -> le_axis ax m (min_axis ax)
 
     let split = split
@@ -2601,7 +2613,7 @@ module Value_with (Areality : Areality) = struct
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
 
-  type error = Error : ('a, _, _) Axis.t * 'a Solver.error -> error
+  type error = Error : 'a Axis.t * 'a Solver.error -> error
 
   type equate_error = equate_step * error
 
@@ -2637,53 +2649,15 @@ module Value_with (Areality : Areality) = struct
 
   let proj_comonadic ax { comonadic; _ } = Comonadic.proj ax comonadic
 
-  let proj :
-      type a l0 l1 r0 r1.
-      (a, l0 * r0, l1 * r1) Axis.t -> (l0 * r0) t -> (a, l1 * r1) mode =
-   fun ax m ->
-    match ax with
-    | Monadic ax -> proj_monadic ax m
-    | Comonadic ax -> proj_comonadic ax m
-
-  let max_with_monadic ax m =
-    let comonadic =
-      Comonadic.max |> Comonadic.disallow_left |> Comonadic.allow_right
-    in
-    let monadic = Monadic.max_with ax m in
-    { comonadic; monadic }
-
   let max_with_comonadic ax m =
     let comonadic = Comonadic.max_with ax m in
     let monadic = Monadic.max |> Monadic.disallow_left |> Monadic.allow_right in
-    { comonadic; monadic }
-
-  let max_with :
-      type a l0 l1 r0 r1.
-      (a, l0 * r0, l1 * r1) Axis.t -> (a, l1 * r1) mode -> (disallowed * r0) t =
-   fun ax m ->
-    match ax with
-    | Monadic ax -> max_with_monadic ax m
-    | Comonadic ax -> max_with_comonadic ax m
-
-  let min_with_monadic ax m =
-    let comonadic =
-      Comonadic.min |> Comonadic.disallow_right |> Comonadic.allow_left
-    in
-    let monadic = Monadic.min_with ax m in
     { comonadic; monadic }
 
   let min_with_comonadic ax m =
     let comonadic = Comonadic.min_with ax m in
     let monadic = Monadic.min |> Monadic.disallow_right |> Monadic.allow_left in
     { comonadic; monadic }
-
-  let min_with :
-      type a l0 l1 r0 r1.
-      (a, l0 * r0, l1 * r1) Axis.t -> (a, l1 * r1) mode -> (l0 * disallowed) t =
-   fun ax m ->
-    match ax with
-    | Monadic ax -> min_with_monadic ax m
-    | Comonadic ax -> min_with_comonadic ax m
 
   let join_with ax c { monadic; comonadic } =
     let monadic = Monadic.join_with ax c monadic in
@@ -2862,7 +2836,7 @@ module Modality = struct
     | Meet_with : 'a -> 'a raw
     | Join_with : 'a -> 'a raw
 
-  type t = Atom : ('a, _, _) Value.Axis.t * 'a raw -> t
+  type t = Atom : 'a Value.Axis.t * 'a raw -> t
 
   let is_id (Atom (ax, a)) =
     match a with
@@ -2939,7 +2913,7 @@ module Modality = struct
   module Monadic = struct
     module Mode = Value.Monadic
 
-    type 'a axis = 'a Mode.axis
+    type 'a axis = 'a Mode.Axis.t
 
     type error = Error : 'a axis * 'a raw Solver.error -> error
 
@@ -3071,7 +3045,7 @@ module Modality = struct
   module Comonadic = struct
     module Mode = Value.Comonadic
 
-    type 'a axis = 'a Mode.axis
+    type 'a axis = 'a Mode.Axis.t
 
     type error = Error : 'a axis * 'a raw Solver.error -> error
 
@@ -3225,8 +3199,7 @@ module Modality = struct
   end
 
   module Value = struct
-    type error =
-      | Error : ('a, _, _) Value.Axis.t * 'a raw Solver.error -> error
+    type error = Error : 'a Value.Axis.t * 'a raw Solver.error -> error
 
     type equate_error = equate_step * error
 
@@ -3261,14 +3234,13 @@ module Modality = struct
         let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
         { monadic; comonadic }
 
-      let proj (type a d0 d1) (ax : (a, d0, d1) Value.Axis.t)
-          { monadic; comonadic } =
+      let proj (type a) (ax : a Value.Axis.t) { monadic; comonadic } =
         match ax with
         | Monadic ax -> Monadic.proj ax monadic
         | Comonadic ax -> Comonadic.proj ax comonadic
 
-      let set (type a d0 d1) (ax : (a, d0, d1) Value.Axis.t) (a : a raw)
-          { monadic; comonadic } =
+      let set (type a) (ax : a Value.Axis.t) (a : a raw) { monadic; comonadic }
+          =
         match ax with
         | Monadic ax ->
           let monadic = Monadic.set ax a monadic in

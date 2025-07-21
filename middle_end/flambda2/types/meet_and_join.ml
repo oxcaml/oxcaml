@@ -71,11 +71,9 @@ let add_equation (simple : Simple.t) ty_of_simple env ~meet_type :
          that is matches the assigned type. *)
       if Flambda_features.check_light_invariants ()
       then assert (TG.get_alias_opt ty_of_simple == None);
-      let expanded =
-        Expand_head.expand_head0 env (MTC.type_for_const const)
-          ~known_canonical_simple_at_in_types_mode:(Some simple)
-      in
-      match meet_type env (ET.to_type expanded) ty_of_simple with
+      (* Make sure to not use an alias type, or we will loop! *)
+      let concrete_ty_of_const = ET.to_type (ET.create_const const) in
+      match meet_type env concrete_ty_of_const ty_of_simple with
       | Or_bottom.Ok (_, env) -> Ok (New_result (), env)
       | Or_bottom.Bottom -> Bottom (New_result ()))
 
@@ -2360,8 +2358,3 @@ let meet env ty1 ty2 : _ Or_bottom.t =
     | Ok (r, env) ->
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
-
-let meet_shape env t ~shape : _ Or_bottom.t =
-  if TE.is_bottom env
-  then Bottom
-  else match meet env t shape with Bottom -> Bottom | Ok (_, env) -> Ok env

@@ -67,11 +67,9 @@ let add_equation (simple : Simple.t) ty_of_simple env ~meet_type :
          that is matches the assigned type. *)
       if Flambda_features.check_light_invariants ()
       then assert (TG.get_alias_opt ty_of_simple == None);
-      let expanded =
-        Expand_head.expand_head0 env (MTC.type_for_const const)
-          ~known_canonical_simple_at_in_types_mode:(Some simple)
-      in
-      match meet_type env (ET.to_type expanded) ty_of_simple with
+      (* Make sure to not use an alias type, or we will loop! *)
+      let concrete_ty_of_const = ET.to_type (ET.create_const const) in
+      match meet_type env concrete_ty_of_const ty_of_simple with
       | Or_bottom.Ok (_, env) -> Ok (New_result (), env)
       | Or_bottom.Bottom -> Bottom (New_result ()))
 
@@ -1681,7 +1679,7 @@ and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
       let kind = TG.kind t1 in
       if not (List.for_all (fun (_, t) -> K.equal kind (TG.kind t)) ts)
       then
-        Misc.fatal_errorf "Kind mismatch upon join:@ %a"
+        Misc.fatal_errorf "Kind mismatch upon join:@ %a@ versus@ %a" TG.print t1
           (Format.pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ versus@ ")
              TG.print)
@@ -2762,7 +2760,10 @@ and n_way_join_function_type (env : Join_env.t)
     match func_types with
     | [] -> Bottom, env
     | (id1, { code_id = code_id1; rec_info = rec_info1 }) :: func_types -> (
-      let target_typing_env = Join_env.target_join_env env in
+      let target_code_age_relation = Join_env.code_age_relation env in
+      let target_code_age_relation_resolver =
+        Join_env.code_age_relation_resolver env
+      in
       let code_id, _, rec_infos =
         List.fold_left
           (fun (code_id1, code_age_relation1, rec_infos)
@@ -2775,18 +2776,14 @@ and n_way_join_function_type (env : Join_env.t)
                code age relation meet would remain though as it's useful
                elsewhere.) *)
             match
-              Code_age_relation.join
-                ~target_t:(TE.code_age_relation target_typing_env)
-                ~resolver:(TE.code_age_relation_resolver target_typing_env)
-                code_age_relation1
+              Code_age_relation.join ~target_t:target_code_age_relation
+                ~resolver:target_code_age_relation_resolver code_age_relation1
                 (TE.code_age_relation (Join_env.joined_env env id2))
                 code_id1 code_id2
             with
             | Unknown -> raise Unknown_result
             | Known code_id ->
-              ( code_id,
-                TE.code_age_relation target_typing_env,
-                (id2, rec_info2) :: rec_infos ))
+              code_id, target_code_age_relation, (id2, rec_info2) :: rec_infos)
           ( code_id1,
             TE.code_age_relation (Join_env.joined_env env id1),
             [id1, rec_info1] )
@@ -2816,8 +2813,3 @@ let meet env ty1 ty2 : _ Or_bottom.t =
     | Ok (r, env) ->
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
-
-let meet_shape env t ~shape : _ Or_bottom.t =
-  if TE.is_bottom env
-  then Bottom
-  else match meet env t shape with Bottom -> Bottom | Ok (_, env) -> Ok env

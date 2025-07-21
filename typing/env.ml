@@ -3295,7 +3295,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
 let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
   begin match
   Mode.Regionality.submode
-    (Mode.Value.proj (Comonadic Areality) vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode.mode)
     (Mode.Regionality.global)
   with
   | Ok () -> ()
@@ -3308,7 +3308,7 @@ let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
 let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
   match
     Mode.Linearity.submode
-      (Mode.Value.proj (Comonadic Linearity) vmode.mode)
+      (Mode.Value.proj_comonadic Linearity vmode.mode)
       Mode.Linearity.many
   with
   | Error _ ->
@@ -3342,7 +3342,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
 let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
   match
   Mode.Regionality.submode
-    (Mode.Value.proj (Comonadic Areality) vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode.mode)
     Mode.Regionality.regional
 with
 | Ok () ->
@@ -3418,7 +3418,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           let mode = mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value in
           Mode.Value.meet
             [mode;
-             Mode.Value.max_with (Comonadic Areality)
+             Mode.Value.max_with_comonadic Areality
                                  (Mode.Regionality.regional)]
       | Exclave_lock ->
           (* If [m0] is [global], then inside the exclave we require new values

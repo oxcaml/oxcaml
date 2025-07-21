@@ -430,8 +430,9 @@ module Solver_mono (C : Lattices_mono) = struct
           let src = C.src dst g in
           let g'f = C.compose src g' (C.disallow_right f) in
           let x = Amorphvar (v, g'f) in
-          if not (VarMap.exists (fun _ mv -> eq_morphvar mv x) u.vlower)
-          then set_vlower ~log u (VarMap.add (get_key x) x u.vlower);
+          let key = get_key x in
+          if not (VarMap.mem key u.vlower)
+          then set_vlower ~log u (VarMap.add key x u.vlower);
           Ok ())
 
   let cnt_id = ref 0

@@ -1590,8 +1590,6 @@ and transl_tupled_function
         in
         let region = region || not (may_allocate_in_region body) in
         add_type_shapes_of_cases arg_sort cases;
-        (* CR sspies: Unsure whether this is the right place to grab the type
-           expressions. *)
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
