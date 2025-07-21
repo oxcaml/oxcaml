@@ -385,46 +385,48 @@ module F = struct
   (* returns an [Ident.t] of type ptr pointing to the address specified by
      [addr]. Starts counting arguments of [i] from [n] *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
+    let add_offset offset base =
+      let res = fresh_ident t in
+      ins_binop t "add" base offset res Llvm_typ.i64;
+      res
+    in
+    let add_offset_imm offset base =
+      let res = fresh_ident t in
+      ins_binop_imm t "add" base (Int.to_string offset) res Llvm_typ.i64;
+      res
+    in
+    let mul_scale scale base =
+      let res = fresh_ident t in
+      ins_binop_imm t "mul" base (Int.to_string scale) res Llvm_typ.i64;
+      res
+    in
+    let make_ptr ident =
+      let res = fresh_ident t in
+      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident ident;
+      res
+    in
     match addr with
     | Ibased (sym_name, _sym_global, offset) ->
       t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
       let base_sym = asprintf "%a" pp_global sym_name in
       let base_addr = fresh_ident t in
-      let offset_addr = fresh_ident t in
-      let offset_ptr = fresh_ident t in
       ins t "%a = ptrtoint ptr %s to i64" pp_ident base_addr base_sym;
-      ins t "%a = add i64 %d, %a" pp_ident offset_addr offset pp_ident base_addr;
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident offset_ptr pp_ident
-        offset_addr;
-      offset_ptr
+      add_offset_imm offset base_addr |> make_ptr
     | Iindexed offset ->
       let arg = load_reg_to_temp t i.arg.(n) in
-      let temp = fresh_ident t in
-      let res = fresh_ident t in
-      ins t "%a = add i64 %d, %a" pp_ident temp offset pp_ident arg;
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident temp;
-      res
+      add_offset_imm offset arg |> make_ptr
     | Iindexed2 offset ->
       let arg1 = load_reg_to_temp t i.arg.(n) in
       let arg2 = load_reg_to_temp t i.arg.(n + 1) in
-      let temp1 = fresh_ident t in
-      let temp2 = fresh_ident t in
-      let res = fresh_ident t in
-      ins t "%a = add i64 %a, %a" pp_ident temp1 pp_ident arg1 pp_ident arg2;
-      ins t "%a = add i64 %d, %a" pp_ident temp2 offset pp_ident temp1;
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident temp2;
-      res
+      add_offset arg2 arg1 |> add_offset_imm offset
     | Iscaled (scale, offset) ->
       let arg = load_reg_to_temp t i.arg.(n) in
-      let temp1 = fresh_ident t in
-      let temp2 = fresh_ident t in
-      let res = fresh_ident t in
-      ins t "%a = mul i64 %d, %a" pp_ident temp1 scale pp_ident arg;
-      ins t "%a = add i64 %d, %a" pp_ident temp2 offset pp_ident temp1;
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident temp2;
-      res
-    | Iindexed2scaled _ ->
-      Misc.fatal_error "Llvmize.load_addr: addressing mode not implemented"
+      mul_scale scale arg |> add_offset_imm offset |> make_ptr
+    | Iindexed2scaled (scale, offset) ->
+      let arg1 = load_reg_to_temp t i.arg.(n) in
+      let arg2 = load_reg_to_temp t i.arg.(n + 1) in
+      mul_scale scale arg2 |> add_offset arg1 |> add_offset_imm offset
+      |> make_ptr
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
@@ -893,6 +895,9 @@ let emit_data_extern t =
    more structured manner which we can directly pass on to [declare]. *)
 let emit_data t =
   let declare = F.data_decl t in
+  let fail msg =
+    Misc.fatal_error ("Llvmize: data item not implemented: " ^ msg)
+  in
   let cur_sym, ds =
     List.fold_left
       (fun (cur_sym, ds) (d : Cmm.data_item) ->
@@ -901,10 +906,13 @@ let emit_data t =
           Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
           Some sym_name, []
         | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
-        | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
-        | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
-        | Calign _ ->
-          Misc.fatal_error "Llvmize: data item not implemented")
+        | Calign _ -> fail "align"
+        | Cint8 _ | Cint16 _ | Cint32 _ -> fail "int"
+        | Csingle _ | Cdouble _ -> fail "float"
+        | Cvec128 _ | Cvec256 _ | Cvec512 _ -> fail "vec"
+        | Csymbol_offset _ -> fail "symbol offset"
+        | Cstring _ -> fail "string"
+        | Cskip _ -> fail "skip")
       (None, []) t.data
   in
   Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
