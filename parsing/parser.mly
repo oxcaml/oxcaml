@@ -922,7 +922,10 @@ let mk_directive ~loc name arg =
 let unboxed_literals_extension = Language_extension.Layouts
 
 let generic_optional mod_path label _loc =
-  Generic_optional(mod_path, label)
+  Generic_optional(Some mod_path, label)
+
+let generic_optional_no_mpath label _loc =
+  Generic_optional(None, label)
 
 type sign = Positive | Negative
 
@@ -1077,6 +1080,7 @@ let maybe_pmod_constraint mode expr =
 %token PRIVATE                "private"
 %token QUESTION               "?"
 %token DOTQUESTIONQUOTE       ".?'"
+%token QUESTIONQUOTE          "?'"
 %token QUOTE                  "'"
 %token RBRACE                 "}"
 %token RBRACKET               "]"
@@ -3179,6 +3183,8 @@ labeled_simple_expr:
       { (Optional $1, $2) }
   | mkrhs(mod_longident) GENOPTLABEL simple_expr %prec below_HASH
       { (generic_optional $1 $2 $sloc, $3) }
+  | QUESTIONQUOTE LIDENT COLON simple_expr %prec below_HASH
+      { (generic_optional_no_mpath $2 $sloc, $4) }
 ;
 %inline let_ident:
     val_ident { mkpatvar ~loc:$sloc $1 }

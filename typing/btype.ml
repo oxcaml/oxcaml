@@ -625,10 +625,12 @@ let is_optional_parsetree : Parsetree.arg_label -> bool = function
   | _ -> false
 
 (* CR generic-optional: temporary function, to remove *)
-type optional_module_path = Stdlib_option | Stdlib_or_null
-let classify_module_path : Longident.t -> optional_module_path = function
-  | Ldot(Lident "Stdlib", "Option") -> Stdlib_option
-  | Ldot(Lident "Stdlib", "Or_null") -> Stdlib_or_null
+type optional_module_path = Stdlib_option | Stdlib_or_null | Unknown
+let classify_module_path (path: Longident.t Location.loc option) =
+  match path with
+  | None -> Unknown
+  | Some {txt=Ldot(Lident "Stdlib", "Option");_} -> Stdlib_option
+  | Some {txt=Ldot(Lident "Stdlib", "Or_null");_} -> Stdlib_or_null
   | _ -> failwith "Only expected Stdlib.Option and Stdlib.Or_null"
 
 type optionality = Optional_arg of optional_module_path
@@ -636,12 +638,12 @@ type optionality = Optional_arg of optional_module_path
 
 let classify_optionality (lbl: Types.arg_label) = match lbl with
   | Optional _ -> Optional_arg Stdlib_option
-  | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
+  | Generic_optional(path, _) -> Optional_arg (classify_module_path path)
   | _ -> Required_or_position_arg
 
 let classify_optionality_parsetree (lbl : Parsetree.arg_label) = match lbl with
   | Optional _ -> Optional_arg Stdlib_option
-  | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
+  | Generic_optional(path, _) -> Optional_arg (classify_module_path path)
   | _ -> Required_or_position_arg
 
 let is_optional arg =
@@ -668,8 +670,10 @@ let prefixed_label_name ppf l =
     Nolabel -> fprintf ppf  ""
   | Labelled s | Position s -> fprintf ppf "~%s" s
   | Optional s -> fprintf ppf "?%s" s
-  | Generic_optional (path, s) ->
+  | Generic_optional (Some path, s) ->
       fprintf ppf "%a.?'%s" Pprintast.longident path.txt s
+  | Generic_optional (None, s) ->
+      fprintf ppf "?'%s" s
 
 let arg_label_compatible param_label arg_label =
   match param_label, arg_label with

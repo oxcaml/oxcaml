@@ -132,9 +132,12 @@ let arg_label i ppf = function
   | Nolabel -> line i ppf "Nolabel\n"
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
-  | Generic_optional (l,s) ->
+  | Generic_optional (Some l,s) ->
       line i ppf "Generic_optional\n";
-      longident_loc i ppf l;
+      line i ppf "Some%a\n" (longident_loc i) l;
+      string i ppf s
+  | Generic_optional (None,s) ->
+      line i ppf "Generic_optional\nNone\n";
       string i ppf s
 
 

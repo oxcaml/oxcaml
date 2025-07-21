@@ -1407,7 +1407,8 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Labelled l -> Labelled l
   | Optional l -> Optional l
   | Position l -> Position l
-  | Generic_optional (path, l) -> Generic_optional (path.txt, l)
+  | Generic_optional (Some path, l) -> Generic_optional (Some path.txt, l)
+  | Generic_optional (None, l) -> Generic_optional (None, l)
 
 let rec all_or_none f = function
   | [] -> Some []
@@ -1518,9 +1519,11 @@ let rec tree_of_typexp mode alloc_mode ty =
                 tree_of_typexp mode arg_mode ty
             | Generic_optional (genopt_path, _), Tconstr(path, [ty], _)
               when Path.same path
-                    (match Btype.classify_module_path genopt_path.txt with
+                    (match Btype.classify_module_path genopt_path with
                     | Stdlib_option -> Predef.path_option
-                    | Stdlib_or_null -> Predef.path_or_null) ->
+                    | Stdlib_or_null -> Predef.path_or_null
+                    | Unknown ->
+                        failwith "Module path cannot be omitted in types.") ->
                 tree_of_typexp mode arg_mode ty
             (* this case will show up when there is a bug in the compiler
                when incorrect types are assigned to optional arguments *)
@@ -2401,9 +2404,11 @@ let rec tree_of_class_type mode params =
            tree_of_typexp mode ty
        | Generic_optional (genopt_path, _), Tconstr(path, [ty], _)
          when Path.same path
-                (match Btype.classify_module_path genopt_path.txt with
+                (match Btype.classify_module_path genopt_path with
                 | Stdlib_option -> Predef.path_option
-                | Stdlib_or_null -> Predef.path_or_null) ->
+                | Stdlib_or_null -> Predef.path_or_null
+                | Unknown ->
+                    failwith "Module path cannot be omitted in types.") ->
            tree_of_typexp mode ty
        | (Optional _ | Generic_optional _), _ -> Otyp_stuff "<hidden>"
        | _ -> tree_of_typexp mode ty in

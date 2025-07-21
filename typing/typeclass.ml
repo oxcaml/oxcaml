@@ -459,6 +459,7 @@ and class_type_aux env virt self_scope scty =
               match mpath with
               | Stdlib_option -> Predef.path_option
               | Stdlib_or_null -> Predef.path_or_null
+              | Unknown -> failwith "Types need to have module path"
             in
             Ctype.newty (Tconstr(t_cons,[ty], ref Mnil))
         | Required_or_position_arg -> ty in
@@ -1589,11 +1590,12 @@ let rec approx_declaration cl =
       let l, _ = Typetexp.transl_label_from_pat l pat in
       let arg =
         match l with
-        | Optional _ -> Ctype.instance var_option
-        | Generic_optional (path, _) ->
-            (match Btype.classify_module_path path.txt with
-            | Stdlib_option -> Ctype.instance var_option
-            | Stdlib_or_null -> Ctype.instance var_or_null)
+        | Optional _ | Generic_optional _ ->
+            (match Btype.classify_optionality l with
+            | Optional_arg Stdlib_option -> Ctype.instance var_option
+            | Optional_arg Stdlib_or_null -> Ctype.instance var_or_null
+            | Optional_arg Unknown -> failwith "Types need to have module path"
+            | Required_or_position_arg -> assert false)
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
@@ -1619,7 +1621,8 @@ let rec approx_description ct =
         | Optional_arg mpath ->
             (match mpath with
             | Stdlib_option -> Ctype.instance var_option
-            | Stdlib_or_null -> Ctype.instance var_or_null)
+            | Stdlib_or_null -> Ctype.instance var_or_null
+            | Unknown -> failwith "Types need to have module path")
         | Required_or_position_arg ->
             Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we

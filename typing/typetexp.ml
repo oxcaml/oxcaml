@@ -671,7 +671,7 @@ let transl_label (label : Parsetree.arg_label)
       -> raise (Error (arg.ptyp_loc, Env.empty, Invalid_label_for_call_pos label))
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
-  | Generic_optional (path, l), _ -> (
+  | Generic_optional (Some path, l), _ -> (
     match Language_extension.is_enabled Generic_optional_arguments with
     | false ->
       raise
@@ -682,11 +682,13 @@ let transl_label (label : Parsetree.arg_label)
         if path.txt = Longident.Ldot (Lident "Stdlib", "Option") ||
           path.txt = Longident.Ldot (Lident "Stdlib", "Or_null")
         then
-          Generic_optional(path, l)
+          Generic_optional(Some path, l)
         else
           raise (Error (path.loc, Env.empty,
             Invalid_generic_optional_argument_module_path path.txt))
   )
+  | Generic_optional (None, _), _ ->
+      failwith "Types need to have module paths."
   | Nolabel, _ -> Nolabel
 
 (* Parallel to [transl_label_from_expr]. *)
@@ -795,7 +797,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               let path = match Btype.classify_optionality l with
                 | Optional_arg mpath -> (match mpath with
                     | Stdlib_option -> Predef.path_option
-                    | Stdlib_or_null -> Predef.path_or_null)
+                    | Stdlib_or_null -> Predef.path_or_null
+                    | Unknown ->
+                        failwith "Module path cannot be omitted in types.")
                 | Required_or_position_arg -> assert false
               in
               newmono

@@ -888,10 +888,12 @@ let constant_or_raise env loc cst =
 let predef_path_of_optional_module_path = function
   | Stdlib_option -> Predef.path_option
   | Stdlib_or_null -> Predef.path_or_null
+  | Unknown -> failwith "Types need to have module path"
 
 let predef_jkind_of_optional_module_path = function
   | Stdlib_option -> Predef.option_argument_jkind
   | Stdlib_or_null -> Jkind.for_or_null_argument Predef.ident_or_null
+  | Unknown -> failwith "Types need to have module path"
 
 (* Specific version of type_option, using newty rather than newgenty *)
 
@@ -907,6 +909,7 @@ let type_option_none env mpath ty loc =
   let cnone = match mpath with
     | Stdlib_option -> Env.find_ident_constructor Predef.ident_none env
     | Stdlib_or_null -> Env.find_ident_constructor Predef.ident_null env
+    | Unknown -> failwith "Types need to have module path"
   in
   mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
 
@@ -8036,7 +8039,8 @@ and type_option_some env mpath expected_mode sarg ty ty0 =
     | Stdlib_option -> (Longident.Lident "Some",
       Env.find_ident_constructor Predef.ident_some env)
     | Stdlib_or_null -> (Longident.Lident "This",
-      Env.find_ident_constructor Predef.ident_this env)) in
+      Env.find_ident_constructor Predef.ident_this env)
+    | Unknown -> failwith "Types need to have module path") in
   mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
     (type_option mpath arg.exp_type) arg.exp_loc arg.exp_env
 

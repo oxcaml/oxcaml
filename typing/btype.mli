@@ -260,8 +260,9 @@ val backtrack: snapshot -> unit
 (**** Utilities for labels ****)
 
 (* CR generic-optional: temporary function, to remove *)
-type optional_module_path = Stdlib_option | Stdlib_or_null
-val classify_module_path : Longident.t -> optional_module_path
+type optional_module_path = Stdlib_option | Stdlib_or_null | Unknown
+val classify_module_path :
+    Longident.t Location.loc option -> optional_module_path
 
 type optionality = Optional_arg of optional_module_path
 (* The reason this is called [Required_or_position_arg] instead of

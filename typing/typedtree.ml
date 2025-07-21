@@ -209,7 +209,7 @@ and arg_label = Types.arg_label =
   | Labelled of string
   | Optional of string
   | Position of string
-  | Generic_optional of Longident.t Location.loc * string
+  | Generic_optional of Longident.t Location.loc option * string
 
 and expression_desc =
     Texp_ident of

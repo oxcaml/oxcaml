@@ -99,8 +99,9 @@ let map_arg_label sub = function
 | Nolabel -> Nolabel
 | Labelled s -> Labelled s
 | Optional s -> Optional s
-| Generic_optional (module_path, s) ->
-    Generic_optional (map_loc sub module_path, s)
+| Generic_optional (None, s) -> Generic_optional (None, s)
+| Generic_optional (Some module_path, s) ->
+    Generic_optional (Some (map_loc sub module_path), s)
 
 module C = struct
   (* Constants *)

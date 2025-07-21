@@ -4521,6 +4521,7 @@ let for_optional_arg_default (mpath : Btype.optional_module_path)
            (Pfield (0, Pointer, Reads_agree),
             [ Lvar param ],
             Loc_unknown))
+    | Unknown -> failwith "Types need to have module path"
   in
   for_let ~scopes ~arg_sort:default_arg_sort ~return_layout
     loc supplied_or_default Immutable pat body

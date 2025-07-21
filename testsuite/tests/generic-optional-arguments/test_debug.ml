@@ -11,7 +11,7 @@ flags = "-extension-universe alpha ";
 let f_or_null Stdlib.Or_null.?'(x = 35) () = x
 
 (* 7. f_or_null with Stdlib.Or_null.?'x:(This 1) *)
-let _ = f_or_null  ()
+let _ = f_or_null ?'x:(This 1) ()
 (*= [%%expect{|
 val f_or_null : Stdlib.Or_null.?'x:int -> unit -> int or_null = <fun>
 - : int or_null = This 1

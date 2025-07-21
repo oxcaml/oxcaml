@@ -1660,7 +1660,8 @@ and transl_curried_function ~scopes loc repr params body
               expr.exp_env,
               (match path with
               | Stdlib_option -> Predef.type_option expr.exp_type
-              | Stdlib_or_null -> Predef.type_or_null expr.exp_type),
+              | Stdlib_or_null -> Predef.type_or_null expr.exp_type
+              | Unknown -> failwith "Module paths cannot be omitted in types"),
               (* CR generic-optional : CHECK THIS *)
               Translattribute.transl_param_attributes pat
         in

@@ -3316,7 +3316,7 @@ let arg_label_equal l1 l2 =
   match l1, l2 with
   | Generic_optional(path1, str1), Generic_optional(path2, str2) ->
       str1 = str2 &&
-        (classify_module_path path1.txt = classify_module_path path2.txt)
+        (classify_module_path path1 = classify_module_path path2)
   | _ -> l1 = l2
 
 let equivalent_with_nolabels l1 l2 =
@@ -4569,6 +4569,8 @@ let filter_arrow env t l ~force_tpoly =
               | Stdlib_or_null ->
                   Predef.path_or_null,
                     Jkind.for_or_null_argument Predef.ident_or_null
+              | Unknown ->
+                  failwith "Module path cannot be omitted in types."
             in
             newty2 ~level (Tconstr(t_cons,
               [newvar2 level arg_jkind], ref Mnil))

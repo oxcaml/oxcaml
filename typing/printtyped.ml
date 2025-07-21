@@ -164,8 +164,11 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
-  | Generic_optional (path, s) ->
-      line i ppf "Generic_optional (%a, \"%s\")\n" fmt_longident_aux path.txt s
+  | Generic_optional (Some path, s) ->
+      line i ppf "Generic_optional (Some %a, \"%s\")\n"
+        fmt_longident_aux path.txt s
+  | Generic_optional (None, s) ->
+      line i ppf "Generic_optional (None, \"%s\")\n" s
 
 let typevar_jkind ~print_quote ppf (v, l) =
   let pptv =
@@ -698,6 +701,7 @@ and optional_module_path i ppf (x : Btype.optional_module_path) =
   match x with
   | Stdlib_option -> line i ppf "Stdlib.Option\n"
   | Stdlib_or_null -> line i ppf "Stdlib.Or_null\n"
+  | Unknown -> line i ppf "Unknown\n"
 
 and function_param i ppf x =
   let p = x.fp_arg_label in

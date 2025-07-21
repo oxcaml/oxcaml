@@ -258,7 +258,7 @@ and arg_label =
   | Labelled of string (** [label:T -> ...] *)
   | Optional of string (** [?label:T -> ...] *)
   | Position of string (** [label:[%call_pos] -> ...] *)
-  | Generic_optional of Longident.t Location.loc * string
+  | Generic_optional of Longident.t Location.loc option * string
       (** [Module.Path.?'label:T -> ...] *)
 
 and arrow_desc =
