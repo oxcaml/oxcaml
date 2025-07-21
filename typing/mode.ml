@@ -1594,6 +1594,8 @@ module Hint = struct
 
   let morph_none = None
 
+  let morph_skip = Skip
+
   let rec left_adjoint :
       type l. (l * allowed) morph -> (allowed * disallowed) morph = function
     | None -> None

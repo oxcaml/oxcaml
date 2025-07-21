@@ -315,6 +315,9 @@ module type Hint = sig
   (** The empty mode morphism hint *)
   val morph_none : 'd morph
 
+  (** The skip mode morphism hint *)
+  val morph_skip : 'd morph
+
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
 
