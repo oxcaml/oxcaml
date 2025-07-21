@@ -12,13 +12,13 @@ let block_like ~env ~res (const : Static_const.t) :
   | Block (tag, mut, _shape, fields) ->
     (* CR selee: is it ok to ignore shape? *)
     let tag = Tag.Scannable.to_int tag in
-    let mutability =
+    let mutability : Jsir.mutability =
       match mut with
-      | Mutable -> Jsir.Maybe_mutable
-      | Immutable -> Jsir.Immutable
+      | Mutable -> Maybe_mutable
+      | Immutable -> Immutable
       | Immutable_unique ->
         (* CR selee: check *)
-        Jsir.Immutable
+        Immutable
     in
     let fields, res =
       To_jsir_shared.simples ~env ~res
