@@ -897,6 +897,9 @@ let type_value_slots_and_make_lifting_decision_for_one_set dacc
          | Proved () -> true
          | Unknown -> false)
        | Heap -> true
+       | External -> false
+    (* CR jcutler for ccasinghino: I think this is conservative, unclear if it's
+       the "right" choice *)
   in
   let value_slot_permits_lifting _value_slot simple =
     can_lift_coercion (Simple.coercion simple)

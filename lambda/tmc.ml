@@ -577,7 +577,7 @@ let find_candidate = function
      | Alloc_local ->
        raise (Error (Debuginfo.Scoped_location.to_location lfun.loc,
                      Tmc_local_returning))
-     | Alloc_heap -> Some lfun
+     | Alloc_heap | Alloc_external -> Some lfun
      end
   | _ -> None
 
@@ -1084,6 +1084,9 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
       | Alloc_heap, (Curried _ as k) ->
          (* Prepending arguments does not affect nlocal *)
          k
+      | Alloc_external, _ ->
+          Misc.fatal_error
+            "Impossible, externally allocated functions are not supported."
     in
     Lambda.duplicate_function @@ lfunction'
       ~kind

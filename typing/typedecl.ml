@@ -3419,7 +3419,7 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
   | Ok s -> Jkind.Sort.default_to_value_and_get s
   | Error err ->
     let kloc =
-      if is_layout_poly then External_with_layout_poly else External
+      if is_layout_poly then External_with_layout_poly else (External : jkind_sort_loc)
     in
     raise(Error (loc, Jkind_sort {kloc; typ; err}))
 

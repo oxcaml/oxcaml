@@ -44,7 +44,7 @@ module type Code_metadata_accessors_result_type = sig
 
   val result_types : 'a t -> Result_types.t Or_unknown_or_bottom.t
 
-  val result_mode : 'a t -> Lambda.locality_mode
+  val result_mode : 'a t -> Lambda.allocation_mode
 
   val stub : 'a t -> bool
 
@@ -94,7 +94,7 @@ type 'a create_type =
   first_complex_local_param:int ->
   result_arity:[`Unarized] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
-  result_mode:Lambda.locality_mode ->
+  result_mode:Lambda.allocation_mode ->
   stub:bool ->
   inline:Inline_attribute.t ->
   zero_alloc_attribute:Zero_alloc_attribute.t ->

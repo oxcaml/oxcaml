@@ -25,7 +25,7 @@ type t =
        for instance as a result of a partial application. *)
     result_arity : [`Unarized] Flambda_arity.t;
     result_types : Result_types.t Or_unknown_or_bottom.t;
-    result_mode : Lambda.locality_mode;
+    result_mode : Lambda.allocation_mode;
     stub : bool;
     inline : Inline_attribute.t;
     zero_alloc_attribute : Zero_alloc_attribute.t;
@@ -136,7 +136,7 @@ type 'a create_type =
   first_complex_local_param:int ->
   result_arity:[`Unarized] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
-  result_mode:Lambda.locality_mode ->
+  result_mode:Lambda.allocation_mode ->
   stub:bool ->
   inline:Inline_attribute.t ->
   zero_alloc_attribute:Zero_alloc_attribute.t ->
@@ -341,7 +341,7 @@ let [@ocamlformat "disable"] print ppf
     else Flambda_colours.none)
     Flambda_colours.pop
     (Or_unknown_or_bottom.print Result_types.print) result_types
-    (match result_mode with Alloc_heap -> "Heap" | Alloc_local -> "Local")
+    (match result_mode with Alloc_heap -> "Heap" | Alloc_local -> "Local" | Alloc_external -> "External")
     (match recursive with
     | Non_recursive -> Flambda_colours.elide
     | Recursive -> Flambda_colours.none)
@@ -553,7 +553,7 @@ let approx_equal
   && List.equal Alloc_mode.For_types.equal param_modes1 param_modes2
   && Int.equal first_complex_local_param1 first_complex_local_param2
   && Flambda_arity.equal_ignoring_subkinds result_arity1 result_arity2
-  && Lambda.eq_locality_mode result_mode1 result_mode2
+  && Lambda.eq_allocation_mode result_mode1 result_mode2
   && Bool.equal stub1 stub2
   && Inline_attribute.equal inline1 inline2
   && Zero_alloc_attribute.equal zero_alloc_attribute1 zero_alloc_attribute2

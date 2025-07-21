@@ -903,7 +903,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
     begin match kind, ret_mode with
     | Curried {nlocal}, _ when nlocal > 0 -> raise Exit
     | Tupled, Alloc_local -> raise Exit
-    | _, Alloc_heap -> ()
+    | _, (Alloc_heap | Alloc_external) -> ()
     | _, Alloc_local -> assert false
     end;
     let body, inner = aux [] false body in

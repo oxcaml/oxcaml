@@ -1039,7 +1039,7 @@ let result_kind_of_nullary_primitive p : result_kind =
 
 let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
   | Local _ -> Coeffects.Has_coeffects
-  | Heap -> Coeffects.No_coeffects
+  | Heap | External -> Coeffects.No_coeffects
 
 let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
   match p with
@@ -1146,7 +1146,8 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Array_length _ -> true
   | Bigarray_length _ -> false
   | String_length _ -> true
-  | Int_as_pointer m -> ( match m with Heap -> true | Local _ -> false)
+  | Int_as_pointer m -> (
+    match m with Heap -> true | Local _ | External -> false)
   | Opaque_identity _ -> false
   | Int_arith _ -> true
   | Float_arith _ ->
@@ -1158,6 +1159,7 @@ let unary_primitive_eligible_for_cse p ~arg =
     (* For the moment we don't CSE any local allocations. *)
     (* CR mshinwell: relax this in the future? *)
     false
+  | Box_number (_, External) -> false
   | Box_number (_, Heap) | Tag_immediate ->
     (* Boxing or tagging of constants will yield values that can be lifted and
        if needs be deduplicated -- so there's no point in adding CSE variables
@@ -1501,7 +1503,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         (* Local allocations have coeffects, to avoid them being moved past a
            begin/end region. Hence, it is not safe to force the allocation to be
            moved, so we cannot use the `Delay` mode for those. *)
-        match alloc_mode with Heap -> Delay | Local _ -> Strict
+        match alloc_mode with Heap | External -> Delay | Local _ -> Strict
       else Strict
     in
     Only_generative_effects Immutable, coeffects_of_mode alloc_mode, placement
@@ -2205,6 +2207,7 @@ let variadic_primitive_eligible_for_cse p ~args =
   match p with
   | Begin_region _ | Begin_try_region _ -> false
   | Make_block (_, _, Local _) | Make_array (_, _, Local _) -> false
+  | Make_block (_, _, External) | Make_array (_, _, External) -> false
   | Make_block (_, Mutable, _) | Make_array (_, Mutable, _) -> false
   | Make_block (_, Immutable_unique, _) | Make_array (_, Immutable_unique, _) ->
     false
@@ -2286,7 +2289,7 @@ let effects_and_coeffects_of_variadic_primitive p =
   | Make_block (_, mut, alloc_mode) | Make_array (_, mut, alloc_mode) ->
     let coeffects : Coeffects.t =
       match alloc_mode with
-      | Heap -> Coeffects.No_coeffects
+      | Heap | External -> Coeffects.No_coeffects
       | Local _ -> Coeffects.Has_coeffects
     in
     Effects.Only_generative_effects mut, coeffects, Placement.Strict

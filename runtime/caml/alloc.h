@@ -24,6 +24,8 @@
 extern "C" {
 #endif
 
+CAMLexport void* caml_alloc_malloc(mlsize_t wosize, tag_t tag);
+
 /* It is guaranteed that these allocation functions will not trigger
    any OCaml callback such as finalizers or signal handlers. */
 

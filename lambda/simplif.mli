@@ -38,6 +38,6 @@ val split_default_wrapper
   -> body:lambda
   -> attr:function_attribute
   -> loc:Lambda.scoped_location
-  -> mode:Lambda.locality_mode
-  -> ret_mode:Lambda.locality_mode
+  -> mode:Lambda.allocation_mode
+  -> ret_mode:Lambda.allocation_mode
   -> rec_binding list

@@ -79,7 +79,8 @@ let find_compatible_allocations :
       | Op (Begin_region | End_region) -> (
         match curr_mode with
         | Local -> return ()
-        | Heap -> loop allocations (DLL.next cell) ~curr_mode ~curr_size)
+        | Heap | External ->
+          loop allocations (DLL.next cell) ~curr_mode ~curr_size)
       | Op Poll -> return ()
       | Reloadretaddr | Poptrap _ | Prologue | Pushtrap _ | Stack_check _ ->
         (* CR-soon xclerc for xclerc: is it too conservative? (note: only the

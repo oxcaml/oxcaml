@@ -112,10 +112,12 @@ let print_unique_use ppf (u,l) =
     (Mode.Uniqueness.print ()) u
     (Mode.Linearity.print ()) l
 
-type alloc_mode = {
-  mode : Mode.Alloc.r;
-  locality_context : Env.locality_context option;
-}
+type alloc_mode =
+  | Internal of {
+      mode : Mode.Alloc.r;
+      locality_context : Env.locality_context option
+    }
+  | External
 
 type allocator =
   | Allocator_heap
@@ -207,6 +209,7 @@ and exp_extra =
   | Texp_newtype of Ident.t * string loc *
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
+  | Texp_alloc
   | Texp_mode of Mode.Alloc.Const.Option.t
 
 and arg_label = Types.arg_label =
@@ -314,7 +317,6 @@ and expression_desc =
   | Texp_src_pos
   | Texp_overwrite of expression * expression
   | Texp_hole of unique_use
-  | Texp_alloc of expression * allocator
 
 and ident_kind =
   | Id_value

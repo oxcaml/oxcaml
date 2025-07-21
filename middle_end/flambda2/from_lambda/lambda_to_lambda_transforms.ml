@@ -252,11 +252,14 @@ let initialize_array env loc ~length array_set_kind width ~init creation_expr =
   | Some init ->
     initialize_array0 env loc ~length array_set_kind width ~init creation_expr
 
-let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
-    =
+let makearray_dynamic_singleton name (mode : L.allocation_mode) ~length ~init
+    loc =
   let name =
     Printf.sprintf "caml_make%s_%s%svect"
-      (match mode with Alloc_heap -> "" | Alloc_local -> "_local")
+      (match mode with
+      | Alloc_heap -> ""
+      | Alloc_local -> "_local"
+      | Alloc_external -> Misc.fatal_error "External Vectors not supported")
       name
       (if String.length name > 0 then "_" else "")
   in
@@ -274,7 +277,8 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ~native_repr_res:
         ( (match mode with
           | Alloc_heap -> Prim_global
-          | Alloc_local -> Prim_local),
+          | Alloc_local -> Prim_local
+          | Alloc_external -> Misc.fatal_error "External Vectors not supported"),
           L.Same_as_ocaml_repr (Base Value) )
       ~is_layout_poly:false
   in
@@ -283,10 +287,10 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ([length] @ match init with None -> [] | Some (_, init) -> [init]),
       loc )
 
-let makearray_dynamic_singleton_uninitialized name (mode : L.locality_mode)
+let makearray_dynamic_singleton_uninitialized name (mode : L.allocation_mode)
     ~length loc =
   makearray_dynamic_singleton name
-    (mode : L.locality_mode)
+    (mode : L.allocation_mode)
     ~length ~init:None loc
 
 let makearray_dynamic_unboxed_products_only_64_bit () =
@@ -298,7 +302,7 @@ let makearray_dynamic_unboxed_products_only_64_bit () =
       "Cannot compile Pmakearray_dynamic at unboxed product layouts for 32-bit \
        targets"
 
-let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
+let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.allocation_mode) =
   Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
     ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
     ~native_name:name
@@ -307,16 +311,23 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
         Prim_local, L.Same_as_ocaml_repr (Base Value);
         Prim_global, L.Same_as_ocaml_repr (Base Value) ]
     ~native_repr_res:
-      ( (match mode with Alloc_heap -> Prim_global | Alloc_local -> Prim_local),
+      ( (match mode with
+        | Alloc_heap -> Prim_global
+        | Alloc_local -> Prim_local
+        | Alloc_external ->
+          Misc.fatal_error "Externally allocated arrays are not supported"),
         L.Same_as_ocaml_repr (Base Value) )
     ~is_layout_poly:false
 
 let makearray_dynamic_non_scannable_unboxed_product env
-    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length
+    (lambda_array_kind : L.array_kind) (mode : L.allocation_mode) ~length
     ~(init : L.lambda option) loc =
   makearray_dynamic_unboxed_products_only_64_bit ();
   let is_local =
-    L.of_bool (match mode with Alloc_heap -> false | Alloc_local -> true)
+    L.of_bool
+      (match mode with
+      | Alloc_heap | Alloc_external -> false
+      | Alloc_local -> true)
   in
   let external_call_desc =
     makearray_dynamic_unboxed_product_c_stub
@@ -354,14 +365,14 @@ let makearray_dynamic_non_scannable_unboxed_product env
       (L.array_set_kind
          (match mode with
          | Alloc_heap -> L.modify_heap
-         | Alloc_local -> L.modify_maybe_stack)
+         | Alloc_local | Alloc_external -> L.modify_maybe_stack)
          lambda_array_kind)
       (* There is no packing in unboxed product arrays, even if the elements are
          all float32# or int32#. *)
       Sixty_four_or_more ~init term
 
 let makearray_dynamic_scannable_unboxed_product0
-    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
+    (lambda_array_kind : L.array_kind) (mode : L.allocation_mode) ~length ~init
     loc =
   makearray_dynamic_unboxed_products_only_64_bit ();
   (* Trick: use the local stack as a way of getting the variable argument list
@@ -375,7 +386,10 @@ let makearray_dynamic_scannable_unboxed_product0
   let args_array_duid = Lambda.debug_uid_none in
   let array_layout = L.layout_array lambda_array_kind in
   let is_local =
-    L.of_bool (match mode with Alloc_heap -> false | Alloc_local -> true)
+    L.of_bool
+      (match mode with
+      | Alloc_heap | Alloc_external -> false
+      | Alloc_local -> true)
   in
   let external_call_desc =
     makearray_dynamic_unboxed_product_c_stub
@@ -402,11 +416,11 @@ let makearray_dynamic_scannable_unboxed_product0
      otherwise we will incorrectly close the region on such live value. *)
   Transformed
     (match mode with
-    | Alloc_local -> body
+    | Alloc_local | Alloc_external -> body
     | Alloc_heap -> L.Lregion (body, array_layout))
 
 let makearray_dynamic_scannable_unboxed_product env
-    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length
+    (lambda_array_kind : L.array_kind) (mode : L.allocation_mode) ~length
     ~(init : L.lambda) loc =
   let must_be_scanned =
     match lambda_array_kind with
@@ -435,7 +449,7 @@ let makearray_dynamic_scannable_unboxed_product env
       ~length ~init:(Some init) loc
 
 let makearray_dynamic env (lambda_array_kind : L.array_kind)
-    (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
+    (mode : L.allocation_mode) (has_init : L.has_initializer) args loc :
     Env.t * primitive_transform_result =
   (* %makearray_dynamic is analogous to (from stdlib/array.ml):
    *   external create: int -> 'a -> 'a array = "caml_make_vect"

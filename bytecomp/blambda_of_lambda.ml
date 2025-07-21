@@ -733,7 +733,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Pgcignorableproductarray _ -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_make_vect")
-        | Alloc_local -> binary (Ccall "caml_make_local_vect")))
+        | Alloc_local -> binary (Ccall "caml_make_local_vect")
+        | Alloc_external ->
+          Misc.fatal_error "Externally allocated vectors are not supported."))
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()

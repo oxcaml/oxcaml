@@ -514,6 +514,7 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
   | Local { region = r } ->
     let r = Env.find_region_exn env r in
     Local { region = r }
+  | External -> External
 
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.alloc_mode_for_applications =
@@ -962,6 +963,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         match Code.result_mode code with
         | Alloc_heap -> Heap
         | Alloc_local -> Local
+        | Alloc_external -> failwith "fixme" (* CR jcutler:??*)
       in
       Code
         { id = code_id;

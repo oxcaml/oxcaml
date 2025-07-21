@@ -715,7 +715,9 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     ( Only_generative_effects Immutable,
       (match closure_alloc_mode with
       | Heap -> No_coeffects
-      | Local _ -> Has_coeffects),
+      | Local _ -> Has_coeffects
+      | External ->
+        failwith "Unimplemented" (* CR jcutler: fixme, ask OCamlPRO*)),
       Strict )
   in
   let decl_map =
