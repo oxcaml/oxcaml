@@ -628,7 +628,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
           first;
         Graph.add_accessor_dep (Acc.graph acc)
           ~to_:(Code_id_or_name.var calls_are_not_pure)
-          Code_of_closure ~base:callee;
+          (Code_of_closure closure_entry_point) ~base:callee;
         Graph.add_accessor_dep (Acc.graph acc)
           ~to_:(Code_id_or_name.var exn_arg)
           (Apply (closure_entry_point, Exn))
