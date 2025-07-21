@@ -2360,8 +2360,3 @@ let meet env ty1 ty2 : _ Or_bottom.t =
     | Ok (r, env) ->
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
-
-let meet_shape env t ~shape : _ Or_bottom.t =
-  if TE.is_bottom env
-  then Bottom
-  else match meet env t shape with Bottom -> Bottom | Ok (_, env) -> Ok env

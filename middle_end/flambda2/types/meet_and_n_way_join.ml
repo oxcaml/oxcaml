@@ -1681,7 +1681,7 @@ and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
       let kind = TG.kind t1 in
       if not (List.for_all (fun (_, t) -> K.equal kind (TG.kind t)) ts)
       then
-        Misc.fatal_errorf "Kind mismatch upon join:@ %a"
+        Misc.fatal_errorf "Kind mismatch upon join:@ %a@ versus@ %a" TG.print t1
           (Format.pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ versus@ ")
              TG.print)
@@ -2816,8 +2816,3 @@ let meet env ty1 ty2 : _ Or_bottom.t =
     | Ok (r, env) ->
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
-
-let meet_shape env t ~shape : _ Or_bottom.t =
-  if TE.is_bottom env
-  then Bottom
-  else match meet env t shape with Bottom -> Bottom | Ok (_, env) -> Ok env
