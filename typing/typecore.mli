@@ -177,6 +177,7 @@ val generalizable: int -> type_expr -> bool
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
+<<<<<<< HEAD
 val reset_allocations: unit -> unit
 val optimise_allocations: unit -> unit
 
@@ -197,6 +198,15 @@ type submode_reason =
   | Other (* add more cases here for better hints *)
 
 val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.Value.t -> unit
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+val name_pattern : string -> Typedtree.pattern list -> Ident.t
+val name_cases : string -> Typedtree.value Typedtree.case list -> Ident.t
+=======
+val has_poly_constraint : Parsetree.pattern -> bool
+
+val name_pattern : string -> Typedtree.pattern list -> Ident.t
+val name_cases : string -> Typedtree.value Typedtree.case list -> Ident.t
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
@@ -329,6 +339,7 @@ type error =
   | Missing_tuple_label of string option * type_expr
   | Repeated_tuple_exp_label of string
   | Repeated_tuple_pat_label of string
+<<<<<<< HEAD
   | Wrong_expected_record_boxing of
       wrong_kind_context * Data_types.record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of
@@ -369,6 +380,10 @@ type error =
 
 and invalid_layout_poly_inst_context =
   | Binding_op
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+=======
+  | Optional_poly_param of string
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

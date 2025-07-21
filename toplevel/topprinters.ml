@@ -16,11 +16,18 @@
 (* Infrastructure to support user-defined printers in toplevels and debugger *)
 
 let type_arrow ta tb =
+<<<<<<< HEAD
   let arrow_desc =
     Types.Nolabel,Mode.Alloc.legacy,Mode.Alloc.legacy
   in
   Ctype.newty
     (Tarrow (arrow_desc, Ctype.newmono ta, tb, Types.commu_var ()))
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  Ctype.newty (Tarrow (Asttypes.Nolabel, ta, tb, Types.commu_var ()))
+=======
+  let ta = Ctype.newmono ta in
+  Ctype.newty (Tarrow (Asttypes.Nolabel, ta, tb, Types.commu_var ()))
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 let type_formatter () =
   let format = Path.Pident (Ident.create_persistent "Stdlib__Format") in
@@ -95,6 +102,7 @@ let extract_last_arrow env ty =
   in extract None ty
 
 let extract_target_type env ty =
+<<<<<<< HEAD
   match extract_last_arrow env ty with
   | None -> None
   | Some ty ->
@@ -103,6 +111,15 @@ let extract_target_type env ty =
     | exception Ctype.Filter_mono_failed ->
         None
     | ty -> Some ty
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  Option.map fst (extract_last_arrow env ty)
+=======
+  match extract_last_arrow env ty with
+  | None -> None
+  | Some ty ->
+    let ty = fst ty in
+    Btype.tpoly_get_mono_opt ty
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 let extract_target_parameters env ty =
   match extract_target_type env ty with

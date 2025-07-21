@@ -2080,8 +2080,17 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
+<<<<<<< HEAD
               Tpat_var { id; uid; _ } -> id, uid
             | _ -> Misc.fatal_error "Translcore.transl_let")
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+              Tpat_var (id,_,_) -> id
+            | Tpat_alias ({pat_desc=Tpat_any}, id,_,_,_) -> id
+            | _ -> assert false)
+=======
+              Tpat_var (id,_,_) -> id
+            | _ -> assert false)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         pat_expr_list in
       let transl_case
             {vb_expr=expr; vb_sort; vb_attributes; vb_rec_kind = rkind;
