@@ -4,15 +4,15 @@ source_filename = "int_ops.ml"
 define void @camlInt_ops__code_begin() { ret void }
 
 define i64 @camlInt_ops__add_0_23_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -55,15 +55,15 @@ L101:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__sub_1_24_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -106,17 +106,17 @@ L109:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__mul_2_25_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -169,22 +169,22 @@ L117:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__div_3_26_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
-  %17 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -276,22 +276,22 @@ L149:                                                ; preds = %L136
 }
 
 define i64 @camlInt_ops__mod__4_27_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
-  %17 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -369,14 +369,14 @@ L172:                                                ; preds = %L154
 }
 
 define i64 @camlInt_ops__land__5_28_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -414,14 +414,14 @@ L176:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lor__6_29_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -459,15 +459,15 @@ L183:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lxor__7_30_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -510,12 +510,12 @@ L190:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lnot__8_31_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -546,18 +546,18 @@ L198:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lsl__9_32_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -612,17 +612,17 @@ L204:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lsr__10_33_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -672,17 +672,17 @@ L214:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__asr__11_34_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -732,11 +732,11 @@ L223:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__add_imm_12_35_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -762,11 +762,11 @@ L232:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__sub_imm_13_36_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -792,12 +792,12 @@ L237:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__mul_imm_14_37_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -828,18 +828,18 @@ L242:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__div_imm_15_38_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -898,20 +898,20 @@ L248:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__mod_imm_16_39_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -978,11 +978,11 @@ L259:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__land_imm_17_40_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -1008,11 +1008,11 @@ L271:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lor_imm_18_41_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -1038,12 +1038,12 @@ L276:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lxor_imm_19_42_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -1074,12 +1074,12 @@ L281:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lsl_imm_20_43_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -1110,12 +1110,12 @@ L287:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__lsr_imm_21_44_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -1146,12 +1146,12 @@ L293:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__asr_imm_22_45_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -1182,11 +1182,11 @@ L299:                                                ; preds = %L1
 }
 
 define i64 @camlInt_ops__entry()  {
-  %1 = alloca i64 
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
+  %1 = alloca i64
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
   br label %L1
 L1:
   br label %L308

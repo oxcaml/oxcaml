@@ -4,43 +4,43 @@ source_filename = "gcd.ml"
 define void @camlGcd__code_begin() { ret void }
 
 define i64 @camlGcd__gcd_0_1_code(i64 %0)  {
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
-  %17 = alloca i64 
-  %18 = alloca i64 
-  %19 = alloca i64 
-  %20 = alloca i64 
-  %21 = alloca i64 
-  %22 = alloca i64 
-  %23 = alloca i64 
-  %24 = alloca i64 
-  %25 = alloca i64 
-  %26 = alloca i64 
-  %27 = alloca i64 
-  %28 = alloca i64 
-  %29 = alloca i64 
-  %30 = alloca i64 
-  %31 = alloca i64 
-  %32 = alloca i64 
-  %33 = alloca i64 
-  %34 = alloca i64 
-  %35 = alloca i64 
-  %36 = alloca i64 
-  %37 = alloca i64 
-  %38 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = alloca i64
+  %20 = alloca i64
+  %21 = alloca i64
+  %22 = alloca i64
+  %23 = alloca i64
+  %24 = alloca i64
+  %25 = alloca i64
+  %26 = alloca i64
+  %27 = alloca i64
+  %28 = alloca i64
+  %29 = alloca i64
+  %30 = alloca i64
+  %31 = alloca i64
+  %32 = alloca i64
+  %33 = alloca i64
+  %34 = alloca i64
+  %35 = alloca i64
+  %36 = alloca i64
+  %37 = alloca i64
+  %38 = alloca i64
   store i64 %0, ptr %2
   br label %L1
 L1:
@@ -205,11 +205,11 @@ L142:                                                ; preds = %L109
 }
 
 define i64 @camlGcd__entry()  {
-  %1 = alloca i64 
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
+  %1 = alloca i64
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
   br label %L1
 L1:
   br label %L154
