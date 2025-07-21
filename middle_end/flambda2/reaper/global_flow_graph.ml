@@ -13,16 +13,16 @@
 (*                                                                        *)
 (**************************************************************************)
 type closure_entry_point =
-  | Indirect_code_pointer
-  | Direct_code_pointer
+  | Unknown_arity_code_pointer
+  | Known_arity_code_pointer
 
 let closure_entry_point_to_int = function
-  | Indirect_code_pointer -> 0
-  | Direct_code_pointer -> 1
+  | Unknown_arity_code_pointer -> 0
+  | Known_arity_code_pointer -> 1
 
 let closure_entry_point_to_string = function
-  | Indirect_code_pointer -> "Indirect_code_pointer"
-  | Direct_code_pointer -> "Direct_code_pointer"
+  | Unknown_arity_code_pointer -> "Unknown_arity_code_pointer"
+  | Known_arity_code_pointer -> "Known_arity_code_pointer"
 
 module Field = struct
   module M = struct

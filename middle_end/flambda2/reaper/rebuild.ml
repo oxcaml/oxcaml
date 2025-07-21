@@ -709,10 +709,10 @@ let make_apply_wrapper env
                 match Apply.call_kind apply with
                 | Function { function_call = Direct _; _ } -> error ()
                 | Function { function_call = Indirect_known_arity; _ } ->
-                  GFG.Direct_code_pointer
+                  GFG.Known_arity_code_pointer
                 | Function { function_call = Indirect_unknown_arity; _ }
                 | C_call _ | Method _ | Effect _ ->
-                  GFG.Indirect_code_pointer
+                  GFG.Unknown_arity_code_pointer
               in
               let field =
                 GFG.Field.Apply (direct_or_indirect, GFG.Field.Normal i)
@@ -984,7 +984,7 @@ let rebuild_apply env apply =
           match callee_with_known_arity with
           | Some callee ->
             if DS.cofield_has_use env.uses callee
-                 (Param (Direct_code_pointer, i))
+                 (Param (Known_arity_code_pointer, i))
             then arg
             else
               Simple.pattern_match arg

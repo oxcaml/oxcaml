@@ -604,9 +604,9 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       | Indirect_unknown_arity ->
         ( Flambda_arity.group_by_parameter (Apply.args_arity apply)
             (Apply.args apply),
-          Global_flow_graph.Indirect_code_pointer )
+          Global_flow_graph.Unknown_arity_code_pointer )
       | Indirect_known_arity | Direct _ ->
-        [Apply.args apply], Global_flow_graph.Direct_code_pointer
+        [Apply.args apply], Global_flow_graph.Known_arity_code_pointer
     in
     (* List.iter (fun arg -> Acc.used ~denv arg acc) (Apply.args apply); *)
     let callee =
