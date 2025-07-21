@@ -6,7 +6,7 @@ let try_gcd x y =
 
 let () =
   try_gcd 216 250 (* 2 *);
-  try_gcd 37 37 (* 30 *);
+  try_gcd 37 37 (* 37 *);
   try_gcd 987 1597 (* 1 *);
   try_gcd 1665 1035 (* 45 *);
   try_gcd 23 0 (* 23 *)

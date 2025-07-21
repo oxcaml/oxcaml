@@ -21,7 +21,7 @@ L1:
 L101:                                                ; preds = %L1
   %12 = load i64, ptr %2
   store i64 %12, ptr %3
-  store ptr @camlInt_ops__add_13, ptr %4
+  store ptr @camlInt_ops__add_12, ptr %4
   %13 = load i64, ptr %4
   store i64 %13, ptr %5
   %14 = load i64, ptr %5
@@ -32,7 +32,7 @@ L101:                                                ; preds = %L1
   %18 = inttoptr i64 %17 to ptr
   %19 = load i64, ptr %18
   store i64 %19, ptr %6
-  store ptr @camlInt_ops__add_13, ptr %7
+  store ptr @camlInt_ops__add_12, ptr %7
   %20 = load i64, ptr %7
   store i64 %20, ptr %8
   %21 = load i64, ptr %8
@@ -78,7 +78,7 @@ L1:
 L110:                                                ; preds = %L1
   %12 = load i64, ptr %2
   store i64 %12, ptr %3
-  store ptr @camlInt_ops__sub_14, ptr %4
+  store ptr @camlInt_ops__sub_13, ptr %4
   %13 = load i64, ptr %4
   store i64 %13, ptr %5
   %14 = load i64, ptr %5
@@ -89,7 +89,7 @@ L110:                                                ; preds = %L1
   %18 = inttoptr i64 %17 to ptr
   %19 = load i64, ptr %18
   store i64 %19, ptr %6
-  store ptr @camlInt_ops__sub_14, ptr %7
+  store ptr @camlInt_ops__sub_13, ptr %7
   %20 = load i64, ptr %7
   store i64 %20, ptr %8
   %21 = load i64, ptr %8
@@ -143,7 +143,7 @@ L1:
 L119:                                                ; preds = %L1
   %14 = load i64, ptr %2
   store i64 %14, ptr %3
-  store ptr @camlInt_ops__mul_15, ptr %4
+  store ptr @camlInt_ops__mul_14, ptr %4
   %15 = load i64, ptr %4
   store i64 %15, ptr %5
   %16 = load i64, ptr %5
@@ -159,7 +159,7 @@ L119:                                                ; preds = %L1
   %23 = load i64, ptr %7
   %24 = ashr i64 %23, 1
   store i64 %24, ptr %7
-  store ptr @camlInt_ops__mul_15, ptr %8
+  store ptr @camlInt_ops__mul_14, ptr %8
   %25 = load i64, ptr %8
   store i64 %25, ptr %9
   %26 = load i64, ptr %9
@@ -222,7 +222,7 @@ L1:
 L130:                                                ; preds = %L1
   %24 = load i64, ptr %2
   store i64 %24, ptr %4
-  store ptr @camlInt_ops__div_16, ptr %5
+  store ptr @camlInt_ops__div_15, ptr %5
   %25 = load i64, ptr %5
   store i64 %25, ptr %6
   %26 = load i64, ptr %6
@@ -247,7 +247,7 @@ L134:                                                ; preds = %L130
   %38 = load i64, ptr %2
   ret i64 %38
 L139:                                                ; preds = %L130
-  store ptr @camlInt_ops__div_16, ptr %9
+  store ptr @camlInt_ops__div_15, ptr %9
   %39 = load i64, ptr %9
   store i64 %39, ptr %10
   %40 = load i64, ptr %10
@@ -266,7 +266,7 @@ L139:                                                ; preds = %L130
   %50 = icmp sgt i64 %49, 1
   br i1 %50, label %L143, label %L157
 L143:                                                ; preds = %L139
-  store ptr @camlInt_ops__div_16, ptr %12
+  store ptr @camlInt_ops__div_15, ptr %12
   %51 = load i64, ptr %12
   store i64 %51, ptr %13
   %52 = load i64, ptr %13
@@ -282,7 +282,7 @@ L143:                                                ; preds = %L139
   %59 = load i64, ptr %15
   %60 = ashr i64 %59, 1
   store i64 %60, ptr %15
-  store ptr @camlInt_ops__div_16, ptr %16
+  store ptr @camlInt_ops__div_15, ptr %16
   %61 = load i64, ptr %16
   store i64 %61, ptr %17
   %62 = load i64, ptr %17
@@ -357,7 +357,7 @@ L1:
 L162:                                                ; preds = %L1
   %21 = load i64, ptr %2
   store i64 %21, ptr %5
-  store ptr @camlInt_ops__mod__17, ptr %6
+  store ptr @camlInt_ops__mod__16, ptr %6
   %22 = load i64, ptr %6
   store i64 %22, ptr %7
   %23 = load i64, ptr %7
@@ -376,7 +376,7 @@ L162:                                                ; preds = %L1
   %33 = icmp sgt i64 %32, 1
   br i1 %33, label %L169, label %L183
 L169:                                                ; preds = %L162
-  store ptr @camlInt_ops__mod__17, ptr %9
+  store ptr @camlInt_ops__mod__16, ptr %9
   %34 = load i64, ptr %9
   store i64 %34, ptr %10
   %35 = load i64, ptr %10
@@ -392,7 +392,7 @@ L169:                                                ; preds = %L162
   %42 = load i64, ptr %12
   %43 = ashr i64 %42, 1
   store i64 %43, ptr %12
-  store ptr @camlInt_ops__mod__17, ptr %13
+  store ptr @camlInt_ops__mod__16, ptr %13
   %44 = load i64, ptr %13
   store i64 %44, ptr %14
   %45 = load i64, ptr %14
@@ -457,7 +457,7 @@ L1:
 L187:                                                ; preds = %L1
   %11 = load i64, ptr %2
   store i64 %11, ptr %3
-  store ptr @camlInt_ops__land__18, ptr %4
+  store ptr @camlInt_ops__land__17, ptr %4
   %12 = load i64, ptr %4
   store i64 %12, ptr %5
   %13 = load i64, ptr %5
@@ -468,7 +468,7 @@ L187:                                                ; preds = %L1
   %17 = inttoptr i64 %16 to ptr
   %18 = load i64, ptr %17
   store i64 %18, ptr %6
-  store ptr @camlInt_ops__land__18, ptr %7
+  store ptr @camlInt_ops__land__17, ptr %7
   %19 = load i64, ptr %7
   store i64 %19, ptr %8
   %20 = load i64, ptr %8
@@ -508,7 +508,7 @@ L1:
 L195:                                                ; preds = %L1
   %11 = load i64, ptr %2
   store i64 %11, ptr %3
-  store ptr @camlInt_ops__lor__20, ptr %4
+  store ptr @camlInt_ops__lor__18, ptr %4
   %12 = load i64, ptr %4
   store i64 %12, ptr %5
   %13 = load i64, ptr %5
@@ -519,7 +519,7 @@ L195:                                                ; preds = %L1
   %17 = inttoptr i64 %16 to ptr
   %18 = load i64, ptr %17
   store i64 %18, ptr %6
-  store ptr @camlInt_ops__lor__20, ptr %7
+  store ptr @camlInt_ops__lor__18, ptr %7
   %19 = load i64, ptr %7
   store i64 %19, ptr %8
   %20 = load i64, ptr %8
@@ -560,7 +560,7 @@ L1:
 L203:                                                ; preds = %L1
   %12 = load i64, ptr %2
   store i64 %12, ptr %3
-  store ptr @camlInt_ops__lxor__21, ptr %4
+  store ptr @camlInt_ops__lxor__19, ptr %4
   %13 = load i64, ptr %4
   store i64 %13, ptr %5
   %14 = load i64, ptr %5
@@ -571,7 +571,7 @@ L203:                                                ; preds = %L1
   %18 = inttoptr i64 %17 to ptr
   %19 = load i64, ptr %18
   store i64 %19, ptr %6
-  store ptr @camlInt_ops__lxor__21, ptr %7
+  store ptr @camlInt_ops__lxor__19, ptr %7
   %20 = load i64, ptr %7
   store i64 %20, ptr %8
   %21 = load i64, ptr %8
@@ -614,7 +614,7 @@ L1:
 L212:                                                ; preds = %L1
   %9 = load i64, ptr %2
   store i64 %9, ptr %3
-  store ptr @camlInt_ops__lnot__22, ptr %4
+  store ptr @camlInt_ops__lnot__20, ptr %4
   %10 = load i64, ptr %4
   store i64 %10, ptr %5
   %11 = load i64, ptr %5
@@ -662,7 +662,7 @@ L1:
 L219:                                                ; preds = %L1
   %15 = load i64, ptr %2
   store i64 %15, ptr %4
-  store ptr @camlInt_ops__lsl__23, ptr %5
+  store ptr @camlInt_ops__lsl__21, ptr %5
   %16 = load i64, ptr %5
   store i64 %16, ptr %6
   %17 = load i64, ptr %6
@@ -678,7 +678,7 @@ L219:                                                ; preds = %L1
   %24 = load i64, ptr %8
   %25 = ashr i64 %24, 1
   store i64 %25, ptr %8
-  store ptr @camlInt_ops__lsl__23, ptr %9
+  store ptr @camlInt_ops__lsl__21, ptr %9
   %26 = load i64, ptr %9
   store i64 %26, ptr %10
   %27 = load i64, ptr %10
@@ -733,7 +733,7 @@ L1:
 L230:                                                ; preds = %L1
   %14 = load i64, ptr %2
   store i64 %14, ptr %4
-  store ptr @camlInt_ops__lsr__24, ptr %5
+  store ptr @camlInt_ops__lsr__22, ptr %5
   %15 = load i64, ptr %5
   store i64 %15, ptr %6
   %16 = load i64, ptr %6
@@ -749,7 +749,7 @@ L230:                                                ; preds = %L1
   %23 = load i64, ptr %8
   %24 = ashr i64 %23, 1
   store i64 %24, ptr %8
-  store ptr @camlInt_ops__lsr__24, ptr %9
+  store ptr @camlInt_ops__lsr__22, ptr %9
   %25 = load i64, ptr %9
   store i64 %25, ptr %10
   %26 = load i64, ptr %10
@@ -799,7 +799,7 @@ L1:
 L240:                                                ; preds = %L1
   %14 = load i64, ptr %2
   store i64 %14, ptr %4
-  store ptr @camlInt_ops__asr__25, ptr %5
+  store ptr @camlInt_ops__asr__23, ptr %5
   %15 = load i64, ptr %5
   store i64 %15, ptr %6
   %16 = load i64, ptr %6
@@ -815,7 +815,7 @@ L240:                                                ; preds = %L1
   %23 = load i64, ptr %8
   %24 = ashr i64 %23, 1
   store i64 %24, ptr %8
-  store ptr @camlInt_ops__asr__25, ptr %9
+  store ptr @camlInt_ops__asr__23, ptr %9
   %25 = load i64, ptr %9
   store i64 %25, ptr %10
   %26 = load i64, ptr %10
@@ -913,7 +913,7 @@ L253:                                                ; preds = %L1
   store i64 %59, ptr %3
   %60 = load i64, ptr %3
   store i64 %60, ptr %4
-  store ptr @camlInt_ops__add_13, ptr %5
+  store ptr @camlInt_ops__add_12, ptr %5
   %61 = load i64, ptr %5
   store i64 %61, ptr %6
   %62 = load i64, ptr %6
@@ -924,7 +924,7 @@ L253:                                                ; preds = %L1
   %66 = inttoptr i64 %65 to ptr
   %67 = load i64, ptr %4
   store i64 %67, ptr %66
-  store ptr @camlInt_ops__sub_14, ptr %7
+  store ptr @camlInt_ops__sub_13, ptr %7
   %68 = load i64, ptr %7
   store i64 %68, ptr %8
   %69 = load i64, ptr %8
@@ -935,7 +935,7 @@ L253:                                                ; preds = %L1
   %73 = inttoptr i64 %72 to ptr
   %74 = load i64, ptr %4
   store i64 %74, ptr %73
-  store ptr @camlInt_ops__mul_15, ptr %9
+  store ptr @camlInt_ops__mul_14, ptr %9
   %75 = load i64, ptr %9
   store i64 %75, ptr %10
   %76 = load i64, ptr %10
@@ -946,7 +946,7 @@ L253:                                                ; preds = %L1
   %80 = inttoptr i64 %79 to ptr
   %81 = load i64, ptr %4
   store i64 %81, ptr %80
-  store ptr @camlInt_ops__div_16, ptr %11
+  store ptr @camlInt_ops__div_15, ptr %11
   %82 = load i64, ptr %11
   store i64 %82, ptr %12
   %83 = load i64, ptr %12
@@ -957,7 +957,7 @@ L253:                                                ; preds = %L1
   %87 = inttoptr i64 %86 to ptr
   %88 = load i64, ptr %4
   store i64 %88, ptr %87
-  store ptr @camlInt_ops__mod__17, ptr %13
+  store ptr @camlInt_ops__mod__16, ptr %13
   %89 = load i64, ptr %13
   store i64 %89, ptr %14
   %90 = load i64, ptr %14
@@ -968,7 +968,7 @@ L253:                                                ; preds = %L1
   %94 = inttoptr i64 %93 to ptr
   %95 = load i64, ptr %4
   store i64 %95, ptr %94
-  store ptr @camlInt_ops__land__18, ptr %15
+  store ptr @camlInt_ops__land__17, ptr %15
   %96 = load i64, ptr %15
   store i64 %96, ptr %16
   %97 = load i64, ptr %16
@@ -979,7 +979,7 @@ L253:                                                ; preds = %L1
   %101 = inttoptr i64 %100 to ptr
   %102 = load i64, ptr %4
   store i64 %102, ptr %101
-  store ptr @camlInt_ops__lor__20, ptr %17
+  store ptr @camlInt_ops__lor__18, ptr %17
   %103 = load i64, ptr %17
   store i64 %103, ptr %18
   %104 = load i64, ptr %18
@@ -990,7 +990,7 @@ L253:                                                ; preds = %L1
   %108 = inttoptr i64 %107 to ptr
   %109 = load i64, ptr %4
   store i64 %109, ptr %108
-  store ptr @camlInt_ops__lxor__21, ptr %19
+  store ptr @camlInt_ops__lxor__19, ptr %19
   %110 = load i64, ptr %19
   store i64 %110, ptr %20
   %111 = load i64, ptr %20
@@ -1001,7 +1001,7 @@ L253:                                                ; preds = %L1
   %115 = inttoptr i64 %114 to ptr
   %116 = load i64, ptr %4
   store i64 %116, ptr %115
-  store ptr @camlInt_ops__lnot__22, ptr %21
+  store ptr @camlInt_ops__lnot__20, ptr %21
   %117 = load i64, ptr %21
   store i64 %117, ptr %22
   %118 = load i64, ptr %22
@@ -1012,7 +1012,7 @@ L253:                                                ; preds = %L1
   %122 = inttoptr i64 %121 to ptr
   %123 = load i64, ptr %4
   store i64 %123, ptr %122
-  store ptr @camlInt_ops__lsl__23, ptr %23
+  store ptr @camlInt_ops__lsl__21, ptr %23
   %124 = load i64, ptr %23
   store i64 %124, ptr %24
   %125 = load i64, ptr %24
@@ -1023,7 +1023,7 @@ L253:                                                ; preds = %L1
   %129 = inttoptr i64 %128 to ptr
   %130 = load i64, ptr %4
   store i64 %130, ptr %129
-  store ptr @camlInt_ops__lsr__24, ptr %25
+  store ptr @camlInt_ops__lsr__22, ptr %25
   %131 = load i64, ptr %25
   store i64 %131, ptr %26
   %132 = load i64, ptr %26
@@ -1034,7 +1034,7 @@ L253:                                                ; preds = %L1
   %136 = inttoptr i64 %135 to ptr
   %137 = load i64, ptr %4
   store i64 %137, ptr %136
-  store ptr @camlInt_ops__asr__25, ptr %27
+  store ptr @camlInt_ops__asr__23, ptr %27
   %138 = load i64, ptr %27
   store i64 %138, ptr %28
   %139 = load i64, ptr %28
@@ -1056,7 +1056,7 @@ L253:                                                ; preds = %L1
   store i64 %149, ptr %30
   %150 = load i64, ptr %30
   store i64 %150, ptr %31
-  store ptr @camlInt_ops__add_13, ptr %32
+  store ptr @camlInt_ops__add_12, ptr %32
   %151 = load i64, ptr %32
   store i64 %151, ptr %33
   %152 = load i64, ptr %33
@@ -1067,7 +1067,7 @@ L253:                                                ; preds = %L1
   %156 = inttoptr i64 %155 to ptr
   %157 = load i64, ptr %31
   store i64 %157, ptr %156
-  store ptr @camlInt_ops__sub_14, ptr %34
+  store ptr @camlInt_ops__sub_13, ptr %34
   %158 = load i64, ptr %34
   store i64 %158, ptr %35
   %159 = load i64, ptr %35
@@ -1078,7 +1078,7 @@ L253:                                                ; preds = %L1
   %163 = inttoptr i64 %162 to ptr
   %164 = load i64, ptr %31
   store i64 %164, ptr %163
-  store ptr @camlInt_ops__mul_15, ptr %36
+  store ptr @camlInt_ops__mul_14, ptr %36
   %165 = load i64, ptr %36
   store i64 %165, ptr %37
   %166 = load i64, ptr %37
@@ -1089,7 +1089,7 @@ L253:                                                ; preds = %L1
   %170 = inttoptr i64 %169 to ptr
   %171 = load i64, ptr %31
   store i64 %171, ptr %170
-  store ptr @camlInt_ops__div_16, ptr %38
+  store ptr @camlInt_ops__div_15, ptr %38
   %172 = load i64, ptr %38
   store i64 %172, ptr %39
   %173 = load i64, ptr %39
@@ -1100,7 +1100,7 @@ L253:                                                ; preds = %L1
   %177 = inttoptr i64 %176 to ptr
   %178 = load i64, ptr %31
   store i64 %178, ptr %177
-  store ptr @camlInt_ops__mod__17, ptr %40
+  store ptr @camlInt_ops__mod__16, ptr %40
   %179 = load i64, ptr %40
   store i64 %179, ptr %41
   %180 = load i64, ptr %41
@@ -1111,7 +1111,7 @@ L253:                                                ; preds = %L1
   %184 = inttoptr i64 %183 to ptr
   %185 = load i64, ptr %31
   store i64 %185, ptr %184
-  store ptr @camlInt_ops__land__18, ptr %42
+  store ptr @camlInt_ops__land__17, ptr %42
   %186 = load i64, ptr %42
   store i64 %186, ptr %43
   %187 = load i64, ptr %43
@@ -1122,7 +1122,7 @@ L253:                                                ; preds = %L1
   %191 = inttoptr i64 %190 to ptr
   %192 = load i64, ptr %31
   store i64 %192, ptr %191
-  store ptr @camlInt_ops__lor__20, ptr %44
+  store ptr @camlInt_ops__lor__18, ptr %44
   %193 = load i64, ptr %44
   store i64 %193, ptr %45
   %194 = load i64, ptr %45
@@ -1133,7 +1133,7 @@ L253:                                                ; preds = %L1
   %198 = inttoptr i64 %197 to ptr
   %199 = load i64, ptr %31
   store i64 %199, ptr %198
-  store ptr @camlInt_ops__lxor__21, ptr %46
+  store ptr @camlInt_ops__lxor__19, ptr %46
   %200 = load i64, ptr %46
   store i64 %200, ptr %47
   %201 = load i64, ptr %47
@@ -1144,7 +1144,7 @@ L253:                                                ; preds = %L1
   %205 = inttoptr i64 %204 to ptr
   %206 = load i64, ptr %31
   store i64 %206, ptr %205
-  store ptr @camlInt_ops__lsl__23, ptr %48
+  store ptr @camlInt_ops__lsl__21, ptr %48
   %207 = load i64, ptr %48
   store i64 %207, ptr %49
   %208 = load i64, ptr %49
@@ -1155,7 +1155,7 @@ L253:                                                ; preds = %L1
   %212 = inttoptr i64 %211 to ptr
   %213 = load i64, ptr %31
   store i64 %213, ptr %212
-  store ptr @camlInt_ops__lsr__24, ptr %50
+  store ptr @camlInt_ops__lsr__22, ptr %50
   %214 = load i64, ptr %50
   store i64 %214, ptr %51
   %215 = load i64, ptr %51
@@ -1166,7 +1166,7 @@ L253:                                                ; preds = %L1
   %219 = inttoptr i64 %218 to ptr
   %220 = load i64, ptr %31
   store i64 %220, ptr %219
-  store ptr @camlInt_ops__asr__25, ptr %52
+  store ptr @camlInt_ops__asr__23, ptr %52
   %221 = load i64, ptr %52
   store i64 %221, ptr %53
   %222 = load i64, ptr %53
