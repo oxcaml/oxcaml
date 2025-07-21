@@ -144,7 +144,13 @@ let mkTexp_function ?(id = texp_function_defaults)
                 (match optional_default with
                 | None -> Tparam_pat pattern
                 | Some default ->
-                    Tparam_optional_default (pattern, default, id.param_sort));
+                    let mpath =
+                      match Btype.classify_optionality arg_label with
+                      | Optional_arg mpath -> mpath
+                      | Not_optional_arg -> assert false
+                    in
+                    Tparam_optional_default
+                      (pattern, default, id.param_sort, mpath));
               fp_param = param;
               fp_param_debug_uid = Lambda.debug_uid_none;
               fp_partial = partial;

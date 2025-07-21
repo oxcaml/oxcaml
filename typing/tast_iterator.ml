@@ -302,7 +302,7 @@ let function_param sub { fp_loc; fp_kind; fp_newtypes; _ } =
     fp_newtypes;
   match fp_kind with
   | Tparam_pat pat -> sub.pat sub pat
-  | Tparam_optional_default (pat, default_arg, _) ->
+  | Tparam_optional_default (pat, default_arg, _, _) ->
       sub.pat sub pat;
       sub.expr sub default_arg
 
