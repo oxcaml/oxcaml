@@ -3320,12 +3320,14 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
 
 let closure_mode ~errors ~env ~loc ~item:_ ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
+  (* [mode] is the mode of the value being closed over, [comonadic0] is the mode of the closure *)
   begin
     match
       Mode.Value.Comonadic.submode
+comonadic
         (Mode.Value.Comonadic.apply_hint
-          (Mode.Hint.Close_over loc)
-          comonadic) comonadic0
+          (Mode.Hint.Is_closed_by loc)
+          comonadic0)
     with
     | Error e ->
         may_lookup_error errors loc env

@@ -213,6 +213,8 @@ module type S = sig
       | Is_closed_by : Location.t -> (disallowed * 'r) morph
       | Partial_application : (disallowed * 'r) morph
       | Adj_partial_application : ('l * disallowed) morph
+      | Crossing_left : ('l * disallowed) morph
+      | Crossing_right : (disallowed * 'r) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
@@ -221,6 +223,8 @@ module type S = sig
        the monadic axis modules, as we can't use [neg] within the substitution due
        to type checker limitations *)
     type 'd neg_morph = 'd neg morph constraint 'd = _ * _
+
+    val is_rigid : _ morph -> bool
   end
 
   (** Hints for the mode solvers. These are axis-specific hints that contain a trace

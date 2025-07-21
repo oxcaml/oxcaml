@@ -1573,11 +1573,24 @@ module Hint = struct
     | Is_closed_by : Location.t -> (disallowed * 'r) morph
     | Partial_application : (disallowed * 'r) morph
     | Adj_partial_application : ('l * disallowed) morph
+    | Crossing_left : ('l * disallowed) morph
+    | Crossing_right : (disallowed * 'r) morph
     | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
   type 'd neg_morph = 'd neg morph constraint 'd = _ * _
+
+  let rec is_rigid : type l r. (l * r) morph -> bool = function
+    | None -> false
+    | Skip -> false
+    | Close_over _ -> true
+    | Is_closed_by _ -> true
+    | Partial_application -> true
+    | Adj_partial_application -> true
+    | Crossing_left -> false
+    | Crossing_right -> false
+    | Compose (x, y) -> is_rigid x || is_rigid y
 
   let morph_none = None
 
@@ -1587,6 +1600,7 @@ module Hint = struct
     | Skip -> Skip
     | Is_closed_by l -> Close_over l
     | Partial_application -> Adj_partial_application
+    | Crossing_right -> Crossing_left
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
 
   let rec right_adjoint :
@@ -1595,6 +1609,7 @@ module Hint = struct
     | Skip -> Skip
     | Close_over l -> Is_closed_by l
     | Adj_partial_application -> Partial_application
+    | Crossing_left -> Crossing_right
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
   let compose x y = Compose (x, y)
@@ -1609,6 +1624,7 @@ module Hint = struct
        | Skip -> Skip
        | Close_over l -> Close_over l
        | Adj_partial_application -> Adj_partial_application
+       | Crossing_left -> Crossing_left
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
@@ -1618,6 +1634,7 @@ module Hint = struct
        | Skip -> Skip
        | Is_closed_by l -> Is_closed_by l
        | Partial_application -> Partial_application
+       | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
@@ -1629,6 +1646,8 @@ module Hint = struct
        | Is_closed_by l -> Is_closed_by l
        | Partial_application -> Partial_application
        | Adj_partial_application -> Adj_partial_application
+       | Crossing_left -> Crossing_left
+       | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
@@ -1640,6 +1659,8 @@ module Hint = struct
        | Is_closed_by l -> Is_closed_by l
        | Partial_application -> Partial_application
        | Adj_partial_application -> Adj_partial_application
+       | Crossing_left -> Crossing_left
+       | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
   end)
 end
@@ -1667,7 +1688,7 @@ module Axis = C.Axis
 (** Hints for the mode solvers. These are axis-specific hints that contain a trace
 of the values in a single axis from an error. *)
 type 'a axhint =
-  | Morph : 'd Hint.morph * 'b * 'b C.obj * 'b axhint -> 'a axhint
+  | Morph : 'd Hint.morph * 'b * 'b C.obj * 'b axhint * _ C.morph -> 'a axhint
   | Const : Hint.const -> 'a axhint
   | Empty : 'a axhint
 [@@ocaml.warning "-62"]
@@ -1706,6 +1727,7 @@ let rec res_sprint_morph_hint :
   | Is_closed_by loc ->
     Ok (asprintf "is closed by something (at %a)" Location.print_loc loc)
   | Partial_application -> Ok "is captured by a partial application"
+  | Crossing_left | Crossing_right -> Ok "crosses with something (TODO)"
   | Adj_partial_application -> Ok "has a partial application capturing a value"
   | Compose (hint1, hint2) ->
     Result.bind (res_sprint_morph_hint hint1) (fun s1 ->
@@ -1719,19 +1741,48 @@ let rec opt_sprint_axhint_chain :
  fun (a : a) (a_obj : a C.obj) (hint : a axhint) ->
   let open Format in
   match hint with
-  | Morph (morph_hint, b, b_obj, b_hint) -> (
-    match res_sprint_morph_hint morph_hint with
-    | Error `Stop -> None
-    | Error `Skip -> opt_sprint_axhint_chain b b_obj b_hint
-    | Ok morph_hint_str ->
-      let subchain_str =
-        match opt_sprint_axhint_chain b b_obj b_hint with
-        | None -> ""
-        | Some s -> sprintf "\n%s" s
-      in
-      Some
-        (asprintf "This is %a because it %s %a.%s" (C.print a_obj) a
-           morph_hint_str (C.print b_obj) b subchain_str))
+  | Morph (morph_hint, b, b_obj, b_hint, morph) -> (
+    let morph_name =
+      match morph with
+      | Id -> "Id"
+      | Meet_with _ -> "Meet_with"
+      | Imply _ -> "Imply"
+      | Proj _ -> "Proj"
+      | Max_with _ -> "Max_with"
+      | Min_with _ -> "Min_with"
+      | Map_comonadic _ -> "Map_comonadic"
+      | Monadic_to_comonadic_min -> "Monadic_to_comonadic_min"
+      | Comonadic_to_monadic _ -> "Comonadic_to_monadic"
+      | Monadic_to_comonadic_max -> "Monadic_to_comonadic_max"
+      | Local_to_regional -> "Local_to_regional"
+      | Regional_to_local -> "Regional_to_local"
+      | Locality_as_regionality -> "Locality_as_regionality"
+      | Regional_to_global -> "Regional_to_global"
+      | Global_to_regional -> "Global_to_regional"
+      | Compose _ -> "Compose"
+    in
+    match C.eq_obj a_obj b_obj with
+    | Some Refl
+      when Misc.Le_result.equal ~le:(C.le a_obj) a b
+           && not (Hint.is_rigid morph_hint) ->
+      (* When the [a] and [b] modes are equal, and the hint is non-rigid,
+         we can skip printing this line. *)
+      opt_sprint_axhint_chain b b_obj b_hint
+    | Some Refl | None -> (
+      match res_sprint_morph_hint morph_hint with
+      | Error `Stop -> None
+      | Error `Skip -> opt_sprint_axhint_chain b b_obj b_hint
+      | Ok morph_hint_str ->
+        let subchain_str =
+          match opt_sprint_axhint_chain b b_obj b_hint with
+          | None -> ""
+          | Some s -> sprintf "\n%s" s
+        in
+        (* TODO - When we are printing an expected mode, use the word "expected" at start (i.e. "This is expected to be ...") *)
+        (* TODO - also use "expected" for stuff like "closed by something that is expected to be global" *)
+        Some
+          (asprintf "[morph=%s] This is %a because it %s %a.%s" morph_name
+             (C.print a_obj) a morph_hint_str (C.print b_obj) b subchain_str)))
   | Const const_hint -> (
     match res_sprint_const_hint const_hint with
     | Error () -> None
@@ -1911,13 +1962,13 @@ let rec shint_to_axhint :
         (* Note that unlike below, the returned [b] value will be the same as
            the current [b], so we can discard it. *)
         let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        a, Morph (morph_hint, b, b_obj, b_hint)
+        a, Morph (morph_hint, b, b_obj, b_hint, morph)
       | Axis b_ax ->
         (* Note that [ax_b] is different to [b] as it refers to a single-axis
            value in [b] *)
         let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
         let ax_b_obj = C.proj_obj b_ax b_obj in
-        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint))
+        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
     | Const r_const_hint -> a, Const r_const_hint
     | Branch (x, x_hint, y, y_hint) ->
       let x_axval = Axis.proj ax x in
@@ -1958,12 +2009,12 @@ and single_axis_shint_to_axhint :
       | SourceIsSingle ->
         (* See notes above in [shint_to_axhint] regarding returned [b] value *)
         let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        a, Morph (morph_hint, b, b_obj, b_hint)
+        a, Morph (morph_hint, b, b_obj, b_hint, morph)
       | Axis b_ax ->
         (* See notes above in [shint_to_axhint] regarding returned [b] value *)
         let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
         let ax_b_obj = C.proj_obj b_ax b_obj in
-        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint))
+        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
     | Const a_const_hint -> a, Const a_const_hint
     | Branch (x, x_hint, y, y_hint) ->
       let chosen, chosen_hint =
@@ -2527,10 +2578,9 @@ module Comonadic_with (Areality : Areality) = struct
       | None -> ""
       | Some s -> sprintf "\n%s" s
     in
-    fprintf ppf
-      {| It is expected to be at most %a.%s
+    fprintf ppf {| It is expected to be %a.%s
 
-However, it is actually at least %a.%s |}
+However, it is actually %a.%s |}
       (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
       left_trace_str
 
@@ -2688,10 +2738,9 @@ module Monadic = struct
       | None -> ""
       | Some s -> sprintf "\n%s" s
     in
-    fprintf ppf
-      {| It is expected to be at most %a.%s
+    fprintf ppf {| It is expected to be %a.%s
 
-However, it is actually at least %a.%s |}
+However, it is actually %a.%s |}
       (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
       left_trace_str
 
