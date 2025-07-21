@@ -1280,7 +1280,7 @@ end = struct
         | Regf _ ),
         offset ) ->
       I.lea src dest;
-      if offset <> 0 then I.add (Imm (Int64.of_int offset)) dest
+      if offset <> 0 then I.add (int offset) dest
 
   let[@inline always] is_stack_16_byte_aligned () =
     (* Yes, sadly this does result in materially better assembly than
@@ -1434,6 +1434,8 @@ end = struct
         (* [push rax] is a single-byte instruction, as opposed to something like
            [push 0] which is a 2-byte instruction. *)
         push rax;
+      (* Pass base address to report function. *)
+      if offset <> 0 then I.add (int (-offset)) rdi;
       (* The asan report wrappers preserve all registers except for [r11] (which
          is clobbered), in order to minimize the amount of spilling we have to
          do here. [address] is already in [rdi], and this function accepts just
