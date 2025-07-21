@@ -79,11 +79,26 @@ module Type_shape : sig
 
   type 'a ts =
     | Ts_constr of (Uid.t * Path.t * 'a) * without_layout ts list
+        (** [Ts_constr ((uid, p, ly), args)] is the shape of the type constructor
+        [p] applied to the arguments [args], resulting in data of layout [ly].
+        Unlike for the resulting data, we do not definitely know the layout
+        of the arguments yet. This is only fully determined once we look at the
+        declaration behind [p]. Thus, even when the type constructor application
+        [Ts_constr((uid, p, ly), args)] itself carries a layout, the layout of
+        the arguments is still to be determined.  *)
     | Ts_tuple of 'a ts list
     | Ts_unboxed_tuple of 'a ts list
     | Ts_var of string option * 'a
     | Ts_predef of Predef.t * without_layout ts list
+        (** [Ts_predef(p, args)] is the shape for predefined type shapes.
+          Analogously to [Ts_constr], its arguments do not carry a layout yet.
+        *)
     | Ts_arrow of without_layout ts * without_layout ts
+        (** [Ts_arrow(arg, ret)] is the shape for the function type
+            [arg -> ret]. When emitting DWARF information for this type, there
+            is no need to inspect the type arguments, and we never find out
+            their layout. As such, these remain [without_layout] even after
+            substituting in layouts.   *)
     | Ts_variant of 'a ts poly_variant_constructors
     | Ts_other of 'a
 
