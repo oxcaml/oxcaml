@@ -278,6 +278,7 @@ type error =
   | Missing_tuple_label of string option * type_expr
   | Repeated_tuple_exp_label of string
   | Repeated_tuple_pat_label of string
+<<<<<<< HEAD
   | Wrong_expected_record_boxing of
       wrong_kind_context * record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
@@ -323,6 +324,10 @@ type error =
 
 and invalid_layout_poly_inst_context =
   | Binding_op
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+=======
+  | Optional_poly_param of string
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 
 let not_principal fmt =
@@ -1327,6 +1332,25 @@ let disambiguate_array_literal ~loc env expected_ty =
   else
     { ty_elt = None; mut = Mutable }
 
+let has_poly_constraint spat =
+  match spat.ppat_desc with
+  | Ppat_constraint(_, styp) -> begin
+      match styp.ptyp_desc with
+      | Ptyp_poly _ -> true
+      | _ -> false
+    end
+  | _ -> false
+
+let check_poly_constraint spat env arg_label =
+  let has_poly = has_poly_constraint spat in
+  if has_poly then begin
+    match arg_label with
+    | Nolabel | Labelled _ -> ()
+    | Optional l ->
+        raise(Error(spat.ppat_loc, env, Optional_poly_param l))
+  end;
+  has_poly
+
 (* Typing of patterns *)
 
 (* Simplified patterns for effect continuations *)
@@ -1957,10 +1981,31 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
 
 (* Constraint solving during typing of patterns *)
 
+<<<<<<< HEAD
 let solve_Ppat_alias ~mode env pat =
   with_local_level_generalize
     ~before_generalize:(fun (ty_var, _) -> generalize ty_var)
     (fun () -> build_as_type_and_mode ~mode env pat)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+let solve_Ppat_poly_constraint tps env loc sty expected_ty =
+  let cty, ty, force = Typetexp.transl_simple_type_delayed env sty in
+  unify_pat_types loc env ty (instance expected_ty);
+  tps.tps_pattern_force <- force :: tps.tps_pattern_force;
+  match get_desc ty with
+  | Tpoly (body, tyl) ->
+      let _, ty' =
+        with_level ~level:generic_level
+          (fun () -> instance_poly ~keep_names:true ~fixed:false tyl body)
+      in
+      (cty, ty, ty')
+  | _ -> assert false
+
+let solve_Ppat_alias env pat =
+  with_local_level_generalize (fun () -> build_as_type env pat)
+=======
+let solve_Ppat_alias env pat =
+  with_local_level_generalize (fun () -> build_as_type env pat)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 (* Extracts the first element from a list matching a label. Roughly:
      pat <- List.assoc_opt label patl;
@@ -3913,6 +3958,7 @@ and type_pat_aux
         pat_loc = loc; pat_extra=[];
         pat_type = instance expected_ty;
         pat_attributes = sp.ppat_attributes;
+<<<<<<< HEAD
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
@@ -3936,6 +3982,36 @@ and type_pat_aux
       | None ->
         type_pat ~alloc_mode tps category sp_constrained expected_ty sort
       end
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        pat_env = !!penv }
+  | Ppat_constraint(sp, sty) ->
+      (* Pretend separate = true *)
+      let cty, ty, expected_ty' =
+        solve_Ppat_constraint tps loc !!penv sty expected_ty in
+      let p = type_pat tps category sp expected_ty' in
+      let extra = (Tpat_constraint cty, loc, sp.ppat_attributes) in
+      begin match category, (p : k general_pattern) with
+      | Value, {pat_desc = Tpat_var (id,s,uid); _} ->
+          { p with
+            pat_type = ty;
+            pat_desc =
+            Tpat_alias
+              ({p with pat_desc = Tpat_any; pat_attributes = []},
+               id, s, uid, ty);
+            pat_extra = [extra];
+          }
+      | _, p ->
+          { p with pat_type = ty; pat_extra = extra::p.pat_extra }
+      end
+=======
+        pat_env = !!penv }
+  | Ppat_constraint(sp, sty) ->
+      let cty, ty, expected_ty' =
+        solve_Ppat_constraint tps loc !!penv sty expected_ty in
+      let p = type_pat tps category sp expected_ty' in
+      let extra = (Tpat_constraint cty, loc, sp.ppat_attributes) in
+      { p with pat_type = ty; pat_extra = extra::p.pat_extra }
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | Ppat_type lid ->
       Env.check_no_open_quotations sp.ppat_loc !!penv
         (Env.Tconst_pat_qt lid.txt);
@@ -4020,6 +4096,7 @@ let type_pattern_list
   (patl, !!new_penv, forces, pvs, mvs)
 
 let type_class_arg_pattern cl_num val_env met_env l spat =
+<<<<<<< HEAD
   let pvs, pat =
     with_local_level_generalize_structure_if_principal begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
@@ -4045,6 +4122,40 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       tps.tps_pattern_variables, pat
     end
   in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  let tps = create_type_pat_state Modules_rejected in
+  let nv = newvar () in
+  let equations_scope = get_current_level () in
+  let new_penv = Pattern_env.make val_env
+      ~equations_scope ~in_counterexample:false in
+  let pat =
+    type_pat tps Value ~no_existentials:In_class_args new_penv spat nv in
+  if has_variants pat then begin
+    Parmatch.pressure_variants val_env [pat];
+    finalize_variants pat;
+  end;
+  List.iter (fun f -> f()) tps.tps_pattern_force;
+  if is_optional l then unify_pat val_env pat (type_option (newvar ()));
+=======
+  let pattern_variables, pat =
+    with_local_level_generalize_structure_if_principal begin fun () ->
+      let tps = create_type_pat_state Modules_rejected in
+      let nv = newvar () in
+      let equations_scope = get_current_level () in
+      let new_penv = Pattern_env.make val_env
+          ~equations_scope ~in_counterexample:false in
+      let pat =
+        type_pat tps Value ~no_existentials:In_class_args new_penv spat nv in
+      if has_variants pat then begin
+        Parmatch.pressure_variants val_env [pat];
+        finalize_variants pat;
+      end;
+      List.iter (fun f -> f()) tps.tps_pattern_force;
+      if is_optional l then unify_pat val_env pat (type_option (newvar ()));
+      tps.tps_pattern_variables, pat
+    end
+  in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   let (pv, val_env, met_env) =
     List.fold_right
       (fun {pv_id; pv_uid; pv_type; pv_loc; pv_kind; pv_attributes; pv_sort}
@@ -4081,7 +4192,13 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             met_env
          in
          ((id', pv_id, pv_type)::pv, val_env, met_env))
+<<<<<<< HEAD
       pvs ([], val_env, met_env)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      tps.tps_pattern_variables ([], val_env, met_env)
+=======
+      pattern_variables ([], val_env, met_env)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   in
   (pat, pv, val_env, met_env)
 
@@ -4642,8 +4759,16 @@ type untyped_apply_arg =
        or the [commu_ok] case where a function type is known
        but not principally).
 
+<<<<<<< HEAD
        [ty_arg_mono] is the expected type of the argument, usually just
        a fresh type variable. *)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+       [ty_arg] is the expected type of the argument, usually just
+       a fresh type variable. *)
+=======
+       [ty_arg is the expected type of the argument, usually just a fresh type
+       variable. *)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | Eliminated_optional_arg of
       { expected_label: arg_label;
         mode_fun: Alloc.lr;
@@ -4844,6 +4969,7 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         let (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res) =
           let ty_fun = expand_head env ty_fun in
           match get_desc ty_fun with
+<<<<<<< HEAD
           | Tvar { jkind; _ } ->
               let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
               let ty_arg = newmono ty_arg_mono in
@@ -4854,9 +4980,24 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
               if ret_tvar &&
                  not (is_prim ~name:"%identity" funct) &&
                  not (is_prim ~name:"%obj_magic" funct)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+          | Tvar _ ->
+              let ty_arg = newvar () in
+              let ty_res = newvar () in
+              if get_level ty_fun >= get_level ty_arg &&
+                 not (is_prim ~name:"%identity" funct)
+=======
+          | Tvar _ ->
+              let ty_arg = newvar () in
+              let ty_param = newmono ty_arg in
+              let ty_res = newvar () in
+              if get_level ty_fun >= get_level ty_param &&
+                 not (is_prim ~name:"%identity" funct)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
               then
                 Location.prerr_warning sarg.pexp_loc
                   Warnings.Ignored_extra_argument;
+<<<<<<< HEAD
               let mode_arg = Alloc.newvar () in
               let mode_ret = Alloc.newvar () in
               let kind = (lbl, mode_arg, mode_ret) in
@@ -4902,6 +5043,41 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                 else
                   raise (Error(funct.exp_loc, env, Incoherent_label_order))
             | _ ->
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+              unify env ty_fun (newty (Tarrow(lbl,ty_arg,ty_res,commu_var ())));
+              (ty_arg, ty_res)
+          | Tarrow (l, ty_arg, ty_res, _) when labels_match ~param:l ~arg:lbl ->
+              (ty_arg, ty_res)
+          | td ->
+              let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
+              let ty_res = remaining_function_type_for_error ty_fun rev_args in
+              match get_desc ty_res with
+              | Tarrow _ ->
+                  if !Clflags.classic || not (has_label lbl ty_fun) then
+                    raise (Error(sarg.pexp_loc, env,
+                                Apply_wrong_label(lbl, ty_res, false)))
+                  else
+                    raise (Error(funct.exp_loc, env, Incoherent_label_order))
+              | _ ->
+=======
+              unify env ty_fun
+                (newty (Tarrow(lbl,ty_param,ty_res,commu_var ())));
+              (ty_arg, ty_res)
+          | Tarrow (l, ty_param, ty_res, _)
+              when labels_match ~param:l ~arg:lbl ->
+              tpoly_get_mono ty_param, ty_res
+          | td ->
+              let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
+              let ty_res = remaining_function_type_for_error ty_fun rev_args in
+              match get_desc ty_res with
+              | Tarrow _ ->
+                  if !Clflags.classic || not (has_label lbl ty_fun) then
+                    raise (Error(sarg.pexp_loc, env,
+                                Apply_wrong_label(lbl, ty_res, false)))
+                  else
+                    raise (Error(funct.exp_loc, env, Incoherent_label_order))
+              | _ ->
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
                 raise(Error(funct.exp_loc, env, Apply_non_function {
                     funct;
                     func_ty = expand_head env funct.exp_type;
@@ -5472,6 +5648,7 @@ let approx_type_default () = newvar (Jkind.Builtin.any ~why:Dummy_jkind)
 
 let rec approx_type env sty =
   match sty.ptyp_desc with
+<<<<<<< HEAD
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
@@ -5502,6 +5679,26 @@ let rec approx_type env sty =
       let marg = Alloc.of_const arg_mode.mode_modes in
       let mret = Alloc.newvar () in
       newty (Tarrow ((p,marg,mret), newmono arg, ret, commu_ok))
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    Ptyp_arrow (p, _, sty) ->
+      let ty1 = if is_optional p then type_option (newvar ()) else newvar () in
+      newty (Tarrow (p, ty1, approx_type env sty, commu_ok))
+=======
+  | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty) ->
+    if is_optional p then newvar ()
+    else begin
+      let arg_ty =
+        (* Polymorphic types will only unify with types that match all of their
+         polymorphic parts, so we need to fully translate the type here
+         unlike in the monomorphic case *)
+        Typetexp.transl_simple_type env ~closed:false arg_sty
+      in
+      newty (Tarrow (p, arg_ty.ctyp_type, approx_type env sty, commu_ok))
+    end
+  | Ptyp_arrow (p, _, sty) ->
+      let ty1 = if is_optional p then type_option (newvar ()) else newvar () in
+      newty (Tarrow (p, newmono ty1, approx_type env sty, commu_ok))
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | Ptyp_tuple args ->
       newty (Ttuple (List.map (fun (l, t) -> l, approx_type env t) args))
   | Ptyp_constr (lid, ctl) ->
@@ -5512,10 +5709,19 @@ let rec approx_type env sty =
         let tyl = List.map (approx_type env) ctl in
         newconstr path tyl
       end
+<<<<<<< HEAD
   | _ -> approx_type_default ()
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  | Ptyp_poly (_, sty) ->
+      approx_type env sty
+  | _ -> newvar ()
+=======
+  | _ -> newvar ()
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 let type_pattern_approx env spat ty_expected =
   match spat.ppat_desc with
+<<<<<<< HEAD
   | Ppat_constraint(_, Some sty, arg_type_mode) ->
       let inferred_ty =
         match sty with
@@ -5529,6 +5735,25 @@ let type_pattern_approx env spat ty_expected =
         | _ -> approx_type env sty
       in
       begin try unify env inferred_ty ty_expected with Unify trace ->
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  | Ppat_constraint (_, sty) ->
+      let inferred_ty = approx_type env sty in
+      begin try unify_pat_types spat.ppat_loc env inferred_ty ty_expected
+        with Unify trace ->
+=======
+  | Ppat_constraint (_, sty) ->
+      let inferred_ty =
+        match sty with
+        | {ptyp_desc=Ptyp_poly _} ->
+          let inferred_ty =
+            Typetexp.transl_simple_type env ~closed:false sty
+          in
+          inferred_ty.ctyp_type
+        | _ -> approx_type env sty
+      in
+      begin try unify_pat_types spat.ppat_loc env inferred_ty ty_expected
+        with Unify trace ->
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         raise(Error(spat.ppat_loc, env, Pattern_type_clash(trace, None)))
       end;
   | _ -> ()
@@ -5555,6 +5780,7 @@ let type_approx_constraint_opt ~loc env constraint_ ty_expected =
   | Some ty -> type_approx_constraint ~loc env ty ty_expected
 
 let type_approx_fun_one_param
+<<<<<<< HEAD
     env loc label spato ty_expected ~first ~in_function
   =
   let mode_annots, has_poly =
@@ -5570,21 +5796,83 @@ let type_approx_fun_one_param
   let loc_fun, ty_fun = in_function in
   let { ty_arg; arg_mode; ty_ret; _ } =
     try filter_arrow env ty_expected label ~force_tpoly:(not has_poly)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  env label default spato ty_expected ~first ~in_function =
+  (* [spato] is [None] when approximating a [Pfunction_cases],
+     the parameter is implicit in that case. *)
+  let ty_arg, ty_ret =
+    try filter_arrow env ty_expected label
+=======
+  env label default spato ty_expected ~first ~in_function =
+  (* [spato] is [None] when approximating a [Pfunction_cases],
+     the parameter is implicit in that case. *)
+  let has_poly =
+    match spato with
+    | None -> false
+    | Some spat -> check_poly_constraint spat env label
+  in
+  let { ty_param; ty_ret } =
+    try filter_arrow env ty_expected label ~param_hole:has_poly
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
       in
       raise (Error(loc_fun, env, err))
   in
+<<<<<<< HEAD
   Option.iter
     (fun mode_annots ->
       apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
     mode_annots;
   if has_poly then begin
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  let () =
+=======
+  begin
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     match spato with
     | None -> ()
+<<<<<<< HEAD
     | Some spat -> type_pattern_approx env spat ty_arg
   end;
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    | Some spat ->
+        let ty_arg =
+        match label, default with
+        | (Nolabel | Labelled _), _ -> ty_arg
+        | Optional _, None ->
+          unify_pat_types spat.ppat_loc env ty_arg (type_option (newvar ()));
+          ty_arg
+        | Optional _, Some _ ->
+          let var = newvar () in
+          unify_pat_types spat.ppat_loc env ty_arg (type_option var);
+          var
+        in
+        type_pattern_approx env spat ty_arg;
+  in
+=======
+    | Some spat ->
+        let ty_param =
+          match label, default with
+          | (Nolabel | Labelled _), _ -> ty_param
+          | Optional _, None ->
+            let var = newmono (type_option (newvar ())) in
+            unify_pat_types spat.ppat_loc env ty_param var;
+            ty_param
+          | Optional _, Some _ ->
+            let ty_opt_param = newvar () in
+            let ty_pat_param = newmono (type_option ty_opt_param) in
+            unify_pat_types spat.ppat_loc env ty_param ty_pat_param;
+            newmono ty_opt_param
+        in
+        let ty_param =
+          if has_poly || not (Btype.tpoly_is_mono ty_param) then ty_param
+          else Btype.tpoly_get_mono  ty_param
+        in
+        type_pattern_approx env spat ty_param;
+  end;
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   ty_ret
 
 let rec type_approx env sexp ty_expected =
@@ -5686,7 +5974,13 @@ let check_univars env kind exp ty_expected vars =
           (* Enforce scoping for type_let:
              since body is not generic,  instance_poly_fixed only makes
              copies of nodes that have a Tunivar as descendant *)
+<<<<<<< HEAD
           let univars, ty' = instance_poly_fixed tl body in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+          let _, ty' = instance_poly ~fixed:true tl body in
+=======
+          let _, ty' = instance_poly_fixed tl body in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           let vars, exp_ty = instance_parameterized_type vars exp.exp_type in
           List.iter2 (fun uvar var ->
             (* This checks that the term doesn't require more specific jkinds
@@ -6051,19 +6345,40 @@ type apply_prim =
   | Revapply
 let check_apply_prim_type prim typ =
   match get_desc typ with
+<<<<<<< HEAD
   | Tarrow ((Nolabel,_,_),a,b,_) when tpoly_is_mono a ->
       let a = tpoly_get_mono a in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  | Tarrow (Nolabel,a,b,_) ->
+=======
+  | Tarrow (Nolabel,a,b,_) when tpoly_is_mono a ->
+      let a = tpoly_get_mono a in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       begin match get_desc b with
+<<<<<<< HEAD
       | Tarrow((Nolabel,_,_),c,d,_) when tpoly_is_mono c ->
           let c = tpoly_get_mono c in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      | Tarrow(Nolabel,c,d,_) ->
+=======
+      | Tarrow(Nolabel,c,d,_) when tpoly_is_mono c ->
+          let c = tpoly_get_mono c in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           let f, x, res =
             match prim with
             | Apply -> a, c, d
             | Revapply -> c, a, d
           in
           begin match get_desc f with
+<<<<<<< HEAD
           | Tarrow((Nolabel,_,_),fl,fr,_) ->
               let fl = tpoly_get_mono fl in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+          | Tarrow(Nolabel,fl,fr,_) ->
+=======
+          | Tarrow(Nolabel,fl,fr,_) when tpoly_is_mono fl  ->
+              let fl = tpoly_get_mono fl in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
               is_Tvar fl && is_Tvar fr && is_Tvar x && is_Tvar res
               && Types.eq_type fl x && Types.eq_type fr res
           | _ -> false
@@ -6095,6 +6410,30 @@ let with_explanation explanation f =
         when should_show_explanation ~loc:loc' ~explanation ->
         let err = Expr_type_clash(err', Some explanation, exp') in
         raise (Error (loc', env', err))
+
+
+
+(** The result of splitting a function type into its argument/return types along
+    with some extra information relevant to typechecking. The "extra
+    information" is documented on the fields of [t] below.
+
+    As a running example, we'll suppose the type of a function
+    [f = fun x_1 ... x_n -> e] is [a_1 -> a_2 -> ... -> a_n -> b], and we're
+    currently typechecking [a_i -> a_{i+1} -> ... -> b] for [i <= n].
+*)
+type split_function_ty =
+{ filtered_arrow: filtered_arrow;
+    (** The result of calling [Ctype.filter_arrow] on
+        [a_i -> a_{i+1} -> ... -> b]. *)
+  ty_arg_mono: type_expr;
+    (** An instance of [a_i], unless [x_i] is annotated as polymorphic,
+        in which case it's just [a_i] (not an instance). *)
+}
+
+type type_function_result_param =
+{ param : function_param;
+  has_poly : bool;
+}
 
 (* Generalize expressions *)
 let may_lower_contravariant env exp =
@@ -7076,6 +7415,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_function (params, body_constraint, body) ->
+<<<<<<< HEAD
       type_n_ary_function ~loc ~env ~expected_mode ~ty_expected ~explanation
         ~attributes:sexp.pexp_attributes (params, body_constraint, body)
   | Pexp_apply
@@ -7100,7 +7440,97 @@ and type_expect_
           let new_env = Env.add_exclave_lock env in
           let exp =
             type_expect ~recarg new_env mode' sbody ty_expected_explained
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      let in_function = ty_expected_explained, loc in
+      let exp_type, params, body, newtypes, contains_gadt =
+        type_function env params body_constraint body ty_expected ~in_function
+          ~first:true
+      in
+      (* Require that the n-ary function is known to have at least n arrows
+         in the type. This prevents GADT equations introduced by the parameters
+         from hiding arrows from the resulting type.
+
+         Performance hack: Only do this check when any of [params] contains a
+         GADT, as this is the only opportunity for arrows to be hidden from the
+         resulting type.
+      *)
+      begin match contains_gadt with
+      | No_gadt -> ()
+      | Contains_gadt ->
+          let ty_function =
+            List.fold_right
+              (fun param rest_ty ->
+                newty
+                  (Tarrow (param.fp_arg_label, newvar (), rest_ty, commu_ok)))
+              params
+              (match body with
+              | Tfunction_body _ -> newvar ()
+              | Tfunction_cases _ ->
+                newty (Tarrow (Nolabel, newvar (), newvar (), commu_ok)))
+=======
+      let in_function = ty_expected_explained, loc in
+      let exp_type, result_params, body, newtypes, contains_gadt =
+        type_function env params body_constraint body ty_expected ~in_function
+          ~first:true
+      in
+      (* Require that the n-ary function is known to have at least n arrows
+         in the type. This prevents GADT equations introduced by the parameters
+         from hiding arrows from the resulting type.
+
+         Performance hack: Only do this check when any of [params] contains a
+         GADT, as this is the only opportunity for arrows to be hidden from the
+         resulting type.
+      *)
+      begin match contains_gadt with
+      | No_gadt -> ()
+      | Contains_gadt ->
+          (* Assert that [ty] is a function, and return its return type. *)
+          let filter_ty_ret_exn ty arg_label ~param_hole =
+            match filter_arrow env ty arg_label ~param_hole with
+            | { ty_ret; _ } -> ty_ret
+            | exception (Filter_arrow_failed error) ->
+                let trace =
+                  match error with
+                  | Unification_error trace -> trace
+                  | Not_a_function ->
+                      let tarrow =
+                        (newty
+                          (Tarrow
+                            (arg_label,
+                             newmono (newvar ()),
+                             newvar (),
+                             commu_ok)));
+                      in
+                      (* We go to some trouble to try to generate a unification
+                        error to help the error printing code's heuristic to
+                        identify the type equation at fault.
+                      *)
+                      (try
+                        unify env tarrow ty;
+                        fatal_error "unification unexpectedly succeeded"
+                      with Unify trace -> trace)
+                  | Label_mismatch _ ->
+                      fatal_error
+                        "Label_mismatch not expected as this point; this should\
+                        have been caught when the function was typechecked."
+                in
+                let syntactic_arity =
+                  List.length result_params +
+                    (match body with
+                      | Tfunction_body _ -> 0
+                      | Tfunction_cases _ -> 1)
+                in
+                let err =
+                  Function_arity_type_clash
+                    { syntactic_arity;
+                      type_constraint = exp_type;
+                      trace;
+                    }
+                in
+                raise (Error (loc, env, err))
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           in
+<<<<<<< HEAD
           submode ~loc ~env ~reason:Other
             (Value.min_with_comonadic Areality Regionality.regional)
             expected_mode;
@@ -7128,6 +7558,60 @@ and type_expect_
         (Texp_borrowed, Location.none, []) :: exp.exp_extra;
       exp_attributes = sexp.pexp_attributes @ exp.exp_attributes;
     }
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+          try unify env ty_function exp_type
+          with Unify trace ->
+            let syntactic_arity =
+              List.length params +
+                (match body with
+                  | Tfunction_body _ -> 0
+                  | Tfunction_cases _ -> 1)
+            in
+            let err =
+              Function_arity_type_clash
+                { syntactic_arity;
+                  type_constraint = exp_type;
+                  trace;
+                }
+            in
+            raise (Error (loc, env, err))
+      end;
+      re
+        { exp_desc = Texp_function (params, body);
+          exp_loc = loc;
+          exp_extra =
+            List.map (fun { txt; loc } -> Texp_newtype txt, loc, []) newtypes;
+          exp_type;
+          exp_attributes = sexp.pexp_attributes;
+          exp_env = env;
+        }
+=======
+          let ret_ty =
+            List.fold_left (fun ret_ty { param; has_poly } ->
+                filter_ty_ret_exn ret_ty param.fp_arg_label ~param_hole:has_poly
+              )
+              exp_type
+              result_params
+          in
+          match body with
+          | Tfunction_body _ -> ()
+          | Tfunction_cases _ ->
+              ignore
+                (filter_ty_ret_exn ret_ty Nolabel ~param_hole:false : type_expr)
+      end;
+      let params =
+        List.map (fun { param; has_poly = _ } -> param) result_params
+      in
+      re
+        { exp_desc = Texp_function (params, body);
+          exp_loc = loc;
+          exp_extra =
+            List.map (fun { txt; loc } -> Texp_newtype txt, loc, []) newtypes;
+          exp_type;
+          exp_attributes = sexp.pexp_attributes;
+          exp_env = env;
+        }
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
       let is_bor, sargs =
@@ -7214,6 +7698,7 @@ and type_expect_
         | _ ->
             (rt, funct), sargs
       in
+<<<<<<< HEAD
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
@@ -7241,6 +7726,19 @@ and type_expect_
                               zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      let (args, ty_res) = type_application env funct sargs in
+      rue {
+        exp_desc = Texp_apply(funct, args);
+        exp_loc = loc; exp_extra = [];
+        exp_type = ty_res;
+=======
+      let (args, ty_res) = type_application env loc funct sargs in
+      rue {
+        exp_desc = Texp_apply(funct, args);
+        exp_loc = loc; exp_extra = [];
+        exp_type = ty_res;
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
@@ -7930,11 +8428,17 @@ and type_expect_
             if !Clflags.principal && get_level typ <> generic_level then
               Location.prerr_warning loc
                 (not_principal "this use of a polymorphic method");
+<<<<<<< HEAD
             instance_poly tl ty,
             Some (
               Texp_inspected_type (Polymorphic_parameter (
                 Method (met, Ctype.instance ~partial:true typ))),
               loc, [])
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+            snd (instance_poly ~fixed:false tl ty)
+=======
+            instance_poly tl ty
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         | Tvar _ ->
             let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
             unify env (instance typ) (newty(Tpoly(ty',[])));
@@ -8328,15 +8832,36 @@ and type_expect_
           let ty_func_result, body_sort = new_rep_var ~why:Function_result () in
           let arrow_desc = Nolabel, Alloc.legacy, Alloc.legacy in
           let ty_func =
+<<<<<<< HEAD
             newty (Tarrow(arrow_desc, newmono ty_params, ty_func_result,
                           commu_ok))
           in
           let ty_result, op_result_sort = new_rep_var ~why:Function_result () in
           let ty_andops, sort_andops = new_rep_var ~why:Function_argument () in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+            newty (Tarrow(Nolabel, ty_params, ty_func_result, commu_ok)) in
+          let ty_result = newvar () in
+          let ty_andops = newvar () in
+=======
+            newty (Tarrow(Nolabel, newmono ty_params, ty_func_result, commu_ok))
+          in
+          let ty_result = newvar () in
+          let ty_andops = newvar () in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           let ty_op =
+<<<<<<< HEAD
             newty (Tarrow(arrow_desc, newmono ty_andops,
               newty (Tarrow(arrow_desc, newmono ty_func, ty_result, commu_ok)),
                      commu_ok))
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+            newty (Tarrow(Nolabel, ty_andops,
+              newty (Tarrow(Nolabel, ty_func, ty_result, commu_ok)), commu_ok))
+=======
+            let ty_fun =
+              newty (Tarrow(Nolabel, newmono ty_func, ty_result, commu_ok))
+            in
+            newty (Tarrow(Nolabel, newmono ty_andops, ty_fun, commu_ok))
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           in
           begin try
             unify env op_type ty_op
@@ -9104,6 +9629,88 @@ and type_binding_op_ident env s =
   assert (kind = Id_value);
   path, desc
 
+<<<<<<< HEAD
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+(** Returns the argument type and then the return type.
+
+    @param first Whether the parameter corresponding to the argument of
+      [ty_expected] is the first parameter to the (n-ary) function. This only
+      affects error messages.
+    @param in_function Information about the [Pexp_function] node that's in the
+      process of being typechecked (its overall type and its location). Again,
+      this is only used to improve error messages.
+*)
+and split_function_ty env ty_expected ~arg_label ~first ~in_function =
+  let { ty = ty_fun; explanation }, loc = in_function in
+  let separate = !Clflags.principal || Env.has_local_constraints env in
+  with_local_level_generalize_structure_if separate begin fun () ->
+    let ty_arg, ty_res =
+      try filter_arrow env (instance ty_expected) arg_label
+      with Filter_arrow_failed err ->
+      let err =
+        error_of_filter_arrow_failure ~explanation ty_fun err ~first
+      in
+        raise (Error(loc, env, err))
+    in
+    let ty_arg =
+      if is_optional arg_label then
+        let tv = newvar () in
+        begin
+          try unify env ty_arg (type_option tv)
+          with Unify _ -> assert false
+        end;
+        type_option tv
+      else ty_arg
+    in
+    (ty_arg, ty_res)
+  end
+
+=======
+(** Returns the argument type and then the return type.
+
+    @param arg_label label for the relevant parameter
+    @param has_poly whether the parameter has a polymorphic type annotation
+    @param first Whether the parameter corresponding to the argument of
+      [ty_expected] is the first parameter to the (n-ary) function. This only
+      affects error messages.
+    @param in_function Information about the [Pexp_function] node that's in the
+      process of being typechecked (its overall type and its location). Again,
+      this is only used to improve error messages.
+*)
+and split_function_ty env ty_expected ~arg_label ~has_poly ~first ~in_function =
+  let { ty = ty_fun; explanation }, loc = in_function in
+  let separate = !Clflags.principal || Env.has_local_constraints env in
+  let { ty_param; ty_ret = _ } as filtered_arrow =
+    with_local_level_generalize_structure_if separate begin fun () ->
+      (* If [has_poly] is true then we rely on the later call to type_pat to
+         enforce the invariant that the parameter type be a [Tpoly] node *)
+      try filter_arrow env (instance ty_expected) arg_label ~param_hole:has_poly
+      with Filter_arrow_failed err ->
+      let err =
+        error_of_filter_arrow_failure ~explanation ty_fun err ~first
+      in
+        raise (Error(loc, env, err))
+    end
+  in
+  if !Clflags.principal
+      && not has_poly && not (tpoly_is_mono ty_param)
+      && get_level ty_param < Btype.generic_level
+      && Ctype.is_really_poly env ty_param
+   then Location.prerr_warning loc (not_principal "this higher-rank function");
+  let ty_param =
+    if has_poly then ty_param
+    else begin
+      let ty, vars = tpoly_get_poly ty_param in
+      if vars = [] then ty
+      else begin
+        with_level ~level:generic_level
+          (fun () -> instance_poly ~keep_names:true vars ty)
+      end
+    end
+  in
+  { filtered_arrow; ty_arg_mono = ty_param }
+
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 (* Typecheck parameters one at a time followed by the body. Later parameters
    are checked in the scope of earlier ones. That's necessary to support
    constructs like [fun (type a) (x : a) -> ...] and
@@ -9157,6 +9764,7 @@ and type_function
   | { pparam_desc = Pparam_val (arg_label, default_arg, pat); pparam_loc }
       :: rest
     ->
+<<<<<<< HEAD
       let typed_arg_label, pat =
         Typetexp.transl_label_from_pat arg_label pat
       in
@@ -9205,6 +9813,15 @@ and type_function
           ~arg_label:typed_arg_label ~in_function ~has_poly
           ~mode_annots:mode_annots.mode_modes
           ~ret_mode_annots:ret_mode_annots.mode_modes
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      let ty_arg, ty_res =
+        split_function_ty env ty_expected ~arg_label ~first ~in_function
+=======
+      let has_poly = check_poly_constraint pat env arg_label in
+      let { filtered_arrow = { ty_param; ty_ret }; ty_arg_mono } =
+        split_function_ty env ty_expected ~arg_label ~first ~in_function
+          ~has_poly
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       in
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
@@ -9213,7 +9830,13 @@ and type_function
       *)
       let ty_arg_internal, default_arg, sort_arg_internal =
         match default_arg with
+<<<<<<< HEAD
         | None -> ty_arg_mono, None, arg_sort
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        | None -> ty_arg, None
+=======
+        | None -> ty_arg_mono, None
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         | Some default ->
             let arg_label =
               match arg_label with
@@ -9227,7 +9850,13 @@ and type_function
             in
             let ty_default_arg = newvar default_arg_jkind in
             begin
+<<<<<<< HEAD
               try unify env (type_option ty_default_arg) ty_arg_mono
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+              try unify env (type_option ty_default) ty_arg
+=======
+              try unify env (type_option ty_default) ty_arg_mono
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
               with Unify _ -> assert false;
             end;
             (* Issue#12668: Retain type-directed disambiguation of
@@ -9250,8 +9879,14 @@ and type_function
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
+<<<<<<< HEAD
         map_half_typed_cases Value env expected_pat_mode
           ty_arg_internal sort_arg_internal ty_ret pat.ppat_loc
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        map_half_typed_cases Value env ty_arg_internal ty_res pat.ppat_loc
+=======
+        map_half_typed_cases Value env ty_arg_internal ty_ret pat.ppat_loc
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           ~check_if_total:true
           (* We don't make use of [case_data] here so we pass unit. *)
           [ { pattern = pat; has_guard = false; needs_refute = false }, () ]
@@ -9312,10 +9947,16 @@ and type_function
         | ([] | _ :: _ :: _), _ -> assert false
       in
       let exp_type =
+<<<<<<< HEAD
         instance
           (newgenty
              (Tarrow
                 ((typed_arg_label, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        instance (newgenty (Tarrow (arg_label, ty_arg, ty_res, commu_ok)))
+=======
+        instance (newgenty (Tarrow (arg_label, ty_param, ty_ret, commu_ok)))
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       in
       (* This is quadratic, as it operates over the entire tail of the
          type for each new parameter. Now that functions are n-ary, we
@@ -9333,6 +9974,7 @@ and type_function
         let ls, tvar = list_labels env ty in
         List.for_all (( <> ) Nolabel) ls && not tvar
       in
+<<<<<<< HEAD
       if is_optional typed_arg_label && not_nolabel_function ty_ret then
         Location.prerr_warning pat.pat_loc
           Warnings.Unerasable_optional_argument
@@ -9350,6 +9992,21 @@ and type_function
         else pat
       in
       let fp_kind, fp_param, fp_param_debug_uid =
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      if is_optional arg_label && not_nolabel_function ty_res
+      then
+        Location.prerr_warning
+          pat.pat_loc
+          Warnings.Unerasable_optional_argument;
+      let fp_kind, fp_param =
+=======
+      if is_optional arg_label && not_nolabel_function ty_ret
+      then
+        Location.prerr_warning
+          pat.pat_loc
+          Warnings.Unerasable_optional_argument;
+      let fp_kind, fp_param =
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         match default_arg with
         | None ->
             let param, param_uid = name_pattern "param" [ pat ] in
@@ -9362,6 +10019,7 @@ and type_function
             param_uid
       in
       let param =
+<<<<<<< HEAD
         { has_poly;
           param =
             { fp_kind;
@@ -9376,6 +10034,24 @@ and type_function
               fp_curry = curry;
               fp_loc = pparam_loc;
             };
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        { fp_kind;
+          fp_arg_label = arg_label;
+          fp_param;
+          fp_partial = partial;
+          fp_newtypes = newtypes;
+          fp_loc = pparam_loc;
+=======
+        { has_poly;
+          param =
+            { fp_kind;
+              fp_arg_label = arg_label;
+              fp_param;
+              fp_partial = partial;
+              fp_newtypes = newtypes;
+              fp_loc = pparam_loc;
+            };
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         }
       in
       let ret_info =
@@ -9973,6 +10649,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
+<<<<<<< HEAD
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
             let ty =
               type_option_none env (instance (tpoly_get_mono ty_arg))
@@ -9985,6 +10662,19 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             let arg = src_pos (Location.ghostify sarg.pexp_loc) [] env in
             make_args ((l, Arg (arg, Jkind.Sort.scannable)) :: args) ty_fun
         | Tarrow ((l,_,_),_,ty_res',_) when l = Nolabel || !Clflags.classic ->
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        | Tarrow (l,ty_arg,ty_fun,_) when is_optional l ->
+            let ty = option_none env (instance ty_arg) sarg.pexp_loc in
+            make_args ((l, Arg ty) :: args) ty_fun
+        | Tarrow (l,_,ty_res',_) when l = Nolabel || !Clflags.classic ->
+=======
+        | Tarrow (l,ty_arg,ty_fun,_) when is_optional l ->
+            let ty =
+              option_none env (instance (tpoly_get_mono ty_arg)) sarg.pexp_loc
+            in
+            make_args ((l, Arg ty) :: args) ty_fun
+        | Tarrow (l,_,ty_res',_) when l = Nolabel || !Clflags.classic ->
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
             List.rev args, ty_fun, no_labels ty_res'
         | Tvar _ ->  List.rev args, ty_fun, false
         |  _ -> [], texp.exp_type, false
@@ -10125,10 +10815,17 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       unify_exp ~sexp:sarg env texp ty_expected;
       texp
 
+<<<<<<< HEAD
 (* See Note [Type-checking applications] for an overview *)
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg) =
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+and type_apply_arg env (lbl, arg) =
+=======
+and type_apply_arg env ~app_loc (lbl, arg) =
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   match arg with
+<<<<<<< HEAD
   | Arg (Unknown_arg { sarg; ty_arg_mono; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
@@ -10197,6 +10894,70 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           check_univars env "argument" arg ty_arg vars;
           {arg with exp_type = instance arg.exp_type}, sch
         end
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  | Arg (Unknown_arg { sarg; ty_arg }) ->
+      let arg = type_expect env sarg (mk_expected ty_arg) in
+      if is_optional lbl then
+        unify_exp ~sexp:sarg env arg (type_option(newvar()));
+      (lbl, Arg arg)
+  | Arg (Known_arg { sarg; ty_arg; ty_arg0; wrapped_in_some }) ->
+      let arg =
+        if wrapped_in_some then
+          option_some env
+            (type_argument env sarg
+               (extract_option_type env ty_arg)
+               (extract_option_type env ty_arg0))
+        else
+          type_argument env sarg ty_arg ty_arg0
+=======
+  | Arg (Unknown_arg { sarg; ty_arg }) ->
+      let arg = type_expect env sarg (mk_expected ty_arg) in
+      if is_optional lbl then
+        unify_exp ~sexp:sarg env arg (type_option(newvar()));
+      (lbl, Arg arg)
+  | Arg (Known_arg { sarg; ty_arg; ty_arg0; wrapped_in_some }) ->
+      let ty_arg', vars = tpoly_get_poly ty_arg in
+      let arg =
+        if vars = [] then begin
+          let ty_arg0' = tpoly_get_mono ty_arg0 in
+          if wrapped_in_some then
+            option_some env
+              (type_argument env sarg
+                 (extract_option_type env ty_arg')
+                 (extract_option_type env ty_arg0'))
+          else
+            type_argument env sarg ty_arg' ty_arg0'
+        end else begin
+          if !Clflags.principal
+             && get_level ty_arg < Btype.generic_level
+             && Ctype.is_really_poly env ty_arg
+          then
+            Location.prerr_warning app_loc
+              (not_principal "applying a higher-rank function here");
+          let arg, ty_arg, vars =
+            with_local_level_generalize begin fun () ->
+              let separate =
+                !Clflags.principal || Env.has_local_constraints env
+              in
+              let vars, ty_arg' =
+                with_local_level_generalize_structure_if separate @@ fun () ->
+                  instance_poly_fixed vars ty_arg'
+              in
+              let (ty_arg0', vars0) = tpoly_get_poly ty_arg0 in
+              let vars0, ty_arg0' = instance_poly_fixed vars0 ty_arg0' in
+              List.iter2 (fun ty ty' -> unify_var env ty ty') vars vars0;
+              let arg =
+                type_argument env sarg ty_arg' ty_arg0'
+              in
+              arg, ty_arg, vars0
+            end
+            ~before_generalize:(fun (arg, _, _) ->
+                                  may_lower_contravariant env arg)
+          in
+          check_univars env "argument" arg ty_arg vars;
+          {arg with exp_type = instance arg.exp_type}
+        end
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       in
       (lbl, Arg (arg, mode_arg, sort_arg), sch)
   | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
@@ -10210,8 +10971,23 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       | Labelled _ | Nolabel -> assert false)
   | Omitted _ as arg -> (lbl, arg, None)
 
+<<<<<<< HEAD
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+and type_application env funct sargs =
+=======
+and type_application env app_loc funct sargs =
+  let exception Filter_arrow_mono_failed in
+  let filter_arrow_mono env t l =
+    match filter_arrow env t l ~param_hole:false with
+    | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
+    | {ty_param; _} as farr  ->
+        match tpoly_get_mono_opt ty_param with
+        | None -> raise Filter_arrow_mono_failed
+        | Some ty_param -> { farr with ty_param }
+  in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
@@ -10219,6 +10995,7 @@ and type_application env app_loc expected_mode position_and_mode
   in
   match sargs with
   | (* Special case for ignore: avoid discarding warning *)
+<<<<<<< HEAD
     [Parsetree.Nolabel, sarg] when is_ignore funct ->
       let {ty_arg; arg_mode; ty_ret; ret_mode} =
         with_local_level_generalize_structure_if_principal (fun () ->
@@ -10236,9 +11013,28 @@ and type_application env app_loc expected_mode position_and_mode
           ~partial_app:false arg_mode
       in
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    [Nolabel, sarg] when is_ignore funct ->
+      let ty_arg, ty_res =
+        filter_arrow env (instance funct.exp_type) Nolabel in
+      let exp = type_expect env sarg (mk_expected ty_arg) in
+=======
+    [Nolabel, sarg] when is_ignore funct ->
+      let { ty_param; ty_ret } =
+        with_local_level_generalize_structure_if_principal (fun () ->
+          filter_arrow_mono env (instance funct.exp_type) Nolabel)
+      in
+      let exp = type_expect env sarg (mk_expected ty_param) in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       check_partial_application ~statement:false exp;
+<<<<<<< HEAD
       ([Nolabel, Arg (exp, arg_sort), None],
        ty_ret, ret_mode, position_and_mode)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      ([Nolabel, Arg exp], ty_res)
+=======
+      ([Nolabel, Arg exp], ty_ret)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | _ ->
     (* See Note [Type-checking applications] for an overview *)
       let ty = funct.exp_type in
@@ -10304,7 +11100,47 @@ and type_application env app_loc expected_mode position_and_mode
           ty_ret, mode_ret, args, position_and_mode
         end
       in
+<<<<<<< HEAD
       args, ty_ret, mode_ret, position_and_mode
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      (* example: [collect_apply_args] returns
+         [ty_ret = unit] and
+         [args = [(Label "a", Omitted bar);
+                  (Optional "opt", Arg (Eliminated_optional_arg baz));
+                  (Nolabel, Arg (Known_arg n))]] *)
+      let args = List.map (fun arg -> type_apply_arg env arg) args in
+      (* example: type-check [n] and generate [None] for [?opt].
+         [args] becomes [(Label "a", Omitted bar);
+                         (Optional "opt", Arg None);
+                         (Nolabel, Arg n)] *)
+      let ty_ret, args =
+        type_omitted_parameters_and_build_result_type ty_ret args in
+      (* example:
+         [ty_ret] becomes [a:bar -> unit]
+         [args] becomes [(Label "a", Omitted ());
+                         (Optional "opt", Arg None);
+                         (Nolabel, Arg n)] *)
+      args, instance ty_ret
+=======
+      (* example: [collect_apply_args] returns
+         [ty_ret = unit] and
+         [args = [(Label "a", Omitted bar);
+                  (Optional "opt", Arg (Eliminated_optional_arg baz));
+                  (Nolabel, Arg (Known_arg n))]] *)
+      let args = List.map (fun arg -> type_apply_arg ~app_loc env arg) args in
+      (* example: type-check [n] and generate [None] for [?opt].
+         [args] becomes [(Label "a", Omitted bar);
+                         (Optional "opt", Arg None);
+                         (Nolabel, Arg n)] *)
+      let ty_ret, args =
+        type_omitted_parameters_and_build_result_type ty_ret args in
+      (* example:
+         [ty_ret] becomes [a:bar -> unit]
+         [args] becomes [(Label "a", Omitted ());
+                         (Optional "opt", Arg None);
+                         (Nolabel, Arg n)] *)
+      args, instance ty_ret
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
@@ -11028,6 +11864,7 @@ and type_cases
 and type_function_cases_expect
     env expected_mode ty_expected loc cases attrs ~first ~in_function =
   Builtin_attributes.warning_scope attrs begin fun () ->
+<<<<<<< HEAD
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
           arg_sort; ret_sort;
@@ -11037,16 +11874,38 @@ and type_function_cases_expect
         ~in_function ~has_poly:false ~mode_annots:Mode.Alloc.Const.Option.none
         ~ret_mode_annots:Mode.Alloc.Const.Option.none
         ~is_first_val_param:first ~is_final_val_param:true
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    let ty_arg, ty_res =
+      split_function_ty env ty_expected ~arg_label:Nolabel ~first ~in_function
+=======
+    let { filtered_arrow = { ty_param; ty_ret }; ty_arg_mono } =
+      split_function_ty env ty_expected ~arg_label:Nolabel
+        ~first ~in_function ~has_poly:false
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     in
     let cases, partial =
+<<<<<<< HEAD
       type_cases Value env
         expected_pat_mode expected_inner_mode ty_arg_mono arg_sort
         (mk_expected ty_ret) ~check_if_total:true loc cases
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      type_cases Value env ty_arg (mk_expected ty_res)
+        ~check_if_total:true loc cases
+=======
+      type_cases Value env ty_arg_mono (mk_expected ty_ret)
+        ~check_if_total:true loc cases
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     in
     let ty_fun =
+<<<<<<< HEAD
       instance
         (newgenty
            (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      instance (newgenty (Tarrow (Nolabel, ty_arg, ty_res, commu_ok)))
+=======
+      instance (newgenty (Tarrow (Nolabel, ty_param, ty_ret, commu_ok)))
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     let param , param_uid = name_cases "param" cases in
@@ -11158,6 +12017,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       if existential_context = At_toplevel then Typetexp.TyVarEnv.reset ();
       let (pat_list, new_env, force, pvs, mvs), sorts =
         with_local_level_generalize_structure_if_principal begin fun () ->
+<<<<<<< HEAD
           let nvs, sorts =
             List.split (List.map (fun _ -> new_rep_var ~why:Let_binding ())
                           spatl)
@@ -11169,6 +12029,19 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             ) ~before_generalize:(fun (_, _, _, pvs, _) ->
                                     iter_pattern_variables_type generalize pvs)
           in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+          let nvs = List.map (fun _ -> newvar ()) spatl in
+          let (pat_list, _new_env, _force, _pvs, _mvs as res) =
+            type_pattern_list
+              Value existential_context env spatl nvs allow_modules in
+=======
+          let nvs = List.map (fun _ -> newvar ()) spatl in
+          let (pat_list, _new_env, _force, _pvs, _mvs as res) =
+            with_local_level_generalize_if is_recursive (fun () ->
+              type_pattern_list
+                Value existential_context env spatl nvs allow_modules)
+          in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
           (* If recursive, first unify with an approximation of the
              expression *)
           if is_recursive then
@@ -11548,9 +12421,21 @@ and type_andops env sarg sands expected_sort expected_ty =
             in
             let arrow_desc = (Nolabel, Alloc.legacy, Alloc.legacy) in
             let ty_rest_fun =
+<<<<<<< HEAD
               newty (Tarrow(arrow_desc, newmono ty_arg, ty_result, commu_ok)) in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+              newty (Tarrow(Nolabel, ty_arg, ty_result, commu_ok)) in
+=======
+              newty (Tarrow(Nolabel, newmono ty_arg, ty_result, commu_ok)) in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
             let ty_op =
+<<<<<<< HEAD
               newty (Tarrow(arrow_desc, newmono ty_rest, ty_rest_fun, commu_ok)) in
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+              newty (Tarrow(Nolabel, ty_rest, ty_rest_fun, commu_ok)) in
+=======
+              newty (Tarrow(Nolabel, newmono ty_rest, ty_rest_fun, commu_ok)) in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
             begin try
               unify env op_type ty_op
             with Unify err ->
@@ -13065,6 +13950,7 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[This tuple pattern has two labels named %a@]"
         Style.inline_code l
+<<<<<<< HEAD
   | Expr_record_type_has_wrong_boxing (P record_form, ty) ->
       let expected, actual =
         match record_form with
@@ -13347,6 +14233,14 @@ let report_error ~loc env =
          Consider using a regular %a instead."
         Style.inline_code "poly_"
         Style.inline_code "let"
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+=======
+  | Optional_poly_param l ->
+      Location.errorf ~loc
+        "@[The optional parameter %a \
+         cannot have a polymorphic type.@]"
+        Style.inline_code l
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

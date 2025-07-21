@@ -1870,8 +1870,19 @@ let instance_poly' copy_scope
 
 let instance_poly_fixed ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
+<<<<<<< HEAD
     instance_poly' copy_scope
       ~keep_names ~fixed:true ~partial:false ~copy_var:None univars sch
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    instance_poly' copy_scope ~keep_names ~fixed univars sch
+=======
+    instance_poly' copy_scope ~keep_names ~fixed:true univars sch
+  )
+
+let instance_poly ?(keep_names=false) univars sch =
+  For_copy.with_scope (fun copy_scope ->
+    snd (instance_poly' copy_scope ~keep_names ~fixed:false univars sch)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   )
 
 let instance_poly ?(keep_names=false) univars sch =
@@ -5667,6 +5678,7 @@ type filter_arrow_failure =
 
 exception Filter_arrow_failed of filter_arrow_failure
 
+<<<<<<< HEAD
 type filtered_arrow =
   { ty_arg : type_expr;
     arg_mode : Mode.Alloc.lr;
@@ -5675,7 +5687,18 @@ type filtered_arrow =
   }
 
 let filter_arrow env t l ~force_tpoly =
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+let filter_arrow env t l =
+=======
+type filtered_arrow =
+  { ty_param : type_expr;
+    ty_ret : type_expr;
+  }
+
+let filter_arrow env t l ~param_hole =
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   let function_type level =
+<<<<<<< HEAD
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let ty_arg =
@@ -5706,6 +5729,30 @@ let filter_arrow env t l ~force_tpoly =
       newty2 ~level (Tarrow ((l, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok))
     in
     t', { ty_arg; arg_mode; ty_ret; ret_mode }
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    let t1 = newvar2 level and t2 = newvar2 level in
+    let t' = newty2 ~level (Tarrow (l, t1, t2, commu_ok)) in
+    t', t1, t2
+=======
+    let t1 =
+      if param_hole then begin
+        assert (not (is_optional l));
+        newvar2 level
+      end else begin
+        let t1 =
+          if is_optional l then
+            newty2 ~level
+              (Tconstr(Predef.path_option,[newvar2 level], ref Mnil))
+          else
+            newvar2 level
+        in
+        newty2 ~level (Tpoly(t1, []))
+      end
+    in
+    let t2 = newvar2 level in
+    let t' = newty2 ~level (Tarrow (l, t1, t2, commu_ok)) in
+    t', t1, t2
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   in
   let t =
     try expand_head_trace env t
@@ -5718,6 +5765,7 @@ let filter_arrow env t l ~force_tpoly =
                      (Diff { got = t'; expected = t } :: trace))))
   in
   match get_desc t with
+<<<<<<< HEAD
     Tvar { jkind } ->
       let t', arrow_desc = function_type (get_level t) in
       begin match constrain_type_jkind env t' (Jkind.disallow_left jkind) with
@@ -5729,19 +5777,39 @@ let filter_arrow env t l ~force_tpoly =
                        env
                        [Bad_jkind (t',err)])))
       end;
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  | Tvar _ ->
+      let t', t1, t2 = function_type (get_level t) in
+=======
+  | Tvar _ ->
+      let t', ty_param, ty_ret = function_type (get_level t) in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       link_type t t';
+<<<<<<< HEAD
       arrow_desc
   | Tarrow((l', arg_mode, ret_mode), ty_arg, ty_ret, _) ->
       if l = l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
       then
         { ty_arg; arg_mode; ty_ret; ret_mode }
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      (t1, t2)
+  | Tarrow(l', t1, t2, _) ->
+      if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
+      then (t1, t2)
+=======
+      { ty_param; ty_ret }
+  | Tarrow(l', ty_param, ty_ret, _) ->
+      if l = l' || !Clflags.classic && l = Nolabel && not (is_optional l')
+      then { ty_param; ty_ret }
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 
+<<<<<<< HEAD
 exception Filter_mono_failed
 
 let filter_mono ty =
@@ -5760,6 +5828,20 @@ let filter_arrow_mono env t l =
       | exception Filter_mono_failed -> raise Filter_arrow_mono_failed
       | ty_arg -> { farr with ty_arg }
 
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+=======
+let is_really_poly env ty =
+  let snap = Btype.snapshot () in
+  let really_poly =
+    try
+      unify env (newmono (newvar ())) ty;
+      false
+    with Unify _ -> true
+  in
+  Btype.backtrack snap;
+  really_poly
+
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 type filter_method_failure =
   | Unification_error of unification_error
   | Not_a_method
@@ -7755,6 +7837,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
+<<<<<<< HEAD
         let cstrs =
           subtype_rec
             env
@@ -7767,6 +7850,19 @@ let rec subtype_rec env trace t1 t2 cstrs =
         (* RHS mode of arrow types indicates allocation in the parent region
            and is not subject to mode crossing *)
         subtype_alloc_mode env trace r1 r2;
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        let constraints =
+          subtype_rec
+            env
+            (Subtype.Diff {got = t2; expected = t1} :: trace)
+            t2 t1
+            constraints
+        in
+=======
+        (* the trace will be updated at the next step due to the Tpoly wrapping
+           of parameter. *)
+        let constraints = subtype_rec env trace t2 t1 constraints in
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
         subtype_rec
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)
@@ -7833,11 +7929,28 @@ let rec subtype_rec env trace t1 t2 cstrs =
           (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tpoly (u1, []), Tpoly (u2, [])) ->
+<<<<<<< HEAD
         subtype_rec env trace u1 u2 cstrs
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        subtype_rec env trace u1 u2 constraints
+=======
+        let trace = Subtype.Diff {got = u1; expected = u2} :: trace in
+        subtype_rec env trace u1 u2 constraints
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     | (Tpoly (u1, tl1), Tpoly (u2, [])) ->
+<<<<<<< HEAD
         let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 cstrs
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+        let _, u1' = instance_poly ~fixed:false tl1 u1 in
+        subtype_rec env trace u1' u2 constraints
+=======
+        let trace = Subtype.Diff {got = t1; expected = u2} :: trace in
+        let u1' = instance_poly tl1 u1 in
+        subtype_rec env trace u1' u2 constraints
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     | (Tpoly (u1, tl1), Tpoly (u2,tl2)) ->
+        let trace = Subtype.Diff {got = t1; expected = t2} :: trace in
         begin try
           enter_poly env u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)

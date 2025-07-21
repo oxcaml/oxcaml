@@ -44,6 +44,10 @@ OCaml 5.4.0 (9 October 2025)
   (Clément Allain and Gabriel Scherer, review by KC Sivaramakrishnan,
    Basile Clément and Olivier Nicole)
 
+- #13806 Enable the use of function parameters with polymorphic types.
+  (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
+  Scherer and Jacques Garrigue)
+
 ### Standard library:
 
 * #14124: Do not raise Invalid_argument on negative List.{drop,take}.

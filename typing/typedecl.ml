@@ -3373,8 +3373,17 @@ let check_regularity ~abs_env env loc path decl to_check =
           end;
           List.iter (check_subtype cpath args prev_exp trace ty env) args'
       | Tpoly (ty, tl) ->
+<<<<<<< HEAD
           let ty = Ctype.instance_poly ~keep_names:true tl ty in
           check_regular cpath args prev_exp trace env ty
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+          let (_, ty) =
+            Ctype.instance_poly ~keep_names:true ~fixed:false tl ty in
+          check_regular cpath args prev_exp trace ty
+=======
+          let ty = Ctype.instance_poly ~keep_names:true tl ty in
+          check_regular cpath args prev_exp trace ty
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       | _ ->
           Ctype.iter_type_expr_with_stages
             (check_subtype cpath args prev_exp trace ty) env ty
@@ -4459,6 +4468,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
   with
   | Ptyp_arrow _, Tarrow _, Native_repr_attr_present kind  ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
+<<<<<<< HEAD
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
     let t1, _ = Btype.tpoly_get_poly t1 in
@@ -4466,6 +4476,18 @@ let rec parse_native_repr_attributes env core_type ty rmode
       make_native_repr
         env ct1 t1 ~global_repr
         ~is_layout_poly ~why:External_argument ~is_return:false
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+  | Ptyp_arrow (_, ct1, ct2), Tarrow (_, t1, t2, _), _ ->
+    let repr_arg = make_native_repr env ct1 t1 ~global_repr in
+    let repr_args, repr_res =
+      parse_native_repr_attributes env ct2 t2 ~global_repr
+=======
+  | Ptyp_arrow (_, ct1, ct2), Tarrow (_, t1, t2, _), _ ->
+    let t1, _ = Btype.tpoly_get_poly t1 in
+    let repr_arg = make_native_repr env ct1 t1 ~global_repr in
+    let repr_args, repr_res =
+      parse_native_repr_attributes env ct2 t2 ~global_repr
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     in
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes

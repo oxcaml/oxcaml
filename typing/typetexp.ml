@@ -94,6 +94,7 @@ type error =
   | Opened_object of Path.t option
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
+<<<<<<< HEAD
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -111,6 +112,10 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+=======
+  | Polymorphic_optional_param of string
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -872,6 +877,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes }
   in
   match styp.ptyp_desc with
+<<<<<<< HEAD
     Ptyp_any jkind ->
       let tjkind, tjkind_annot =
         match jkind with
@@ -936,6 +942,68 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
       loop mode args
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+    Ptyp_any ->
+      let ty = TyVarEnv.new_any_var styp.ptyp_loc env policy in
+      ctyp Ttyp_any ty
+  | Ptyp_var name ->
+    let ty =
+      check_tyvar_name env styp.ptyp_loc name;
+      begin try
+        TyVarEnv.lookup_local ~row_context:row_context name
+      with Not_found ->
+        let v = TyVarEnv.new_var ~name policy in
+        TyVarEnv.remember_used name v styp.ptyp_loc;
+        v
+      end
+    in
+    ctyp (Ttyp_var name) ty
+  | Ptyp_arrow(l, st1, st2) ->
+    let cty1 = transl_type env ~policy ~row_context st1 in
+    let cty2 = transl_type env ~policy ~row_context st2 in
+    let ty1 = cty1.ctyp_type in
+    let ty1 =
+      if Btype.is_optional l
+      then newty (Tconstr(Predef.path_option,[ty1], ref Mnil))
+      else ty1 in
+    let ty = newty (Tarrow(l, ty1, cty2.ctyp_type, commu_ok)) in
+    ctyp (Ttyp_arrow (l, cty1, cty2)) ty
+=======
+    Ptyp_any ->
+      let ty = TyVarEnv.new_any_var styp.ptyp_loc env policy in
+      ctyp Ttyp_any ty
+  | Ptyp_var name ->
+    let ty =
+      check_tyvar_name env styp.ptyp_loc name;
+      begin try
+        TyVarEnv.lookup_local ~row_context:row_context name
+      with Not_found ->
+        let v = TyVarEnv.new_var ~name policy in
+        TyVarEnv.remember_used name v styp.ptyp_loc;
+        v
+      end
+    in
+    ctyp (Ttyp_var name) ty
+  | Ptyp_arrow(l, st1, st2) ->
+    let arg_cty = transl_type env ~policy ~row_context st1 in
+    let ret_cty = transl_type env ~policy ~row_context st2 in
+    let arg_ty = arg_cty.ctyp_type in
+    let arg_ty =
+      if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
+    in
+    let arg_ty =
+      match l with
+      | Nolabel | Labelled _ -> arg_ty
+      | Optional l -> begin
+          if not (Btype.tpoly_is_mono arg_ty) then
+            raise (Error (st1.ptyp_loc, env, Polymorphic_optional_param l));
+          newmono
+            (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+        end
+    in
+    let ty = newty (Tarrow(l, arg_ty, ret_cty.ctyp_type, commu_ok)) in
+    ctyp (Ttyp_arrow (l, arg_cty, ret_cty)) ty
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | Ptyp_tuple stl ->
     let desc, typ =
       transl_type_aux_tuple env ~loc ~policy ~row_context stl
@@ -1930,6 +1998,7 @@ let report_error_doc loc env = function
   | Repeated_tuple_label l ->
       Location.errorf ~loc "This tuple type has two labels named %a"
         Style.inline_code l
+<<<<<<< HEAD
   | Unsupported_extension ext ->
       let ext = Language_extension.to_string ext in
       Location.errorf ~loc
@@ -1993,6 +2062,12 @@ let report_error_doc loc env = function
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+=======
+  | Polymorphic_optional_param l ->
+      Location.errorf ~loc "@[Optional parameter %a cannot be polymorphic@]"
+        Style.inline_code l
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 let () =
   Location.register_error_of_exn

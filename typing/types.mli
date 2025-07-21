@@ -164,8 +164,15 @@ and type_desc =
       [Tarrow (Labelled "l", e1, e2, c)] ==> [l:e1  -> e2]
       [Tarrow (Optional "l", e1, e2, c)] ==> [?l:e1 -> e2]
 
+<<<<<<< HEAD
       See [commutable] for the last argument. The argument
       type must be a [Tpoly] node *)
+||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
+      See [commutable] for the last argument. *)
+=======
+      See [commutable] for the last argument.
+      The argument type must be a [Tpoly] node. *)
+>>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
   | Ttuple of (string option * type_expr) list
   (** [Ttuple [None, t1; ...; None, tn]] ==> [t1 * ... * tn]
