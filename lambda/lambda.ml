@@ -636,8 +636,8 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
-  | (Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 |
-     Vec256 | Vec512 | Word | Product _), _ -> false
+  | (Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+    | Bits64 | Vec128 | Vec256 | Vec512 | Word | Product _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2

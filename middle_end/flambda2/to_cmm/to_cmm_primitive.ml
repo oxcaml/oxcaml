@@ -717,6 +717,13 @@ let scalar_type_of_standard_int_or_float :
 let unary_int_arith_primitive _env dbg kind op arg =
   match (op : P.unary_int_arith_op) with
   | Swap_byte_endianness -> (
+    (* CR lthls: Swap_byte_endianness is a weird primitive, that is only defined
+       on a subset of the naked types with tricky semantics, so I would be in
+       favour of not supporting the small integer versions and not changing the
+       other ones
+
+       jvanburen: I think it's well-defined on all of the naked integer types in
+       cmm_helpers... *)
     match (kind : K.Standard_int.t) with
     | Tagged_immediate ->
       (* This isn't currently needed since [Lambda_to_flambda_primitives] always
