@@ -882,7 +882,8 @@ let[@inline always] meet_boxed_number_containing_simple
   | Value (Ok { is_null = _; non_null = Bottom }) | Value Bottom -> Invalid
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _ ->
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _
+    ->
     wrong_kind "Value" t (Invalid : _ meet_shortcut)
 
 let meet_boxed_float32_containing_simple =
@@ -1130,7 +1131,8 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
       | String _ -> Proved ())
     | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
     | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-    | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _ ->
+    | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
+    | Region _ ->
       Proved ())
 
 let prove_physical_equality env t1 t2 =

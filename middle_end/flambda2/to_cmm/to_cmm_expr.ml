@@ -160,7 +160,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
               (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
             ()
           | Naked_number
-              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128 
+              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
               | Naked_vec256 | Naked_vec512 | Naked_float32 )
           | Value | Region | Rec_info ->
             Misc.fatal_errorf

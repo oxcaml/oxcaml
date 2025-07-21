@@ -170,7 +170,8 @@ let is_naked_float t =
   | Value
   | Naked_number
       ( Naked_immediate | Naked_float32 | Naked_int8 | Naked_int16 | Naked_int32
-      | Naked_int64 | Naked_nativeint | Naked_vec128 | Naked_vec256 | Naked_vec512 )
+      | Naked_int64 | Naked_nativeint | Naked_vec128 | Naked_vec256
+      | Naked_vec512 )
   | Region | Rec_info ->
     false
 

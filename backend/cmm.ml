@@ -759,8 +759,8 @@ let equal_machtype_component
   rank_machtype_component left = rank_machtype_component right
 
 let equal_exttype
-    ((XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128 | XVec256 | XVec512) as
-    left) right =
+    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
+     | XVec256 | XVec512 ) as left) right =
   (* we can use polymorphic compare as long as exttype is all constant
      constructors *)
   Stdlib.( = ) left right

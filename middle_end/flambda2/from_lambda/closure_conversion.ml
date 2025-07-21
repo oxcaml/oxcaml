@@ -178,7 +178,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
               | Tagged_immediate _ | Null -> ()
               | Naked_immediate _ | Naked_float32 _ | Naked_float _
               | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
-              | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ ->
+              | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
+              | Naked_vec512 _ ->
                 Misc.fatal_errorf
                   "Unboxed constants are not allowed inside of Const_block: %a"
                   Printlambda.structured_constant const);
@@ -231,7 +232,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       List.mapi
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
-          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word ->
             arg
           | Float_boxed _ -> unbox_float_constant arg)
@@ -1107,15 +1108,14 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pbox_float (_, _)
       | Punbox_vector _
       | Pbox_vector (_, _)
-      | Pmakelazyblock _ | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _ 
-      | Punbox_unit | Pmake_unboxed_product _
-      | Punboxed_product_field _ | Parray_element_size_in_bytes _
-      | Pget_header _ | Prunstack | Pperform | Presume | Preperform
-      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-      | Patomic_compare_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ppoll
-      | Patomic_load_field _ | Patomic_set_field _ | Pcpu_relax
+      | Pmakelazyblock _ | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _
+      | Punbox_unit | Pmake_unboxed_product _ | Punboxed_product_field _
+      | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
+      | Presume | Preperform | Patomic_exchange_field _
+      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Ppoll | Patomic_load_field _ | Patomic_set_field _ | Pcpu_relax
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _ ->
         (* Inconsistent with outer match *)
@@ -1364,10 +1364,10 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                           match Reg_width_const.descr cst with
                           | Naked_float f -> Or_variable.Const f
                           | Tagged_immediate _ | Naked_immediate _
-                          | Naked_float32 _ | Naked_int8 _ | Naked_int16 _ 
-                          | Naked_int32 _ | Naked_int64 _
-                          | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
-                          | Naked_vec512 _ | Null ->
+                          | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
+                          | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+                          | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+                          | Null ->
                             Misc.fatal_errorf
                               "Binding of %a to %a contains the constant %a \
                                inside a float record, whereas only naked \

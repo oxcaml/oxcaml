@@ -426,6 +426,7 @@ module Update_kind = struct
   let naked_int8_fields = { kind = Naked_int8; stride = Arch.size_addr }
 
   let naked_int16_fields = { kind = Naked_int16; stride = Arch.size_addr }
+
   let naked_int32_fields = { kind = Naked_int32; stride = Arch.size_addr }
 
   let naked_float32_fields = { kind = Naked_float32; stride = Arch.size_addr }
