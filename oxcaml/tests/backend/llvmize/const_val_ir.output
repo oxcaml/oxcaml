@@ -4,11 +4,11 @@ source_filename = "const_val.ml"
 define void @camlConst_val__code_begin() { ret void }
 
 define i64 @camlConst_val__entry()  {
-  %1 = alloca i64 
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
+  %1 = alloca i64
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
   br label %L1
 L1:
   br label %L104
