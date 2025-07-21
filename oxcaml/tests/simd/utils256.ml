@@ -1,5 +1,7 @@
 [@@@ocaml.warning "-unused-module"]
 
+open Utils
+
 external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4
   = "" "vec256_of_int64s"
   [@@noalloc] [@@unboxed]
@@ -323,4 +325,21 @@ module Vector256_casts = struct
     eq a b c d 13L 14L 15L 16L;
     let a, b, c, d = int64x4_to_quadruple _4 in
     eq a b c d 17L 18L 19L 20L
+
+  external int64x4_of_int64x2 : int64x2 -> int64x4
+    = "caml_vec256_unreachable" "caml_vec256_low_of_vec128"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external int64x2_of_int64x4 : int64x4 -> int64x2
+    = "caml_vec256_unreachable" "caml_vec256_low_to_vec128"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  let () =
+    let _12 = int64x2_of_int64s 1L 2L in
+    let up = int64x4_of_int64x2 (Sys.opaque_identity _12) in
+    let down = int64x2_of_int64x4 (Sys.opaque_identity up) in
+    let _d, _c, b, a = int64x4_to_quadruple up in
+    eq a b 0L 0L 1L 2L 0L 0L;
+    let a, b = int64x2_low_int64 down, int64x2_high_int64 down in
+    eq a b 0L 0L 1L 2L 0L 0L
 end
