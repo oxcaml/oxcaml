@@ -375,51 +375,15 @@ module F = struct
     ins_load_reg t temp reg;
     temp
 
-  (* returns an [Ident.t] of type ptr pointing to the address specified by
-     [addr]. Starts counting arguments of [i] from [n] *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
-    let add_offset offset base =
-      let res = fresh_ident t in
-      ins_binop t "add" base offset res Llvm_typ.i64;
-      res
-    in
-    let add_offset_imm offset base =
-      let res = fresh_ident t in
-      ins_binop_imm t "add" base (Int.to_string offset) res Llvm_typ.i64;
-      res
-    in
-    let mul_scale scale base =
-      let res = fresh_ident t in
-      ins_binop_imm t "mul" base (Int.to_string scale) res Llvm_typ.i64;
-      res
-    in
-    let make_ptr ident =
-      let res = fresh_ident t in
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident ident;
-      res
-    in
-    match addr with
-    | Ibased (sym_name, _sym_global, offset) ->
-      t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
-      let base_sym = asprintf "%a" pp_global sym_name in
-      let base_addr = fresh_ident t in
-      ins t "%a = ptrtoint ptr %s to i64" pp_ident base_addr base_sym;
-      add_offset_imm offset base_addr |> make_ptr
-    | Iindexed offset ->
-      let arg = load_reg_to_temp t i.arg.(n) in
-      add_offset_imm offset arg |> make_ptr
-    | Iindexed2 offset ->
-      let arg1 = load_reg_to_temp t i.arg.(n) in
-      let arg2 = load_reg_to_temp t i.arg.(n + 1) in
-      add_offset arg2 arg1 |> add_offset_imm offset
-    | Iscaled (scale, offset) ->
-      let arg = load_reg_to_temp t i.arg.(n) in
-      mul_scale scale arg |> add_offset_imm offset |> make_ptr
-    | Iindexed2scaled (scale, offset) ->
-      let arg1 = load_reg_to_temp t i.arg.(n) in
-      let arg2 = load_reg_to_temp t i.arg.(n + 1) in
-      mul_scale scale arg2 |> add_offset arg1 |> add_offset_imm offset
-      |> make_ptr
+    let offset = Arch.addressing_displacement_for_llvmize addr in
+    let arg = load_reg_to_temp t i.arg.(n) in
+    let temp = fresh_ident t in
+    let res = fresh_ident t in
+    ins_binop_imm t "add" arg (Int.to_string offset) temp Llvm_typ.i64;
+    ins_conv t "inttoptr" ~src:temp ~dst:res ~src_typ:Llvm_typ.i64
+      ~dst_typ:Llvm_typ.ptr;
+    res
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =

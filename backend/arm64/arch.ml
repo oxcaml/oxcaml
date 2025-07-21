@@ -115,6 +115,8 @@ let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
 
+let addressing_displacement_for_llvmize = Misc.fatal_error "Llvmize doesn't support arm64"
+
 (* Printing operations and addressing modes *)
 
 let print_addressing printreg addr ppf arg =
