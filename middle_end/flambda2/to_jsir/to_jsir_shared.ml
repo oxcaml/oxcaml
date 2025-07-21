@@ -30,7 +30,7 @@ let simple ~env ~res simple =
     ~const:(fun const ->
       let var = Jsir.Var.fresh () in
       let expr = Jsir.Constant (reg_width_const const) in
-      let res = To_jsir_result.add_instr res (Let (var, expr)) in
+      let res = To_jsir_result.add_instr_exn res (Let (var, expr)) in
       var, res)
 
 let simples ~env ~res simples =

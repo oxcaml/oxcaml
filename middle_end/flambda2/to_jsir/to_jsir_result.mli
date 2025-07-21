@@ -2,37 +2,30 @@
 
 (** An accumulator for the JSIR blocks and instructions.
 
-    Values of type [t] store complete/archived blocks, as well as a "current"
-    block that is still being worked on. *)
+    Values of type [t] store complete/archived blocks, as well as a stack of
+    "current" blocks that is still being worked on. *)
 
 (* CR selee: improve documentation *)
 
 type t
 
-(** Create a new result structure. It is initialised with a block
-    with no params (CR selee ???) *)
-
 (* CR selee: probably we will end up needing to store more info *)
+
+(** Create a new result structure. It is not initialised with any blocks. *)
 val create : unit -> t
 
-(** Add a [Jsir.instr] to the current block. *)
-val add_instr : t -> Jsir.instr -> t
+(** Add a [Jsir.instr] to the top of the stack of current blocks and return the address of
+    the new block. This function raises if there are no blocks being worked on. *)
+val add_instr_exn : t -> Jsir.instr -> t
 
-(* CR selee: This is probably the wrong interface to handle blocks, because we
-   may have to create a new block while in the middle of a different block. Will
-   come back and modify *)
+(** Push a new block to the stack of current blocks. *)
+val new_block : t -> params:Jsir.Var.t list -> t * Jsir.Addr.t
 
-(** Set the continuation of the current block to be the given [Jsir.last]. *)
-val set_last : t -> Jsir.last -> t
-
-(** Create a new block with the given params, and set it to be current.
-
-    The current block before this call will be archived and cannot be modified
-    further. This function raises if [set_branch] has not been set for the
-    current block. *)
-val new_block_exn : t -> Jsir.Var.t list -> t
+(** End the block at the top of the current stack, setting [last] to the given argument.
+    This function raises if there are no blocks being worked on. *)
+val end_block_with_last_exn : t -> Jsir.last -> t
 
 (** Create a [Jsir.program] with the blocks in the result, including the
-    current block. This function raises if [set_branch] has not been set for
-    the current block. *)
+    current block. This function raises if there are still blocks being
+    worked on. *)
 val to_program_exn : t -> Jsir.program
