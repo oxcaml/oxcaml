@@ -13,7 +13,10 @@ end
 module M : S = struct
 let concat Stdlib.Option.?'(sep : string = " ") xs =
   String.concat sep xs
-let concat_2 Stdlib.Or_null.?'(sep : string or_null) xs =
+let concat_2 Stdlib.Or_null.?'(sep : string = " ") xs =
+  String.concat sep xs
+
+let concat_3 Stdlib.Or_null.?'(sep : string or_null) xs =
   String.concat (
     match sep with
     | Null -> " "
