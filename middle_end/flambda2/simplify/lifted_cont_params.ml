@@ -38,8 +38,9 @@ let new_param t ~replay_history bound_param =
       let param_var, param_duid = BP.var_and_uid bound_param in
       let original_var = Variable.Map.find param_var variable_mapping in
       BP.create original_var (BP.kind bound_param) param_duid
-    (* CR sspies: Is it correct that we copy the [Flambda_debug_uid.t] here?
-       This requires a closer look. *)
+    (* It is fine to copy the debugging UID here, because the bound parameters
+       are used only as keys in a map (and hence their debugging UIDs are never
+       projected out). *)
   in
   let new_params_indexed = BP.Map.add key bound_param t.new_params_indexed in
   { len = t.len + 1; new_params_indexed }
