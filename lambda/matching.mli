@@ -56,6 +56,7 @@ val for_tupled_function:
     ]}
 *)
 val for_optional_arg_default:
+  Btype.optional_module_path ->
   scopes:scopes -> Location.t -> pattern -> param:Ident.t ->
   default_arg:lambda -> default_arg_sort:Jkind.Sort.Const.t ->
   return_layout:layout -> lambda -> lambda
