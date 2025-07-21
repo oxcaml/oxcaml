@@ -66,7 +66,8 @@ let[@inline always] shift_left x y = of_int8 (Int8.shift_left (to_int8 x) y)
 
 let[@inline always] shift_right x y = of_int8 (Int8.shift_right (to_int8 x) y)
 
-let[@inline always] shift_right_logical x y = of_int8 (Int8.shift_right_logical (to_int8 x) y)
+let[@inline always] shift_right_logical x y =
+  of_int8 (Int8.shift_right_logical (to_int8 x) y)
 
 let[@inline always] equal x y = Int8.equal (to_int8 x) (to_int8 y)
 
