@@ -25,7 +25,7 @@
  (deps  const_val_main.ml const_val.ml)
  (action
   (progn
-
+   
    (run %{bin:ocamlopt.opt} const_val.ml -c -g -O3 -opaque -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments)
    (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -opaque)
    (run %{bin:ocamlopt.opt}  const_val.cmx const_val_main.cmx -opaque -o const_val.output.exe)
@@ -59,7 +59,7 @@
  (deps  int_ops_main.ml int_ops.ml)
  (action
   (progn
-
+   
    (run %{bin:ocamlopt.opt} int_ops.ml -c -g -O3 -opaque -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments)
    (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -opaque)
    (run %{bin:ocamlopt.opt}  int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe)
