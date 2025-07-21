@@ -69,7 +69,7 @@ let () =
     let run_extra_dep =
       match extra_dep_suffix with
       | Some _ ->
-        Format.asprintf "(run %%{bin:ocamlopt.opt} %s -g -O3 -opaque)"
+        Format.asprintf "(run %%{bin:ocamlopt.opt} %s -g -c -O3 -opaque)"
           extra_dep_ml
       | None -> ""
     in
@@ -129,4 +129,5 @@ let () =
   print_test_ir_and_run "const_val";
   print_test_ir_and_run "int_ops";
   print_test_ir_and_run ~extra_dep_suffix:"data" "gcd";
-  print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev"
+  print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev";
+  print_test_ir_and_run "float_ops"

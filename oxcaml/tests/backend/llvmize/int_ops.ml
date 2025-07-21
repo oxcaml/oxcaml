@@ -16,8 +16,6 @@ let[@inline never] land_ () = x land y
 
 let[@inline never] lor_ () = x lor y
 
-let[@inline never] lor_ () = x lor y
-
 let[@inline never] lxor_ () = x lxor y
 
 let[@inline never] lnot_ () = lnot x

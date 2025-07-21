@@ -1,6 +1,6 @@
-let arr = Sys.opaque_identity Array_rev_data.arr
+let arr = Array_rev_data.arr
 
-let len = Sys.opaque_identity Array_rev_data.len
+let len = Array_rev_data.len
 
 let rev () =
   for i = 0 to (len / 2) - 1 do

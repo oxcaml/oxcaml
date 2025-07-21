@@ -415,8 +415,7 @@ module F = struct
       res
 
   let float_comp t (comp : Operation.float_comparison) (i : 'a Cfg.instruction)
-      =
-    let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
+      typ =
     let comp_name =
       (* CR yusumez: is not (ordered cond) == unordered (not cond)? *)
       match comp with
@@ -493,8 +492,24 @@ module F = struct
       (* CR yusumez: Implement this *)
       ins t "call void @llvm.trap()";
       ins t "unreachable"
-    | Float_test _ | Switch _ | Tailcall_self _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Float_test { width; lt; eq; gt; uo } ->
+      let typ =
+        match width with
+        | Float64 -> Llvm_typ.double
+        | Float32 -> Llvm_typ.float
+      in
+      let is_lt = float_comp t Cmm.CFlt i typ in
+      let ge = fresh_ident t in
+      ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
+      line t.ppf "%a:" Ident.print ge;
+      let is_gt = float_comp t Cmm.CFgt i typ in
+      let eq_or_uo = fresh_ident t in
+      ins_branch_cond_ident t is_gt (get_ident_for_label t gt) eq_or_uo;
+      line t.ppf "%a:" Ident.print eq_or_uo;
+      let is_eq = float_comp t Cmm.CFeq i typ in
+      ins_branch_cond t is_eq eq uo
+    | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
+    | Prim _ ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -561,10 +576,16 @@ module F = struct
         let res = fresh_ident t in
         let suffix = match width with Float32 -> "f32" | Float64 -> "f64" in
         (* CR yusumez: Do this properly when we have [ins_call] *)
-        ins t "%a = call @llvm.fabs.%s(%a %a)" pp_ident res suffix Llvm_typ.pp_t
-          typ pp_ident arg;
+        ins t "%a = call %a @llvm.fabs.%s(%a %a)" pp_ident res Llvm_typ.pp_t typ
+          suffix Llvm_typ.pp_t typ pp_ident arg;
         res
-      | Icompf comp -> float_comp t comp i
+      | Icompf comp ->
+        let bool_res = float_comp t comp i typ in
+        (* convert i1 -> i64 *)
+        let int_res = fresh_ident t in
+        ins_conv t "zext" ~src:bool_res ~dst:int_res ~src_typ:Llvm_typ.bool
+          ~dst_typ:(Llvm_typ.of_machtyp_component i.res.(0).typ);
+        int_res
     in
     ins_store_reg t res i.res.(0)
 
