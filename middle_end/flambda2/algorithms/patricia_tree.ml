@@ -795,15 +795,29 @@ end = struct
         else inter_domain_is_non_empty t0 t11
       else false
 
+  (* CR bclement: this could probably be removed now that we have a more generic
+     [diff]. *)
   let rec diff_domains t0 t1 =
     let iv = is_value_of t0 in
-    pattern_match_pair_merge
-      ~only_left:(fun t0 -> t0)
-      ~only_right:(fun _ -> empty iv)
-      ~both_sides:(fun t0 t1 -> diff_domains t0 t1)
-      iv
-      (fun [@inline always] _i _d0 _d1 -> None)
-      t0 t1
+    match descr t0, descr t1 with
+    | Empty, _ -> empty iv
+    | _, Empty -> t0
+    | Leaf (i, _), _ -> if mem i t1 then empty iv else t0
+    | _, Leaf (i, _) -> remove i t0
+    | Branch (prefix0, bit0, t00, t01), Branch (prefix1, bit1, t10, t11) ->
+      if equal_prefix prefix0 bit0 prefix1 bit1
+      then branch prefix0 bit0 (diff_domains t00 t10) (diff_domains t01 t11)
+      else if includes_prefix prefix0 bit0 prefix1 bit1
+      then
+        if zero_bit prefix1 bit0
+        then branch prefix0 bit0 (diff_domains t00 t1) t01
+        else branch prefix0 bit0 t00 (diff_domains t01 t1)
+      else if includes_prefix prefix1 bit1 prefix0 bit0
+      then
+        if zero_bit prefix0 bit1
+        then diff_domains t0 t10
+        else diff_domains t0 t11
+      else t0
 
   let rec cardinal t =
     match descr t with
