@@ -1106,8 +1106,17 @@ let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
   | Naked_number Naked_float ->
     fun arg -> H.Unary (Box_number (Naked_float, alloc_mode), Prim arg)
   | Naked_number Naked_int8 ->
+    (* CR lthls: we should consider using a variant of Tag_int/Untag_int instead
+       of Num_conv
+
+       jvanburen: Num_conv is well-defined in to_cmm. If anything I would think
+       we could remove Tag_int/Untag_int since they're totally subsumed by
+       Num_conv.
+
+       ccasin: FWIW, I tend to agree with lthls here that being more explicit
+       about what kind of conversion this is would be clearer *)
     fun arg ->
-      H.Unary (Num_conv { src = Naked_int8; dst = Tagged_immediate }, Prim arg)
+     H.Unary (Num_conv { src = Naked_int8; dst = Tagged_immediate }, Prim arg)
   | Naked_number Naked_int16 ->
     fun arg ->
       H.Unary (Num_conv { src = Naked_int16; dst = Tagged_immediate }, Prim arg)
@@ -1622,7 +1631,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       List.mapi
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
-          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word ->
             arg
           | Float_boxed _ -> unbox_float arg)
@@ -2186,7 +2195,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             | Value value_kind ->
               Value_prefix
                 (convert_block_access_field_kind_from_value_kind value_kind)
-            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
+            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
               | Vec256 | Vec512 | Word ) as mixed_block_element ->
               Flat_suffix
                 (K.Flat_suffix_element.from_singleton_mixed_block_element
@@ -2204,8 +2213,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         match flattened_reordered_shape.(new_index) with
         | Float_boxed (mode : Lambda.locality_mode) ->
           box_float mode block_access ~current_region
-        | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
-        | Vec256 | Vec512 | Word ->
+        | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+        | Vec128 | Vec256 | Vec512 | Word ->
           block_access)
       new_indexes
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
@@ -2277,8 +2286,9 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
                     Value_prefix
                       (convert_block_access_field_kind_from_value_kind
                          value_kind)
-                  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
-                    | Vec256 | Vec512 | Word ) as mixed_block_element ->
+                  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+                    | Vec128 | Vec256 | Vec512 | Word ) as mixed_block_element
+                    ->
                     Flat_suffix
                       (K.Flat_suffix_element.from_singleton_mixed_block_element
                          mixed_block_element)
@@ -2294,8 +2304,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           in
           let value : H.simple_or_prim =
             match flattened_reordered_shape.(new_index) with
-            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 
-            | Vec256 | Vec512 | Word ->
+            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+            | Vec128 | Vec256 | Vec512 | Word ->
               value
             | Float_boxed _ -> unbox_float value
           in
@@ -2768,9 +2778,9 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Pbox_float (_, _)
       | Punbox_vector _
       | Pbox_vector (_, _)
-      | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _ | Punbox_unit 
-      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _ | Pmixedfield _
-      | Preinterpret_unboxed_int64_as_tagged_int63
+      | Puntag_int _ | Ptag_int _ | Punbox_int _ | Pbox_int _ | Punbox_unit
+      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
+      | Pmixedfield _ | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Parray_element_size_in_bytes _ | Ppeek _ | Pmakelazyblock _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
