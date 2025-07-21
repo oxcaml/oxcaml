@@ -48,6 +48,7 @@ typedef int32x4_t simd_int32x4_t;
 #define simd_float32x4_rsqrt vrsqrteq_f32
 #define simd_float32x4_to_int32x4 vcvtnq_s32_f32
 #define simd_int32x4_to_float32x4 vcvtq_f32_s32
+#define simd_float32x4_to_int32x4_trunc vcvtq_s32_f32
 
 /* [caml_float32_to_bits] is defined in runtime/float32.c */
 int32_t caml_float32_to_bits(float f);
@@ -92,6 +93,12 @@ static inline simd_float64x2_t simd_float64x2_round_near(simd_float64x2_t v)
 static inline simd_float32x4_t simd_float32x4_round_near(simd_float32x4_t v)
 {
   return vrndnq_f32(v);
+}
+
+static inline simd_int32x4_t simd_float64x2_to_int32x2_trunc(simd_float64x2_t v)
+{
+  int32x2_t i32 = vqmovn_s64(vcvtq_s64_f64(v));
+  return vcombine_s32(i32, vdup_n_s32(0));
 }
 
 int64x2_t vec128_of_int64s(int64_t low, int64_t high)
@@ -146,6 +153,8 @@ typedef __m128i simd_int32x4_t;
 #define simd_float32x4_rcp _mm_rcp_ps
 #define simd_float32x4_rsqrt _mm_rsqrt_ps
 #define simd_float32x4_to_int32x4 _mm_cvtps_epi32
+#define simd_float32x4_to_int32x4_trunc _mm_cvttps_epi32
+#define simd_float64x2_to_int32x2_trunc _mm_cvttpd_epi32
 
 #define Int64x2_vali Vec128_vali
 
@@ -429,6 +438,10 @@ int64_t int16_mulsign(int64_t l, int64_t r) {
   int16_t x = l, y = r;
   return y == 0 ? 0 : y > 0 ? x : -x;
 }
+int64_t int16_mul_round(int64_t l, int64_t r) {
+  int16_t x = l, y = r;
+  return ((((int32_t)x * (int32_t)y) >> 14) + 1) >> 1;
+}
 int64_t int16_cmpeq(int64_t l, int64_t r) {
   if((int16_t)l == (int16_t)r) return 0xffff;
   return 0;
@@ -659,6 +672,12 @@ double float64_max(double l, double r) {
   return simd_low_float64x2(simd_float64x2_max(lv, rv));
 }
 
+int32_t float64_cvtt_i32(double d) {
+  simd_float64x2_t v = simd_dup_float64x2(d);
+  simd_int32x4_t res = simd_float64x2_to_int32x2_trunc(v);
+  return simd_extract_int32x4(res, 0);
+}
+
 // Float32
 
 int32_t int32_of_float(float f) {
@@ -714,6 +733,13 @@ int32_t float32_cvt_i32(int32_t i) {
   float f = float_of_int32(i);
   simd_float32x4_t v = simd_dup_float32x4(f);
   simd_int32x4_t res = simd_float32x4_to_int32x4(v);
+  return simd_extract_int32x4(res, 0);
+}
+
+int32_t float32_cvtt_i32(int32_t i) {
+  float f = float_of_int32(i);
+  simd_float32x4_t v = simd_dup_float32x4(f);
+  simd_int32x4_t res = simd_float32x4_to_int32x4_trunc(v);
   return simd_extract_int32x4(res, 0);
 }
 

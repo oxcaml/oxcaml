@@ -134,6 +134,9 @@ type t =
     ppf_dump : Format.formatter;
     mutable sourcefile : string option; (* gets set in [begin_assembly] *)
     mutable asm_filename : string option; (* gets set in [open_out] *)
+    ppf_dump : Format.formatter;
+    mutable sourcefile : string option; (* gets set in [begin_assembly] *)
+    mutable asm_filename : string option; (* gets set in [open_out] *)
     mutable current_fun_info : fun_info;
         (* Maintains the state of the current function (reset for every
            function) *)
@@ -193,6 +196,10 @@ let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
    passed *)
 let _get_ppf_dump t = t.ppf_dump
 
+(* CR yusumez: Write to this ppf alongside the normal one when -dllvmir is
+   passed *)
+let _get_ppf_dump t = t.ppf_dump
+
 module F = struct
   open Format
 
@@ -201,6 +208,14 @@ module F = struct
   let pp_comma ppf () = fprintf ppf ", "
 
   let line ppf = kfprintf (fun ppf -> pp_print_newline ppf ()) ppf
+
+  (* CR gyorsh: emit metadata debuginfo (of the form !dbg <id>). For now just
+     emit a comment, to help debug llvmize pass. Emit a block comment in the
+     case there is a newline after it.
+
+     yusumez: Multiline comments don't work for some reason... *)
+
+  let do_if_comments_enabled f = if !Oxcaml_flags.dasm_comments then f ()
 
   (* CR gyorsh: emit metadata debuginfo (of the form !dbg <id>). For now just
      emit a comment, to help debug llvmize pass. Emit a block comment in the
@@ -237,6 +252,8 @@ module F = struct
   let ins t =
     pp_indent t.ppf ();
     kfprintf (fun ppf -> pp_print_newline ppf ()) t.ppf
+
+  let source_filename t s = line t.ppf "source_filename = \"%s\"" s
 
   let source_filename t s = line t.ppf "source_filename = \"%s\"" s
 
@@ -296,6 +313,7 @@ module F = struct
       pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}";
+    line t.ppf "" line t.ppf "}";
     line t.ppf ""
 
   (* == LLVM instructions == *)
@@ -495,6 +513,7 @@ module F = struct
      instructions *)
 
   let terminator t (i : Cfg.terminator Cfg.instruction) =
+    pp_dbg_instr_terminator t.ppf i;
     pp_dbg_instr_terminator t.ppf i;
     match i.desc with
     | Never -> assert false

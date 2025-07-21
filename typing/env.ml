@@ -1692,6 +1692,14 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Class_type ->
       (IdTbl.find_same id env.cltypes).cltda_shape
 
+let find_uid_of_path env path =
+  (* We currently only support looking up debugging uids in the current
+     environment. Future versions will support looking up declarations in other
+     files via the shape mechanism in [shape.ml]. *)
+  match find_type path env with
+  | exception Not_found -> None
+  | type_ -> let uid = type_.type_uid in Some uid
+
 let shape_of_path ~namespace env =
   Shape.of_path ~namespace ~find_shape:(find_shape env)
 
@@ -2983,10 +2991,23 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
 
 (* Make the initial environment, without language extensions *)
 let initial =
-  Predef.build_initial_env
-    (add_type ~check:false)
-    (add_extension ~check:false ~rebind:false)
-    empty
+  (* We collect all the type declarations that are added to the initial
+     environment in a table. *)
+  let added_types = Ident.Tbl.create 16 in
+  let add_type_and_remember_decl (type_ident : Ident.t) decl env =
+    Ident.Tbl.add added_types type_ident decl;
+    add_type type_ident decl env ~check:false
+  in
+  let initial_env =
+    Predef.build_initial_env add_type_and_remember_decl
+      (add_extension ~check:false ~rebind:false) empty
+  in
+  (* We record the type declarations for the type shapes. *)
+  Ident.Tbl.iter (fun type_ident decl ->
+    Type_shape.add_to_type_decls (Pident type_ident) decl
+      (find_uid_of_path initial_env)
+  ) added_types;
+  initial_env
 
 let add_language_extension_types env =
   let add ext lvl f env  =
@@ -3274,7 +3295,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
 let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
   begin match
   Mode.Regionality.submode
-    (Mode.Value.proj (Comonadic Areality) vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode.mode)
     (Mode.Regionality.global)
   with
   | Ok () -> ()
@@ -3287,7 +3308,7 @@ let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
 let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
   match
     Mode.Linearity.submode
-      (Mode.Value.proj (Comonadic Linearity) vmode.mode)
+      (Mode.Value.proj_comonadic Linearity vmode.mode)
       Mode.Linearity.many
   with
   | Error _ ->
@@ -3321,7 +3342,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
 let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
   match
   Mode.Regionality.submode
-    (Mode.Value.proj (Comonadic Areality) vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode.mode)
     Mode.Regionality.regional
 with
 | Ok () ->
@@ -3397,7 +3418,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           let mode = mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value in
           Mode.Value.meet
             [mode;
-             Mode.Value.max_with (Comonadic Areality)
+             Mode.Value.max_with_comonadic Areality
                                  (Mode.Regionality.regional)]
       | Exclave_lock ->
           (* If [m0] is [global], then inside the exclave we require new values

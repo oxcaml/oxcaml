@@ -214,6 +214,7 @@
   mtype
   envaux
   includecore
+  type_shape
   tast_iterator
   tast_mapper
   signature_group

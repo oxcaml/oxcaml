@@ -1,0 +1,5 @@
+File "c.ml", line 1, characters 5-15:
+Error: Annotation check for zero_alloc failed on function C.test_foo (camlC.test_foo_HIDE_STAMP).
+
+File "c.ml", line 1, characters 30-42:
+Error: called function may allocate (direct tailcall camlA.inner_foo_HIDE_STAMP) (c.ml:1,30--42;b.ml:1,17--24;a.ml:3,28--39)

@@ -101,7 +101,7 @@ type arg =
   | Imm of int64
   (** Operand is an immediate constant integer *)
 
-  | Sym of  string
+  | Sym of string
   (** Address of a symbol (absolute address except for call/jmp target
       where it is interpreted as a relative displacement *)
 
@@ -117,9 +117,7 @@ type arg =
 
 type instruction =
   | ADD of arg * arg
-  | ADDSD of arg * arg
   | AND of arg * arg
-  | ANDPD of arg * arg
   | BSF of arg * arg
   | BSR of arg * arg
   | BSWAP of arg
@@ -128,17 +126,8 @@ type instruction =
   | CLDEMOTE of arg
   | CMOV of condition * arg * arg
   | CMP of arg * arg
-  | CMPSD of float_condition * arg * arg
-  | COMISD of arg * arg
   | CQO
-  | CVTSD2SS of arg * arg
-  | CVTSI2SS of arg * arg
-  | CVTSS2SD of arg * arg
-  | CVTSI2SD of arg * arg
-  | CVTTSD2SI of arg * arg
-  | CVTTSS2SI of arg * arg
   | DEC of arg
-  | DIVSD of arg * arg
   | HLT
   | IDIV of arg
   | IMUL of arg * arg option
@@ -156,17 +145,9 @@ type instruction =
   | LOCK_XOR of arg * arg
   | LEAVE
   | MOV of arg * arg
-  | MOVAPD of arg * arg
-  | MOVUPD of arg * arg
-  | MOVD of arg * arg
-  | MOVQ of arg * arg
-  | MOVLPD of arg * arg
-  | MOVSD of arg * arg
-  | MOVSS of arg * arg
   | MOVSX of arg * arg
   | MOVSXD of arg * arg
   | MOVZX of arg * arg
-  | MULSD of arg * arg
   | NEG of arg
   | NOP
   | OR of arg * arg
@@ -186,21 +167,9 @@ type instruction =
   | SET of condition * arg
   | SHR of arg * arg
   | SUB of arg * arg
-  | SUBSD of arg * arg
   | TEST of arg * arg
-  | UCOMISD of arg * arg
   | XCHG of arg * arg
   | XOR of arg * arg
-  | XORPD of arg * arg
-  | ADDSS of arg * arg
-  | SUBSS of arg * arg
-  | MULSS of arg * arg
-  | DIVSS of arg * arg
-  | COMISS of arg * arg
-  | UCOMISS of arg * arg
-  | XORPS of arg * arg
-  | ANDPS of arg * arg
-  | CMPSS of float_condition * arg * arg
   | TZCNT of arg * arg
   | LZCNT of arg * arg
   | SIMD of Amd64_simd_instrs.instr * arg array

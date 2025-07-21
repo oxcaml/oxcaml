@@ -1,0 +1,1371 @@
+(data
+ global "camlInt_ops__gc_roots":
+ addr G:"camlInt_ops"
+ addr L:"camlInt_ops__asr__25"
+ addr L:"camlInt_ops__lsr__24"
+ addr L:"camlInt_ops__lsl__23"
+ addr L:"camlInt_ops__lnot__22"
+ addr L:"camlInt_ops__lxor__21"
+ addr L:"camlInt_ops__lor__20"
+ addr L:"camlInt_ops__land__18"
+ addr L:"camlInt_ops__mod__17"
+ addr L:"camlInt_ops__div_16"
+ addr L:"camlInt_ops__mul_15"
+ addr L:"camlInt_ops__sub_14"
+ addr L:"camlInt_ops__add_13"
+ int 0)
+(data
+ int 15104
+ global "camlInt_ops":
+ int 1
+ int 1
+ addr L:"camlInt_ops__add_13"
+ addr L:"camlInt_ops__sub_14"
+ addr L:"camlInt_ops__mul_15"
+ addr L:"camlInt_ops__div_16"
+ addr L:"camlInt_ops__mod__17"
+ addr L:"camlInt_ops__land__18"
+ addr L:"camlInt_ops__lor__20"
+ addr L:"camlInt_ops__lxor__21"
+ addr L:"camlInt_ops__lnot__22"
+ addr L:"camlInt_ops__lsl__23"
+ addr L:"camlInt_ops__lsr__24"
+ addr L:"camlInt_ops__asr__25")
+(data
+ int 5111
+ "camlInt_ops__asr__25":
+ addr L:"camlInt_ops__asr__12_25_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__lsr__24":
+ addr L:"camlInt_ops__lsr__11_24_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__lsl__23":
+ addr L:"camlInt_ops__lsl__10_23_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 4087
+ "camlInt_ops__lnot__22":
+ addr L:"camlInt_ops__lnot__9_22_code"
+ int 108086391056891911
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__lxor__21":
+ addr L:"camlInt_ops__lxor__8_21_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__lor__20":
+ addr L:"camlInt_ops__lor__7_20_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__land__18":
+ addr L:"camlInt_ops__land__5_18_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__mod__17":
+ addr L:"camlInt_ops__mod__4_17_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__div_16":
+ addr L:"camlInt_ops__div_3_16_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__mul_15":
+ addr L:"camlInt_ops__mul_2_15_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__sub_14":
+ addr L:"camlInt_ops__sub_1_14_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(data
+ int 5111
+ "camlInt_ops__add_13":
+ addr L:"camlInt_ops__add_0_13_code"
+ int 108086391056891913
+ int 1
+ int 1)
+(function{int_ops.ml:5,23-33} camlInt_ops__add_0_13_code
+     (param/449: int) : int
+ (+
+   (+ (load val (+a L:"camlInt_ops__add_13" 24))
+     (load val (+a L:"camlInt_ops__add_13" 16)))
+   -1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__add_0_13_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:15) prologue
+(id:14) goto 101
+
+predecessors:
+successors: 101
+exn-successors:
+
+101:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__add_13"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__add_13"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 + anon:V/31
+(id:10) anon:I/35 := anon:I/34
+(id:11) anon:I/35 := anon:I/35 + -1
+(id:12) pin:anon:I/0[%rax] := anon:I/35
+(id:17) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__add_0_13_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:15) prologue
+(id:14) goto 101
+
+predecessors:
+successors: 101
+exn-successors:
+
+101:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__add_13"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__add_13"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 + anon:V/31
+(id:10) anon:I/35 := anon:I/34
+(id:11) anon:I/35 := anon:I/35 + -1
+(id:12) pin:anon:I/0[%rax] := anon:I/35
+(id:17) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:7,23-33} camlInt_ops__sub_1_14_code
+     (param/453: int) : int
+ (+
+   (- (load val (+a L:"camlInt_ops__sub_14" 24))
+     (load val (+a L:"camlInt_ops__sub_14" 16)))
+   1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__sub_1_14_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:15) prologue
+(id:14) goto 108
+
+predecessors:
+successors: 108
+exn-successors:
+
+108:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__sub_14"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__sub_14"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 - anon:V/31
+(id:10) anon:I/35 := anon:I/34
+(id:11) anon:I/35 := anon:I/35 + 1
+(id:12) pin:anon:I/0[%rax] := anon:I/35
+(id:17) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__sub_1_14_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:15) prologue
+(id:14) goto 108
+
+predecessors:
+successors: 108
+exn-successors:
+
+108:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__sub_14"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__sub_14"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 - anon:V/31
+(id:10) anon:I/35 := anon:I/34
+(id:11) anon:I/35 := anon:I/35 + 1
+(id:12) pin:anon:I/0[%rax] := anon:I/35
+(id:17) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:9,23-33} camlInt_ops__mul_2_15_code
+     (param/457: int) : int
+ (+
+   (* (+ (load val (+a L:"camlInt_ops__mul_15" 24)) -1)
+     (>>s (load val (+a L:"camlInt_ops__mul_15" 16)) 1))
+   1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__mul_2_15_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:19) prologue
+(id:18) goto 115
+
+predecessors:
+successors: 115
+exn-successors:
+
+115:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__mul_15"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__mul_15"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) anon:I/35 := anon:I/35 + -1
+(id:12) anon:I/36 := anon:I/35
+(id:13) anon:I/36 := anon:I/36 * anon:I/32
+(id:14) anon:I/37 := anon:I/36
+(id:15) anon:I/37 := anon:I/37 + 1
+(id:16) pin:anon:I/0[%rax] := anon:I/37
+(id:21) reload retaddr
+(id:17) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__mul_2_15_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:19) prologue
+(id:18) goto 115
+
+predecessors:
+successors: 115
+exn-successors:
+
+115:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__mul_15"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__mul_15"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) anon:I/35 := anon:I/35 + -1
+(id:12) anon:I/36 := anon:I/35
+(id:13) anon:I/36 := anon:I/36 * anon:I/32
+(id:14) anon:I/37 := anon:I/36
+(id:15) anon:I/37 := anon:I/37 + 1
+(id:16) pin:anon:I/0[%rax] := anon:I/37
+(id:21) reload retaddr
+(id:17) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:11,23-54} camlInt_ops__div_3_16_code
+     (param/461: int) : int
+ (if (== (load val (+a L:"camlInt_ops__div_16" 16)) 1) 1
+   (catch
+     (if (!= (load val (+a L:"camlInt_ops__div_16" 16)) 1)
+       (+
+         (<<
+           (/ (>>s (load val (+a L:"camlInt_ops__div_16" 24)) 1)
+             (>>s (load val (+a L:"camlInt_ops__div_16" 16)) 1))
+           1)
+         1)
+       (exit 3))
+   with(3)(cold) (raise{int_ops.ml:11,49-54} G:"caml_exn_Division_by_zero"))) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__div_3_16_code
+layout.length=6
+blocks.length=6
+
+1:
+(id:53) prologue
+(id:52) goto 124
+
+predecessors:
+successors: 124
+exn-successors:
+
+124:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__div_16"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:50) if anon:V/31 < s 1 goto 132
+if anon:V/31 = s 1 goto 127
+if anon:V/31 > s 1 goto 132
+
+predecessors: 1
+successors: 127 132
+exn-successors:
+
+127:
+(id:8) anon:I/32 := 1
+(id:9) pin:anon:I/0[%rax] := anon:I/32
+(id:55) reload retaddr
+(id:10) Return pin:anon:I/0[%rax]
+
+predecessors: 124
+successors:
+exn-successors:
+
+132:
+(id:15) anon:I/33 := "camlInt_ops__div_16"
+(id:16) anon:V/34 := val [anon:I/33 + 16]
+(id:40) if anon:V/34 < s 1 goto 135
+if anon:V/34 = s 1 goto 147
+if anon:V/34 > s 1 goto 135
+
+predecessors: 124
+successors: 135 147
+exn-successors:
+
+135:
+(id:19) anon:I/35 := "camlInt_ops__div_16"
+(id:20) anon:V/36 := val [anon:I/35 + 16]
+(id:21) anon:I/37 := anon:V/36
+(id:22) anon:I/37 := anon:I/37 >>s 1
+(id:23) anon:I/38 := "camlInt_ops__div_16"
+(id:24) anon:V/39 := val [anon:I/38 + 24]
+(id:25) anon:I/40 := anon:V/39
+(id:26) anon:I/40 := anon:I/40 >>s 1
+(id:27) pin:anon:I/0[%rax] := anon:I/40
+(id:28) pin:anon:I/5[%rcx] := anon:I/37
+(id:29) pin:anon:I/0[%rax] := pin:anon:I/0[%rax] div pin:anon:I/5[%rcx]
+(id:30) anon:I/41 := pin:anon:I/0[%rax]
+(id:31) anon:I/42 := anon:I/41
+(id:32) anon:I/42 := anon:I/42 << 1
+(id:33) anon:I/43 := anon:I/42
+(id:34) anon:I/43 := anon:I/43 + 1
+(id:35) pin:anon:I/0[%rax] := anon:I/43
+(id:56) reload retaddr
+(id:36) Return pin:anon:I/0[%rax]
+
+predecessors: 132
+successors:
+exn-successors:
+
+147:
+(id:44) anon:I/44 := "caml_exn_Division_by_zero"
+(id:45) pin:anon:I/0[%rax] := anon:I/44
+(id:46) Raise pin:anon:I/0[%rax]
+
+predecessors: 132
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__div_3_16_code
+layout.length=6
+blocks.length=6
+
+1:
+(id:53) prologue
+(id:52) goto 124
+
+predecessors:
+successors: 124
+exn-successors:
+
+124:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__div_16"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:50) if anon:V/31 < s 1 goto 132
+if anon:V/31 = s 1 goto 127
+if anon:V/31 > s 1 goto 132
+
+predecessors: 1
+successors: 127 132
+exn-successors:
+
+127:
+(id:8) anon:I/32 := 1
+(id:9) pin:anon:I/0[%rax] := anon:I/32
+(id:55) reload retaddr
+(id:10) Return pin:anon:I/0[%rax]
+
+predecessors: 124
+successors:
+exn-successors:
+
+132:
+(id:15) anon:I/33 := "camlInt_ops__div_16"
+(id:16) anon:V/34 := val [anon:I/33 + 16]
+(id:40) if anon:V/34 < s 1 goto 135
+if anon:V/34 = s 1 goto 147
+if anon:V/34 > s 1 goto 135
+
+predecessors: 124
+successors: 135 147
+exn-successors:
+
+135:
+(id:19) anon:I/35 := "camlInt_ops__div_16"
+(id:20) anon:V/36 := val [anon:I/35 + 16]
+(id:21) anon:I/37 := anon:V/36
+(id:22) anon:I/37 := anon:I/37 >>s 1
+(id:23) anon:I/38 := "camlInt_ops__div_16"
+(id:24) anon:V/39 := val [anon:I/38 + 24]
+(id:25) anon:I/40 := anon:V/39
+(id:26) anon:I/40 := anon:I/40 >>s 1
+(id:27) pin:anon:I/0[%rax] := anon:I/40
+(id:28) pin:anon:I/5[%rcx] := anon:I/37
+(id:29) pin:anon:I/0[%rax] := pin:anon:I/0[%rax] div pin:anon:I/5[%rcx]
+(id:30) anon:I/41 := pin:anon:I/0[%rax]
+(id:31) anon:I/42 := anon:I/41
+(id:32) anon:I/42 := anon:I/42 << 1
+(id:33) anon:I/43 := anon:I/42
+(id:34) anon:I/43 := anon:I/43 + 1
+(id:35) pin:anon:I/0[%rax] := anon:I/43
+(id:56) reload retaddr
+(id:36) Return pin:anon:I/0[%rax]
+
+predecessors: 132
+successors:
+exn-successors:
+
+147:
+(id:44) anon:I/44 := "caml_exn_Division_by_zero"
+(id:45) pin:anon:I/0[%rax] := anon:I/44
+(id:46) Raise pin:anon:I/0[%rax]
+
+predecessors: 132
+successors:
+exn-successors:
+
+(function{int_ops.ml:13,24-36} camlInt_ops__mod__4_17_code
+     (param/467: int) : int
+ (catch
+   (if (!= (load val (+a L:"camlInt_ops__mod__17" 16)) 1)
+     (+
+       (<<
+         (mod (>>s (load val (+a L:"camlInt_ops__mod__17" 24)) 1)
+           (>>s (load val (+a L:"camlInt_ops__mod__17" 16)) 1))
+         1)
+       1)
+     (exit 4))
+ with(4)(cold) (raise{int_ops.ml:13,29-36} G:"caml_exn_Division_by_zero")) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__mod__4_17_code
+layout.length=4
+blocks.length=4
+
+1:
+(id:42) prologue
+(id:41) goto 152
+
+predecessors:
+successors: 152
+exn-successors:
+
+152:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:6) anon:I/30 := "camlInt_ops__mod__17"
+(id:7) anon:V/31 := val [anon:I/30 + 16]
+(id:31) if anon:V/31 < s 1 goto 158
+if anon:V/31 = s 1 goto 170
+if anon:V/31 > s 1 goto 158
+
+predecessors: 1
+successors: 158 170
+exn-successors:
+
+158:
+(id:10) anon:I/32 := "camlInt_ops__mod__17"
+(id:11) anon:V/33 := val [anon:I/32 + 16]
+(id:12) anon:I/34 := anon:V/33
+(id:13) anon:I/34 := anon:I/34 >>s 1
+(id:14) anon:I/35 := "camlInt_ops__mod__17"
+(id:15) anon:V/36 := val [anon:I/35 + 24]
+(id:16) anon:I/37 := anon:V/36
+(id:17) anon:I/37 := anon:I/37 >>s 1
+(id:18) pin:anon:I/0[%rax] := anon:I/37
+(id:19) pin:anon:I/5[%rcx] := anon:I/34
+(id:20) pin:anon:I/4[%rdx] := pin:anon:I/0[%rax] mod pin:anon:I/5[%rcx]
+(id:21) anon:I/38 := pin:anon:I/4[%rdx]
+(id:22) anon:I/39 := anon:I/38
+(id:23) anon:I/39 := anon:I/39 << 1
+(id:24) anon:I/40 := anon:I/39
+(id:25) anon:I/40 := anon:I/40 + 1
+(id:26) pin:anon:I/0[%rax] := anon:I/40
+(id:44) reload retaddr
+(id:27) Return pin:anon:I/0[%rax]
+
+predecessors: 152
+successors:
+exn-successors:
+
+170:
+(id:35) anon:I/41 := "caml_exn_Division_by_zero"
+(id:36) pin:anon:I/0[%rax] := anon:I/41
+(id:37) Raise pin:anon:I/0[%rax]
+
+predecessors: 152
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__mod__4_17_code
+layout.length=4
+blocks.length=4
+
+1:
+(id:42) prologue
+(id:41) goto 152
+
+predecessors:
+successors: 152
+exn-successors:
+
+152:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:6) anon:I/30 := "camlInt_ops__mod__17"
+(id:7) anon:V/31 := val [anon:I/30 + 16]
+(id:31) if anon:V/31 < s 1 goto 158
+if anon:V/31 = s 1 goto 170
+if anon:V/31 > s 1 goto 158
+
+predecessors: 1
+successors: 158 170
+exn-successors:
+
+158:
+(id:10) anon:I/32 := "camlInt_ops__mod__17"
+(id:11) anon:V/33 := val [anon:I/32 + 16]
+(id:12) anon:I/34 := anon:V/33
+(id:13) anon:I/34 := anon:I/34 >>s 1
+(id:14) anon:I/35 := "camlInt_ops__mod__17"
+(id:15) anon:V/36 := val [anon:I/35 + 24]
+(id:16) anon:I/37 := anon:V/36
+(id:17) anon:I/37 := anon:I/37 >>s 1
+(id:18) pin:anon:I/0[%rax] := anon:I/37
+(id:19) pin:anon:I/5[%rcx] := anon:I/34
+(id:20) pin:anon:I/4[%rdx] := pin:anon:I/0[%rax] mod pin:anon:I/5[%rcx]
+(id:21) anon:I/38 := pin:anon:I/4[%rdx]
+(id:22) anon:I/39 := anon:I/38
+(id:23) anon:I/39 := anon:I/39 << 1
+(id:24) anon:I/40 := anon:I/39
+(id:25) anon:I/40 := anon:I/40 + 1
+(id:26) pin:anon:I/0[%rax] := anon:I/40
+(id:44) reload retaddr
+(id:27) Return pin:anon:I/0[%rax]
+
+predecessors: 152
+successors:
+exn-successors:
+
+170:
+(id:35) anon:I/41 := "caml_exn_Division_by_zero"
+(id:36) pin:anon:I/0[%rax] := anon:I/41
+(id:37) Raise pin:anon:I/0[%rax]
+
+predecessors: 152
+successors:
+exn-successors:
+
+(function{int_ops.ml:15,25-38} camlInt_ops__land__5_18_code
+     (param/472: int) : int
+ (and (load val (+a L:"camlInt_ops__land__18" 24))
+   (load val (+a L:"camlInt_ops__land__18" 16))) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__land__5_18_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:13) prologue
+(id:12) goto 174
+
+predecessors:
+successors: 174
+exn-successors:
+
+174:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__land__18"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__land__18"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 & anon:V/31
+(id:10) pin:anon:I/0[%rax] := anon:I/34
+(id:15) reload retaddr
+(id:11) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__land__5_18_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:13) prologue
+(id:12) goto 174
+
+predecessors:
+successors: 174
+exn-successors:
+
+174:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__land__18"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__land__18"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 & anon:V/31
+(id:10) pin:anon:I/0[%rax] := anon:I/34
+(id:15) reload retaddr
+(id:11) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:19,24-36} camlInt_ops__lor__7_20_code
+     (param/476: int) : int
+ (or (load val (+a L:"camlInt_ops__lor__20" 24))
+   (load val (+a L:"camlInt_ops__lor__20" 16))) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__lor__7_20_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:13) prologue
+(id:12) goto 180
+
+predecessors:
+successors: 180
+exn-successors:
+
+180:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lor__20"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__lor__20"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 | anon:V/31
+(id:10) pin:anon:I/0[%rax] := anon:I/34
+(id:15) reload retaddr
+(id:11) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__lor__7_20_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:13) prologue
+(id:12) goto 180
+
+predecessors:
+successors: 180
+exn-successors:
+
+180:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lor__20"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__lor__20"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 | anon:V/31
+(id:10) pin:anon:I/0[%rax] := anon:I/34
+(id:15) reload retaddr
+(id:11) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:21,25-38} camlInt_ops__lxor__8_21_code
+     (param/480: int) : int
+ (or
+   (xor (load val (+a L:"camlInt_ops__lxor__21" 24))
+     (load val (+a L:"camlInt_ops__lxor__21" 16)))
+   1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__lxor__8_21_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:15) prologue
+(id:14) goto 186
+
+predecessors:
+successors: 186
+exn-successors:
+
+186:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lxor__21"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__lxor__21"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 ^ anon:V/31
+(id:10) anon:I/35 := anon:I/34
+(id:11) anon:I/35 := anon:I/35 | 1
+(id:12) pin:anon:I/0[%rax] := anon:I/35
+(id:17) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__lxor__8_21_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:15) prologue
+(id:14) goto 186
+
+predecessors:
+successors: 186
+exn-successors:
+
+186:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lxor__21"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := "camlInt_ops__lxor__21"
+(id:7) anon:V/33 := val [anon:I/32 + 24]
+(id:8) anon:I/34 := anon:V/33
+(id:9) anon:I/34 := anon:I/34 ^ anon:V/31
+(id:10) anon:I/35 := anon:I/34
+(id:11) anon:I/35 := anon:I/35 | 1
+(id:12) pin:anon:I/0[%rax] := anon:I/35
+(id:17) reload retaddr
+(id:13) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:23,25-36} camlInt_ops__lnot__9_22_code
+     (param/484: int) : int
+ (or (xor (load val (+a L:"camlInt_ops__lnot__22" 16)) -1) 1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__lnot__9_22_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:13) prologue
+(id:12) goto 193
+
+predecessors:
+successors: 193
+exn-successors:
+
+193:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lnot__22"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 ^ -1
+(id:8) anon:I/33 := anon:I/32
+(id:9) anon:I/33 := anon:I/33 | 1
+(id:10) pin:anon:I/0[%rax] := anon:I/33
+(id:15) reload retaddr
+(id:11) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__lnot__9_22_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:13) prologue
+(id:12) goto 193
+
+predecessors:
+successors: 193
+exn-successors:
+
+193:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lnot__22"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 ^ -1
+(id:8) anon:I/33 := anon:I/32
+(id:9) anon:I/33 := anon:I/33 | 1
+(id:10) pin:anon:I/0[%rax] := anon:I/33
+(id:15) reload retaddr
+(id:11) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:25,24-36} camlInt_ops__lsl__10_23_code
+     (param/487: int) : int
+ (+
+   (<< (+ (load val (+a L:"camlInt_ops__lsl__23" 24)) -1)
+     (>>s (load val (+a L:"camlInt_ops__lsl__23" 16)) 1))
+   1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__lsl__10_23_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:20) prologue
+(id:19) goto 199
+
+predecessors:
+successors: 199
+exn-successors:
+
+199:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lsl__23"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__lsl__23"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) anon:I/35 := anon:I/35 + -1
+(id:12) anon:I/36 := anon:I/35
+(id:13) pin:anon:I/5[%rcx] := anon:I/32
+(id:14) anon:I/36 := anon:I/36 << pin:anon:I/5[%rcx]
+(id:15) anon:I/37 := anon:I/36
+(id:16) anon:I/37 := anon:I/37 + 1
+(id:17) pin:anon:I/0[%rax] := anon:I/37
+(id:22) reload retaddr
+(id:18) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__lsl__10_23_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:20) prologue
+(id:19) goto 199
+
+predecessors:
+successors: 199
+exn-successors:
+
+199:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lsl__23"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__lsl__23"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) anon:I/35 := anon:I/35 + -1
+(id:12) anon:I/36 := anon:I/35
+(id:13) pin:anon:I/5[%rcx] := anon:I/32
+(id:14) anon:I/36 := anon:I/36 << pin:anon:I/5[%rcx]
+(id:15) anon:I/37 := anon:I/36
+(id:16) anon:I/37 := anon:I/37 + 1
+(id:17) pin:anon:I/0[%rax] := anon:I/37
+(id:22) reload retaddr
+(id:18) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:27,24-36} camlInt_ops__lsr__11_24_code
+     (param/492: int) : int
+ (or
+   (>>u (load val (+a L:"camlInt_ops__lsr__24" 24))
+     (>>s (load val (+a L:"camlInt_ops__lsr__24" 16)) 1))
+   1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__lsr__11_24_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:18) prologue
+(id:17) goto 208
+
+predecessors:
+successors: 208
+exn-successors:
+
+208:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lsr__24"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__lsr__24"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) pin:anon:I/5[%rcx] := anon:I/32
+(id:12) anon:I/35 := anon:I/35 >>u pin:anon:I/5[%rcx]
+(id:13) anon:I/36 := anon:I/35
+(id:14) anon:I/36 := anon:I/36 | 1
+(id:15) pin:anon:I/0[%rax] := anon:I/36
+(id:20) reload retaddr
+(id:16) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__lsr__11_24_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:18) prologue
+(id:17) goto 208
+
+predecessors:
+successors: 208
+exn-successors:
+
+208:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__lsr__24"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__lsr__24"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) pin:anon:I/5[%rcx] := anon:I/32
+(id:12) anon:I/35 := anon:I/35 >>u pin:anon:I/5[%rcx]
+(id:13) anon:I/36 := anon:I/35
+(id:14) anon:I/36 := anon:I/36 | 1
+(id:15) pin:anon:I/0[%rax] := anon:I/36
+(id:20) reload retaddr
+(id:16) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function{int_ops.ml:29,24-36} camlInt_ops__asr__12_25_code
+     (param/497: int) : int
+ (or
+   (>>s (load val (+a L:"camlInt_ops__asr__25" 24))
+     (>>s (load val (+a L:"camlInt_ops__asr__25" 16)) 1))
+   1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__asr__12_25_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:18) prologue
+(id:17) goto 216
+
+predecessors:
+successors: 216
+exn-successors:
+
+216:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__asr__25"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__asr__25"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) pin:anon:I/5[%rcx] := anon:I/32
+(id:12) anon:I/35 := anon:I/35 >>s pin:anon:I/5[%rcx]
+(id:13) anon:I/36 := anon:I/35
+(id:14) anon:I/36 := anon:I/36 | 1
+(id:15) pin:anon:I/0[%rax] := anon:I/36
+(id:20) reload retaddr
+(id:16) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__asr__12_25_code
+layout.length=2
+blocks.length=2
+
+1:
+(id:18) prologue
+(id:17) goto 216
+
+predecessors:
+successors: 216
+exn-successors:
+
+216:
+(id:2) param:I/29 := pin:anon:I/0[%rax]
+(id:4) anon:I/30 := "camlInt_ops__asr__25"
+(id:5) anon:V/31 := val [anon:I/30 + 16]
+(id:6) anon:I/32 := anon:V/31
+(id:7) anon:I/32 := anon:I/32 >>s 1
+(id:8) anon:I/33 := "camlInt_ops__asr__25"
+(id:9) anon:V/34 := val [anon:I/33 + 24]
+(id:10) anon:I/35 := anon:V/34
+(id:11) pin:anon:I/5[%rcx] := anon:I/32
+(id:12) anon:I/35 := anon:I/35 >>s pin:anon:I/5[%rcx]
+(id:13) anon:I/36 := anon:I/35
+(id:14) anon:I/36 := anon:I/36 | 1
+(id:15) pin:anon:I/0[%rax] := anon:I/36
+(id:20) reload retaddr
+(id:16) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(function no_cse reduce_code_size linscan camlInt_ops__entry () : val
+ (catch
+   (let x/447 (opaque -29)
+     (store int(init) (+a L:"camlInt_ops__add_13" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__sub_14" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__mul_15" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__div_16" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__mod__17" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__land__18" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__lor__20" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__lxor__21" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__lnot__22" 16) x/447)
+     (store int(init) (+a L:"camlInt_ops__lsl__23" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__lsr__24" 24) x/447)
+     (store int(init) (+a L:"camlInt_ops__asr__25" 24) x/447)
+     (store val(init) G:"camlInt_ops" x/447)
+     (let y/448 (opaque 9)
+       (store int(init) (+a L:"camlInt_ops__add_13" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__sub_14" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__mul_15" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__div_16" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__mod__17" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__land__18" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__lor__20" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__lxor__21" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__lsl__23" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__lsr__24" 16) y/448)
+       (store int(init) (+a L:"camlInt_ops__asr__25" 16) y/448)
+       (store val(init) (+a G:"camlInt_ops" 8) y/448)
+       (exit 2 G:"camlInt_ops")))
+ with(2 *ret*/445: val) 1) )
+
+*** After selection
+
+cfg for 
+camlInt_ops__entry
+layout.length=2
+blocks.length=2
+
+1:
+(id:74) prologue
+(id:73) goto 227
+
+predecessors:
+successors: 227
+exn-successors:
+
+227:
+(id:5) anon:I/30 := -29
+(id:6) anon:I/30 := opaque anon:I/30
+(id:7) x:I/31 := anon:I/30
+(id:8) anon:I/32 := "camlInt_ops__add_13"
+(id:9) int[anon:I/32 + 24] := x:I/31 (init)
+(id:10) anon:I/33 := "camlInt_ops__sub_14"
+(id:11) int[anon:I/33 + 24] := x:I/31 (init)
+(id:12) anon:I/34 := "camlInt_ops__mul_15"
+(id:13) int[anon:I/34 + 24] := x:I/31 (init)
+(id:14) anon:I/35 := "camlInt_ops__div_16"
+(id:15) int[anon:I/35 + 24] := x:I/31 (init)
+(id:16) anon:I/36 := "camlInt_ops__mod__17"
+(id:17) int[anon:I/36 + 24] := x:I/31 (init)
+(id:18) anon:I/37 := "camlInt_ops__land__18"
+(id:19) int[anon:I/37 + 24] := x:I/31 (init)
+(id:20) anon:I/38 := "camlInt_ops__lor__20"
+(id:21) int[anon:I/38 + 24] := x:I/31 (init)
+(id:22) anon:I/39 := "camlInt_ops__lxor__21"
+(id:23) int[anon:I/39 + 24] := x:I/31 (init)
+(id:24) anon:I/40 := "camlInt_ops__lnot__22"
+(id:25) int[anon:I/40 + 16] := x:I/31 (init)
+(id:26) anon:I/41 := "camlInt_ops__lsl__23"
+(id:27) int[anon:I/41 + 24] := x:I/31 (init)
+(id:28) anon:I/42 := "camlInt_ops__lsr__24"
+(id:29) int[anon:I/42 + 24] := x:I/31 (init)
+(id:30) anon:I/43 := "camlInt_ops__asr__25"
+(id:31) int[anon:I/43 + 24] := x:I/31 (init)
+(id:32) anon:I/44 := "camlInt_ops"
+(id:33) val[anon:I/44] := x:I/31 (init)
+(id:34) anon:I/45 := 9
+(id:35) anon:I/45 := opaque anon:I/45
+(id:36) y:I/46 := anon:I/45
+(id:37) anon:I/47 := "camlInt_ops__add_13"
+(id:38) int[anon:I/47 + 16] := y:I/46 (init)
+(id:39) anon:I/48 := "camlInt_ops__sub_14"
+(id:40) int[anon:I/48 + 16] := y:I/46 (init)
+(id:41) anon:I/49 := "camlInt_ops__mul_15"
+(id:42) int[anon:I/49 + 16] := y:I/46 (init)
+(id:43) anon:I/50 := "camlInt_ops__div_16"
+(id:44) int[anon:I/50 + 16] := y:I/46 (init)
+(id:45) anon:I/51 := "camlInt_ops__mod__17"
+(id:46) int[anon:I/51 + 16] := y:I/46 (init)
+(id:47) anon:I/52 := "camlInt_ops__land__18"
+(id:48) int[anon:I/52 + 16] := y:I/46 (init)
+(id:49) anon:I/53 := "camlInt_ops__lor__20"
+(id:50) int[anon:I/53 + 16] := y:I/46 (init)
+(id:51) anon:I/54 := "camlInt_ops__lxor__21"
+(id:52) int[anon:I/54 + 16] := y:I/46 (init)
+(id:53) anon:I/55 := "camlInt_ops__lsl__23"
+(id:54) int[anon:I/55 + 16] := y:I/46 (init)
+(id:55) anon:I/56 := "camlInt_ops__lsr__24"
+(id:56) int[anon:I/56 + 16] := y:I/46 (init)
+(id:57) anon:I/57 := "camlInt_ops__asr__25"
+(id:58) int[anon:I/57 + 16] := y:I/46 (init)
+(id:59) anon:I/58 := "camlInt_ops"
+(id:60) val[anon:I/58 + 8] := y:I/46 (init)
+(id:61) anon:I/59 := "camlInt_ops"
+(id:62) anon:I/60 := anon:I/59
+(id:63) *ret*:V/29 := anon:I/60
+(id:67) anon:I/61 := 1
+(id:68) pin:anon:I/0[%rax] := anon:I/61
+(id:76) reload retaddr
+(id:69) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+*** After comballoc
+
+cfg for 
+camlInt_ops__entry
+layout.length=2
+blocks.length=2
+
+1:
+(id:74) prologue
+(id:73) goto 227
+
+predecessors:
+successors: 227
+exn-successors:
+
+227:
+(id:5) anon:I/30 := -29
+(id:6) anon:I/30 := opaque anon:I/30
+(id:7) x:I/31 := anon:I/30
+(id:8) anon:I/32 := "camlInt_ops__add_13"
+(id:9) int[anon:I/32 + 24] := x:I/31 (init)
+(id:10) anon:I/33 := "camlInt_ops__sub_14"
+(id:11) int[anon:I/33 + 24] := x:I/31 (init)
+(id:12) anon:I/34 := "camlInt_ops__mul_15"
+(id:13) int[anon:I/34 + 24] := x:I/31 (init)
+(id:14) anon:I/35 := "camlInt_ops__div_16"
+(id:15) int[anon:I/35 + 24] := x:I/31 (init)
+(id:16) anon:I/36 := "camlInt_ops__mod__17"
+(id:17) int[anon:I/36 + 24] := x:I/31 (init)
+(id:18) anon:I/37 := "camlInt_ops__land__18"
+(id:19) int[anon:I/37 + 24] := x:I/31 (init)
+(id:20) anon:I/38 := "camlInt_ops__lor__20"
+(id:21) int[anon:I/38 + 24] := x:I/31 (init)
+(id:22) anon:I/39 := "camlInt_ops__lxor__21"
+(id:23) int[anon:I/39 + 24] := x:I/31 (init)
+(id:24) anon:I/40 := "camlInt_ops__lnot__22"
+(id:25) int[anon:I/40 + 16] := x:I/31 (init)
+(id:26) anon:I/41 := "camlInt_ops__lsl__23"
+(id:27) int[anon:I/41 + 24] := x:I/31 (init)
+(id:28) anon:I/42 := "camlInt_ops__lsr__24"
+(id:29) int[anon:I/42 + 24] := x:I/31 (init)
+(id:30) anon:I/43 := "camlInt_ops__asr__25"
+(id:31) int[anon:I/43 + 24] := x:I/31 (init)
+(id:32) anon:I/44 := "camlInt_ops"
+(id:33) val[anon:I/44] := x:I/31 (init)
+(id:34) anon:I/45 := 9
+(id:35) anon:I/45 := opaque anon:I/45
+(id:36) y:I/46 := anon:I/45
+(id:37) anon:I/47 := "camlInt_ops__add_13"
+(id:38) int[anon:I/47 + 16] := y:I/46 (init)
+(id:39) anon:I/48 := "camlInt_ops__sub_14"
+(id:40) int[anon:I/48 + 16] := y:I/46 (init)
+(id:41) anon:I/49 := "camlInt_ops__mul_15"
+(id:42) int[anon:I/49 + 16] := y:I/46 (init)
+(id:43) anon:I/50 := "camlInt_ops__div_16"
+(id:44) int[anon:I/50 + 16] := y:I/46 (init)
+(id:45) anon:I/51 := "camlInt_ops__mod__17"
+(id:46) int[anon:I/51 + 16] := y:I/46 (init)
+(id:47) anon:I/52 := "camlInt_ops__land__18"
+(id:48) int[anon:I/52 + 16] := y:I/46 (init)
+(id:49) anon:I/53 := "camlInt_ops__lor__20"
+(id:50) int[anon:I/53 + 16] := y:I/46 (init)
+(id:51) anon:I/54 := "camlInt_ops__lxor__21"
+(id:52) int[anon:I/54 + 16] := y:I/46 (init)
+(id:53) anon:I/55 := "camlInt_ops__lsl__23"
+(id:54) int[anon:I/55 + 16] := y:I/46 (init)
+(id:55) anon:I/56 := "camlInt_ops__lsr__24"
+(id:56) int[anon:I/56 + 16] := y:I/46 (init)
+(id:57) anon:I/57 := "camlInt_ops__asr__25"
+(id:58) int[anon:I/57 + 16] := y:I/46 (init)
+(id:59) anon:I/58 := "camlInt_ops"
+(id:60) val[anon:I/58 + 8] := y:I/46 (init)
+(id:61) anon:I/59 := "camlInt_ops"
+(id:62) anon:I/60 := anon:I/59
+(id:63) *ret*:V/29 := anon:I/60
+(id:67) anon:I/61 := 1
+(id:68) pin:anon:I/0[%rax] := anon:I/61
+(id:76) reload retaddr
+(id:69) Return pin:anon:I/0[%rax]
+
+predecessors: 1
+successors:
+exn-successors:
+
+(data)

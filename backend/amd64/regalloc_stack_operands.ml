@@ -155,14 +155,17 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   match instr.desc with
   | Op (Floatop (_, (Iaddf | Isubf | Imulf | Idivf))) ->
     may_use_stack_operand_for_second_argument map instr ~num_args:2
-      ~res_is_fst:true
+      ~res_is_fst:(not (Proc.has_three_operand_float_ops ()))
   | Op (Specific Ipackf32) -> May_still_have_spilled_registers
   | Op (Specific (Isimd op)) -> (
     let simd =
       match op.instr with
       | Instruction instr -> instr
       | Sequence
-          { id = Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _;
+          { id =
+              ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
+              | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz
+              | Vptestc | Vptestnzc );
             instr
           } ->
         instr
@@ -198,14 +201,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op
       (Specific
         (Isimd_mem
-          ( ( SSE2 Add_f64
-            | SSE2 Sub_f64
-            | SSE2 Mul_f64
-            | SSE2 Div_f64
-            | SSE Add_f32
-            | SSE Sub_f32
-            | SSE Mul_f32
-            | SSE Div_f32 ),
+          ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
+            | Mul_f32 | Div_f32 ),
             _ ))) ->
     May_still_have_spilled_registers
   | Op
@@ -284,7 +281,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         | Istore_int (_, _, _)
         | Ioffset_loc (_, _)
         | Ifloatarithmem (_, _, _)
-        | Ipause | Icldemote _ | Iprefetch _ | Ibswap _ ))
+        | Icldemote _ | Iprefetch _ | Ibswap _ ))
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue ->
     (* no rewrite *)
     May_still_have_spilled_registers
