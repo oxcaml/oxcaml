@@ -1,0 +1,326 @@
+source_filename = "gcd.ml"
+
+@camlGcd__data_begin = global i64 0
+define void @camlGcd__code_begin() { ret void }
+
+define i64 @camlGcd__gcd_0_1_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  %14 = alloca i64 
+  %15 = alloca i64 
+  %16 = alloca i64 
+  %17 = alloca i64 
+  %18 = alloca i64 
+  %19 = alloca i64 
+  %20 = alloca i64 
+  %21 = alloca i64 
+  %22 = alloca i64 
+  %23 = alloca i64 
+  %24 = alloca i64 
+  %25 = alloca i64 
+  %26 = alloca i64 
+  %27 = alloca i64 
+  %28 = alloca i64 
+  %29 = alloca i64 
+  %30 = alloca i64 
+  %31 = alloca i64 
+  %32 = alloca i64 
+  %33 = alloca i64 
+  %34 = alloca i64 
+  %35 = alloca i64 
+  %36 = alloca i64 
+  %37 = alloca i64 
+  %38 = alloca i64 
+  %39 = alloca i64 
+  %40 = alloca i64 
+  %41 = alloca i64 
+  %42 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L101
+L101:                                                ; preds = %L1
+  %43 = load i64, ptr %2
+  store i64 %43, ptr %5
+  br label %L109
+L109:                                                ; preds = %L101, %L124
+  store ptr @camlGcd__gcd_1, ptr %6
+  %44 = load i64, ptr %6
+  %45 = add i64 %44, 24
+  %46 = inttoptr i64 %45 to ptr
+  %47 = load i64, ptr %46
+  store i64 %47, ptr %7
+  %48 = load i64, ptr %7
+  %49 = add i64 %48, 0
+  %50 = inttoptr i64 %49 to ptr
+  %51 = load i64, ptr %50
+  store i64 %51, ptr %8
+  %52 = load i64, ptr %8
+  %53 = icmp slt i64 %52, 1
+  br i1 %53, label %L113, label %54
+54:
+  %55 = load i64, ptr %8
+  %56 = icmp sgt i64 %55, 1
+  br i1 %56, label %L113, label %L145
+L113:                                                ; preds = %L109
+  store ptr @camlGcd__gcd_1, ptr %9
+  %57 = load i64, ptr %9
+  %58 = add i64 %57, 24
+  %59 = inttoptr i64 %58 to ptr
+  %60 = load i64, ptr %59
+  store i64 %60, ptr %10
+  %61 = load i64, ptr %10
+  %62 = add i64 %61, 0
+  %63 = inttoptr i64 %62 to ptr
+  %64 = load i64, ptr %63
+  store i64 %64, ptr %11
+  %65 = load i64, ptr %11
+  store i64 %65, ptr %12
+  store ptr @camlGcd__gcd_1, ptr %13
+  %66 = load i64, ptr %13
+  %67 = add i64 %66, 24
+  %68 = inttoptr i64 %67 to ptr
+  %69 = load i64, ptr %68
+  store i64 %69, ptr %14
+  %70 = load i64, ptr %14
+  %71 = add i64 %70, 0
+  %72 = inttoptr i64 %71 to ptr
+  %73 = load i64, ptr %72
+  store i64 %73, ptr %15
+  %74 = load i64, ptr %15
+  store i64 %74, ptr %16
+  store ptr @camlGcd__gcd_1, ptr %17
+  %75 = load i64, ptr %17
+  %76 = add i64 %75, 32
+  %77 = inttoptr i64 %76 to ptr
+  %78 = load i64, ptr %77
+  store i64 %78, ptr %18
+  %79 = load i64, ptr %18
+  %80 = add i64 %79, 0
+  %81 = inttoptr i64 %80 to ptr
+  %82 = load i64, ptr %81
+  store i64 %82, ptr %19
+  %83 = load i64, ptr %19
+  store i64 %83, ptr %20
+  %84 = load i64, ptr %16
+  %85 = icmp slt i64 %84, 1
+  br i1 %85, label %L124, label %86
+86:
+  %87 = load i64, ptr %16
+  %88 = icmp sgt i64 %87, 1
+  br i1 %88, label %L124, label %L138
+L124:                                                ; preds = %L113
+  store ptr @camlGcd__gcd_1, ptr %21
+  %89 = load i64, ptr %21
+  %90 = add i64 %89, 32
+  %91 = inttoptr i64 %90 to ptr
+  %92 = load i64, ptr %91
+  store i64 %92, ptr %22
+  %93 = load i64, ptr %22
+  %94 = add i64 %93, 0
+  %95 = inttoptr i64 %94 to ptr
+  %96 = load i64, ptr %12
+  store i64 %96, ptr %95
+  store i64 1, ptr %23
+  %97 = load i64, ptr %23
+  store i64 %97, ptr %24
+  store ptr @camlGcd__gcd_1, ptr %25
+  %98 = load i64, ptr %25
+  %99 = add i64 %98, 24
+  %100 = inttoptr i64 %99 to ptr
+  %101 = load i64, ptr %100
+  store i64 %101, ptr %26
+  %102 = load i64, ptr %16
+  store i64 %102, ptr %27
+  %103 = load i64, ptr %27
+  %104 = ashr i64 %103, 1
+  store i64 %104, ptr %27
+  %105 = load i64, ptr %20
+  store i64 %105, ptr %28
+  %106 = load i64, ptr %28
+  %107 = ashr i64 %106, 1
+  store i64 %107, ptr %28
+  %108 = load i64, ptr %28
+  store i64 %108, ptr %2
+  %109 = load i64, ptr %27
+  store i64 %109, ptr %4
+  %110 = load i64, ptr %2
+  %111 = load i64, ptr %4
+  %112 = srem i64 %110, %111
+  store i64 %112, ptr %3
+  %113 = load i64, ptr %3
+  store i64 %113, ptr %29
+  %114 = load i64, ptr %29
+  store i64 %114, ptr %30
+  %115 = load i64, ptr %30
+  %116 = shl i64 %115, 1
+  store i64 %116, ptr %30
+  %117 = load i64, ptr %30
+  store i64 %117, ptr %31
+  %118 = load i64, ptr %31
+  %119 = add i64 %118, 1
+  store i64 %119, ptr %31
+  %120 = load i64, ptr %26
+  %121 = add i64 %120, 0
+  %122 = inttoptr i64 %121 to ptr
+  %123 = load i64, ptr %31
+  store i64 %123, ptr %122
+  store i64 1, ptr %32
+  %124 = load i64, ptr %32
+  store i64 %124, ptr %33
+  br label %L109
+L138:                                                ; preds = %L113
+  store ptr @caml_exn_Division_by_zero, ptr %34
+  %125 = load i64, ptr %34
+  store i64 %125, ptr %2
+  call void @llvm.trap()
+  unreachable
+L145:                                                ; preds = %L109
+  store ptr @camlGcd__gcd_1, ptr %35
+  %126 = load i64, ptr %35
+  %127 = add i64 %126, 16
+  %128 = inttoptr i64 %127 to ptr
+  %129 = load i64, ptr %128
+  store i64 %129, ptr %36
+  store ptr @camlGcd__gcd_1, ptr %37
+  %130 = load i64, ptr %37
+  %131 = add i64 %130, 32
+  %132 = inttoptr i64 %131 to ptr
+  %133 = load i64, ptr %132
+  store i64 %133, ptr %38
+  %134 = load i64, ptr %38
+  %135 = add i64 %134, 0
+  %136 = inttoptr i64 %135 to ptr
+  %137 = load i64, ptr %136
+  store i64 %137, ptr %39
+  %138 = load i64, ptr %36
+  %139 = add i64 %138, 0
+  %140 = inttoptr i64 %139 to ptr
+  %141 = load i64, ptr %39
+  store i64 %141, ptr %140
+  store i64 1, ptr %40
+  %142 = load i64, ptr %40
+  store i64 %142, ptr %41
+  store i64 1, ptr %42
+  %143 = load i64, ptr %42
+  store i64 %143, ptr %2
+  %144 = load i64, ptr %2
+  ret i64 %144
+}
+
+define i64 @camlGcd__entry()  {
+  %1 = alloca i64 
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  %14 = alloca i64 
+  %15 = alloca i64 
+  %16 = alloca i64 
+  %17 = alloca i64 
+  %18 = alloca i64 
+  %19 = alloca i64 
+  %20 = alloca i64 
+  br label %L1
+L1:
+  br label %L156
+L156:                                                ; preds = %L1
+  store ptr @camlGcd_data, ptr %3
+  %21 = load i64, ptr %3
+  %22 = add i64 %21, 0
+  %23 = inttoptr i64 %22 to ptr
+  %24 = load i64, ptr %23
+  store i64 %24, ptr %4
+  %25 = load i64, ptr %4
+  store i64 %25, ptr %5
+  store ptr @camlGcd__gcd_1, ptr %6
+  %26 = load i64, ptr %6
+  %27 = add i64 %26, 32
+  %28 = inttoptr i64 %27 to ptr
+  %29 = load i64, ptr %5
+  store i64 %29, ptr %28
+  store ptr @camlGcd, ptr %7
+  %30 = load i64, ptr %7
+  %31 = add i64 %30, 0
+  %32 = inttoptr i64 %31 to ptr
+  %33 = load i64, ptr %5
+  store i64 %33, ptr %32
+  store ptr @camlGcd_data, ptr %8
+  %34 = load i64, ptr %8
+  %35 = add i64 %34, 8
+  %36 = inttoptr i64 %35 to ptr
+  %37 = load i64, ptr %36
+  store i64 %37, ptr %9
+  %38 = load i64, ptr %9
+  store i64 %38, ptr %10
+  store ptr @camlGcd__gcd_1, ptr %11
+  %39 = load i64, ptr %11
+  %40 = add i64 %39, 24
+  %41 = inttoptr i64 %40 to ptr
+  %42 = load i64, ptr %10
+  store i64 %42, ptr %41
+  store ptr @camlGcd, ptr %12
+  %43 = load i64, ptr %12
+  %44 = add i64 %43, 8
+  %45 = inttoptr i64 %44 to ptr
+  %46 = load i64, ptr %10
+  store i64 %46, ptr %45
+  store ptr @camlGcd_data, ptr %13
+  %47 = load i64, ptr %13
+  %48 = add i64 %47, 16
+  %49 = inttoptr i64 %48 to ptr
+  %50 = load i64, ptr %49
+  store i64 %50, ptr %14
+  %51 = load i64, ptr %14
+  store i64 %51, ptr %15
+  store ptr @camlGcd__gcd_1, ptr %16
+  %52 = load i64, ptr %16
+  %53 = add i64 %52, 16
+  %54 = inttoptr i64 %53 to ptr
+  %55 = load i64, ptr %15
+  store i64 %55, ptr %54
+  store ptr @camlGcd, ptr %17
+  %56 = load i64, ptr %17
+  %57 = add i64 %56, 16
+  %58 = inttoptr i64 %57 to ptr
+  %59 = load i64, ptr %15
+  store i64 %59, ptr %58
+  store ptr @camlGcd, ptr %18
+  %60 = load i64, ptr %18
+  store i64 %60, ptr %19
+  %61 = load i64, ptr %19
+  store i64 %61, ptr %2
+  store i64 1, ptr %20
+  %62 = load i64, ptr %20
+  store i64 %62, ptr %1
+  %63 = load i64, ptr %1
+  ret i64 %63
+}
+
+@camlGcd__gc_roots = global { ptr, ptr, i64, i64 } { ptr @camlGcd, ptr @camlGcd__gcd_1, i64 0, i64 4864 }
+@camlGcd = global { i64, i64, i64, ptr, i64 } { i64 1, i64 1, i64 1, ptr @camlGcd__gcd_1, i64 6135 }
+@camlGcd__gcd_1 = global { ptr, i64, i64, i64, i64 } { ptr @camlGcd__gcd_0_1_code, i64 108086391056891909, i64 1, i64 1, i64 1 }
+@camlGcd_data = external global ptr
+@caml_exn_Division_by_zero = external global ptr
+
+@camlGcd__data_end = global i64 0
+define void @camlGcd__code_end() { ret void }
+@camlGcd__frametable = global i64 0
