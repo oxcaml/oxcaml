@@ -19,7 +19,26 @@ module Uid = Flambda2_identifiers.Flambda_debug_uid
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 
-let cache = Type_shape.Type_shape.Tbl.create 16
+module Type_shape_ident = struct
+  include Identifiable.Make (struct
+    type nonrec t =
+      Type_shape.Type_shape.without_layout Type_shape.Type_shape.ts
+
+    let compare = Stdlib.compare
+
+    let print = Type_shape.Type_shape.print
+
+    let hash = Hashtbl.hash
+
+    let equal (x : t) y = x = y
+
+    let output = Misc.output_of_print print
+  end)
+end
+(* CR sspies: In subsequent PRs, we should enrich this module to also cache the
+   type layout. For now, we completely ignore the type layout. *)
+
+let cache = Type_shape_ident.Tbl.create 16
 
 let wrap_die_under_a_pointer ~proto_die ~reference ~parent_proto_die =
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
@@ -68,15 +87,6 @@ let create_char_die ~reference ~parent_proto_die =
             DAH.create_name (Printf.sprintf "%C" (Char.chr i)) ]
         ())
     (List.init 256 (fun i -> i))
-
-let create_unboxed_float_die ~reference ~parent_proto_die =
-  Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
-    ~tag:Dwarf_tag.Base_type
-    ~attribute_values:
-      [ DAH.create_name "float#";
-        DAH.create_byte_size_exn ~byte_size:8;
-        DAH.create_encoding ~encoding:Encoding_attribute.float ]
-    ()
 
 let create_typedef_die ~reference ~parent_proto_die ~child_die ~name =
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
@@ -132,7 +142,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
     =
   let complex_constructors_names =
     List.map
-      (fun { Type_shape.Type_decl_shape.name; args = _ } -> name)
+      (fun { Type_shape.Type_decl_shape.name; kind = _; args = _ } -> name)
       complex_constructors
   in
   let variant_part_immediate_or_pointer =
@@ -268,7 +278,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
           ()
       in
       List.iteri
-        (fun i { Type_shape.Type_decl_shape.name; args = _ } ->
+        (fun i { Type_shape.Type_decl_shape.name; kind = _; args = _ } ->
           Proto_die.create_ignore ~parent:(Some enum_die)
             ~tag:Dwarf_tag.Enumerator
             ~attribute_values:
@@ -289,7 +299,9 @@ let create_complex_variant_die ~reference ~parent_proto_die ~name
            ~proto_die_reference:(Proto_die.reference discriminant))
     in
     List.iteri
-      (fun i { Type_shape.Type_decl_shape.name = _; args } ->
+      (fun i { Type_shape.Type_decl_shape.name = _; kind = _; args } ->
+        (* CR sspies: In a subsequent PR, we have to take the kind here into
+           account. *)
         let subvariant =
           Proto_die.create ~parent:(Some variant_part_pointer)
             ~tag:Dwarf_tag.Variant
@@ -343,17 +355,22 @@ let create_tuple_die ~reference ~parent_proto_die ~name ~fields =
   wrap_die_under_a_pointer ~proto_die:structure_type ~reference
     ~parent_proto_die
 
-let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
+(* CR sspies: The function [type_shape_to_die] currently ignores type layouts
+   completely. As such, it will output wrong type dies for variables that use
+   non-value layout. This will be fixed in subsequent PRs. The places are marked
+   with a comment. *)
+let rec type_shape_to_die
+    (type_shape : Type_shape.Type_shape.without_layout Type_shape.Type_shape.ts)
     ~parent_proto_die ~fallback_die =
-  match Type_shape.Type_shape.Tbl.find_opt cache type_shape with
+  match Type_shape_ident.Tbl.find_opt cache type_shape with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Type_shape.Type_shape.Tbl.add cache type_shape reference;
+    Type_shape_ident.Tbl.add cache type_shape reference;
     let name = Type_shape.type_name type_shape in
     let successfully_created =
       match type_shape with
-      | Ts_other | Ts_var _ -> false
+      | Ts_other Layout_to_be_determined | Ts_var _ -> false
       | Ts_predef (Array, [element_type_shape]) ->
         let child_die =
           type_shape_to_die element_type_shape ~parent_proto_die ~fallback_die
@@ -364,17 +381,16 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
       | Ts_predef (Char, _) ->
         create_char_die ~reference ~parent_proto_die;
         true
-      | Ts_predef (Unboxed_float, _) ->
-        create_unboxed_float_die ~reference ~parent_proto_die;
-        true
       | Ts_predef
           ( ( Bytes | Extension_constructor | Float | Floatarray | Int | Int32
-            | Int64 | Lazy_t | Nativeint | String ),
+            | Int64 | Lazy_t | Nativeint | String | Float32 | Exception | Simd _
+              ),
             _ ) ->
         create_typedef_die ~reference ~parent_proto_die ~name
           ~child_die:fallback_die;
         true
-      | Ts_constr ((type_uid, _type_path), shapes) -> (
+      | Ts_predef (Unboxed _, _) -> false (* CR sspies: Fix layout. *)
+      | Ts_constr ((type_uid, _type_path, Layout_to_be_determined), shapes) -> (
         match(* CR sspies: Somewhat subtly, this case currently also handles
                 [unit], [bool], [option], and [list], because they are not
                 treated as predefined types, but they do have declarations. *)
@@ -395,10 +411,11 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
             create_typedef_die ~reference ~parent_proto_die ~child_die:alias_die
               ~name;
             true
-          | Tds_record fields ->
+          | Tds_record { kind = _; fields } ->
             let fields =
               List.map
-                (fun (name, type_shape) ->
+                (fun (name, type_shape, _) ->
+                  (* CR sspies: Fix layout. *)
                   ( name,
                     type_shape_to_die ~parent_proto_die ~fallback_die type_shape
                   ))
@@ -416,21 +433,26 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
               let complex_constructors =
                 List.map
                   (Type_shape.Type_decl_shape.complex_constructor_map
-                     (type_shape_to_die ~parent_proto_die ~fallback_die))
+                     (fun (sh, _) ->
+                       (* CR sspies: Fix layout. *)
+                       type_shape_to_die ~parent_proto_die ~fallback_die sh))
                   complex_constructors
               in
               create_complex_variant_die ~reference ~parent_proto_die ~name
                 ~simple_constructors ~complex_constructors;
-              true)))
+              true)
+          | Tds_variant_unboxed _ -> false (* CR sspies: Fix layout. *)))
       | Ts_tuple fields ->
         let fields =
           List.map (type_shape_to_die ~parent_proto_die ~fallback_die) fields
         in
         create_tuple_die ~reference ~parent_proto_die ~name ~fields;
         true
+      | Ts_variant _ | Ts_unboxed_tuple _ | Ts_arrow _ ->
+        false (* CR sspies: Fix layout. *)
     in
     let reference = if successfully_created then reference else fallback_die in
-    Type_shape.Type_shape.Tbl.add (* replace *) cache type_shape reference;
+    Type_shape_ident.Tbl.add (* replace *) cache type_shape reference;
     reference
 
 let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
@@ -439,8 +461,8 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
   | Uid var_uid -> (
     match Shape.Uid.Tbl.find_opt Type_shape.all_type_shapes var_uid with
     | None -> fallback_die
-    | Some { type_shape; type_sort = _ } ->
-      (* CR sspies: For now, we ignore the sort here. This has to be fixed in
+    | Some { type_shape; type_layout = _ } ->
+      (* CR sspies: For now, we ignore the layout here. This has to be fixed in
          future versions. *)
       type_shape_to_die type_shape ~parent_proto_die ~fallback_die)
   | Proj (_uid, _field) ->
