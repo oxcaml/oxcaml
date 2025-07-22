@@ -1278,10 +1278,10 @@ let rec flatten_to_base_sorts (sort : Layout.t) : base_layout list =
    compiler. We flatten the type into a sequence that corresponds to the fields
    after unarization. In some cases, the type cannot be broken up (e.g., for
    type variables). In these cases, we produce the corresponding number of
-   entries of the form [`Unknown base_layout] for the fields. Otherwise, when
-   the type is known, we produce [`Known type_shape] for the fields. *)
+   entries of the form [Unknown base_layout] for the fields. Otherwise, when the
+   type is known, we produce [Known type_shape] for the fields. *)
 
-type 'a or_unknown =
+type shape_or_unknown =
   | Known of Layout.t TS.ts
   | Unknown of base_layout
 
@@ -1400,8 +1400,11 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
       | None -> Known type_shape
       | Some i ->
         let flattened = flatten_shape type_shape in
-        if i < 0 || i >= List.length flattened
-        then Misc.fatal_errorf "unboxed projection index %d out of bounds" i;
+        let flattened_length = List.length flattened in
+        if i < 0 || i >= flattened_length
+        then
+          Misc.fatal_errorf "unboxed projection index %d out of bounds 0...%d" i
+            (flattened_length - 1);
         List.nth flattened i
     in
     match type_shape with
