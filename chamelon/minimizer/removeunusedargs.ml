@@ -76,8 +76,9 @@ let rec longident_label = function
 let string_label = function
   | Nolabel -> "Nolabel"
   | Optional s -> "Optional " ^ s
-  | Generic_optional (module_path, s) ->
+  | Generic_optional (Some module_path, s) ->
       "Generic_optional " ^ longident_label module_path.txt ^ "." ^ s
+  | Generic_optional (None, s) -> "Generic_optional " ^ s
   | Labelled s -> "Labelled " ^ s
 
 let replace_mapper id to_replace label =

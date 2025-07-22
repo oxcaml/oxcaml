@@ -681,8 +681,11 @@ let arg_label_compatible param_label arg_label =
   | (Labelled s | Optional s | Generic_optional(_, s)), Labelled s' -> s = s'
   | _ ->
     (match classify_optionality param_label, classify_optionality arg_label with
+    | Optional_arg _, Optional_arg Unknown ->
+        label_name param_label = label_name arg_label
+          (* unknown matches are always successful *)
     | Optional_arg l_path, Optional_arg l_path' ->
-        l_path = l_path' && (label_name param_label = label_name arg_label)
+        l_path = l_path' && label_name param_label = label_name arg_label
     | _ ->
       (* when positional labels are involved,
         we only care whether label names are equal*)

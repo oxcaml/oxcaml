@@ -687,8 +687,8 @@ let transl_label (label : Parsetree.arg_label)
           raise (Error (path.loc, Env.empty,
             Invalid_generic_optional_argument_module_path path.txt))
   )
-  | Generic_optional (None, _), _ ->
-      failwith "Types need to have module paths."
+  | Generic_optional (None, label), _ ->
+      Generic_optional(None, label)
   | Nolabel, _ -> Nolabel
 
 (* Parallel to [transl_label_from_expr]. *)

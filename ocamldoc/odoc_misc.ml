@@ -500,7 +500,8 @@ let remove_option lbl typ =
             | Optional_arg mpath ->
                 (match mpath with
                 | Stdlib_option -> Predef.path_option
-                | Stdlib_or_null -> Predef.path_or_null))
+                | Stdlib_or_null -> Predef.path_or_null
+                | Unknown -> failwith "Types need to have module path"))
         -> get_desc ty
     | Tconstr _
     | Tvar _
