@@ -58,83 +58,27 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     | Set_of_closures bound_vars, Set_of_closures soc ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
+      (* To translate closures, we require that code is translated before the
+         corresponding closure, so that the translation environment is set
+         correctly. Code usually does come before it is used in a closure, but
+         for static lets, they may be defined within the same let binding.
+         Hence, we need to run two passes: one only looking at the code, and one
+         skipping the code.
+
+         CR selee: This is slightly tragic, maybe there's a cleaner solution *)
+      let env, res =
+        Static_const_group.match_against_bound_static consts bound_static
+          ~init:(env, res)
+          ~code:(fun (env, res) code_id code ->
+            To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id
+              code)
+          ~deleted_code:(fun (env, res) _code_id -> env, res)
+          ~set_of_closures:(fun (env, res) ~closure_symbols:_ _soc -> env, res)
+          ~block_like:(fun (env, res) _symbol _static_const -> env, res)
+      in
       Static_const_group.match_against_bound_static consts bound_static
         ~init:(env, res)
-        ~code:(fun (env, res) code_id code ->
-          let free_names = Code0.free_names code in
-          let function_slots = Name_occurrences.all_function_slots free_names in
-          let value_slots = Name_occurrences.all_value_slots free_names in
-          (* We create new variables that represent each function slot and value
-             slot if they don't exist already, and use them everywhere that the
-             corresponding slot is used. We will make sure later (when
-             translating [Set_of_closures]) that the [Closure]s or values
-             representing these slots are bound to the correct variables. *)
-          let env =
-            Function_slot.Set.fold
-              (fun slot env ->
-                match To_jsir_env.get_function_slot_exn env slot with
-                | _var -> env
-                | exception Not_found ->
-                  let var = Jsir.Var.fresh () in
-                  To_jsir_env.add_function_slot env slot var)
-              function_slots env
-          in
-          let env =
-            Value_slot.Set.fold
-              (fun slot env ->
-                match To_jsir_env.get_value_slot_exn env slot with
-                | _var -> env
-                | exception Not_found ->
-                  let var = Jsir.Var.fresh () in
-                  To_jsir_env.add_value_slot env slot var)
-              value_slots env
-          in
-          let params_and_body = Code0.params_and_body code in
-          Flambda.Function_params_and_body.pattern_match params_and_body
-            ~f:(fun
-                 ~return_continuation
-                 ~exn_continuation
-                 bound_params
-                 ~body
-                 ~my_closure
-                 ~is_my_closure_used:_
-                 ~my_region:_
-                 ~my_ghost_region:_
-                 ~my_depth:_
-                 ~free_names_of_body:_
-               ->
-              (* CR selee: A hack to get things to work, should figure out what
-                 [my_closure] is actually used for *)
-              let var = Jsir.Var.fresh () in
-              let env = To_jsir_env.add_var env my_closure var in
-              let env, fn_params =
-                (* The natural fold instead of [List.fold_left] to preserve
-                   order of parameters *)
-                List.fold_right
-                  (fun bound_param (env, params) ->
-                    let var = Jsir.Var.fresh () in
-                    let env =
-                      To_jsir_env.add_var env
-                        (Bound_parameter.var bound_param)
-                        var
-                    in
-                    env, var :: params)
-                  (Bound_parameters.to_list bound_params)
-                  (env, [])
-              in
-              let res, addr = To_jsir_result.new_block res ~params:[] in
-              let env =
-                To_jsir_env.add_code_id env code_id ~addr ~params:fn_params
-              in
-              let _env, res =
-                (* Throw away the environment after translating the body *)
-                expr
-                  ~env:
-                    (To_jsir_env.enter_function_body env ~return_continuation
-                       ~exn_continuation)
-                  ~res body
-              in
-              env, res))
+        ~code:(fun (env, res) _code_id _code -> env, res)
         ~deleted_code:(fun (env, res) _code_id -> env, res)
         ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
           To_jsir_set_of_closures.static_set_of_closures ~env ~res

@@ -9,3 +9,16 @@ val block_like :
   Symbol.t ->
   Static_const.t ->
   To_jsir_env.t * To_jsir_result.t
+
+(** Translate a static block of code. *)
+val code :
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  translate_body:
+    (env:To_jsir_env.t ->
+    res:To_jsir_result.t ->
+    Flambda.expr ->
+    To_jsir_env.t * To_jsir_result.t) ->
+  code_id:Code_id.t ->
+  Flambda.function_params_and_body Code0.t ->
+  To_jsir_env.t * To_jsir_result.t
