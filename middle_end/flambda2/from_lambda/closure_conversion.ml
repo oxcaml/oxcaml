@@ -1842,7 +1842,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
 let variables_for_unboxing boxed_variable_name (k : Function_decl.unboxing_kind)
     =
   (* CR sspies: In the future, improve the debugging UIDs we produce here
-    (currently they are all none) for better debug information. *)
+     (currently they are all none) for better debug information. *)
   match k with
   | Fields_of_block_with_tag_zero kinds ->
     List.mapi
@@ -1946,7 +1946,7 @@ let compute_body_of_unboxed_function acc my_region my_closure
                   (Bound_parameter.var param)
                   param_duid Name_mode.normal))
             (* CR sspies: In the future, improve the debugging UIDs here if
-             possible. *)
+               possible. *)
             (Named.create_prim
                (boxing_primitive k alloc_mode
                   (List.map (fun (var, _, _) -> var) vars_with_kinds))
@@ -3094,8 +3094,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
      allow inlining and lifting *)
   let wrapper_id = Ident.create_local ("partial_" ^ Ident.name apply.func) in
   let wrapper_id_duid = Flambda_debug_uid.none in
-  (* CR sspies: In the future, improve the debugging UIDs here if
-      possible. *)
+  (* CR sspies: In the future, improve the debugging UIDs here if possible. *)
   let function_slot =
     Function_slot.create
       (Compilation_unit.get_current_exn ())

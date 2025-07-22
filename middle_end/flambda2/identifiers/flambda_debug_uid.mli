@@ -17,7 +17,10 @@
 
 type t = private
   | Uid of Lambda.debug_uid
-  | Proj of { uid: Lambda.debug_uid; unboxed_field: int }
+  | Proj of
+      { uid : Lambda.debug_uid;
+        unboxed_field : int
+      }
 
 val none : t
 

@@ -14,7 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 (** Environments and auxiliary structures used during closure conversion. *)
 
 module IR : sig

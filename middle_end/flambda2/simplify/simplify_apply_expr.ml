@@ -127,8 +127,8 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
           Flambda_debug_uid.none,
           (* This internally created variable does not get a
              [Flambda_debug_uid.t]. *)
-          (* CR sspies: Consider introducing a phantom let for it in the
-             future to improve the debug information. *)
+          (* CR sspies: Consider introducing a phantom let for it in the future
+             to improve the debug information. *)
           Simplify_common.project_tuple ~dbg ~size:tuple_size ~field tuple_arg ))
   in
   (* Construct the arities for the tuple and any over application arguments *)
