@@ -125,8 +125,10 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
     List.init tuple_size (fun field ->
         ( Variable.create "tuple_field",
           Flambda_debug_uid.none,
-          (* This internally created varibale does not get a
+          (* This internally created variable does not get a
              [Flambda_debug_uid.t]. *)
+          (* CR sspies: Consider introducing a phantom let for it in the
+             future to improve the debug information. *)
           Simplify_common.project_tuple ~dbg ~size:tuple_size ~field tuple_arg ))
   in
   (* Construct the arities for the tuple and any over application arguments *)
@@ -612,9 +614,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               | In_closure { var; value_slot; value = _ } ->
                 let arg =
                   VB.create var Flambda_debug_uid.none
-                    (* CR sspies: I'm unsure whether these are user visible
-                       variables. At least at one call site, this is an
-                       internally defined variable. *)
+                    (* CR sspies: In the future, try improving the debugging UID
+                       propagation here if possible. *)
                     Name_mode.normal
                 in
                 let prim =

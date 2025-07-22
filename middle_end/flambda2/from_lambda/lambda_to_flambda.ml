@@ -684,7 +684,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
   | Llet
       ((Strict | Alias | StrictOpt), _layout, id, _duid, defining_expr, Lvar id')
     when Ident.same id id' ->
-    (* CR sspies: Is there any use for the debugging uid in this case? *)
+    (* CR sspies: To propagate the debug UID here correctly, insert a phantom
+       let here once they are available in the compiler. *)
     (* Simplif already simplifies such bindings, but we can generate new ones
        when translating primitives (see the Lprim case below). *)
     (* This case must not be moved above the case for let-bound primitives. *)

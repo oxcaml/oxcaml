@@ -485,6 +485,7 @@ module Fold_prims = struct
                 in
                 let var = Variable.create (Printf.sprintf "%s_%i" name i) in
                 let var_duid = Flambda_debug_uid.none in
+                (* CR sspies: Improve the debug UID here in the future. *)
                 Bound_parameter.create var kind var_duid)
               fields_kinds
           in

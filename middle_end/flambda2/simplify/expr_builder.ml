@@ -265,8 +265,8 @@ let create_coerced_singleton_let uacc var defining_expr
         Variable.create name
       in
       let uncoerced_var_duid = Flambda_debug_uid.none in
-      (* CR sspies: Would it make sense here to propagate the
-         [Flambda_debug_uid.t] of the variable [var]? *)
+      (* CR sspies: In the future, try propagating the debugging UID information
+         here if possible. *)
       (* Generate [let var = uncoerced_var @ <coercion>] *)
       let ((body, uacc, inner_result) as inner) =
         let defining_simple =
@@ -574,8 +574,6 @@ let create_let_symbols uacc lifted_constant ~body =
       let expr, uacc, _ =
         create_coerced_singleton_let uacc
           (VB.create var Flambda_debug_uid.none Name_mode.normal)
-          (* CR sspies: I have no idea whether this could ever be a user visible
-             variable. *)
           defining_expr ~coercion_from_defining_expr_to_var
           ~free_names_of_defining_expr ~body:expr ~cost_metrics_of_defining_expr
       in

@@ -348,8 +348,8 @@ let define_name t name kind =
     ~var:(fun [@inline] var ->
       (define_variable [@inlined hint]) t
         (Bound_var.create var Flambda_debug_uid.none
-           (* CR sspies: Unclear whether bound names should have a
-              [Flambda_debug_uid.t]. For now, I just left it as [.none]. *)
+           (* CR sspies: In the future, improve the debug UID propagation
+              here. *)
            (Bound_name.name_mode name))
         kind)
     ~symbol:(fun [@inline] sym -> (define_symbol [@inlined hint]) t sym kind)
@@ -372,8 +372,8 @@ let add_name t name ty =
     ~var:(fun [@inline] var ->
       add_variable t
         (Bound_var.create var Flambda_debug_uid.none
-           (* CR sspies: Unclear whether bound names should have a
-              [Flambda_debug_uid.t]. For now, I just left it as [.none]. *)
+           (* CR sspies: In the future, improve the debug UID propagation
+              here. *)
            (Bound_name.name_mode name))
         ty)
     ~symbol:(fun [@inline] sym -> add_symbol t sym ty)
