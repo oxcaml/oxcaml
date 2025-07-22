@@ -204,6 +204,7 @@ module type S = sig
       | Return
       | Stack
 
+    (** A description of what type of closure is closing a value *)
     type closure_context =
       | Function
       | Functor
@@ -239,6 +240,10 @@ module type S = sig
        to type checker limitations *)
     type 'd neg_morph = 'd neg morph constraint 'd = _ * _
 
+    (** When a morph hint is "rigid", this means that it must be printed in
+    the error message.  Conversely, when it is not rigid, we may choose not
+    to include it, for example when the mode axis we are considering is unchanged
+    by the morphism associated with this hint. *)
     val is_rigid : _ morph -> bool
   end
 

@@ -1757,46 +1757,58 @@ let print_const_hint a_obj a ppf : Hint.const -> unit =
       (dprintf "is a function return value without an exclave annotation")
   | Stack -> wrap_print_hint (dprintf "is in a stack expression")
 
-let rec print_morph_hint :
-    type l r.
-    (l * r) Hint.morph ->
-    [ `Skip
-    | `Stop
-    | `PrintThenStop of Format.formatter -> unit
-    | `PrintThenContinue of Format.formatter -> unit ] =
+type print_morph_hint =
+  | Skip
+      (** [Skip] means we don't print anything for this line,
+      and continue onto the next hint *)
+  | Stop
+      (** [Stop] means we don't print anything for this line,
+      and stop the trace here *)
+  | PrintThenStop of (Format.formatter -> unit)
+      (** [PrintThenStop pp] means we print this line, using [pp] to print the
+      morph hint, then stop the trace here *)
+  | PrintThenContinue of (Format.formatter -> unit)
+      (** [PrintThenContinue pp] means we print this line, using [pp] to print the
+      morph hint, then continue onto the next hint *)
+
+(** Get a printer for a single morph hint, or a special output if the hint requires
+  special behvaiour *)
+let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
   let open Format in
   fun hint ->
     match hint with
-    (* | Debug s -> `PrintThenContinue (dprintf "DEBUG[%s]" s) *)
-    | Debug _ -> `Skip
-    | None -> `Stop
-    | Skip -> `Skip
+    (* | Debug s -> PrintThenContinue (dprintf "DEBUG[%s]" s) *)
+    | Debug _ -> Skip
+    | None -> Stop
+    | Skip -> Skip
     | Close_over (item, locs) ->
-      `PrintThenContinue
+      PrintThenContinue
         (dprintf "closes over a %a (at %a)" Hint.print_closure_context item
            Location.print_loc locs.value)
     | Is_closed_by (item, _locs) ->
-      `PrintThenContinue
+      PrintThenContinue
         (dprintf "is used inside a %a" Hint.print_closure_context item)
     | Partial_application ->
-      `PrintThenContinue (dprintf "is captured by a partial application")
+      PrintThenContinue (dprintf "is captured by a partial application")
     | Crossing_left | Crossing_right ->
-      `PrintThenContinue (dprintf "crosses with something")
+      PrintThenContinue (dprintf "crosses with something")
     | Adj_partial_application ->
-      `PrintThenContinue (dprintf "has a partial application capturing a value")
+      PrintThenContinue (dprintf "has a partial application capturing a value")
     | Compose (hint1, hint2) -> (
       match print_morph_hint hint1 with
-      | `Skip -> print_morph_hint hint2
-      | `Stop -> `Stop
-      | `PrintThenStop pp1 -> `PrintThenStop pp1
-      | `PrintThenContinue pp1 -> (
+      | Skip -> print_morph_hint hint2
+      | Stop -> Stop
+      | PrintThenStop pp1 -> PrintThenStop pp1
+      | PrintThenContinue pp1 -> (
         match print_morph_hint hint2 with
-        | `Skip -> `PrintThenContinue pp1
-        | `Stop -> `PrintThenStop pp1
-        | `PrintThenStop pp2 -> `PrintThenStop (dprintf "%t@ which %t" pp1 pp2)
-        | `PrintThenContinue pp2 ->
-          `PrintThenContinue (dprintf "%t@ which %t" pp1 pp2)))
+        | Skip -> PrintThenContinue pp1
+        | Stop -> PrintThenStop pp1
+        | PrintThenStop pp2 -> PrintThenStop (dprintf "%t@ which %t" pp1 pp2)
+        | PrintThenContinue pp2 ->
+          PrintThenContinue (dprintf "%t@ which %t" pp1 pp2)))
 
+(** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
+terminated with an [Empty] or [Const] axhint *)
 let rec print_axhint_chain :
     type a. a -> a C.obj -> a axhint -> Format.formatter -> unit =
  fun (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
@@ -1825,14 +1837,14 @@ let rec print_axhint_chain :
       print_axhint_chain b b_obj b_hint ppf
     | Some Refl | None -> (
       match print_morph_hint morph_hint with
-      | `Skip ->
+      | Skip ->
         (* This is another case where we skip a line without printing the mode first *)
         print_axhint_chain b b_obj b_hint ppf
-      | `Stop -> print_mode a_obj a
-      | `PrintThenStop pp ->
+      | Stop -> print_mode a_obj a
+      | PrintThenStop pp ->
         print_mode a_obj a;
         fprintf ppf " because it %t@ which is of some unknown mode" pp
-      | `PrintThenContinue pp ->
+      | PrintThenContinue pp ->
         print_mode a_obj a;
         fprintf ppf " because it %t@ which is " pp;
         print_axhint_chain b b_obj b_hint ppf))
@@ -1841,15 +1853,16 @@ let rec print_axhint_chain :
     print_const_hint a_obj a ppf const_hint
   | Empty -> print_mode a_obj a
 
+(** Report an axerror, printing error traces for both the left and the right sides *)
 let report_axerror :
     type a.
     ?target:(Format.formatter -> unit) ->
-    a Lattices_mono.obj ->
-    a Lattices_mono.obj ->
+    left_obj:a Lattices_mono.obj ->
+    right_obj:a Lattices_mono.obj ->
     a axerror ->
     Format.formatter ->
     unit =
- fun ?target left_obj right_obj err ppf ->
+ fun ?target ~left_obj ~right_obj err ppf ->
   let open Format in
   let target ppf =
     match target with None -> fprintf ppf "This value" | Some name -> name ppf
@@ -2634,7 +2647,7 @@ module Comonadic_with (Areality : Areality) = struct
   let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ?target left_obj right_obj err ppf
+    report_axerror ?target ~left_obj ~right_obj err ppf
 
   type equate_error = equate_step * error
 
