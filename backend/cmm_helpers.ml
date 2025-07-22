@@ -1774,17 +1774,9 @@ let unboxed_float32_array_ref =
     ~memory_chunk:(Single { reg = Float32 })
     ~elements_per_word:2
 
-let unboxed_int64_or_nativeint_array_ref ~has_custom_ops arr ~array_index dbg =
+let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index ->
-          let index =
-            if has_custom_ops
-            then
-              (* Need to skip the custom_operations field. 2 not 1 since we are
-                 manipulating a tagged int. *)
-              add_int index (int ~dbg 2) dbg
-            else index
-          in
           int_array_ref arr index dbg))
 
 let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk
@@ -1810,18 +1802,11 @@ let unboxed_float32_array_set =
     ~memory_chunk:(Single { reg = Float32 })
     ~elements_per_word:2
 
-let unboxed_int64_or_nativeint_array_set ~has_custom_ops arr ~index ~new_value
+let unboxed_int64_or_nativeint_array_set arr ~index ~new_value
     dbg =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
-              let index =
-                if has_custom_ops
-                then
-                  (* See comment in [unboxed_int64_or_nativeint_array_ref]. *)
-                  add_int index (int ~dbg 2) dbg
-                else index
-              in
               int_array_set arr index new_value dbg)))
 
 let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
