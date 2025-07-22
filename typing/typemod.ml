@@ -3544,6 +3544,13 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let constructor = ext.tyexn_constructor in
         Signature_names.check_typext names constructor.ext_loc
           constructor.ext_id;
+        let nonportable_mode =
+          Value.min_with (Comonadic Portability) Portability.max in
+        begin match Value.submode nonportable_mode md_mode with
+          | Ok () -> ()
+          | Error e ->
+              raise (Error (loc, env, Item_weaker_than_structure e))
+        end;
         Tstr_exception ext,
         [Sig_typext(constructor.ext_id,
                     constructor.ext_type,
