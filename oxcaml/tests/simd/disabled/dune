@@ -3,7 +3,9 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
  (deps disabled256.expected disabled256.corrected)
  (action
   (progn
@@ -11,7 +13,9 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
  (targets disabled256.corrected)
  (deps
   (:ml disabled256.ml))
