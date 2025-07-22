@@ -1815,26 +1815,7 @@ let rec print_axhint_chain :
    [@@ocaml.warning "-4"]
   in
   match hint with
-  | Morph (morph_hint, b, b_obj, b_hint, morph) -> (
-    let morph_name =
-      match morph with
-      | Id -> "Id"
-      | Meet_with _ -> "Meet_with"
-      | Imply _ -> "Imply"
-      | Proj _ -> "Proj"
-      | Max_with _ -> "Max_with"
-      | Min_with _ -> "Min_with"
-      | Map_comonadic _ -> "Map_comonadic"
-      | Monadic_to_comonadic_min -> "Monadic_to_comonadic_min"
-      | Comonadic_to_monadic _ -> "Comonadic_to_monadic"
-      | Monadic_to_comonadic_max -> "Monadic_to_comonadic_max"
-      | Local_to_regional -> "Local_to_regional"
-      | Regional_to_local -> "Regional_to_local"
-      | Locality_as_regionality -> "Locality_as_regionality"
-      | Regional_to_global -> "Regional_to_global"
-      | Global_to_regional -> "Global_to_regional"
-      | Compose _ -> "Compose"
-    in
+  | Morph (morph_hint, b, b_obj, b_hint, _morph) -> (
     match C.eq_obj a_obj b_obj with
     | Some Refl
       when Misc.Le_result.equal ~le:(C.le a_obj) a b
@@ -1850,11 +1831,10 @@ let rec print_axhint_chain :
       | `Stop -> print_mode a_obj a
       | `PrintThenStop pp ->
         print_mode a_obj a;
-        fprintf ppf " [morph=%s] because it %t@ which is of some unknown mode"
-          morph_name pp
+        fprintf ppf " because it %t@ which is of some unknown mode" pp
       | `PrintThenContinue pp ->
         print_mode a_obj a;
-        fprintf ppf " [morph=%s] because it %t@ which is " morph_name pp;
+        fprintf ppf " because it %t@ which is " pp;
         print_axhint_chain b b_obj b_hint ppf))
   | Const const_hint ->
     print_mode a_obj a;
