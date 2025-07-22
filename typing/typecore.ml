@@ -704,7 +704,8 @@ let lower_bound_externality ~loc ~env lower_bound alloc_mode =
   | Ok () -> ()
   | Error failure_reason ->
       let error =
-        Submode_failed(Value.Error (Comonadic Externality,failure_reason), Other, None,
+        Submode_failed(Value.Error (Comonadic Externality,failure_reason),
+          Other, None,
           None, None, None)
       in
       raise (Error(loc, env, error)))
@@ -5667,7 +5668,8 @@ and type_expect_
         check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
           ~modalities:label.lbl_modalities record_mode;
         let argument_mode = mode_modality label.lbl_modalities record_mode in
-        type_label_exp ~overwrite ~create:true env argument_mode loc ty_record x record_form
+        type_label_exp ~overwrite ~create:true env argument_mode loc ty_record x
+          record_form
       in
       let overwrites =
         assign_label_children (List.length lbl_a_list)
@@ -6207,7 +6209,9 @@ and type_expect_
             row_field_repr (get_row_field l row0)
           with
             Rpresent (Some ty), Rpresent (Some ty0) ->
-              let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
+              let alloc_mode, argument_mode =
+                register_allocation ~loc ~env expected_mode
+              in
               let arg =
                 type_argument ~overwrite:No_overwrite env argument_mode sarg ty ty0
               in
@@ -6224,7 +6228,8 @@ and type_expect_
         | None -> None
         | Some sarg ->
             let ty_expected =
-              newvar (Jkind.Builtin.value_or_null ~why:Polymorphic_variant_field)
+              newvar
+                (Jkind.Builtin.value_or_null ~why:Polymorphic_variant_field)
             in
             let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
             let arg =
@@ -6285,7 +6290,9 @@ and type_expect_
         in
         match is_float_boxing with
         | true ->
-          let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
+          let alloc_mode, argument_mode =
+            register_allocation ~loc ~env expected_mode
+          in
           let mode = cross_left env Predef.type_unboxed_float mode in
           submode ~loc ~env mode argument_mode;
           let uu =
@@ -8564,7 +8571,9 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         (* If the pattern and the expression have different tuple length, it
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
-          List.map (fun mode -> snd (register_allocation_value_mode ~loc ~env mode)) tuple_modes
+          List.map
+            (fun mode -> snd (register_allocation_value_mode ~loc ~env mode))
+            tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
@@ -8756,7 +8765,9 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     | Variant_unboxed | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
     | Variant_boxed _ | Variant_extensible ->
-       let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
+       let alloc_mode, argument_mode =
+        register_allocation ~loc ~env expected_mode
+      in
        argument_mode, Some alloc_mode
   in
   begin match overwrite, constr.cstr_repr with
