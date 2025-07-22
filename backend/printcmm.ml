@@ -218,9 +218,9 @@ let to_string msg =
     ppf msg
 
 let reinterpret_cast : Cmm.reinterpret_cast -> string = function
-  | V128_of_vec w -> Printf.sprintf "vec128 as %s" (vector_width w)
-  | V256_of_vec w -> Printf.sprintf "vec256 as %s" (vector_width w)
-  | V512_of_vec w -> Printf.sprintf "vec512 as %s" (vector_width w)
+  | V128_of_vec w -> Printf.sprintf "%s as vec128" (vector_width w)
+  | V256_of_vec w -> Printf.sprintf "%s as vec256" (vector_width w)
+  | V512_of_vec w -> Printf.sprintf "%s as vec512" (vector_width w)
   | Value_of_int -> "int as value"
   | Int_of_value -> "value as int"
   | Float32_of_float -> "float as float32"
