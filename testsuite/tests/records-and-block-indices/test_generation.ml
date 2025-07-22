@@ -20,7 +20,7 @@ let interesting_type_trees : Type_structure.t Tree.t list =
   let patient =
     (* Enable extra tests that take too long to compile (particularly on
        native), and thus are run locally only *)
-    true
+    false
   in
   let open Type_structure in
   List.concat_map
@@ -372,14 +372,25 @@ let toplevel_unit_block f =
 
 type test =
   | Record_size
-  | Record_access of { local : bool }
+  | Record_access of
+      { local : bool;
+        with_void : bool
+      }
 
 let main test ~bytecode =
   let types =
     match test with
-    | Record_size | Record_access _ ->
+    | Record_size ->
       List.filter_map interesting_type_trees
         ~f:Type_structure.boxed_record_containing_unboxed_records
+    | Record_access { with_void = false; _ } ->
+      List.filter_map interesting_type_trees
+        ~f:Type_structure.boxed_record_containing_unboxed_records
+      |> List.filter ~f:(fun ty -> not (Type_structure.contains_unit_u ty))
+    | Record_access { with_void = true; _ } ->
+      List.filter_map interesting_type_trees
+        ~f:Type_structure.boxed_record_containing_unboxed_records
+      |> List.filter ~f:Type_structure.contains_unit_u
   in
   let types =
     if bytecode
@@ -438,8 +449,11 @@ let main test ~bytecode =
 
 let tests =
   [ "record_size", Record_size;
-    "record_access", Record_access { local = false };
-    "record_access_local", Record_access { local = true }
+    "record_access", Record_access { local = false; with_void = false };
+    "record_access_local", Record_access { local = true; with_void = false };
+    "record_access_with_void", Record_access { local = false; with_void = true };
+    ( "record_access_with_void_local",
+      Record_access { local = true; with_void = true } )
   ]
 
 let () =
