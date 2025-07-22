@@ -489,18 +489,12 @@ let create_index_lists elements string_of_ele =
 let is_optional = Btype.is_optional
 let label_name = Btype.label_name
 
-let remove_option lbl typ =
+let remove_option mpath typ =
   let open Types in
   let rec trim t =
     match t with
     | Tconstr(path, [ty], _)
-      when Path.same path
-            (match Btype.classify_optionality lbl with
-            | Required_or_position_arg -> assert false
-            | Optional_arg mpath ->
-                (match mpath with
-                | Stdlib_option -> Predef.path_option
-                | Stdlib_or_null -> Predef.path_or_null))
+      when Path.same path (Ctype.predef_path_of_optional_module_path mpath)
         -> get_desc ty
     | Tconstr _
     | Tvar _

@@ -794,7 +794,8 @@ val create_index_lists : 'a list -> ('a -> string) -> 'a list list
 (** Take a type and remove the option top constructor. This is
    useful when printing labels, we then remove the top option constructor
    for optional labels.*)
-val remove_option : Types.arg_label -> Types.type_expr -> Types.type_expr
+val remove_option :
+  Btype.optional_module_path -> Types.type_expr -> Types.type_expr
 
 (** Return [true] if the given label is optional.*)
 val is_optional : Types.arg_label -> bool

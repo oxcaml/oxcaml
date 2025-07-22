@@ -885,17 +885,9 @@ let constant_or_raise env loc cst =
   | Error err -> raise (Error (loc, env, err))
 
 
-let predef_path_of_optional_module_path = function
-  | Stdlib_option -> Predef.path_option
-  | Stdlib_or_null -> Predef.path_or_null
-
-let predef_jkind_of_optional_module_path = function
-  | Stdlib_option -> Predef.option_argument_jkind
-  | Stdlib_or_null -> Jkind.for_or_null_argument Predef.ident_or_null
-
 (* Specific version of type_option, using newty rather than newgenty *)
 
-let type_option (mpath : optional_module_path) ty =
+let type_option mpath ty =
   newty (Tconstr(predef_path_of_optional_module_path mpath,[ty], ref Mnil))
 
 let mkexp exp_desc exp_type exp_loc exp_env =
@@ -3298,7 +3290,6 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
         finalize_variants pat;
       end;
       List.iter (fun f -> f()) tps.tps_pattern_force;
-      (* CR layouts v5: value restriction here to be relaxed *)
       (match classify_optionality l with
       | Optional_arg mpath ->
           unify_pat val_env pat
@@ -8031,11 +8022,12 @@ and type_option_some env mpath expected_mode sarg ty ty0 =
   let ty0' = extract_option_type env mpath ty0 in
   let alloc_mode, argument_mode = register_allocation expected_mode in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
-  let lid, csome = (match mpath with
+  let lid, csome = match mpath with
     | Stdlib_option -> (Longident.Lident "Some",
       Env.find_ident_constructor Predef.ident_some env)
     | Stdlib_or_null -> (Longident.Lident "This",
-      Env.find_ident_constructor Predef.ident_this env)) in
+      Env.find_ident_constructor Predef.ident_this env)
+  in
   mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
     (type_option mpath arg.exp_type) arg.exp_loc arg.exp_env
 

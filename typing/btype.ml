@@ -626,6 +626,7 @@ let is_optional_parsetree : Parsetree.arg_label -> bool = function
 
 (* CR generic-optional: temporary function, to remove *)
 type optional_module_path = Stdlib_option | Stdlib_or_null
+
 let classify_module_path : Longident.t -> optional_module_path = function
   | Ldot(Lident "Stdlib", "Option") -> Stdlib_option
   | Ldot(Lident "Stdlib", "Or_null") -> Stdlib_or_null
@@ -637,15 +638,17 @@ type optionality = Optional_arg of optional_module_path
 let classify_optionality (lbl: Types.arg_label) = match lbl with
   | Optional _ -> Optional_arg Stdlib_option
   | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
-  | _ -> Required_or_position_arg
+  | Labelled _ | Position _ | Nolabel -> Required_or_position_arg
 
 let classify_optionality_parsetree (lbl : Parsetree.arg_label) = match lbl with
   | Optional _ -> Optional_arg Stdlib_option
   | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
-  | _ -> Required_or_position_arg
+  | Labelled _ | Nolabel -> Required_or_position_arg
 
 let is_optional arg =
-  not (classify_optionality arg = Required_or_position_arg)
+  match classify_optionality arg with
+  | Optional_arg _ -> true
+  | Required_or_position_arg -> false
 
 let is_position = function Position _ -> true | _ -> false
 

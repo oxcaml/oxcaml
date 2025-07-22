@@ -455,11 +455,7 @@ and class_type_aux env virt self_scope scty =
       let ty =
         match Btype.classify_optionality l with
         | Optional_arg mpath ->
-            let t_cons =
-              match mpath with
-              | Stdlib_option -> Predef.path_option
-              | Stdlib_or_null -> Predef.path_or_null
-            in
+            let t_cons = Ctype.predef_path_of_optional_module_path mpath in
             Ctype.newty (Tconstr(t_cons,[ty], ref Mnil))
         | Required_or_position_arg -> ty in
       let clty = class_type env virt self_scope scty in
@@ -1337,11 +1333,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         match ty_fun, ty_fun0 with
         | Cty_arrow (l, ty, ty_fun), Cty_arrow (_, ty0, ty_fun0)
           when sargs <> [] ->
-            (* CR generic-optional:
-              This edit needs test cases.
-
-              - Classes with generic optional methods
-            *)
+            (* CR generic-optional: test generic optional arguments in class
+               methods *)
             let optional = Btype.is_optional l in
             let use_arg sarg l' =
               Arg (
@@ -1352,21 +1345,21 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   (match Btype.classify_optionality l with
                   | Optional_arg mpath ->
                       Typecore.type_option_some val_env mpath sarg ty ty0,
-                      (* CR layouts v5: Change the sort when options can hold
-                        non-values. *)
+                      (* CR generic-optional: Change the sort when options can
+                         hold non-values. *)
                       Jkind.Sort.value
                   | Required_or_position_arg -> assert false)
               )
             in
             let eliminate_optional_arg lbl =
-              (match Btype.classify_optionality lbl with
+              match Btype.classify_optionality lbl with
               | Optional_arg mpath ->
                   Arg
                     (Typecore.type_option_none val_env mpath ty0 Location.none,
                       (* CR layouts v5: Change the sort when options can hold
                           non-values. *)
                       Jkind.Sort.value)
-              | Required_or_position_arg -> assert false)
+              | Required_or_position_arg -> assert false
             in
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in
@@ -1583,6 +1576,11 @@ let var_or_null =
   Predef.type_or_null
     (Btype.newgenvar (Jkind.for_or_null_argument Predef.ident_or_null))
 
+let ctype_instance_of_optional_mpath (mpath : Btype.optional_module_path) =
+  match mpath with
+  | Stdlib_option -> Ctype.instance var_option
+  | Stdlib_or_null -> Ctype.instance var_or_null
+
 let rec approx_declaration cl =
   match cl.pcl_desc with
     Pcl_fun (l, _, pat, cl) ->
@@ -1591,9 +1589,8 @@ let rec approx_declaration cl =
         match l with
         | Optional _ -> Ctype.instance var_option
         | Generic_optional (path, _) ->
-            (match Btype.classify_module_path path.txt with
-            | Stdlib_option -> Ctype.instance var_option
-            | Stdlib_or_null -> Ctype.instance var_or_null)
+            ctype_instance_of_optional_mpath
+              (Btype.classify_module_path path.txt)
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
@@ -1616,10 +1613,7 @@ let rec approx_description ct =
       let l = transl_label l (Some core_type) in
       let arg =
         match Btype.classify_optionality l with
-        | Optional_arg mpath ->
-            (match mpath with
-            | Stdlib_option -> Ctype.instance var_option
-            | Stdlib_or_null -> Ctype.instance var_or_null)
+        | Optional_arg mpath -> ctype_instance_of_optional_mpath mpath
         | Required_or_position_arg ->
             Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we

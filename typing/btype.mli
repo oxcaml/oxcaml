@@ -259,15 +259,15 @@ val backtrack: snapshot -> unit
 
 (**** Utilities for labels ****)
 
-(* CR generic-optional: temporary function, to remove *)
 type optional_module_path = Stdlib_option | Stdlib_or_null
 val classify_module_path : Longident.t -> optional_module_path
 
 type optionality = Optional_arg of optional_module_path
+                 | Required_or_position_arg
 (* The reason this is called [Required_or_position_arg] instead of
  [Required_arg] is that [Position] are omittable (thus not required),
  but is not optional *)
-                 | Required_or_position_arg
+
 val is_optional : arg_label -> bool
 val is_optional_parsetree : Parsetree.arg_label -> bool
 val classify_optionality : arg_label -> optionality

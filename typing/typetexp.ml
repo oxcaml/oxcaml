@@ -679,6 +679,7 @@ let transl_label (label : Parsetree.arg_label)
                 Env.empty,
                 Unsupported_extension Generic_optional_arguments));
     | true ->
+        (* CR generic-optional: allow more module names / use path lookup *)
         if path.txt = Longident.Ldot (Lident "Stdlib", "Option") ||
           path.txt = Longident.Ldot (Lident "Stdlib", "Or_null")
         then
@@ -793,9 +794,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
               let path = match Btype.classify_optionality l with
-                | Optional_arg mpath -> (match mpath with
-                    | Stdlib_option -> Predef.path_option
-                    | Stdlib_or_null -> Predef.path_or_null)
+                | Optional_arg mpath ->
+                    Ctype.predef_path_of_optional_module_path mpath
                 | Required_or_position_arg -> assert false
               in
               newmono

@@ -3312,11 +3312,13 @@ let rec expands_to_datatype env ty =
       end
   | _ -> false
 
+(* The reason we need this equality function is that [Generic_optional] contains
+ [Location.loc], which needs to be ignored. *)
 let arg_label_equal l1 l2 =
   match l1, l2 with
   | Generic_optional(path1, str1), Generic_optional(path2, str2) ->
       str1 = str2 &&
-        (classify_module_path path1.txt = classify_module_path path2.txt)
+        classify_module_path path1.txt = classify_module_path path2.txt
   | _ -> l1 = l2
 
 let equivalent_with_nolabels l1 l2 =
@@ -4539,6 +4541,14 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
+let predef_path_of_optional_module_path = function
+  | Stdlib_option -> Predef.path_option
+  | Stdlib_or_null -> Predef.path_or_null
+
+let predef_jkind_of_optional_module_path = function
+  | Stdlib_option -> Predef.option_argument_jkind
+  | Stdlib_or_null -> Jkind.for_or_null_argument Predef.ident_or_null
+
 let filter_arrow env t l ~force_tpoly =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -4563,16 +4573,12 @@ let filter_arrow env t l ~force_tpoly =
 
             *)
             let t_cons, arg_jkind =
-              match mpath with
-              | Stdlib_option ->
-                  Predef.path_option, Predef.option_argument_jkind
-              | Stdlib_or_null ->
-                  Predef.path_or_null,
-                    Jkind.for_or_null_argument Predef.ident_or_null
+              predef_path_of_optional_module_path mpath,
+                predef_jkind_of_optional_module_path mpath
             in
             newty2 ~level (Tconstr(t_cons,
               [newvar2 level arg_jkind], ref Mnil))
-          | _ ->
+          | Required_or_position_arg ->
             if is_position l then
               newty2 ~level
                 (Tconstr (Predef.path_lexing_position, [], ref Mnil))
