@@ -8058,7 +8058,8 @@ and type_label_exp
     overwrite:_ -> create:_ -> _ -> _ -> _ -> _ ->
     _ * rep gen_label_description * _ -> rep record_form ->
     _ * rep gen_label_description * _
-  = fun ~overwrite ~create env arg_mode loc ty_expected (lid, label, sarg) record_form ->
+  = fun ~overwrite ~create env arg_mode loc ty_expected
+        (lid, label, sarg) record_form ->
   (* Here also ty_expected may be at generic_level *)
   let separate = !Clflags.principal || Env.has_local_constraints env in
   (* #4682: we try two type-checking approaches for [arg] using backtracking:
