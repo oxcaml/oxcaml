@@ -5,9 +5,9 @@ let float_u_test expr res =
 
 let compare_test f1 f2 =
   let res = match F.compare (F.of_float f1) (F.of_float f2) with
-    | 1 -> "<"
+    | 1 -> ">"
     | 0 -> "="
-    | -1 -> ">"
+    | -1 -> "<"
     | _ -> assert false
   in
   Format.printf "%f %s %f\n" f1 res f2
@@ -23,4 +23,13 @@ let () =
   float_u_test "neg(3.7)" (F.neg (#3.7));
   compare_test 3.7 2.3;
   compare_test 2.3 3.7;
-  compare_test 3.7 3.7
+  compare_test 3.7 3.7;
+  compare_test nan 3.7;
+  compare_test (-.2.3) nan;
+  compare_test (-.infinity) nan;
+  compare_test (-.infinity) (-.nan);
+  compare_test infinity (-.nan);
+  compare_test infinity (-.infinity);
+  compare_test (-.infinity) infinity;
+  compare_test 0. (-.0.);
+  compare_test nan nan

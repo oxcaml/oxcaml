@@ -83,9 +83,13 @@ let () =
           "extra_dep_ml", extra_dep_ml;
           "extra_dep_cmx", extra_dep_cmx;
           "run_extra_dep", run_extra_dep;
+          (* CR yusumez: remove -disable-poll-insertion once we can emit poll
+             insertions *)
           ( "llvm_flags",
-            "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments" );
-          "common_flags", "-g -O3 -opaque" ]
+            "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments \
+             -disable-poll-insertion" );
+          ( "common_flags",
+            "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear" ) ]
       ~name ~buf
       {|
 (rule

@@ -8,19 +8,19 @@ module Float_u = struct
   external of_float : (float[@local_opt]) -> t @@ portable =
     "%unbox_float" [@@warning "-187"]
 
-  let[@inline always] add x y = of_float (Float.add (to_float x) (to_float y))
+  let add x y = of_float (Float.add (to_float x) (to_float y))
 
-  let[@inline always] sub x y = of_float (Float.sub (to_float x) (to_float y))
+  let sub x y = of_float (Float.sub (to_float x) (to_float y))
 
-  let[@inline always] mul x y = of_float (Float.mul (to_float x) (to_float y))
+  let mul x y = of_float (Float.mul (to_float x) (to_float y))
 
-  let[@inline always] div x y = of_float (Float.div (to_float x) (to_float y))
+  let div x y = of_float (Float.div (to_float x) (to_float y))
 
-  let[@inline always] neg x = of_float (Float.neg (to_float x))
+  let neg x = of_float (Float.neg (to_float x))
 
 
-  let[@inline always] abs x = of_float (Float.abs (to_float x))
+  let abs x = of_float (Float.abs (to_float x))
 
-  let[@inline always] compare x y = (Float.compare (to_float x) (to_float y))
+  let compare x y = (Float.compare (to_float x) (to_float y))
 
 end

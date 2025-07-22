@@ -139,8 +139,8 @@ type t =
            function) *)
     mutable data : Cmm.data_item list;
         (* Collects data items as they come and processes them at the end *)
-    mutable defined_symbols : String.Set.t;
-        (* Keeps track of all function symbols so far *)
+    mutable defined_function_symbols : String.Set.t;
+        (* Keeps track of all function symbols defined so far *)
     mutable referenced_symbols : String.Set.t
         (* Keeps track of all global symbols referenced so far *)
   }
@@ -163,7 +163,7 @@ let create ~llvmir_filename ~ppf_dump =
     ppf_dump;
     current_fun_info = create_fun_info ();
     data = [];
-    defined_symbols = String.Set.empty;
+    defined_function_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty
   }
 
@@ -800,7 +800,8 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
-  t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
+  t.defined_function_symbols
+    <- String.Set.add fun_name t.defined_function_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
   let fun_args_with_idents =
@@ -834,7 +835,7 @@ let data ds =
 
 (* Define menitoned but not declared data items as extern *)
 let emit_data_extern t =
-  let defined_symbols =
+  let defined_function_symbols =
     List.filter_map
       (fun (d : Cmm.data_item) ->
         match d with
@@ -845,7 +846,7 @@ let emit_data_extern t =
           None)
       t.data
     |> String.Set.of_list
-    |> String.Set.union t.defined_symbols
+    |> String.Set.union t.defined_function_symbols
   in
   let referenced_symbols =
     List.filter_map
@@ -860,7 +861,7 @@ let emit_data_extern t =
     |> String.Set.of_list
     |> String.Set.union t.referenced_symbols
   in
-  String.Set.diff referenced_symbols defined_symbols
+  String.Set.diff referenced_symbols defined_function_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
 
 (* CR yusumez: We do this cumbersome list wrangling since we receive data
