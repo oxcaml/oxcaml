@@ -2792,7 +2792,7 @@ module Monadic = struct
   let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ?target left_obj right_obj err ppf
+    report_axerror ?target ~left_obj ~right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -3256,7 +3256,7 @@ module Value_with (Areality : Areality) = struct
   let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ?target left_obj right_obj err ppf
+    report_axerror ?target ~left_obj ~right_obj err ppf
 
   type equate_error = equate_step * error
 
