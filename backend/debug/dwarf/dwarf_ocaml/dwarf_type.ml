@@ -25,7 +25,8 @@ module Type_shape_ident = struct
       Type_shape.Type_shape.without_layout Type_shape.Type_shape.ts
 
     let compare = Stdlib.compare
-    (* CR sspies: Fix compare and equals on this type. *)
+    (* CR sspies: Fix compare and equals on this type. Move the module to
+       type shape once it is more cleaned up. *)
 
     let print = Type_shape.Type_shape.print
 
