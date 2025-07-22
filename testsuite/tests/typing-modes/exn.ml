@@ -1,4 +1,5 @@
 (* TEST
+   flags = "-extension-universe alpha";
    expect;
 *)
 
@@ -25,7 +26,7 @@ exception Portable' of (unit -> unit) @@ portable
 
 let x : exn = Nonportable (fun x -> x)
 [%%expect{|
-val x : exn = Nonportable <fun>
+val x : exn @@ portable = Nonportable <fun>
 |}]
 
 let (foo @ portable) () =
@@ -268,6 +269,19 @@ module type S = sig exception Exn of string ref end
 
 (* CR dkalinichenko: fix. *)
 
+let fails : (unit -> (module S)) Modes.Portable.t =
+    let module M @ portable = struct
+        exception Exn of string ref
+    end
+    in
+    { portable = fun () -> (module M : S) }
+[%%expect{|
+Line 3, characters 8-35:
+3 |         exception Exn of string ref
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
+|}]
+
 let make_s : (unit -> (module S)) Modes.Portable.t =
     let module M = struct
         exception Exn of string ref
@@ -276,7 +290,7 @@ let make_s : (unit -> (module S)) Modes.Portable.t =
     { portable = fun () -> (module M : S) }
 
 [%%expect{|
-val make_s : (unit -> (module S)) Modes.Portable.t =
+val make_s : (unit -> (module S)) Modes.Portable.t @@ portable =
   {Modes.Portable.portable = <fun>}
 |}]
 
