@@ -1575,9 +1575,9 @@ module Hint = struct
   let print_closure_context ppf =
     let open Format in
     function
-    | Function -> fprintf ppf "a function"
-    | Functor -> fprintf ppf "a functor"
-    | Lazy -> fprintf ppf "a lazy expression"
+    | Function -> fprintf ppf "function"
+    | Functor -> fprintf ppf "functor"
+    | Lazy -> fprintf ppf "lazy expression"
 
   type closing_loc =
     { closure : Location.t;
@@ -1793,9 +1793,9 @@ let rec print_morph_hint :
         match print_morph_hint hint2 with
         | `Skip -> `PrintThenContinue pp1
         | `Stop -> `PrintThenStop pp1
-        | `PrintThenStop pp2 -> `PrintThenStop (dprintf "%t, which %t" pp1 pp2)
+        | `PrintThenStop pp2 -> `PrintThenStop (dprintf "%t@ which %t" pp1 pp2)
         | `PrintThenContinue pp2 ->
-          `PrintThenContinue (dprintf "%t, which %t" pp1 pp2)))
+          `PrintThenContinue (dprintf "%t@ which %t" pp1 pp2)))
 
 let rec print_axhint_chain :
     type a. a -> a C.obj -> a axhint -> Format.formatter -> unit =
@@ -1808,7 +1808,7 @@ let rec print_axhint_chain :
       (* In the special case that we are talking about the regional mode,
          we print a more user-friendly message, as below, instead of referring
          directly to the regional mode *)
-      fprintf ppf "%a to the parent region" Misc.Style.inline_code "local"
+      fprintf ppf "local to the parent region"
     | _ ->
       (* Otherwise, we just use the default mode constant printer *)
       Misc.Style.as_inline_code (C.print x_obj) ppf x
@@ -1850,11 +1850,11 @@ let rec print_axhint_chain :
       | `Stop -> print_mode a_obj a
       | `PrintThenStop pp ->
         print_mode a_obj a;
-        fprintf ppf " [morph=%s] because it %t, which is of some unknown mode"
+        fprintf ppf " [morph=%s] because it %t@ which is of some unknown mode"
           morph_name pp
       | `PrintThenContinue pp ->
         print_mode a_obj a;
-        fprintf ppf " [morph=%s] because it %t,@ which is " morph_name pp;
+        fprintf ppf " [morph=%s] because it %t@ which is " morph_name pp;
         print_axhint_chain b b_obj b_hint ppf))
   | Const const_hint ->
     print_mode a_obj a;
@@ -1872,9 +1872,7 @@ let report_axerror :
  fun ?target left_obj right_obj err ppf ->
   let open Format in
   let target ppf =
-    match target with
-    | None -> fprintf ppf "It"
-    | Some name -> fprintf ppf "The %t" name
+    match target with None -> fprintf ppf "This value" | Some name -> name ppf
   in
   fprintf ppf {|%t is expected to be %t.@ However, it is actually %t.|} target
     (print_axhint_chain err.right right_obj err.right_hint)
