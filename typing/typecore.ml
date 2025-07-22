@@ -501,7 +501,6 @@ let mode_return mode =
   { (mode_default (meet_regional Return mode)) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
-    locality_context = Some Return;
   }
 
 (* used when entering a region.*)
@@ -510,7 +509,6 @@ let mode_region mode =
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
-    locality_context = None;
   }
 
 let mode_max =
