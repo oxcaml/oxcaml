@@ -97,14 +97,17 @@ module Await_atomic_bitset = struct
 end
 
 type request : value mod contended portable =
-  { action : unit -> unit @@ portable
-  ; mutable error : (exn * Printexc.raw_backtrace) Modes.Portable.t option
-  ; mutable ready : bool
-  ; mutex : Mutex.t
-  ; condition : Condition.t
-  }
+    Request :
+      { action : 'a @ unique -> unit @@ portable
+      ; argument : 'a
+      ; mutable error : (exn * Printexc.raw_backtrace) Modes.Portable.t option
+      ; mutable ready : bool
+      ; mutex : Mutex.t
+      ; condition : Condition.t
+      }
+      -> request
 [@@unsafe_allow_any_mode_crossing
-  (* The mutable fields are synchronized via [mutex] and [condition]. *)]
+   (* The mutable fields are synchronized via [mutex] and [condition]. *)]
 
 type t : value mod contended portable =
   { index : int
@@ -203,7 +206,7 @@ let () =
 ;;
 
 (** Run some function on a new thread. *)
-let thread action =
+let thread #(action, argument) =
   let decr () =
     let t = get (current_domain ()) in
     let threads_before_decr = Atomic.fetch_and_add t.threads (-1) in
@@ -213,7 +216,12 @@ let thread action =
          We must wakeup the manager to potentially allow it to exit. *)
       wakeup_manager t
   in
-  match action () with
+  match
+    action
+      (* SAFETY: We know each value is only popped from the request stack
+         once *)
+      (Obj.magic_unique argument)
+  with
   | () -> decr ()
   | exception exn ->
     let bt = Printexc.get_raw_backtrace () in
@@ -240,8 +248,12 @@ let rec manager_loop t =
       manager_loop t
     | _ ->
       let requests = Atomic.exchange t.incoming [] in
-      List.iter (fun (request : request) ->
-        (match Thread.Portable.create thread request.action with
+      List.iter (fun (Request request : request) ->
+        (match
+           Thread.Portable.create2
+             thread
+             #(request.action, request.argument)
+         with
          | _ -> ()
          | exception exn ->
            (* This might fail if the user tries to create too many threads *)
@@ -275,7 +287,11 @@ let create_initial_manager =
        Atomic.Contended.exchange need_manager false
     then ignore (Thread.Portable.create manager (get 0))
 
-let spawn_on ~domain:i f =
+type 'a spawn_result =
+  | Spawned
+  | Failed of 'a * exn @@ aliased * Printexc.raw_backtrace @@ aliased
+
+let spawn_on ~domain:i f a =
   if i < 0 || max_domains () <= i
   then invalid_arg "Multicore.spawn_on: invalid domain index";
   create_initial_manager ();
@@ -295,8 +311,13 @@ let spawn_on ~domain:i f =
   in
   let t = get i in
   let threads_before_incr = Atomic.fetch_and_add t.threads 1 in
-  let request = { action = f; error = None; ready = false;
-                  mutex = Mutex.create (); condition = Condition.create () } in
+  let mutex = Mutex.create () in
+  let condition = Condition.create () in
+  let request =
+    Request
+      { action = f; argument = a; error = None; ready = false; mutex;
+        condition }
+  in
   push t.incoming request;
   if threads_before_incr = 0
   then (
@@ -317,14 +338,18 @@ let spawn_on ~domain:i f =
     Atomic.decr t.threads);
   (* We have added incoming work and must wakeup the manager thread. *)
   wakeup_manager t;
-  Mutex.lock request.mutex;
-  while not request.ready do
-    Condition.wait request.condition request.mutex
+  Mutex.lock mutex;
+  while let Request { ready; _ } = request in not ready do
+    Condition.wait condition mutex
   done;
-  Mutex.unlock request.mutex;
-  match request.error with
-  | None -> ()
-  | Some { portable = exn, bt } -> Printexc.raise_with_backtrace exn bt
+  Mutex.unlock mutex;
+  match request with
+  | Request { error = None; _ } -> Spawned
+  | Request { error = Some { portable = exn, bt }; _ } ->
+    Failed (
+      (* SAFETY: We know that if we got an error here, the thread failed to spawn and
+         hence no longer has a reference to [a] *)
+      Obj.magic_unique a, exn, bt)
 ;;
 
 let spawn f =

@@ -72,8 +72,36 @@ let create (fn @ once) arg =
           Printexc.print_backtrace stdout;
           flush stderr)
 
+let create2 (fn @ once) args =
+  thread_new
+    (fun () ->
+      try
+        fn args;
+        ignore (Sys.opaque_identity (check_memprof_cb ()))
+      with
+      | Exit ->
+        ignore (Sys.opaque_identity (check_memprof_cb ()))
+      | exn ->
+        let raw_backtrace = Printexc.get_raw_backtrace () in
+        flush stdout; flush stderr;
+        try
+          (Atomic.Contended.get uncaught_exception_handler).portable exn
+        with
+        | Exit -> ()
+        | exn' ->
+          Printf.eprintf
+            "Thread %d killed on uncaught exception %s\n"
+            (id (self ())) (Printexc.to_string exn);
+          Printexc.print_raw_backtrace stderr raw_backtrace;
+          Printf.eprintf
+            "Thread %d uncaught exception handler raised %s\n"
+            (id (self ())) (Printexc.to_string exn');
+          Printexc.print_backtrace stdout;
+          flush stderr)
+
 module Portable = struct
   let create (fn @ once portable) arg = create fn arg
+  let create2 (fn @ once portable) arg = create2 fn arg
 end
 
 let create (fn @ many) arg = create fn arg
