@@ -63,7 +63,7 @@ module M :
 module type S =
   sig
     module F : functor (X : T) -> T @@ stateless
-    module rec Fixed : sig type t = F(Fixed).t end @@ stateless
+    module rec Fixed : sig type t = F(Fixed).t end
   end
 module Id : functor (X : T) -> sig type t = X.t end
 |}]

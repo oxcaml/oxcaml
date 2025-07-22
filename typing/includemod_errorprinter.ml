@@ -244,50 +244,50 @@ end
 
 (* CR zqian: refactor to remove the following two functions *)
 let zap_axis_to_floor
-  : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> Mode.Value.l -> a
+  : type a. a Mode.Value.Axis.t -> Mode.Value.l -> a
   = fun ax m ->
   match ax with
   | Comonadic Areality ->
-      Mode.Regionality.zap_to_floor (Mode.Value.proj (Comonadic Areality) m)
+      Mode.Regionality.zap_to_floor (Mode.Value.proj_comonadic Areality m)
   | Comonadic Linearity ->
-      Mode.Linearity.zap_to_floor (Mode.Value.proj (Comonadic Linearity) m)
+      Mode.Linearity.zap_to_floor (Mode.Value.proj_comonadic Linearity m)
   | Comonadic Portability ->
-      Mode.Portability.zap_to_floor (Mode.Value.proj (Comonadic Portability)  m)
+      Mode.Portability.zap_to_floor (Mode.Value.proj_comonadic Portability  m)
   | Comonadic Yielding ->
-      Mode.Yielding.zap_to_floor (Mode.Value.proj (Comonadic Yielding) m)
+      Mode.Yielding.zap_to_floor (Mode.Value.proj_comonadic Yielding m)
   | Comonadic Statefulness ->
       Mode.Statefulness.zap_to_floor
-        (Mode.Value.proj (Comonadic Statefulness) m)
+        (Mode.Value.proj_comonadic Statefulness m)
   | Monadic Uniqueness ->
-      Mode.Uniqueness.zap_to_floor (Mode.Value.proj (Monadic Uniqueness) m)
+      Mode.Uniqueness.zap_to_floor (Mode.Value.proj_monadic Uniqueness m)
   | Monadic Contention ->
-      Mode.Contention.zap_to_floor (Mode.Value.proj (Monadic Contention) m)
+      Mode.Contention.zap_to_floor (Mode.Value.proj_monadic Contention m)
   | Monadic Visibility ->
-      Mode.Visibility.zap_to_floor (Mode.Value.proj (Monadic Visibility) m)
+      Mode.Visibility.zap_to_floor (Mode.Value.proj_monadic Visibility m)
 
 let zap_axis_to_ceil
-  : type a d0 d1. (a, d0, d1) Mode.Value.Axis.t -> Mode.Value.r -> a
+  : type a. a Mode.Value.Axis.t -> Mode.Value.r -> a
   = fun ax m ->
   match ax with
   | Comonadic Areality ->
-      Mode.Regionality.zap_to_ceil (Mode.Value.proj (Comonadic Areality) m)
+      Mode.Regionality.zap_to_ceil (Mode.Value.proj_comonadic Areality m)
   | Comonadic Linearity ->
-      Mode.Linearity.zap_to_ceil (Mode.Value.proj (Comonadic Linearity) m)
+      Mode.Linearity.zap_to_ceil (Mode.Value.proj_comonadic Linearity m)
   | Comonadic Portability ->
-      Mode.Portability.zap_to_ceil (Mode.Value.proj (Comonadic Portability) m)
+      Mode.Portability.zap_to_ceil (Mode.Value.proj_comonadic Portability m)
   | Comonadic Yielding ->
-      Mode.Yielding.zap_to_ceil (Mode.Value.proj (Comonadic Yielding) m)
+      Mode.Yielding.zap_to_ceil (Mode.Value.proj_comonadic Yielding m)
   | Comonadic Statefulness ->
-      Mode.Statefulness.zap_to_ceil (Mode.Value.proj (Comonadic Statefulness) m)
+      Mode.Statefulness.zap_to_ceil (Mode.Value.proj_comonadic Statefulness m)
   | Monadic Uniqueness ->
-      Mode.Uniqueness.zap_to_ceil (Mode.Value.proj (Monadic Uniqueness) m)
+      Mode.Uniqueness.zap_to_ceil (Mode.Value.proj_monadic Uniqueness m)
   | Monadic Contention ->
-      Mode.Contention.zap_to_ceil (Mode.Value.proj (Monadic Contention) m)
+      Mode.Contention.zap_to_ceil (Mode.Value.proj_monadic Contention m)
   | Monadic Visibility ->
-      Mode.Visibility.zap_to_ceil (Mode.Value.proj (Monadic Visibility) m)
+      Mode.Visibility.zap_to_ceil (Mode.Value.proj_monadic Visibility m)
 
 let print_out_mode
-: type a d0 d1. ?in_structure:_ -> (a, d0, d1) Mode.Value.Axis.t -> a -> _
+: type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _
 = fun ?(in_structure=true) ax mode ->
   let (module L) = Mode.Value.Const.lattice_of_axis ax in
   if in_structure then

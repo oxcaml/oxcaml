@@ -202,34 +202,33 @@ let should_use_linscan fd =
 
 let if_emit_do f x = if should_emit () then f x else ()
 
-let emit_begin_assembly unix =
-  if_emit_do
-    (fun () ->
-      if !Oxcaml_flags.llvm_backend
-      then Llvmize.begin_assembly ()
-      else Emit.begin_assembly unix)
-    ()
+let emit_begin_assembly ~sourcefile unix =
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.begin_assembly ~sourcefile
+  else if_emit_do (fun () -> Emit.begin_assembly unix) ()
 
 let emit_end_assembly ~sourcefile () =
-  if_emit_do
-    (fun () ->
-      if !Oxcaml_flags.llvm_backend
-      then Llvmize.end_assembly ~sourcefile
-      else
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.end_assembly ()
+  else
+    if_emit_do
+      (fun () ->
         try Emit.end_assembly ()
         with Emitaux.Error e ->
           let sourcefile = Option.value ~default:"*none*" sourcefile in
           raise (Error (Asm_generation (sourcefile, e))))
-    ()
+      ()
 
 let emit_data dl =
-  if_emit_do (if !Oxcaml_flags.llvm_backend then Llvmize.data else Emit.data) dl
+  if !Oxcaml_flags.llvm_backend
+  then Llvmize.data dl
+  else if_emit_do Emit.data dl
 
 let emit_fundecl f =
+  if !Oxcaml_flags.llvm_backend
+  then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
-      if !Oxcaml_flags.llvm_backend
-      then Misc.fatal_error "Linear IR not supported with llvm backend";
       try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
       with Emitaux.Error e ->
         raise (Error (Asm_generation (fundecl.Linear.fun_name, e))))
@@ -524,11 +523,12 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
+  if !Oxcaml_flags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
   let open_asm_file () =
     if create_asm
     then
       if !Oxcaml_flags.llvm_backend
-      then Llvmize.open_out ~asm_filename ~output_prefix
+      then Llvmize.open_out ~asm_filename
       else Emitaux.output_channel := open_out asm_filename
   in
   let close_asm_file () =
@@ -537,6 +537,24 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
       if !Oxcaml_flags.llvm_backend
       then Llvmize.close_out ()
       else close_out !Emitaux.output_channel
+  in
+  let assemble_file () =
+    if !Oxcaml_flags.llvm_backend
+    then Llvmize.assemble_file ~asm_filename ~obj_filename
+    else if not (should_emit ())
+    then 0
+    else (
+      if may_reduce_heap
+      then
+        Emitaux.reduce_heap_size ~reset:(fun () ->
+            reset ();
+            (* note: we need to preserve the persistent env, because it is used
+               to populate fields of the record written as the cmx file
+               afterwards. *)
+            Typemod.reset ~preserve_persistent_env:true;
+            Emitaux.reset ();
+            Reg.clear_relocatable_regs ());
+      Proc.assemble_file asm_filename obj_filename)
   in
   Misc.try_finally
     ~exceptionally:(fun () -> remove_file obj_filename)
@@ -551,30 +569,13 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
           write_ir output_prefix)
         ~always:(fun () -> close_asm_file ())
         ~exceptionally:remove_asm_file;
-      if should_emit ()
-      then (
-        if may_reduce_heap
-        then
-          Emitaux.reduce_heap_size ~reset:(fun () ->
-              reset ();
-              (* note: we need to preserve the persistent env, because it is
-                 used to populate fields of the record written as the cmx file
-                 afterwards. *)
-              Typemod.reset ~preserve_persistent_env:true;
-              Emitaux.reset ();
-              Reg.clear_relocatable_regs ());
-        let assemble_result =
-          Profile.record "assemble"
-            (Proc.assemble_file asm_filename)
-            obj_filename
-        in
-        if assemble_result <> 0
-        then raise (Error (Assembler_error asm_filename)));
+      let assemble_result = Profile.record_call "assemble" assemble_file in
+      if assemble_result <> 0 then raise (Error (Assembler_error asm_filename));
       remove_asm_file ())
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
        if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
@@ -639,7 +640,7 @@ let linear_gen_implementation unix filename =
   (* CR mshinwell: set [sourcefile] properly; [filename] isn't a .ml file *)
   let sourcefile = Some filename in
   Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  emit_begin_assembly ~sourcefile unix;
   Profile.record "Emit" (List.iter emit_item) linear_unit_info.items;
   emit_end_assembly ~sourcefile ()
 

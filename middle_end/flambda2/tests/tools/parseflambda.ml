@@ -1,6 +1,6 @@
 open Import
 
-let get_global_info = Flambda2.get_global_info
+let get_module_info = Flambda2.get_module_info
 
 let check_invariants program =
   try () (* Flambda_unit.invariant program *)
@@ -15,13 +15,18 @@ let parse_flambda filename =
     let comp_unit =
       Parse_flambda.make_compilation_unit ~extension:".fl" ~filename ()
     in
-    Compilation_unit.set_current (Some (comp_unit, Impl));
+    let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
+    Env.set_unit_name (Some unit_info);
     Format.printf "%a@.@." Print_fexpr.flambda_unit unit;
     let fl2 = Fexpr_to_flambda.conv comp_unit unit in
     Format.printf "flambda:@.%a@.@." Flambda_unit.print fl2;
     check_invariants fl2;
-    let cmx_loader = Flambda_cmx.create_loader ~get_global_info in
-    let { Simplify.unit = fl2'; _ } = Simplify.run ~cmx_loader ~round:1 fl2 in
+    let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+    (* CR gbury/lmaurer/bclement: add a proper traversal to compute the actual
+       code_slot_offsets here (as well as free_names) *)
+    let { Simplify.unit = fl2'; _ } =
+      Simplify.run ~cmx_loader ~round:1 fl2 ~code_slot_offsets:Code_id.Map.empty
+    in
     Format.printf "simplify:@.%a@." Flambda_unit.print fl2';
     let fl3 = Flambda_to_fexpr.conv fl2' in
     Format.printf "back to fexpr:@.%a@." Print_fexpr.flambda_unit fl3;

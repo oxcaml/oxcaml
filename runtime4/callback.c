@@ -216,6 +216,36 @@ static value callbackN(value closure, int narg, value args[])
   CAMLreturn (res);
 }
 
+/* The closures passed to caml_callback* are assumed to return a
+   global value, but if their runtime arity does not match the call
+   they may locally allocate some temporary intermediate closures.
+   These wrappers remove such closures from the stack.
+   This mirrors what is done by caml_apply3, as opposed to caml_apply3L */
+static value callback2_global(value closure, value arg1, value arg2)
+{
+  intnat sp = Caml_state->local_sp;
+  value res = callback2(closure, arg1, arg2);
+  Caml_state->local_sp = sp;
+  return res;
+}
+
+static value callback3_global(value closure, value arg1, value arg2, value arg3)
+{
+  intnat sp = Caml_state->local_sp;
+  value res = callback3(closure, arg1, arg2, arg3);
+  Caml_state->local_sp = sp;
+  return res;
+}
+
+static value callbackN_global(value closure, int narg, value args[])
+{
+  intnat sp = Caml_state->local_sp;
+  value res = callbackN(closure, narg, args);
+  Caml_state->local_sp = sp;
+  return res;
+}
+
+
 /* Functions that return all exceptions, including asynchronous ones */
 
 CAMLexport value caml_callback_exn(value closure, value arg)
@@ -227,7 +257,7 @@ CAMLexport value caml_callback_exn(value closure, value arg)
 
 CAMLexport value caml_callback2_exn(value closure, value arg1, value arg2)
 {
-  value res = callback2(closure, arg1, arg2);
+  value res = callback2_global(closure, arg1, arg2);
   Caml_state->raising_async_exn = 0;
   return res;
 }
@@ -235,14 +265,14 @@ CAMLexport value caml_callback2_exn(value closure, value arg1, value arg2)
 CAMLexport value caml_callback3_exn(value closure, value arg1, value arg2,
                                     value arg3)
 {
-  value res = callback3(closure, arg1, arg2, arg3);
+  value res = callback3_global(closure, arg1, arg2, arg3);
   Caml_state->raising_async_exn = 0;
   return res;
 }
 
 CAMLexport value caml_callbackN_exn(value closure, int narg, value args[])
 {
-  value res = callbackN(closure, narg, args);
+  value res = callbackN_global(closure, narg, args);
   Caml_state->raising_async_exn = 0;
   return res;
 }
@@ -257,18 +287,18 @@ CAMLexport value caml_callback (value closure, value arg)
 
 CAMLexport value caml_callback2 (value closure, value arg1, value arg2)
 {
-  return raise_if_exception(callback2(closure, arg1, arg2));
+  return raise_if_exception(callback2_global(closure, arg1, arg2));
 }
 
 CAMLexport value caml_callback3 (value closure, value arg1, value arg2,
                                  value arg3)
 {
-  return raise_if_exception(callback3(closure, arg1, arg2, arg3));
+  return raise_if_exception(callback3_global(closure, arg1, arg2, arg3));
 }
 
 CAMLexport value caml_callbackN (value closure, int narg, value args[])
 {
-  return raise_if_exception(callbackN(closure, narg, args));
+  return raise_if_exception(callbackN_global(closure, narg, args));
 }
 
 #endif

@@ -273,12 +273,13 @@ CAMLprim value caml_atomic_set(value ref, value v)
 
 CAMLprim value caml_atomic_compare_exchange_field(value ref, value vfield, value oldv, value newv)
 {
-  value* p = Op_val(ref);
-  if (*p == oldv) {
-    caml_modify_local(ref, Long_val(vfield), newv);
+  intnat field = Long_val(vfield);
+  value p = Field(ref, field);
+  if (p == oldv) {
+    caml_modify_local(ref, field, newv);
     return oldv;
   } else {
-    return *p;
+    return p;
   }
 }
 

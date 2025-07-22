@@ -113,11 +113,11 @@ let hard_float32_reg =
   Array.map (fun r -> {r with Reg.typ = Float32}) hard_float_reg
 
 let add_hard_vec256_regs list ~f =
-  if Arch.Extension.allow_vec256 ()
+  if Arch.Extension.enabled_vec256 ()
   then f hard_vec256_reg :: list else list
 
 let add_hard_vec512_regs list ~f =
-  if Arch.Extension.allow_vec512 ()
+  if Arch.Extension.enabled_vec512 ()
   then f hard_vec512_reg :: list else list
 
 let all_phys_regs =
@@ -519,12 +519,14 @@ let destroyed_by_simd_op (op : Simd.operation) =
     destroyed_by_simd_instr seq.instr
     |> Array.append
       (match seq.id with
-       | Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _ -> [||])
+       | Sqrtss | Sqrtsd | Roundss | Roundsd
+       | Pcompare_string _ | Vpcompare_string _
+       | Ptestz | Ptestc | Ptestnzc | Vptestz | Vptestc | Vptestnzc -> [||])
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
-  | SSE Add_f32 | SSE Sub_f32 | SSE Mul_f32 | SSE Div_f32
-  | SSE2 Add_f64 | SSE2 Sub_f64 | SSE2 Mul_f64 | SSE2 Div_f64 -> [||]
+  | Add_f32 | Sub_f32 | Mul_f32 | Div_f32
+  | Add_f64 | Sub_f64 | Mul_f64 | Div_f64 -> [||]
 
 let destroyed_at_raise = all_phys_regs
 
@@ -592,7 +594,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32 | Ipause
+                  | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Pause)
   | Poptrap _ | Prologue ->
@@ -707,8 +709,16 @@ let precolored_regs () =
   let phys_regs = Reg.set_of_array all_phys_regs in
   if fp then Reg.Set.remove rbp phys_regs else phys_regs
 
+let has_three_operand_float_ops () = Arch.Extension.enabled AVX
+
 let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
+  | Creinterpret_cast V256_of_v256
+  | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
+    Arch.Extension.enabled_vec256 ()
+  | Creinterpret_cast V512_of_v512
+  | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
+    Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -720,12 +730,28 @@ let operation_supported = function
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _
-  | Creinterpret_cast _ | Cstatic_cast _
   | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
   | Cpoll
   | Cpause
-    -> true
+  | Creinterpret_cast (Int_of_value | Value_of_int |
+                       Int64_of_float | Float_of_int64 |
+                       Float32_of_float | Float_of_float32 |
+                       Float32_of_int32 | Int32_of_float32 |
+                       V128_of_v128)
+  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+                  Int_of_float Float32 | Float_of_int Float32 |
+                  Float_of_int Float64 | Int_of_float Float64 |
+                  V128_of_scalar _ | Scalar_of_v128 _) ->
+    true
+
+let expression_supported = function
+  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+  | Cexit _ -> true
+  | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
+  | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 
 let trap_size_in_bytes = 16

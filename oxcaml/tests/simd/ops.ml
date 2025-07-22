@@ -2,6 +2,19 @@
 
 open Utils
 
+let check_binop scalar vector i0 i1 =
+  (failmsg := fun () -> Printf.printf "%016Lx | %016Lx\n%!" i0 i1);
+  let r0 = scalar i0 i1 in
+  let r1 = scalar i1 i0 in
+  let expect = int64x2_of_int64s r0 r1 in
+  let v1 = int64x2_of_int64s i0 i1 in
+  let v2 = int64x2_of_int64s i1 i0 in
+  let result = vector v1 v2 in
+  eq (int64x2_low_int64 result)
+    (int64x2_high_int64 result)
+    (int64x2_low_int64 expect)
+    (int64x2_high_int64 expect)
+
 module SSE_Util = struct
   include Builtins.SSE_Util
 
@@ -11,6 +24,13 @@ module SSE_Util = struct
   let low = int32x4_low_int64
 
   let high = int32x4_high_int64
+
+  let () =
+    Int64s.check_ints (check_binop Int64.logand bitwise_and);
+    Int64s.check_ints
+      (check_binop (fun l r -> Int64.(logand (lognot l) r)) andnot);
+    Int64s.check_ints (check_binop Int64.logor bitwise_or);
+    Int64s.check_ints (check_binop Int64.logxor bitwise_xor)
 
   let () =
     let eql = eq in
@@ -60,26 +80,6 @@ end
 
 module SSE2_Util = struct
   include Builtins.SSE2_Util
-
-  let check_binop scalar vector i0 i1 =
-    (failmsg := fun () -> Printf.printf "%016Lx | %016Lx\n%!" i0 i1);
-    let r0 = scalar i0 i1 in
-    let r1 = scalar i1 i0 in
-    let expect = int64x2_of_int64s r0 r1 in
-    let v1 = int64x2_of_int64s i0 i1 in
-    let v2 = int64x2_of_int64s i1 i0 in
-    let result = vector v1 v2 in
-    eq (int64x2_low_int64 result)
-      (int64x2_high_int64 result)
-      (int64x2_low_int64 expect)
-      (int64x2_high_int64 expect)
-
-  let () =
-    Int64s.check_ints (check_binop Int64.logand bitwise_and);
-    Int64s.check_ints
-      (check_binop (fun l r -> Int64.(logand (lognot l) r)) andnot);
-    Int64s.check_ints (check_binop Int64.logor bitwise_or);
-    Int64s.check_ints (check_binop Int64.logxor bitwise_xor)
 
   let () =
     let v0 = int64x2_of_int64s 0xffffffffffffffffL 0x8000000000000000L in

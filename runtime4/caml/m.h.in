@@ -106,4 +106,24 @@
 
 #undef STACK_ALLOCATION
 
+#undef HAS_POPCNT
+
+#undef HAS_PCLMUL
+
+#undef HAS_LZCNT
+
+#undef HAS_SSE3
+
+#undef HAS_SSSE3
+
+#undef HAS_SSE4_1
+
+#undef HAS_SSE4_2
+
 #undef HAS_BMI
+
+#undef HAS_BMI2
+
+#undef HAS_AVX
+
+#undef HAS_AVX2

@@ -383,6 +383,8 @@ let const c : Fexpr.const =
   | Naked_vec512 bits ->
     Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
+  | Naked_int8 _ | Naked_int16 _ ->
+    Misc.fatal_error "small integers not supported in fexpr"
   | Null -> Misc.fatal_error "null not supported in fexpr"
 
 let depth_or_infinity (d : int Or_infinity.t) : Fexpr.rec_info =
@@ -607,8 +609,9 @@ let binop env (op : Flambda_primitive.binary_primitive) : Fexpr.binop =
   | Phys_equal op -> Phys_equal op
   | Int_arith (Tagged_immediate, o) -> Infix (Int_arith o)
   | Int_arith
-      (((Naked_immediate | Naked_int32 | Naked_int64 | Naked_nativeint) as i), o)
-    ->
+      ( (( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32
+         | Naked_int64 | Naked_nativeint ) as i),
+        o ) ->
     Int_arith (i, o)
   | Int_comp (i, c) -> Int_comp (i, c)
   | Int_shift (Tagged_immediate, s) -> Infix (Int_shift s)

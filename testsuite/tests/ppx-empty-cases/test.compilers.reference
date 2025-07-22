@@ -1,19 +1,19 @@
 (setglobal Test!
   (let
     (empty_cases_returning_string/275 =
-       (function {nlocal = 0} param/277
+       (function {nlocal = 0} param/277?
          (raise
            (makeblock 0 (getpredef Match_failure/42!!) [0: "test.ml" 28 50])))
      empty_cases_returning_float64/278 =
-       (function {nlocal = 0} param/280 : unboxed_float
+       (function {nlocal = 0} param/280? : unboxed_float
          (raise
            (makeblock 0 (getpredef Match_failure/42!!) [0: "test.ml" 29 50])))
      empty_cases_accepting_string/281 =
-       (function {nlocal = 0} param/283
+       (function {nlocal = 0} param/283?
          (raise
            (makeblock 0 (getpredef Match_failure/42!!) [0: "test.ml" 30 50])))
      empty_cases_accepting_float64/284 =
-       (function {nlocal = 0} param/286[unboxed_float]
+       (function {nlocal = 0} param/286[float]
          (raise
            (makeblock 0 (getpredef Match_failure/42!!) [0: "test.ml" 31 50])))
      non_empty_cases_returning_string/287 =
@@ -29,7 +29,7 @@
          (raise
            (makeblock 0 (getpredef Assert_failure/52!!) [0: "test.ml" 34 68])))
      non_empty_cases_accepting_float64/296 =
-       (function {nlocal = 0} param/298[unboxed_float]
+       (function {nlocal = 0} param/298[float]
          (raise
            (makeblock 0 (getpredef Assert_failure/52!!) [0: "test.ml" 35 68]))))
     (makeblock 0 empty_cases_returning_string/275
