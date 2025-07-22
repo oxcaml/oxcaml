@@ -10,7 +10,6 @@ title: Syntax
 [manual]: https://ocaml.org/manual/language.html
 [unboxed types]: ../../unboxed-types/intro
 [nullability]: ../non-modal#nullability
-[externality]: ../non-modal#externality
 
 This page describes user-facing concerns about kind annotations. You may
 want to read an [overview][] of the kind system first.
@@ -98,7 +97,7 @@ We thus give the non-primitive `value` the shorter name.
 
 Beyond just kind abbreviations, we also have one bounds abbreviation:
 `everything`. `everything` describes a maximal amount of crossing on
-*deep* axes: modal axes and externality. The `nullability` and `separability` bounds, due to
+modal axes. The `nullability` and `separability` bounds, due to
 their shallowness, are considered separately.
 
 The abbreviations defined in the language are as follows:
@@ -108,7 +107,7 @@ The abbreviations defined in the language are as follows:
 
     Values whose types have kinds that include `mod everything` do not...
 
-    * ... allocate memory: this allows them to mode-cross to `global` and be
+    * ... allocate memory: this allows them to mode-cross to `global` and
       `external_`.
     * ... contain functions: this allows them to mode-cross to `many portable
       unyielding stateless` (all of which only affect functions).
@@ -163,9 +162,8 @@ The abbreviations defined in the language are as follows:
 
     `external64` describes exactly this scenario: on a 64-bit machine, values
     of this type are never pointers to allocations managed by the OCaml garbage
-    collector. This means that mutations of values of this type do not require a
-    call to `caml_modify` (on 64-bit machines). See also the documentation on
-    [externality][].
+    collector. See also the documentation on
+    [externality](../_05-modes/intro.md#future-modes-externality).
 
 * `immutable_data =
      value mod many contended portable unyielding immutable stateless non_float`

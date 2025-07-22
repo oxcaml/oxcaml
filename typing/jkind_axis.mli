@@ -21,16 +21,6 @@ module type Axis_ops = sig
   val equal : t -> t -> bool
 end
 
-(** The jkind axis of Externality *)
-module Externality : sig
-  type t =
-    | External
-    | External64
-    | Internal
-
-  include Axis_ops with type t := t
-end
-
 (** The jkind axis of nullability *)
 module Nullability : sig
   type t =
@@ -52,7 +42,6 @@ end
 module Axis : sig
   module Nonmodal : sig
     type 'a t =
-      | Externality : Externality.t t
       | Nullability : Nullability.t t
       | Separability : Separability.t t
   end

@@ -20,59 +20,6 @@ module type Axis_ops = sig
   val equal : t -> t -> bool
 end
 
-module Externality = struct
-  type t =
-    | External
-    | External64
-    | Internal
-
-  let max = Internal
-
-  let min = External
-
-  let legacy = Internal
-
-  let equal e1 e2 =
-    match e1, e2 with
-    | External, External -> true
-    | External64, External64 -> true
-    | Internal, Internal -> true
-    | (External | External64 | Internal), _ -> false
-
-  let less_or_equal t1 t2 : Misc.Le_result.t =
-    match t1, t2 with
-    | External, External -> Equal
-    | External, (External64 | Internal) -> Less
-    | External64, External -> Not_le
-    | External64, External64 -> Equal
-    | External64, Internal -> Less
-    | Internal, (External | External64) -> Not_le
-    | Internal, Internal -> Equal
-
-  let le t1 t2 = Misc.Le_result.is_le (less_or_equal t1 t2)
-
-  let meet t1 t2 =
-    match t1, t2 with
-    | External, (External | External64 | Internal)
-    | (External64 | Internal), External ->
-      External
-    | External64, (External64 | Internal) | Internal, External64 -> External64
-    | Internal, Internal -> Internal
-
-  let join t1 t2 =
-    match t1, t2 with
-    | Internal, (Internal | External64 | External)
-    | (External64 | External), Internal ->
-      Internal
-    | External64, (External64 | External) | External, External64 -> External64
-    | External, External -> External
-
-  let print ppf = function
-    | External -> Format.fprintf ppf "external_"
-    | External64 -> Format.fprintf ppf "external64"
-    | Internal -> Format.fprintf ppf "internal"
-end
-
 module Nullability = struct
   type t =
     | Non_null
@@ -171,7 +118,6 @@ end
 module Axis = struct
   module Nonmodal = struct
     type 'a t =
-      | Externality : Externality.t t
       | Nullability : Nullability.t t
       | Separability : Separability.t t
   end
@@ -198,7 +144,6 @@ module Axis = struct
   let get (type a) : a t -> (module Axis_ops with type t = a) = function
     | Modal axis ->
       (module Accent_lattice ((val Mode.Alloc.Const.lattice_of_axis axis)))
-    | Nonmodal Externality -> (module Externality)
     | Nonmodal Nullability -> (module Nullability)
     | Nonmodal Separability -> (module Separability)
 
@@ -211,13 +156,12 @@ module Axis = struct
       Pack (Modal (Comonadic Yielding));
       Pack (Modal (Comonadic Statefulness));
       Pack (Modal (Monadic Visibility));
-      Pack (Nonmodal Externality);
+      Pack (Modal (Comonadic Externality));
       Pack (Nonmodal Nullability);
       Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
     | Modal axis -> Format.asprintf "%a" Mode.Alloc.Axis.print axis
-    | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
     | Nonmodal Separability -> "separability"
 end
@@ -238,7 +182,7 @@ module Axis_set = struct
     | Modal (Comonadic Yielding) -> 5
     | Modal (Comonadic Statefulness) -> 6
     | Modal (Monadic Visibility) -> 7
-    | Nonmodal Externality -> 8
+    | Modal (Comonadic Externality) -> 8
     | Nonmodal Nullability -> 9
     | Nonmodal Separability -> 10
 
@@ -268,7 +212,7 @@ module Axis_set = struct
     |> set_axis (Modal (Comonadic Yielding))
     |> set_axis (Modal (Comonadic Statefulness))
     |> set_axis (Modal (Monadic Visibility))
-    |> set_axis (Nonmodal Externality)
+    |> set_axis (Modal (Comonadic Externality))
     |> set_axis (Nonmodal Nullability)
     |> set_axis (Nonmodal Separability)
 

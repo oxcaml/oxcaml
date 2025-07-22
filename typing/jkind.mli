@@ -619,12 +619,12 @@ val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 val get_externality_upper_bound :
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
   'd Types.jkind ->
-  Jkind_axis.Externality.t
+  Mode.Externality.Const.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the externality axis *)
 val set_externality_upper_bound :
-  Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
+  Types.jkind_r -> Mode.Externality.Const.t -> Types.jkind_r
 
 (** Gets the nullability from a jkind. *)
 val get_nullability :
