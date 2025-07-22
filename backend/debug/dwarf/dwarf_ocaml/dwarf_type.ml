@@ -466,7 +466,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
       (* CR sspies: For now, we ignore the layout here. This has to be fixed in
          future versions. *)
       type_shape_to_die type_shape ~parent_proto_die ~fallback_die)
-  | Proj { uid = _; unboxed_field = _} ->
+  | Proj { uid = _; unboxed_field = _ } ->
     (* CR mshinwell: support unboxed product projections in the shape eval
        language *)
     fallback_die
