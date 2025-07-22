@@ -1555,6 +1555,7 @@ module Hint = struct
     | None
     | Lazy
     | Functor
+    | Module
     | Function
     | Tailcall_function
     | Tailcall_argument
@@ -1713,147 +1714,76 @@ type 'a axerror =
     right_hint : 'a axhint
   }
 
-let print_const_hint ppf : Hint.const -> unit =
+let print_const_hint a_obj a ppf : Hint.const -> unit =
   let open Format in
-  let print = fprintf ppf in
+  let wrap_print_hint t = fprintf ppf " because it %t" t in
   function
   | None -> ()
-  | Lazy -> print "is the result of a lazy expression"
-  | Functor -> print "is used in a functor"
-  | Function -> print "is used in a function"
-  | Tailcall_function -> print "is the function in a tail call"
-  | Tailcall_argument -> print "is an argument in a tail call"
-  | Read_mutable -> print "has a mutable field read from"
-  | Write_mutable -> print "has a mutable field written to"
-  | Force_lazy -> print "has a lazy expression forced"
-  | Return -> print "is a local value returned without an exclave annotation"
-  | Stack -> print "is in a stack expression"
+  | Lazy -> wrap_print_hint (dprintf "is the result of a lazy expression")
+  | Functor ->
+    wrap_print_hint
+      (dprintf "is used in a functor, and functors are always %a"
+         (C.print a_obj) a)
+  | Function -> wrap_print_hint (dprintf "is used in a function")
+  | Tailcall_function ->
+    wrap_print_hint (dprintf "is the function in a tail call")
+  | Tailcall_argument ->
+    wrap_print_hint (dprintf "is an argument in a tail call")
+  | Read_mutable -> wrap_print_hint (dprintf "has a mutable field read from")
+  | Write_mutable -> wrap_print_hint (dprintf "has a mutable field written to")
+  | Force_lazy -> wrap_print_hint (dprintf "has a lazy expression forced")
+  | Return ->
+    wrap_print_hint
+      (dprintf "is a function return value without an exclave annotation")
+  | Stack -> wrap_print_hint (dprintf "is in a stack expression")
 
-let rec res_print_morph_hint :
-    type l r. Format.formatter -> (l * r) Hint.morph -> unit =
+let rec print_morph_hint :
+    type l r.
+    (l * r) Hint.morph ->
+    [ `Skip
+    | `Stop
+    | `PrintThenStop of Format.formatter -> unit
+    | `PrintThenContinue of Format.formatter -> unit ] =
   let open Format in
-  fun ppf hint ->
-    let print = fprintf ppf in
+  fun hint ->
     match hint with
-    | Debug s -> printf "DEBUG[%s]" s
-    | None ->
-      (* TODO - once done adding correct functionality, remove stopping for development *)
-      print "emptymorphhint"
-    | Skip ->
-      (* TODO - once done adding correct functionality, remove stopping for development *)
-      print "skipmorphhint"
-    | Close_over loc ->
-      printf "closes over something (at %a)" Location.print_loc loc
-    | Is_closed_by loc ->
-      printf "is closed by something (at %a)" Location.print_loc loc
-    | Partial_application -> print "is captured by a partial application"
-    | Crossing_left | Crossing_right -> print "crosses with something (TODO)"
+    (* | Debug s -> `PrintThenContinue (dprintf "DEBUG[%s]" s) *)
+    | Debug _ -> `Skip
+    | None -> `Stop
+    | Skip -> `Skip
+    | Close_over (item, loc) ->
+      `PrintThenContinue
+        (dprintf "closes over a %a (at %a)" _ _ Location.print_loc loc)
+    | Is_closed_by (item, loc) ->
+      `PrintThenContinue
+        (dprintf "is used inside %a (at %a)" _ _ Location.print_loc loc)
+    | Partial_application ->
+      `PrintThenContinue (dprintf "is captured by a partial application")
+    | Crossing_left | Crossing_right ->
+      `PrintThenContinue (dprintf "crosses with something")
     | Adj_partial_application ->
-      print "has a partial application capturing a value"
-    | Compose (hint1, hint2) ->
-      (* TODO - refer to old impl. *)
-      (* TODO - need to make this so that if hint1 is skip it still prints out hint2 *)
-      _
+      `PrintThenContinue (dprintf "has a partial application capturing a value")
+    | Compose (hint1, hint2) -> (
+      match print_morph_hint hint1 with
+      | `Skip -> print_morph_hint hint2
+      | `Stop -> `Stop
+      | `PrintThenStop pp1 -> `PrintThenStop pp1
+      | `PrintThenContinue pp1 -> (
+        match print_morph_hint hint2 with
+        | `Skip -> `PrintThenContinue pp1
+        | `Stop -> `PrintThenStop pp1
+        | `PrintThenStop pp2 -> `PrintThenStop (dprintf "%t, which %t" pp1 pp2)
+        | `PrintThenContinue pp2 ->
+          `PrintThenContinue (dprintf "%t, which %t" pp1 pp2)))
 
-and print_axhint_chain :
-    type a. a -> a C.obj -> Format.formatter -> a axhint -> unit =
+let rec print_axhint_chain :
+    type a. a -> a C.obj -> a axhint -> Format.formatter -> unit =
+ fun (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
   let open Format in
-  fun (a : a) (a_obj : a C.obj) ppf (hint : a axhint) ->
-    (* TODO - we plan now to write this so that it can just write it continuously.
-       This should be fine to do, even if we don't know what mode to write at the end of the line yet, as that should be the next information gained, I think? *)
-    match hint with
-    | Morph (morph_hint, b, b_obj, b_hint, morph) -> (
-      let morph_name =
-        match morph with
-        | Id -> "Id"
-        | Meet_with _ -> "Meet_with"
-        | Imply _ -> "Imply"
-        | Proj _ -> "Proj"
-        | Max_with _ -> "Max_with"
-        | Min_with _ -> "Min_with"
-        | Map_comonadic _ -> "Map_comonadic"
-        | Monadic_to_comonadic_min -> "Monadic_to_comonadic_min"
-        | Comonadic_to_monadic _ -> "Comonadic_to_monadic"
-        | Monadic_to_comonadic_max -> "Monadic_to_comonadic_max"
-        | Local_to_regional -> "Local_to_regional"
-        | Regional_to_local -> "Regional_to_local"
-        | Locality_as_regionality -> "Locality_as_regionality"
-        | Regional_to_global -> "Regional_to_global"
-        | Global_to_regional -> "Global_to_regional"
-        | Compose _ -> "Compose"
-      in
-      match C.eq_obj a_obj b_obj with
-      | Some Refl
-        when Misc.Le_result.equal ~le:(C.le a_obj) a b
-             && not (Hint.is_rigid morph_hint) ->
-        (* When the [a] and [b] modes are equal, and the hint is non-rigid,
-           we can skip printing this line. *)
-        opt_sprint_axhint_chain b b_obj b_hint
-      | Some Refl | None -> (
-        match res_sprint_morph_hint morph_hint with
-        | Error `Stop -> None
-        | Error `Skip -> opt_sprint_axhint_chain b b_obj b_hint
-        | Ok morph_hint_str ->
-          let subchain_str =
-            match opt_sprint_axhint_chain b b_obj b_hint with
-            | None -> ""
-            | Some s -> sprintf "\n%s" s
-          in
-          (* TODO - When we are printing an expected mode, use the word "expected" at start (i.e. "This is expected to be ...") *)
-          (* TODO - also use "expected" for stuff like "closed by something that is expected to be global" *)
-          Some
-            (asprintf "[morph=%s] This is %a because it %s %a.%s" morph_name
-               (C.print a_obj) a morph_hint_str
-               (axhint_chain_print_next_mode b_obj b)
-               b_hint subchain_str)))
-    | Const const_hint -> (
-      match res_sprint_const_hint const_hint with
-      | Error () -> ()
-      | Ok const_hint_str ->
-        Some
-          (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str)
-      )
-    | Empty -> ()
-
-let res_sprint_const_hint : Hint.const -> (string, unit) result = function
-  | None -> Error ()
-  | Lazy -> Ok "is the result of a lazy expression"
-  | Functor -> Ok "is used in a functor"
-  | Function -> Ok "is used in a function"
-  | Tailcall_function -> Ok "is the function in a tail call"
-  | Tailcall_argument -> Ok "is an argument in a tail call"
-  | Read_mutable -> Ok "has a mutable field read from"
-  | Write_mutable -> Ok "has a mutable field written to"
-  | Force_lazy -> Ok "has a lazy expression forced"
-  | Return -> Ok "is a local value returned without an exclave annotation"
-  | Stack -> Ok "is in a stack expression"
-
-let rec res_sprint_morph_hint :
-    type l r. (l * r) Hint.morph -> (string, [`Stop | `Skip]) result =
-  let open Format in
-  function
-  | Debug s -> Ok (sprintf "DEBUG[%s]" s)
-  | None -> Ok "emptymorphhint"
-  | Skip -> Ok "skipmorphhint"
-  | Close_over loc ->
-    Ok (asprintf "closes over something (at %a)" Location.print_loc loc)
-  | Is_closed_by loc ->
-    Ok (asprintf "is closed by something (at %a)" Location.print_loc loc)
-  | Partial_application -> Ok "is captured by a partial application"
-  | Crossing_left | Crossing_right -> Ok "crosses with something (TODO)"
-  | Adj_partial_application -> Ok "has a partial application capturing a value"
-  | Compose (hint1, hint2) ->
-    (* TODO - need to fix this so that if hint1 is skip it still prints out hint2 *)
-    Result.bind (res_sprint_morph_hint hint1) (fun s1 ->
-        match res_sprint_morph_hint hint2 with
-        | Error `Stop -> Error `Stop
-        | Error `Skip -> Ok (sprintf "%s" s1)
-        | Ok s2 -> Ok (sprintf "%s, which %s" s1 s2))
-
-let rec opt_axhint_chain_tail :
-    type a. a -> a C.obj -> a axhint -> (string * string) option =
- fun (a : a) (a_obj : a C.obj) (hint : a axhint) ->
-  let open Format in
+  let print_mode x_obj x =
+    (* TODO - wrap around this to handle regional specially, "local to the parent region" *)
+    C.print x_obj ppf x
+  in
   match hint with
   | Morph (morph_hint, b, b_obj, b_hint, morph) -> (
     let morph_name =
@@ -1880,59 +1810,39 @@ let rec opt_axhint_chain_tail :
       when Misc.Le_result.equal ~le:(C.le a_obj) a b
            && not (Hint.is_rigid morph_hint) ->
       (* When the [a] and [b] modes are equal, and the hint is non-rigid,
-         we can skip printing this line. *)
-      opt_sprint_axhint_chain b b_obj b_hint
+         we can definitely skip printing this line. *)
+      print_axhint_chain b b_obj b_hint ppf
     | Some Refl | None -> (
-      match res_sprint_morph_hint morph_hint with
-      | Error `Stop -> None
-      | Error `Skip -> opt_sprint_axhint_chain b b_obj b_hint
-      | Ok morph_hint_str ->
-        let subchain_str =
-          match opt_sprint_axhint_chain b b_obj b_hint with
-          | None -> ""
-          | Some s -> sprintf "\n%s" s
-        in
-        (* TODO - When we are printing an expected mode, use the word "expected" at start (i.e. "This is expected to be ...") *)
-        (* TODO - also use "expected" for stuff like "closed by something that is expected to be global" *)
-        Some
-          (asprintf "[morph=%s] This is %a because it %s %a.%s" morph_name
-             (C.print a_obj) a morph_hint_str
-             (axhint_chain_print_next_mode b_obj b)
-             b_hint subchain_str)))
-  | Const const_hint -> (
-    match res_sprint_const_hint const_hint with
-    | Error () -> None
-    | Ok const_hint_str ->
-      Some
-        (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str))
-  | Empty -> None
+      match print_morph_hint morph_hint with
+      | `Skip ->
+        (* This is another case where we skip a line without printing the mode first *)
+        print_axhint_chain b b_obj b_hint ppf
+      | `Stop -> print_mode a_obj a
+      | `PrintThenStop pp ->
+        print_mode a_obj a;
+        fprintf ppf " [morph=%s] because it %t, that is of some unknown mode"
+          morph_name pp
+      | `PrintThenContinue pp ->
+        print_mode a_obj a;
+        fprintf ppf " [morph=%s] because it %t,@ that is " morph_name pp;
+        print_axhint_chain b b_obj b_hint ppf))
+  | Const const_hint ->
+    print_mode a_obj a;
+    print_const_hint a_obj a ppf const_hint
+  | Empty -> print_mode a_obj a
 
 let report_axerror :
     type a.
-    Format.formatter ->
     a Lattices_mono.obj ->
     a Lattices_mono.obj ->
     a axerror ->
+    Format.formatter ->
     unit =
- fun ppf left_obj right_obj err ->
+ fun left_obj right_obj err ppf ->
   let open Format in
-  let right_trace_str =
-    match opt_sprint_axhint_chain err.right right_obj err.right_hint with
-    | None -> ""
-    | Some s -> sprintf "\n%s" s
-  in
-  let left_trace_str =
-    match opt_sprint_axhint_chain err.left left_obj err.left_hint with
-    | None -> ""
-    | Some s -> sprintf "\n%s" s
-  in
-  fprintf ppf {|It is expected to be %a.%s
-
-However, it is actually %a.%s|}
-    (axhint_chain_print_next_mode right_obj err.right)
-    err.right_hint right_trace_str
-    (axhint_chain_print_next_mode left_obj err.left)
-    err.left_hint left_trace_str
+  fprintf ppf {|It is expected to be %t.@ However, it is actually %t.|}
+    (print_axhint_chain err.right right_obj err.right_hint)
+    (print_axhint_chain err.left left_obj err.left_hint)
 
 (** Description of an input axis responsible for an output axis of a morphism *)
 type 'a responsible_axis =
@@ -2710,7 +2620,7 @@ module Comonadic_with (Areality : Areality) = struct
   let report_error ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ppf left_obj right_obj err
+    report_axerror left_obj right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -2855,7 +2765,7 @@ module Monadic = struct
   let report_error ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ppf left_obj right_obj err
+    report_axerror left_obj right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -3319,7 +3229,7 @@ module Value_with (Areality : Areality) = struct
   let report_error ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ppf left_obj right_obj err
+    report_axerror left_obj right_obj err ppf
 
   type equate_error = equate_step * error
 

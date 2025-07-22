@@ -3318,7 +3318,7 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     in
     {mode; context = Some shared_context}
 
-let closure_mode ~errors ~env ~loc ~item:_ ~lid
+let closure_mode ~errors ~env ~loc ~item ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
   (* [mode] is the mode of the value being closed over, [comonadic0] is the mode of the closure *)
   begin
