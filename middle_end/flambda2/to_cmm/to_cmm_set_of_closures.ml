@@ -28,7 +28,10 @@ type translate_expr =
   To_cmm_env.t ->
   To_cmm_result.t ->
   Expr.t ->
-  Cmm.expression * To_cmm_env.free_vars * To_cmm_result.t
+  Cmm.expression
+  * To_cmm_env.free_vars
+  * To_cmm_env.Symbol_inits.t
+  * To_cmm_result.t
 
 (* Filling of closure blocks *)
 
@@ -440,7 +443,7 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
     ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_region
-    ~my_ghost_region ~translate_expr =
+    ~my_ghost_region ~(translate_expr : translate_expr) =
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -496,7 +499,15 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
-  let fun_body, fun_body_free_vars, res = translate_expr env res body in
+  let fun_body, fun_body_free_vars, fun_body_symbol_inits, res =
+    translate_expr env res body
+  in
+  (* Symbol definitions should have been lifted at top-level *)
+  if not (To_cmm_env.Symbol_inits.is_empty fun_body_symbol_inits)
+  then
+    Misc.fatal_errorf
+      "Found leftover symbol initializations statements in a function body: %a"
+      To_cmm_env.Symbol_inits.print fun_body_symbol_inits;
   let fun_free_vars =
     C.remove_vars_with_machtype
       (C.remove_var_opt_with_provenance
@@ -537,7 +548,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     res )
 
 let params_and_body env res code_id p ~result_arity ~fun_dbg
-    ~zero_alloc_attribute ~translate_expr =
+    ~zero_alloc_attribute ~(translate_expr : translate_expr) =
   Function_params_and_body.pattern_match p
     ~f:(fun
          ~return_continuation
@@ -666,8 +677,8 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
  *   g
 
  *)
-let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
-    ~num_normal_occurrences_of_bound_vars =
+let lift_set_of_closures env res ~body ~bound_vars layout set
+    ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
   let comp_unit = Compilation_unit.get_current_exn () in
   let dbg = debuginfo_for_set_of_closures env set in
@@ -715,7 +726,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
 
 let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     (layout : Slot_offsets.Layout.t) ~num_normal_occurrences_of_bound_vars
-    ~(closure_alloc_mode : Alloc_mode.For_allocations.t) ~translate_expr =
+    ~(closure_alloc_mode : Alloc_mode.For_allocations.t)
+    ~(translate_expr : translate_expr) =
   let fun_decls = Set_of_closures.function_decls set in
   let decls = Function_declarations.funs_in_order fun_decls in
   let value_slots = Set_of_closures.value_slots set in
@@ -795,7 +807,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   translate_expr env res body
 
 let let_dynamic_set_of_closures env res ~body ~bound_vars
-    ~num_normal_occurrences_of_bound_vars set ~translate_expr =
+    ~num_normal_occurrences_of_bound_vars set ~(translate_expr : translate_expr)
+    =
   let layout = layout_for_set_of_closures env set in
   if layout.empty_env
   then
