@@ -86,6 +86,8 @@ val ge_component : machtype_component -> machtype_component -> bool
     to external C functions *)
 type exttype =
   | XInt  (**r OCaml value, word-sized integer *)
+  | XInt8  (**r 8-bit integer *)
+  | XInt16  (**r 16-bit integer *)
   | XInt32  (**r 32-bit integer *)
   | XInt64  (**r 64-bit integer  *)
   | XFloat32  (**r single-precision FP number *)
@@ -291,7 +293,9 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128 (* Converts between vector types of the same width. *)
+  | V128_of_v128
+  | V256_of_v256
+  | V512_of_v512 (* Converts between vector types of the same width. *)
 
 (* These casts may require a particular value-preserving operation, e.g.
    truncating a float to an int. *)
@@ -302,6 +306,10 @@ type static_cast =
   | Float32_of_float
   | V128_of_scalar of vec128_type
   | Scalar_of_v128 of vec128_type
+  | V256_of_scalar of vec256_type
+  | Scalar_of_v256 of vec256_type
+  | V512_of_scalar of vec512_type
+  | Scalar_of_v512 of vec512_type
 
 module Alloc_mode : sig
   type t =
@@ -540,7 +548,8 @@ type fundecl =
     fun_body : expression;
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
-    fun_dbg : Debuginfo.t
+    fun_dbg : Debuginfo.t;
+    fun_ret_type : machtype
   }
 
 (** When data items that are less than 64 bits wide occur in blocks, whose

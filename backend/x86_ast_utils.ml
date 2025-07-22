@@ -90,3 +90,14 @@ let equal_arg left right =
   | Mem64_RIP (l_dt, l_s, l_i), Mem64_RIP (r_dt, r_s, r_i) ->
     equal_data_type l_dt r_dt && String.equal l_s r_s && Int.equal l_i r_i
   | (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _ | Mem64_RIP _), _ -> false
+
+let is_mem = function
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
+    false
+  | Mem _ | Mem64_RIP _ -> true
+
+let is_regf = function
+  | Regf _ -> true
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
+  | Mem64_RIP _ ->
+    false

@@ -1237,7 +1237,12 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
       Variable.Map.fold
         (fun var kind target_env ->
           TE.add_definition target_env
-            (Bound_name.create_var (Bound_var.create var Name_mode.in_types))
+            (Bound_name.create_var
+               (Bound_var.create var Flambda_debug_uid.none
+                  (* Variables with [Name_mode.in_types] do not exist at
+                     runtime, so we do not equip them with a
+                     [Flambda_debug_uid.t]. See #3967. *)
+                  Name_mode.in_types))
             kind)
         extra_variables target_env
     in
@@ -1375,7 +1380,10 @@ type env_id = Index.t
 
 type 'a join_arg = env_id * 'a
 
-let target_join_env { target_env; _ } = target_env
+let code_age_relation { target_env; _ } = TE.code_age_relation target_env
+
+let code_age_relation_resolver { target_env; _ } =
+  TE.code_age_relation_resolver target_env
 
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 

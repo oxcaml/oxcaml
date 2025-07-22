@@ -47,7 +47,7 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
        Using [addressing_mode] is tricky because it need not be the start of the
        prefetch cache line and the interval would depend on cache line size. *)
     create Memory_access.Arbitrary
-  | Icldemote _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipause ->
+  | Icldemote _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence ->
     (* Conservative, don't reorder around timing or ordering instructions. *)
     create Memory_access.Arbitrary
   | Ipackf32 -> None
@@ -66,6 +66,6 @@ let is_seed_store :
   match op with
   | Istore_int _ -> Some W64
   | Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _ | Irdtsc
-  | Irdpmc | Ilfence | Isfence | Imfence | Ipause | Ipackf32 | Isimd _
-  | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32 | Izextend32 ->
+  | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 ->
     None

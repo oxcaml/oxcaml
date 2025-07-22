@@ -87,6 +87,7 @@ module type Oxcaml_options = sig
 
   val llvm_backend : unit -> unit
   val dllvmir : unit -> unit
+  val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
 
   val flambda2_debug : unit -> unit

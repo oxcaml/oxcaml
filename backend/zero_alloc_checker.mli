@@ -61,9 +61,12 @@ module Witness : sig
         }
     | Widen
 
+  type hint
+
   type t =
     { dbg : Debuginfo.t;
-      kind : kind
+      kind : kind;
+      hint : hint
     }
 end
 

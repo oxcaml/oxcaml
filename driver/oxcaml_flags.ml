@@ -128,6 +128,8 @@ let llvm_backend = ref false (* -llvm-backend *)
 
 let dump_llvmir = ref false (* -dllvmir *)
 
+let keep_llvmir = ref false (* -keep-llvmir *)
+
 let llvm_path = ref None (* -llvm-path *)
 
 module Flambda2 = struct

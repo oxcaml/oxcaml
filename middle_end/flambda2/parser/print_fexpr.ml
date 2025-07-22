@@ -131,6 +131,8 @@ let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   | Naked_immediate -> "imm"
   | Naked_float32 -> "float32"
   | Naked_float -> "float"
+  | Naked_int8 -> "int8"
+  | Naked_int16 -> "int16"
   | Naked_int32 -> "int32"
   | Naked_int64 -> "int64"
   | Naked_nativeint -> "nativeint"
@@ -203,6 +205,8 @@ let standard_int ~space ppf (i : standard_int) =
     match i with
     | Tagged_immediate -> None
     | Naked_immediate -> Some "imm"
+    | Naked_int8 -> Some "int8"
+    | Naked_int16 -> Some "int16"
     | Naked_int32 -> Some "int32"
     | Naked_int64 -> Some "int64"
     | Naked_nativeint -> Some "nativeint"
@@ -216,6 +220,8 @@ let convertible_type ppf (t : standard_int_or_float) =
     | Naked_immediate -> "imm"
     | Naked_float32 -> "float32"
     | Naked_float -> "float"
+    | Naked_int8 -> "int8"
+    | Naked_int16 -> "int16"
     | Naked_int32 -> "int32"
     | Naked_int64 -> "int64"
     | Naked_nativeint -> "nativeint"
@@ -522,12 +528,18 @@ let string_accessor_width ppf saw =
     | Single -> "f32"
     | Sixty_four -> "64"
     | One_twenty_eight { aligned = false } -> "128u"
-    | One_twenty_eight { aligned = true } -> "128a")
+    | One_twenty_eight { aligned = true } -> "128a"
+    | Two_fifty_six { aligned = false } -> "256u"
+    | Two_fifty_six { aligned = true } -> "256a"
+    | Five_twelve { aligned = false } -> "512u"
+    | Five_twelve { aligned = true } -> "512a")
 
 let array_load_kind ~space ppf (load_kind : array_load_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] load_kind with
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | _ -> None
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -536,6 +548,8 @@ let array_set_kind ~space ppf (set_kind : array_set_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] set_kind with
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | _ -> None
   in
   pp_option ~space Format.pp_print_string ppf str

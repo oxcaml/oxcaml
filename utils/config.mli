@@ -321,3 +321,36 @@ val config_var : string -> string option
 val merlin : bool
 
 (**/**)
+
+val has_pclmul : bool
+(* Whether the compiler was configured on a machine with PCLMUL *)
+
+val has_popcnt : bool
+(* Whether the compiler was configured on a machine with POPCNT *)
+
+val has_lzcnt : bool
+(* Whether the compiler was configured on a machine with LZCNT *)
+
+val has_sse3 : bool
+(* Whether the compiler was configured on a machine with SSE3 *)
+
+val has_ssse3 : bool
+(* Whether the compiler was configured on a machine with SSSE3 *)
+
+val has_sse4_1 : bool
+(* Whether the compiler was configured on a machine with SSE4.1 *)
+
+val has_sse4_2 : bool
+(* Whether the compiler was configured on a machine with SSE4.2 *)
+
+val has_bmi : bool
+(* Whether the compiler was configured on a machine with BMI *)
+
+val has_bmi2 : bool
+(* Whether the compiler was configured on a machine with BMI2 *)
+
+val has_avx : bool
+(* Whether the compiler was configured on a machine with AVX *)
+
+val has_avx2 : bool
+(* Whether the compiler was configured on a machine with AVX2 *)

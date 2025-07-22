@@ -146,7 +146,7 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
 let register_allocation () =
   let m, _ =
     Alloc.(newvar_below
-      (max_with (Comonadic Areality) Locality.global))
+      (max_with_comonadic Areality Locality.global))
   in
   m, alloc_as_value m
 
@@ -2419,8 +2419,14 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
          in
          let mmode =
            Option.map (fun smmode ->
-            smmode |> Typemode.transl_mode_annots |> new_mode_var_from_annots
-            ) smmode
+            smmode
+            |> Typemode.transl_mode_annots
+            (* CR zqian: mode annotations on rec modules default to legacy for
+            now. We can remove this workaround once [module type of] doesn't
+            require zapping. *)
+            |> Alloc.Const.Option.value ~default:Alloc.Const.legacy
+            |> Alloc.of_const
+            |> alloc_as_value) smmode
           in
          (id_shape, pmd.pmd_name, md, mmode, ()))
       ids sdecls
@@ -3395,8 +3401,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           begin match Jkind.Sort.default_to_value_and_get sort with
           | Base Value -> ()
           | Product _
-          | Base (Void | Float64 | Float32 | Word | Bits32 | Bits64 |
-                  Vec128 | Vec256 | Vec512) ->
+          | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
+                 | Bits64 | Vec128 | Vec256 | Vec512) ->
             raise (Error (sexpr.pexp_loc, env, Toplevel_unnamed_nonvalue sort))
           end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
@@ -3415,8 +3421,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
               | Base Value -> ()
               | Product _
-              | Base (Void | Float64 | Float32 | Word | Bits32 | Bits64 |
-                      Vec128 | Vec256 | Vec512) ->
+              | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
+                     | Bits64 | Vec128 | Vec256 | Vec512) ->
                 raise (Error (vb.vb_loc, env,
                               Toplevel_unnamed_nonvalue vb.vb_sort))
               end

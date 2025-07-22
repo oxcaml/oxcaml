@@ -24,6 +24,10 @@ external c_sqrt : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_sqrt"
   [@@noalloc]
 
+external cvtt_i32 : (t[@unboxed]) -> (int32[@unboxed])
+  = "caml_vec128_unreachable" "float64_cvtt_i32"
+  [@@noalloc]
+
 external float32x4_of_int64s : int64 -> int64 -> float32x4
   = "caml_vec128_unreachable" "vec128_of_int64s"
   [@@noalloc] [@@unboxed]

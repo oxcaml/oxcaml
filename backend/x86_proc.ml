@@ -288,6 +288,16 @@ let string_of_condition = function
   | NO -> "no"
   | O -> "o"
 
+let imm_of_float_condition = function
+  | EQf -> Imm 0L
+  | LTf -> Imm 1L
+  | LEf -> Imm 2L
+  | UNORDf -> Imm 3L
+  | NEQf -> Imm 4L
+  | NLTf -> Imm 5L
+  | NLEf -> Imm 6L
+  | ORDf -> Imm 7L
+
 let string_of_float_condition = function
   | EQf -> "eq"
   | LTf -> "lt"

@@ -205,6 +205,8 @@ let classify ~classify_product env loc ty sort : _ classification =
   end
   | Base Float64 -> Unboxed_float Unboxed_float64
   | Base Float32 -> Unboxed_float Unboxed_float32
+  | Base Bits8 -> Unboxed_int Unboxed_int8
+  | Base Bits16 -> Unboxed_int Unboxed_int16
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
@@ -225,7 +227,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
      kinds. *)
   match s with
   | Base Value -> Paddr_scannable
-  | Base (Float64 | Float32 | Bits32 | Bits64 | Word |
+  | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
           Vec128 | Vec256 | Vec512) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
   | Base Void as c ->
@@ -241,6 +243,8 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   | Base Value -> Pint_ignorable
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
+  | Base Bits8 -> Punboxedint_ignorable Unboxed_int8
+  | Base Bits16 -> Punboxedint_ignorable Unboxed_int16
   | Base Bits32 -> Punboxedint_ignorable Unboxed_int32
   | Base Bits64 -> Punboxedint_ignorable Unboxed_int64
   | Base Word -> Punboxedint_ignorable Unboxed_nativeint
@@ -406,7 +410,7 @@ let value_kind_of_value_jkind env jkind =
   | Base Value, Internal -> Pgenval
   | Any, _
   | Product _, _
-  | Base (Void | Float64 | Float32 | Word | Bits32 | Bits64 |
+  | Base (Void | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64 |
           Vec128 | Vec256 | Vec512) , _ ->
     Misc.fatal_error "expected a layout of value"
 
@@ -711,6 +715,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   | Float_boxed -> num_nodes_visited, Float_boxed ()
   | Float64 -> num_nodes_visited, Float64
   | Float32 -> num_nodes_visited, Float32
+  | Bits8 -> num_nodes_visited, Bits8
+  | Bits16 -> num_nodes_visited, Bits16
   | Bits32 -> num_nodes_visited, Bits32
   | Bits64 -> num_nodes_visited, Bits64
   | Vec128 -> num_nodes_visited, Vec128
@@ -963,6 +969,12 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_int Unboxed_nativeint
+  | Base Bits8 when Language_extension.(is_at_least Layouts Beta) &&
+                    Language_extension.(is_at_least Small_numbers Beta) ->
+    Lambda.Punboxed_int Unboxed_int8
+  | Base Bits16 when Language_extension.(is_at_least Layouts Beta) &&
+                     Language_extension.(is_at_least Small_numbers Beta) ->
+    Lambda.Punboxed_int Unboxed_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_int Unboxed_int32
   | Base Bits64 when Language_extension.(is_at_least Layouts Stable) ->
@@ -981,14 +993,14 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   | Base Void when Language_extension.(is_at_least Layouts Alpha) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
-    (* CR layouts v7.1: assess whether it is important for performance to support
-       deep value_kinds here *)
+    (* CR layouts v7.1: assess whether it is important for performance to
+       support deep value_kinds here *)
     Lambda.Punboxed_product
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
-  | ((  Base (Void | Float32 | Float64 | Word | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
+  | ((  Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+             | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const
 
@@ -1007,7 +1019,8 @@ let layout env loc sort ty =
       | Base (Vec128 | Vec256 | Vec512) as const ->
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | (Base (Float64 | Word | Bits32 | Bits64) | Product _) as const ->
+      | (Base (Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64) | Product _)
+        as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
@@ -1027,7 +1040,8 @@ let layout_of_sort loc sort =
     | Base (Vec128 | Vec256 | Vec512) as const ->
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | (Base (Float64 | Word | Bits32 | Bits64) | Product _) as const ->
+    | (Base (Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64) | Product _)
+      as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
     )
