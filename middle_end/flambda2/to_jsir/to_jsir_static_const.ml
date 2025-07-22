@@ -1,7 +1,7 @@
 let static_const_not_supported () =
   Misc.fatal_error "This static_const is not yet supported."
 
-let block_like ~env ~res (const : Static_const.t) :
+let block_like' ~env ~res (const : Static_const.t) :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =
   match const with
   | Set_of_closures _closures ->
@@ -88,3 +88,7 @@ let block_like ~env ~res (const : Static_const.t) :
   | Immutable_string value ->
     ignore value;
     static_const_not_supported ()
+
+let block_like ~env ~res symbol const =
+  let expr, env, res = block_like' ~env ~res const in
+  To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr

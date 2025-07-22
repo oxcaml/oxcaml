@@ -1,24 +1,5 @@
 open! Flambda.Import
 
-let bind_expr_to_var0 ~env ~res fvar expr =
-  let jvar = Jsir.Var.fresh () in
-  ( jvar,
-    To_jsir_env.add_var env fvar jvar,
-    To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) )
-
-(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
-    environment. *)
-let bind_expr_to_var ~env ~res fvar expr =
-  let _jvar, env, res = bind_expr_to_var0 ~env ~res fvar expr in
-  env, res
-
-(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
-    environment. *)
-let bind_expr_to_symbol ~env ~res symbol expr =
-  let jvar = Jsir.Var.fresh () in
-  ( To_jsir_env.add_symbol env symbol jvar,
-    To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr)) )
-
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
@@ -34,19 +15,13 @@ let create_let_simple ~env ~res fvar simple =
       env, res)
     ~const:(fun const ->
       let expr = Jsir.Constant (To_jsir_shared.reg_width_const const) in
-      bind_expr_to_var ~env ~res fvar expr)
+      To_jsir_shared.bind_expr_to_var ~env ~res fvar expr)
 
 (** Bind a fresh variable to the result of translating [prim] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_prim ~env ~res fvar prim dbg =
-  let expr, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
-  bind_expr_to_var ~env ~res fvar expr
-
-(** Bind a fresh variable to the result of translating [const] into JSIR, and
-    map [symbol] to this new variable in the environment.*)
-let create_let_block_like ~env ~res symbol const =
-  let expr, env, res = To_jsir_static_const.block_like ~env ~res const in
-  bind_expr_to_symbol ~env ~res symbol expr
+  let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
+  To_jsir_env.add_var env fvar jvar, res
 
 let rec expr ~env ~res e =
   match Expr.descr e with
@@ -71,9 +46,7 @@ and let_expr ~env ~res e =
           Let.print e)
 
 and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
-    ~num_normal_occurrences_of_bound_vars ~body =
-  (* CR selee: translate to [Let] *)
-  ignore num_normal_occurrences_of_bound_vars;
+    ~num_normal_occurrences_of_bound_vars:_ ~body =
   let env, res =
     match bound_pattern, Let.defining_expr e with
     | Singleton v, Simple s ->
@@ -83,47 +56,91 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let fvar = Bound_var.var v in
       create_let_prim ~env ~res fvar p dbg
     | Set_of_closures bound_vars, Set_of_closures soc ->
-      let fun_decls = Set_of_closures.function_decls soc in
-      let decls =
-        Function_declarations.funs_in_order fun_decls
-        |> Function_slot.Lmap.to_seq
-      in
-      let env, res =
-        Seq.fold_left2
-          (fun (env, res) bvar (slot, decl) ->
-            match
-              (decl : Function_declarations.code_id_in_function_declaration)
-            with
-            | Deleted _ -> env, res
-            | Code_id { code_id; only_full_applications = _ } ->
-              (* CR selee: thread through debug information *)
-              let var = Bound_var.var bvar in
-              let addr, params = To_jsir_env.get_code_id_exn env code_id in
-              let expr : Jsir.expr = Closure (params, (addr, []), None) in
-              let jvar, env, res = bind_expr_to_var0 ~env ~res var expr in
-              let env = To_jsir_env.add_function_slot env slot jvar in
-              env, res)
-          (env, res) (List.to_seq bound_vars) decls
-      in
-      Value_slot.Map.fold
-        (fun slot simple (env, res) ->
-          let var, res = To_jsir_shared.simple ~env ~res simple in
-          let env = To_jsir_env.add_value_slot env slot var in
-          env, res)
-        (Set_of_closures.value_slots soc)
-        (env, res)
+      To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
       Static_const_group.match_against_bound_static consts bound_static
         ~init:(env, res)
         ~code:(fun (env, res) code_id code ->
-          ignore (env, res, code_id, code);
-          failwith "unimplemented")
+          let free_names = Code0.free_names code in
+          let function_slots = Name_occurrences.all_function_slots free_names in
+          let value_slots = Name_occurrences.all_value_slots free_names in
+          (* We create new variables that represent each function slot and value
+             slot if they don't exist already, and use them everywhere that the
+             corresponding slot is used. We will make sure later (when
+             translating [Set_of_closures]) that the [Closure]s or values
+             representing these slots are bound to the correct variables. *)
+          let env =
+            Function_slot.Set.fold
+              (fun slot env ->
+                match To_jsir_env.get_function_slot_exn env slot with
+                | _var -> env
+                | exception Not_found ->
+                  let var = Jsir.Var.fresh () in
+                  To_jsir_env.add_function_slot env slot var)
+              function_slots env
+          in
+          let env =
+            Value_slot.Set.fold
+              (fun slot env ->
+                match To_jsir_env.get_value_slot_exn env slot with
+                | _var -> env
+                | exception Not_found ->
+                  let var = Jsir.Var.fresh () in
+                  To_jsir_env.add_value_slot env slot var)
+              value_slots env
+          in
+          let params_and_body = Code0.params_and_body code in
+          Flambda.Function_params_and_body.pattern_match params_and_body
+            ~f:(fun
+                 ~return_continuation
+                 ~exn_continuation
+                 bound_params
+                 ~body
+                 ~my_closure
+                 ~is_my_closure_used:_
+                 ~my_region:_
+                 ~my_ghost_region:_
+                 ~my_depth:_
+                 ~free_names_of_body:_
+               ->
+              (* CR selee: A hack to get things to work, should figure out what
+                 [my_closure] is actually used for *)
+              let var = Jsir.Var.fresh () in
+              let env = To_jsir_env.add_var env my_closure var in
+              let env, fn_params =
+                (* The natural fold instead of [List.fold_left] to preserve
+                   order of parameters *)
+                List.fold_right
+                  (fun bound_param (env, params) ->
+                    let var = Jsir.Var.fresh () in
+                    let env =
+                      To_jsir_env.add_var env
+                        (Bound_parameter.var bound_param)
+                        var
+                    in
+                    env, var :: params)
+                  (Bound_parameters.to_list bound_params)
+                  (env, [])
+              in
+              let res, addr = To_jsir_result.new_block res ~params:[] in
+              let env =
+                To_jsir_env.add_code_id env code_id ~addr ~params:fn_params
+              in
+              let _env, res =
+                (* Throw away the environment after translating the body *)
+                expr
+                  ~env:
+                    (To_jsir_env.enter_function_body env ~return_continuation
+                       ~exn_continuation)
+                  ~res body
+              in
+              env, res))
         ~deleted_code:(fun (env, res) _code_id -> env, res)
         ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
-          ignore (env, res, closure_symbols, soc);
-          failwith "unimplemented")
+          To_jsir_set_of_closures.static_set_of_closures ~env ~res
+            ~closure_symbols soc)
         ~block_like:(fun (env, res) symbol static_const ->
-          create_let_block_like ~env ~res symbol static_const)
+          To_jsir_static_const.block_like ~env ~res symbol static_const)
     | Singleton _, Rec_info _ -> expr ~env ~res body
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
@@ -159,7 +176,6 @@ and apply_expr ~env ~res e =
   failwith "unimplemented"
 
 and apply_cont ~env ~res apply_cont =
-  print_endline "apply cont";
   let args, res =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in

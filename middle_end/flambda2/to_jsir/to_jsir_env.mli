@@ -15,6 +15,13 @@ val create :
   exn_continuation:Continuation.t ->
   t
 
+(** Enter a function body, with the corresponding return and exception continuations. *)
+val enter_function_body :
+  t ->
+  return_continuation:Continuation.t ->
+  exn_continuation:Continuation.t ->
+  t
+
 (** Symbol corresponding to the module currently compiling. *)
 val module_symbol : t -> Symbol.t
 
@@ -66,6 +73,6 @@ val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
 val get_code_id_exn : t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list
 
 (** Return the variable corresponding to a function slot. *)
-val get_function_slot : t -> Function_slot.t -> Jsir.Var.t
+val get_function_slot_exn : t -> Function_slot.t -> Jsir.Var.t
 
-val get_value_slot : t -> Value_slot.t -> Jsir.Var.t
+val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t

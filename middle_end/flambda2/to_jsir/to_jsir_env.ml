@@ -22,6 +22,9 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     value_slots = Value_slot.Map.empty
   }
 
+let enter_function_body t ~return_continuation ~exn_continuation =
+  { t with return_continuation; exn_continuation }
+
 let module_symbol t = t.module_symbol
 
 let add_continuation t cont addr =
@@ -59,9 +62,10 @@ let get_symbol_exn t symbol = Symbol.Map.find symbol t.symbols
 
 let get_code_id_exn t code_id = Code_id.Map.find code_id t.code_ids
 
-let get_function_slot t fslot = Function_slot.Map.find fslot t.function_slots
+let get_function_slot_exn t fslot =
+  Function_slot.Map.find fslot t.function_slots
 
-let get_value_slot t vslot = Value_slot.Map.find vslot t.value_slots
+let get_value_slot_exn t vslot = Value_slot.Map.find vslot t.value_slots
 
 let add_alias_of_var_exn t ~var ~alias_of =
   let jvar = get_var_exn t alias_of in
