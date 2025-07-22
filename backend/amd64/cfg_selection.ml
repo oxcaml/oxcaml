@@ -442,24 +442,6 @@ let select_operation
   then Use_default
   else select_operation' ~generic_select_condition op args dbg ~label_after
 
-let select_operation
-    ~(generic_select_condition :
-       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
-    (args : Cmm.expression list) dbg ~label_after :
-    Cfg_selectgen_target_intf.select_operation_result =
-  if !Oxcaml_flags.llvm_backend
-  then Use_default
-  else select_operation' ~generic_select_condition op args dbg ~label_after
-
-let select_operation
-    ~(generic_select_condition :
-       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
-    (args : Cmm.expression list) dbg ~label_after :
-    Cfg_selectgen_target_intf.select_operation_result =
-  if !Oxcaml_flags.llvm_backend
-  then Use_default
-  else select_operation' ~generic_select_condition op args dbg ~label_after
-
 (* Deal with register constraints *)
 
 let insert_op_debug env sub_cfg op dbg rs rd :
