@@ -15,8 +15,8 @@ let apply1 x = g x
 Line 1, characters 15-18:
 1 | let apply1 x = g x
                    ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -38,8 +38,8 @@ let apply3_wrapped x = (g x x) x
 Line 1, characters 23-32:
 1 | let apply3_wrapped x = (g x x) x
                            ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -87,33 +87,35 @@ let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) 
 Line 1, characters 64-79:
 1 | let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) ()
                                                                     ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: It is captured by a partial application.
+Error: This value is expected to be "global" because it is captured by a partial application
+       which is "global" because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 64-79:
 1 | let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
                                                                     ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: It is captured by a partial application.
+Error: This value is expected to be "global" because it is captured by a partial application
+       which is "global" because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 56-71:
 1 | let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: It is captured by a partial application.
+Error: This value is expected to be "global" because it is captured by a partial application
+       which is "global" because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 56-71:
 1 | let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is expected to be local to the parent region because it is an argument in a tail call.
+       However, it is actually "local".
 |}]
 let app42 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(local_ ref 1) 2 ~c:4
@@ -138,9 +140,8 @@ let app43 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
 Line 2, characters 7-21:
 2 |   f ~a:(local_ ref 1) 2
            ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is expected to be local to the parent region because it is an argument in a tail call.
+       However, it is actually "local".
 |}]
 let app5 (f : b:local_ int ref -> a:int -> unit) = f ~a:42
 [%%expect{|
@@ -174,8 +175,8 @@ let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
 Line 1, characters 52-65:
 1 | let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
                                                         ^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -229,8 +230,8 @@ let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
 Line 1, characters 50-59:
 1 | let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
                                                       ^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 
 let bug1 () =
@@ -244,8 +245,8 @@ let bug1 () =
 Line 7, characters 2-5:
 7 |   res
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 let bug2 () =
   let foo : a:local_ string -> (b:local_ string -> (c:int -> unit)) =
@@ -274,7 +275,8 @@ let bug3 () =
 Line 3, characters 63-64:
 3 |     fun ~a -> fun[@curry] ~b -> fun[@curry] ~c -> print_string a
                                                                    ^
-Error: The value "a" is local, so cannot be used inside a function that might escape.
+Error: The value "a" is expected to be "global" because it is used inside a function
+       which is "global". However, it is actually "local".
 |}]
 let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 
@@ -330,7 +332,7 @@ let bug4 : local_ (string -> foo:string -> unit) -> (string -> unit) =
 Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global". However, it is actually "local".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -353,8 +355,8 @@ let bug4' () =
 Line 3, characters 25-31:
 3 |   let local_ perm ~foo = f ~foo in
                              ^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local".
   Hint: This is a partial application
         Adding 1 more argument may make the value non-local
 |}]

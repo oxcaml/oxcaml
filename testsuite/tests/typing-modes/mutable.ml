@@ -13,7 +13,8 @@ type r = { mutable s : string; }
 Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
-Error: This value escapes its region.
+Error: This value is expected to be "global" because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 
 (* you can override those implied modalities *)
@@ -82,7 +83,7 @@ let foo (local_ r) =
 Line 2, characters 9-25:
 2 |   r.s <- (local_ "hello")
              ^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global". However, it is actually "local".
 |}]
 
 let foo (local_ r) = ref r.s
@@ -90,7 +91,8 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually local to the parent region.
 |}]
 
 let foo (local_ r) =
@@ -111,7 +113,8 @@ let foo (local_ s') = exclave_ {s'}
 Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
-Error: This value escapes its region.
+Error: This value is expected to be "global" because it is a function return value without an exclave annotation.
+       However, it is actually "local".
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a
@@ -121,7 +124,8 @@ let foo (s @ portable) = ({s} : _ @ portable)
 Line 1, characters 26-29:
 1 | let foo (s @ portable) = ({s} : _ @ portable)
                               ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable".
 |}]
 
 (* This attribute doesn't disable implied modalities on monadic axes. For
@@ -143,7 +147,7 @@ let foo (r @ unique) = (r.s : _ @ unique)
 Line 1, characters 24-27:
 1 | let foo (r @ unique) = (r.s : _ @ unique)
                             ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is expected to be "unique". However, it is actually "aliased".
 |}]
 
 module M : sig
@@ -257,5 +261,6 @@ type 'a r = { f : string -> string; mutable a : 'a; }
 Lines 6-7, characters 2-12:
 6 | ..{ f = (fun x -> x);
 7 |     a = 42 }
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable".
 |}]

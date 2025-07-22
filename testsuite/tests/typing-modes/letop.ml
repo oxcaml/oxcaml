@@ -28,7 +28,7 @@ let foo () =
 Line 2, characters 13-27:
 2 |     let* a = local_ "hello" in
                  ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global". However, it is actually "local".
 |}]
 
 let foo () =
@@ -39,7 +39,7 @@ let foo () =
 Line 3, characters 13-27:
 3 |     and* b = local_ "hello" in
                  ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global". However, it is actually "local".
 |}]
 
 (* Bindings are avialable as legacy *)
@@ -51,7 +51,8 @@ let foo () =
 Line 4, characters 17-18:
 4 |     portable_use a
                      ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable".
 |}]
 
 let foo () =
@@ -62,7 +63,8 @@ let foo () =
 Line 4, characters 17-18:
 4 |     portable_use b
                      ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable".
 |}]
 
 (* Body required to be legacy *)
@@ -76,7 +78,7 @@ let foo () =
 Line 4, characters 8-22:
 4 |         local_ "hello"
             ^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global". However, it is actually "local".
 |}]
 
 (* The whole letop is available as legacy *)
@@ -91,5 +93,6 @@ Lines 2-5, characters 17-5:
 3 |         let* a = Some (fun x -> x) in
 4 |         fun x -> x
 5 |     )
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable".
 |}]

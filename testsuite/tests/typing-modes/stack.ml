@@ -14,7 +14,8 @@ let f = ref (stack_ fun x -> x)
 Line 1, characters 12-31:
 1 | let f = ref (stack_ fun x -> x)
                 ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f = ref (stack_ (42, 42))
@@ -22,7 +23,8 @@ let f = ref (stack_ (42, 42))
 Line 1, characters 12-29:
 1 | let f = ref (stack_ (42, 42))
                 ^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () =
@@ -32,7 +34,8 @@ let f () =
 Line 2, characters 17-41:
 2 |   let g = stack_ ((42, 42) : _ @ global ) in
                      ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This allocation cannot be on the stack.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () =
@@ -42,7 +45,8 @@ let f () =
 Line 2, characters 14-47:
 2 |   let g = ref (stack_ ((42, 42) : _ @ global )) in
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () =
@@ -52,7 +56,8 @@ let f () =
 Line 2, characters 17-48:
 2 |   let g = stack_ (fun x y -> x : 'a -> 'a -> 'a) in
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This allocation cannot be on the stack.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () =
@@ -62,7 +67,8 @@ let f () =
 Line 2, characters 14-54:
 2 |   let g = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a)) in
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 
@@ -71,12 +77,17 @@ let f = ref (stack_ (2, 3))
 Line 1, characters 12-27:
 1 | let f = ref (stack_ (2, 3))
                 ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f = ignore_local (stack_ (2, 3))
 [%%expect{|
-val f : unit = ()
+Line 1, characters 29-35:
+1 | let f = ignore_local (stack_ (2, 3))
+                                 ^^^^^^
+Error: This value is expected to be "many".
+       However, it is actually "once" because it is in a stack expression.
 |}]
 
 type t = Foo | Bar of int
@@ -95,12 +106,17 @@ let f = ref (stack_ (Bar 42))
 Line 1, characters 12-29:
 1 | let f = ref (stack_ (Bar 42))
                 ^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f = ignore_local (stack_ (Bar 42))
 [%%expect{|
-val f : unit = ()
+Line 1, characters 29-37:
+1 | let f = ignore_local (stack_ (Bar 42))
+                                 ^^^^^^^^
+Error: This value is expected to be "many".
+       However, it is actually "once" because it is in a stack expression.
 |}]
 
 let f = ref (stack_ `Foo)
@@ -116,12 +132,17 @@ let f = ref (stack_ (`Bar 42))
 Line 1, characters 12-30:
 1 | let f = ref (stack_ (`Bar 42))
                 ^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f = ignore_local (stack_ (`Bar 42))
 [%%expect{|
-val f : unit = ()
+Line 1, characters 29-38:
+1 | let f = ignore_local (stack_ (`Bar 42))
+                                 ^^^^^^^^^
+Error: This value is expected to be "many".
+       However, it is actually "once" because it is in a stack expression.
 |}]
 
 type r = {x : string} [@@unboxed]
@@ -143,12 +164,17 @@ type r = { x : string; }
 Line 3, characters 12-34:
 3 | let f = ref (stack_ {x = "hello"})
                 ^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f = ignore_local (stack_ {x = "hello"})
 [%%expect{|
-val f : unit = ()
+Line 1, characters 29-42:
+1 | let f = ignore_local (stack_ {x = "hello"})
+                                 ^^^^^^^^^^^^^
+Error: This value is expected to be "many".
+       However, it is actually "once" because it is in a stack expression.
 |}]
 
 type r = {x : float; y : string}
@@ -169,12 +195,17 @@ type r = { x : float; y : float; }
 Line 2, characters 20-32:
 2 | let f (r : r) = ref (stack_ r.x)
                         ^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f (r : r) = ignore_local (stack_ r.x) [@nontail]
 [%%expect{|
-val f : r -> unit = <fun>
+Line 1, characters 37-40:
+1 | let f (r : r) = ignore_local (stack_ r.x) [@nontail]
+                                         ^^^
+Error: This value is expected to be "many".
+       However, it is actually "once" because it is in a stack expression.
 |}]
 
 let f = ref (stack_ [| 42; 56 |])
@@ -182,12 +213,17 @@ let f = ref (stack_ [| 42; 56 |])
 Line 1, characters 12-33:
 1 | let f = ref (stack_ [| 42; 56 |])
                 ^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f = ignore_local (stack_ [| 42; 56 |])
 [%%expect{|
-val f : unit = ()
+Line 1, characters 29-41:
+1 | let f = ignore_local (stack_ [| 42; 56 |])
+                                 ^^^^^^^^^^^^
+Error: This value is expected to be "many".
+       However, it is actually "once" because it is in a stack expression.
 |}]
 
 (* tail-position stack_ does not indicate local-returning *)
@@ -196,13 +232,13 @@ let f () = stack_ (3, 5)
 Line 1, characters 11-24:
 1 | let f () = stack_ (3, 5)
                ^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () = exclave_ stack_ (3, 5)
 [%%expect{|
-val f : unit -> local_ int * int = <fun>
+val f : unit -> int * int @ local once immutable = <fun>
 |}]
 
 let f () =
@@ -212,9 +248,8 @@ let f () =
 Line 3, characters 4-5:
 3 |     g 42
         ^
-Error: This value escapes its region.
-  Hint: This function cannot be local,
-  because it is the function in a tail call.
+Error: This value is expected to be local to the parent region because it is the function in a tail call.
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () =
@@ -223,9 +258,8 @@ let f () =
 Line 2, characters 4-23:
 2 |     (stack_ fun x -> x) 42
         ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This function cannot be local,
-  because it is the function in a tail call.
+Error: This value is expected to be local to the parent region because it is the function in a tail call.
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 let f () =
@@ -234,9 +268,8 @@ let f () =
 Line 2, characters 16-34:
 2 |     List.length (stack_ [1; 2; 3])
                     ^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is expected to be "global".
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 (* Allocations that are not supported for stack *)
@@ -338,8 +371,8 @@ let mk () =
 Line 3, characters 2-5:
 3 |   r.x
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is actually "local" because it is in a stack expression.
 |}]
 
 (* Testing primitives *)

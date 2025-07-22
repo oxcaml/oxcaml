@@ -129,7 +129,8 @@ let cross_local (x : cross_local @ local) : _ @ global = x
 Line 1, characters 57-58:
 1 | let cross_local (x : cross_local @ local) : _ @ global = x
                                                              ^
-Error: This value escapes its region.
+Error: This value is expected to be "global".
+       However, it is actually local to the parent region.
 |}]
 
 let cross_many (x : cross_many @ once) : _ @ many = x
@@ -142,7 +143,7 @@ let cross_once (x : cross_once @ once) : _ @ many = x
 Line 1, characters 52-53:
 1 | let cross_once (x : cross_once @ once) : _ @ many = x
                                                         ^
-Error: This value is "once" but expected to be "many".
+Error: This value is expected to be "many". However, it is actually "once".
 |}]
 
 let cross_portable (x : cross_portable @ nonportable) : _ @ portable = x
@@ -155,7 +156,8 @@ let cross_nonportable (x : cross_nonportable @ nonportable) : _ @ portable = x
 Line 1, characters 77-78:
 1 | let cross_nonportable (x : cross_nonportable @ nonportable) : _ @ portable = x
                                                                                  ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable".
 |}]
 
 let cross_unyielding (x : cross_unyielding @ yielding) : _ @ unyielding = x
@@ -169,7 +171,8 @@ let cross_yielding (x : cross_yielding @ yielding) : _ @ unyielding = x
 Line 1, characters 70-71:
 1 | let cross_yielding (x : cross_yielding @ yielding) : _ @ unyielding = x
                                                                           ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is expected to be "unyielding".
+       However, it is actually "yielding".
 |}]
 
 let cross_aliased (x : cross_aliased @ aliased) : _ @ unique = x
@@ -182,7 +185,7 @@ let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
 Line 1, characters 61-62:
 1 | let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
                                                                  ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is expected to be "unique". However, it is actually "aliased".
 |}]
 
 let cross_contended1 (x : cross_contended @ shared) : _ @ uncontended = x
@@ -206,7 +209,8 @@ let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
 Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
-Error: This value is "contended" but expected to be "shared" or "uncontended".
+Error: This value is expected to be "shared".
+       However, it is actually "contended".
 |}]
 
 let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
@@ -214,7 +218,8 @@ let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
 Line 1, characters 76-77:
 1 | let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
                                                                                 ^
-Error: This value is "shared" but expected to be "uncontended".
+Error: This value is expected to be "uncontended".
+       However, it is actually "shared".
 |}]
 
 let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
@@ -222,7 +227,8 @@ let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
 Line 1, characters 74-75:
 1 | let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
                                                                               ^
-Error: This value is "contended" but expected to be "shared" or "uncontended".
+Error: This value is expected to be "shared".
+       However, it is actually "contended".
 |}]
 
 (* Check that all modalities cross modes *)

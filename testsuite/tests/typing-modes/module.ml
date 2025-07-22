@@ -42,7 +42,10 @@ let u =
 Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is expected to be "portable".
+       However, it is actually "nonportable" because it closes over a function (at Line 7, characters 23-24)
+       which is "nonportable" because it closes over a functor (at Line 15, characters 12-15)
+       which is "nonportable".
 |}]
 
 let u =
@@ -174,7 +177,8 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
-Error: The value "N.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N.foo" is expected to be "portable" because it is used inside a function
+       which is "portable". However, it is actually "nonportable".
 |}]
 
 let (bar @ portable) () =
@@ -184,7 +188,8 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
-Error: The value "M.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M.foo" is expected to be "portable" because it is used inside a function
+       which is "portable". However, it is actually "nonportable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -207,7 +212,8 @@ let (bar @ portable) () =
 Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
-Error: The value "N'.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N'.foo" is expected to be "portable" because it is used inside a function
+       which is "portable". However, it is actually "nonportable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -220,7 +226,8 @@ let (bar @ portable) () =
 Line 3, characters 19-20:
 3 |         module L = M
                        ^
-Error: The module "M" is nonportable, so cannot be used inside a function that is portable.
+Error: The module "M" is expected to be "portable" because it is used inside a function
+       which is "portable". However, it is actually "nonportable".
 |}]
 
 module F (X : S @ portable) = struct
@@ -374,7 +381,8 @@ val foo : unit -> unit = <fun>
 Line 4, characters 14-17:
 4 |     let bar = foo
                   ^^^
-Error: The value "foo" is nonportable, so cannot be used inside a functor that is portable.
+Error: The value "foo" is expected to be "portable" because it is used inside a functor
+       which is "portable". However, it is actually "nonportable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct
