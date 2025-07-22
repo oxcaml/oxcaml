@@ -30,6 +30,8 @@ module Tree : sig
   val to_string : ('a -> string) -> 'a t -> string
 
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+
+  val exists : f:('a -> bool) -> 'a t -> bool
 end
 
 module Boxing : sig
@@ -60,6 +62,8 @@ module Layout : sig
   val reordered_in_block : t -> bool
 
   val contains_vec128 : t -> bool
+
+  val contains_void : t -> bool
 end
 
 module Type_structure : sig
@@ -92,6 +96,8 @@ module Type_structure : sig
   (** This differs from composing [layout] and [Layout.contains_vec128] because
      this function considers the fields of boxed values *)
   val contains_vec128 : t -> bool
+
+  val contains_unit_u : t -> bool
 
   (** [None] if the tree is a [Leaf] (thus will always produce a boxed record *)
   val boxed_record_containing_unboxed_records : t Tree.t -> t option

@@ -205,6 +205,10 @@ module Tree = struct
     | Leaf x1, Leaf x2 -> f x1 x2
     | Branch l1, Branch l2 -> List.compare ~cmp:(compare f) l1 l2
 
+  let rec exists ~f = function
+    | Leaf x -> f x
+    | Branch forest -> List.exists ~f:(exists ~f) forest
+
   let rec enumerate ~(shape : unit t) ~(leaves : 'a list) : 'a t list =
     match shape with
     | Leaf () -> List.map leaves ~f:(fun x -> Leaf x)
@@ -297,6 +301,17 @@ module Type_structure = struct
     | Float_u | Int32_u | Float32_u | Nativeint_u | Unit_u ->
       false
     | Int64x2_u -> true
+
+  let rec contains_unit_u t =
+    match t with
+    | Record (ts, _) | Tuple (ts, _) -> List.exists ts ~f:contains_unit_u
+    | Variant constructors ->
+      List.exists constructors ~f:(fun ts -> List.exists ts ~f:contains_unit_u)
+    | Option t -> contains_unit_u t
+    | String | Int64 | Nativeint | Float32 | Int32 | Int | Float | Int64_u
+    | Float_u | Int32_u | Float32_u | Nativeint_u | Int64x2_u ->
+      false
+    | Unit_u -> true
 
   let rec nested_unboxed_record (tree : t Tree.t) : t =
     match tree with
