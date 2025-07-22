@@ -30,6 +30,17 @@ let eqf32 lv hv l h =
   if h <> hv then Printf.printf "%f <> %f\n" (f32 h) (f32 hv);
   if l <> lv || h <> hv then !failmsg ()
 
+let eq4 w0v w1v w2v w3v w0 w1 w2 w3 =
+  if w0 <> w0v
+  then Printf.printf "word0: actual = 0x%016Lx <> 0x%016Lx = expected\n" w0v w0;
+  if w1 <> w1v
+  then Printf.printf "word1: actual = 0x%016Lx <> 0x%016Lx = expected\n" w1v w1;
+  if w2 <> w2v
+  then Printf.printf "word2: actual = 0x%016Lx <> 0x%016Lx = expected\n" w2v w2;
+  if w3 <> w3v
+  then Printf.printf "word3: actual = 0x%016Lx <> 0x%016Lx = expected\n" w3v w3;
+  if w0 <> w0v || w1 <> w1v || w2 <> w2v || w3 <> w3v then !failmsg ()
+
 external abort : unit -> unit = "caml_test_abort" [@@noalloc]
 
 let eqf' lv l =

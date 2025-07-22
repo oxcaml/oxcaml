@@ -14,6 +14,19 @@
 
 [@@@ocaml.warning "+a-42"]
 
+(* amd64 extension *)
+type ext =
+  | SSE
+  | SSE2
+  | SSE3
+  | SSSE3
+  | SSE4_1
+  | SSE4_2
+  | PCLMULQDQ
+  | BMI2
+  | AVX
+  | AVX2
+
 (* Fixed machine register location *)
 type reg =
   | RAX
@@ -48,6 +61,7 @@ type loc_enc =
   | RM_rm
   | Vex_v
   | Implicit
+  | Immediate
 
 type arg =
   { loc : loc;
@@ -103,13 +117,19 @@ type enc =
     opcode : int
   }
 
+type imm =
+  | Imm_none
+  | Imm_reg
+  | Imm_spec
+
 (* CR-someday gyorsh: restructure to avoid 'id and make the backend independent
    of simdgen, backend should only depend on the result of simdgen. *)
 type 'id instr =
   { id : 'id;
+    ext : ext array; (* Multiple extensions may be required. *)
     args : arg array;
     res : res;
-    imm : bool;
+    imm : imm;
     mnemonic : string;
     enc : enc
   }
@@ -161,7 +181,7 @@ let loc_allows_mem = function
 let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 
 let arg_is_implicit ({ enc; _ } : arg) =
-  match enc with Implicit -> true | RM_r | RM_rm | Vex_v -> false
+  match enc with Implicit -> true | Immediate | RM_r | RM_rm | Vex_v -> false
 
 type bit_width =
   | Eight

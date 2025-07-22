@@ -1268,6 +1268,8 @@ module BR = Branch_relaxation.Make (struct
           | Int32_of_float32 )) ->
       1
     | Lop (Reinterpret_cast V128_of_v128) -> 1
+    | Lop (Reinterpret_cast (V256_of_v256 | V512_of_v512)) ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
     | Lop
         (Static_cast
@@ -1281,6 +1283,11 @@ module BR = Branch_relaxation.Make (struct
           (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2))) ->
       1
     | Lop (Static_cast (V128_of_scalar _)) -> 1
+    | Lop
+        (Static_cast
+          ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
+          | Scalar_of_v512 _ )) ->
+      Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Floatop (Float64, (Iaddf | Isubf | Imulf | Idivf))) -> 1
     | Lop (Floatop (Float32, (Iaddf | Isubf | Imulf | Idivf))) -> 1
     | Lop (Specific Inegmulf) -> 1
@@ -1566,6 +1573,8 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       DSL.check_reg Vec128 src;
       DSL.check_reg Vec128 dst;
       DSL.ins I.MOV [| DSL.emit_reg_v16b dst; DSL.emit_reg_v16b src |])
+  | V256_of_v256 | V512_of_v512 ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
   | Int_of_value | Value_of_int -> move src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
@@ -1631,6 +1640,8 @@ let emit_static_cast (cast : Cmm.static_cast) i =
       then (
         DSL.check_reg Float src;
         DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg src |]))
+  | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
 
 (* Output the assembly code for an instruction *)
 
