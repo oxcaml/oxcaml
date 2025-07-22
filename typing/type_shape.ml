@@ -558,6 +558,7 @@ module Type_decl_shape = struct
     | Types.Word -> Layout.Base Word
     | Types.Bits8 -> Layout.Base Bits8
     | Types.Bits16 -> Layout.Base Bits16
+    | Types.Void -> Layout.Base Void
     | Types.Product args ->
       Layout.Product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
