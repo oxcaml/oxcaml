@@ -734,7 +734,8 @@ let get_implicit_jkind_attr x =
       pairs
     | exception Exit ->
       warn_payload x.attr_loc x.attr_name.txt
-        "implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...";
+        "implicit_kind attribute expects:\
+        ('var1 : jkind1) * ('var2 : jkind2) ...";
       []
     end
   | _ -> []
