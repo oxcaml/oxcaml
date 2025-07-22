@@ -15,18 +15,21 @@
 
 module CL = Cfg_with_layout
 module DLL = Oxcaml_utils.Doubly_linked_list
+module String = Misc.Stdlib.String
 
 type error = Asm_generation of (string * int)
 
 exception Error of error
 
 module Ident : sig
-  (** Unnamed LLVM identifiers that start with "%".  This includes
-      basic blocks, unnamed function parameters, and temporaries
-      (virtual registers).  *)
+  (** LLVM identifiers that start with "%".  This includes
+      basic blocks, function parameters, and temporaries
+      (virtual registers). They can be unnamed or named.  *)
   type t
 
   val print : Format.formatter -> t -> unit
+
+  val named : string -> t
 
   module Gen : sig
     (** per-function counter for generating identifiers *)
@@ -39,14 +42,21 @@ module Ident : sig
     val get_fresh : t -> ident
   end
 end = struct
-  type t = int
+  type t =
+    | Unnamed of int
+    | Named of string
 
-  let print fmt t = Format.fprintf fmt "%d" t
+  let named s = Named s
+
+  let print fmt t =
+    match t with
+    | Unnamed n -> Format.fprintf fmt "%d" n
+    | Named s -> Format.fprintf fmt "%s" s
 
   module Gen = struct
     type ident = t
 
-    type t = { mutable next : ident }
+    type t = { mutable next : int }
 
     (* Local identifiers are only valid within function scope, so we can reset
        it to 0 every time *)
@@ -55,7 +65,7 @@ end = struct
     let get_fresh t =
       let res = t.next in
       t.next <- succ res;
-      res
+      Unnamed res
   end
 end
 
@@ -105,8 +115,12 @@ type t =
     mutable current_fun_info : fun_info;
         (* Maintains the state of the current function (reset for every
            function) *)
-    mutable data : Cmm.data_item list
+    mutable data : Cmm.data_item list;
         (* Collects data items as they come and processes them at the end *)
+    mutable defined_function_symbols : String.Set.t;
+        (* Keeps track of all function symbols defined so far *)
+    mutable referenced_symbols : String.Set.t
+        (* Keeps track of all global symbols referenced so far *)
   }
 
 let create_fun_info () =
@@ -126,27 +140,32 @@ let create ~llvmir_filename ~ppf_dump =
     ppf;
     ppf_dump;
     current_fun_info = create_fun_info ();
-    data = []
+    data = [];
+    defined_function_symbols = String.Set.empty;
+    referenced_symbols = String.Set.empty
   }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
 
-let get_ident_aux t table key ~find_opt ~add =
-  let fun_info = t.current_fun_info in
+let get_ident_aux table key ~get_ident ~find_opt ~add =
   match find_opt table key with
   | Some ident -> ident
   | None ->
-    let ident = Ident.Gen.get_fresh fun_info.ident_gen in
+    let ident = get_ident key in
     add table key ident;
     ident
 
+(* We use named identifiers for labels because their original ids are not
+   ordered, but LLVM expects them to be ordered if they are unnamed *)
 let get_ident_for_label t label =
-  get_ident_aux t t.current_fun_info.label2ident label
+  get_ident_aux t.current_fun_info.label2ident label
+    ~get_ident:(fun label -> "L" ^ Label.to_string label |> Ident.named)
     ~find_opt:Label.Tbl.find_opt ~add:Label.Tbl.add
 
-let get_ident_for_reg t label =
-  get_ident_aux t t.current_fun_info.reg2ident label ~find_opt:Reg.Tbl.find_opt
-    ~add:Reg.Tbl.add
+let get_ident_for_reg t reg =
+  get_ident_aux t.current_fun_info.reg2ident reg
+    ~get_ident:(fun _ -> Ident.Gen.get_fresh t.current_fun_info.ident_gen)
+    ~find_opt:Reg.Tbl.find_opt ~add:Reg.Tbl.add
 
 let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 
@@ -340,6 +359,7 @@ module F = struct
       ins_store t temp i.res.(0)
     | Const_int n -> ins_store_nativeint t n i.res.(0)
     | Const_symbol { sym_name; sym_global } -> (
+      t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
       match sym_global with
       | Global -> ins_store_global t sym_name i.res.(0)
       | Local ->
@@ -383,10 +403,7 @@ module F = struct
     match d with
     | Cdefine_symbol _ -> assert false (* cannot happen *)
     | Cint n -> fprintf ppf "%s" (Nativeint.to_string n)
-    | Csymbol_address { sym_name; sym_global } -> (
-      match sym_global with
-      | Global -> pp_global ppf sym_name
-      | Local -> Misc.fatal_error "Llvmize.pp_const_data_item: not implemented")
+    | Csymbol_address { sym_name; sym_global = _ } -> pp_global ppf sym_name
     | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
     | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _ | Calign _
       ->
@@ -400,6 +417,10 @@ module F = struct
       (Llvm_typ.Struct (List.map typ_of_data_item ds))
       (pp_print_list ~pp_sep:pp_comma pp_typ_and_const)
       ds
+
+  let data_decl_extern t sym =
+    line t.ppf "%a = external global %a" pp_global sym Llvm_typ.pp_t
+      Llvm_typ.Ptr
 
   let symbol_decl t sym =
     line t.ppf "%a = global i64 0" pp_global (Cmm_helpers.make_symbol sym)
@@ -487,6 +508,8 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
+  t.defined_function_symbols
+    <- String.Set.add fun_name t.defined_function_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
   let fun_args_with_idents =
@@ -518,29 +541,64 @@ let data ds =
   let t = get_current_compilation_unit "data" in
   t.data <- List.append t.data ds
 
+(* Define menitoned but not declared data items as extern *)
+let emit_data_extern t =
+  let defined_function_symbols =
+    List.filter_map
+      (fun (d : Cmm.data_item) ->
+        match d with
+        | Cdefine_symbol { sym_name; sym_global = _ } -> Some sym_name
+        | Cint _ | Csymbol_address _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _
+        | Cdouble _ | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _
+        | Cstring _ | Cskip _ | Calign _ ->
+          None)
+      t.data
+    |> String.Set.of_list
+    |> String.Set.union t.defined_function_symbols
+  in
+  let referenced_symbols =
+    List.filter_map
+      (fun (d : Cmm.data_item) ->
+        match d with
+        | Csymbol_address { sym_name; _ } -> Some sym_name
+        | Cdefine_symbol _ | Cint _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _
+        | Cdouble _ | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _
+        | Cstring _ | Cskip _ | Calign _ ->
+          None)
+      t.data
+    |> String.Set.of_list
+    |> String.Set.union t.referenced_symbols
+  in
+  String.Set.diff referenced_symbols defined_function_symbols
+  |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
+
 (* CR yusumez: We do this cumbersome list wrangling since we receive data
    declarations as a flat list. Ideally, [data_item]s would be represented in a
    more structured manner which we can directly pass on to [declare]. *)
 let emit_data t =
   let declare = F.data_decl t in
+  let fail msg =
+    Misc.fatal_error ("Llvmize: data item not implemented: " ^ msg)
+  in
   let cur_sym, ds =
     List.fold_left
       (fun (cur_sym, ds) (d : Cmm.data_item) ->
         match d with
-        | Cdefine_symbol { sym_name; sym_global } -> (
-          match sym_global with
-          | Global ->
-            Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
-            Some sym_name, []
-          | Local -> Misc.fatal_error "Llvmize: local symbols not implemented")
+        | Cdefine_symbol { sym_name; sym_global = _ } ->
+          Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
+          Some sym_name, []
         | Cint _ | Csymbol_address _ -> cur_sym, ds @ [d]
-        | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _ | Cvec128 _
-        | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _ | Cskip _
-        | Calign _ ->
-          Misc.fatal_error "Llvmize: data item not implemented")
+        | Calign _ -> fail "align"
+        | Cint8 _ | Cint16 _ | Cint32 _ -> fail "int"
+        | Csingle _ | Cdouble _ -> fail "float"
+        | Cvec128 _ | Cvec256 _ | Cvec512 _ -> fail "vec"
+        | Csymbol_offset _ -> fail "symbol offset"
+        | Cstring _ -> fail "string"
+        | Cskip _ -> fail "skip")
       (None, []) t.data
   in
-  Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym
+  Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
+  emit_data_extern t
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
@@ -633,6 +691,7 @@ let end_assembly () =
    section. However, we currently don't have control over where they end up in
    the asm file. *)
 (* CR gyorsh: assume 64-bit architecture *)
+(* CR yusumez: We ignore whether symbols are local/global. *)
 
 (* Error report *)
 
