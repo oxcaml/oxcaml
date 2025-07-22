@@ -119,8 +119,8 @@ end
      test =
        (function {nlocal = 0} param : int
          (if (== (field_imm 0 param) A) (field_int 1 param) 0))
-     *match* =[int]
-       (if (== (apply test (makemutable 0 (*,int) A 42)) 42) 0
+     *match* =[value<int>]
+       (if (== (apply test (makemutable 0 (?,value<int>) A 42)) 42) 0
          (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
     (makeblock 0 A test)))
 module Extension_with_inline_record :
@@ -151,10 +151,11 @@ represented as a flat float array.
 (apply (field_imm 1 (global Toploop!)) "Float_records/347"
   (let
     (mk_flat =
-       (function {nlocal = 0} x[float] y[float] (makefloatblock Mutable x y))
+       (function {nlocal = 0} x[value<float>] y[value<float>]
+         (makefloatblock Mutable x y))
      mk_t =
-       (function {nlocal = 0} x[float] y[float]
-         (makemutable 0 (float,float) x y))
+       (function {nlocal = 0} x[value<float>] y[value<float>]
+         (makemutable 0 (value<float>,value<float>) x y))
      get = (function {nlocal = 0} v : float (field_mut 1 v)))
     (makeblock 0 mk_flat mk_t get)))
 
