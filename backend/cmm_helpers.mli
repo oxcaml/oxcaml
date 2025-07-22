@@ -1294,14 +1294,9 @@ val unboxed_mutable_int32_unboxed_product_array_set :
 (** Read from an unboxed int64 or unboxed nativeint array (without bounds
     check).
 
-    The [has_custom_ops] parameter should be set to [true] unless the array
-    in question is an unboxed product array: these are represented as mixed
-    blocks, not custom blocks.
-
     The zero-indexed element number is specified as a tagged immediate.
 *)
 val unboxed_int64_or_nativeint_array_ref :
-  has_custom_ops:bool ->
   expression ->
   array_index:expression ->
   Debuginfo.t ->
@@ -1325,13 +1320,8 @@ val unboxed_int32_array_set :
 
 (** Update an unboxed int64 or unboxed nativeint array (without bounds
     check).
-
-    The [has_custom_ops] parameter should be set to [true] unless the array
-    in question is an unboxed product array: these are represented as mixed
-    blocks, not custom blocks.
 *)
 val unboxed_int64_or_nativeint_array_set :
-  has_custom_ops:bool ->
   expression ->
   index:expression ->
   new_value:expression ->
