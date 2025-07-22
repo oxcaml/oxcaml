@@ -1,19 +1,19 @@
-source_filename = "const_val_ir.ml"
+source_filename = "const_val.ml"
 
-@camlConst_val_ir.data_begin = global i64 0
-define void @camlConst_val_ir.code_begin() { ret void }
+@camlConst_val__data_begin = global i64 0
+define void @camlConst_val__code_begin() { ret void }
 
-define i64 @camlConst_val_ir.entry()  {
-  %1 = alloca i64
-  %2 = alloca i64
-  %3 = alloca i64
-  %4 = alloca i64
-  %5 = alloca i64
+define i64 @camlConst_val__entry()  {
+  %1 = alloca i64 
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
   br label %L1
 L1:
   br label %L104
 L104:                                                ; preds = %L1
-  store ptr @camlConst_val_ir, ptr %3
+  store ptr @camlConst_val, ptr %3
   %6 = load i64, ptr %3
   store i64 %6, ptr %4
   %7 = load i64, ptr %4
@@ -25,9 +25,9 @@ L104:                                                ; preds = %L1
   ret i64 %9
 }
 
-@camlConst_val_ir.gc_roots = global { i64, i64 } { i64 0, i64 1792 }
-@camlConst_val_ir = global { i64 } { i64 75 }
+@camlConst_val__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
+@camlConst_val = global { i64 } { i64 75 }
 
-@camlConst_val_ir.data_end = global i64 0
-define void @camlConst_val_ir.code_end() { ret void }
-@camlConst_val_ir.frametable = global i64 0
+@camlConst_val__data_end = global i64 0
+define void @camlConst_val__code_end() { ret void }
+@camlConst_val__frametable = global i64 0

@@ -97,6 +97,8 @@ val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
 
+val addressing_displacement_for_llvmize : addressing_mode -> int
+
 (* Printing operations and addressing modes *)
 
 val print_addressing :

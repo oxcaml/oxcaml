@@ -115,6 +115,19 @@ let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
 
+let addressing_displacement_for_llvmize addr =
+  if not !Oxcaml_flags.llvm_backend
+  then
+    Misc.fatal_error
+      "Arch.displacement_addressing_for_llvmize: should only be called with \
+        -llvm-backend"
+  else
+    match addr with
+    | Iindexed d -> d
+    | Ibased _ ->
+      Misc.fatal_error
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
+
 (* Printing operations and addressing modes *)
 
 let print_addressing printreg addr ppf arg =
