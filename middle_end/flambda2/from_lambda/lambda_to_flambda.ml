@@ -455,8 +455,6 @@ let name_if_not_var acc ccenv name simple kind body =
   | IR.Const _ ->
     let id = Ident.create_local name in
     let id_duid = Flambda_debug_uid.none in
-    (* CR sspies: I think the [name] is always a constant string (so these are
-       not user visible variables). As such, using [.none] should be fine. *)
     CC.close_let acc ccenv
       [id, id_duid, kind]
       Not_user_visible (IR.Simple simple) ~body:(body id)

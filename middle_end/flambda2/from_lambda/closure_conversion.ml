@@ -1839,11 +1839,8 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
 
 let variables_for_unboxing boxed_variable_name (k : Function_decl.unboxing_kind)
     =
-  (* CR sspies: This function currently picks [.none] for all the debugging uids
-     of the unboxed variables. Should we put in more effort to propagate the
-     correct debugging uids here? How would the type change from boxed to
-     unboxed affect this function? That is, do all these variables even have the
-     same debugging uids as their original counter parts? *)
+  (* CR sspies: In the future, improve the debugging UIDs we produce here
+    (currently they are all none) for better debug information. *)
   match k with
   | Fields_of_block_with_tag_zero kinds ->
     List.mapi
@@ -1940,13 +1937,13 @@ let compute_body_of_unboxed_function acc my_region my_closure
             Alloc_mode.For_allocations.from_lambda ~current_region:my_region
               (Alloc_mode.For_types.to_lambda param_mode)
           in
-          let _, param_duid = BP.var_and_uid param in
+          let param_duid = Flambda_debug_uid.none in
           Let_with_acc.create acc
             (Bound_pattern.singleton
                (Bound_var.create
                   (Bound_parameter.var param)
                   param_duid Name_mode.normal))
-            (* CR sspies: Is this debugging uid correct? *)
+            (* CR sspies: Consider improving the debug UID here. *)
             (Named.create_prim
                (boxing_primitive k alloc_mode
                   (List.map (fun (var, _, _) -> var) vars_with_kinds))
@@ -2998,8 +2995,6 @@ let close_let_rec acc env ~function_declarations
         let ident_duid = Function_decl.let_rec_debug_uid decl in
         let fun_var =
           VB.create (fst (Env.find_var env ident)) ident_duid Name_mode.normal
-          (* CR sspies: Does it make sense here to take the debugging uid of the
-             function? *)
         in
         let function_slot = Function_decl.function_slot decl in
         ( Function_slot.Map.add function_slot fun_var fun_vars_map,

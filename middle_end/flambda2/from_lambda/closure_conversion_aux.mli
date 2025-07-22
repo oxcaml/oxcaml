@@ -14,7 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Uid = Shape.Uid
 
 (** Environments and auxiliary structures used during closure conversion. *)
 
