@@ -7514,7 +7514,7 @@ and type_function
               type_expect env mode_legacy default (mk_expected ty_default_arg)
             in
             ty_default_arg,
-              Some (default_arg, arg_label, default_arg_sort, mpath)
+            Some (default_arg, arg_label, default_arg_sort, mpath)
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
@@ -8203,9 +8203,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
-            let mpath = (match classify_optionality l with
-              | Optional_arg mpath -> mpath
-              | Required_or_position_arg -> assert false) in
+            let mpath = get_optional_module_path_exn l in
             let ty =
               type_option_none env mpath (instance (tpoly_get_mono ty_arg))
                 sarg.pexp_loc
@@ -8363,12 +8361,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
        | Labelled _ | Nolabel -> ()
        | Optional _ | Generic_optional _ ->
            (* CR layouts v5: relax value requirement *)
-          (match classify_optionality lbl with
-          | Optional_arg mpath ->
-              unify_exp env arg
-                (type_option mpath
-                  (newvar (predef_jkind_of_optional_module_path mpath)))
-          | Required_or_position_arg -> assert false)
+           let mpath = get_optional_module_path_exn lbl in
+           unify_exp env arg
+            (type_option mpath
+              (newvar (predef_jkind_of_optional_module_path mpath)))
        | Position _ ->
            unify_exp env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg))
@@ -8381,10 +8377,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
           if wrapped_in_some then begin
-            (match classify_optionality lbl with
-            | Optional_arg mpath ->
-                type_option_some env mpath expected_mode sarg ty_arg' ty_arg0'
-            | Required_or_position_arg -> assert false)
+            let mpath = get_optional_module_path_exn lbl in
+            type_option_some env mpath expected_mode sarg ty_arg' ty_arg0'
           end else begin
             type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
           end

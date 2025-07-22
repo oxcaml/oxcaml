@@ -144,11 +144,7 @@ let mkTexp_function ?(id = texp_function_defaults)
                 (match optional_default with
                 | None -> Tparam_pat pattern
                 | Some default ->
-                    let mpath =
-                      match Btype.classify_optionality arg_label with
-                      | Optional_arg mpath -> mpath
-                      | Required_or_position_arg -> assert false
-                    in
+                    let mpath = Btype.get_optional_module_path_exn arg_label in
                     Tparam_optional_default
                       (pattern, default, id.param_sort, mpath));
               fp_param = param;

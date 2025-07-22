@@ -567,7 +567,8 @@ and function_param_kind =
   (** [Tparam_optional_default (p, e, sort, mpath)] is an optional argument [p]
       with default value [e], i.e. [?x:(p = e)]. If the parameter is of type
       [a option], the pattern and expression are of type [a]. [sort] is the
-      sort of [e]. [mpath] is the generic optioal module path *)
+      sort of [e]. [mpath] is the generic optional module path, i.e.  [mpath] is
+      [Stdlib.Or_null] in [Stdlib.Or_null.?'x:(p = e)]. *)
 
 and function_body =
   | Tfunction_body of expression

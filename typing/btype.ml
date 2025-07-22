@@ -645,6 +645,11 @@ let classify_optionality_parsetree (lbl : Parsetree.arg_label) = match lbl with
   | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
   | Labelled _ | Nolabel -> Required_or_position_arg
 
+let get_optional_module_path_exn lbl =
+  match classify_optionality lbl with
+  | Optional_arg mpath -> mpath
+  | Required_or_position_arg -> failwith "Expected Optional_arg"
+
 let is_optional arg =
   match classify_optionality arg with
   | Optional_arg _ -> true

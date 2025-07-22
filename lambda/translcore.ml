@@ -1692,7 +1692,7 @@ and transl_curried_function ~scopes loc repr params body
                 event_before ~scopes default_arg
                   (transl_exp ~scopes default_arg_sort default_arg)
               in
-              Matching.for_optional_arg_default mpath ~return_layout
+              Matching.for_optional_arg_default ~mpath ~return_layout
                 ~scopes fp_loc pat body ~default_arg ~default_arg_sort
                 ~param:fp_param
         in

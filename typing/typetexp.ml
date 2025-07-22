@@ -793,10 +793,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              let path = match Btype.classify_optionality l with
-                | Optional_arg mpath ->
-                    Ctype.predef_path_of_optional_module_path mpath
-                | Required_or_position_arg -> assert false
+              let path = Ctype.predef_path_of_optional_module_path
+                           (Btype.get_optional_module_path_exn l)
               in
               newmono
                 (newconstr path [Btype.tpoly_get_mono arg_ty])

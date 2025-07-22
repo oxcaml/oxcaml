@@ -272,6 +272,7 @@ val is_optional : arg_label -> bool
 val is_optional_parsetree : Parsetree.arg_label -> bool
 val classify_optionality : arg_label -> optionality
 val classify_optionality_parsetree : Parsetree.arg_label -> optionality
+val get_optional_module_path_exn : arg_label -> optional_module_path
 val is_position : arg_label -> bool
 val is_omittable : arg_label -> bool
 val label_name : arg_label -> label
