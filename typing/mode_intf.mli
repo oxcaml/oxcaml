@@ -176,7 +176,8 @@ module type Common_product = sig
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
-  val report_error : Format.formatter -> error -> unit
+  val report_error :
+    ?target:(Format.formatter -> unit) -> Format.formatter -> error -> unit
 
   include
     Common
@@ -193,6 +194,7 @@ module type S = sig
       | None
       | Lazy
       | Functor
+      | Class
       | Function
       | Tailcall_function
       | Tailcall_argument
@@ -202,6 +204,18 @@ module type S = sig
       | Return
       | Stack
 
+    type closure_context =
+      | Function
+      | Functor
+      | Lazy
+
+    type closing_loc =
+      { (* CR pdsouza: for now, this field will always be none and ignored. In future
+           we will include a one which should be used in the printing of [Is_closed_by] *)
+        closure : Location.t;  (** Location of the closing scope's definition *)
+        value : Location.t  (** Location of the value being closed over *)
+      }
+
     type 'd morph =
       | Debug : string -> (_ * _) morph
       | None : (_ * _) morph
@@ -210,8 +224,8 @@ module type S = sig
       | Skip : (_ * _) morph
           (** An empty morphism hint, but telling the error reporter to continue the trace,
             instead of terminating it there, as it would for [None]. *)
-      | Close_over : Location.t -> ('l * disallowed) morph
-      | Is_closed_by : Location.t -> (disallowed * 'r) morph
+      | Close_over : closure_context * closing_loc -> ('l * disallowed) morph
+      | Is_closed_by : closure_context * closing_loc -> (disallowed * 'r) morph
       | Partial_application : (disallowed * 'r) morph
       | Adj_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph
@@ -635,7 +649,8 @@ module type S = sig
 
     type error = Error : 'a Axis.t * 'a axerror -> error
 
-    val report_error : Format.formatter -> error -> unit
+    val report_error :
+      ?target:(Format.formatter -> unit) -> Format.formatter -> error -> unit
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 

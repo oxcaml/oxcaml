@@ -1555,7 +1555,7 @@ module Hint = struct
     | None
     | Lazy
     | Functor
-    | Module
+    | Class
     | Function
     | Tailcall_function
     | Tailcall_argument
@@ -1567,12 +1567,29 @@ module Hint = struct
 
   let const_none = None
 
+  type closure_context =
+    | Function
+    | Functor
+    | Lazy
+
+  let print_closure_context ppf =
+    let open Format in
+    function
+    | Function -> fprintf ppf "a function"
+    | Functor -> fprintf ppf "a functor"
+    | Lazy -> fprintf ppf "a lazy expression"
+
+  type closing_loc =
+    { closure : Location.t;
+      value : Location.t
+    }
+
   type 'd morph =
     | Debug : string -> (_ * _) morph
     | None : (_ * _) morph
     | Skip : (_ * _) morph
-    | Close_over : Location.t -> ('l * disallowed) morph
-    | Is_closed_by : Location.t -> (disallowed * 'r) morph
+    | Close_over : closure_context * closing_loc -> ('l * disallowed) morph
+    | Is_closed_by : closure_context * closing_loc -> (disallowed * 'r) morph
     | Partial_application : (disallowed * 'r) morph
     | Adj_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
@@ -1604,7 +1621,7 @@ module Hint = struct
     | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
-    | Is_closed_by l -> Close_over l
+    | Is_closed_by (x, y) -> Close_over (x, y)
     | Partial_application -> Adj_partial_application
     | Crossing_right -> Crossing_left
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
@@ -1614,7 +1631,7 @@ module Hint = struct
     | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
-    | Close_over l -> Is_closed_by l
+    | Close_over (x, y) -> Is_closed_by (x, y)
     | Adj_partial_application -> Partial_application
     | Crossing_left -> Crossing_right
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
@@ -1630,7 +1647,7 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Close_over l -> Close_over l
+       | Close_over (x, y) -> Close_over (x, y)
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
@@ -1641,7 +1658,7 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Is_closed_by l -> Is_closed_by l
+       | Is_closed_by (x, y) -> Is_closed_by (x, y)
        | Partial_application -> Partial_application
        | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
@@ -1652,8 +1669,8 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Close_over l -> Close_over l
-       | Is_closed_by l -> Is_closed_by l
+       | Close_over (x, y) -> Close_over (x, y)
+       | Is_closed_by (x, y) -> Is_closed_by (x, y)
        | Partial_application -> Partial_application
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
@@ -1666,8 +1683,8 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Close_over l -> Close_over l
-       | Is_closed_by l -> Is_closed_by l
+       | Close_over (x, y) -> Close_over (x, y)
+       | Is_closed_by (x, y) -> Is_closed_by (x, y)
        | Partial_application -> Partial_application
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
@@ -1724,6 +1741,9 @@ let print_const_hint a_obj a ppf : Hint.const -> unit =
     wrap_print_hint
       (dprintf "is used in a functor, and functors are always %a"
          (C.print a_obj) a)
+  | Class ->
+    wrap_print_hint
+      (dprintf "is used in a class, and classes are always %a" (C.print a_obj) a)
   | Function -> wrap_print_hint (dprintf "is used in a function")
   | Tailcall_function ->
     wrap_print_hint (dprintf "is the function in a tail call")
@@ -1731,7 +1751,7 @@ let print_const_hint a_obj a ppf : Hint.const -> unit =
     wrap_print_hint (dprintf "is an argument in a tail call")
   | Read_mutable -> wrap_print_hint (dprintf "has a mutable field read from")
   | Write_mutable -> wrap_print_hint (dprintf "has a mutable field written to")
-  | Force_lazy -> wrap_print_hint (dprintf "has a lazy expression forced")
+  | Force_lazy -> wrap_print_hint (dprintf "forces a lazy expression")
   | Return ->
     wrap_print_hint
       (dprintf "is a function return value without an exclave annotation")
@@ -1751,12 +1771,13 @@ let rec print_morph_hint :
     | Debug _ -> `Skip
     | None -> `Stop
     | Skip -> `Skip
-    | Close_over (item, loc) ->
+    | Close_over (item, locs) ->
       `PrintThenContinue
-        (dprintf "closes over a %a (at %a)" _ _ Location.print_loc loc)
-    | Is_closed_by (item, loc) ->
+        (dprintf "closes over a %a (at %a)" Hint.print_closure_context item
+           Location.print_loc locs.value)
+    | Is_closed_by (item, _locs) ->
       `PrintThenContinue
-        (dprintf "is used inside %a (at %a)" _ _ Location.print_loc loc)
+        (dprintf "is used inside %a" Hint.print_closure_context item)
     | Partial_application ->
       `PrintThenContinue (dprintf "is captured by a partial application")
     | Crossing_left | Crossing_right ->
@@ -1780,9 +1801,18 @@ let rec print_axhint_chain :
     type a. a -> a C.obj -> a axhint -> Format.formatter -> unit =
  fun (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
   let open Format in
-  let print_mode x_obj x =
-    (* TODO - wrap around this to handle regional specially, "local to the parent region" *)
-    C.print x_obj ppf x
+  let print_mode : type x. x C.obj -> x -> _ =
+   fun x_obj x ->
+    match x_obj, x with
+    | Regionality, Regional ->
+      (* In the special case that we are talking about the regional mode,
+         we print a more user-friendly message, as below, instead of referring
+         directly to the regional mode *)
+      fprintf ppf "%a to the parent region" Misc.Style.inline_code "local"
+    | _ ->
+      (* Otherwise, we just use the default mode constant printer *)
+      Misc.Style.as_inline_code (C.print x_obj) ppf x
+   [@@ocaml.warning "-4"]
   in
   match hint with
   | Morph (morph_hint, b, b_obj, b_hint, morph) -> (
@@ -1820,11 +1850,11 @@ let rec print_axhint_chain :
       | `Stop -> print_mode a_obj a
       | `PrintThenStop pp ->
         print_mode a_obj a;
-        fprintf ppf " [morph=%s] because it %t, that is of some unknown mode"
+        fprintf ppf " [morph=%s] because it %t, which is of some unknown mode"
           morph_name pp
       | `PrintThenContinue pp ->
         print_mode a_obj a;
-        fprintf ppf " [morph=%s] because it %t,@ that is " morph_name pp;
+        fprintf ppf " [morph=%s] because it %t,@ which is " morph_name pp;
         print_axhint_chain b b_obj b_hint ppf))
   | Const const_hint ->
     print_mode a_obj a;
@@ -1833,14 +1863,20 @@ let rec print_axhint_chain :
 
 let report_axerror :
     type a.
+    ?target:(Format.formatter -> unit) ->
     a Lattices_mono.obj ->
     a Lattices_mono.obj ->
     a axerror ->
     Format.formatter ->
     unit =
- fun left_obj right_obj err ppf ->
+ fun ?target left_obj right_obj err ppf ->
   let open Format in
-  fprintf ppf {|It is expected to be %t.@ However, it is actually %t.|}
+  let target ppf =
+    match target with
+    | None -> fprintf ppf "It"
+    | Some name -> fprintf ppf "The %t" name
+  in
+  fprintf ppf {|%t is expected to be %t.@ However, it is actually %t.|} target
     (print_axhint_chain err.right right_obj err.right_hint)
     (print_axhint_chain err.left left_obj err.left_hint)
 
@@ -2617,10 +2653,10 @@ module Comonadic_with (Areality : Areality) = struct
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
-  let report_error ppf (Error (ax, err)) =
+  let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror left_obj right_obj err ppf
+    report_axerror ?target left_obj right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -2762,10 +2798,10 @@ module Monadic = struct
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
-  let report_error ppf (Error (ax, err)) =
+  let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror left_obj right_obj err ppf
+    report_axerror ?target left_obj right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -3226,10 +3262,10 @@ module Value_with (Areality : Areality) = struct
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
-  let report_error ppf (Error (ax, err)) =
+  let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror left_obj right_obj err ppf
+    report_axerror ?target left_obj right_obj err ppf
 
   type equate_error = equate_step * error
 

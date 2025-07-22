@@ -171,7 +171,7 @@ type shared_context =
 type lock =
   | Escape_lock of escaping_context
   | Share_lock of shared_context
-  | Closure_lock of Mode.Value.Comonadic.r
+  | Closure_lock of Mode.Hint.closure_context * Location.t * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -337,7 +337,6 @@ module TycompTbl =
         keys2
 
   end
-
 
 type empty = |
 
@@ -754,7 +753,7 @@ and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
 
-let clda_mode = Mode.Value.legacy |> Mode.Value.disallow_right
+let clda_mode = Mode.Value.(of_const ~hint:Class Const.legacy) |> Mode.Value.disallow_right
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 
@@ -811,7 +810,7 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of Longident.t * Mode.Value.Comonadic.error
+  | Value_used_in_closure of lock_item * Longident.t * Mode.Value.Comonadic.error
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
@@ -2806,8 +2805,8 @@ let add_share_lock shared_context env =
   let lock = Share_lock shared_context in
   add_lock lock env
 
-let add_closure_lock comonadic env =
-  let lock = Closure_lock (Mode.Value.Comonadic.disallow_left comonadic)
+let add_closure_lock closure_context comonadic env =
+  let lock = Closure_lock (closure_context, Location.none, Mode.Value.Comonadic.disallow_left comonadic)
   in
   add_lock lock env
 
@@ -3319,25 +3318,25 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     {mode; context = Some shared_context}
 
 let closure_mode ~errors ~env ~loc ~item ~lid
-  ({mode = {Mode.monadic; comonadic}; _} as vmode) (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
+  ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context closure_loc (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
   (* [mode] is the mode of the value being closed over, [comonadic0] is the mode of the closure *)
   begin
     match
       Mode.Value.Comonadic.submode
-comonadic
+        comonadic
         (Mode.Value.Comonadic.apply_hint
-          (Mode.Hint.Is_closed_by loc)
+          Mode.Hint.(Is_closed_by (closure_context, { closure = closure_loc; value = loc }))
           comonadic0)
     with
     | Error e ->
         may_lookup_error errors loc env
-          (Value_used_in_closure (lid, e))
+          (Value_used_in_closure (item, lid, e))
     | Ok () -> ()
   end;
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic ~hint:(Mode.Hint.Is_closed_by loc) comonadic0 ]
+        Mode.Value.comonadic_to_monadic ~hint:Mode.Hint.(Is_closed_by (closure_context, { closure = closure_loc; value = loc })) comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 
@@ -3390,8 +3389,8 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
           escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context
       | Share_lock shared_context ->
           share_mode ~errors ~env ~loc ~item ~lid vmode shared_context
-      | Closure_lock comonadic ->
-          closure_mode ~errors ~env ~loc ~item ~lid vmode comonadic
+      | Closure_lock (closure_context, closure_loc, comonadic) ->
+          closure_mode ~errors ~env ~loc ~item ~lid vmode closure_context closure_loc comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~loc ~item ~lid vmode
       | Unboxed_lock ->
@@ -4584,7 +4583,12 @@ let sharedness_hint ppf : shared_context -> _ = function
         "@[Hint: This identifier cannot be used uniquely,@ \
           because it is defined outside of the probe.@]"
 
-let print_lock_item ppf (item, lid) =
+let print_lock_item ppf = function
+  | Module -> fprintf ppf "module"
+  | Class -> fprintf ppf "class"
+  | Value -> fprintf ppf "value"
+
+let print_lock_item_reason ppf (item, lid) =
   match item with
   | Module ->
       fprintf ppf "The module %a is"
@@ -4797,22 +4801,24 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf
         "@[%a local, so cannot be used \
           inside %s.@]"
-        print_lock_item (item, lid)
+        print_lock_item_reason (item, lid)
         (string_of_escaping_context context);
   | Once_value_used_in (item, lid, context) ->
       fprintf ppf
         "@[%a once, so cannot be used \
             inside %s@]"
-        print_lock_item (item, lid)
+        print_lock_item_reason (item, lid)
         (string_of_shared_context context)
-  | Value_used_in_closure (lid, err) ->
-    (* CR pdsouza: improve how this error message reads *)
-    fprintf ppf "@[%a cannot be used inside a closure as this breaks mode constraints as described below.@]\n%a"
-      !print_longident lid Mode.Value.Comonadic.report_error err
+  | Value_used_in_closure (item, lid, err) ->
+      Mode.Value.Comonadic.report_error ppf
+        ~target:(dprintf "The %a %a"
+          print_lock_item item
+          (Style.as_inline_code !print_longident) lid)
+        err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"
-        print_lock_item (item, lid)
+        print_lock_item_reason (item, lid)
   | Non_value_used_in_object (lid, typ, err) ->
       fprintf ppf "@[%a must have a type of layout value because it is \
                    captured by an object.@ %a@]"

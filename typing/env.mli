@@ -259,7 +259,7 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of lock_item * Longident.t * escaping_context
   | Once_value_used_in of lock_item * Longident.t * shared_context
-  | Value_used_in_closure of Longident.t * Mode.Value.Comonadic.error
+  | Value_used_in_closure of lock_item * Longident.t * Mode.Value.Comonadic.error
   | Local_value_used_in_exclave of lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
@@ -525,7 +525,8 @@ val add_escape_lock : escaping_context -> t -> t
     `unique` variables beyond the lock can still be accessed, but will be
     relaxed to `shared` *)
 val add_share_lock : shared_context -> t -> t
-val add_closure_lock : ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+val add_closure_lock:
+  Mode.Hint.closure_context -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t

@@ -1822,4 +1822,4 @@ let undo_compress (changes, _old) =
         log
 
 let functor_param_mode = Mode.Alloc.legacy
-let functor_res_mode = Mode.Alloc.(of_const ~hint:Functor Const.legacy)
+let functor_res_mode = Mode.Alloc.legacy

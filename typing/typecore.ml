@@ -5238,8 +5238,8 @@ let split_function_ty
     | false -> env
     | true ->
         let env =
-          (* TODO - pass through [expected_mode.locality_context] somewhere to be part of the const hint for the mode *)
           Env.add_closure_lock
+            Function
             (alloc_as_value alloc_mode).comonadic
             env
         in
@@ -6672,7 +6672,7 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      let env = Env.add_closure_lock closure_mode.comonadic env in
+      let env = Env.add_closure_lock Lazy closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
         exp_desc = Texp_lazy arg;
@@ -11047,9 +11047,9 @@ let report_error ~loc env =
       | Error (Comonadic Areality, _) -> escaping_submode_reason_hint reason
       | _ -> []
     in
-    Location.errorf ~loc ~sub "%a" Value.report_error fail_reason
+    Location.errorf ~loc ~sub "%a" (Value.report_error ?target:None) fail_reason
   | Submode_failed_alloc(fail_reason) ->
-    Location.errorf ~loc "%a" Alloc.report_error fail_reason
+    Location.errorf ~loc "%a" (Alloc.report_error ?target:None) fail_reason
   | Curried_application_complete (lbl, Error (ax, {left; _}), loc_kind) ->
       let sub =
         match loc_kind with
