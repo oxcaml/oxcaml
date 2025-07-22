@@ -9,20 +9,20 @@ define i64 @camlConst_val_ir.entry()  {
   %3 = alloca i64
   %4 = alloca i64
   %5 = alloca i64
-  br label %6
-6:
-  br label %7
-7:                                                ; preds = %6
+  br label %L1
+L1:
+  br label %L104
+L104:                                                ; preds = %L1
   store ptr @camlConst_val_ir, ptr %3
-  %8 = load i64, ptr %3
-  store i64 %8, ptr %4
-  %9 = load i64, ptr %4
-  store i64 %9, ptr %2
+  %6 = load i64, ptr %3
+  store i64 %6, ptr %4
+  %7 = load i64, ptr %4
+  store i64 %7, ptr %2
   store i64 1, ptr %5
-  %10 = load i64, ptr %5
-  store i64 %10, ptr %1
-  %11 = load i64, ptr %1
-  ret i64 %11
+  %8 = load i64, ptr %5
+  store i64 %8, ptr %1
+  %9 = load i64, ptr %1
+  ret i64 %9
 }
 
 @camlConst_val_ir.gc_roots = global { i64, i64 } { i64 0, i64 1792 }
