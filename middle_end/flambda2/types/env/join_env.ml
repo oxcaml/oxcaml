@@ -1375,7 +1375,10 @@ type env_id = Index.t
 
 type 'a join_arg = env_id * 'a
 
-let target_join_env { target_env; _ } = target_env
+let code_age_relation { target_env; _ } = TE.code_age_relation target_env
+
+let code_age_relation_resolver { target_env; _ } =
+  TE.code_age_relation_resolver target_env
 
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 

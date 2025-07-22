@@ -40,6 +40,8 @@
 #ifndef strtof_l
 #define strtof_l _strtof_l
 #endif
+#elif defined(__OpenBSD__)
+#define strtof_l(b, e, l) strtof(b, e)
 #endif
 
 extern locale_t caml_locale;

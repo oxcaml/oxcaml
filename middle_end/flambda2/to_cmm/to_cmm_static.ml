@@ -44,8 +44,8 @@ let static_field res field field_kind =
               word7 = 1L
             } ]
       | Naked_number
-          ( Naked_immediate | Naked_float32 | Naked_float | Naked_int32
-          | Naked_int64 | Naked_nativeint )
+          ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
+          | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint )
       | Value ->
         [C.cint 1n]
       | Region | Rec_info ->
@@ -338,6 +338,8 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
               match flat_suffix_elt with
               | Naked_float -> UK.naked_floats
               | Naked_float32 -> UK.naked_float32_fields
+              | Naked_int8 -> UK.naked_int8_fields
+              | Naked_int16 -> UK.naked_int16_fields
               | Naked_int32 -> UK.naked_int32_fields
               | Naked_vec128 -> UK.naked_vec128_fields
               | Naked_vec256 -> UK.naked_vec256_fields

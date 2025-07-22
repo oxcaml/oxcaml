@@ -119,6 +119,10 @@ module Layout = struct
 
       let word = Base Sort.Word
 
+      let bits8 = Base Sort.Bits8
+
+      let bits16 = Base Sort.Bits16
+
       let bits32 = Base Sort.Bits32
 
       let bits64 = Base Sort.Bits64
@@ -135,6 +139,8 @@ module Layout = struct
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
@@ -1552,6 +1558,42 @@ module Const = struct
 
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
+    let bits8 =
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits8"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_int8 =
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits8 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let bits16 =
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits16"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_int16 =
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits16 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits32 =
       { jkind =
           mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
@@ -1661,6 +1703,10 @@ module Const = struct
         kind_of_unboxed_float32;
         word;
         kind_of_unboxed_nativeint;
+        bits8;
+        kind_of_unboxed_int8;
+        bits16;
+        kind_of_unboxed_int16;
         bits32;
         kind_of_unboxed_int32;
         bits64;
@@ -1932,6 +1978,8 @@ module Const = struct
       | "float64" -> Builtin.float64.jkind
       | "float32" -> Builtin.float32.jkind
       | "word" -> Builtin.word.jkind
+      | "bits8" -> Builtin.bits8.jkind
+      | "bits16" -> Builtin.bits16.jkind
       | "bits32" -> Builtin.bits32.jkind
       | "bits64" -> Builtin.bits64.jkind
       | "vec128" -> Builtin.vec128.jkind
@@ -1993,6 +2041,7 @@ module Const = struct
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
+      | Base (Bits8 | Bits16), (Non_null | Maybe_null) -> Beta
       | Base Void, _ -> Alpha
     in
     scan_layout jkind.layout

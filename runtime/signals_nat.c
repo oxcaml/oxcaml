@@ -17,7 +17,9 @@
 
 #include <unistd.h>
 #define __USE_GNU
+#if !defined(__OpenBSD__)
 #include <sys/ucontext.h>
+#endif
 
 /* Signal handling, code specific to the native-code compiler */
 
