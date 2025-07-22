@@ -183,6 +183,21 @@ let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 let arg_is_implicit ({ enc; _ } : arg) =
   match enc with Implicit -> true | Immediate | RM_r | RM_rm | Vex_v -> false
 
+let ext_to_string : ext -> string = function
+  | SSE -> "SSE"
+  | SSE2 -> "SSE2"
+  | SSE3 -> "SSE3"
+  | SSSE3 -> "SSSE3"
+  | SSE4_1 -> "SSE4_1"
+  | SSE4_2 -> "SSE4_2"
+  | PCLMULQDQ -> "PCLMULQDQ"
+  | BMI2 -> "BMI2"
+  | AVX -> "AVX"
+  | AVX2 -> "AVX2"
+
+let exts_to_string exts =
+  Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
+
 type bit_width =
   | Eight
   | Sixteen

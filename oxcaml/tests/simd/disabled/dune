@@ -1,0 +1,32 @@
+; Test disabling extensions required for 256/512 bit vectors
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps disabled256.expected disabled256.corrected)
+ (action
+  (progn
+   (diff disabled256.expected disabled256.corrected))))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets disabled256.corrected)
+ (deps
+  (:ml disabled256.ml))
+ (action
+  (with-outputs-to
+   disabled256.corrected
+   (with-accepted-exit-codes
+    2
+    (run
+     %{bin:ocamlopt.opt}
+     %{ml}
+     -extension
+     simd
+     -color
+     never
+     -error-style
+     short
+     -fno-avx)))))
