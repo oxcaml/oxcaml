@@ -529,7 +529,7 @@ let mode_exclave expected_mode =
      as_single_mode expected_mode
      (* if we expect an exclave to be [regional], then inside the exclave the
         body should be [local] *)
-     |> value_to_alloc_r2l
+     |> value_to_alloc_r2l ~hint:(Debug "typecore1")
      |> alloc_as_value
   in
   { (mode_default mode)
@@ -658,7 +658,7 @@ let register_allocation_mode alloc_mode =
   allocations := alloc_mode :: !allocations
 
 let register_allocation_value_mode mode =
-  let alloc_mode = value_to_alloc_r2g mode in
+  let alloc_mode = value_to_alloc_r2g ~hint:(Debug "hi") mode in
   register_allocation_mode alloc_mode;
   let mode = alloc_as_value alloc_mode in
   alloc_mode, mode
@@ -4186,7 +4186,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                  (fun (exp, marg) ->
                     submode ~loc:exp.exp_loc ~env ~reason:Other
                       marg (mode_partial_application expected_mode);
-                    value_to_alloc_r2l marg)
+                    value_to_alloc_r2l ~hint:(Debug "d") marg)
                  open_args
              in
              let closed_args = new_closed_args @ closed_args in
@@ -5267,7 +5267,7 @@ let split_function_ty
       end
     end
   in
-  let arg_value_mode = alloc_to_value_l2r arg_mode in
+  let arg_value_mode = alloc_to_value_l2r ~hint:(Debug "bye") arg_mode in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
@@ -6283,7 +6283,7 @@ and type_expect_
       unify_exp env record ty_record;
       rue {
         exp_desc = Texp_setfield(record,
-          Locality.disallow_right (regional_to_local
+          Locality.disallow_right (regional_to_local ~hint:(Debug "c")
             (Value.proj_comonadic Areality rmode)),
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
@@ -8220,7 +8220,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               args @ [Nolabel, Arg (eta_var, arg_sort)], Nontail,
               ret_mode
               |> Value.proj_comonadic Areality
-              |> regional_to_global
+              |> regional_to_global ~hint:(Debug "b")
               |> Locality.disallow_right,
               None)}
         in
@@ -8424,7 +8424,7 @@ and type_application env app_loc expected_mode position_and_mode
           in
           let ty_ret, mode_ret, untyped_args =
             collect_apply_args env funct ignore_labels ty (instance ty)
-              (value_to_alloc_r2l funct_mode) sargs ret_tvar
+              (value_to_alloc_r2l ~hint:(Debug "a") funct_mode) sargs ret_tvar
           in
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =

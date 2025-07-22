@@ -3348,7 +3348,7 @@ let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
     Mode.Regionality.regional
 with
 | Ok () ->
-  let mode = vmode.mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value in
+  let mode = vmode.mode |> Mode.value_to_alloc_r2l ~hint:(Debug "env1") |> Mode.alloc_as_value in
   {vmode with mode}
 | Error _ ->
     may_lookup_error errors loc env
@@ -3356,7 +3356,7 @@ with
 
 let region_mode vmode =
   let mode =
-    vmode.mode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
+    vmode.mode |> Mode.value_to_alloc_r2l ~hint:(Debug "env2") |> Mode.alloc_to_value_l2r ~hint:(Debug "env2-toher")
   in
   {vmode with mode}
 
@@ -3417,7 +3417,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Region_lock ->
           (* CR zqian: once we have finer regionality, remove this branch *)
           (* First map [regional] to [global], then cap [local] to [regional] *)
-          let mode = mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value in
+          let mode = mode |> Mode.value_to_alloc_r2g ~hint:(Debug "env3") |> Mode.alloc_as_value in
           Mode.Value.meet
             [mode;
              Mode.Value.max_with_comonadic Areality
@@ -3427,7 +3427,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [global]. If [m0] is [regional], then we require the new values
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
-          mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
+          mode |> Mode.value_to_alloc_r2l ~hint:(Debug "env4") |> Mode.alloc_as_value
       | Escape_lock (Letop | Probe | Class as ctx) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure (`Escape ctx))

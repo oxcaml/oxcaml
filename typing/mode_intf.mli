@@ -203,6 +203,7 @@ module type S = sig
       | Stack
 
     type 'd morph =
+      | Debug : string -> (_ * _) morph
       | None : (_ * _) morph
           (** An empty morphism hint. The error reporter should terminate the
             trace on seeing this. *)
@@ -719,35 +720,31 @@ module type S = sig
 
   (** Converts regional to local, identity otherwise *)
   val regional_to_local :
-    ?hint:('l * 'r) Hint.morph ->
-    ('l * 'r) Regionality.t ->
-    ('l * 'r) Locality.t
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Inject locality into regionality *)
   val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
 
   (** Converts regional to global, identity otherwise *)
   val regional_to_global :
-    ?hint:('l * 'r) Hint.morph ->
-    ('l * 'r) Regionality.t ->
-    ('l * 'r) Locality.t
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r :
-    ?hint:('l * disallowed) Hint.morph ->
+    hint:('l * disallowed) Hint.morph ->
     ('l * 'r) Alloc.t ->
     ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val value_to_alloc_r2l :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   module Modality : sig
     type 'a raw =

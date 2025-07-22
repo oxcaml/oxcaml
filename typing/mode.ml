@@ -1567,6 +1567,7 @@ module Hint = struct
   let const_none = None
 
   type 'd morph =
+    | Debug : string -> (_ * _) morph
     | None : (_ * _) morph
     | Skip : (_ * _) morph
     | Close_over : Location.t -> ('l * disallowed) morph
@@ -1582,6 +1583,7 @@ module Hint = struct
   type 'd neg_morph = 'd neg morph constraint 'd = _ * _
 
   let rec is_rigid : type l r. (l * r) morph -> bool = function
+    | Debug _ -> true
     | None -> false
     | Skip -> false
     | Close_over _ -> true
@@ -1598,6 +1600,7 @@ module Hint = struct
 
   let rec left_adjoint :
       type l. (l * allowed) morph -> (allowed * disallowed) morph = function
+    | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
     | Is_closed_by l -> Close_over l
@@ -1607,6 +1610,7 @@ module Hint = struct
 
   let rec right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
+    | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
     | Close_over l -> Is_closed_by l
@@ -1622,6 +1626,7 @@ module Hint = struct
     let rec allow_left : type l r. (allowed * r) morph -> (l * r) morph =
       fun (type l r) (h : (allowed * r) morph) : (l * r) morph ->
        match h with
+       | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
        | Close_over l -> Close_over l
@@ -1632,6 +1637,7 @@ module Hint = struct
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
        match h with
+       | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
        | Is_closed_by l -> Is_closed_by l
@@ -1642,6 +1648,7 @@ module Hint = struct
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
        match h with
+       | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
        | Close_over l -> Close_over l
@@ -1655,6 +1662,7 @@ module Hint = struct
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
        match h with
+       | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
        | Close_over l -> Close_over l
@@ -1705,6 +1713,108 @@ type 'a axerror =
     right_hint : 'a axhint
   }
 
+let print_const_hint ppf : Hint.const -> unit =
+  let open Format in
+  let print = fprintf ppf in
+  function
+  | None -> ()
+  | Lazy -> print "is the result of a lazy expression"
+  | Functor -> print "is used in a functor"
+  | Function -> print "is used in a function"
+  | Tailcall_function -> print "is the function in a tail call"
+  | Tailcall_argument -> print "is an argument in a tail call"
+  | Read_mutable -> print "has a mutable field read from"
+  | Write_mutable -> print "has a mutable field written to"
+  | Force_lazy -> print "has a lazy expression forced"
+  | Return -> print "is a local value returned without an exclave annotation"
+  | Stack -> print "is in a stack expression"
+
+let rec res_print_morph_hint :
+    type l r. Format.formatter -> (l * r) Hint.morph -> unit =
+  let open Format in
+  fun ppf hint ->
+    let print = fprintf ppf in
+    match hint with
+    | Debug s -> printf "DEBUG[%s]" s
+    | None ->
+      (* TODO - once done adding correct functionality, remove stopping for development *)
+      print "emptymorphhint"
+    | Skip ->
+      (* TODO - once done adding correct functionality, remove stopping for development *)
+      print "skipmorphhint"
+    | Close_over loc ->
+      printf "closes over something (at %a)" Location.print_loc loc
+    | Is_closed_by loc ->
+      printf "is closed by something (at %a)" Location.print_loc loc
+    | Partial_application -> print "is captured by a partial application"
+    | Crossing_left | Crossing_right -> print "crosses with something (TODO)"
+    | Adj_partial_application ->
+      print "has a partial application capturing a value"
+    | Compose (hint1, hint2) ->
+      (* TODO - refer to old impl. *)
+      (* TODO - need to make this so that if hint1 is skip it still prints out hint2 *)
+      _
+
+and print_axhint_chain :
+    type a. a -> a C.obj -> Format.formatter -> a axhint -> unit =
+  let open Format in
+  fun (a : a) (a_obj : a C.obj) ppf (hint : a axhint) ->
+    (* TODO - we plan now to write this so that it can just write it continuously.
+       This should be fine to do, even if we don't know what mode to write at the end of the line yet, as that should be the next information gained, I think? *)
+    match hint with
+    | Morph (morph_hint, b, b_obj, b_hint, morph) -> (
+      let morph_name =
+        match morph with
+        | Id -> "Id"
+        | Meet_with _ -> "Meet_with"
+        | Imply _ -> "Imply"
+        | Proj _ -> "Proj"
+        | Max_with _ -> "Max_with"
+        | Min_with _ -> "Min_with"
+        | Map_comonadic _ -> "Map_comonadic"
+        | Monadic_to_comonadic_min -> "Monadic_to_comonadic_min"
+        | Comonadic_to_monadic _ -> "Comonadic_to_monadic"
+        | Monadic_to_comonadic_max -> "Monadic_to_comonadic_max"
+        | Local_to_regional -> "Local_to_regional"
+        | Regional_to_local -> "Regional_to_local"
+        | Locality_as_regionality -> "Locality_as_regionality"
+        | Regional_to_global -> "Regional_to_global"
+        | Global_to_regional -> "Global_to_regional"
+        | Compose _ -> "Compose"
+      in
+      match C.eq_obj a_obj b_obj with
+      | Some Refl
+        when Misc.Le_result.equal ~le:(C.le a_obj) a b
+             && not (Hint.is_rigid morph_hint) ->
+        (* When the [a] and [b] modes are equal, and the hint is non-rigid,
+           we can skip printing this line. *)
+        opt_sprint_axhint_chain b b_obj b_hint
+      | Some Refl | None -> (
+        match res_sprint_morph_hint morph_hint with
+        | Error `Stop -> None
+        | Error `Skip -> opt_sprint_axhint_chain b b_obj b_hint
+        | Ok morph_hint_str ->
+          let subchain_str =
+            match opt_sprint_axhint_chain b b_obj b_hint with
+            | None -> ""
+            | Some s -> sprintf "\n%s" s
+          in
+          (* TODO - When we are printing an expected mode, use the word "expected" at start (i.e. "This is expected to be ...") *)
+          (* TODO - also use "expected" for stuff like "closed by something that is expected to be global" *)
+          Some
+            (asprintf "[morph=%s] This is %a because it %s %a.%s" morph_name
+               (C.print a_obj) a morph_hint_str
+               (axhint_chain_print_next_mode b_obj b)
+               b_hint subchain_str)))
+    | Const const_hint -> (
+      match res_sprint_const_hint const_hint with
+      | Error () -> ()
+      | Ok const_hint_str ->
+        Some
+          (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str)
+      )
+    | Empty -> ()
+
 let res_sprint_const_hint : Hint.const -> (string, unit) result = function
   | None -> Error ()
   | Lazy -> Ok "is the result of a lazy expression"
@@ -1722,6 +1832,7 @@ let rec res_sprint_morph_hint :
     type l r. (l * r) Hint.morph -> (string, [`Stop | `Skip]) result =
   let open Format in
   function
+  | Debug s -> Ok (sprintf "DEBUG[%s]" s)
   | None -> Ok "emptymorphhint"
   | Skip -> Ok "skipmorphhint"
   | Close_over loc ->
@@ -1732,14 +1843,15 @@ let rec res_sprint_morph_hint :
   | Crossing_left | Crossing_right -> Ok "crosses with something (TODO)"
   | Adj_partial_application -> Ok "has a partial application capturing a value"
   | Compose (hint1, hint2) ->
+    (* TODO - need to fix this so that if hint1 is skip it still prints out hint2 *)
     Result.bind (res_sprint_morph_hint hint1) (fun s1 ->
         match res_sprint_morph_hint hint2 with
         | Error `Stop -> Error `Stop
         | Error `Skip -> Ok (sprintf "%s" s1)
         | Ok s2 -> Ok (sprintf "%s, which %s" s1 s2))
 
-let rec opt_sprint_axhint_chain :
-    type a. a -> a C.obj -> a axhint -> string option =
+let rec opt_axhint_chain_tail :
+    type a. a -> a C.obj -> a axhint -> (string * string) option =
  fun (a : a) (a_obj : a C.obj) (hint : a axhint) ->
   let open Format in
   match hint with
@@ -1784,7 +1896,9 @@ let rec opt_sprint_axhint_chain :
         (* TODO - also use "expected" for stuff like "closed by something that is expected to be global" *)
         Some
           (asprintf "[morph=%s] This is %a because it %s %a.%s" morph_name
-             (C.print a_obj) a morph_hint_str (C.print b_obj) b subchain_str)))
+             (C.print a_obj) a morph_hint_str
+             (axhint_chain_print_next_mode b_obj b)
+             b_hint subchain_str)))
   | Const const_hint -> (
     match res_sprint_const_hint const_hint with
     | Error () -> None
@@ -1792,6 +1906,33 @@ let rec opt_sprint_axhint_chain :
       Some
         (asprintf "This is %a because it %s." (C.print a_obj) a const_hint_str))
   | Empty -> None
+
+let report_axerror :
+    type a.
+    Format.formatter ->
+    a Lattices_mono.obj ->
+    a Lattices_mono.obj ->
+    a axerror ->
+    unit =
+ fun ppf left_obj right_obj err ->
+  let open Format in
+  let right_trace_str =
+    match opt_sprint_axhint_chain err.right right_obj err.right_hint with
+    | None -> ""
+    | Some s -> sprintf "\n%s" s
+  in
+  let left_trace_str =
+    match opt_sprint_axhint_chain err.left left_obj err.left_hint with
+    | None -> ""
+    | Some s -> sprintf "\n%s" s
+  in
+  fprintf ppf {|It is expected to be %a.%s
+
+However, it is actually %a.%s|}
+    (axhint_chain_print_next_mode right_obj err.right)
+    err.right_hint right_trace_str
+    (axhint_chain_print_next_mode left_obj err.left)
+    err.left_hint left_trace_str
 
 (** Description of an input axis responsible for an output axis of a morphism *)
 type 'a responsible_axis =
@@ -2510,14 +2651,14 @@ module Yielding = struct
     match global with true -> zap_to_floor | false -> zap_to_ceil
 end
 
-let regional_to_local ?hint m =
-  S.apply ?hint Locality.Obj.obj C.Regional_to_local m
+let regional_to_local ~hint m =
+  S.apply ~hint Locality.Obj.obj C.Regional_to_local m
 
 let locality_as_regionality m =
   S.apply ~hint:Skip Regionality.Obj.obj C.Locality_as_regionality m
 
-let regional_to_global ?hint m =
-  S.apply ?hint Locality.Obj.obj C.Regional_to_global m
+let regional_to_global ~hint m =
+  S.apply ~hint Locality.Obj.obj C.Regional_to_global m
 
 module type Areality = sig
   module Const : C.Areality
@@ -2567,24 +2708,9 @@ module Comonadic_with (Areality : Areality) = struct
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   let report_error ppf (Error (ax, err)) =
-    let open Format in
     let right_obj = proj_obj ax in
-    let right_trace_str =
-      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
     let left_obj = proj_obj ax in
-    let left_trace_str =
-      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    fprintf ppf {| It is expected to be %a.%s
-
-However, it is actually %a.%s |}
-      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
-      left_trace_str
+    report_axerror ppf left_obj right_obj err
 
   type equate_error = equate_step * error
 
@@ -2727,24 +2853,9 @@ module Monadic = struct
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   let report_error ppf (Error (ax, err)) =
-    let open Format in
     let right_obj = proj_obj ax in
-    let right_trace_str =
-      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
     let left_obj = proj_obj ax in
-    let left_trace_str =
-      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    fprintf ppf {| It is expected to be %a.%s
-
-However, it is actually %a.%s |}
-      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
-      left_trace_str
+    report_axerror ppf left_obj right_obj err
 
   type equate_error = equate_step * error
 
@@ -3206,25 +3317,9 @@ module Value_with (Areality : Areality) = struct
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   let report_error ppf (Error (ax, err)) =
-    let open Format in
     let right_obj = proj_obj ax in
-    let right_trace_str =
-      match opt_sprint_axhint_chain err.right right_obj err.right_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
     let left_obj = proj_obj ax in
-    let left_trace_str =
-      match opt_sprint_axhint_chain err.left left_obj err.left_hint with
-      | None -> ""
-      | Some s -> sprintf "\n%s" s
-    in
-    fprintf ppf
-      {|@[It is expected to be %a.%s
-
-However, it is actually %a.%s@] |}
-      (C.print right_obj) err.right right_trace_str (C.print left_obj) err.left
-      left_trace_str
+    report_axerror ppf left_obj right_obj err
 
   type equate_error = equate_step * error
 
@@ -3411,40 +3506,40 @@ module Const = struct
   let locality_as_regionality = C.locality_as_regionality
 end
 
-let comonadic_locality_as_regionality ?hint comonadic =
-  S.apply ?hint Value.Comonadic.Obj.obj (Map_comonadic Locality_as_regionality)
-    comonadic
+let comonadic_locality_as_regionality comonadic =
+  S.apply ~hint:Skip Value.Comonadic.Obj.obj
+    (Map_comonadic Locality_as_regionality) comonadic
 
-let comonadic_regional_to_local ?hint comonadic =
-  S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
+let comonadic_regional_to_local ~hint comonadic =
+  S.apply ~hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_local)
     comonadic
 
 let alloc_as_value m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_locality_as_regionality ~hint:Skip comonadic in
+  let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_to_value_l2r ?hint m =
+let alloc_to_value_l2r ~hint m =
   let { comonadic; monadic } = Alloc.disallow_right m in
   let comonadic =
-    S.apply ?hint Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+    S.apply ~hint Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
       comonadic
   in
   { comonadic; monadic }
 
 let value_to_alloc_r2g :
-    type l r. ?hint:(l * r) Hint.morph -> (l * r) Value.t -> (l * r) Alloc.t =
- fun ?hint m ->
+    type l r. hint:(l * r) Hint.morph -> (l * r) Value.t -> (l * r) Alloc.t =
+ fun ~hint m ->
   let { comonadic; monadic } = m in
   let comonadic =
-    S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
+    S.apply ~hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
       comonadic
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2l ?hint m =
+let value_to_alloc_r2l ~hint m =
   let { comonadic; monadic } = m in
-  let comonadic = comonadic_regional_to_local ?hint comonadic in
+  let comonadic = comonadic_regional_to_local ~hint comonadic in
   { comonadic; monadic }
 
 module Modality = struct
@@ -4099,17 +4194,19 @@ module Crossing = struct
      [regional_to_local] the left adjoint. *)
 
   let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left t |> value_to_alloc_r2l
+    m |> alloc_as_value |> apply_left t
+    |> value_to_alloc_r2l ~hint:(Debug "apply_left_alloc 1")
 
   let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right t |> value_to_alloc_r2g
+    m |> alloc_as_value |> apply_right t
+    |> value_to_alloc_r2g ~hint:(Debug "apply_right_alloc 1")
 
   let apply_left_right_alloc t { monadic; comonadic } =
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
       |> Comonadic.apply_left t.comonadic
-      |> comonadic_regional_to_local
+      |> comonadic_regional_to_local ~hint:(Debug "apply_left_right_alloc 1")
       (* the left adjoint of [locality_as_regionality]*)
     in
     { monadic; comonadic }
