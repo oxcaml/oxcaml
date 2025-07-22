@@ -162,10 +162,8 @@ The abbreviations defined in the language are as follows:
 
     `external64` describes exactly this scenario: on a 64-bit machine, values
     of this type are never pointers to allocations managed by the OCaml garbage
-    collector. This means that mutations of values of this type do not require a
-    call to `caml_modify` (on 64-bit machines). See also the documentation on
-    [externality][].
-    <!-- CR jcutler fixme -->
+    collector. See also the documentation on
+    [externality](../_05-modes/intro.md#future-modes-externality).
 
 * `immutable_data =
      value mod many contended portable unyielding immutable stateless non_float`
