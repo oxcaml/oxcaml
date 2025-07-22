@@ -56,8 +56,8 @@ let field_offset_for_label lbl =
   | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
       lbl.lbl_pos + 1
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
-    (* For unboxed records, no offset calculation needed in regular field
-       access *)
+    (* CR layouts 5.1: For unboxed records, no offset calculation needed in
+       regular field access *)
       lbl.lbl_pos
   | Record_float ->
       lbl.lbl_pos

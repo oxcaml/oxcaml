@@ -1843,7 +1843,7 @@ let atomic_arity op (kind : atomic_kind) =
   in
   let extra_kind_arity =
     match kind with
-    | Ref | Loc-> 0
+    | Ref | Loc -> 0
     | Field -> 1
   in
   arity_of_op + extra_kind_arity
