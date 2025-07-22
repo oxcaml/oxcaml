@@ -40,6 +40,9 @@ val loc_parameters : Cmm.machtype -> Reg.t array
 
 val loc_results_return : Cmm.machtype -> Reg.t array
 
+(* Whether float/float32 arithmetic allows three operands. *)
+val has_three_operand_float_ops : unit -> bool
+
 (* For argument number [n] split across multiple registers, the target-specific
    implementation of [loc_external_arguments] must return [regs] such that
    [regs.(n).(0)] is to hold the part of the value at the lowest address. *)

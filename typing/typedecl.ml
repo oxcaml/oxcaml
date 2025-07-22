@@ -1139,7 +1139,7 @@ let record_gets_unboxed_version = function
       Array.exists
         (fun (kind : mixed_block_element) ->
           match kind with
-          | Value | Float64 | Float32 | Bits32 | Bits64
+          | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
@@ -1654,6 +1654,8 @@ module Element_repr = struct
   type unboxed_element =
     | Float64
     | Float32
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
@@ -1689,6 +1691,8 @@ module Element_repr = struct
       | Base Float64 -> Unboxed_element Float64
       | Base Float32 -> Unboxed_element Float32
       | Base Word -> Unboxed_element Word
+      | Base Bits8 -> Unboxed_element Bits8
+      | Base Bits16 -> Unboxed_element Bits16
       | Base Bits32 -> Unboxed_element Bits32
       | Base Bits64 -> Unboxed_element Bits64
       | Base Vec128 -> Unboxed_element Vec128
@@ -1715,6 +1719,8 @@ module Element_repr = struct
       and of_unboxed_element : unboxed_element -> mixed_block_element = function
         | Float64 -> Float64
         | Float32 -> Float32
+        | Bits8 -> Bits8
+        | Bits16 -> Bits16
         | Bits32 -> Bits32
         | Bits64 -> Bits64
         | Vec128 -> Vec128
@@ -1732,7 +1738,7 @@ module Element_repr = struct
         | Float_element | Value_element -> acc + 1
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
-        | Float64 | Float32 | Bits32 | Bits64
+        | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word -> acc
         | Product l -> Array.fold_left count_boxed_in_t acc l
       in
@@ -1857,7 +1863,7 @@ let rec update_decl_jkind env dpath decl =
                if Types.is_atomic lbl.Types.ld_mutable
                then repr_summary.atomic_floats <- true;
            | Unboxed_element Float64 -> repr_summary.float64s <- true
-           | Unboxed_element ( Float32 | Bits32 | Bits64
+           | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
                              | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
            | Value_element ->
@@ -2994,6 +3000,12 @@ let transl_type_decl env rec_flag sdecl_list =
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env decls shapes env in
+  (* Save the shapes of the declarations in [Type_shape] for debug info. *)
+  List.iter (fun (id, decl) ->
+    Type_shape.add_to_type_decls
+      (Pident id) decl
+      (Env.find_uid_of_path final_env)
+  ) decls;
   (* Keep original declaration *)
   let final_decls =
     List.map2
@@ -3372,12 +3384,16 @@ let native_repr_of_type env kind ty sort_or_poly =
     Some (Unboxed_float Boxed_float64)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32 ->
     Some (Unboxed_float Boxed_float32)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int8 ->
+    Some (Unboxed_integer Unboxed_int8)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int16 ->
+    Some (Unboxed_integer Unboxed_int16)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int32 ->
-    Some (Unboxed_integer Boxed_int32)
+    Some (Unboxed_integer Unboxed_int32)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64 ->
-    Some (Unboxed_integer Boxed_int64)
+    Some (Unboxed_integer Unboxed_int64)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_nativeint ->
-    Some (Unboxed_integer Boxed_nativeint)
+    Some (Unboxed_integer Unboxed_nativeint)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int8x16 ->
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int16x8 ->
@@ -3568,11 +3584,11 @@ let rec parse_native_repr_attributes env core_type ty rmode
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
       then Prim_poly
-      else prim_const_mode (Mode.Alloc.proj (Comonadic Areality) marg)
+      else prim_const_mode (Mode.Alloc.proj_comonadic Areality marg)
     in
     let repr_args, repr_res =
       parse_native_repr_attributes env ct2 t2
-        (prim_const_mode (Mode.Alloc.proj (Comonadic Areality) mret))
+        (prim_const_mode (Mode.Alloc.proj_comonadic Areality mret))
         ~global_repr ~is_layout_poly
     in
     ((mode, repr_arg) :: repr_args, repr_res)
@@ -4558,8 +4574,10 @@ let report_error ppf = function
         Style.inline_code "int64"
         Style.inline_code "nativeint"
   | Cannot_unbox_or_untag_type Untagged ->
-      fprintf ppf "@[Don't know how to untag this type. Only %a@ \
-                   and other immediate types can be untagged.@]"
+      fprintf ppf "@[Don't know how to untag this type. Only %a, %a, %a, \
+                   and@ other immediate types can be untagged.@]"
+        Style.inline_code "int8"
+        Style.inline_code "int16"
         Style.inline_code "int"
   | Deep_unbox_or_untag_attribute kind ->
       fprintf ppf

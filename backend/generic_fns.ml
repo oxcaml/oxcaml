@@ -345,7 +345,9 @@ let default_generic_fns : Cmx_format.generic_fns =
   { curry_fun = [];
     apply_fun =
       [ [typ_val; typ_val], typ_val, Cmx_format.Alloc_heap;
-        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Alloc_heap ];
+        [typ_val; typ_val], typ_val, Cmx_format.Alloc_local;
+        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Alloc_heap;
+        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Alloc_local ];
     send_fun = []
   }
 

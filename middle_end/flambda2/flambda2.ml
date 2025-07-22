@@ -63,10 +63,11 @@ let print_rawflambda ppf unit =
 
 let print_flambda name condition ppf unit =
   let header = "After " ^ name in
-  dump_if_enabled ppf condition ~header ~f:Flambda_unit.print unit;
-  dump_to_target_if_any ppf
-    (Flambda_features.dump_fexpr ())
-    ~header ~f:pp_flambda_as_fexpr unit
+  dump_if_enabled ppf condition ~header ~f:Flambda_unit.print unit
+
+let print_fexpr name target ppf unit =
+  let header = "After " ^ name in
+  dump_to_target_if_any ppf target ~header ~f:pp_flambda_as_fexpr unit
 
 let pp_flambda_as_flexpect ppf (old_unit, new_unit) =
   let before = old_unit |> Flambda_to_fexpr.conv in
@@ -227,6 +228,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname (program : Lambda.program) =
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
         ppf flambda;
+      print_fexpr last_pass_name (Flambda_features.dump_fexpr ()) ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
         build_run_result flambda ~free_names ~final_typing_env ~all_code
           slot_offsets

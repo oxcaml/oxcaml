@@ -213,7 +213,7 @@ let external_calling_conventions
     begin match (ty_arg : Cmm.exttype) with
     | XInt | XInt64 ->
         loc.(i) <- [| loc_int last_int make_stack int ofs |]
-    | XInt32 ->
+    | XInt32 | XInt16 | XInt8 ->
         loc.(i) <- [| loc_int32 last_int make_stack int ofs |]
     | XFloat ->
         loc.(i) <- [| loc_float last_float make_stack float ofs |]
@@ -446,6 +446,8 @@ let assemble_file infile outfile =
   Ccomp.command (Config.asm ^ " " ^
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
+
+let has_three_operand_float_ops () = false
 
 let operation_supported : Cmm.operation -> bool = function
   | Cprefetch _ | Catomic _

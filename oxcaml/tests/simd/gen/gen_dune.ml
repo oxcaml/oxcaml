@@ -142,6 +142,7 @@ let () =
       "ops_int16x16";
       "ops_int8x32";
       "sse_other_ops";
+      "sse41_test_ops";
       "sse42_string_ops" ]
   in
   List.iter make_ops_u ops;
@@ -168,6 +169,8 @@ let () =
       "ops_u", enabled_if_main;
       "sse_other_ops", enabled_if_main_amd64_not_macos;
       "sse_other_ops_u", enabled_if_main_amd64_not_macos;
+      "sse41_test_ops", enabled_if_main_amd64_not_macos;
+      "sse41_test_ops_u", enabled_if_main_amd64_not_macos;
       "sse42_string_ops", enabled_if_main_amd64_not_macos;
       "sse42_string_ops_u", enabled_if_main_amd64_not_macos;
       "arrays", enabled_if_main;

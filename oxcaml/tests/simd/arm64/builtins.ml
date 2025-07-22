@@ -450,6 +450,10 @@ module Float32x4 = struct
     = "caml_vec128_unreachable" "caml_neon_cvt_float32x4_to_int32x4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
+  external cvtt_int32x4 : t -> int32x4
+    = "caml_vec128_unreachable" "caml_neon_cvtt_float32x4_to_int32x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
   external cvt_float64x2 : t -> float64x2
     = "caml_vec128_unreachable" "caml_neon_cvt_float32x2_to_float64x2"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -537,6 +541,10 @@ module Float64x2 = struct
     = "caml_vec128_unreachable" "caml_neon_cvt_float64x2_to_int64x2"
     [@@noalloc] [@@unboxed] [@@builtin]
 
+  external cvtt_int64x2 : t -> int64x2
+    = "caml_vec128_unreachable" "caml_neon_cvtt_float64x2_to_int64x2"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
   external cvt_float32x4 : t -> float32x4
     = "caml_vec128_unreachable" "caml_neon_cvt_float64x2_to_float32x2"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -553,6 +561,11 @@ module Float64x2 = struct
    (* Use saturating narrowing conversion here to match SSE intrinsics and C
       stubs behavior. *)
    fun t -> t |> round_current |> cvt_int64x2 |> Int64x2.cvt_int32x4_saturating
+
+  let cvtt_int32x4 : t -> int32x4 =
+   (* Use saturating narrowing conversion here to match SSE intrinsics and C
+      stubs behavior. *)
+   fun t -> t |> cvtt_int64x2 |> Int64x2.cvt_int32x4_saturating
 end
 
 module Int16x8 = struct
@@ -927,6 +940,15 @@ end
 module SSE_Util = struct
   type t = int32x4
 
+  let bitwise_and : int64x2 -> int64x2 -> int64x2 = Int64x2.bitwise_and
+
+  let bitwise_or : int64x2 -> int64x2 -> int64x2 = Int64x2.bitwise_or
+
+  let andnot : int64x2 -> int64x2 -> int64x2 =
+   fun a b -> Int64x2.bitwise_and (Int64x2.bitwise_not a) b
+
+  let bitwise_xor : int64x2 -> int64x2 -> int64x2 = Int64x2.bitwise_xor
+
   external high_64_to_low_64 : t -> t -> t
     = "caml_vec128_unreachable" "caml_simd_vec128_high_64_to_low_64"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -1006,15 +1028,6 @@ module SSE_Util = struct
 end
 
 module SSE2_Util = struct
-  let bitwise_and : int64x2 -> int64x2 -> int64x2 = Int64x2.bitwise_and
-
-  let bitwise_or : int64x2 -> int64x2 -> int64x2 = Int64x2.bitwise_or
-
-  let andnot : int64x2 -> int64x2 -> int64x2 =
-   fun a b -> Int64x2.bitwise_and (Int64x2.bitwise_not a) b
-
-  let bitwise_xor : int64x2 -> int64x2 -> int64x2 = Int64x2.bitwise_xor
-
   (* See [movemask_32]. *)
   let movemask_8 (t : int8x16) : int =
     let mask = Int8x16.cmpltz t in

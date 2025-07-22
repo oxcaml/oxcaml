@@ -92,7 +92,7 @@ let main unix argv ppf ~flambda2 =
                          -output-obj, -instantiate";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
-              | P.Register_allocation) as p) ->
+              | P.Register_allocation | P.Llvmize) as p) ->
         assert (P.is_compilation_pass p);
         Printf.ksprintf Compenv.fatal
           "Options -i and -stop-after (%s) \

@@ -9,8 +9,12 @@ let _ =
     let modname1 =
       Parse_flambda.make_compilation_unit ~filename:file1 ~extension:".fl" ()
     in
-    Compilation_unit.set_current (Some (modname1, Impl));
-    Format.printf "%a@."
-      (Compare.Comparison.print Flambda_unit.print)
-      (Compare.flambda_units unit1 unit2)
+    let unit_info = Unit_info.make_dummy ~input_name:file1 modname1 in
+    Env.set_unit_name (Some unit_info);
+    match Compare.flambda_units unit2 unit1 with
+    | Equivalent -> ()
+    | Different { approximant = unit2' } ->
+      Format.printf "%a@." Print_fexpr.flambda_unit
+        (Flambda_to_fexpr.conv unit2');
+      exit 1
   with Test_utils.Failure -> exit 1

@@ -34,6 +34,8 @@ module Singleton_mixed_block_element = struct
     | Float_boxed of 'a
     | Float64
     | Float32
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
@@ -49,6 +51,8 @@ module Singleton_mixed_block_element = struct
       Format.fprintf ppf "@[<hov 1>(Float_boxed %a)@]" print_locality locality
     | Float64 -> Format.fprintf ppf "Float64"
     | Float32 -> Format.fprintf ppf "Float32"
+    | Bits8 -> Format.fprintf ppf "Bits8"
+    | Bits16 -> Format.fprintf ppf "Bits16"
     | Bits32 -> Format.fprintf ppf "Bits32"
     | Bits64 -> Format.fprintf ppf "Bits64"
     | Vec128 -> Format.fprintf ppf "Vec128"
@@ -71,7 +75,7 @@ type 'a tree =
 type 'a t =
   { prefix : 'a shape;
     suffix : 'a shape;
-    flattened_reordered_shape : 'a shape;
+    flattened_reordered_shape : 'a shape_with_paths;
     forest : 'a tree array;
     print_locality : Format.formatter -> 'a -> unit
   }
@@ -84,7 +88,7 @@ let value_prefix_len t = Array.length t.prefix
 
 let flat_suffix_len t = Array.length t.suffix
 
-let flattened_reordered_shape t = t.flattened_reordered_shape
+let flattened_reordered_shape t = Array.map fst t.flattened_reordered_shape
 
 let print_indentation ppf k =
   for _ = 1 to k do
@@ -133,6 +137,11 @@ let new_indexes_to_old_indexes t =
     old_indexes_to_new_indexes;
   result
 
+let new_index_to_old_path t new_index =
+  snd t.flattened_reordered_shape.(new_index)
+
+let new_block_length t = Array.length t.flattened_reordered_shape
+
 let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   let original_path = path in
   match path with
@@ -164,6 +173,8 @@ let singleton_or_product_of_mixed_block_element
   | Float_boxed locality -> Singleton (Float_boxed locality)
   | Float64 -> Singleton Float64
   | Float32 -> Singleton Float32
+  | Bits8 -> Singleton Bits8
+  | Bits16 -> Singleton Bits16
   | Bits32 -> Singleton Bits32
   | Bits64 -> Singleton Bits64
   | Vec128 -> Singleton Vec128
@@ -229,8 +240,8 @@ let of_mixed_block_elements ~print_locality
     let is_value =
       match elem with
       | Value _ -> true
-      | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word ->
+      | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+      | Vec128 | Vec256 | Vec512 | Word ->
         false
     in
     if is_value
@@ -252,7 +263,7 @@ let of_mixed_block_elements ~print_locality
   let forest = build_tree_list old_path_to_new_index [] original_shape in
   { prefix = Array.map fst prefix;
     suffix = Array.map fst suffix;
-    flattened_reordered_shape = Array.map fst flattened_reordered_shape;
+    flattened_reordered_shape;
     forest;
     print_locality
   }

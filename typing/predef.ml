@@ -119,6 +119,8 @@ and path_float64x8 = Pident ident_float64x8
 let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_float32 = Path.unboxed_version path_float32
 and path_unboxed_nativeint = Path.unboxed_version path_nativeint
+and path_unboxed_int8 = Path.unboxed_version path_int8
+and path_unboxed_int16 = Path.unboxed_version path_int16
 and path_unboxed_int32 = Path.unboxed_version path_int32
 and path_unboxed_int64 = Path.unboxed_version path_int64
 
@@ -171,6 +173,8 @@ and type_unboxed_nativeint =
       newgenty (Tconstr(path_unboxed_nativeint, [], ref Mnil))
 and type_unboxed_int32 = newgenty (Tconstr(path_unboxed_int32, [], ref Mnil))
 and type_unboxed_int64 = newgenty (Tconstr(path_unboxed_int64, [], ref Mnil))
+and type_unboxed_int8 = newgenty (Tconstr(path_unboxed_int8, [], ref Mnil))
+and type_unboxed_int16 = newgenty (Tconstr(path_unboxed_int16, [], ref Mnil))
 and type_or_null t = newgenty (Tconstr(path_or_null, [t], ref Mnil))
 
 and type_int8x16 = newgenty (Tconstr(path_int8x16, [], ref Mnil))
@@ -408,8 +412,8 @@ let mk_add_extension add_extension id args =
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind.Sort.Const.t) with
       | Base Value -> ()
-      | Base (Void | Float32 | Float64 | Word | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
+      | Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+             | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _ -> raise_error ())
     args;
   add_extension id
@@ -614,14 +618,10 @@ let add_simd_stable_extension_types add_type env =
 
 (* CR-soon mslater:
   Remaining work before these can be moved to stable:
-    - Static & reinterpet casts (tests: see ops.ml)
-    - Constants (tests: see consts.ml, consts_u.ml)
-    - Array accessors (tests: see arrays.ml, arrays_u.ml)
     - Correct ASAN checks for 32/64 byte memory chunks
     - Correct TSAN save/restore SIMD registers
   Not strictly required for stable, but will be necessary:
     - Align Vec256 stack slots on the OCaml stack
-    - Use VEX encoding for SSE intrinsics when AVX is enabled
     - AVX & AVX2 intrinsics (tests: see ops.ml, ocaml_simd_sse)
 *)
 let add_simd_beta_extension_types add_type env =
@@ -666,7 +666,10 @@ let add_small_number_beta_extension_types add_type env =
   let _, add_type = mk_add_type add_type in
   env
   |> add_type ident_int8 ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int8
   |> add_type ident_int16 ~jkind:Jkind.Const.Builtin.immediate
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int16
+
 
 
 let or_null_argument_sort = Jkind.Sort.Const.value

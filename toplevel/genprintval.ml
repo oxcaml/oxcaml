@@ -276,7 +276,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Value -> Print_as_value
       | Base Void -> Print_as "<void>"
-      | Base (Float64 | Float32 | Bits32 | Bits64 |
+      | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
               Vec128 | Vec256 | Vec512 | Word) -> Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
 
@@ -633,7 +633,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Value -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
-                        | Float32 | Bits32 | Bits64
+                        | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                         | Vec128 | Vec256 | Vec512 | Word | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
                       in

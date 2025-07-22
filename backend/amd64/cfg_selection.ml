@@ -128,10 +128,13 @@ let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor)
-  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
-  | Specific Ipackf32 ->
+  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
+  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
+  | Specific (Ifloatarithmem (_, _, _)) ->
+    if Proc.has_three_operand_float_ops ()
+    then raise Use_default_exn
+    else [| res.(0); arg.(1) |], res
   | Intop_atomic { op = Compare_set; size = _; addr = _ } ->
     (* first arg must be rax *)
     let arg = Array.copy arg in
@@ -158,10 +161,6 @@ let pseudoregs_for_operation op arg res =
   (* For imulh, first arg must be in rax, rax is clobbered, and result is in
      rdx. *)
   | Intop (Imulh _) -> [| rax; arg.(1) |], [| rdx |]
-  | Specific (Ifloatarithmem (_, _, _)) ->
-    let arg' = Array.copy arg in
-    arg'.(0) <- res.(0);
-    arg', res
   (* For shifts with variable shift count, second arg must be in rcx *)
   | Intop (Ilsl | Ilsr | Iasr) -> [| res.(0); rcx |], res
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
@@ -170,7 +169,6 @@ let pseudoregs_for_operation op arg res =
   | Intop Idiv -> [| rax; rcx |], [| rax |]
   | Intop Imod -> [| rax; rcx |], [| rdx |]
   | Floatop (Float64, Icompf cond) ->
-    (* CR gyorsh: make this optimization as a separate PR. *)
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would
        still be live after this operation -- so we add a fresh register as both
@@ -178,22 +176,30 @@ let pseudoregs_for_operation op arg res =
        forces us to choose a fixed register, which makes it more likely an extra
        mov would be added to transfer the argument to the fixed register. *)
     let treg = Reg.create Float in
-    let _, is_swapped = float_cond_and_need_swap cond in
-    ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
-      [| res.(0); treg |] )
+    if Proc.has_three_operand_float_ops ()
+    then arg, [| res.(0); treg |]
+    else
+      let _, is_swapped = float_cond_and_need_swap cond in
+      ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
+        [| res.(0); treg |] )
   | Floatop (Float32, Icompf cond) ->
     let treg = Reg.create Float32 in
-    let _, is_swapped = float_cond_and_need_swap cond in
-    ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
-      [| res.(0); treg |] )
+    if Proc.has_three_operand_float_ops ()
+    then arg, [| res.(0); treg |]
+    else
+      let _, is_swapped = float_cond_and_need_swap cond in
+      ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
+        [| res.(0); treg |] )
   | Specific Irdpmc ->
     (* For rdpmc instruction, the argument must be in ecx and the result is in
        edx (high) and eax (low). Make it simple and force the argument in rcx,
        and rax and rdx clobbered *)
     [| rcx |], res
   | Specific (Isimd op) -> Simd_selection.pseudoregs_for_operation op arg res
-  | Specific (Isimd_mem (op, _addr)) ->
-    Simd_selection.pseudoregs_for_mem_operation op arg res
+  | Specific (Isimd_mem (op, _addr)) -> (
+    match Simd_selection.pseudoregs_for_mem_operation op arg res with
+    | None -> raise Use_default_exn
+    | Some (arg, res) -> arg, res)
   | Csel _ ->
     (* last arg must be the same as res.(0) *)
     let len = Array.length arg in
@@ -207,7 +213,7 @@ let pseudoregs_for_operation op arg res =
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
-      | Ipause | Ilfence | Isfence | Imfence
+      | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
@@ -353,7 +359,6 @@ let select_operation
     match func with
     | "caml_rdtsc_unboxed" -> Rewritten (specific Irdtsc, args)
     | "caml_rdpmc_unboxed" -> Rewritten (specific Irdpmc, args)
-    | "caml_pause_hint" -> Rewritten (specific Ipause, args)
     | "caml_load_fence" -> Rewritten (specific Ilfence, args)
     | "caml_store_fence" -> Rewritten (specific Isfence, args)
     | "caml_memory_fence" -> Rewritten (specific Imfence, args)
@@ -361,7 +366,7 @@ let select_operation
       let addr, eloc = select_addressing Word_int (one_arg "cldemote" args) in
       Rewritten (specific (Icldemote addr), [eloc])
     | _ -> (
-      match Simd_selection.select_operation_cfg func args with
+      match Simd_selection.select_operation_cfg ~dbg func args with
       | Some (op, args) -> Rewritten (Basic (Op op), args)
       | None -> Use_default))
   (* Recognize store instructions *)

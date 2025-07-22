@@ -569,6 +569,9 @@ module Int16 = struct
   external mulsign : t -> t -> t = "caml_vec128_unreachable" "int16_mulsign"
     [@@noalloc] [@@untagged]
 
+  external mul_round : t -> t -> t = "caml_vec128_unreachable" "int16_mul_round"
+    [@@noalloc] [@@untagged]
+
   external addsu : t -> t -> t = "caml_vec128_unreachable" "int16_addsu"
     [@@noalloc] [@@untagged]
 

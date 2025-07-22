@@ -2848,6 +2848,91 @@ AS_IF([test x"$enable_multidomain" = "xyes"],
     [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
 poll insertion enabled.])])], [])
 
+AC_SUBST([has_popcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("popcnt")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_POPCNT]) has_popcnt=yes, [])
+
+AC_SUBST([has_pclmul])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("pclmul")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
+
+AC_SUBST([has_lzcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("lzcnt")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_LZCNT]) has_lzcnt=yes, [])
+
+AC_SUBST([has_sse3])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse3")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE3]) has_sse3=yes, [])
+
+AC_SUBST([has_ssse3])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("ssse3")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSSE3]) has_ssse3=yes, [])
+
+AC_SUBST([has_sse4_1])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse4.1")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE4_1]) has_sse4_1=yes, [])
+
+AC_SUBST([has_sse4_2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse4.2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE4_2]) has_sse4_2=yes, [])
+
+AC_SUBST([has_bmi])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 int main(void) {
   __builtin_cpu_init ();
@@ -2857,7 +2942,43 @@ int main(void) {
     return 1;
   }
 }
-]])], AC_DEFINE([HAS_BMI]), [])
+]])], AC_DEFINE([HAS_BMI]) has_bmi=yes, [])
+
+AC_SUBST([has_bmi2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("bmi2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_BMI2]) has_bmi2=yes, [])
+
+AC_SUBST([has_avx])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX]) has_avx=yes, [])
+
+AC_SUBST([has_avx2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX2]) has_avx2=yes, [])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
