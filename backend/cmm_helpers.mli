@@ -496,10 +496,7 @@ val negint : unary_primitive
 val addr_array_length : unary_primitive
 
 (** Byte swap primitive Operates on Cmm integers (unboxed values) *)
-val bbswap : Primitive.unboxed_integer -> unary_primitive
-
-(** 16-bit byte swap primitive Operates on Cmm integers (untagged integers) *)
-val bswap16 : unary_primitive
+val bbswap : bswap_bitwidth -> unary_primitive
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 

@@ -42,6 +42,10 @@ val type_lexing_position:type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
 val type_unboxed_nativeint:type_expr
+val type_unboxed_char: type_expr
+val type_unboxed_int: type_expr
+val type_unboxed_int8: type_expr
+val type_unboxed_int16: type_expr
 val type_unboxed_int32:type_expr
 val type_unboxed_int64:type_expr
 val type_or_null: type_expr -> type_expr
@@ -85,6 +89,10 @@ val path_lexing_position: Path.t
 val path_unboxed_float: Path.t
 val path_unboxed_float32: Path.t
 val path_unboxed_nativeint: Path.t
+val path_unboxed_char: Path.t
+val path_unboxed_int: Path.t
+val path_unboxed_int8: Path.t
+val path_unboxed_int16: Path.t
 val path_unboxed_int32: Path.t
 val path_unboxed_int64: Path.t
 val path_or_null: Path.t
@@ -126,7 +134,7 @@ val list_argument_jkind : jkind_lr
    recursion between predef and env, we break it by parameterizing
    over Env.t, Env.add_type and Env.add_extension. *)
 
-val build_initial_env:
+val build_initial_env :
   (Ident.t -> type_declaration -> 'a -> 'a) ->
   (Ident.t -> extension_constructor -> 'a -> 'a) ->
   'a -> 'a

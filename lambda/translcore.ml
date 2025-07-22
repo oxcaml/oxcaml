@@ -57,8 +57,10 @@ let sort_must_not_be_void loc ty sort =
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
-let check_record_field_sort loc : Jkind.Sort.Const.t -> _ = function
-  | Base (Value | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word) -> ()
+let check_record_field_sort loc sort =
+  match (sort : Jkind.Sort.Const.t) with
+  | Base (Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+         | Word) -> ()
   | Base Void -> raise (Error (loc, Illegal_void_record_field))
   | Product _ as c -> raise (Error (loc, Illegal_product_record_field c))
 
@@ -106,7 +108,7 @@ let transl_extension_constructor ~scopes env path ext =
          to pattern typing, as patterns can close over them. *)
       Lprim (Pmakeblock (Obj.object_tag, Immutable_unique, None, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
-         Lprim (prim_fresh_oo_id, [Lconst (const_int 0)], loc)],
+         Lprim (prim_fresh_oo_id, [(lconst_int int 0)], loc)],
         loc)
   | Text_rebind(path, _lid) ->
       transl_extension_path loc env path
@@ -522,7 +524,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           assert (args_with_sorts = []);
           (* CR layouts v5: This could have void args, but for now we've ruled
              that out by checking that the sort list is empty *)
-          Lconst(const_int runtime_tag)
+          (lconst_int int runtime_tag)
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
@@ -617,16 +619,16 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_variant(l, arg) ->
       let tag = Btype.hash_variant l in
       begin match arg with
-        None -> Lconst(const_int tag)
+        None -> (lconst_int int tag)
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
-            Lconst(Const_block(0, [const_int tag;
+            Lconst(Const_block(0, [const_int int tag;
                                    extract_constant lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
-                  [Lconst(const_int tag); lam],
+                  [lconst_int int tag; lam],
                   of_location ~scopes e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
