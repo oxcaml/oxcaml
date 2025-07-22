@@ -925,3 +925,38 @@ let rec type_name : 'a. 'a Type_shape.ts -> _ =
       let args = type_arg_list_to_string (List.map type_name shapes) in
       let name = Path.name type_decl_shape.path in
       args ^ name)
+
+let print_table_all_type_decls ppf =
+  let entries = Uid.Tbl.to_list all_type_decls in
+  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
+  let entries =
+    List.map
+      (fun (k, v) ->
+        ( Format.asprintf "%a" Uid.print k,
+          Format.asprintf "%a" Type_decl_shape.print v ))
+      entries
+  in
+  let uids, decls = List.split entries in
+  Misc.pp_table ppf ["UID", uids; "Type Declaration", decls]
+
+let print_table_all_type_shapes ppf =
+  let entries = Uid.Tbl.to_list all_type_shapes in
+  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
+  let entries =
+    List.map
+      (fun (k, { type_shape; type_layout }) ->
+        ( Format.asprintf "%a" Uid.print k,
+          ( Format.asprintf "%a" Type_shape.print type_shape,
+            Format.asprintf "%a" Layout.format type_layout ) ))
+      entries
+  in
+  let uids, rest = List.split entries in
+  let types, sorts = List.split rest in
+  Misc.pp_table ppf ["UID", uids; "Type", types; "Sort", sorts]
+
+(* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
+let print_debug_uid_tables ppf =
+  Format.fprintf ppf "\n";
+  print_table_all_type_decls ppf;
+  Format.fprintf ppf "\n";
+  print_table_all_type_shapes ppf
