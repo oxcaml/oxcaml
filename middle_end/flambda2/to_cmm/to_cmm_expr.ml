@@ -1228,9 +1228,7 @@ and switch env res switch =
         Backend_var.Set.union scrutinee_free_vars
           (Backend_var.Set.union else_free_vars then_free_vars)
       in
-      (* CR gbury: technically, these symbol inits should be empty since neither
-         of the branches should be at top-level, but it should not hurt to do
-         this. *)
+      (* See comment below about symbol inits and branches *)
       let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
       let cmm, free_vars, symbol_inits =
         wrap
@@ -1252,9 +1250,7 @@ and switch env res switch =
           (C.eq ~dbg (C.int ~dbg x) scrutinee)
           ~then_dbg:if_x_dbg ~then_:if_x ~else_dbg:if_not_dbg ~else_:if_not
       in
-      (* CR gbury: technically, these symbol inits should be empty since neither
-         of the branches should be at top-level, but it should not hurt to do
-         this. *)
+      (* See comment below about symbol inits and branches *)
       let symbol_inits =
         Env.Symbol_inits.merge if_x_symbol_inits if_not_symbol_inits
       in
@@ -1276,9 +1272,14 @@ and switch env res switch =
               =
             make_arm ~must_tag_discriminant env res (discriminant, action)
           in
-          (* CR gbury: technically, these symbol inits should be empty since
-             neither of the branches should be at top-level, but it should not
-             hurt to do this. *)
+          (* Note about symbol inits and branches: symbol allocation can occur
+             in branches of a switch/ite, e.g. if there are two branches and one
+             of them raises, then the other one can be considered at unit
+             top-level and allow for symbols to be defined; after inlining of
+             continuation by to_cmm, this means it is expected that there can be
+             some symbol inits in branches of a switch (although we'd expect at
+             most one branch to have some). Therefore we want to correctly
+             handle and propagate up symbol inits that come from branches. *)
           let symbol_inits =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
