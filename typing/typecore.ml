@@ -5658,7 +5658,9 @@ and type_expect_
       end;
       let alloc_mode, record_mode =
         if is_boxed then
-          let alloc_mode, record_mode = register_allocation ~loc ~env expected_mode in
+          let alloc_mode, record_mode =
+            register_allocation ~loc ~env expected_mode
+          in
           Some alloc_mode, record_mode
         else
           (register_bytecode_allocation ~loc ~env expected_mode;
@@ -6231,7 +6233,9 @@ and type_expect_
               newvar
                 (Jkind.Builtin.value_or_null ~why:Polymorphic_variant_field)
             in
-            let alloc_mode, argument_mode = register_allocation ~loc ~env expected_mode in
+            let alloc_mode, argument_mode =
+              register_allocation ~loc ~env expected_mode
+            in
             let arg =
               type_expect env argument_mode sarg (mk_expected ty_expected)
             in
@@ -6355,8 +6359,8 @@ and type_expect_
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
-          type_label_exp ~overwrite:No_overwrite_label ~create:false env mode loc ty_record
-            (lid, label, snewval) Legacy
+          type_label_exp ~overwrite:No_overwrite_label ~create:false env mode
+            loc ty_record (lid, label, snewval) Legacy
         | Immutable ->
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
@@ -7366,7 +7370,8 @@ and type_ident env ?(recarg=Rejected) lid =
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_allocation_mode ~loc:lid.loc ~env (Alloc.max_with_comonadic Areality mode)
+           register_allocation_mode ~loc:lid.loc ~env
+              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
        ty, Id_prim (Option.map Locality.disallow_right mode, sort)
@@ -8037,7 +8042,9 @@ and type_format loc str env =
 and type_option_some env expected_mode sarg ty ty0 =
   let ty' = extract_option_type env ty in
   let ty0' = extract_option_type env ty0 in
-  let alloc_mode, argument_mode = register_allocation ~loc:sarg.pexp_loc ~env expected_mode in
+  let alloc_mode, argument_mode =
+    register_allocation ~loc:sarg.pexp_loc ~env expected_mode
+  in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
@@ -8248,7 +8255,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       unify_exp env {texp with exp_type = ty_fun} ty_expected;
       if args = [] then texp else begin
-      let alloc_mode, mode_subcomponent = register_allocation ~loc:sarg.pexp_loc ~env mode in
+      let alloc_mode, mode_subcomponent =
+        register_allocation ~loc:sarg.pexp_loc ~env mode
+      in
       submode ~loc:sarg.pexp_loc ~env ~reason:Other
         exp_mode mode_subcomponent;
       (* eta-expand to avoid side effects *)
@@ -8543,7 +8552,9 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
-  let alloc_mode, argument_mode = register_allocation_value_mode ~loc ~env expected_mode.mode in
+  let alloc_mode, argument_mode =
+    register_allocation_value_mode ~loc ~env expected_mode.mode
+  in
   let alloc_mode =
     { mode = alloc_mode;
       locality_context = expected_mode.locality_context }
