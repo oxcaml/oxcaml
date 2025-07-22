@@ -2042,7 +2042,7 @@ module Const = struct
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
       | Base (Bits8 | Bits16), (Non_null | Maybe_null) -> Beta
-      | Base Void, _ -> Alpha
+      | Base Void, _ -> Stable
     in
     scan_layout jkind.layout
 
