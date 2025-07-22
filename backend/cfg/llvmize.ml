@@ -163,7 +163,7 @@ let create ~llvmir_filename ~ppf_dump =
     ppf_dump;
     current_fun_info = create_fun_info ();
     data = [];
-    defined_symbols = String.Set.empty;
+    defined_function_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty
   }
 
@@ -806,7 +806,8 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
-  t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
+  t.defined_function_symbols
+    <- String.Set.add fun_name t.defined_function_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
   let fun_args_with_idents =
