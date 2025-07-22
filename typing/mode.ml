@@ -1777,7 +1777,7 @@ let rec print_morph_hint :
            Location.print_loc locs.value)
     | Is_closed_by (item, _locs) ->
       `PrintThenContinue
-        (dprintf "is used inside %a" Hint.print_closure_context item)
+        (dprintf "is used inside a %a" Hint.print_closure_context item)
     | Partial_application ->
       `PrintThenContinue (dprintf "is captured by a partial application")
     | Crossing_left | Crossing_right ->
