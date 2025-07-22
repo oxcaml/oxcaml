@@ -4,8 +4,8 @@
 value local_args_repro_call(value fn) {
   CAMLparam1(fn);
 
-  int nargs = 7;
-  value argv[7];
+  enum {nargs = 7};
+  value argv[nargs];
   for (int i = 0; i < nargs; i++) {
     argv[i] = Val_unit;
   }
