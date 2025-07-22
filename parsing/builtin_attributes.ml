@@ -116,6 +116,7 @@ let builtin_attrs =
   ; "or_null_reexport"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
+  ; "implicit_kind"
   ]
 
 let builtin_attrs =
@@ -700,6 +701,43 @@ let error_message_attr l =
       end
     | _ -> None in
   List.find_map inner l
+
+let get_implicit_jkind_attr x =
+  let extract_var_and_jkind typ =
+    match typ.ptyp_desc with
+    | Ptyp_var (var_name, Some jkind_annot) ->
+        var_name, jkind_annot
+    | _ -> raise Exit
+  in
+  let parse_implicit_jkind_payload = function
+    | PTyp typ ->
+        begin match typ.ptyp_desc with
+        | Ptyp_var (_, Some _) ->
+            (* Single variable: ('a : immediate) *)
+            [extract_var_and_jkind typ]
+        | Ptyp_tuple typs ->
+            (* Multiple variables: ('a : immediate) * ('b : int) *)
+            List.map (fun (label_opt, typ) ->
+              match label_opt with
+              | None -> extract_var_and_jkind typ
+              | Some _ -> raise Exit
+            ) typs
+        | _ -> raise Exit
+        end
+    | _ -> raise Exit
+  in
+  match x.attr_name.txt with
+  | "ocaml.implicit_kind" | "implicit_kind" ->
+    begin match parse_implicit_jkind_payload x.attr_payload with
+    | pairs ->
+      mark_used x.attr_name;
+      pairs
+    | exception Exit ->
+      warn_payload x.attr_loc x.attr_name.txt
+        "implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...";
+      []
+    end
+  | _ -> []
 
 type zero_alloc_check =
   { strict: bool;
