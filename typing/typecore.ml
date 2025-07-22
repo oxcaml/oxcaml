@@ -698,7 +698,7 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 let reset_allocations () = allocations := []
 
 let lower_bound_externality ~loc ~env lower_bound alloc_mode =
-  let externality = Alloc.proj (Comonadic Externality) alloc_mode in
+  let externality = Alloc.proj_comonadic Externality alloc_mode in
   let res = Externality.submode lower_bound externality in
   (match res with
   | Ok () -> ()
