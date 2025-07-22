@@ -376,10 +376,9 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
           (fun return_value_component kind ->
             ( return_value_component,
               Flambda_debug_uid.none,
-              (* CR sspies: There are some debug uids for the extra arguments
-                 that we could propagate here. But it seems these are never user
-                 visible, so there is currently no point in propagate the debug
-                 uids. (They are probably [.none] anyways, I guess.) *)
+              (* CR sspies: Try to improve the debug UID propagation here in the
+                 future. These might be derived from user visible variables. See
+                 #3967. *)
               IR.Not_user_visible,
               kind ))
           return_value_components return_kinds

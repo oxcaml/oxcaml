@@ -306,9 +306,11 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
           rewrite_ids
       in
       let var_duid = Flambda_debug_uid.none in
-      (* CR sspies: [extra_param] can be derived/aliased from a user visible
-         variable. If we can, it would be good to propagate debugging UIDs (or
-         derived UIDs) here. For now, we make due without. *)
+      (* CR sspies: Improve the debug UID propagation here in the future.
+         Concretely, extra params can sometimes be generated and not user
+         visible (e.g. create during unboxing), and sometimes can be
+         user-visible, or at least aliases of user-visible variable (e.g. CSE,
+         loop invariants, etc...). See #3967. *)
       let var_kind =
         Flambda_kind.With_subkind.anything (Variable.Map.find var aliases_kind)
       in
@@ -562,7 +564,7 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         let var_duid = Flambda_debug_uid.none in
         (* CR sspies: [var] can be derived/aliased from a user visible variable.
            If we can, it would be good to propagate debugging UIDs (or derived
-           UIDs) here. For now, we make due without. *)
+           UIDs) here in the future. For now, we make due without. See #3967 *)
         let bound_pattern =
           Bound_pattern.singleton
             (Bound_var.create var var_duid Name_mode.normal)

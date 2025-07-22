@@ -1720,6 +1720,10 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
   let scrutinee = find_simple_from_id env scrutinee in
   let untagged_scrutinee = Variable.create "untagged" in
   let untagged_scrutinee_duid = Flambda_debug_uid.none in
+  (* CR sspies: We should probably have something like a phantom let here, even
+     though the target variable isn't user-visible. Then in the debugger, if
+     only the untagged scrutinee were available (and not the original variable),
+     we could still show a value for the original variable. See #3967. *)
   let untagged_scrutinee' =
     VB.create untagged_scrutinee untagged_scrutinee_duid Name_mode.normal
   in
