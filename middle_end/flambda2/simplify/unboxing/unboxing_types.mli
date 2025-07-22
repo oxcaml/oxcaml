@@ -32,9 +32,6 @@ module Extra_param_and_args : sig
   type t = private
     { param : Variable.t;
       param_debug_uid : Flambda_debug_uid.t;
-      (* CR sspies: This is [Flambda_debug_uid.none] at all the creation points
-         that I found. I still added the field, because it is non-obvious that
-         it is always [Flambda_debug_uid.none] at the usage points. *)
       args : EPA.Extra_arg.t Apply_cont_rewrite_id.Map.t
     }
 

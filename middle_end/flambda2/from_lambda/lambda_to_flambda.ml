@@ -509,7 +509,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
   | Lfunction func ->
     let id = Ident.create_local (name_for_function func) in
     let id_duid = Flambda_debug_uid.none in
-    (* CR sspies: Is there a better [Flambda_debug_uid.t] available here? *)
+    (* CR sspies: In the future, improve the debugging UIDs here if possible.
+       Consider introducing a special debug UID for closures. See #3967. *)
     let dbg = Debuginfo.from_location func.loc in
     let func =
       cps_function env ~fid:id ~fuid:id_duid
@@ -546,7 +547,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           | None -> [temp_id]
           | Some (_, temp_id_unarized) -> List.map fst temp_id_unarized
           (* CR sspies: Probably we do not want to discard the debugging uid
-             here. *)
+             here. Try to improve this in the future. *)
         in
         List.fold_left2
           (fun body new_id_with_kind temp_id acc ccenv ->

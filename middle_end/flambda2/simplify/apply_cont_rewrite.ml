@@ -177,8 +177,6 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
               simple, [], Simple.free_names simple, Name_occurrences.empty
             | New_let_binding (temp, prim) ->
               let temp_duid = Flambda_debug_uid.none in
-              (* CR sspies: The name [temp] suggests that this is not
-                 user-visible. *)
               let extra_let =
                 ( Bound_var.create temp temp_duid Name_mode.normal,
                   Code_size.prim prim,
@@ -190,8 +188,6 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
                 Name_occurrences.singleton_variable temp Name_mode.normal )
             | New_let_binding_with_named_args (temp, gen_prim) ->
               let temp_duid = Flambda_debug_uid.none in
-              (* CR sspies: The name [temp] suggests that this is not
-                 user-visible. *)
               let prim =
                 match (ctx : rewrite_apply_cont_ctx) with
                 | Apply_expr function_return_values ->

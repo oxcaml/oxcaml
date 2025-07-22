@@ -45,9 +45,9 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
         Some callee, unrolled_rec_info)
   in
   let my_closure_duid = Flambda_debug_uid.none in
-  (* CR sspies: Not sure whethere these closures can ever be user visible.
-     Popagating a [Lambda_debug_uid.t] here is nontrivial, so I picked
-     [Flambda_debug_uid.none] for now. *)
+  (* CR sspies: Not sure whether these closures can ever be user visible.
+     Propagating a [Lambda_debug_uid.t] here is nontrivial, so I picked
+     [Flambda_debug_uid.none] for now. Improve this in the future. *)
   let my_closure =
     Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
       my_closure_duid

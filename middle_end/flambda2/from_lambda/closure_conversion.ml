@@ -657,8 +657,6 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
           Env.add_var_like env id Not_user_visible kind
         in
         env, (let_bound_var, id_duid))
-        (* CR sspies: Alternatively, we could drop the debugging uid here,
-           because these variables are not user visible. *)
       env let_bound_ids_with_kinds
   in
   let cost_metrics_of_body, free_names_of_body, acc, body =
@@ -1947,7 +1945,8 @@ let compute_body_of_unboxed_function acc my_region my_closure
                (Bound_var.create
                   (Bound_parameter.var param)
                   param_duid Name_mode.normal))
-            (* CR sspies: Consider improving the debug UID here. *)
+            (* CR sspies: In the future, improve the debugging UIDs here if
+             possible. *)
             (Named.create_prim
                (boxing_primitive k alloc_mode
                   (List.map (fun (var, _, _) -> var) vars_with_kinds))
@@ -2048,7 +2047,6 @@ let compute_body_of_unboxed_function acc my_region my_closure
     Let_with_acc.create acc
       (Bound_pattern.singleton
          (Bound_var.create my_closure my_closure_duid Name_mode.normal))
-      (* CR sspies: Should this be [my_unboxed_closure]? *)
       (Named.create_prim
          (Flambda_primitive.Unary
             ( Project_function_slot
@@ -2540,8 +2538,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
             Project_function_slot { move_from = function_slot; move_to }
           in
           let var = VB.create var Flambda_debug_uid.none Name_mode.normal in
-          (* CR sspies: Should we put in more effort to propagate a debugging
-             uid to here? *)
+          (* CR sspies: In the future, improve the debugging UIDs here if
+             possible. *)
           let named =
             Named.create_prim (Unary (move, my_closure')) Debuginfo.none
           in
@@ -2552,8 +2550,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       Variable.Map.fold
         (fun var value_slot (acc, body) ->
           let var = VB.create var Flambda_debug_uid.none Name_mode.normal in
-          (* CR sspies: Should we put in more effort to propagate a debugging
-             uid to here? *)
+          (* CR sspies: In the future, improve the debugging UIDs here if
+             possible. *)
           let named =
             Named.create_prim
               (Unary
@@ -3096,8 +3094,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
      allow inlining and lifting *)
   let wrapper_id = Ident.create_local ("partial_" ^ Ident.name apply.func) in
   let wrapper_id_duid = Flambda_debug_uid.none in
-  (* CR sspies: Should we try harder to get a debug uid here? Seems this
-     variable is not user visible. *)
+  (* CR sspies: In the future, improve the debugging UIDs here if
+      possible. *)
   let function_slot =
     Function_slot.create
       (Compilation_unit.get_current_exn ())

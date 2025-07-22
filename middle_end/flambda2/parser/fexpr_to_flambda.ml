@@ -131,8 +131,7 @@ let fresh_exn_cont env { Fexpr.txt = name; loc = _ } =
 let fresh_var env { Fexpr.txt = name; loc = _ } =
   let v = Variable.create name ~user_visible:() in
   let v_duid = Flambda_debug_uid.none in
-  (* CR sspies: These variables are apparently user visible. Where do we get
-     [Lambda.debug_uid] values for them from? *)
+  (* CR sspies: In the future, try to improve the debug UID propagation here. *)
   v, v_duid, { env with variables = VM.add name v env.variables }
 
 let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
@@ -937,7 +936,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
             fresh_var env ghost_region_var
           in
           let my_depth, _my_depth, env = fresh_var env depth_var in
-          (* CR sspies: Should we propagate these debug identifiers? *)
+          (* CR sspies: In the future, consider propagating these debug UIDs. *)
           let return_continuation, env =
             fresh_cont env ret_cont ~sort:Return
               ~arity:(Flambda_arity.cardinal_unarized result_arity)
