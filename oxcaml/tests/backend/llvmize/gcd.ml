@@ -1,14 +1,10 @@
-let x : int ref = Gcd_data.x
-
-let y : int ref = Gcd_data.y
-
-let res : int ref = Gcd_data.res
+module D = Gcd_data
 
 let[@inline never] gcd () =
-  while !y <> 0 do
-    let new_x = !y in
-    let new_y = !x mod !y in
-    x := new_x;
-    y := new_y
+  while !D.y <> 0 do
+    let new_x = !D.y in
+    let new_y = !D.x mod !D.y in
+    D.x := new_x;
+    D.y := new_y
   done;
-  res := !x
+  D.res := !D.x

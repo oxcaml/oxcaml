@@ -139,8 +139,8 @@ type t =
            function) *)
     mutable data : Cmm.data_item list;
         (* Collects data items as they come and processes them at the end *)
-    mutable defined_symbols : String.Set.t;
-        (* Keeps track of all function symbols so far *)
+    mutable defined_function_symbols : String.Set.t;
+        (* Keeps track of all function symbols defined so far *)
     mutable referenced_symbols : String.Set.t
         (* Keeps track of all global symbols referenced so far *)
   }
@@ -163,7 +163,7 @@ let create ~llvmir_filename ~ppf_dump =
     ppf_dump;
     current_fun_info = create_fun_info ();
     data = [];
-    defined_symbols = String.Set.empty;
+    defined_function_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty
   }
 
@@ -177,6 +177,8 @@ let get_ident_aux table key ~get_ident ~find_opt ~add =
     add table key ident;
     ident
 
+(* We use named identifiers for labels because their original ids are not
+   ordered, but LLVM expects them to be ordered if they are unnamed *)
 let get_ident_for_label t label =
   get_ident_aux t.current_fun_info.label2ident label
     ~get_ident:(fun label -> "L" ^ Label.to_string label |> Ident.named)
@@ -214,7 +216,7 @@ module F = struct
 
   let do_if_comments_enabled f = if !Oxcaml_flags.dasm_comments then f ()
 
-  let pp_dbg ppf dbg =
+  let pp_dbginfo ppf dbg =
     if Debuginfo.is_none dbg
     then ()
     else fprintf ppf "[ %a ]" Debuginfo.print_compact dbg
@@ -222,17 +224,18 @@ module F = struct
   let pp_dbg_comment ?(newline = true) ppf name dbg =
     do_if_comments_enabled (fun () ->
         match newline with
-        | true -> line ppf "; %s %a" name pp_dbg dbg
-        | false -> fprintf ppf "; %s %a" name pp_dbg dbg)
+        | true -> line ppf "; %s %a" name pp_dbginfo dbg
+        | false -> fprintf ppf "; %s %a" name pp_dbginfo dbg)
 
   let pp_dbg_instr_aux pp_instr ppf ins =
     do_if_comments_enabled (fun () ->
         pp_indent ppf ();
+        (* Replace newlines since this is a line comment *)
         let instr_str =
           asprintf "%a" pp_instr ins
           |> String.map (function '\n' -> ' ' | c -> c)
         in
-        line ppf "; %s %a" instr_str pp_dbg ins.Cfg.dbg)
+        line ppf "; %s %a" instr_str pp_dbginfo ins.Cfg.dbg)
 
   let pp_dbg_instr_basic = pp_dbg_instr_aux Cfg.print_basic
 
@@ -304,10 +307,6 @@ module F = struct
 
   (* == LLVM instructions == *)
 
-  (* CR yusumez: loads/stores might be of different sizes *)
-  (* CR yusumez: For now, [ins_*] functions always take idents as operands
-     unless specialised (as in [ins_store_nativeint]) *)
-
   let ins_load t ~src ~dst typ =
     ins t "%a = load %a, ptr %a" pp_ident dst Llvm_typ.pp_t typ pp_ident src
 
@@ -331,6 +330,8 @@ module F = struct
 
   let ins_branch t label = ins t "br %a" (pp_label t) label
 
+  (* [dbg] is used to print the [Reg.t] the allocated identifier corresponds to
+     in the preamble *)
   let ins_alloca ?dbg t (reg : Reg.t) =
     let pp_my_dbg ppf () =
       match dbg with
@@ -347,16 +348,8 @@ module F = struct
     ins t "br i1 %a, label %a, label %a" pp_ident cond pp_ident ifso pp_ident
       ifnot
 
-  let ins_zext t ~src ~dst ~src_typ ~dst_typ =
-    ins t "%a = zext %a %a to %a" pp_ident dst Llvm_typ.pp_t src_typ pp_ident
-      src Llvm_typ.pp_t dst_typ
-
-  let ins_sext t ~src ~dst ~src_typ ~dst_typ =
-    ins t "%a = zext %a %a to %a" pp_ident dst Llvm_typ.pp_t src_typ pp_ident
-      src Llvm_typ.pp_t dst_typ
-
-  let ins_trunc t ~src ~dst ~src_typ ~dst_typ =
-    ins t "%a = trunc %a %a to %a" pp_ident dst Llvm_typ.pp_t src_typ pp_ident
+  let ins_conv t op ~src ~dst ~src_typ ~dst_typ =
+    ins t "%a = %s %a %a to %a" pp_ident dst op Llvm_typ.pp_t src_typ pp_ident
       src Llvm_typ.pp_t dst_typ
 
   let ins_binop t op arg1 arg2 res typ =
@@ -386,51 +379,15 @@ module F = struct
     ins_load_reg t temp reg;
     temp
 
-  (* returns an [Ident.t] of type ptr pointing to the address specified by
-     [addr]. Starts counting arguments of [i] from [n] *)
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
-    let add_offset offset base =
-      let res = fresh_ident t in
-      ins_binop t "add" base offset res Llvm_typ.i64;
-      res
-    in
-    let add_offset_imm offset base =
-      let res = fresh_ident t in
-      ins_binop_imm t "add" base (Int.to_string offset) res Llvm_typ.i64;
-      res
-    in
-    let mul_scale scale base =
-      let res = fresh_ident t in
-      ins_binop_imm t "mul" base (Int.to_string scale) res Llvm_typ.i64;
-      res
-    in
-    let make_ptr ident =
-      let res = fresh_ident t in
-      ins t "%a = inttoptr i64 %a to ptr" pp_ident res pp_ident ident;
-      res
-    in
-    match addr with
-    | Ibased (sym_name, _sym_global, offset) ->
-      t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
-      let base_sym = asprintf "%a" pp_global sym_name in
-      let base_addr = fresh_ident t in
-      ins t "%a = ptrtoint ptr %s to i64" pp_ident base_addr base_sym;
-      add_offset_imm offset base_addr |> make_ptr
-    | Iindexed offset ->
-      let arg = load_reg_to_temp t i.arg.(n) in
-      add_offset_imm offset arg |> make_ptr
-    | Iindexed2 offset ->
-      let arg1 = load_reg_to_temp t i.arg.(n) in
-      let arg2 = load_reg_to_temp t i.arg.(n + 1) in
-      add_offset arg2 arg1 |> add_offset_imm offset
-    | Iscaled (scale, offset) ->
-      let arg = load_reg_to_temp t i.arg.(n) in
-      mul_scale scale arg |> add_offset_imm offset |> make_ptr
-    | Iindexed2scaled (scale, offset) ->
-      let arg1 = load_reg_to_temp t i.arg.(n) in
-      let arg2 = load_reg_to_temp t i.arg.(n + 1) in
-      mul_scale scale arg2 |> add_offset arg1 |> add_offset_imm offset
-      |> make_ptr
+    let offset = Arch.addressing_displacement_for_llvmize addr in
+    let arg = load_reg_to_temp t i.arg.(n) in
+    let temp = fresh_ident t in
+    let res = fresh_ident t in
+    ins_binop_imm t "add" arg (Int.to_string offset) temp Llvm_typ.i64;
+    ins_conv t "inttoptr" ~src:temp ~dst:res ~src_typ:Llvm_typ.i64
+      ~dst_typ:Llvm_typ.ptr;
+    res
 
   let int_comp t (comp : Operation.integer_comparison) (i : 'a Cfg.instruction)
       ~imm =
@@ -462,8 +419,7 @@ module F = struct
       res
 
   let float_comp t (comp : Operation.float_comparison) (i : 'a Cfg.instruction)
-      =
-    let typ = Llvm_typ.of_machtyp_component i.arg.(0).typ in
+      typ =
     let comp_name =
       (* CR yusumez: is not (ordered cond) == unordered (not cond)? *)
       match comp with
@@ -508,15 +464,16 @@ module F = struct
       (* Check if the argument is even *)
       let arg_temp = load_reg_to_temp t i.arg.(0) in
       let is_odd = fresh_ident t in
-      ins t "%a = trunc %a %a to i1" pp_ident is_odd pp_machtyp_component
-        i.arg.(0).typ pp_ident arg_temp;
+      ins_conv t "trunc" ~src:arg_temp ~dst:is_odd
+        ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
+        ~dst_typ:Llvm_typ.bool;
       (* reverse the branches *)
       ins_branch_cond t is_odd b.ifnot b.ifso
     | Truth_test b ->
       (* Check if the argument is true. *)
       let arg_temp = load_reg_to_temp t i.arg.(0) in
       let is_true = fresh_ident t in
-      ins_trunc t ~src:arg_temp ~dst:is_true
+      ins_conv t "trunc" ~src:arg_temp ~dst:is_true
         ~src_typ:(Llvm_typ.of_machtyp_component i.arg.(0).typ)
         ~dst_typ:Llvm_typ.bool;
       ins_branch_cond t is_true b.ifso b.ifnot
@@ -539,8 +496,24 @@ module F = struct
       (* CR yusumez: Implement this *)
       ins t "call void @llvm.trap()";
       ins t "unreachable"
-    | Float_test _ | Switch _ | Tailcall_self _ | Tailcall_func _
-    | Call_no_return _ | Call _ | Prim _ ->
+    | Float_test { width; lt; eq; gt; uo } ->
+      let typ =
+        match width with
+        | Float64 -> Llvm_typ.double
+        | Float32 -> Llvm_typ.float
+      in
+      let is_lt = float_comp t Cmm.CFlt i typ in
+      let ge = fresh_ident t in
+      ins_branch_cond_ident t is_lt (get_ident_for_label t lt) ge;
+      line t.ppf "%a:" Ident.print ge;
+      let is_gt = float_comp t Cmm.CFgt i typ in
+      let eq_or_uo = fresh_ident t in
+      ins_branch_cond_ident t is_gt (get_ident_for_label t gt) eq_or_uo;
+      line t.ppf "%a:" Ident.print eq_or_uo;
+      let is_eq = float_comp t Cmm.CFeq i typ in
+      ins_branch_cond t is_eq eq uo
+    | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
+    | Prim _ ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -607,10 +580,16 @@ module F = struct
         let res = fresh_ident t in
         let suffix = match width with Float32 -> "f32" | Float64 -> "f64" in
         (* CR yusumez: Do this properly when we have [ins_call] *)
-        ins t "%a = call @llvm.fabs.%s(%a %a)" pp_ident res suffix Llvm_typ.pp_t
-          typ pp_ident arg;
+        ins t "%a = call %a @llvm.fabs.%s(%a %a)" pp_ident res Llvm_typ.pp_t typ
+          suffix Llvm_typ.pp_t typ pp_ident arg;
         res
-      | Icompf comp -> float_comp t comp i
+      | Icompf comp ->
+        let bool_res = float_comp t comp i typ in
+        (* convert i1 -> i64 *)
+        let int_res = fresh_ident t in
+        ins_conv t "zext" ~src:bool_res ~dst:int_res ~src_typ:Llvm_typ.bool
+          ~dst_typ:(Llvm_typ.of_machtyp_component i.res.(0).typ);
+        int_res
     in
     ins_store_reg t res i.res.(0)
 
@@ -631,28 +610,21 @@ module F = struct
         ins_load t ~src ~dst:temp typ;
         ins_store_reg t temp i.res.(0)
       in
-      let sext typ =
+      let extend op typ =
         let temp = fresh_ident t in
         let temp2 = fresh_ident t in
         ins_load t ~src ~dst:temp typ;
-        ins_sext t ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
-        ins_store_reg t temp2 i.res.(0)
-      in
-      let zext typ =
-        let temp = fresh_ident t in
-        let temp2 = fresh_ident t in
-        ins_load t ~src ~dst:temp typ;
-        ins_zext t ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
+        ins_conv t op ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
         ins_store_reg t temp2 i.res.(0)
       in
       match memory_chunk with
       | Word_int | Word_val -> basic Llvm_typ.i64
-      | Byte_unsigned -> zext Llvm_typ.i8
-      | Byte_signed -> sext Llvm_typ.i8
-      | Sixteen_unsigned -> zext Llvm_typ.i16
-      | Sixteen_signed -> sext Llvm_typ.i16
-      | Thirtytwo_unsigned -> zext Llvm_typ.i32
-      | Thirtytwo_signed -> sext Llvm_typ.i32
+      | Byte_unsigned -> extend "zext" Llvm_typ.i8
+      | Byte_signed -> extend "sext" Llvm_typ.i8
+      | Sixteen_unsigned -> extend "zext" Llvm_typ.i16
+      | Sixteen_signed -> extend "sext" Llvm_typ.i16
+      | Thirtytwo_unsigned -> extend "zext" Llvm_typ.i32
+      | Thirtytwo_signed -> extend "sext" Llvm_typ.i32
       | Single { reg = Float32 } -> basic Llvm_typ.float
       | Double -> basic Llvm_typ.double
       | Single { reg = Float64 }
@@ -672,7 +644,7 @@ module F = struct
         let temp = fresh_ident t in
         let truncated = fresh_ident t in
         ins_load_reg t temp i.arg.(0);
-        ins_trunc t ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
+        ins_conv t "trunc" ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
         ins_store t ~src:truncated ~dst dst_typ
       in
       match chunk with
@@ -832,7 +804,8 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
-  t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
+  t.defined_function_symbols
+    <- String.Set.add fun_name t.defined_function_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
   let fun_args_with_idents =
@@ -864,9 +837,9 @@ let data ds =
   let t = get_current_compilation_unit "data" in
   t.data <- List.append t.data ds
 
-(* Define data items menitoned but not declared as extern *)
+(* Define menitoned but not declared data items as extern *)
 let emit_data_extern t =
-  let defined_symbols =
+  let defined_function_symbols =
     List.filter_map
       (fun (d : Cmm.data_item) ->
         match d with
@@ -877,7 +850,7 @@ let emit_data_extern t =
           None)
       t.data
     |> String.Set.of_list
-    |> String.Set.union t.defined_symbols
+    |> String.Set.union t.defined_function_symbols
   in
   let referenced_symbols =
     List.filter_map
@@ -892,7 +865,7 @@ let emit_data_extern t =
     |> String.Set.of_list
     |> String.Set.union t.referenced_symbols
   in
-  String.Set.diff referenced_symbols defined_symbols
+  String.Set.diff referenced_symbols defined_function_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
 
 (* CR yusumez: We do this cumbersome list wrangling since we receive data

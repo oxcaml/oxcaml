@@ -69,7 +69,7 @@ let () =
     let run_extra_dep =
       match extra_dep_suffix with
       | Some _ ->
-        Format.asprintf "(run %%{bin:ocamlopt.opt} %s -g -O3 -opaque)"
+        Format.asprintf "(run %%{bin:ocamlopt.opt} %s -g -c -O3 -opaque)"
           extra_dep_ml
       | None -> ""
     in
@@ -83,9 +83,13 @@ let () =
           "extra_dep_ml", extra_dep_ml;
           "extra_dep_cmx", extra_dep_cmx;
           "run_extra_dep", run_extra_dep;
+          (* CR yusumez: remove -disable-poll-insertion once we can emit poll
+             insertions *)
           ( "llvm_flags",
-            "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments" );
-          "common_flags", "-g -O3 -opaque" ]
+            "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments \
+             -disable-poll-insertion" );
+          ( "common_flags",
+            "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear" ) ]
       ~name ~buf
       {|
 (rule
@@ -108,6 +112,7 @@ let () =
   (diff ${ir_output} ${ir_output}.corrected)))
 
 (rule
+ ${enabled_if}
  (deps ${output}.exe)
  (targets ${output}.corrected)
  (action
@@ -126,6 +131,7 @@ let () =
   (* make run test check ir as well *)
   print_test_ir_only "id_fn";
   print_test_ir_and_run "const_val";
-  print_test_ir_and_run "int_ops";
+  print_test_ir_and_run ~extra_dep_suffix:"data" "int_ops";
   print_test_ir_and_run ~extra_dep_suffix:"data" "gcd";
-  print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev"
+  print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev";
+  print_test_ir_and_run "float_ops"

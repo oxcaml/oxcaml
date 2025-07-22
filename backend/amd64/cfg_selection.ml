@@ -255,6 +255,8 @@ let select_addressing (_chunk : Cmm.memory_chunk) exp :
   (* PR#4625: displacement must be a signed 32-bit immediate *)
   if not (int_is_immediate d)
   then Iindexed 0, exp
+  else if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
   else
     match a with
     | Asymbol s ->
@@ -329,7 +331,7 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
   | _ -> assert false
 
-let select_operation
+let select_operation'
     ~(generic_select_condition :
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after:_ :
@@ -435,6 +437,15 @@ let select_operation
       let addr, eloc = select_addressing Word_int (one_arg "prefetch" args) in
       Rewritten (specific (Iprefetch { is_write; addr; locality }), [eloc])
     | _ -> Use_default
+
+let select_operation
+    ~(generic_select_condition :
+       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
+    (args : Cmm.expression list) dbg ~label_after :
+    Cfg_selectgen_target_intf.select_operation_result =
+  if !Oxcaml_flags.llvm_backend
+  then Use_default
+  else select_operation' ~generic_select_condition op args dbg ~label_after
 
 (* Deal with register constraints *)
 
