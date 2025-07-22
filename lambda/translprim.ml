@@ -1074,6 +1074,10 @@ let glb_array_type loc t1 t2 =
     Misc.fatal_error "unexpected array kind in glb"
   | (Pgenarray | Punboxedvectorarray Unboxed_vec128), Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray Unboxed_vec128
+  | (Pgenarray | Punboxedvectorarray Unboxed_vec256), Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray Unboxed_vec256
+  | (Pgenarray | Punboxedvectorarray Unboxed_vec512), Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
 
@@ -1135,6 +1139,10 @@ let glb_array_ref_type loc t1 t2 =
     Misc.fatal_error "unexpected array kind in glb"
   | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec128), Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_ref Unboxed_vec128
+  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec256), Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray_ref Unboxed_vec256
+  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec512), Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
 
@@ -1210,6 +1218,10 @@ let glb_array_set_type loc t1 t2 =
     Misc.fatal_error "unexpected array kind in glb"
   | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec128), Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_set Unboxed_vec128
+  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec256), Punboxedvectorarray Unboxed_vec256 ->
+  Punboxedvectorarray_set Unboxed_vec256
+  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec512), Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
 
