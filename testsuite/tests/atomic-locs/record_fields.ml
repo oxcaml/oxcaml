@@ -82,6 +82,37 @@ end)
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
+module Modalities_forbidden = struct
+  type t = { mutable x : (int -> int) @@ portable [@atomic] }
+end
+[%%expect{|
+Line 2, characters 13-59:
+2 |   type t = { mutable x : (int -> int) @@ portable [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Non-legacy modalities are not allowed on atomic fields (here, "x").
+Use one of the modality types from the Modes module in the type of the
+field instead]
+|}]
+
+module Legacy_modalities_allowed : sig
+  type t = {
+    mutable x :
+      (int -> int)
+      (* legacy modalities are allowed because they're the same thing as writing
+         nothing at all *)
+      [@atomic]
+  }
+end= struct
+  type t = { mutable x : (int -> int) @@ aliased [@atomic] }
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Legacy_modalities_allowed/313"
+  (makeblock 0))
+module Legacy_modalities_allowed :
+  sig type t = { mutable x : int -> int [@atomic]; } end
+|}]
+
+
 (* Inline records are supported, including in extensions. *)
 
 module Inline_record = struct
@@ -90,7 +121,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/313"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/321"
   (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
     (makeblock 0 test)))
 module Inline_record :
@@ -111,7 +142,7 @@ module Extension_with_inline_record = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/321"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/329"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -148,7 +179,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic
 float fields, which prevents the float record optimization. The
 fields of this record will be boxed instead of being
 represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/347"
+(apply (field_imm 1 (global Toploop!)) "Float_records/355"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
