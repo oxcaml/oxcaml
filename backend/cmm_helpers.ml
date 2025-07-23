@@ -1629,17 +1629,9 @@ let rec sign_extend ~bits ~dbg e =
         | e -> sign_extend_via_shift e)
       (low_bits ~bits e ~dbg)
 
-let unboxed_packed_array_ref arr index dbg ~memory_chunk ~elements_per_word =
+let unboxed_packed_array_ref arr index dbg ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
-          let index =
-            (* Need to skip the custom_operations field. We add
-               elements_per_word offsets not 1 since the call to
-               [array_indexing], below, is in terms of elements. Then we
-               multiply the offset by 2 since we are manipulating a tagged
-               int. *)
-            add_int index (int ~dbg (elements_per_word * 2)) dbg
-          in
           let log2_size_addr = 2 in
           Cop
             ( mk_load_mut memory_chunk,
@@ -1649,7 +1641,7 @@ let unboxed_packed_array_ref arr index dbg ~memory_chunk ~elements_per_word =
 let unboxed_int32_array_ref =
   (* N.B. The resulting value will be sign extended by the code generated for a
      [Thirtytwo_signed] load. *)
-  unboxed_packed_array_ref ~memory_chunk:Thirtytwo_signed ~elements_per_word:2
+  unboxed_packed_array_ref ~memory_chunk:Thirtytwo_signed
 
 let unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
@@ -1675,21 +1667,15 @@ let unboxed_mutable_int32_unboxed_product_array_set arr ~array_index ~new_value
 let unboxed_float32_array_ref =
   unboxed_packed_array_ref
     ~memory_chunk:(Single { reg = Float32 })
-    ~elements_per_word:2
 
 let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
-let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk
-    ~elements_per_word =
+let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
-              let index =
-                (* See comment in [unboxed_packed_array_ref]. *)
-                add_int index (int ~dbg (elements_per_word * 2)) dbg
-              in
               let log2_size_addr = 2 in
               Cop
                 ( Cstore (memory_chunk, Assignment),
@@ -1697,12 +1683,11 @@ let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk
                   dbg ))))
 
 let unboxed_int32_array_set =
-  unboxed_packed_array_set ~memory_chunk:Thirtytwo_signed ~elements_per_word:2
+  unboxed_packed_array_set ~memory_chunk:Thirtytwo_signed
 
 let unboxed_float32_array_set =
   unboxed_packed_array_set
     ~memory_chunk:(Single { reg = Float32 })
-    ~elements_per_word:2
 
 let unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg =
   bind "arr" arr (fun arr ->
