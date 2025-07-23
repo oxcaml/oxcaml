@@ -146,19 +146,7 @@ let code ~env ~res ~translate_body ~code_id code =
          [my_closure] is actually used for *)
       let var = Jsir.Var.fresh () in
       let env = To_jsir_env.add_var env my_closure var in
-      let env, fn_params =
-        (* The natural fold instead of [List.fold_left] to preserve order of
-           parameters *)
-        List.fold_right
-          (fun bound_param (env, params) ->
-            let var = Jsir.Var.fresh () in
-            let env =
-              To_jsir_env.add_var env (Bound_parameter.var bound_param) var
-            in
-            env, var :: params)
-          (Bound_parameters.to_list bound_params)
-          (env, [])
-      in
+      let fn_params, env = To_jsir_shared.bound_parameters ~env bound_params in
       let res, addr = To_jsir_result.new_block res ~params:[] in
       let env = To_jsir_env.add_code_id env code_id ~addr ~params:fn_params in
       let _env, res =

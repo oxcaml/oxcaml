@@ -54,3 +54,14 @@ let simples ~env ~res simples =
       let var, res = simple ~env ~res s in
       var :: vars, res)
     simples ([], res)
+
+let bound_parameters ~env bound_params =
+  (* The natural fold instead of [List.fold_left] to preserve order of
+     parameters *)
+  List.fold_right
+    (fun bound_param (params, env) ->
+      let var = Jsir.Var.fresh () in
+      let env = To_jsir_env.add_var env (Bound_parameter.var bound_param) var in
+      var :: params, env)
+    (Bound_parameters.to_list bound_params)
+    ([], env)

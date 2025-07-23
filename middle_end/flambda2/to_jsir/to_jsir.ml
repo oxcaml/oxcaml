@@ -23,6 +23,14 @@ let create_let_prim ~env ~res fvar prim dbg =
   let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
   To_jsir_env.add_var env fvar jvar, res
 
+(** Apply the function pointed to by the variable in [f] with [args], bind the
+    return value to a variable, and return the variable and the result. *)
+let apply_fn ~res ~f ~args ~exact =
+  let apply : Jsir.expr = Apply { f; args; exact } in
+  let var = Jsir.Var.fresh () in
+  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
+  var, res
+
 let rec expr ~env ~res e =
   match Expr.descr e with
   | Let e' -> let_expr ~env ~res e'
@@ -95,13 +103,26 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
+  (* We treat continuations as normal functions (i.e. a code block and a
+     corresponding [Closure]. *)
   match e with
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
-    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
+    let continuation = Non_recursive_let_cont_handler.handler handler in
+    Continuation_handler.pattern_match continuation
+      ~f:(fun params ~handler:cont_body ->
+        let params, env = To_jsir_shared.bound_parameters ~env params in
         let res, addr = To_jsir_result.new_block res ~params:[] in
-        let env = To_jsir_env.add_continuation env k addr in
-        expr ~env ~res body)
+        let _env, res = expr ~env ~res cont_body in
+        Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
+            (* CR selee: thread through debug information *)
+            let closure_expr : Jsir.expr = Closure (params, (addr, []), None) in
+            let var = Jsir.Var.fresh () in
+            let env = To_jsir_env.add_continuation env k var in
+            let res =
+              To_jsir_result.add_instr_exn res (Let (var, closure_expr))
+            in
+            expr ~env ~res body))
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
       ~f:(fun ~invariant_params ~body conts ->
@@ -135,9 +156,7 @@ and apply_expr ~env ~res e =
   let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
   (* CR selee: assume exact = false for now, JSIR seems to assume false in the
      case that we don't know *)
-  let apply : Jsir.expr = Apply { f; args; exact = false } in
-  let var = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
+  let var, res = apply_fn ~res ~f ~args ~exact:false in
   env, To_jsir_result.end_block_with_last_exn res (Return var)
 
 and apply_cont ~env ~res apply_cont =
@@ -192,8 +211,9 @@ and apply_cont ~env ~res apply_cont =
           Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
             Continuation.print continuation)
       | Exception -> failwith "unimplemented"
-      | Block addr ->
-        To_jsir_result.end_block_with_last_exn res (Jsir.Branch (addr, args)))
+      | Function f ->
+        let var, res = apply_fn ~res ~f ~args ~exact:true in
+        To_jsir_result.end_block_with_last_exn res (Jsir.Return var))
     | Some (Push { exn_handler }) ->
       ignore exn_handler;
       failwith "unimplemented"

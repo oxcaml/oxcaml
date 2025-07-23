@@ -2,7 +2,7 @@ type t =
   { module_symbol : Symbol.t;
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
-    continuations : Jsir.Addr.t Continuation.Map.t;
+    continuations : Jsir.Var.t Continuation.Map.t;
     vars : Jsir.Var.t Variable.Map.t;
     symbols : Jsir.Var.t Symbol.Map.t;
     code_ids : (Jsir.Addr.t * Jsir.Var.t list) Code_id.Map.t;
@@ -51,14 +51,14 @@ let add_value_slot t vslot jvar =
 type continuation =
   | Return
   | Exception
-  | Block of Jsir.Addr.t
+  | Function of Jsir.Var.t
 
 let get_continuation_exn t cont =
   if cont = t.return_continuation
   then Return
   else if cont = t.exn_continuation
   then Exception
-  else Block (Continuation.Map.find cont t.continuations)
+  else Function (Continuation.Map.find cont t.continuations)
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
