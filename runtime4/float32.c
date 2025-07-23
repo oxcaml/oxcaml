@@ -846,6 +846,7 @@ CAMLextern void caml_unboxed_array_serialize(value v, uintnat* bsize_32, uintnat
 CAMLextern uintnat caml_unboxed_array_deserialize(void* dst);
 CAMLextern value caml_make_vect(value len, value init);
 
+/* No longer needed - float32 arrays now use Double_array_tag/Abstract_tag
 CAMLexport struct custom_operations caml_unboxed_float32_array_ops[2] = {
   { "_unboxed_float32_even_array",
     custom_finalize_default,
@@ -864,6 +865,7 @@ CAMLexport struct custom_operations caml_unboxed_float32_array_ops[2] = {
     custom_compare_ext_default,
     custom_fixed_length_default },
 };
+*/
 
 static value caml_make_unboxed_float32_vect0(value len, int local)
 {
@@ -872,16 +874,15 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   mlsize_t num_elements = Long_val(len);
   if (num_elements > Max_unboxed_float32_array_wosize) caml_invalid_argument("Array.make");
 
-  /* [num_fields] does not include the custom operations field. */
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
-
-  struct custom_operations* ops =
-    &caml_unboxed_float32_array_ops[num_elements % 2];
+  
+  /* Use Double_array_tag for even length, Abstract_tag for odd length */
+  tag_t tag = (num_elements % 2 == 0) ? Double_array_tag : Abstract_tag;
 
   if (local)
-    return caml_alloc_custom_local(ops, num_fields * sizeof(value), 0, 0);
+    return caml_alloc_local(num_fields, tag);
   else
-    return caml_alloc_custom(ops, num_fields * sizeof(value), 0, 0);
+    return caml_alloc(num_fields, tag);
 }
 
 CAMLprim value caml_make_unboxed_float32_vect(value len)
@@ -902,9 +903,8 @@ CAMLprim value caml_make_unboxed_float32_vect_bytecode(value len)
 CAMLprim value caml_unboxed_float32_vect_blit(value a1, value ofs1, value a2,
                                               value ofs2, value n)
 {
-  // Need to skip the custom_operations field
-  memmove((float *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (float *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((float *)a2 + Long_val(ofs2),
+          (float *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(float));
   return Val_unit;
 }

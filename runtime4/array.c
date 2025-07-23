@@ -61,6 +61,7 @@ CAMLprim uintnat caml_unboxed_array_deserialize(void* dst)
 // the int32 unboxed arrays, care needs to be taken with the last word
 // when the array is of odd length -- this is not currently initialized.
 
+/* No longer needed - int32 arrays now use Double_array_tag/Abstract_tag
 CAMLexport struct custom_operations caml_unboxed_int32_array_ops[2] = {
   { "_unboxed_int32_even_array",
     custom_finalize_default,
@@ -79,6 +80,7 @@ CAMLexport struct custom_operations caml_unboxed_int32_array_ops[2] = {
     custom_compare_ext_default,
     custom_fixed_length_default },
 };
+*/
 
 /* No longer needed - int64 and nativeint arrays now use Abstract_tag
 CAMLexport struct custom_operations caml_unboxed_int64_array_ops = {
@@ -661,16 +663,15 @@ static value caml_make_unboxed_int32_vect0(value len, int local)
   if (num_elements > Max_unboxed_int32_array_wosize)
     caml_invalid_argument("Array.make");
 
-  /* [num_fields] does not include the custom operations field. */
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
-
-  struct custom_operations* ops =
-    &caml_unboxed_int32_array_ops[num_elements % 2];
+  
+  /* Use Double_array_tag for even length, Abstract_tag for odd length */
+  tag_t tag = (num_elements % 2 == 0) ? Double_array_tag : Abstract_tag;
 
   if (local)
-    return caml_alloc_custom_local(ops, num_fields * sizeof(value), 0, 0);
+    return caml_alloc_local(num_fields, tag);
   else
-    return caml_alloc_custom(ops, num_fields * sizeof(value), 0, 0);
+    return caml_alloc(num_fields, tag);
 }
 
 CAMLprim value caml_make_unboxed_int32_vect(value len)
@@ -814,9 +815,8 @@ CAMLprim value caml_floatarray_blit(value a1, value ofs1, value a2, value ofs2,
 CAMLprim value caml_unboxed_int32_vect_blit(value a1, value ofs1, value a2,
                                             value ofs2, value n)
 {
-  // Need to skip the custom_operations field
-  memmove((int32_t *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (int32_t *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((int32_t *)a2 + Long_val(ofs2),
+          (int32_t *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(int32_t));
   return Val_unit;
 }
