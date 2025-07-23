@@ -239,14 +239,15 @@ let simplify_is_int ~variant_only dacc ~original_term ~arg:scrutinee
     | Unknown ->
       SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
 
-let simplify_get_tag ~variant_only dacc ~original_term ~arg:scrutinee ~arg_ty:scrutinee_ty
-    ~result_var =
+let simplify_get_tag ~variant_only dacc ~original_term ~arg:scrutinee
+    ~arg_ty:scrutinee_ty ~result_var =
   match variant_only with
   | true ->
     simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
       ~result_var ~add_relation:TE.add_get_tag_relation
   | false ->
-    (* For variant_only=false, no special handling - just create the primitive *)
+    (* For variant_only=false, no special handling - just create the
+       primitive *)
     SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
 
 let simplify_array_length _array_kind dacc ~original_term ~arg:_

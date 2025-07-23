@@ -1028,8 +1028,9 @@ let unary_primitive env res dbg f arg =
   | Is_int _ -> None, res, C.and_int arg (C.int ~dbg 1) dbg
   | Is_null -> None, res, C.eq ~dbg arg (C.nativeint ~dbg 0n)
   | Get_tag { variant_only = true } -> None, res, C.get_tag arg dbg
-  | Get_tag { variant_only = false } -> 
-    (* Use atomic acquire load as per obj.c comment about Forward_tag synchronization *)
+  | Get_tag { variant_only = false } ->
+    (* Use atomic acquire load as per obj.c comment about Forward_tag
+       synchronization *)
     None, res, C.get_tag_atomic arg dbg
   | Array_length (Array_kind array_kind) ->
     None, res, array_length ~dbg arg array_kind

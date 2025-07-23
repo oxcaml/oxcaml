@@ -1316,7 +1316,9 @@ let print_unary_primitive ppf p =
     if variant_only then fprintf ppf "Is_int" else fprintf ppf "Is_int_generic"
   | Is_null -> fprintf ppf "Is_null"
   | Get_tag { variant_only } ->
-    if variant_only then fprintf ppf "Get_tag" else fprintf ppf "Get_tag_generic"
+    if variant_only
+    then fprintf ppf "Get_tag"
+    else fprintf ppf "Get_tag_generic"
   | String_length _ -> fprintf ppf "String_length"
   | Int_as_pointer alloc_mode ->
     fprintf ppf "Int_as_pointer[%a]" Alloc_mode.For_allocations.print alloc_mode
@@ -2767,7 +2769,8 @@ end = struct
   let create_is_int ~variant_only ~immediate_or_block =
     Unary (Is_int { variant_only }, Simple.name immediate_or_block)
 
-  let create_get_tag ~block = Unary (Get_tag { variant_only = true }, Simple.name block)
+  let create_get_tag ~block =
+    Unary (Get_tag { variant_only = true }, Simple.name block)
 
   let eligible t = match create t with None -> false | Some _ -> true
 

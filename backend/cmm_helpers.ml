@@ -1287,8 +1287,8 @@ let get_header ptr dbg =
       dbg )
 
 let get_header_atomic ptr dbg =
-  (* Atomic header load for Get_tag with variant_only=false, as per obj.c comment
-     about Forward_tag synchronization needing atomic acquire loads *)
+  (* Atomic header load for Get_tag with variant_only=false, as per obj.c
+     comment about Forward_tag synchronization needing atomic acquire loads *)
   Cop
     ( mk_load_atomic Word_int,
       [Cop (Cadda, [ptr; Cconst_int (-size_int, dbg)], dbg)],
