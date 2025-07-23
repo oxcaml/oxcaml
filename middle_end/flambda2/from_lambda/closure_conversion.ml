@@ -1110,7 +1110,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu
       | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
       | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
-      | Pisnull | Pisout | Pbintofint _ | Pintofbint _ | Pcvtbint _ | Pnegbint _
+      | Pgettag _ | Pisnull | Pisout | Pbintofint _ | Pintofbint _ | Pcvtbint _ | Pnegbint _
       | Paddbint _ | Psubbint _ | Pmulbint _ | Pdivbint _ | Pmodbint _
       | Pandbint _ | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _
       | Pasrbint _ | Pbintcomp _ | Punboxed_int_comp _ | Pbigarrayref _
