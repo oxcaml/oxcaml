@@ -2,69 +2,6 @@
    expect;
 *)
 
-module Atomic = struct
-  module Loc = struct
-    type ('a : value_or_null) t = 'a atomic_loc
-    external get : ('a : value_or_null).
-        'a t @ local -> 'a @@ portable = "%atomic_load_loc"
-    external set : ('a : value_or_null).
-        'a t @ local -> 'a -> unit @@ portable = "%atomic_set_loc"
-    external exchange : ('a : value_or_null).
-        'a t @ local -> 'a -> 'a @@ portable = "%atomic_exchange_loc"
-    external compare_and_set : ('a : value_or_null).
-        'a t @ local -> 'a -> 'a -> bool @@ portable = "%atomic_cas_loc"
-    external compare_exchange : ('a : value_or_null).
-        'a t @ local -> 'a -> 'a -> 'a @@ portable = "%atomic_compare_exchange_loc"
-
-    external fetch_and_add
-        : int t @ contended local -> int -> int @@ portable = "%atomic_fetch_add_loc"
-
-    external add
-        : int t @ contended local -> int -> unit @@ portable = "%atomic_add_loc"
-
-    external sub
-        : int t @ contended local -> int -> unit @@ portable = "%atomic_sub_loc"
-
-    external logand
-        : int t @ contended local -> int -> unit @@ portable = "%atomic_land_loc"
-
-    external logor
-        : int t @ contended local -> int -> unit @@ portable = "%atomic_lor_loc"
-
-    external logxor
-        : int t @ contended local -> int -> unit @@ portable = "%atomic_lxor_loc"
-  end
-end
-[%%expect{|
-module Atomic :
-  sig
-    module Loc :
-      sig
-        type ('a : value_or_null) t = 'a atomic_loc
-        external get : local_ 'a t -> 'a = "%atomic_load_loc"
-        external set : local_ 'a t -> 'a -> unit = "%atomic_set_loc"
-        external exchange : local_ 'a t -> 'a -> 'a = "%atomic_exchange_loc"
-        external compare_and_set : local_ 'a t -> 'a -> 'a -> bool
-          = "%atomic_cas_loc"
-        external compare_exchange : local_ 'a t -> 'a -> 'a -> 'a
-          = "%atomic_compare_exchange_loc"
-        external fetch_and_add : int t @ local contended -> int -> int
-          = "%atomic_fetch_add_loc"
-        external add : int t @ local contended -> int -> unit
-          = "%atomic_add_loc"
-        external sub : int t @ local contended -> int -> unit
-          = "%atomic_sub_loc"
-        external logand : int t @ local contended -> int -> unit
-          = "%atomic_land_loc"
-        external logor : int t @ local contended -> int -> unit
-          = "%atomic_lor_loc"
-        external logxor : int t @ local contended -> int -> unit
-          = "%atomic_lxor_loc"
-      end
-  end
-|}]
-
-
 type t = { mutable first_field : int; mutable field : int [@atomic] }
 [%%expect{|
 type t = { mutable first_field : int; mutable field : int [@atomic]; }
