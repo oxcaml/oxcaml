@@ -1375,7 +1375,7 @@ let int ~dbg i = natint_const_untagged dbg (Nativeint.of_int i)
 
 
 
-let unboxed_int32_array_length arr dbg =
+let unboxed_packed_array_length arr dbg =
   bind "arr" arr (fun arr ->
       let size_in_words = get_size arr dbg in
       let tag = get_tag arr dbg in
@@ -1384,31 +1384,27 @@ let unboxed_int32_array_length arr dbg =
       let adjustment = Cop (Cand, [tag; int ~dbg 1], dbg) in
       tag_int (sub_int total_slots adjustment dbg) dbg)
 
-let unboxed_float32_array_length arr dbg =
-  bind "arr" arr (fun arr ->
-      let size_in_words = get_size arr dbg in
-      let tag = get_tag arr dbg in
-      (* Calculate: (size_in_words * 2) - (tag & 1) *)
-      let total_slots = lsl_int size_in_words (int ~dbg 1) dbg in
-      let adjustment = Cop (Cand, [tag; int ~dbg 1], dbg) in
-      tag_int (sub_int total_slots adjustment dbg) dbg)
+let unboxed_int32_array_length = unboxed_packed_array_length
+
+let unboxed_float32_array_length = unboxed_packed_array_length
 
 
 let unboxed_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr ->
       tag_int (get_size arr dbg) dbg)
 
-let unboxed_vec128_array_length arr dbg =
+let unboxed_vector_array_length ~log2_ints_per_vec arr dbg =
   bind "arr" arr (fun arr ->
-      tag_int (lsr_int (get_size arr dbg) (int ~dbg 1) dbg) dbg)
+      tag_int (lsr_int (get_size arr dbg) (int ~dbg log2_ints_per_vec) dbg) dbg)
+
+let unboxed_vec128_array_length arr dbg =
+  unboxed_vector_array_length ~log2_ints_per_vec:1 arr dbg
 
 let unboxed_vec256_array_length arr dbg =
-  bind "arr" arr (fun arr ->
-      tag_int (lsr_int (get_size arr dbg) (int ~dbg 2) dbg) dbg)
+  unboxed_vector_array_length ~log2_ints_per_vec:2 arr dbg
 
 let unboxed_vec512_array_length arr dbg =
-  bind "arr" arr (fun arr ->
-      tag_int (lsr_int (get_size arr dbg) (int ~dbg 3) dbg) dbg)
+  unboxed_vector_array_length ~log2_ints_per_vec:3 arr dbg
 
 let field_address_computed ptr ofs dbg =
   array_indexing log2_size_addr ptr ofs dbg
@@ -4739,8 +4735,8 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   in
   aux [] unboxed_int32_list
 
-let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let num_elts, payload = make_unboxed_int32_array_payload dbg elements in
+let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~elements mode dbg =
+  let num_elts, payload = make_payload dbg elements in
   let tag = match num_elts with
     | Even -> Obj.double_array_tag
     | Odd -> Obj.abstract_tag
@@ -4748,13 +4744,19 @@ let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let header =
     let size = List.length payload in
     match mode with
-    | Heap -> block_header tag size
-    | Local -> local_block_header tag size
+    | Cmm.Alloc_mode.Heap -> block_header tag size
+    | Cmm.Alloc_mode.Local -> local_block_header tag size
   in
   Cop
-    ( Calloc (mode, Alloc_block_kind_int32_u_array),
+    ( Calloc (mode, alloc_kind),
       Cconst_natint (header, dbg) :: payload,
       dbg )
+
+let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
+  allocate_unboxed_packed_array
+    ~make_payload:make_unboxed_int32_array_payload
+    ~alloc_kind:(Alloc_block_kind_int32_u_array)
+    ~elements mode dbg
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   if Sys.big_endian
@@ -4776,21 +4778,10 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   aux [] unboxed_float32_list
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let num_elts, payload = make_unboxed_float32_array_payload dbg elements in
-  let tag = match num_elts with
-    | Even -> Obj.double_array_tag
-    | Odd -> Obj.abstract_tag
-  in
-  let header =
-    let size = List.length payload in
-    match mode with
-    | Heap -> block_header tag size
-    | Local -> local_block_header tag size
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_float32_u_array),
-      Cconst_natint (header, dbg) :: payload,
-      dbg )
+  allocate_unboxed_packed_array
+    ~make_payload:make_unboxed_float32_array_payload
+    ~alloc_kind:(Alloc_block_kind_float32_u_array)
+    ~elements mode dbg
 
 let allocate_unboxed_int64_or_nativeint_array ~elements
     (mode : Cmm.Alloc_mode.t) dbg =
