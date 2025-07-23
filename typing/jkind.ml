@@ -2451,7 +2451,8 @@ let for_or_null_argument ident =
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
       ~visibility:Visibility.Const_op.max ~externality:Externality.Const.max
-      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
   in
   fresh_jkind
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
