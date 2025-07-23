@@ -1555,7 +1555,6 @@ module Hint = struct
     | None
     | Lazy
     | Class
-    | Function
     | Tailcall_function
     | Tailcall_argument
     | Read_mutable
@@ -1760,9 +1759,6 @@ let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
     HintPrinted
   | Class ->
     wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a);
-    HintPrinted
-  | Function ->
-    wrap_print_hint (dprintf "it is used in a function");
     HintPrinted
   | Tailcall_function ->
     wrap_print_hint (dprintf "it is the function in a tail call");

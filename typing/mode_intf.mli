@@ -194,7 +194,6 @@ module type S = sig
       | None
       | Lazy
       | Class
-      | Function
       | Tailcall_function
       | Tailcall_argument
       | Read_mutable
