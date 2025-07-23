@@ -378,7 +378,11 @@ let rcp node =
 
 
 (* Context for inline record arguments; see [type_ident] *)
-
+(* Is a record argument allowed/required/rejected?
+   A record argument for Foo is *allowed* in [type 'a t = Foo of 'a]
+   A record argument for Foo is *required* in [type 'a t = Foo of {x : 'a}]
+   A record argument for Foo is *rejected* in [type t = Foo of int]
+*)
 type recarg =
   | Allowed
   | Required
@@ -8885,6 +8889,15 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          ty_args)
       overwrite
   in
+  (* Which allocator we use to type the arguments of this constructor depends on
+     wether or not the constructor *requires* a record argument.
+     Depending on [Foo], the allocation [malloc_ (Foo {x = 3})] behaves
+     differently. If [type 'a t = Foo of {x : 'a}], the record is part of
+     the constructor and is externally-allocated, so we continue to type
+     its bit of the syntax tree with the current allocator.
+     If [type 'a t = Foo of 'a], the record is not part of the constructor
+     (and allocated separately), so we reset the allocator to Allocator_heap.
+     *)
   let argument_allocator =
     match recarg with
     | Allowed | Rejected -> Allocator_heap
