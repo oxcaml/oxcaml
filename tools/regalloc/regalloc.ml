@@ -60,11 +60,27 @@ let dummy_in_stats =
 
 type out_stats =
   { spills : int;
-    reloads : int
+    reloads : int;
+    spill_cost : int;
+    reload_cost : int
   }
 
 let row_header =
-  "allocator;function_name;duration;rounds;in_is_entry_function;in_num_regs;in_num_blocks;in_num_instrs;in_num_destruction_points;in_num_high_pressure_points;out_spills;out_reloads"
+  String.concat ";"
+    [ "allocator";
+      "function_name";
+      "duration";
+      "rounds";
+      "in_is_entry_function";
+      "in_num_regs";
+      "in_num_blocks";
+      "in_num_instrs";
+      "in_num_destruction_points";
+      "in_num_high_pressure_points";
+      "out_spills";
+      "out_reloads";
+      "out_spill_cost";
+      "out_reload_cost" ]
 
 let print_row ~allocator ~function_name ~duration ~rounds
     ~in_stats:
@@ -74,12 +90,12 @@ let print_row ~allocator ~function_name ~duration ~rounds
         num_instrs;
         num_destruction_points;
         num_high_pressure_points
-      } ~out_stats:{ spills; reloads } =
-  Printf.printf "%s;%s;%g;%d;%s;%d;%d;%d;%d;%d;%d;%d\n%!" allocator
+      } ~out_stats:{ spills; reloads; spill_cost; reload_cost } =
+  Printf.printf "%s;%s;%g;%d;%s;%d;%d;%d;%d;%d;%d;%d;%d;%d\n%!" allocator
     function_name duration rounds
     (if is_entry_function then "True" else "False")
     num_regs num_blocks num_instrs num_destruction_points
-    num_high_pressure_points spills reloads
+    num_high_pressure_points spills reloads spill_cost reload_cost
 
 let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
     (relocatable_regs : Reg.t list) =
@@ -157,14 +173,41 @@ let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
     num_high_pressure_points
   }
 
+let safe_pow10 n =
+  let res = ref 1 in
+  let idx = ref 0 in
+  while !idx < n && Misc.no_overflow_mul 10 !res do
+    idx := !idx + 1;
+    res := !res * 10
+  done;
+  !res
+
 let collect_out_stats (cfg_with_infos : Cfg_with_infos.t) =
-  Cfg_with_infos.fold_blocks cfg_with_infos ~init:{ spills = 0; reloads = 0 }
-    ~f:(fun (_label : Label.t) (block : Cfg.basic_block) (acc : out_stats) ->
+  let loop_depths = (Cfg_with_infos.loop_infos cfg_with_infos).loop_depths in
+  Cfg_with_infos.fold_blocks cfg_with_infos
+    ~init:{ spills = 0; reloads = 0; spill_cost = 0; reload_cost = 0 }
+    ~f:(fun (label : Label.t) (block : Cfg.basic_block) (acc : out_stats) ->
+      let cost =
+        match Label.Map.find_opt label loop_depths with
+        | Some depth -> safe_pow10 depth
+        | None -> 1
+      in
+      let update_cost curr =
+        if Misc.no_overflow_add curr cost then curr + cost else max_int
+      in
       DLL.fold_left block.body ~init:acc
         ~f:(fun (acc : out_stats) (instr : Cfg.basic Cfg.instruction) ->
           match[@ocaml.warning "-4"] instr.desc with
-          | Op Spill -> { acc with spills = succ acc.spills }
-          | Op Reload -> { acc with reloads = succ acc.reloads }
+          | Op Spill ->
+            { acc with
+              spills = succ acc.spills;
+              spill_cost = update_cost acc.spill_cost
+            }
+          | Op Reload ->
+            { acc with
+              reloads = succ acc.reloads;
+              reload_cost = update_cost acc.reload_cost
+            }
           | _ -> acc))
 
 let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
