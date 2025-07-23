@@ -585,6 +585,7 @@ and print_function_params_and_body ppf t =
     let my_closure =
       Bound_parameter.create my_closure
         (K.With_subkind.create K.value Anything Non_nullable)
+        Flambda_debug_uid.none
     in
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \
@@ -1403,6 +1404,10 @@ module Named = struct
         Simple.const
           (Reg_width_const.naked_float32
              Numeric_types.Float32_by_bit_pattern.zero)
+      | Naked_number Naked_int8 ->
+        Simple.const (Reg_width_const.naked_int8 Numeric_types.Int8.zero)
+      | Naked_number Naked_int16 ->
+        Simple.const (Reg_width_const.naked_int16 Numeric_types.Int16.zero)
       | Naked_number Naked_int32 ->
         Simple.const (Reg_width_const.naked_int32 Int32.zero)
       | Naked_number Naked_int64 ->

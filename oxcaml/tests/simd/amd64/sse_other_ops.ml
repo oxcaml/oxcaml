@@ -158,6 +158,41 @@ module Int32x4 = struct
 
   let () =
     Int32s.check_ints (fun l r ->
+        (failmsg := fun () -> Printf.printf "%08lx|%08lx mul_even\n%!" l r);
+        let v0 = Int32s.of_int32s l 1l r 3l in
+        let v1 = Int32s.of_int32s r 2l l 1l in
+        let result = mul_even v0 v1 in
+        let expect =
+          int64x2_of_int64s
+            Stdlib.Int64.(mul (of_int32 l) (of_int32 r))
+            Stdlib.Int64.(mul (of_int32 r) (of_int32 l))
+        in
+        eq (int64x2_low_int64 result)
+          (int64x2_high_int64 result)
+          (int64x2_low_int64 expect)
+          (int64x2_high_int64 expect));
+    Int32s.check_ints (fun l r ->
+        (failmsg
+           := fun () -> Printf.printf "%08lx|%08lx mul_even_unsigned\n%!" l r);
+        let v0 = Int32s.of_int32s l 1l r 3l in
+        let v1 = Int32s.of_int32s r 2l l 1l in
+        let result = mul_even_unsigned v0 v1 in
+        let expect =
+          int64x2_of_int64s
+            Stdlib.Int64.(
+              mul
+                (logand (of_int32 l) 0xffffffffL)
+                (logand (of_int32 r) 0xffffffffL))
+            Stdlib.Int64.(
+              mul
+                (logand (of_int32 r) 0xffffffffL)
+                (logand (of_int32 l) 0xffffffffL))
+        in
+        eq (int64x2_low_int64 result)
+          (int64x2_high_int64 result)
+          (int64x2_low_int64 expect)
+          (int64x2_high_int64 expect));
+    Int32s.check_ints (fun l r ->
         (failmsg := fun () -> Printf.printf "%08lx|%08lx mulsign\n%!" l r);
         let v0 = Int32s.of_int32s l l r r in
         let v1 = Int32s.of_int32s l r l r in
@@ -199,6 +234,21 @@ module Int16x8 = struct
         let expect =
           Int16.of_ints (mulsign l l) (mulsign l r) (mulsign r l) (mulsign r r)
             (mulsign l l) (mulsign l r) (mulsign r l) (mulsign r r)
+        in
+        eq (int16x8_low_int64 result)
+          (int16x8_high_int64 result)
+          (int16x8_low_int64 expect)
+          (int16x8_high_int64 expect));
+    Int16.check_ints (fun l r ->
+        (failmsg := fun () -> Printf.printf "%04x|%04x mul_round\n%!" l r);
+        let v0 = Int16.of_ints l l r r l l r r in
+        let v1 = Int16.of_ints l r l r l r l r in
+        let result = mul_round v0 v1 in
+        let mul_round x y = Int16.mul_round x y in
+        let expect =
+          Int16.of_ints (mul_round l l) (mul_round l r) (mul_round r l)
+            (mul_round r r) (mul_round l l) (mul_round l r) (mul_round r l)
+            (mul_round r r)
         in
         eq (int16x8_low_int64 result)
           (int16x8_high_int64 result)

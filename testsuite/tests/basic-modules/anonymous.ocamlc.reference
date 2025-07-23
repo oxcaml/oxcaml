@@ -1,7 +1,9 @@
 (setglobal Anonymous!
   (seq
     (ignore
-      (let (x =[(consts ()) (non_consts ([0: [int], [int]]))] [0: 13 37])
+      (let
+        (x =[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+           [0: 13 37])
         (makeblock 0 x)))
     (let
       (A =
@@ -12,20 +14,25 @@
            [0: "anonymous.ml" 35 6] [0: [0]]))
       (seq
         (ignore
-          (let (x =[(consts ()) (non_consts ([0: [int], [int]]))] [0: 4 2])
+          (let
+            (x =[value<
+                  (consts ()) (non_consts ([0: value<int>, value<int>]))>]
+               [0: 4 2])
             (makeblock 0 x)))
         (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] A A)
         (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] B
-          (let (x =[(consts ()) (non_consts ([0: *, *]))] [0: "foo" "bar"])
+          (let
+            (x =[value<(consts ()) (non_consts ([0: *, *]))>]
+               [0: "foo" "bar"])
             (makeblock 0)))
         (let
           (f = (function {nlocal = 0} param : int 0)
            s = (makemutable 0 (*) ""))
           (seq
             (ignore
-              (let (*match* =[int] (setfield_ptr 0 s "Hello World!"))
+              (let (*match* =[value<int>] (setfield_ptr 0 s "Hello World!"))
                 (makeblock 0)))
             (let
-              (drop = (function {nlocal = 0} param : int 0)
-               *match* =[int] (apply drop (field_mut 0 s)))
+              (drop = (function {nlocal = 0} param? : int 0)
+               *match* =[value<int>] (apply drop (field_mut 0 s)))
               (makeblock 0 A B f s drop))))))))

@@ -46,7 +46,7 @@ let[@inline never] int_as_pointer_global x =
      function calls don't allocate on the region (superficially). The first call
      secretly does, hence stack space leaking. *)
   leak_in_current_region x;
-  let _ = Sys.opaque_identity (follow ext) in
+  let _ @ global = Sys.opaque_identity (follow ext) in
   ()
 
 let () =
@@ -293,7 +293,7 @@ let[@inline never] create_local () =
   { x = opaque_identity 0 }
 let create_and_ignore () =
   let x = create_local () in
-  ignore (Sys.opaque_identity x : t)
+  ignore (Sys.opaque_identity x : t @ global)
 
 let () =
   create_and_ignore ();

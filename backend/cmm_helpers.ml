@@ -3421,7 +3421,8 @@ let send_function (arity, result, mode) =
       fun_body = body;
       fun_codegen_options = [];
       fun_dbg;
-      fun_poll = Default_poll
+      fun_poll = Default_poll;
+      fun_ret_type = result
     }
 
 let apply_function (arity, result, mode) =
@@ -3435,7 +3436,8 @@ let apply_function (arity, result, mode) =
       fun_body = body;
       fun_codegen_options = [];
       fun_dbg;
-      fun_poll = Default_poll
+      fun_poll = Default_poll;
+      fun_ret_type = result
     }
 
 (* Generate tuplifying functions:
@@ -3473,7 +3475,8 @@ let tuplify_function arity return =
             dbg () );
       fun_codegen_options = [];
       fun_dbg;
-      fun_poll = Default_poll
+      fun_poll = Default_poll;
+      fun_ret_type = return
     }
 
 (* Generate currying functions:
@@ -3646,7 +3649,8 @@ let final_curry_function nlocal arity result =
           last_clos (narity - 1);
       fun_codegen_options = [];
       fun_dbg;
-      fun_poll = Default_poll
+      fun_poll = Default_poll;
+      fun_ret_type = result
     }
 
 let intermediate_curry_functions ~nlocal ~arity result =
@@ -3706,7 +3710,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
                 dbg () );
           fun_codegen_options = [];
           fun_dbg;
-          fun_poll = Default_poll
+          fun_poll = Default_poll;
+          fun_ret_type = result
         }
       ::
       (if has_nary
@@ -3737,7 +3742,8 @@ let intermediate_curry_functions ~nlocal ~arity result =
                   clos (num + 1);
               fun_codegen_options = [];
               fun_dbg;
-              fun_poll = Default_poll
+              fun_poll = Default_poll;
+              fun_ret_type = result
             }
         in
         [cf]
@@ -3775,55 +3781,43 @@ let addr_array_length arg dbg =
    (e.g., bswap). *)
 
 let bbswap bi arg dbg =
-  let bitwidth : Cmm.bswap_bitwidth =
-    match (bi : Primitive.unboxed_integer) with
-    | Unboxed_nativeint -> if size_int = 4 then Thirtytwo else Sixtyfour
-    | Unboxed_int32 -> Thirtytwo
-    | Unboxed_int64 -> Sixtyfour
-  in
-  let op = Cbswap { bitwidth } in
-  if (bi = Primitive.Unboxed_int64 && size_int = 4)
-     || not (Proc.operation_supported op)
-  then
-    let prim, tyarg =
+  match (bi : Primitive.unboxed_integer) with
+  | Unboxed_int8 -> arg
+  | _ ->
+    let bitwidth : Cmm.bswap_bitwidth =
       match (bi : Primitive.unboxed_integer) with
-      | Unboxed_nativeint -> "nativeint", XInt
-      | Unboxed_int32 -> "int32", XInt32
-      | Unboxed_int64 -> "int64", XInt64
+      | Unboxed_nativeint -> if size_int = 4 then Thirtytwo else Sixtyfour
+      | Unboxed_int8 -> assert false
+      | Unboxed_int16 -> Sixteen
+      | Unboxed_int32 -> Thirtytwo
+      | Unboxed_int64 -> Sixtyfour
     in
-    Cop
-      ( Cextcall
-          { func = Printf.sprintf "caml_%s_direct_bswap" prim;
-            builtin = false;
-            returns = true;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects;
-            ty = typ_int;
-            alloc = false;
-            ty_args = [tyarg]
-          },
-        [arg],
-        dbg )
-  else Cop (op, [arg], dbg)
-
-let bswap16 arg dbg =
-  let op = Cbswap { bitwidth = Cmm.Sixteen } in
-  if Proc.operation_supported op
-  then Cop (op, [arg], dbg)
-  else
-    Cop
-      ( Cextcall
-          { func = "caml_bswap16_direct";
-            builtin = false;
-            returns = true;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects;
-            ty = typ_int;
-            alloc = false;
-            ty_args = []
-          },
-        [arg],
-        dbg )
+    let op = Cbswap { bitwidth } in
+    if (bi = Primitive.Unboxed_int64 && size_int = 4)
+       || not (Proc.operation_supported op)
+    then
+      let func, tyarg =
+        match (bi : Primitive.unboxed_integer) with
+        | Unboxed_int8 -> assert false
+        | Unboxed_int16 -> "caml_bswap16_direct", XInt16
+        | Unboxed_int32 -> "caml_int32_direct_bswap", XInt32
+        | Unboxed_nativeint -> "caml_nativeint_direct_bswap", XInt
+        | Unboxed_int64 -> "caml_int64_direct_bswap", XInt64
+      in
+      Cop
+        ( Cextcall
+            { func;
+              builtin = false;
+              returns = true;
+              effects = Arbitrary_effects;
+              coeffects = Has_coeffects;
+              ty = typ_int;
+              alloc = false;
+              ty_args = [tyarg]
+            },
+          [arg],
+          dbg )
+    else Cop (op, [arg], dbg)
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
@@ -4070,7 +4064,10 @@ let fail_if_called_indirectly_function () =
       fun_body;
       fun_codegen_options = [];
       fun_poll = Default_poll;
-      fun_dbg = Debuginfo.none
+      fun_dbg = Debuginfo.none;
+      fun_ret_type =
+        typ_void
+        (* This function never returns, so we can assume this return type *)
     }
   in
   [Cdata string_data; Cfunction fn]
@@ -4175,7 +4172,8 @@ let entry_point namelist =
         fun_body = Csequence (body, cconst_int 1);
         fun_codegen_options = [Reduce_code_size; Use_linscan_regalloc];
         fun_dbg;
-        fun_poll = Default_poll
+        fun_poll = Default_poll;
+        fun_ret_type = typ_val
       } ]
 
 (* Generate the table of globals *)
@@ -4613,8 +4611,16 @@ let cfunction decl = Cmm.Cfunction decl
 
 let cdata d = Cmm.Cdata d
 
-let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg fun_poll =
-  { Cmm.fun_name; fun_args; fun_body; fun_codegen_options; fun_dbg; fun_poll }
+let fundecl fun_name fun_args fun_body fun_codegen_options fun_dbg fun_poll
+    fun_ret_type =
+  { Cmm.fun_name;
+    fun_args;
+    fun_body;
+    fun_codegen_options;
+    fun_dbg;
+    fun_poll;
+    fun_ret_type
+  }
 
 (* Gc root table *)
 

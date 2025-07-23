@@ -1,4 +1,3 @@
-
 ;; CR-someday mslater: with layout polymorphism, the tests could be
 ;; functorized instead concatenating files.
 

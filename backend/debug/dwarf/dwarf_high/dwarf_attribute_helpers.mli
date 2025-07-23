@@ -120,7 +120,7 @@ val create_encoding :
 val create_byte_size_exn :
   byte_size:int -> Dwarf_attribute_values.Attribute_value.t
 
-val create_bit_size : Int64.t -> Dwarf_attribute_values.Attribute_value.t
+val create_bit_size : Numbers.Int8.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_data_member_location_offset :
   byte_offset:Int64.t -> Dwarf_attribute_values.Attribute_value.t

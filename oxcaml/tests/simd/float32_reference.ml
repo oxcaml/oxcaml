@@ -58,6 +58,10 @@ external cvt_i32 : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_cvt_i32"
   [@@noalloc]
 
+external cvtt_i32 : (t[@unboxed]) -> (t[@unboxed])
+  = "caml_vec128_unreachable" "float32_cvtt_i32"
+  [@@noalloc]
+
 external round : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_round"
   [@@noalloc]

@@ -84,17 +84,20 @@ module Cfg_desc = struct
   type t =
     { mutable fun_args : Reg.t array;
       blocks : Block.t list;
-      fun_contains_calls : bool
+      fun_contains_calls : bool;
+      fun_ret_type : Cmm.machtype
     }
 
   let make ~remove_regalloc ~remove_locs
-      ({ fun_args; blocks; fun_contains_calls } : t) : Cfg_with_layout.t =
+      ({ fun_args; blocks; fun_contains_calls; fun_ret_type } : t) :
+      Cfg_with_layout.t =
     let cfg =
       Cfg.create ~fun_name:"foo" ~fun_args:(Array.copy fun_args)
         ~fun_dbg:Debuginfo.none ~fun_codegen_options:[] ~fun_contains_calls
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
         ~fun_poll:Lambda.Default_poll
         ~next_instruction_id:(InstructionId.make_sequence ())
+        ~fun_ret_type
     in
     List.iter
       (fun (block : Block.t) ->
@@ -141,7 +144,11 @@ end
 
 let entry_label =
   Cfg_desc.make_post
-    { fun_args = [||]; blocks = []; fun_contains_calls = false }
+    { fun_args = [||];
+      blocks = [];
+      fun_contains_calls = false;
+      fun_ret_type = Cmm.typ_void
+    }
   |> Cfg_with_layout.cfg |> Cfg.entry_label
   (* CR xclerc for xclerc: that test relies on the use of the polymorphic
           comparison over CFG values, but that can no longer be used since instruction
@@ -348,7 +355,8 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
             terminator =
               { id = make_id (); desc = Return; arg = result_locs; res = [||] }
           } ];
-      fun_contains_calls = true
+      fun_contains_calls = true;
+      fun_ret_type = Cmm.typ_val
     },
     make_id )
 
@@ -1022,7 +1030,8 @@ let make_loop ~loop_loc_first n =
             terminator =
               { id = make_id (); desc = Return; arg = result_locs; res = [||] }
           } ];
-      fun_contains_calls = true
+      fun_contains_calls = true;
+      fun_ret_type = Cmm.typ_val
     }
   in
   Cfg_desc.make_pre templ, Cfg_desc.make_post templ

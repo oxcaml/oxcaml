@@ -1699,11 +1699,11 @@ let prim_mode mvar prim =
     from the given [m]. This function is too specific to be put in [mode.ml] *)
 let with_locality_and_yielding (locality, yielding) m =
   let m' = Alloc.newvar () in
-  Locality.equate_exn (Alloc.proj (Comonadic Areality) m') locality;
+  Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
   let yielding =
-    Option.value ~default:(Alloc.proj (Comonadic Yielding) m) yielding
+    Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
   in
-  Yielding.equate_exn (Alloc.proj (Comonadic Yielding) m') yielding;
+  Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
   let c =
     { Alloc.Comonadic.Const.max with
       areality = Locality.Const.min;
@@ -5143,7 +5143,9 @@ let submode_with_cross env ~is_ret ty l r =
       (* the locality axis of the return mode cannot cross modes, because a
          local-returning function might allocate in the caller's region, and
          this info must be preserved. *)
-      Alloc.meet [r'; Alloc.max_with (Comonadic Areality) (Alloc.proj (Comonadic Areality) r)]
+      Alloc.meet
+        [r';
+         Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality r)]
     else
       r'
   in

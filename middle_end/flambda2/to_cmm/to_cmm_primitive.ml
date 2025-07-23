@@ -103,6 +103,8 @@ let mixed_block_kinds shape =
         match flat_suffix_element with
         | Naked_float -> KS.naked_float
         | Naked_float32 -> KS.naked_float32
+        | Naked_int8 -> KS.naked_int8
+        | Naked_int16 -> KS.naked_int16
         | Naked_int32 -> KS.naked_int32
         | Naked_int64 -> KS.naked_int64
         | Naked_vec128 -> KS.naked_vec128
@@ -135,6 +137,8 @@ let memory_chunk_of_flat_suffix_element :
     K.flat_suffix_element -> Cmm.memory_chunk = function
   | Naked_float -> Double
   | Naked_float32 -> Single { reg = Float32 }
+  | Naked_int8 -> Byte_signed
+  | Naked_int16 -> Sixteen_signed
   | Naked_int32 -> Thirtytwo_signed
   | Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_vec256 -> Twofiftysix_unaligned
@@ -592,6 +596,14 @@ let string_like_load_aux ~ptr_out_of_heap ~dbg width ~str ~index =
     C.aligned_load_128 ~ptr_out_of_heap str index dbg
   | One_twenty_eight { aligned = false } ->
     C.unaligned_load_128 ~ptr_out_of_heap str index dbg
+  | Two_fifty_six { aligned = true } ->
+    C.aligned_load_256 ~ptr_out_of_heap str index dbg
+  | Two_fifty_six { aligned = false } ->
+    C.unaligned_load_256 ~ptr_out_of_heap str index dbg
+  | Five_twelve { aligned = true } ->
+    C.aligned_load_512 ~ptr_out_of_heap str index dbg
+  | Five_twelve { aligned = false } ->
+    C.unaligned_load_512 ~ptr_out_of_heap str index dbg
 
 let string_like_load ~dbg kind width ~str ~index =
   match (kind : P.string_like_value) with
@@ -617,6 +629,14 @@ let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
     C.unaligned_set_128 ~ptr_out_of_heap bytes index new_value dbg
   | One_twenty_eight { aligned = true } ->
     C.aligned_set_128 ~ptr_out_of_heap bytes index new_value dbg
+  | Two_fifty_six { aligned = false } ->
+    C.unaligned_set_256 ~ptr_out_of_heap bytes index new_value dbg
+  | Two_fifty_six { aligned = true } ->
+    C.aligned_set_256 ~ptr_out_of_heap bytes index new_value dbg
+  | Five_twelve { aligned = false } ->
+    C.unaligned_set_512 ~ptr_out_of_heap bytes index new_value dbg
+  | Five_twelve { aligned = true } ->
+    C.aligned_set_512 ~ptr_out_of_heap bytes index new_value dbg
 
 let bytes_or_bigstring_set ~dbg kind width ~bytes ~index ~new_value =
   let expr =
@@ -651,6 +671,12 @@ let dead_slots_msg dbg function_slots value_slots =
 
 (* Arithmetic primitives *)
 
+let naked_int8 : C.Scalar_type.Integral.t =
+  Untagged (C.Scalar_type.Integer.create_exn ~bit_width:8 ~signedness:Signed)
+
+let naked_int16 : C.Scalar_type.Integral.t =
+  Untagged (C.Scalar_type.Integer.create_exn ~bit_width:16 ~signedness:Signed)
+
 let naked_int32 : C.Scalar_type.Integral.t =
   Untagged (C.Scalar_type.Integer.create_exn ~bit_width:32 ~signedness:Signed)
 
@@ -668,6 +694,8 @@ let tagged_immediate : C.Scalar_type.Integral.t =
 
 let integral_of_standard_int : K.Standard_int.t -> C.Scalar_type.Integral.t =
   function
+  | Naked_int8 -> naked_int8
+  | Naked_int16 -> naked_int16
   | Naked_int32 -> naked_int32
   | Naked_int64 -> naked_int64
   | Naked_nativeint -> naked_nativeint
@@ -676,6 +704,8 @@ let integral_of_standard_int : K.Standard_int.t -> C.Scalar_type.Integral.t =
 
 let scalar_type_of_standard_int_or_float :
     K.Standard_int_or_float.t -> C.Scalar_type.t = function
+  | Naked_int8 -> Integral naked_int8
+  | Naked_int16 -> Integral naked_int16
   | Naked_int32 -> Integral naked_int32
   | Naked_int64 -> Integral naked_int64
   | Naked_nativeint -> Integral naked_nativeint
@@ -687,6 +717,13 @@ let scalar_type_of_standard_int_or_float :
 let unary_int_arith_primitive _env dbg kind op arg =
   match (op : P.unary_int_arith_op) with
   | Swap_byte_endianness -> (
+    (* CR lthls: Swap_byte_endianness is a weird primitive, that is only defined
+       on a subset of the naked types with tricky semantics, so I would be in
+       favour of not supporting the small integer versions and not changing the
+       other ones
+
+       jvanburen: I think it's well-defined on all of the naked integer types in
+       cmm_helpers... *)
     match (kind : K.Standard_int.t) with
     | Tagged_immediate ->
       (* This isn't currently needed since [Lambda_to_flambda_primitives] always
@@ -696,7 +733,15 @@ let unary_int_arith_primitive _env dbg kind op arg =
       (* This case should not have a sign extension, confusingly, because it
          arises from the [Pbswap16] Lambda primitive. That operation does not
          affect the sign of the resulting value. *)
-      C.bswap16 arg dbg
+      C.Scalar_type.Integral.static_cast arg ~dbg ~src:naked_immediate
+        ~dst:naked_int16
+      |> (fun arg -> C.bbswap Unboxed_int16 arg dbg)
+      |> C.zero_extend ~bits:16 ~dbg
+    | Naked_int8 -> arg
+    | Naked_int16 ->
+      (* Byte swaps of small integers need a sign-extension in order to match
+         the Lambda semantics (where the swap might affect the sign). *)
+      C.sign_extend (C.bbswap Unboxed_int16 arg dbg) ~bits:16 ~dbg
     | Naked_int32 ->
       C.sign_extend (C.bbswap Unboxed_int32 arg dbg) ~bits:32 ~dbg
     (* int64 and nativeint don't require a sign-extension since they are already
