@@ -61,50 +61,7 @@ CAMLprim uintnat caml_unboxed_array_deserialize(void* dst)
 // the int32 unboxed arrays, care needs to be taken with the last word
 // when the array is of odd length -- this is not currently initialized.
 
-/* No longer needed - int32 arrays now use Double_array_tag/Abstract_tag
-CAMLexport struct custom_operations caml_unboxed_int32_array_ops[2] = {
-  { "_unboxed_int32_even_array",
-    custom_finalize_default,
-    caml_unboxed_array_no_polymorphic_compare,
-    caml_unboxed_array_no_polymorphic_hash,
-    caml_unboxed_array_serialize,
-    caml_unboxed_array_deserialize,
-    custom_compare_ext_default,
-    custom_fixed_length_default },
-  { "_unboxed_int32_odd_array",
-    custom_finalize_default,
-    caml_unboxed_array_no_polymorphic_compare,
-    caml_unboxed_array_no_polymorphic_hash,
-    caml_unboxed_array_serialize,
-    caml_unboxed_array_deserialize,
-    custom_compare_ext_default,
-    custom_fixed_length_default },
-};
-*/
 
-/* No longer needed - int64 and nativeint arrays now use Abstract_tag
-CAMLexport struct custom_operations caml_unboxed_int64_array_ops = {
-  "_unboxed_int64_array",
-  custom_finalize_default,
-  caml_unboxed_array_no_polymorphic_compare,
-  caml_unboxed_array_no_polymorphic_hash,
-  caml_unboxed_array_serialize,
-  caml_unboxed_array_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
-
-CAMLexport struct custom_operations caml_unboxed_nativeint_array_ops = {
-  "_unboxed_nativeint_array",
-  custom_finalize_default,
-  caml_unboxed_array_no_polymorphic_compare,
-  caml_unboxed_array_no_polymorphic_hash,
-  caml_unboxed_array_serialize,
-  caml_unboxed_array_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
-*/
 
 /* returns number of elements (either fields or floats) */
 /* [ 'a array -> int ] */

@@ -228,11 +228,6 @@ let boxedintnat_local_header = local_block_header Obj.custom_tag 2
 
 let black_custom_header ~size = black_block_header Obj.custom_tag size
 
-(* No longer needed since we don't use custom blocks
-let custom_header ~size = block_header Obj.custom_tag size
-
-let custom_local_header ~size = local_block_header Obj.custom_tag size
-*)
 
 let caml_float32_ops = "caml_float32_ops"
 
@@ -1375,106 +1370,10 @@ let array_indexing ?typ log2size ptr ofs dbg =
    cross-compiling for 64-bit on a 32-bit host *)
 let int ~dbg i = natint_const_untagged dbg (Nativeint.of_int i)
 
-(* No longer needed since we don't use custom blocks
-let custom_ops_size_log2 =
-  let lg = Misc.log2 Config.custom_ops_struct_size in
-  assert (1 lsl lg = Config.custom_ops_struct_size);
-  lg
-*)
 
-(* No longer needed - int32 and float32 arrays now use Double_array_tag/Abstract_tag
-   caml_unboxed_int32_array_ops refers to the first element of an array of two
-   custom ops. The array index indicates the number of (invalid) tailing int32s
-   (0 or 1).
-let custom_ops_unboxed_int32_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_int32_array_ops", Debuginfo.none)
 
-let custom_ops_unboxed_int32_even_array = custom_ops_unboxed_int32_array
 
-let custom_ops_unboxed_int32_odd_array =
-  Cop
-    ( Caddi,
-      [ custom_ops_unboxed_int32_array;
-        Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
-      Debuginfo.none )
 
-   caml_unboxed_float32_array_ops refers to the first element of an array of two
-   custom ops. The array index indicates the number of (invalid) tailing
-   float32s (0 or 1).
-let custom_ops_unboxed_float32_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_float32_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_float32_even_array = custom_ops_unboxed_float32_array
-
-let custom_ops_unboxed_float32_odd_array =
-  Cop
-    ( Caddi,
-      [ custom_ops_unboxed_float32_array;
-        Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
-      Debuginfo.none )
-*)
-
-(* No longer needed - int64 and nativeint arrays now use Abstract_tag
-let custom_ops_unboxed_int64_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_int64_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_nativeint_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_nativeint_array_ops", Debuginfo.none)
-*)
-
-(* No longer needed - vec128, vec256 and vec512 arrays now use Abstract_tag
-let custom_ops_unboxed_vec128_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_vec128_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_vec256_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_vec256_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_vec512_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_vec512_array_ops", Debuginfo.none)
-*)
-
-(* No longer needed - using tag-based length calculation
-let unboxed_packed_array_length arr dbg ~custom_ops_base_symbol
-    ~elements_per_word =
-  (* Checking custom_ops is needed to determine if the array contains an odd or
-     even number of elements *)
-  let res =
-    bind "arr" arr (fun arr ->
-        let custom_ops_var = Backend_var.create_local "custom_ops" in
-        let custom_ops_index_var =
-          Backend_var.create_local "custom_ops_index"
-        in
-        let num_words_var = Backend_var.create_local "num_words" in
-        Clet
-          ( VP.create num_words_var,
-            (* subtract custom_operations word *)
-            sub_int (get_size arr dbg) (int ~dbg 1) dbg,
-            Clet
-              ( VP.create custom_ops_var,
-                Cop (mk_load_immut Word_int, [arr], dbg),
-                Clet
-                  ( VP.create custom_ops_index_var,
-                    (* compute index into custom ops array *)
-                    lsr_int
-                      (sub_int (Cvar custom_ops_var) custom_ops_base_symbol dbg)
-                      (int ~dbg custom_ops_size_log2)
-                      dbg,
-                    (* subtract index from length in elements *)
-                    sub_int
-                      (mul_int (Cvar num_words_var)
-                         (int ~dbg elements_per_word)
-                         dbg)
-                      (Cvar custom_ops_index_var) dbg ) ) ))
-  in
-  tag_int res dbg
-*)
 
 let unboxed_int32_array_length arr dbg =
   bind "arr" arr (fun arr ->
@@ -1494,17 +1393,6 @@ let unboxed_float32_array_length arr dbg =
       let adjustment = Cop (Cand, [tag; int ~dbg 1], dbg) in
       tag_int (sub_int total_slots adjustment dbg) dbg)
 
-(* No longer needed - unboxed arrays no longer use custom blocks
-let unboxed_custom_array_length ~log2_element_words arr dbg =
-  let res =
-    bind "arr" arr (fun arr ->
-        (* need to subtract so as not to count the custom_operations field *)
-        sub_int (get_size arr dbg) (int ~dbg 1) dbg)
-  in
-  if log2_element_words = 0
-  then tag_int res dbg
-  else tag_int (lsr_int res (int ~dbg log2_element_words) dbg) dbg
-*)
 
 let unboxed_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr ->
