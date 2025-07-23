@@ -1894,12 +1894,11 @@ let report_axerror :
     unit =
  fun ?target ~left_obj ~right_obj err ppf ->
   let open Format in
-  let target ppf =
-    match target with None -> fprintf ppf "This value" | Some name -> name ppf
-  in
-  fprintf ppf "%t is " target;
+  (match target with
+  | None -> fprintf ppf "This value is "
+  | Some name -> fprintf ppf "%t is " name);
   (match print_axhint_chain err.left left_obj err.left_hint ppf with
-  | HintPrinted -> fprintf ppf ".@.However, it is expected to be "
+  | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
   | NothingPrinted -> fprintf ppf "@ but expected to be ");
   ignore (print_axhint_chain err.right right_obj err.right_hint ppf);
   fprintf ppf "."

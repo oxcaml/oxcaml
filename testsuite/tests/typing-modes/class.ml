@@ -175,7 +175,7 @@ Line 3, characters 17-20:
 Error: This value is "nonportable"
        because it closes over a function (at Line 2, characters 21-24)
        which is "nonportable" because it is used in a class, and classes are always nonportable.
-However, it is expected to be "portable".
+       However, it is expected to be "portable".
 |}]
 
 module type SC = sig

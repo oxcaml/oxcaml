@@ -397,7 +397,7 @@ Line 4, characters 24-27:
 Error: This value is "stateful"
        because it closes over a function (at Line 3, characters 28-29)
        which is of some unknown mode.
-However, it is expected to be "stateless".
+       However, it is expected to be "stateless".
 |}]
 
 let foo : int Atomic.t @ read_write -> (unit -> unit) @ stateless =
@@ -423,7 +423,7 @@ Line 2, characters 25-26:
                              ^
 Error: This value is "immutable" because it is used inside a function
        which is "stateless".
-However, it is expected to be "read_write".
+       However, it is expected to be "read_write".
 |}]
 
 (* Closing over a stateful value also gives stateful. *)
@@ -485,7 +485,7 @@ Line 4, characters 22-25:
 Error: This value is "observing"
        because it closes over a function (at Line 3, characters 26-27)
        which is of some unknown mode.
-However, it is expected to be "stateless".
+       However, it is expected to be "stateless".
 |}]
 
 (* Closing over a observing value also gives observing. *)
@@ -689,7 +689,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
        which is "stateless".
-However, it is expected to be "read" because it has a mutable field read from.
+       However, it is expected to be "read" because it has a mutable field read from.
 |}]
 
 let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
@@ -699,7 +699,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "immutable" because it is used inside a lazy expression
        which is "stateless".
-However, it is expected to be "read_write" because it has a mutable field written to.
+       However, it is expected to be "read_write" because it has a mutable field written to.
 |}]
 
 (* [lazy_t @ observing] capture values at [read]. *)
@@ -711,7 +711,7 @@ Line 1, characters 42-43:
                                               ^
 Error: This value is "read" because it is used inside a lazy expression
        which is "observing".
-However, it is expected to be "read_write" because it has a mutable field written to.
+       However, it is expected to be "read_write" because it has a mutable field written to.
 |}]
 
 let bar (x : int ref) @ observing = lazy (x.contents)
