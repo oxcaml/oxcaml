@@ -17,6 +17,19 @@
 
 open Cmm
 
+(** Tags for unboxed arrays using mixed block headers with scannable_prefix = 0 *)
+module Unboxed_array_tags : sig
+  val unboxed_int64_array_tag : int
+  val unboxed_nativeint_array_tag : int
+  val unboxed_int32_array_even_tag : int
+  val unboxed_int32_array_odd_tag : int
+  val unboxed_float32_array_even_tag : int
+  val unboxed_float32_array_odd_tag : int
+  val unboxed_vec128_array_tag : int
+  val unboxed_vec256_array_tag : int
+  val unboxed_vec512_array_tag : int
+end
+
 val arch_bits : int
 
 type arity =
