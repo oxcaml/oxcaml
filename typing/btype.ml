@@ -677,15 +677,19 @@ let prefixed_label_name ppf l =
 let arg_label_compatible param_label arg_label =
   match param_label, arg_label with
   | Nolabel, Nolabel -> true
-  | (Labelled s | Optional s | Generic_optional(_, s)), Labelled s' -> s = s'
-  | _ ->
+  | Nolabel, _ | _, Nolabel -> false
+  | (Labelled s | Optional s | Generic_optional(_, s) | Position s), Labelled s'
+      -> s = s'
+  | _, (Optional _ | Generic_optional _ | Position _) ->
     (match classify_optionality param_label, classify_optionality arg_label with
     | Optional_arg l_path, Optional_arg l_path' ->
-        l_path = l_path' && (label_name param_label = label_name arg_label)
-    | _ ->
-      (* when positional labels are involved,
-        we only care whether label names are equal*)
-      label_name param_label = label_name arg_label)
+        l_path = l_path' && label_name param_label = label_name arg_label
+    | Optional_arg _, Required_or_position_arg
+    | Required_or_position_arg, Optional_arg _
+    | Required_or_position_arg, Required_or_position_arg
+        (* when positional labels are involved,
+          we only care whether label names are equal*)
+        -> label_name param_label = label_name arg_label)
 
 let rec extract_label_aux hd l (* param label*) = function
   | [] -> None

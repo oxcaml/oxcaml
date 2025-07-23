@@ -457,7 +457,8 @@ and class_type_aux env virt self_scope scty =
         | Optional_arg mpath ->
             let t_cons = Ctype.predef_path_of_optional_module_path mpath in
             Ctype.newty (Tconstr(t_cons,[ty], ref Mnil))
-        | Required_or_position_arg -> ty in
+        | Required_or_position_arg -> ty
+      in
       let clty = class_type env virt self_scope scty in
       let typ = Cty_arrow (l, ty, clty.cltyp_type) in
       cltyp (Tcty_arrow (l, cty, clty)) typ
