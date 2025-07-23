@@ -1,3 +1,5 @@
+type 'a lam = 'a
+
 module Stamp : sig
   (** [t] is the type of stamps. Stamps have no structure, only a notion
       of identity. *)
@@ -1775,7 +1777,8 @@ module Ast = struct
     | Stack exp -> pp fmt "@[<2>stack_@ %a@]" (print_exp_with_parens env) exp
     | Let_exception (name, exp) ->
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
-    | Extension_constructor name -> pp fmt "(* extension %s *)" name
+    | Extension_constructor name ->
+      pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
     | Unboxed_tuple ts ->
       pp fmt "#";
       print_tuple (print_exp env) fmt ts
@@ -1803,10 +1806,6 @@ module Label = struct
 
     let labelled s = Ast.LabelledTup s
   end
-
-  let nonoptional = function
-    | Ast.NolabelTup -> Ast.Nolabel
-    | Ast.LabelledTup s -> Ast.Labelled s
 
   let no_label = Ast.Nolabel
 
