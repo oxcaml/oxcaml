@@ -251,9 +251,6 @@ let mk_internal_assembler f =
 let mk_gc_timings f =
   "-dgc-timings", Arg.Unit f, "Output information about time spent in the GC"
 
-let mk_llvm_backend f =
-  "-llvm-backend", Arg.Unit f, " Enable LLVM backend (experimental)"
-
 let mk_dllvmir f =
   "-dllvmir", Arg.Unit f, " (undocumented)"
 
@@ -823,7 +820,6 @@ module type Oxcaml_options = sig
 
   val no_mach_ir : unit -> unit
 
-  val llvm_backend : unit -> unit
   val dllvmir : unit -> unit
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
@@ -969,7 +965,6 @@ struct
 
     mk_no_mach_ir F.no_mach_ir;
 
-    mk_llvm_backend F.llvm_backend;
     mk_dllvmir F.dllvmir;
     mk_keep_llvmir F.keep_llvmir;
     mk_llvm_path F.llvm_path;
@@ -1191,7 +1186,6 @@ module Oxcaml_options_impl = struct
 
   let no_mach_ir () = ()
 
-  let llvm_backend () = set' Oxcaml_flags.llvm_backend ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
@@ -1534,7 +1528,7 @@ module Extra_params = struct
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-max-function-complexity" ->
       set_int' Debugging.dwarf_max_function_complexity
-    | "llvm-backend" -> set' Oxcaml_flags.llvm_backend
+    | "llvm-backend" -> set' Clflags.llvm_backend
     | "llvm-path" -> Oxcaml_flags.llvm_path := Some v; true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug

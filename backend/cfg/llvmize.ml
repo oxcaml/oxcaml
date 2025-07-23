@@ -141,8 +141,9 @@ type t =
         (* Collects data items as they come and processes them at the end *)
     mutable defined_function_symbols : String.Set.t;
         (* Keeps track of all function symbols defined so far *)
-    mutable referenced_symbols : String.Set.t
+    mutable referenced_symbols : String.Set.t;
         (* Keeps track of all global symbols referenced so far *)
+    mutable external_calls : Cfg.external_call_operation list
   }
 
 let create_fun_info () =
@@ -164,7 +165,8 @@ let create ~llvmir_filename ~ppf_dump =
     current_fun_info = create_fun_info ();
     data = [];
     defined_function_symbols = String.Set.empty;
-    referenced_symbols = String.Set.empty
+    referenced_symbols = String.Set.empty;
+    external_calls = []
   }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
@@ -374,6 +376,10 @@ module F = struct
     ins t "%a = fcmp %s %a %a, %a" pp_ident res cond Llvm_typ.pp_t typ pp_ident
       arg1 pp_ident arg2
 
+  (* non-void *)
+  let ins_call t sym args res res_typ =
+    ins t "%a = %a(%a)" pp_ident res pp_global sym (pp_print_list ~pp_sep:pp_comma (fun ppf (arg, typ) -> ))
+
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
     ins_load_reg t temp reg;
@@ -512,8 +518,13 @@ module F = struct
       line t.ppf "%a:" Ident.print eq_or_uo;
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
+    | Prim { op; label_after = _ } -> (
+      match op with
+      | External ({ func_symbol = _; ty_res = _; ty_args = _; _ } as ext_call) ->
+        t.external_calls <- ext_call :: t.external_calls;
+      | Probe _ -> not_implemented_terminator ~msg:"probe" i)
     | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
-    | Prim _ ->
+      ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -719,6 +730,11 @@ module F = struct
   let empty_fun_decl t sym =
     line t.ppf "define void %a() { ret void }" pp_global
       (Cmm_helpers.make_symbol sym)
+
+  let fun_decl t sym ret args =
+    line t.ppf "declare %a %a(%a)" Llvm_typ.pp_t ret pp_global sym
+      (pp_print_list ~pp_sep:pp_comma Llvm_typ.pp_t)
+      args
 end
 
 let current_compilation_unit = ref None

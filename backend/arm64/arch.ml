@@ -116,7 +116,7 @@ let num_args_addressing = function
   | Ibased _ -> 0
 
 let addressing_displacement_for_llvmize addr =
-  if not !Oxcaml_flags.llvm_backend
+  if not !Clflags.llvm_backend
   then
     Misc.fatal_error
       "Arch.displacement_addressing_for_llvmize: should only be called with \
