@@ -34,8 +34,8 @@ let simple ~env ~res simple =
       var, res)
 
 let simples ~env ~res simples =
-  List.fold_left
-    (fun (vars, res) s ->
+  List.fold_right
+    (fun s (vars, res) ->
       let var, res = simple ~env ~res s in
       var :: vars, res)
-    ([], res) simples
+    simples ([], res)
