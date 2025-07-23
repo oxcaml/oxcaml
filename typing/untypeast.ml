@@ -729,7 +729,7 @@ let expression sub exp =
     | Texp_alloc (exp,Allocator_malloc) -> Pexp_malloc (sub.expr sub exp)
     (* CR external: Fix this when other allocators are supported. *)
     | Texp_alloc (_,_) -> assert false
-          in
+  in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
 
