@@ -1749,49 +1749,46 @@ type print_hint_res =
   | NothingPrinted
 
 (** Print out the text for a constant hint. Either prints nothing when there is
-  no hint and returns [NothingPrinted] or prints " because it {hint}" where {hint}
+  no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
   is text for the specific constant hint and returns [HintPrinted]. *)
 let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   let open Format in
-  let wrap_print_hint t = fprintf ppf " because it %t" t in
+  let wrap_print_hint t = fprintf ppf " because %t" t in
   function
   | None -> NothingPrinted
   | Lazy ->
-    wrap_print_hint (dprintf "is the result of a lazy expression");
+    wrap_print_hint (dprintf "it is the result of a lazy expression");
     HintPrinted
   | Functor ->
-    wrap_print_hint
-      (dprintf "is used in a functor, and functors are always %a"
-         (C.print a_obj) a);
+    wrap_print_hint (dprintf "functors are always %a" (C.print a_obj) a);
     HintPrinted
   | Class ->
-    wrap_print_hint
-      (dprintf "is used in a class, and classes are always %a" (C.print a_obj) a);
+    wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a);
     HintPrinted
   | Function ->
-    wrap_print_hint (dprintf "is used in a function");
+    wrap_print_hint (dprintf "it is used in a function");
     HintPrinted
   | Tailcall_function ->
-    wrap_print_hint (dprintf "is the function in a tail call");
+    wrap_print_hint (dprintf "it is the function in a tail call");
     HintPrinted
   | Tailcall_argument ->
-    wrap_print_hint (dprintf "is an argument in a tail call");
+    wrap_print_hint (dprintf "it is an argument in a tail call");
     HintPrinted
   | Read_mutable ->
-    wrap_print_hint (dprintf "has a mutable field read from");
+    wrap_print_hint (dprintf "it has a mutable field read from");
     HintPrinted
   | Write_mutable ->
-    wrap_print_hint (dprintf "has a mutable field written to");
+    wrap_print_hint (dprintf "it has a mutable field written to");
     HintPrinted
   | Force_lazy ->
-    wrap_print_hint (dprintf "forces a lazy expression");
+    wrap_print_hint (dprintf "it forces a lazy expression");
     HintPrinted
   | Return ->
     wrap_print_hint
-      (dprintf "is a function return value without an exclave annotation");
+      (dprintf "it is a function return value without an exclave annotation");
     HintPrinted
   | Stack ->
-    wrap_print_hint (dprintf "is in a stack expression");
+    wrap_print_hint (dprintf "it is in a stack expression");
     HintPrinted
 
 type print_morph_hint =
