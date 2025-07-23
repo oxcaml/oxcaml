@@ -884,7 +884,6 @@ let constant_or_raise env loc cst =
       c
   | Error err -> raise (Error (loc, env, err))
 
-
 (* Specific version of type_option, using newty rather than newgenty *)
 
 let type_option mpath ty =
