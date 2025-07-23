@@ -1310,7 +1310,6 @@ module Const = struct
        types that "cross everything" should cross at external or byte_external *)
     let mk_jkind ~mode_crossing ~nullability ~separability ~externality
         (layout : Layout.Const.t) =
-      let id x = x in
       let mod_bounds =
         (match mode_crossing with
         | true -> Mod_bounds.min
