@@ -21,7 +21,7 @@
 (***********)
 (* Prelude *)
 
-type void : void
+type void : void mod everything
 external void : unit -> void = "%unbox_unit"
 
 let test_num = ref 0

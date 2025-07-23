@@ -6,7 +6,7 @@
 (* CR layouts v5: eliminate various restructions about how void is used from
    this file. *)
 
-type t_void : void
+type t_void : void mod everything
 
 type void_rec = { v : t_void } [@@unboxed];;
 
@@ -14,7 +14,7 @@ external t_void : unit -> t_void = "%unbox_unit"
 
 let void_rec () = { v = t_void () }
 [%%expect{|
-type t_void : void
+type t_void : void mod everything
 type void_rec = { v : t_void; } [@@unboxed]
 external t_void : unit -> t_void = "%unbox_unit"
 val void_rec : unit -> void_rec = <fun>
@@ -618,7 +618,7 @@ Line 9, characters 22-23:
 Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
-         because of the definition of t_void at line 1, characters 0-18.
+         because of the definition of t_void at line 1, characters 0-33.
        But the layout of t_void must be a sublayout of value
          because it's the type of the recursive variable v'.
 |}]
@@ -655,7 +655,7 @@ Line 8, characters 25-26:
 Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
-         because of the definition of t_void at line 1, characters 0-18.
+         because of the definition of t_void at line 1, characters 0-33.
        But the layout of t_void must be a sublayout of value
          because it's the type of the recursive variable v1.
 |}]
