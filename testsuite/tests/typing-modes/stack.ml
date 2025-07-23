@@ -83,11 +83,7 @@ Error: This value is expected to be "global".
 
 let f = ignore_local (stack_ (2, 3))
 [%%expect{|
-Line 1, characters 29-35:
-1 | let f = ignore_local (stack_ (2, 3))
-                                 ^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+val f : unit = ()
 |}]
 
 type t = Foo | Bar of int
@@ -112,11 +108,7 @@ Error: This value is expected to be "global".
 
 let f = ignore_local (stack_ (Bar 42))
 [%%expect{|
-Line 1, characters 29-37:
-1 | let f = ignore_local (stack_ (Bar 42))
-                                 ^^^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+val f : unit = ()
 |}]
 
 let f = ref (stack_ `Foo)
@@ -138,11 +130,7 @@ Error: This value is expected to be "global".
 
 let f = ignore_local (stack_ (`Bar 42))
 [%%expect{|
-Line 1, characters 29-38:
-1 | let f = ignore_local (stack_ (`Bar 42))
-                                 ^^^^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+val f : unit = ()
 |}]
 
 type r = {x : string} [@@unboxed]
@@ -170,11 +158,7 @@ Error: This value is expected to be "global".
 
 let f = ignore_local (stack_ {x = "hello"})
 [%%expect{|
-Line 1, characters 29-42:
-1 | let f = ignore_local (stack_ {x = "hello"})
-                                 ^^^^^^^^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+val f : unit = ()
 |}]
 
 type r = {x : float; y : string}
@@ -201,11 +185,7 @@ Error: This value is expected to be "global".
 
 let f (r : r) = ignore_local (stack_ r.x) [@nontail]
 [%%expect{|
-Line 1, characters 37-40:
-1 | let f (r : r) = ignore_local (stack_ r.x) [@nontail]
-                                         ^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+val f : r -> unit = <fun>
 |}]
 
 let f = ref (stack_ [| 42; 56 |])
@@ -219,11 +199,7 @@ Error: This value is expected to be "global".
 
 let f = ignore_local (stack_ [| 42; 56 |])
 [%%expect{|
-Line 1, characters 29-41:
-1 | let f = ignore_local (stack_ [| 42; 56 |])
-                                 ^^^^^^^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+val f : unit = ()
 |}]
 
 (* tail-position stack_ does not indicate local-returning *)
@@ -238,7 +214,7 @@ Error: This value is expected to be local to the parent region because it is a f
 
 let f () = exclave_ stack_ (3, 5)
 [%%expect{|
-val f : unit -> int * int @ local once immutable = <fun>
+val f : unit -> local_ int * int = <fun>
 |}]
 
 let f () =

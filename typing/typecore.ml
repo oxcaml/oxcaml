@@ -6964,7 +6964,7 @@ and type_expect_
             Value.(of_const ~hint:Stack { Const.min with areality = Local })
             expected_mode;
           match
-            Alloc.submode Alloc.(of_const ~hint:Stack { Const.max with areality = Local }) alloc_mode
+            Alloc.submode Alloc.(of_const ~hint:Stack { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
           | Error failure_reason -> raise (Error (e.pexp_loc, env,

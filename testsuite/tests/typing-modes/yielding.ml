@@ -144,11 +144,8 @@ let _ = with_global_effect (fun k -> ok_yielding k)
 [%%expect{|
 external ok_yielding : local_ 'a -> unit = "%ignore"
 - : unit = ()
-Line 5, characters 28-49:
-5 | let _ = ok_yielding (stack_ (Some "local string"))
-                                ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+- : unit = ()
+- : unit = ()
 |}]
 
 external requires_unyielding : 'a @ local unyielding -> unit = "%ignore"
@@ -162,11 +159,12 @@ let _ = with_global_effect (fun k -> requires_unyielding k)
 [%%expect{|
 external requires_unyielding : 'a @ local unyielding -> unit = "%ignore"
 - : unit = ()
-Line 5, characters 36-57:
-5 | let _ = requires_unyielding (stack_ (Some "local string"))
-                                        ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "many".
-       However, it is actually "once" because it is in a stack expression.
+- : unit = ()
+Line 7, characters 57-58:
+7 | let _ = with_global_effect (fun k -> requires_unyielding k)
+                                                             ^
+Error: This value is expected to be "unyielding".
+       However, it is actually "yielding".
 |}]
 
 external returns_unyielding : 'a -> 'a @ local unyielding = "%identity"
