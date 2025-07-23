@@ -518,14 +518,15 @@ module Int32s = struct
     = "caml_vec128_unreachable" "int32_su16"
     [@@noalloc]
 
-  let to_int32x4 a b c d =
+  let to_int64 a b =
     let a = Int64.of_int32 a |> Int64.logand 0xffffffffL in
     let b = Int64.of_int32 b |> Int64.logand 0xffffffffL in
-    let c = Int64.of_int32 c |> Int64.logand 0xffffffffL in
-    let d = Int64.of_int32 d |> Int64.logand 0xffffffffL in
-    int32x4_of_int64s
-      Int64.(logor (shift_left b 32) a)
-      Int64.(logor (shift_left d 32) c)
+    Int64.(logor (shift_left b 32) a)
+
+  let to_int32x4 a b c d =
+    let ab = to_int64 a b in
+    let cd = to_int64 c d in
+    int32x4_of_int64s ab cd
 
   let check_ints f =
     let open Int32 in
@@ -656,7 +657,7 @@ module Int16 = struct
     = "caml_vec128_unreachable" "int16_su8"
     [@@noalloc]
 
-  let pack4 a b c d =
+  let to_int64 a b c d =
     let a = Int64.of_int a |> Int64.logand 0xffffL in
     let b = Int64.of_int b |> Int64.logand 0xffffL in
     let c = Int64.of_int c |> Int64.logand 0xffffL in
@@ -666,8 +667,8 @@ module Int16 = struct
     Int64.(logor (shift_left high 32) low)
 
   let to_int16x8 a b c d e f g h =
-    let low = pack4 a b c d in
-    let high = pack4 e f g h in
+    let low = to_int64 a b c d in
+    let high = to_int64 e f g h in
     int16x8_of_int64s low high
 
   let max_int = 0x7fff
@@ -776,7 +777,7 @@ module Int8 = struct
     = "caml_vec128_unreachable" "int8_zxi64"
     [@@noalloc]
 
-  let pack8 a b c d e f g h =
+  let to_int64 a b c d e f g h =
     let a = Int64.of_int a |> Int64.logand 0xffL in
     let b = Int64.of_int b |> Int64.logand 0xffL in
     let c = Int64.of_int c |> Int64.logand 0xffL in
@@ -794,7 +795,7 @@ module Int8 = struct
     Int64.(logor (shift_left hgfe 32) dcba)
 
   let to_int8x16 a b c d e f g h =
-    let i = pack8 a b c d e f g h in
+    let i = to_int64 a b c d e f g h in
     int8x16_of_int64s i i
 
   let check_ints f =

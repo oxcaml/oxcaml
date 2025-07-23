@@ -17,6 +17,7 @@
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 open Format
 include Amd64_simd_defs
+open Amd64_simd_instrs
 
 module Amd64_simd_instrs = struct
   include Amd64_simd_instrs
@@ -93,8 +94,6 @@ module Seq = struct
     { id : id;
       instr : instr
     }
-
-  open Amd64_simd_instrs
 
   let sqrtss = { id = Sqrtss; instr = sqrtss }
 
