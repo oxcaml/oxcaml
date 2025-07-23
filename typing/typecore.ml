@@ -498,7 +498,7 @@ let mode_modality modality expected_mode =
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
-  { (mode_default (meet_regional Return mode)) with
+  { (mode_default (meet_regional Is_function_return mode)) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
   }
