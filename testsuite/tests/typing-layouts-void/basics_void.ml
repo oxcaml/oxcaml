@@ -96,6 +96,13 @@ Error: The kind of type "bad" is immediate with unit_u with v1 with v2
          because of the annotation on the declaration of the type bad.
 |}]
 
+type vme : void mod external_
+type t : value mod external_ = A of vme
+[%%expect{|
+type vme : void mod external_
+type t = A of vme
+|}]
+
 (* All-void records are not allowed *)
 type u1 = #{ a: unit_u }
 type u2 = #{ a: unit_u; b: unit_u }
