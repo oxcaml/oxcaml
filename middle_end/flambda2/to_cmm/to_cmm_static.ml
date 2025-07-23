@@ -497,53 +497,39 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_float32s ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_float32_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.double_array_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int32s ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_int32_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.double_array_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int64s ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_int64_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.abstract_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_nativeints ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_nativeint_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.abstract_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec128s ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_vec128_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.abstract_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec256s ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_vec256_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.abstract_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec512s ->
-    let block =
-      C.emit_block (R.symbol res s)
-        (C.black_custom_header ~size:1)
-        [C.symbol_address (Cmm.global_symbol "caml_unboxed_vec512_array_ops")]
-    in
+    let sym = R.symbol res s in
+    let header = C.black_block_header Obj.abstract_tag 0 in
+    let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Mutable_string { initial_value = str }
   | Block_like s, Immutable_string str ->
