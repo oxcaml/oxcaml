@@ -57,7 +57,7 @@ module I = struct
 
   let () =
     Printexc.register_printer (function
-      | Extension_disabled msg -> Some ("extension_disabled: " ^ msg)
+      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
       | _ -> None)
 
   let require_vec256 () =
@@ -66,7 +66,7 @@ module I = struct
       raise
         (Extension_disabled
            (Printf.sprintf
-              "found 256-bit register during %s, but AVX is not enabled."
+              "found 256-bit register while emitting %s, but AVX is not enabled."
               !function_name))
 
   let require_vec512 () =
@@ -75,7 +75,7 @@ module I = struct
       raise
         (Extension_disabled
            (Printf.sprintf
-              "found 512-bit register during %s, but AVX512F is not enabled."
+              "found 512-bit register while emitting %s, but AVX512F is not enabled."
               !function_name))
 
   let simd (simd : Simd_instrs.instr) args =
@@ -83,7 +83,7 @@ module I = struct
     then
       raise
         (Extension_disabled
-           (Printf.sprintf "emitted '%s' during %s, but %s is not enabled."
+           (Printf.sprintf "found '%s' while emitting %s, but %s is not enabled."
               simd.mnemonic !function_name
               (Amd64_simd_defs.exts_to_string simd.ext)));
     I.simd simd args
