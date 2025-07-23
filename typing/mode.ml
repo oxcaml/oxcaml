@@ -1812,6 +1812,7 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
     | None -> Stop
     | Skip -> Skip
     | Close_over closure ->
+      (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
       PrintThenContinue
         (dprintf "closes over a %a (at %a)" Hint.print_lock_item
            closure.value_item Location.print_loc closure.value_loc)

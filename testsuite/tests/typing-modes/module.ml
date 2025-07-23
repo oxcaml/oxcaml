@@ -38,6 +38,7 @@ let u =
         ()
     in
     portable_use foo
+(* Note, "Line 7" is relative to this test case, but "Line 15" is referring to [foo] in the previous test block *)
 [%%expect{|
 Line 10, characters 17-20:
 10 |     portable_use foo
