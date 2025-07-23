@@ -193,7 +193,6 @@ module type S = sig
     type const =
       | None
       | Lazy
-      | Functor
       | Class
       | Function
       | Tailcall_function

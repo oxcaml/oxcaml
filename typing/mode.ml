@@ -1554,7 +1554,6 @@ module Hint = struct
   type const =
     | None
     | Lazy
-    | Functor
     | Class
     | Function
     | Tailcall_function
@@ -1758,9 +1757,6 @@ let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   | None -> NothingPrinted
   | Lazy ->
     wrap_print_hint (dprintf "it is the result of a lazy expression");
-    HintPrinted
-  | Functor ->
-    wrap_print_hint (dprintf "functors are always %a" (C.print a_obj) a);
     HintPrinted
   | Class ->
     wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a);
