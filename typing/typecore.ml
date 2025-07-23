@@ -572,7 +572,7 @@ let mode_lazy expected_mode_in =
 
 let mode_partial_application expected_mode =
   mode_morph (fun mode -> alloc_as_value
-    (value_to_alloc_r2g ~hint:Partial_application mode))
+    (value_to_alloc_r2g ~hint:Captured_by_partial_application mode))
     expected_mode
 
 let mode_trywith expected_mode =

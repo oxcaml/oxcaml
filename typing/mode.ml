@@ -1596,14 +1596,16 @@ module Hint = struct
       value_item : lock_item
     }
 
+  (* TODO - still need to actually use the crossing morph hints in the crossing functions *)
+
   type 'd morph =
     | Debug : string -> (_ * _) morph
     | None : (_ * _) morph
     | Skip : (_ * _) morph
     | Close_over : closure_details -> ('l * disallowed) morph
     | Is_closed_by : closure_details -> (disallowed * 'r) morph
-    | Partial_application : (disallowed * 'r) morph
-    | Adj_partial_application : ('l * disallowed) morph
+    | Captured_by_partial_application : (disallowed * 'r) morph
+    | Adj_captured_by_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
     | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
@@ -1618,8 +1620,8 @@ module Hint = struct
     | Skip -> false
     | Close_over _ -> true
     | Is_closed_by _ -> true
-    | Partial_application -> true
-    | Adj_partial_application -> true
+    | Captured_by_partial_application -> true
+    | Adj_captured_by_partial_application -> true
     | Crossing_left -> false
     | Crossing_right -> false
     | Compose (x, y) -> is_rigid x || is_rigid y
@@ -1634,7 +1636,7 @@ module Hint = struct
     | None -> None
     | Skip -> Skip
     | Is_closed_by x -> Close_over x
-    | Partial_application -> Adj_partial_application
+    | Captured_by_partial_application -> Adj_captured_by_partial_application
     | Crossing_right -> Crossing_left
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
 
@@ -1644,7 +1646,7 @@ module Hint = struct
     | None -> None
     | Skip -> Skip
     | Close_over x -> Is_closed_by x
-    | Adj_partial_application -> Partial_application
+    | Adj_captured_by_partial_application -> Captured_by_partial_application
     | Crossing_left -> Crossing_right
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
@@ -1660,7 +1662,8 @@ module Hint = struct
        | None -> None
        | Skip -> Skip
        | Close_over x -> Close_over x
-       | Adj_partial_application -> Adj_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
@@ -1671,7 +1674,7 @@ module Hint = struct
        | None -> None
        | Skip -> Skip
        | Is_closed_by x -> Is_closed_by x
-       | Partial_application -> Partial_application
+       | Captured_by_partial_application -> Captured_by_partial_application
        | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
@@ -1683,8 +1686,9 @@ module Hint = struct
        | Skip -> Skip
        | Close_over x -> Close_over x
        | Is_closed_by x -> Is_closed_by x
-       | Partial_application -> Partial_application
-       | Adj_partial_application -> Adj_partial_application
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
@@ -1697,8 +1701,9 @@ module Hint = struct
        | Skip -> Skip
        | Close_over x -> Close_over x
        | Is_closed_by x -> Is_closed_by x
-       | Partial_application -> Partial_application
-       | Adj_partial_application -> Adj_partial_application
+       | Captured_by_partial_application -> Captured_by_partial_application
+       | Adj_captured_by_partial_application ->
+         Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
@@ -1820,11 +1825,11 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
       PrintThenContinue
         (dprintf "is used inside a %a" Hint.print_closure_context
            closure.closure_context)
-    | Partial_application ->
+    | Captured_by_partial_application ->
       PrintThenContinue (dprintf "is captured by a partial application")
     | Crossing_left | Crossing_right ->
       PrintThenContinue (dprintf "crosses with something")
-    | Adj_partial_application ->
+    | Adj_captured_by_partial_application ->
       PrintThenContinue (dprintf "has a partial application capturing a value")
     | Compose (hint1, hint2) -> (
       match print_morph_hint hint1 with

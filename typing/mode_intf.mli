@@ -203,7 +203,7 @@ module type S = sig
       | Is_function_return
       | Stack_expression
 
-    (** A description of what type of item is beign closed over *)
+    (** A description of what type of item is being closed over *)
     type lock_item =
       | Value
       | Module
@@ -236,9 +236,10 @@ module type S = sig
             instead of terminating it there, as it would for [None]. *)
       | Close_over : closure_details -> ('l * disallowed) morph
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
-      | Partial_application : (disallowed * 'r) morph
-      | Adj_partial_application : ('l * disallowed) morph
+      | Captured_by_partial_application : (disallowed * 'r) morph
+      | Adj_captured_by_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph
+        (* TODO - consider renaming to more descriptive name (and [Crossing_right] too) *)
       | Crossing_right : (disallowed * 'r) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
       constraint 'd = _ * _
