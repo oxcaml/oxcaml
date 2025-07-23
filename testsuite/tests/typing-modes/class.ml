@@ -42,7 +42,7 @@ let foo () =
 Line 5, characters 27-28:
 5 |         val k = unique_use s
                                ^
-Error: This value is expected to be "unique". However, it is actually "aliased".
+Error: This value is "aliased" but expected to be "unique".
   Hint: This identifier cannot be used uniquely,
   because it is defined in a class.
 |}]
@@ -55,7 +55,7 @@ end
 Line 2, characters 12-33:
 2 |     val x = ("world" : _ @ local)
                 ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "global". However, it is actually "local".
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* instance variables are available as legacy to methods *)
@@ -68,8 +68,7 @@ end
 Line 4, characters 30-31:
 4 |     method foo = portable_use x
                                   ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* values written to instance variables need to be legacy *)
@@ -82,7 +81,7 @@ end
 Line 4, characters 22-43:
 4 |     method foo = x <- ("world" : _ @ local)
                           ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "global". However, it is actually "local".
+Error: This value is "local" but expected to be "global".
 |}]
 
 class cla = object
@@ -130,8 +129,7 @@ let foo (obj : cla @ contended) =
 Line 2, characters 26-29:
 2 |     let _ @ uncontended = obj in
                               ^^^
-Error: This value is expected to be "uncontended".
-       However, it is actually "contended".
+Error: This value is "contended" but expected to be "uncontended".
 |}]
 
 (* methods are available as legacy *)
@@ -142,8 +140,7 @@ let u =
 Line 3, characters 17-22:
 3 |     portable_use obj#m
                      ^^^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* for methods, arguments can be of any modes *)
@@ -163,8 +160,7 @@ let foo () =
 Line 4, characters 10-11:
 4 |     o#foo x
               ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 
@@ -176,9 +172,10 @@ let u =
 Line 3, characters 17-20:
 3 |     portable_use foo
                      ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 2, characters 21-24)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 2, characters 21-24)
        which is "nonportable" because it is used in a class, and classes are always nonportable.
+However, it is expected to be "portable".
 |}]
 
 module type SC = sig
@@ -207,8 +204,7 @@ let u =
 Line 3, characters 17-20:
 3 |     portable_use obj
                      ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 let foo () =
@@ -218,8 +214,7 @@ let foo () =
 Line 3, characters 17-18:
 3 |     portable_use x
                      ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 class cla = object
@@ -231,6 +226,5 @@ end
 Line 4, characters 21-22:
 4 |         portable_use o
                          ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]

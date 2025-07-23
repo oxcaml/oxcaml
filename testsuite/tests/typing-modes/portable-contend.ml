@@ -21,8 +21,8 @@ let foo (r @ contended) = r.a <- 42
 Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a <- 42
                               ^
-Error: This value is expected to be "uncontended" because it has a mutable field written to.
-       However, it is actually "contended".
+Error: This value is "contended"
+       but expected to be "uncontended" because it has a mutable field written to.
 |}]
 
 let foo (r @ contended) = r.a
@@ -30,8 +30,8 @@ let foo (r @ contended) = r.a
 Line 1, characters 26-27:
 1 | let foo (r @ contended) = r.a
                               ^
-Error: This value is expected to be "shared" because it has a mutable field read from.
-       However, it is actually "contended".
+Error: This value is "contended"
+       but expected to be "shared" because it has a mutable field read from.
 |}]
 
 let foo (r @ contended) = {r with a = best_bytes ()}
@@ -44,8 +44,8 @@ let foo (r @ contended) = {r with b = best_bytes ()}
 Line 1, characters 27-28:
 1 | let foo (r @ contended) = {r with b = best_bytes ()}
                                ^
-Error: This value is expected to be "shared" because it has a mutable field read from.
-       However, it is actually "contended".
+Error: This value is "contended"
+       but expected to be "shared" because it has a mutable field read from.
 |}]
 
 (* Writing to a mutable field in a shared record is rejected *)
@@ -54,8 +54,8 @@ let foo (r @ shared) = r.a <- 42
 Line 1, characters 23-24:
 1 | let foo (r @ shared) = r.a <- 42
                            ^
-Error: This value is expected to be "uncontended" because it has a mutable field written to.
-       However, it is actually "shared".
+Error: This value is "shared"
+       but expected to be "uncontended" because it has a mutable field written to.
 |}]
 
 (* reading mutable field from shared record is fine *)
@@ -92,8 +92,7 @@ let r @ contended = best_bytes ()
 Line 1, characters 4-33:
 1 | let r @ contended = best_bytes ()
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "uncontended".
-       However, it is actually "contended".
+Error: This value is "contended" but expected to be "uncontended".
 |}]
 
 let r @ shared = best_bytes ()
@@ -101,8 +100,7 @@ let r @ shared = best_bytes ()
 Line 1, characters 4-30:
 1 | let r @ shared = best_bytes ()
         ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "uncontended".
-       However, it is actually "shared".
+Error: This value is "shared" but expected to be "uncontended".
 |}]
 
 let x @ portable = fun a -> a
@@ -113,8 +111,7 @@ val x : 'a -> 'a = <fun>
 Line 3, characters 19-20:
 3 | let y @ portable = x
                        ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* Closing over writing mutable field gives nonportable *)
@@ -127,9 +124,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 3, characters 24-34)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 3, characters 24-34)
        which is "nonportable".
+However, it is expected to be "portable".
 |}]
 
 (* Closing over reading mutable field gives nonportable *)
@@ -142,9 +140,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 3, characters 25-26)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 3, characters 25-26)
        which is of some unknown mode.
+However, it is expected to be "portable".
 |}]
 
 (* Closing over reading mutable field from shared value is nonportable *)
@@ -156,9 +155,10 @@ let foo (r @ shared) =
 Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 2, characters 25-26)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 2, characters 25-26)
        which is of some unknown mode.
+However, it is expected to be "portable".
 |}]
 
 (* Closing over reading immutable field is OK *)
@@ -179,16 +179,14 @@ let foo (r @ contended) = Array.set r 42 (best_bytes ())
 Line 1, characters 36-37:
 1 | let foo (r @ contended) = Array.set r 42 (best_bytes ())
                                         ^
-Error: This value is expected to be "uncontended".
-       However, it is actually "contended".
+Error: This value is "contended" but expected to be "uncontended".
 |}]
 let foo (r @ contended) = Array.get r 42
 [%%expect{|
 Line 1, characters 36-37:
 1 | let foo (r @ contended) = Array.get r 42
                                         ^
-Error: This value is expected to be "uncontended".
-       However, it is actually "contended".
+Error: This value is "contended" but expected to be "uncontended".
 |}]
 let foo (r @ contended) =
     match r with
@@ -197,8 +195,8 @@ let foo (r @ contended) =
 Line 3, characters 6-16:
 3 |     | [| x; y |] -> ()
           ^^^^^^^^^^
-Error: This value is expected to be "shared" because it has a mutable field read from.
-       However, it is actually "contended".
+Error: This value is "contended"
+       but expected to be "shared" because it has a mutable field read from.
 |}]
 (* CR modes: Error message should mention array, not record. *)
 
@@ -207,8 +205,7 @@ let foo (r @ shared) = Array.set r 42 (best_bytes ())
 Line 1, characters 33-34:
 1 | let foo (r @ shared) = Array.set r 42 (best_bytes ())
                                      ^
-Error: This value is expected to be "uncontended".
-       However, it is actually "shared".
+Error: This value is "shared" but expected to be "uncontended".
 |}]
 
 (* The signature of Array.get could be generalized to expect shared rather than
@@ -220,8 +217,7 @@ let foo (r @ shared) = Array.get r 42
 Line 1, characters 33-34:
 1 | let foo (r @ shared) = Array.get r 42
                                      ^
-Error: This value is expected to be "uncontended".
-       However, it is actually "shared".
+Error: This value is "shared" but expected to be "uncontended".
 |}]
 
 (* Reading from a shared array is fine *)
@@ -243,9 +239,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 3, characters 27-28)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 3, characters 27-28)
        which is of some unknown mode.
+However, it is expected to be "portable".
 |}]
 
 (* Closing over read gives nonportable *)
@@ -258,9 +255,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 3, characters 27-28)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 3, characters 27-28)
        which is of some unknown mode.
+However, it is expected to be "portable".
 |}]
 
 (* Closing over Array.length doesn't force nonportable; but that needs a
@@ -298,9 +296,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable" because it closes over a function (at Line 3, characters 25-26)
+Error: This value is "nonportable"
+       because it closes over a function (at Line 3, characters 25-26)
        which is "nonportable".
+However, it is expected to be "portable".
 |}]
 
 (* closing over nonportable gives nonportable *)
@@ -341,8 +340,7 @@ let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportab
 Line 1, characters 4-119:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "uncontended".
-       However, it is actually "contended".
+Error: This value is "contended" but expected to be "uncontended".
 |}]
 
 let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontended portable = fun a b -> best_bytes ()
@@ -350,8 +348,8 @@ let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontend
 Line 1, characters 105-115:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontended portable = fun a b -> best_bytes ()
                                                                                                              ^^^^^^^^^^
-Error: The value "best_bytes" is expected to be "portable" because it is used inside a function
-       which is "portable". However, it is actually "nonportable".
+Error: The value "best_bytes" is "nonportable" but expected to be "portable"
+       because it is used inside a function which is "portable".
 |}]
 
 (* immediates crosses portability and contention *)
@@ -385,8 +383,7 @@ let foo (r @ contended) = Iarray.get r 42
 Line 1, characters 37-38:
 1 | let foo (r @ contended) = Iarray.get r 42
                                          ^
-Error: This value is expected to be "uncontended".
-       However, it is actually "contended".
+Error: This value is "contended" but expected to be "uncontended".
 |}]
 
 (* CR zqian: add portable/uncontended modality and test. *)

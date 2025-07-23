@@ -15,8 +15,8 @@ let foo () =
 Line 2, characters 37-38:
 2 |     lazy (let x @ local = "hello" in x)
                                          ^
-Error: This value is expected to be "global" because it is the result of a lazy expression.
-       However, it is actually "local".
+Error: This value is "local"
+       but expected to be "global" because it is the result of a lazy expression.
 |}]
 
 let foo (local_ x) =
@@ -25,9 +25,9 @@ let foo (local_ x) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is expected to be "global" because it is used inside a lazy expression
+Error: The value "x" is local to the parent region but expected to be "global"
+       because it is used inside a lazy expression
        which is "global" because it is the result of a lazy expression.
-       However, it is actually local to the parent region.
 |}]
 
 (* For simplicity, we also require them to be [unyielding]. *)
@@ -37,9 +37,9 @@ let foo (x @ yielding) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is expected to be "unyielding" because it is used inside a lazy expression
+Error: The value "x" is "yielding" but expected to be "unyielding"
+       because it is used inside a lazy expression
        which is "unyielding" because it is the result of a lazy expression.
-       However, it is actually "yielding".
 |}]
 
 (* lazy expression is constructed as global *)
@@ -65,8 +65,7 @@ let foo () =
 Line 3, characters 17-18:
 3 |     use_portable l
                      ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* thunk is evaluated only when [uncontended] lazy is forced, so the thunk can be
@@ -102,8 +101,7 @@ let foo (x @ nonportable) =
 Line 3, characters 29-30:
 3 |     | lazy r -> use_portable x
                                  ^
-Error: This value is expected to be "portable".
-       However, it is actually "nonportable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* forcing a lazy is not concurrency-safe; therefore, we require uncontended
@@ -115,8 +113,8 @@ let foo (x @ contended) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is expected to be "uncontended" because it forces a lazy expression.
-       However, it is actually "contended".
+Error: This value is "contended"
+       but expected to be "uncontended" because it forces a lazy expression.
 |}]
 
 (* stdlib's [Lazy.force] is a special case of lazy pattern *)

@@ -1731,31 +1731,55 @@ type 'a axerror =
     right_hint : 'a axhint
   }
 
-let print_const_hint a_obj a ppf : Hint.const -> unit =
+type print_hint_res =
+  | HintPrinted
+  | NothingPrinted
+
+(** Print out the text for a constant hint. Either prints nothing when there is
+  no hint and returns [NothingPrinted] or prints " because it {hint}" where {hint}
+  is text for the specific constant hint and returns [HintPrinted]. *)
+let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   let open Format in
   let wrap_print_hint t = fprintf ppf " because it %t" t in
   function
-  | None -> ()
-  | Lazy -> wrap_print_hint (dprintf "is the result of a lazy expression")
+  | None -> NothingPrinted
+  | Lazy ->
+    wrap_print_hint (dprintf "is the result of a lazy expression");
+    HintPrinted
   | Functor ->
     wrap_print_hint
       (dprintf "is used in a functor, and functors are always %a"
-         (C.print a_obj) a)
+         (C.print a_obj) a);
+    HintPrinted
   | Class ->
     wrap_print_hint
-      (dprintf "is used in a class, and classes are always %a" (C.print a_obj) a)
-  | Function -> wrap_print_hint (dprintf "is used in a function")
+      (dprintf "is used in a class, and classes are always %a" (C.print a_obj) a);
+    HintPrinted
+  | Function ->
+    wrap_print_hint (dprintf "is used in a function");
+    HintPrinted
   | Tailcall_function ->
-    wrap_print_hint (dprintf "is the function in a tail call")
+    wrap_print_hint (dprintf "is the function in a tail call");
+    HintPrinted
   | Tailcall_argument ->
-    wrap_print_hint (dprintf "is an argument in a tail call")
-  | Read_mutable -> wrap_print_hint (dprintf "has a mutable field read from")
-  | Write_mutable -> wrap_print_hint (dprintf "has a mutable field written to")
-  | Force_lazy -> wrap_print_hint (dprintf "forces a lazy expression")
+    wrap_print_hint (dprintf "is an argument in a tail call");
+    HintPrinted
+  | Read_mutable ->
+    wrap_print_hint (dprintf "has a mutable field read from");
+    HintPrinted
+  | Write_mutable ->
+    wrap_print_hint (dprintf "has a mutable field written to");
+    HintPrinted
+  | Force_lazy ->
+    wrap_print_hint (dprintf "forces a lazy expression");
+    HintPrinted
   | Return ->
     wrap_print_hint
-      (dprintf "is a function return value without an exclave annotation")
-  | Stack -> wrap_print_hint (dprintf "is in a stack expression")
+      (dprintf "is a function return value without an exclave annotation");
+    HintPrinted
+  | Stack ->
+    wrap_print_hint (dprintf "is in a stack expression");
+    HintPrinted
 
 type print_morph_hint =
   | Skip
@@ -1772,7 +1796,7 @@ type print_morph_hint =
       morph hint, then continue onto the next hint *)
 
 (** Get a printer for a single morph hint, or a special output if the hint requires
-  special behvaiour *)
+  special behaviour *)
 let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
   let open Format in
   fun hint ->
@@ -1810,7 +1834,7 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
 (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
 terminated with an [Empty] or [Const] axhint *)
 let rec print_axhint_chain :
-    type a. a -> a C.obj -> a axhint -> Format.formatter -> unit =
+    type a. a -> a C.obj -> a axhint -> Format.formatter -> print_hint_res =
  fun (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
   let open Format in
   let print_mode : type x. x C.obj -> x -> _ =
@@ -1840,18 +1864,24 @@ let rec print_axhint_chain :
       | Skip ->
         (* This is another case where we skip a line without printing the mode first *)
         print_axhint_chain b b_obj b_hint ppf
-      | Stop -> print_mode a_obj a
+      | Stop ->
+        print_mode a_obj a;
+        NothingPrinted
       | PrintThenStop pp ->
         print_mode a_obj a;
-        fprintf ppf " because it %t@ which is of some unknown mode" pp
+        fprintf ppf "@ because it %t@ which is of some unknown mode" pp;
+        HintPrinted
       | PrintThenContinue pp ->
         print_mode a_obj a;
-        fprintf ppf " because it %t@ which is " pp;
-        print_axhint_chain b b_obj b_hint ppf))
+        fprintf ppf "@ because it %t@ which is " pp;
+        ignore (print_axhint_chain b b_obj b_hint ppf);
+        HintPrinted))
   | Const const_hint ->
     print_mode a_obj a;
     print_const_hint a_obj a ppf const_hint
-  | Empty -> print_mode a_obj a
+  | Empty ->
+    print_mode a_obj a;
+    NothingPrinted
 
 (** Report an axerror, printing error traces for both the left and the right sides *)
 let report_axerror :
@@ -1867,9 +1897,12 @@ let report_axerror :
   let target ppf =
     match target with None -> fprintf ppf "This value" | Some name -> name ppf
   in
-  fprintf ppf {|%t is expected to be %t.@ However, it is actually %t.|} target
-    (print_axhint_chain err.right right_obj err.right_hint)
-    (print_axhint_chain err.left left_obj err.left_hint)
+  fprintf ppf "%t is " target;
+  (match print_axhint_chain err.left left_obj err.left_hint ppf with
+  | HintPrinted -> fprintf ppf ".@.However, it is expected to be "
+  | NothingPrinted -> fprintf ppf "@ but expected to be ");
+  ignore (print_axhint_chain err.right right_obj err.right_hint ppf);
+  fprintf ppf "."
 
 (** Description of an input axis responsible for an output axis of a morphism *)
 type 'a responsible_axis =

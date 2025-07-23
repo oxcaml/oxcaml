@@ -8,8 +8,7 @@ let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
 Line 1, characters 4-73:
 1 | let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 let storage = ref ""
@@ -50,8 +49,7 @@ val run_unyielding : (string -> unit) @ local unyielding -> unit = <fun>
 Line 3, characters 46-47:
 3 | let () = with_effect (fun k -> run_unyielding k)
                                                   ^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 let run_default : (string -> unit) @ local -> unit = fun f -> f "some string"
@@ -72,8 +70,8 @@ let () = with_effect (fun k ->
 Line 2, characters 45-46:
 2 |   let closure @ local unyielding = fun () -> k () in
                                                  ^
-Error: The value "k" is expected to be "unyielding" because it is used inside a function
-       which is "unyielding". However, it is actually "yielding".
+Error: The value "k" is "yielding" but expected to be "unyielding"
+       because it is used inside a function which is "unyielding".
 |}]
 
 
@@ -103,8 +101,7 @@ let _ = with_global_effect (fun k -> let _ = Mk1 k in ())
 Line 1, characters 49-50:
 1 | let _ = with_global_effect (fun k -> let _ = Mk1 k in ())
                                                      ^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 (* [global yielding] works: *)
@@ -121,8 +118,7 @@ let _ = with_global_effect (fun k -> let _ = Mk3 k in ())
 Line 1, characters 49-50:
 1 | let _ = with_global_effect (fun k -> let _ = Mk3 k in ())
                                                      ^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 let _ = with_global_effect (fun k -> let _ = Mk4 k in ())
@@ -163,8 +159,7 @@ external requires_unyielding : 'a @ local unyielding -> unit = "%ignore"
 Line 7, characters 57-58:
 7 | let _ = with_global_effect (fun k -> requires_unyielding k)
                                                              ^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 external returns_unyielding : 'a -> 'a @ local unyielding = "%identity"
@@ -209,8 +204,7 @@ let f2 (x @ local) = exclave_ requires_unyielding x
 Line 1, characters 50-51:
 1 | let f2 (x @ local) = exclave_ requires_unyielding x
                                                       ^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 let f3 (x @ yielding) = requires_unyielding x
@@ -218,8 +212,7 @@ let f3 (x @ yielding) = requires_unyielding x
 Line 1, characters 44-45:
 1 | let f3 (x @ yielding) = requires_unyielding x
                                                 ^
-Error: This value is expected to be "unyielding".
-       However, it is actually "yielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 let f4 (x @ local unyielding) = exclave_ requires_unyielding x
