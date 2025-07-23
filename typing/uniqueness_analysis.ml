@@ -2157,7 +2157,6 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
               let ext, uf_pat = pattern_match pat value in
               ext, (UF.unused, uf_pat)
             | Tparam_optional_default (pat, default, _, _) ->
-              (* CR generic-optional : CHECK THIS *)
               let value, uf_default =
                 check_uniqueness_exp_for_match ienv default
               in

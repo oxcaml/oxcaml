@@ -4503,7 +4503,7 @@ let for_optional_arg_default ~(mpath : Btype.optional_module_path)
           (Lvar param)
           Loc_unknown
           ~if_null:default_arg
-          ~if_this:(Lvar param) (* CR generic-optional: CHECK THIS *)
+          ~if_this:(Lvar param)
     | Stdlib_option ->
         transl_match_on_option
           default_arg_layout
@@ -4512,12 +4512,13 @@ let for_optional_arg_default ~(mpath : Btype.optional_module_path)
           ~if_none:default_arg
           ~if_some:
             (Lprim
-              (* CR ncik-roberts: Check whether we need something better here. *)
+              (* CR ncik-roberts: Check whether we need something better here.*)
               (* CR uniqueness: Currently it is not possible for users to refer
-                  to the [Some] allocation underlying the optional argument. This
-                  makes it impossible to overwrite and safe to use [Reads_agree]
-                  here. It would be slightly safer to use [Reads_vary] here, but
-                  that could degrade performance of programs not using uniqueness *)
+                  to the [Some] allocation underlying the optional argument.
+                  This makes it impossible to overwrite and safe to use
+                  [Reads_agree] here. It would be slightly safer to use
+                  [Reads_vary] here, but that could degrade performance of
+                  programs not using uniqueness *)
               (Pfield (0, Pointer, Reads_agree),
                 [ Lvar param ],
                 Loc_unknown))

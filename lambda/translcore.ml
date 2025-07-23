@@ -1661,7 +1661,6 @@ and transl_curried_function ~scopes loc repr params body
               (match mpath with
               | Stdlib_option -> Predef.type_option expr.exp_type
               | Stdlib_or_null -> Predef.type_or_null expr.exp_type),
-              (* CR generic-optional : CHECK THIS *)
               Translattribute.transl_param_attributes pat
         in
         (* CR generic-optional: This also needs to change fp_sort *)
@@ -1686,7 +1685,6 @@ and transl_curried_function ~scopes loc repr params body
                 ~return_layout
           | Tparam_optional_default
               (pat, default_arg, default_arg_sort, mpath) ->
-              (* CR generic-optional : CHECK THIS *)
               let default_arg_sort = Jkind.Sort.default_for_transl_and_get default_arg_sort in
               let default_arg =
                 event_before ~scopes default_arg
