@@ -1560,7 +1560,7 @@ module Hint = struct
     | Tailcall_argument
     | Mutable_read
     | Mutable_write
-    | Forces_lazy_expression
+    | Forced_lazy_expression
     | Is_function_return
     | Stack_expression
 
@@ -1776,8 +1776,8 @@ let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   | Mutable_write ->
     wrap_print_hint (dprintf "it has a mutable field written to");
     HintPrinted
-  | Forces_lazy_expression ->
-    wrap_print_hint (dprintf "it forces a lazy expression");
+  | Forced_lazy_expression ->
+    wrap_print_hint (dprintf "it is a lazy expression that is forced");
     HintPrinted
   | Is_function_return ->
     wrap_print_hint

@@ -199,7 +199,7 @@ module type S = sig
       | Tailcall_argument
       | Mutable_read
       | Mutable_write
-      | Forces_lazy_expression
+      | Forced_lazy_expression
       | Is_function_return
       | Stack_expression
 

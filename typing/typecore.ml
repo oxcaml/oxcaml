@@ -1020,7 +1020,7 @@ let mode_force_lazy =
   let mode =
     { Value.Const.max with
       contention = Uncontended }
-    |> Value.of_const ~hint:Forces_lazy_expression
+    |> Value.of_const ~hint:Forced_lazy_expression
   in
   mode_default mode
 
