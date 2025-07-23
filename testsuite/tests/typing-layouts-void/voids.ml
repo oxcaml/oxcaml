@@ -672,4 +672,44 @@ let test17 () =
 
 let _ = test17 ()
 
+(***********************************************)
+(* Test 18: Obj.tag of records containing void *)
+
+type record_with_void = {
+  void_field : void;
+  int_field : int;
+  string_field : string;
+}
+
+type record_with_multiple_voids = {
+  v1 : void;
+  x : int;
+  v2 : void;
+  y : string;
+  v3 : void;
+}
+
+type variant_with_record =
+  | VR of record_with_void
+
+let test18 () =
+  start_test "Obj.tag of records containing void";
+
+  let r = { void_field = void (); int_field = 42; string_field = "hello" } in
+  Printf.printf "  Obj.tag of record with void: %d\n" (Obj.tag (Obj.repr r));
+
+  let r2 = {
+    v1 = void ();
+    x = 100;
+    v2 = void ();
+    y = "world";
+    v3 = void ()
+  } in
+  Printf.printf "  Obj.tag of record with multiple voids: %d\n" (Obj.tag (Obj.repr r2));
+
+  let vr = VR { void_field = void (); int_field = 123; string_field = "variant" } in
+  Printf.printf "  Obj.tag of variant containing record with void: %d\n" (Obj.tag (Obj.repr vr))
+
+let _ = test18 ()
+
 let () = print_endline "All tests passed."
