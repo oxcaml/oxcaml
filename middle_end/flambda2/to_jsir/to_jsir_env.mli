@@ -15,6 +15,10 @@ val create :
   exn_continuation:Continuation.t ->
   t
 
+val return_continuation : t -> Continuation.t
+
+val exn_continuation : t -> Continuation.t
+
 (** Enter a function body, with the corresponding return and exception continuations. *)
 val enter_function_body :
   t ->

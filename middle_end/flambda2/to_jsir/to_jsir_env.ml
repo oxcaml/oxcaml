@@ -22,6 +22,10 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     value_slots = Value_slot.Map.empty
   }
 
+let return_continuation t = t.return_continuation
+
+let exn_continuation t = t.exn_continuation
+
 let enter_function_body t ~return_continuation ~exn_continuation =
   { t with return_continuation; exn_continuation }
 

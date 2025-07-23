@@ -115,9 +115,26 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         failwith "recursive continuations not yet supported")
 
 and apply_expr ~env ~res e =
-  (* CR selee: translate to [Apply] *)
-  ignore (env, res, e);
-  failwith "unimplemented"
+  let continuation = Apply_expr.continuation e in
+  let exn_continuation = Apply_expr.exn_continuation e in
+  let expected_continuation : Apply_expr.Result_continuation.t =
+    Return (To_jsir_env.return_continuation env)
+  in
+  if continuation <> expected_continuation
+     || Exn_continuation.exn_handler exn_continuation
+        <> To_jsir_env.exn_continuation env
+  then failwith "unimplemented for now";
+  let f, res =
+    match Apply_expr.callee e with
+    | None -> failwith "effects not implemented yet"
+    | Some callee -> To_jsir_shared.simple ~env ~res callee
+  in
+  let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
+  (* CR selee: come fix this later *)
+  let apply : Jsir.expr = Apply { f; args; exact = true } in
+  let var = Jsir.Var.fresh () in
+  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
+  env, To_jsir_result.end_block_with_last_exn res (Return var)
 
 and apply_cont ~env ~res apply_cont =
   let args, res =
