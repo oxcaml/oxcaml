@@ -211,17 +211,18 @@ val foobar : 'a -> 'a -> 'a t mallocd = <fun>
 |}]
 
 type 'a r = {mutable x : 'a @@ external_ ; mutable y : 'a @@ external_}
-type 'a t = FooBar of 'a
 let flop (x @ external_) (y @ external_ ) = malloc_ {x ; y}
 [%%expect {|
 type 'a r = { mutable x : 'a @@ external_; mutable y : 'a @@ external_; }
-type 'a t = FooBar of 'a
 val flop : 'a -> 'a -> 'a r mallocd = <fun>
 |}]
+
+type 'a t = FooBar of 'a
 let fleep (x @ external_) (y @ external_ ) = malloc_ (FooBar {x ; y})
 [%%expect {|
-Line 1, characters 61-68:
-1 | let fleep (x @ external_) (y @ external_ ) = malloc_ (FooBar {x ; y})
+type 'a t = FooBar of 'a
+Line 2, characters 61-68:
+2 | let fleep (x @ external_) (y @ external_ ) = malloc_ (FooBar {x ; y})
                                                                  ^^^^^^^
 Error: This value is "internal" but expected to be "external_".
 |}]
@@ -281,12 +282,14 @@ Line 1, characters 27-34:
 Error: This value is "internal" but expected to be "external_".
 |}]
 
+type t = {a : int; b : int}
 let f () = malloc_ (`Apple {a = 1; b = 3})
 [%%expect {|
-Line 1, characters 28-29:
-1 | let f () = malloc_ (`Apple {a = 1; b = 3})
-                                ^
-Error: Unbound record field "a"
+type t = { a : int; b : int; }
+Line 2, characters 27-41:
+2 | let f () = malloc_ (`Apple {a = 1; b = 3})
+                               ^^^^^^^^^^^^^^
+Error: This value is "internal" but expected to be "external_".
 |}]
 
 
