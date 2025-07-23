@@ -22,6 +22,19 @@ module VP = Backend_var.With_provenance
 open Cmm
 open Arch
 
+(* Tags for unboxed arrays using mixed block headers with scannable_prefix = 0 *)
+module Unboxed_array_tags = struct
+  let unboxed_int64_array_tag = 0
+  let unboxed_nativeint_array_tag = 1
+  let unboxed_int32_array_even_tag = 2
+  let unboxed_int32_array_odd_tag = 3
+  let unboxed_float32_array_even_tag = 4
+  let unboxed_float32_array_odd_tag = 5
+  let unboxed_vec128_array_tag = 6
+  let unboxed_vec256_array_tag = 7
+  let unboxed_vec512_array_tag = 8
+end
+
 let arch_bits = Arch.size_int * 8
 
 type arity =
@@ -4723,7 +4736,7 @@ let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~base_tag ~elements 
 
 let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   allocate_unboxed_packed_array ~make_payload:make_unboxed_int32_array_payload
-    ~alloc_kind:Alloc_block_kind_int32_u_array ~base_tag:2 ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_int32_u_array ~base_tag:Unboxed_array_tags.unboxed_int32_array_even_tag ~elements mode dbg
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   if Sys.big_endian
@@ -4746,16 +4759,16 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   allocate_unboxed_packed_array ~make_payload:make_unboxed_float32_array_payload
-    ~alloc_kind:Alloc_block_kind_float32_u_array ~base_tag:4 ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_float32_u_array ~base_tag:Unboxed_array_tags.unboxed_float32_array_even_tag ~elements mode dbg
 
 let allocate_unboxed_int64_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let header =
     let size = List.length elements in
     match mode with
     | Heap -> 
-      black_mixed_block_header 0 size ~scannable_prefix_len:0
+      black_mixed_block_header Unboxed_array_tags.unboxed_int64_array_tag size ~scannable_prefix_len:0
     | Local -> 
-      local_block_header 0 size ~block_kind:(Mixed_block { scannable_prefix = 0 })
+      local_block_header Unboxed_array_tags.unboxed_int64_array_tag size ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_int64_u_array),
@@ -4767,9 +4780,9 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     let size = List.length elements in
     match mode with
     | Heap -> 
-      black_mixed_block_header 1 size ~scannable_prefix_len:0
+      black_mixed_block_header Unboxed_array_tags.unboxed_nativeint_array_tag size ~scannable_prefix_len:0
     | Local -> 
-      local_block_header 1 size ~block_kind:(Mixed_block { scannable_prefix = 0 })
+      local_block_header Unboxed_array_tags.unboxed_nativeint_array_tag size ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_int64_u_array),
@@ -4790,15 +4803,15 @@ let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
 
 let allocate_unboxed_vec128_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec128
-    ~alloc_kind:Alloc_block_kind_vec128_u_array ~tag:6 ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_vec128_u_array ~tag:Unboxed_array_tags.unboxed_vec128_array_tag ~elements mode dbg
 
 let allocate_unboxed_vec256_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec256
-    ~alloc_kind:Alloc_block_kind_vec256_u_array ~tag:7 ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_vec256_u_array ~tag:Unboxed_array_tags.unboxed_vec256_array_tag ~elements mode dbg
 
 let allocate_unboxed_vec512_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec512
-    ~alloc_kind:Alloc_block_kind_vec512_u_array ~tag:8 ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_vec512_u_array ~tag:Unboxed_array_tags.unboxed_vec512_array_tag ~elements mode dbg
 
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y

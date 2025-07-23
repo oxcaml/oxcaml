@@ -23,6 +23,7 @@ module SC = Static_const
 module R = To_cmm_result
 module UK = C.Update_kind
 module MBS = Flambda_kind.Mixed_block_shape
+module Tags = C.Unboxed_array_tags
 
 let static_field res field field_kind =
   Simple.pattern_match'
@@ -173,10 +174,10 @@ let immutable_unboxed_int_array env res updates maybe_int32 ~symbol ~elts
     match maybe_int32 with
     | Int32 ->
       let fields = (1 + num_elts) / 2 in
-      let tag = 2 + (if num_elts mod 2 = 0 then 0 else 1) in
+      let tag = Tags.unboxed_int32_array_even_tag + (if num_elts mod 2 = 0 then 0 else 1) in
       fields, UK.naked_int32s, tag
-    | Int64 -> num_elts, UK.naked_int64s, 0
-    | Nativeint -> num_elts, UK.naked_int64s, 1
+    | Int64 -> num_elts, UK.naked_int64s, Tags.unboxed_int64_array_tag
+    | Nativeint -> num_elts, UK.naked_int64s, Tags.unboxed_nativeint_array_tag
   in
   let header = C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0 in
   let static_fields =
@@ -192,7 +193,7 @@ let immutable_unboxed_float32_array env res updates ~symbol ~elts =
   let sym = R.symbol res symbol in
   let num_elts = List.length elts in
   let num_fields = (1 + num_elts) / 2 in
-  let tag = 4 + (if num_elts mod 2 = 0 then 0 else 1) in
+  let tag = Tags.unboxed_float32_array_even_tag + (if num_elts mod 2 = 0 then 0 else 1) in
   let header = C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0 in
   let static_fields =
     (* If the array has odd length, the last 32 bits are implicitly initialized
@@ -234,7 +235,7 @@ let immutable_unboxed_vec128_array =
         Vector_types.Vec128.Bit_pattern.to_bits v
       in
       Cmm.Cvec128 { word0; word1 })
-    ~update_kind:UK.naked_vec128s ~tag:6 ~words_per_element:2
+    ~update_kind:UK.naked_vec128s ~tag:Tags.unboxed_vec128_array_tag ~words_per_element:2
 
 let immutable_unboxed_vec256_array =
   immutable_unboxed_vector_array
@@ -244,7 +245,7 @@ let immutable_unboxed_vec256_array =
         Vector_types.Vec256.Bit_pattern.to_bits v
       in
       Cmm.Cvec256 { word0; word1; word2; word3 })
-    ~update_kind:UK.naked_vec256s ~tag:7 ~words_per_element:4
+    ~update_kind:UK.naked_vec256s ~tag:Tags.unboxed_vec256_array_tag ~words_per_element:4
 
 let immutable_unboxed_vec512_array =
   immutable_unboxed_vector_array
@@ -265,7 +266,7 @@ let immutable_unboxed_vec512_array =
         Vector_types.Vec512.Bit_pattern.to_bits v
       in
       Cmm.Cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 })
-    ~update_kind:UK.naked_vec512s ~tag:8 ~words_per_element:8
+    ~update_kind:UK.naked_vec512s ~tag:Tags.unboxed_vec512_array_tag ~words_per_element:8
 
 let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     (static_const : Static_const.t) =
@@ -496,37 +497,37 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_float32s ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 4 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_float32_array_even_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int32s ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 2 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_int32_array_even_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int64s ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 0 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_int64_array_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_nativeints ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 1 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_nativeint_array_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec128s ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 6 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_vec128_array_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec256s ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 7 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_vec256_array_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec512s ->
     let sym = R.symbol res s in
-    let header = C.black_mixed_block_header 8 0 ~scannable_prefix_len:0 in
+    let header = C.black_mixed_block_header Tags.unboxed_vec512_array_tag 0 ~scannable_prefix_len:0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Mutable_string { initial_value = str }
