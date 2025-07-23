@@ -120,6 +120,9 @@ and apply_expr ~env ~res e =
   let expected_continuation : Apply_expr.Result_continuation.t =
     Return (To_jsir_env.return_continuation env)
   in
+  (* CR selee: Currently function applications are extremely limited and we're
+     not implementing proper CPS, it's only here essentially to test mutually
+     recursive closures. Will be coming back and fixing this later *)
   if continuation <> expected_continuation
      || Exn_continuation.exn_handler exn_continuation
         <> To_jsir_env.exn_continuation env
@@ -130,8 +133,9 @@ and apply_expr ~env ~res e =
     | Some callee -> To_jsir_shared.simple ~env ~res callee
   in
   let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
-  (* CR selee: come fix this later *)
-  let apply : Jsir.expr = Apply { f; args; exact = true } in
+  (* CR selee: assume exact = false for now, JSIR seems to assume false in the
+     case that we don't know *)
+  let apply : Jsir.expr = Apply { f; args; exact = false } in
   let var = Jsir.Var.fresh () in
   let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
   env, To_jsir_result.end_block_with_last_exn res (Return var)
