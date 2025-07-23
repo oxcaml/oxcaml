@@ -7182,8 +7182,10 @@ and type_expect_
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           unify_exp env record ty_res;
           let alloc_mode, argument_mode = register_allocation expected_mode in
-          let mode = Modality.Value.Const.apply label.lbl_modalities rmode in
-          let mode = cross_left env ty_arg mode in
+          (* NOTE: we intentionally ignore lbl.ld_modalities here, since we
+             force it to always be legacy in typecore. The mode of the
+             atomic_loc is then exactly the mode of the record *)
+          let mode = cross_left env ty_arg rmode in
           submode ~loc ~env mode argument_mode;
           rue {
             exp_desc =

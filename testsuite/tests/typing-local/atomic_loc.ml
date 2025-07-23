@@ -2,10 +2,10 @@
    expect;
 *)
 
-type 'a atomic = { mutable contents : 'a @@ local [@atomic] }
+type 'a atomic = { mutable contents : 'a [@atomic] }
 
 [%%expect{|
-type 'a atomic = { mutable contents : 'a @@ local [@atomic]; }
+type 'a atomic = { mutable contents : 'a [@atomic]; }
 |}]
 
 let contents_loc t = [%atomic.loc t.contents]
