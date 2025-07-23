@@ -312,10 +312,13 @@ module type Hint = sig
   (** The type of hints for mode variables with morphisms *)
   type 'd morph constraint 'd = 'l * 'r
 
-  (** The empty mode morphism hint *)
+  (** The empty mode morphism hint: an empty morphism hint.
+      The error reporter should terminate the trace on seeing this. *)
   val morph_none : 'd morph
 
-  (** The skip mode morphism hint *)
+  (** The skip mode morphism hint: an empty morphism hint,
+      but telling the error reporter to continue the trace,
+      instead of terminating it there, as it would for [morph_none]. *)
   val morph_skip : 'd morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)

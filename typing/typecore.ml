@@ -459,7 +459,7 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
     end
   | None -> ()
 
-let meet_regional hint mode =
+let meet_regional ~hint mode =
   let mode = Value.disallow_left mode in
   Value.meet [Value.(of_const ~hint {
     Const.max with
@@ -498,14 +498,14 @@ let mode_modality modality expected_mode =
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
-  { (mode_default (meet_regional Is_function_return mode)) with
+  { (mode_default (meet_regional ~hint:Is_function_return mode)) with
     position = RTail (Regionality.disallow_left
       (Value.proj_comonadic Areality mode), FTail);
   }
 
 (* used when entering a region.*)
 let mode_region mode =
-  { (mode_default (meet_regional None mode)) with
+  { (mode_default (meet_regional ~hint:None mode)) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);

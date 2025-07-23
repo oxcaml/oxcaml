@@ -1876,7 +1876,7 @@ let rec print_axhint_chain :
         NothingPrinted
       | PrintThenStop pp ->
         print_mode a_obj a;
-        fprintf ppf "@ because it %t@ which is of some unknown mode" pp;
+        fprintf ppf "@ because it %t@ which is of some mode" pp;
         HintPrinted
       | PrintThenContinue pp ->
         print_mode a_obj a;
