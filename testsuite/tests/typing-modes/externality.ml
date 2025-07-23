@@ -11,6 +11,11 @@ module Float_u = Stdlib_upstream_compatible.Float_u
 type t = float#
 |}]
 
+type t : bits64 = int64#
+[%%expect {|
+type t = int64#
+|}]
+
 let immediate_is_external () =
   let _x @ external_ = 3 in
   let _y @ external_ = 'a' in
