@@ -110,14 +110,15 @@ val x0 : <[ [> `C of int ] as '_weak3 ]> expr = <[ `C 543 ]>
 
 <[ function | `A x -> x | `B (_, foo) -> foo ]>;;
 [%%expect {|
-- : <[ ([< `A of $ ('a) | `B of $ ('b) * $ ('a) ] as '_weak5) -> $ ('a) ]>
+- : <[ ([< `A of '_weak6 | `B of '_weak7 * '_weak6 ] as '_weak5) -> '_weak6
+     ]>
     expr
 = <[ function | `A x -> x | `B (_, foo) -> foo ]>
 |}];;
 
 <[ function | `A x -> x | `B (_, foo) -> foo | _ -> 42 ]>;;
 [%%expect {|
-- : <[ ([> `A of int | `B of $ ('a) * int ] as '_weak6) -> int ]> expr =
+- : <[ ([> `A of int | `B of '_weak9 * int ] as '_weak8) -> int ]> expr =
 <[ function | `A x -> x | `B (_, foo) -> foo | _ -> 42 ]>
 |}];;
 
@@ -201,13 +202,13 @@ val x0 : <[ [> `C of int ] as '_weak3 ]> expr = <[ `C 543 ]>
 
 <[ function | `A -> true | `B -> false ]>;;
 [%%expect {|
-- : <[ ([< `A | `B ] as '_weak7) -> bool ]> expr =
+- : <[ ([< `A | `B ] as '_weak10) -> bool ]> expr =
 <[ function | `A -> true | `B -> false ]>
 |}];;
 
 <[ function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0 ]>;;
 [%%expect {|
-- : <[ ([< `Bar of int * int | `Baz | `Foo of int ] as '_weak8) -> int ]>
+- : <[ ([< `Bar of int * int | `Baz | `Foo of int ] as '_weak11) -> int ]>
     expr
 = <[ function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0 ]>
 |}];;
