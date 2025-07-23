@@ -605,4 +605,71 @@ let test16 () =
 
 let _ = test16 ()
 
+(***********************************)
+(* Test 17: void in local closures *)
+
+let test17 () =
+  start_test "void in local closures";
+
+  (* Version of f1 using local functions *)
+  let[@inline never] f1_local n v steps () =
+    let[@inline never] rec (go @ local) k =
+      if k = n
+      then 0
+      else begin
+        let contribution = use_void v in
+        let acc = go (k + 1) in
+        steps.(k) <- acc + contribution;
+        acc + contribution
+      end
+    in
+    go 0 [@nontail]
+  in
+
+  (* Test f1_local *)
+  let steps = Array.init 5 (fun _ -> 0) in
+  let v = void () in
+  let result = f1_local 5 v steps () in
+  assert (result = 5);
+  assert (steps = [|5; 4; 3; 2; 1|]);
+
+  (* Version of f2_manyargs using local functions *)
+  let[@inline never] f2_manyargs_local x0 v1 x2 v3 x4 v5 x6 v7 x8 v9 steps () =
+    let (start_k, end_k) = x0 in
+    let[@inline never] rec (go @ local) k =
+      if k = end_k
+      then 0
+      else begin
+        let void_contribution =
+          use_void v1 + use_void v3 + use_void v5 + use_void v7 + use_void v9 in
+        let (x2_1, x2_2) = x2 in
+        let (x4_1, x4_2) = x4 in
+        let (x6_1, x6_2) = x6 in
+        let (x8_1, x8_2) = x8 in
+        let sum = x2_1 + x2_2 + x4_1 + x4_2 + x6_1 + x6_2 + x8_1 + x8_2 in
+        let acc = go (k + 1) in
+        steps.(k) <- acc;
+        acc + sum + void_contribution
+      end
+    in
+    go start_k [@nontail]
+  in
+
+  (* Test f2_manyargs_local *)
+  let steps = Array.init 10 (fun _ -> 0) in
+  let v = void () in
+  let x0 = (2, 6) in
+  let x2 = (1, 2) in
+  let x4 = (3, 4) in
+  let x6 = (5, 6) in
+  let x8 = (7, 8) in
+  let result = f2_manyargs_local x0 v x2 v x4 v x6 v x8 v steps () in
+  assert (steps.(5) = 0);
+  assert (steps.(4) = 41);
+  assert (steps.(3) = 41 * 2);
+  assert (steps.(2) = 41 * 3);
+  assert (result = 41 * 4)
+
+let _ = test17 ()
+
 let () = print_endline "All tests passed."
