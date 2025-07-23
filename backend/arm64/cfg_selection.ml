@@ -95,10 +95,9 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
-let select_addressing chunk (expr : Cmm.expression) :
+let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
-  | arg when !Oxcaml_flags.llvm_backend -> Iindexed 0, arg
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
     when use_direct_addressing s ->
     Ibased (s.sym_name, n), Ctuple []
@@ -113,6 +112,11 @@ let select_addressing chunk (expr : Cmm.expression) :
   | Cconst_symbol (s, _) when use_direct_addressing s ->
     Ibased (s.sym_name, 0), Ctuple []
   | arg -> Iindexed 0, arg
+
+let select_addressing chunk exp : addressing_mode * Cmm.expression =
+  if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
+  else select_addressing' chunk exp
 
 let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after:_ :

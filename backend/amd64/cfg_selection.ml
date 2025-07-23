@@ -249,13 +249,11 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
-let select_addressing (_chunk : Cmm.memory_chunk) exp :
+let select_addressing' (_chunk : Cmm.memory_chunk) exp :
     addressing_mode * Cmm.expression =
   let a, d = select_addr exp in
   (* PR#4625: displacement must be a signed 32-bit immediate *)
   if not (int_is_immediate d)
-  then Iindexed 0, exp
-  else if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
   then Iindexed 0, exp
   else
     match a with
@@ -268,6 +266,11 @@ let select_addressing (_chunk : Cmm.memory_chunk) exp :
     | Aadd (e1, e2) -> Iindexed2 d, Ctuple [e1; e2]
     | Ascale (e, scale) -> Iscaled (scale, d), e
     | Ascaledadd (e1, e2, scale) -> Iindexed2scaled (scale, d), Ctuple [e1; e2]
+
+let select_addressing chunk exp : addressing_mode * Cmm.expression =
+  if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
+  else select_addressing' chunk exp
 
 let select_store ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
