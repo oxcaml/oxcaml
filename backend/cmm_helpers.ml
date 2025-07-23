@@ -228,9 +228,11 @@ let boxedintnat_local_header = local_block_header Obj.custom_tag 2
 
 let black_custom_header ~size = black_block_header Obj.custom_tag size
 
+(* No longer needed since we don't use custom blocks
 let custom_header ~size = block_header Obj.custom_tag size
 
 let custom_local_header ~size = local_block_header Obj.custom_tag size
+*)
 
 let caml_float32_ops = "caml_float32_ops"
 
@@ -1373,14 +1375,17 @@ let array_indexing ?typ log2size ptr ofs dbg =
    cross-compiling for 64-bit on a 32-bit host *)
 let int ~dbg i = natint_const_untagged dbg (Nativeint.of_int i)
 
+(* No longer needed since we don't use custom blocks
 let custom_ops_size_log2 =
   let lg = Misc.log2 Config.custom_ops_struct_size in
   assert (1 lsl lg = Config.custom_ops_struct_size);
   lg
+*)
 
-(* caml_unboxed_int32_array_ops refers to the first element of an array of two
+(* No longer needed - int32 and float32 arrays now use Double_array_tag/Abstract_tag
+   caml_unboxed_int32_array_ops refers to the first element of an array of two
    custom ops. The array index indicates the number of (invalid) tailing int32s
-   (0 or 1). *)
+   (0 or 1).
 let custom_ops_unboxed_int32_array =
   Cconst_symbol
     (Cmm.global_symbol "caml_unboxed_int32_array_ops", Debuginfo.none)
@@ -1394,9 +1399,9 @@ let custom_ops_unboxed_int32_odd_array =
         Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
       Debuginfo.none )
 
-(* caml_unboxed_float32_array_ops refers to the first element of an array of two
+   caml_unboxed_float32_array_ops refers to the first element of an array of two
    custom ops. The array index indicates the number of (invalid) tailing
-   float32s (0 or 1). *)
+   float32s (0 or 1).
 let custom_ops_unboxed_float32_array =
   Cconst_symbol
     (Cmm.global_symbol "caml_unboxed_float32_array_ops", Debuginfo.none)
@@ -1409,6 +1414,7 @@ let custom_ops_unboxed_float32_odd_array =
       [ custom_ops_unboxed_float32_array;
         Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
       Debuginfo.none )
+*)
 
 (* No longer needed - int64 and nativeint arrays now use Abstract_tag
 let custom_ops_unboxed_int64_array =
@@ -1434,6 +1440,7 @@ let custom_ops_unboxed_vec512_array =
     (Cmm.global_symbol "caml_unboxed_vec512_array_ops", Debuginfo.none)
 *)
 
+(* No longer needed - using tag-based length calculation
 let unboxed_packed_array_length arr dbg ~custom_ops_base_symbol
     ~elements_per_word =
   (* Checking custom_ops is needed to determine if the array contains an odd or
@@ -1467,15 +1474,25 @@ let unboxed_packed_array_length arr dbg ~custom_ops_base_symbol
                       (Cvar custom_ops_index_var) dbg ) ) ))
   in
   tag_int res dbg
+*)
 
-let unboxed_int32_array_length =
-  unboxed_packed_array_length
-    ~custom_ops_base_symbol:custom_ops_unboxed_int32_array ~elements_per_word:2
+let unboxed_int32_array_length arr dbg =
+  bind "arr" arr (fun arr ->
+      let size_in_words = get_size arr dbg in
+      let tag = get_tag arr dbg in
+      (* Calculate: (size_in_words * 2) - (tag & 1) *)
+      let total_slots = lsl_int size_in_words (int ~dbg 1) dbg in
+      let adjustment = Cop (Cand, [tag; int ~dbg 1], dbg) in
+      tag_int (sub_int total_slots adjustment dbg) dbg)
 
-let unboxed_float32_array_length =
-  unboxed_packed_array_length
-    ~custom_ops_base_symbol:custom_ops_unboxed_float32_array
-    ~elements_per_word:2
+let unboxed_float32_array_length arr dbg =
+  bind "arr" arr (fun arr ->
+      let size_in_words = get_size arr dbg in
+      let tag = get_tag arr dbg in
+      (* Calculate: (size_in_words * 2) - (tag & 1) *)
+      let total_slots = lsl_int size_in_words (int ~dbg 1) dbg in
+      let adjustment = Cop (Cand, [tag; int ~dbg 1], dbg) in
+      tag_int (sub_int total_slots adjustment dbg) dbg)
 
 (* No longer needed - unboxed arrays no longer use custom blocks
 let unboxed_custom_array_length ~log2_element_words arr dbg =
@@ -4836,23 +4853,19 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
 
 let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let num_elts, payload = make_unboxed_int32_array_payload dbg elements in
-  let header =
-    let size = 1 (* custom_ops field *) + List.length payload in
-    match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+  let tag = match num_elts with
+    | Even -> Obj.double_array_tag
+    | Odd -> Obj.abstract_tag
   in
-  let custom_ops =
-    (* For odd-length unboxed int32 arrays there are 32 bits spare at the end of
-       the block, which are never read. They are initialized to the sign
-       extension of the last element. *)
-    match num_elts with
-    | Even -> custom_ops_unboxed_int32_even_array
-    | Odd -> custom_ops_unboxed_int32_odd_array
+  let header =
+    let size = List.length payload in
+    match mode with
+    | Heap -> block_header tag size
+    | Local -> local_block_header tag size
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_int32_u_array),
-      Cconst_natint (header, dbg) :: custom_ops :: payload,
+      Cconst_natint (header, dbg) :: payload,
       dbg )
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
@@ -4876,22 +4889,19 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let num_elts, payload = make_unboxed_float32_array_payload dbg elements in
-  let header =
-    let size = 1 (* custom_ops field *) + List.length payload in
-    match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+  let tag = match num_elts with
+    | Even -> Obj.double_array_tag
+    | Odd -> Obj.abstract_tag
   in
-  let custom_ops =
-    (* For odd-length unboxed float32 arrays there are 32 bits spare at the end
-       of the block, which are never read. They are *not* initialized. *)
-    match num_elts with
-    | Even -> custom_ops_unboxed_float32_even_array
-    | Odd -> custom_ops_unboxed_float32_odd_array
+  let header =
+    let size = List.length payload in
+    match mode with
+    | Heap -> block_header tag size
+    | Local -> local_block_header tag size
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_float32_u_array),
-      Cconst_natint (header, dbg) :: custom_ops :: payload,
+      Cconst_natint (header, dbg) :: payload,
       dbg )
 
 let allocate_unboxed_int64_or_nativeint_array ~elements
