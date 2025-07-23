@@ -1297,10 +1297,7 @@ val unboxed_mutable_int32_unboxed_product_array_set :
     The zero-indexed element number is specified as a tagged immediate.
 *)
 val unboxed_int64_or_nativeint_array_ref :
-  expression ->
-  array_index:expression ->
-  Debuginfo.t ->
-  expression
+  expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Update an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_set :

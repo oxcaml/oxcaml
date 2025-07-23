@@ -316,11 +316,9 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | (Values | Immediates | Unboxed_product _), Immediates ->
     C.int_array_ref arr index dbg
   | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_ref arr
-      ~array_index:index dbg
+    C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
   | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_ref arr
-      ~array_index:index dbg
+    C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
   | (Values | Immediates | Unboxed_product _), Values ->
     C.addr_array_ref arr index dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
@@ -333,59 +331,41 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Unboxed_product _, Naked_int32s ->
     C.unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index:index dbg
   | (Immediates | Naked_floats), Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
   | Naked_vec128s, Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec256s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec512s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | (Immediates | Naked_floats), Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
   | Naked_vec256s, Naked_vec128s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec512s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | (Immediates | Naked_floats), Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
   | Naked_vec512s, Naked_vec128s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec256s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Values ) ->
@@ -437,11 +417,9 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | (Values | Immediates | Unboxed_product _), Values init ->
     addr_array_store init ~arr ~index ~new_value dbg
   | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_set arr ~index
-      ~new_value dbg
+    C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
   | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_set arr ~index
-      ~new_value dbg
+    C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
     C.float_array_set arr index new_value dbg
   | Naked_float32s, Naked_float32s ->
@@ -455,59 +433,59 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
     C.unboxed_mutable_int32_unboxed_product_array_set arr ~array_index:index
       ~new_value dbg
   | (Immediates | Naked_floats), Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int32s | Naked_float32s), Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
   | Naked_vec128s, Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | Naked_vec128s, Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | Naked_vec128s, Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | (Immediates | Naked_floats), Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int32s | Naked_float32s), Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
   | Naked_vec256s, Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+      new_value
   | Naked_vec256s, Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+      new_value
   | Naked_vec256s, Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+      new_value
   | (Immediates | Naked_floats), Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int32s | Naked_float32s), Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
   | Naked_vec512s, Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+      new_value
   | Naked_vec512s, Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+      new_value
   | Naked_vec512s, Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+      new_value
   | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Values _ ) ->

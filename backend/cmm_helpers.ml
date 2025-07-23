@@ -228,7 +228,6 @@ let boxedintnat_local_header = local_block_header Obj.custom_tag 2
 
 let black_custom_header ~size = black_block_header Obj.custom_tag size
 
-
 let caml_float32_ops = "caml_float32_ops"
 
 let caml_nativeint_ops = "caml_nativeint_ops"
@@ -1370,11 +1369,6 @@ let array_indexing ?typ log2size ptr ofs dbg =
    cross-compiling for 64-bit on a 32-bit host *)
 let int ~dbg i = natint_const_untagged dbg (Nativeint.of_int i)
 
-
-
-
-
-
 let unboxed_packed_array_length arr dbg =
   bind "arr" arr (fun arr ->
       let size_in_words = get_size arr dbg in
@@ -1388,10 +1382,8 @@ let unboxed_int32_array_length = unboxed_packed_array_length
 
 let unboxed_float32_array_length = unboxed_packed_array_length
 
-
 let unboxed_int64_or_nativeint_array_length arr dbg =
-  bind "arr" arr (fun arr ->
-      tag_int (get_size arr dbg) dbg)
+  bind "arr" arr (fun arr -> tag_int (get_size arr dbg) dbg)
 
 let unboxed_vector_array_length ~log2_ints_per_vec arr dbg =
   bind "arr" arr (fun arr ->
@@ -1687,8 +1679,7 @@ let unboxed_float32_array_ref =
 
 let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index ->
-          int_array_ref arr index dbg))
+      bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
 let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk
     ~elements_per_word =
@@ -1713,8 +1704,7 @@ let unboxed_float32_array_set =
     ~memory_chunk:(Single { reg = Float32 })
     ~elements_per_word:2
 
-let unboxed_int64_or_nativeint_array_set arr ~index ~new_value
-    dbg =
+let unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
@@ -4737,9 +4727,8 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
 
 let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~elements mode dbg =
   let num_elts, payload = make_payload dbg elements in
-  let tag = match num_elts with
-    | Even -> Obj.double_array_tag
-    | Odd -> Obj.abstract_tag
+  let tag =
+    match num_elts with Even -> Obj.double_array_tag | Odd -> Obj.abstract_tag
   in
   let header =
     let size = List.length payload in
@@ -4747,16 +4736,11 @@ let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~elements mode dbg =
     | Cmm.Alloc_mode.Heap -> block_header tag size
     | Cmm.Alloc_mode.Local -> local_block_header tag size
   in
-  Cop
-    ( Calloc (mode, alloc_kind),
-      Cconst_natint (header, dbg) :: payload,
-      dbg )
+  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
 
 let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_unboxed_packed_array
-    ~make_payload:make_unboxed_int32_array_payload
-    ~alloc_kind:(Alloc_block_kind_int32_u_array)
-    ~elements mode dbg
+  allocate_unboxed_packed_array ~make_payload:make_unboxed_int32_array_payload
+    ~alloc_kind:Alloc_block_kind_int32_u_array ~elements mode dbg
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   if Sys.big_endian
@@ -4778,10 +4762,8 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   aux [] unboxed_float32_list
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_unboxed_packed_array
-    ~make_payload:make_unboxed_float32_array_payload
-    ~alloc_kind:(Alloc_block_kind_float32_u_array)
-    ~elements mode dbg
+  allocate_unboxed_packed_array ~make_payload:make_unboxed_float32_array_payload
+    ~alloc_kind:Alloc_block_kind_float32_u_array ~elements mode dbg
 
 let allocate_unboxed_int64_or_nativeint_array ~elements
     (mode : Cmm.Alloc_mode.t) dbg =
@@ -4796,39 +4778,31 @@ let allocate_unboxed_int64_or_nativeint_array ~elements
       Cconst_natint (header, dbg) :: elements,
       dbg )
 
-let allocate_unboxed_int64_array =
-  allocate_unboxed_int64_or_nativeint_array
+let allocate_unboxed_int64_array = allocate_unboxed_int64_or_nativeint_array
 
-let allocate_unboxed_nativeint_array =
-  allocate_unboxed_int64_or_nativeint_array
+let allocate_unboxed_nativeint_array = allocate_unboxed_int64_or_nativeint_array
 
-let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind
-    ~elements (mode : Cmm.Alloc_mode.t) dbg =
+let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~elements
+    (mode : Cmm.Alloc_mode.t) dbg =
   let header =
     let size = ints_per_vec * List.length elements in
     match mode with
     | Heap -> block_header Obj.abstract_tag size
     | Local -> local_block_header Obj.abstract_tag size
   in
-  Cop
-    ( Calloc (mode, alloc_kind),
-      Cconst_natint (header, dbg) :: elements,
-      dbg )
+  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: elements, dbg)
 
 let allocate_unboxed_vec128_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec128
-    ~alloc_kind:Alloc_block_kind_vec128_u_array
-    ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_vec128_u_array ~elements mode dbg
 
 let allocate_unboxed_vec256_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec256
-    ~alloc_kind:Alloc_block_kind_vec256_u_array
-    ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_vec256_u_array ~elements mode dbg
 
 let allocate_unboxed_vec512_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec512
-    ~alloc_kind:Alloc_block_kind_vec512_u_array
-    ~elements mode dbg
+    ~alloc_kind:Alloc_block_kind_vec512_u_array ~elements mode dbg
 
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y
