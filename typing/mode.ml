@@ -1553,7 +1553,8 @@ end
 module Hint = struct
   type const =
     | None
-    | Lazy_expression
+    | Result_of_lazy
+    | Lazy_closure
     | Class
     | Tailcall_function
     | Tailcall_argument
@@ -1605,8 +1606,6 @@ module Hint = struct
     | Adj_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
-    | Result_of : closure_context -> ('l * 'r) morph
-    | Returns : closure_context -> ('l * 'r) morph
     | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
@@ -1623,8 +1622,6 @@ module Hint = struct
     | Adj_partial_application -> true
     | Crossing_left -> false
     | Crossing_right -> false
-    | Result_of _ -> true
-    | Returns _ -> true
     | Compose (x, y) -> is_rigid x || is_rigid y
 
   let morph_none = None
@@ -1639,8 +1636,6 @@ module Hint = struct
     | Is_closed_by x -> Close_over x
     | Partial_application -> Adj_partial_application
     | Crossing_right -> Crossing_left
-    | Result_of x -> Returns x
-    | Returns x -> Result_of x
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
 
   let rec right_adjoint :
@@ -1651,32 +1646,9 @@ module Hint = struct
     | Close_over x -> Is_closed_by x
     | Adj_partial_application -> Partial_application
     | Crossing_left -> Crossing_right
-    | Result_of x -> Returns x
-    | Returns x -> Result_of x
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
-  let rec maybe_compose :
-      type l r. (l * r) morph -> (l * r) morph -> (l * r) morph option =
-   fun x y ->
-    match x, y with
-    | Skip, y -> Some y
-    | x, Skip -> Some x
-    | Result_of _, Returns _ | Returns _, Result_of _ -> Some Skip
-    | Compose (x0, x1), y -> (
-      match maybe_compose x1 y with
-      | Some z -> Some (compose x0 z)
-      (* the check needed to prevent infinite loop *)
-      | Option.None -> None)
-    | x, Compose (y0, y1) -> (
-      match maybe_compose x y0 with
-      | Some z -> Some (compose z y1)
-      | Option.None -> None)
-    | _, _ -> None
-   [@@ocaml.warning "-4"]
-
-  and compose : type l r. (l * r) morph -> (l * r) morph -> (l * r) morph =
-   fun x y ->
-    match maybe_compose x y with Some z -> z | Option.None -> Compose (x, y)
+  let compose x y = Compose (x, y)
 
   module Allow_disallow = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
@@ -1690,8 +1662,6 @@ module Hint = struct
        | Close_over x -> Close_over x
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
-       | Result_of x -> Result_of x
-       | Returns x -> Returns x
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
@@ -1703,8 +1673,6 @@ module Hint = struct
        | Is_closed_by x -> Is_closed_by x
        | Partial_application -> Partial_application
        | Crossing_right -> Crossing_right
-       | Result_of x -> Result_of x
-       | Returns x -> Returns x
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
@@ -1719,8 +1687,6 @@ module Hint = struct
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
-       | Result_of x -> Result_of x
-       | Returns x -> Returns x
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
@@ -1735,8 +1701,6 @@ module Hint = struct
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
-       | Result_of x -> Result_of x
-       | Returns x -> Returns x
        | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
   end)
 end
@@ -1791,7 +1755,10 @@ let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   let wrap_print_hint t = fprintf ppf " because %t" t in
   function
   | None -> NothingPrinted
-  | Lazy_expression ->
+  | Result_of_lazy ->
+    wrap_print_hint (dprintf "it is the result of a lazy expression");
+    HintPrinted
+  | Lazy_closure ->
     wrap_print_hint (dprintf "lazy expressions are always %a" (C.print a_obj) a);
     HintPrinted
   | Class ->
@@ -1858,11 +1825,6 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
       PrintThenContinue (dprintf "crosses with something")
     | Adj_partial_application ->
       PrintThenContinue (dprintf "has a partial application capturing a value")
-    | Result_of closure_context ->
-      PrintThenContinue
-        (dprintf "is the result of a %a" Hint.print_closure_context
-           closure_context)
-    | Returns _closure_context -> PrintThenContinue (dprintf "returns a value")
     | Compose (hint1, hint2) -> (
       match print_morph_hint hint1 with
       | Skip -> print_morph_hint hint2

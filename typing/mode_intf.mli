@@ -192,7 +192,8 @@ module type S = sig
   module Hint : sig
     type const =
       | None
-      | Lazy_expression
+      | Result_of_lazy
+      | Lazy_closure
       | Class
       | Tailcall_function
       | Tailcall_argument
@@ -239,8 +240,6 @@ module type S = sig
       | Adj_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph
       | Crossing_right : (disallowed * 'r) morph
-      | Result_of : closure_context -> ('l * 'r) morph
-      | Returns : closure_context -> ('l * 'r) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]

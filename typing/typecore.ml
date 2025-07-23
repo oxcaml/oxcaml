@@ -542,11 +542,12 @@ let mode_strictly_local expected_mode =
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
 
-let mode_lazy expected_mode =
-  let expected_mode =
+let mode_lazy expected_mode_in =
+  let base_mode_const = Value.{ Const.max with areality = Regionality.Const.Global; yielding = Yielding.Const.Unyielding } in
+  let expected_mode_out =
     mode_coerce
-      (Value.of_const ~hint:Lazy_expression { Value.Const.max with areality = Global; yielding = Unyielding })
-      expected_mode
+      (Value.of_const ~hint:Result_of_lazy base_mode_const)
+      expected_mode_in
   in
   let mode_crossing =
     Crossing.of_bounds {
@@ -562,9 +563,12 @@ let mode_lazy expected_mode =
       monadic = Alloc.Monadic.Const.min }
   in
   let closure_mode =
-    expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
+    mode_coerce
+      (Value.of_const ~hint:Lazy_closure base_mode_const)
+      expected_mode_in
+    |> as_single_mode |> Crossing.apply_right mode_crossing
   in
-  expected_mode, closure_mode
+  expected_mode_out, closure_mode
 
 let mode_partial_application expected_mode =
   mode_morph (fun mode -> alloc_as_value
