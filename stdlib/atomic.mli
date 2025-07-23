@@ -108,7 +108,6 @@ module Contended : sig
   external get
     : ('a : value_or_null mod portable).
     'a t @ contended local -> 'a @ contended
-    @@ portable
     = "%atomic_load"
 
   (** Like {!set}, but can be called on an atomic that came from another domain. *)
