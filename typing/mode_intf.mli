@@ -699,7 +699,12 @@ module type S = sig
       ('l0 * 'r0) t ->
       ('l0 * 'r0) t
 
-    val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val join_with :
+      ?hint:('l * 'r) Hint.morph ->
+      'a Monadic.Axis.t ->
+      'a ->
+      ('l * 'r) t ->
+      ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 

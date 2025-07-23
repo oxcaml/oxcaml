@@ -3302,8 +3302,8 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.min |> Monadic.disallow_right |> Monadic.allow_left in
     { comonadic; monadic }
 
-  let join_with ax c { monadic; comonadic } =
-    let monadic = Monadic.join_with ax c monadic in
+  let join_with ?hint ax c { monadic; comonadic } =
+    let monadic = Monadic.join_with ?hint ax c monadic in
     { monadic; comonadic }
 
   let meet_with ?hint ax c { monadic; comonadic } =
