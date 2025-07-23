@@ -1410,6 +1410,7 @@ let custom_ops_unboxed_float32_odd_array =
         Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
       Debuginfo.none )
 
+(* No longer needed - int64 and nativeint arrays now use Abstract_tag
 let custom_ops_unboxed_int64_array =
   Cconst_symbol
     (Cmm.global_symbol "caml_unboxed_int64_array_ops", Debuginfo.none)
@@ -1417,6 +1418,7 @@ let custom_ops_unboxed_int64_array =
 let custom_ops_unboxed_nativeint_array =
   Cconst_symbol
     (Cmm.global_symbol "caml_unboxed_nativeint_array_ops", Debuginfo.none)
+*)
 
 let custom_ops_unboxed_vec128_array =
   Cconst_symbol
@@ -1484,7 +1486,8 @@ let unboxed_custom_array_length ~log2_element_words arr dbg =
   else tag_int (lsr_int res (int ~dbg log2_element_words) dbg) dbg
 
 let unboxed_int64_or_nativeint_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:0 arr dbg
+  bind "arr" arr (fun arr ->
+      tag_int (get_size arr dbg) dbg)
 
 let unboxed_vec128_array_length arr dbg =
   unboxed_custom_array_length ~log2_element_words:1 arr dbg
@@ -4884,24 +4887,24 @@ let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
       Cconst_natint (header, dbg) :: custom_ops :: payload,
       dbg )
 
-let allocate_unboxed_int64_or_nativeint_array custom_ops ~elements
+let allocate_unboxed_int64_or_nativeint_array ~elements
     (mode : Cmm.Alloc_mode.t) dbg =
   let header =
-    let size = 1 (* custom_ops field *) + List.length elements in
+    let size = List.length elements in
     match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+    | Heap -> block_header Obj.abstract_tag size
+    | Local -> local_block_header Obj.abstract_tag size
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_int64_u_array),
-      Cconst_natint (header, dbg) :: custom_ops :: elements,
+      Cconst_natint (header, dbg) :: elements,
       dbg )
 
 let allocate_unboxed_int64_array =
-  allocate_unboxed_int64_or_nativeint_array custom_ops_unboxed_int64_array
+  allocate_unboxed_int64_or_nativeint_array
 
 let allocate_unboxed_nativeint_array =
-  allocate_unboxed_int64_or_nativeint_array custom_ops_unboxed_nativeint_array
+  allocate_unboxed_int64_or_nativeint_array
 
 let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~custom_ops
     ~elements (mode : Cmm.Alloc_mode.t) dbg =
