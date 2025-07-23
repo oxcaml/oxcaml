@@ -101,6 +101,11 @@ let simplify_ternary_primitive dacc original_prim (prim : P.ternary_primitive)
       simplify_atomic_field_int_arith op ~original_prim
     | Atomic_set_field _ -> simplify_atomic_set_field ~original_prim
     | Atomic_exchange_field _ -> simplify_atomic_exchange_field ~original_prim
+    | Write_offset _ ->
+      (* Just use the default simplification for now *)
+      fun dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_
+          ~arg3_ty:_ ~result_var:_ ->
+       Simplify_primitive_result.create original_term ~try_reify:false dacc
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3
     ~arg3_ty ~result_var
