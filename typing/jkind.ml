@@ -2514,7 +2514,7 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     }
     ~annotation:None ~why:Abbreviation
 
-let for_boxed_variant cstrs =
+let for_boxed_variant ~loc cstrs =
   let open Types in
   let has_gadt_constructor =
     List.exists
@@ -2546,7 +2546,20 @@ let for_boxed_variant cstrs =
           cstrs
       in
       if all_args_void
-      then Builtin.immediate ~why:Enumeration
+      then (
+        let has_args =
+          List.exists
+            (fun cstr ->
+              match cstr.cd_args with
+              | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
+              | Cstr_tuple [] | Cstr_record [] -> false)
+            cstrs
+        in
+        if has_args && Language_extension.erasable_extensions_only ()
+        then
+          Location.prerr_warning loc
+            (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
+        Builtin.immediate ~why:Enumeration)
       else
         let is_mutable =
           List.exists

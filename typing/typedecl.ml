@@ -1925,7 +1925,7 @@ let rec update_decl_jkind env dpath decl =
   in
 
   (* returns updated constructors, updated rep, and updated jkind *)
-  let update_variant_kind cstrs rep =
+  let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
@@ -1983,7 +1983,7 @@ let rec update_decl_jkind env dpath decl =
           (idx+1,cstr::cstrs)
         ) (0,[]) cstrs
       in
-      let jkind = Jkind.for_boxed_variant cstrs in
+      let jkind = Jkind.for_boxed_variant ~loc cstrs in
       List.rev cstrs, rep, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
@@ -2044,9 +2044,11 @@ let rec update_decl_jkind env dpath decl =
       Builtin_attributes.has_or_null_reexport decl.type_attributes ->
       decl
     | Type_variant (cstrs, rep, umc) ->
-      let cstrs, rep, type_jkind = update_variant_kind cstrs rep in
-      (* See Note [Quality of jkinds during inference] for more information about when we
-         mark jkinds as best *)
+      let cstrs, rep, type_jkind =
+        update_variant_kind decl.type_loc cstrs rep
+      in
+      (* See Note [Quality of jkinds during inference] for more information
+         about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
       { decl with type_kind = Type_variant (cstrs, rep, umc); type_jkind }
   in
