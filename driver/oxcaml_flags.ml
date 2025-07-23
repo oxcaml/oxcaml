@@ -124,7 +124,7 @@ let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
   | Set O2 -> o2
   | Set O3 -> o3
 
-let llvm_backend = ref false (* -llvm-backend *)
+  (* -llvm-backend is at [Clflags.llvm_backend] *)
 
 let dump_llvmir = ref false (* -dllvmir *)
 

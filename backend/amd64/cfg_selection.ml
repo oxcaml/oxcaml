@@ -255,7 +255,7 @@ let select_addressing (_chunk : Cmm.memory_chunk) exp :
   (* PR#4625: displacement must be a signed 32-bit immediate *)
   if not (int_is_immediate d)
   then Iindexed 0, exp
-  else if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  else if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
   then Iindexed 0, exp
   else
     match a with
@@ -336,7 +336,7 @@ let select_operation'
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Use_default
   else
     match op with
@@ -443,7 +443,7 @@ let select_operation
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after :
     Cfg_selectgen_target_intf.select_operation_result =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Use_default
   else select_operation' ~generic_select_condition op args dbg ~label_after
 

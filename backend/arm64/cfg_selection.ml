@@ -98,7 +98,7 @@ let effects_of (expr : Cmm.expression) :
 let select_addressing chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
-  | arg when !Oxcaml_flags.llvm_backend -> Iindexed 0, arg
+  | arg when !Clflags.llvm_backend -> Iindexed 0, arg
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
     when use_direct_addressing s ->
     Ibased (s.sym_name, n), Ctuple []
@@ -218,7 +218,7 @@ let select_operation
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after :
     Cfg_selectgen_target_intf.select_operation_result =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Use_default
   else select_operation' ~generic_select_condition op args dbg ~label_after
 
