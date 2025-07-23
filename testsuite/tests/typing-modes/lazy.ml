@@ -114,7 +114,7 @@ Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
 Error: This value is "contended"
-       but expected to be "uncontended" because it forces a lazy expression.
+       but expected to be "uncontended" because it is a lazy expression that is forced.
 |}]
 
 (* stdlib's [Lazy.force] is a special case of lazy pattern *)

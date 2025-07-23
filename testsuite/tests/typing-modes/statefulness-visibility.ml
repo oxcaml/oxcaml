@@ -396,7 +396,7 @@ Line 4, characters 24-27:
                             ^^^
 Error: This value is "stateful"
        because it closes over a value (at Line 3, characters 28-29)
-       which is of some unknown mode.
+       which is of some mode.
        However, it is expected to be "stateless".
 |}]
 
@@ -484,7 +484,7 @@ Line 4, characters 22-25:
                           ^^^
 Error: This value is "observing"
        because it closes over a value (at Line 3, characters 26-27)
-       which is of some unknown mode.
+       which is of some mode.
        However, it is expected to be "stateless".
 |}]
 
@@ -744,7 +744,7 @@ Line 3, characters 4-13:
 3 |   | lazy (-1) -> ()
         ^^^^^^^^^
 Error: This value is "contended"
-       but expected to be "uncontended" because it forces a lazy expression.
+       but expected to be "uncontended" because it is a lazy expression that is forced.
 |}]
 
 (* But [immutable] lazy values can be, by design. *)
