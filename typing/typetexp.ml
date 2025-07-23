@@ -671,23 +671,22 @@ let transl_label (label : Parsetree.arg_label)
       -> raise (Error (arg.ptyp_loc, Env.empty, Invalid_label_for_call_pos label))
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
-  | Generic_optional (mod_ident, l), _ -> (
+  | Generic_optional (path, l), _ -> (
     match Language_extension.is_enabled Generic_optional_arguments with
     | false ->
       raise
-        (Error (mod_ident.loc,
+        (Error (path.loc,
                 Env.empty,
                 Unsupported_extension Generic_optional_arguments));
     | true ->
-      match mod_ident with
-      | { txt = Longident.Ldot (Longident.Lident "Stdlib", "Option")
-        ; _ } -> Optional l
-      | { loc ; txt } ->  (
-        raise
-          (Error (loc,
-                  Env.empty,
-                  Invalid_generic_optional_argument_module_path txt))
-      )
+        (* CR generic-optional: allow more module names / use path lookup *)
+        if path.txt = Longident.Ldot (Lident "Stdlib", "Option") ||
+          path.txt = Longident.Ldot (Lident "Stdlib", "Or_null")
+        then
+          Generic_optional(path, l)
+        else
+          raise (Error (path.loc, Env.empty,
+            Invalid_generic_optional_argument_module_path path.txt))
   )
   | Nolabel, _ -> Nolabel
 
@@ -794,8 +793,13 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
+              let path = match Btype.classify_optionality l with
+                | Optional_arg mpath ->
+                    Ctype.predef_path_of_optional_module_path mpath
+                | Required_or_position_arg -> assert false
+              in
               newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+                (newconstr path [Btype.tpoly_get_mono arg_ty])
             end
           in
           let arg_mode = Alloc.of_const arg_mode in

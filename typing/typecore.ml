@@ -886,21 +886,25 @@ let constant_or_raise env loc cst =
 
 (* Specific version of type_option, using newty rather than newgenty *)
 
-let type_option ty =
-  newty (Tconstr(Predef.path_option,[ty], ref Mnil))
+let type_option mpath ty =
+  newty (Tconstr(predef_path_of_optional_module_path mpath,[ty], ref Mnil))
 
 let mkexp exp_desc exp_type exp_loc exp_env =
   { exp_desc; exp_type;
     exp_loc; exp_env; exp_extra = []; exp_attributes = [] }
 
-let type_option_none env ty loc =
+let type_option_none env mpath ty loc =
   let lid = Longident.Lident "None" in
-  let cnone = Env.find_ident_constructor Predef.ident_none env in
+  let cnone = match mpath with
+    | Stdlib_option -> Env.find_ident_constructor Predef.ident_none env
+    | Stdlib_or_null -> Env.find_ident_constructor Predef.ident_null env
+  in
   mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
 
-let extract_option_type env ty =
+let extract_option_type env mpath ty =
   match get_desc (expand_head env ty) with
-    Tconstr(path, [ty], _) when Path.same path Predef.path_option -> ty
+  | Tconstr(path, [ty], _) when
+      Path.same path (predef_path_of_optional_module_path mpath) -> ty
   | _ -> assert false
 
 let protect_expansion env ty =
@@ -3285,10 +3289,12 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
         finalize_variants pat;
       end;
       List.iter (fun f -> f()) tps.tps_pattern_force;
-      (* CR layouts v5: value restriction here to be relaxed *)
-      if is_optional l then
-        unify_pat val_env pat
-          (type_option (newvar Predef.option_argument_jkind));
+      (match classify_optionality l with
+      | Optional_arg mpath ->
+          unify_pat val_env pat
+            (type_option mpath
+              (newvar (predef_jkind_of_optional_module_path mpath)))
+      | Required_or_position_arg -> ());
       tps.tps_pattern_variables, pat
     end
       ~post:(fun (pvs, _) -> iter_pattern_variables_type generalize_structure
@@ -4157,7 +4163,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
             match sargs with
             | [] -> assert false
             | (l', sarg) :: remaining_sargs ->
-                if name = label_name l' || (not omittable && l' = Nolabel) then
+                if arg_label_compatible l l' || (not omittable && l' = Nolabel)
+                then
                   (remaining_sargs, use_arg ~commuted:false sarg l')
                 else if
                   omittable &&
@@ -4173,7 +4180,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
           end else
             (* Arguments can be commuted, try to fetch the argument
                corresponding to the first parameter. *)
-            match extract_label name sargs with
+            match extract_label l sargs with
             | Some (l', sarg, commuted, remaining_sargs) ->
                 if commuted then begin
                   may_warn sarg.pexp_loc
@@ -4495,10 +4502,14 @@ let approx_type_default () = newvar (Jkind.Builtin.any ~why:Dummy_jkind)
 let rec approx_type env sty =
   match sty.ptyp_desc with
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
+    begin
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
-      if is_optional p then newvar Predef.option_argument_jkind
-      else begin
+      match classify_optionality p with
+      | Optional_arg mpath ->
+          newvar (predef_jkind_of_optional_module_path mpath)
+      | Required_or_position_arg ->
+      begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
           (* Polymorphic types will only unify with types that match all of their
@@ -4511,13 +4522,17 @@ let rec approx_type env sty =
         let mret = Alloc.newvar () in
         newty (Tarrow ((p,marg,mret), arg_ty.ctyp_type, ret, commu_ok))
       end
+    end
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
       let arg_mode = Typemode.transl_alloc_mode arg_mode in
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
-        if is_optional p
-        then type_option (newvar Predef.option_argument_jkind)
-        else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
+        match classify_optionality p with
+        | Optional_arg mpath ->
+            type_option mpath
+              (newvar (predef_jkind_of_optional_module_path mpath))
+        | Required_or_position_arg ->
+            newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
       let marg = Alloc.of_const arg_mode in
@@ -7466,12 +7481,12 @@ and type_function
         match default_arg with
         | None -> ty_arg_mono, None
         | Some default ->
-            let arg_label =
-              match arg_label with
-              | Optional arg_label -> arg_label
-              (* CR generic-optional : CHECK THIS *)
-              | Generic_optional (_, arg_label) -> arg_label
-              | Nolabel | Labelled _ ->
+            let arg_label, mpath =
+              match arg_label, classify_optionality_parsetree arg_label with
+              | (Optional arg_label | Generic_optional (_, arg_label)),
+                 Optional_arg mpath -> arg_label, mpath
+              | (Optional _ | Generic_optional _), Required_or_position_arg
+              | (Labelled _ | Nolabel), _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
             let default_arg_jkind, default_arg_sort =
@@ -7479,7 +7494,7 @@ and type_function
             in
             let ty_default_arg = newvar default_arg_jkind in
             begin
-              try unify env (type_option ty_default_arg) ty_arg_mono
+              try unify env (type_option mpath ty_default_arg) ty_arg_mono
               with Unify _ -> assert false;
             end;
             (* Issue#12668: Retain type-directed disambiguation of
@@ -8001,15 +8016,19 @@ and type_format loc str env =
   with Failure msg ->
     raise (Error (loc, env, Invalid_format msg))
 
-and type_option_some env expected_mode sarg ty ty0 =
-  let ty' = extract_option_type env ty in
-  let ty0' = extract_option_type env ty0 in
+and type_option_some env mpath expected_mode sarg ty ty0 =
+  let ty' = extract_option_type env mpath ty in
+  let ty0' = extract_option_type env mpath ty0 in
   let alloc_mode, argument_mode = register_allocation expected_mode in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
-  let lid = Longident.Lident "Some" in
-  let csome = Env.find_ident_constructor Predef.ident_some env in
+  let lid, csome = match mpath with
+    | Stdlib_option -> (Longident.Lident "Some",
+      Env.find_ident_constructor Predef.ident_some env)
+    | Stdlib_or_null -> (Longident.Lident "This",
+      Env.find_ident_constructor Predef.ident_this env)
+  in
   mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
-    (type_option arg.exp_type) arg.exp_loc arg.exp_env
+    (type_option mpath arg.exp_type) arg.exp_loc arg.exp_env
 
 (* [expected_mode] is the expected mode of the field. It's already adjusted for
    allocation, mutation and modalities. *)
@@ -8182,8 +8201,11 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
+            let mpath = (match classify_optionality l with
+              | Optional_arg mpath -> mpath
+              | Required_or_position_arg -> assert false) in
             let ty =
-              type_option_none env (instance (tpoly_get_mono ty_arg))
+              type_option_none env mpath (instance (tpoly_get_mono ty_arg))
                 sarg.pexp_loc
             in
             (* CR layouts v5: change value assumption below when we allow
@@ -8337,14 +8359,14 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       in
       (match lbl with
        | Labelled _ | Nolabel -> ()
-       | Optional _ ->
+       | Optional _ | Generic_optional _ ->
            (* CR layouts v5: relax value requirement *)
-           unify_exp env arg
-             (type_option(newvar Predef.option_argument_jkind))
-       | Generic_optional _ ->
-           (* CR generic-optional: need to not use Predef.option *)
-           unify_exp env arg
-             (type_option(newvar Predef.option_argument_jkind))
+          (match classify_optionality lbl with
+          | Optional_arg mpath ->
+              unify_exp env arg
+                (type_option mpath
+                  (newvar (predef_jkind_of_optional_module_path mpath)))
+          | Required_or_position_arg -> assert false)
        | Position _ ->
            unify_exp env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg))
@@ -8357,7 +8379,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
           if wrapped_in_some then begin
-            type_option_some env expected_mode sarg ty_arg' ty_arg0'
+            (match classify_optionality lbl with
+            | Optional_arg mpath ->
+                type_option_some env mpath expected_mode sarg ty_arg' ty_arg0'
+            | Required_or_position_arg -> assert false)
           end else begin
             type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
           end
@@ -8405,18 +8430,18 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       in
       (lbl, Arg (arg, mode_arg, sort_arg))
   | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
-      (match expected_label with
-      | Optional _ ->
-          let arg = type_option_none env (instance ty_arg) Location.none in
+      (match expected_label, classify_optionality expected_label with
+      | (Optional _| Generic_optional _), Optional_arg mpath ->
+          let arg = type_option_none env mpath
+                      (instance ty_arg) Location.none
+          in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
-      | Generic_optional _ ->
-           (* CR generic-optional: need to not use Predef.option *)
-          let arg = type_option_none env (instance ty_arg) Location.none in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
-      | Position _ ->
+      | Position _, Required_or_position_arg ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
-      | Labelled _ | Nolabel -> assert false)
+      | (Optional _| Generic_optional _), Required_or_position_arg
+      | (Position _ | Labelled _ | Nolabel), _
+          -> assert false)
   | Omitted _ as arg -> (lbl, arg)
 
 and type_application env app_loc expected_mode position_and_mode
@@ -10712,7 +10737,7 @@ let report_error ~loc env =
         | Nolabel -> fprintf ppf "without label"
         |(Labelled _ | Optional _ | Generic_optional _) as l ->
             fprintf ppf "with label %a"
-              Style.inline_code (prefixed_label_name l)
+              (Style.as_inline_code prefixed_label_name) l
         | Position _ -> assert false
           (* Since Position labels never occur in function applications,
              this case is never run *)
@@ -10875,9 +10900,10 @@ let report_error ~loc env =
         | Position l -> Style.inline_code ppf (sprintf "~(%s:[%%call_pos])" l)
         | (Labelled _ | Optional _ | Generic_optional _) as l ->
             if long then
-              fprintf ppf "labeled %a" Style.inline_code (prefixed_label_name l)
+              fprintf ppf "labeled %a"
+                (Style.as_inline_code prefixed_label_name) l
             else
-              Style.inline_code ppf (prefixed_label_name l)
+              fprintf ppf "%a" (Style.as_inline_code prefixed_label_name) l
       in
       let second_long = match got, expected with
         | Nolabel, _ | _, Nolabel -> true
@@ -11382,6 +11408,6 @@ let type_argument env e t1 t2 =
   let exp = type_argument ~overwrite:No_overwrite env mode_legacy e t1 t2 in
   maybe_check_uniqueness_exp exp; exp
 
-let type_option_some env e t1 t2 =
-  let exp = type_option_some env mode_legacy e t1 t2 in
+let type_option_some env lbl e t1 t2 =
+  let exp = type_option_some env lbl mode_legacy e t1 t2 in
   maybe_check_uniqueness_exp exp; exp
