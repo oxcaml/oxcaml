@@ -430,10 +430,10 @@ module Int8 = struct
 
   let to_int8x32 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 b0 b1 b2
       b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 =
-    let i0 = pack8 a0 a1 a2 a3 a4 a5 a6 a7 in
-    let i1 = pack8 a8 a9 a10 a11 a12 a13 a14 a15 in
-    let i2 = pack8 b0 b1 b2 b3 b4 b5 b6 b7 in
-    let i3 = pack8 b8 b9 b10 b11 b12 b13 b14 b15 in
+    let i0 = to_int64 a0 a1 a2 a3 a4 a5 a6 a7 in
+    let i1 = to_int64 a8 a9 a10 a11 a12 a13 a14 a15 in
+    let i2 = to_int64 b0 b1 b2 b3 b4 b5 b6 b7 in
+    let i3 = to_int64 b8 b9 b10 b11 b12 b13 b14 b15 in
     int8x32_of_int64s i0 i1 i2 i3
 end
 
@@ -441,10 +441,10 @@ module Int16 = struct
   include Int16
 
   let to_int16x16 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 =
-    let i0 = pack4 a0 a1 a2 a3 in
-    let i1 = pack4 a4 a5 a6 a7 in
-    let i2 = pack4 a8 a9 a10 a11 in
-    let i3 = pack4 a12 a13 a14 a15 in
+    let i0 = to_int64 a0 a1 a2 a3 in
+    let i1 = to_int64 a4 a5 a6 a7 in
+    let i2 = to_int64 a8 a9 a10 a11 in
+    let i3 = to_int64 a12 a13 a14 a15 in
     int16x16_of_int64s i0 i1 i2 i3
 end
 

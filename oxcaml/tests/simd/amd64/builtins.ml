@@ -196,6 +196,14 @@ module Int64x2 = struct
     (int[@untagged]) -> (t[@unboxed]) -> (int64[@unboxed]) -> (t[@unboxed])
     = "caml_vec128_unreachable" "caml_sse41_int64x2_insert"
     [@@noalloc] [@@builtin]
+
+  external sllv : t -> t -> t
+    = "caml_vec128_unreachable" "caml_avx2_int64x2_sllv"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external srlv : t -> t -> t
+    = "caml_vec128_unreachable" "caml_avx2_int64x2_srlv"
+    [@@noalloc] [@@unboxed] [@@builtin]
 end
 
 module Int32x4 = struct
@@ -283,6 +291,26 @@ module Int32x4 = struct
     = "caml_vec128_unreachable" "caml_sse2_cvt_int32x4_int16x8_saturating_unsigned"
     [@@noalloc] [@@unboxed] [@@builtin]
 
+  external cvtsx_int64x4 : t -> int64x4
+    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int32x4_int64x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtzx_int64x4 : t -> int64x4
+    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int32x4_int64x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external sllv : t -> t -> t
+    = "caml_vec128_unreachable" "caml_avx2_int32x4_sllv"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external srav : t -> t -> t
+    = "caml_vec128_unreachable" "caml_avx2_int32x4_srav"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external srlv : t -> t -> t
+    = "caml_vec128_unreachable" "caml_avx2_int32x4_srlv"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
   external mul_low : t -> t -> t
     = "caml_vec128_unreachable" "caml_sse41_int32x4_mul_low"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -366,6 +394,22 @@ module Int16x8 = struct
 
   external cvtzx_i64 : t -> int64x2
     = "caml_vec128_unreachable" "caml_sse41_cvtzx_int16x8_int64x2"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtsx_int32x8 : t -> int32x8
+    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int16x8_int32x8"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtsx_int64x4 : t -> int64x4
+    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int16x8_int64x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtzx_int32x8 : t -> int32x8
+    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int16x8_int32x8"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtzx_int64x4 : t -> int64x4
+    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int16x8_int64x4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external abs : t -> t = "caml_vec128_unreachable" "caml_ssse3_int16x8_abs"
@@ -489,6 +533,30 @@ module Int8x16 = struct
 
   external cvtzx_i64 : t -> int64x2
     = "caml_vec128_unreachable" "caml_sse41_cvtzx_int8x16_int64x2"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtsx_int16x16 : t -> int16x16
+    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int8x16_int16x16"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtsx_int32x8 : t -> int32x8
+    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int8x16_int32x8"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtsx_int64x4 : t -> int64x4
+    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int8x16_int64x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtzx_int16x16 : t -> int16x16
+    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int8x16_int16x16"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtzx_int32x8 : t -> int32x8
+    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int8x16_int32x8"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvtzx_int64x4 : t -> int64x4
+    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int8x16_int64x4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external abs : t -> t = "caml_vec128_unreachable" "caml_ssse3_int8x16_abs"
@@ -630,6 +698,22 @@ module Sse_other_builtins = struct
      intrinsics that don't have an equivalent arm64 neon intrinsic. They can be
      implemented using a very short sequence of arm64 instructons in a separate
      library [ocaml_simd_neon], but we may need to add compiler intrinsics. *)
+
+  external testz :
+    (int64x2[@unboxed]) -> (int64x2[@unboxed]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_sse41_vec128_testz"
+    [@@noalloc] [@@builtin]
+
+  external testc :
+    (int64x2[@unboxed]) -> (int64x2[@unboxed]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_sse41_vec128_testc"
+    [@@noalloc] [@@builtin]
+
+  external testnzc :
+    (int64x2[@unboxed]) -> (int64x2[@unboxed]) -> (int[@untagged])
+    = "caml_vec128_unreachable" "caml_sse41_vec128_testnzc"
+    [@@noalloc] [@@builtin]
+
   module Float32x4 = struct
     type t = float32x4
 
@@ -930,6 +1014,21 @@ module Sse_other_builtins = struct
 end
 
 module AVX = struct
+  external testz :
+    (int64x4[@unboxed]) -> (int64x4[@unboxed]) -> (int[@untagged])
+    = "caml_vec256_unreachable" "caml_avx_vec256_testz"
+    [@@noalloc] [@@builtin]
+
+  external testc :
+    (int64x4[@unboxed]) -> (int64x4[@unboxed]) -> (int[@untagged])
+    = "caml_vec256_unreachable" "caml_avx_vec256_testc"
+    [@@noalloc] [@@builtin]
+
+  external testnzc :
+    (int64x4[@unboxed]) -> (int64x4[@unboxed]) -> (int[@untagged])
+    = "caml_vec256_unreachable" "caml_avx_vec256_testnzc"
+    [@@noalloc] [@@builtin]
+
   external bitwise_and : int64x4 -> int64x4 -> int64x4
     = "caml_vec256_unreachable" "caml_avx_vec256_and"
     [@@noalloc] [@@unboxed] [@@builtin]
@@ -1389,30 +1488,6 @@ module Int8x32 = struct
     = "caml_vec256_unreachable" "caml_avx2_int8x32_cmpgt"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external cvtsx_int16x16 : int8x16 -> int16x16
-    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int8x16_int16x16"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtsx_int32x8 : int8x16 -> int32x8
-    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int8x16_int32x8"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtsx_int64x4 : int8x16 -> int64x4
-    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int8x16_int64x4"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtzx_int16x16 : int8x16 -> int16x16
-    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int8x16_int16x16"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtzx_int32x8 : int8x16 -> int32x8
-    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int8x16_int32x8"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtzx_int64x4 : int8x16 -> int64x4
-    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int8x16_int64x4"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
   external abs : t -> t = "caml_vec256_unreachable" "caml_avx2_int8x32_abs"
     [@@noalloc] [@@unboxed] [@@builtin]
 
@@ -1427,6 +1502,11 @@ module Int8x32 = struct
   external sad_unsigned : t -> t -> int64x4
     = "caml_vec256_unreachable" "caml_avx2_int8x32_sad_unsigned"
     [@@noalloc] [@@unboxed] [@@builtin]
+
+  external multi_sad_unsigned :
+    (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed]) -> (int16x16[@unboxed])
+    = "caml_vec256_unreachable" "caml_avx2_int8x16x2_multi_sad_unsigned"
+    [@@noalloc] [@@builtin]
 
   external mulsign : t -> t -> t
     = "caml_vec256_unreachable" "caml_avx2_int8x32_mulsign"
@@ -1469,22 +1549,6 @@ module Int16x16 = struct
 
   external cvt_int8x32_saturating_unsigned : t -> t -> int8x32
     = "caml_vec256_unreachable" "caml_avx2_cvt_int16x16_int8x32_saturating_unsigned"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtsx_int32x8 : int16x8 -> int32x8
-    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int16x8_int32x8"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtsx_int64x4 : int16x8 -> int64x4
-    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int16x8_int64x4"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtzx_int32x8 : int16x8 -> int32x8
-    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int16x8_int32x8"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtzx_int64x4 : int16x8 -> int64x4
-    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int16x8_int64x4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external hadd : t -> t -> t
@@ -1533,6 +1597,10 @@ module Int16x16 = struct
 
   external mul_low : t -> t -> t
     = "caml_vec256_unreachable" "caml_avx2_int16x16_mul_low"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external mul_round : t -> t -> t
+    = "caml_vec256_unreachable" "caml_avx2_int16x16_mul_round"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external mulsign : t -> t -> t
@@ -1658,32 +1726,12 @@ module Int32x8 = struct
     = "caml_vec256_unreachable" "caml_avx2_int32x8_srlv"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external sllv_128 : int32x4 -> int32x4 -> int32x4
-    = "caml_vec128_unreachable" "caml_avx2_int32x4_sllv"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external srav_128 : int32x4 -> int32x4 -> int32x4
-    = "caml_vec128_unreachable" "caml_avx2_int32x4_srav"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external srlv_128 : int32x4 -> int32x4 -> int32x4
-    = "caml_vec128_unreachable" "caml_avx2_int32x4_srlv"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
   external hadd : t -> t -> t
     = "caml_vec256_unreachable" "caml_avx2_int32x4x2_hadd"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external hsub : t -> t -> t
     = "caml_vec256_unreachable" "caml_avx2_int32x4x2_hsub"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtsx_int64x4 : int32x4 -> int64x4
-    = "caml_vec256_unreachable" "caml_avx2_cvtsx_int32x4_int64x4"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external cvtzx_int64x4 : int32x4 -> int64x4
-    = "caml_vec256_unreachable" "caml_avx2_cvtzx_int32x4_int64x4"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external cvtsx_int16x8 : t -> int16x8
@@ -1770,13 +1818,5 @@ module Int64x4 = struct
 
   external srlv : t -> t -> t
     = "caml_vec256_unreachable" "caml_avx2_int64x4_srlv"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external sllv_128 : int64x2 -> int64x2 -> int64x2
-    = "caml_vec128_unreachable" "caml_avx2_int64x2_sllv"
-    [@@noalloc] [@@unboxed] [@@builtin]
-
-  external srlv_128 : int64x2 -> int64x2 -> int64x2
-    = "caml_vec128_unreachable" "caml_avx2_int64x2_srlv"
     [@@noalloc] [@@unboxed] [@@builtin]
 end

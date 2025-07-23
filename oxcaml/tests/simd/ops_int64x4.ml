@@ -167,7 +167,7 @@ let () =
       let shifts =
         int64x2_of_int64s (Int64.logand r 63L) (Int64.logand l 63L)
       in
-      let result = sllv_128 v shifts in
+      let result = Builtins.Int64x2.sllv v shifts in
       let expectl = Int64.shift_left l (Int64.to_int (Int64.logand r 63L)) in
       let expectr = Int64.shift_left r (Int64.to_int (Int64.logand l 63L)) in
       let expect = int64x2_of_int64s expectl expectr in
@@ -181,7 +181,7 @@ let () =
       let shifts =
         int64x2_of_int64s (Int64.logand r 63L) (Int64.logand l 63L)
       in
-      let result = srlv_128 v shifts in
+      let result = Builtins.Int64x2.srlv v shifts in
       let expectl =
         Int64.shift_right_logical l (Int64.to_int (Int64.logand r 63L))
       in

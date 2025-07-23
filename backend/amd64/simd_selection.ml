@@ -778,7 +778,7 @@ let select_operation_avx2 ~dbg:_ op args =
     | "caml_avx2_vec256_movemask_8" -> instr vpmovmskb_r64_Y args
     | "caml_avx2_int8x16x2_multi_sad_unsigned" ->
       let i, args = extract_constant args ~max:63 op in
-      instr vmpsadbw_X_X_Xm128 ~i args
+      instr vmpsadbw_Y_Y_Ym256 ~i args
     | "caml_avx2_int32x8_mul_even" -> instr vpmuldq_Y_Y_Ym256 args
     | "caml_avx2_int32x8_mul_even_unsigned" -> instr vpmuludq_Y_Y_Ym256 args
     | "caml_avx2_int16x16_mul_high" -> instr vpmulhw_Y_Y_Ym256 args

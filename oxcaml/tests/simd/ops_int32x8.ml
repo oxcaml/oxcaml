@@ -151,7 +151,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx cvtsx_int64x4\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
-      let result = cvtsx_int64x4 v in
+      let result = Builtins.Int32x4.cvtsx_int64x4 v in
       let expectl = Int64.of_int32 l in
       let expectr = Int64.of_int32 r in
       eq4
@@ -163,7 +163,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx cvtzx_int64x4\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
-      let result = cvtzx_int64x4 v in
+      let result = Builtins.Int32x4.cvtzx_int64x4 v in
       let expectl = Int64.logand (Int64.of_int32 l) 0xffffffffL in
       let expectr = Int64.logand (Int64.of_int32 r) 0xffffffffL in
       eq4
@@ -419,7 +419,7 @@ let () =
         Int32s.to_int32x4 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
           (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
       in
-      let result = sllv_128 v shifts in
+      let result = Builtins.Int32x4.sllv v shifts in
       let expectl = Int32.shift_left l (Int32.to_int (Int32.logand r 0x1fl)) in
       let expectr = Int32.shift_left r (Int32.to_int (Int32.logand l 0x1fl)) in
       let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
@@ -434,7 +434,7 @@ let () =
         Int32s.to_int32x4 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
           (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
       in
-      let result = srav_128 v shifts in
+      let result = Builtins.Int32x4.srav v shifts in
       let expectl = Int32.shift_right l (Int32.to_int (Int32.logand r 0x1fl)) in
       let expectr = Int32.shift_right r (Int32.to_int (Int32.logand l 0x1fl)) in
       let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
@@ -449,7 +449,7 @@ let () =
         Int32s.to_int32x4 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
           (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
       in
-      let result = srlv_128 v shifts in
+      let result = Builtins.Int32x4.srlv v shifts in
       let expectl =
         Int32.shift_right_logical l (Int32.to_int (Int32.logand r 0x1fl))
       in

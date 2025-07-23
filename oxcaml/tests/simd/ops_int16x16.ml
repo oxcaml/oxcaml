@@ -58,6 +58,7 @@ let () =
   Int16.check_ints
     (check_binop "mul_high_unsigned" Int16.mul_high_unsigned mul_high_unsigned);
   Int16.check_ints (check_binop "mul_low" Int16.mul_low mul_low);
+  Int16.check_ints (check_binop "mul_round" Int16.mul_round mul_round);
   Int16.check_ints (check_binop "avg_unsigned" Int16.avgu avg_unsigned);
   Int16.check_ints (check_binop "mulsign" Int16.mulsign mulsign);
   ()
@@ -175,7 +176,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtsx_int64x4\n%!" l r);
       let v = Int16.to_int16x8 l r l r 0 0 0 0 in
-      let result = Builtins.Int16x16.cvtsx_int64x4 v in
+      let result = Builtins.Int16x8.cvtsx_int64x4 v in
       let expectl = Int16.cvtsx_i64 l in
       let expectr = Int16.cvtsx_i64 r in
       eq4
@@ -187,7 +188,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtzx_int64x4\n%!" l r);
       let v = Int16.to_int16x8 l r l r 0 0 0 0 in
-      let result = Builtins.Int16x16.cvtzx_int64x4 v in
+      let result = Builtins.Int16x8.cvtzx_int64x4 v in
       let expectl = Int16.cvtzx_i64 l in
       let expectr = Int16.cvtzx_i64 r in
       eq4
@@ -199,7 +200,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtsx_int32x8\n%!" l r);
       let v = Int16.to_int16x8 l r l r l r l r in
-      let result = Builtins.Int16x16.cvtsx_int32x8 v in
+      let result = Builtins.Int16x8.cvtsx_int32x8 v in
       let expectl = Int16.cvtsx_i32 l in
       let expectr = Int16.cvtsx_i32 r in
       let expect =
@@ -218,7 +219,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtzx_int32x8\n%!" l r);
       let v = Int16.to_int16x8 l r l r l r l r in
-      let result = Builtins.Int16x16.cvtzx_int32x8 v in
+      let result = Builtins.Int16x8.cvtzx_int32x8 v in
       let expectl = Int16.cvtzx_i32 l in
       let expectr = Int16.cvtzx_i32 r in
       let expect =
