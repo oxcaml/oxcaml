@@ -115,6 +115,7 @@ end = struct
       if debug
       then
         Reg.Set.iter (fun reg -> log "%a can be moved" Printreg.reg reg) to_move;
+<<<<<<< HEAD
       let (destructions_at_end, definitions_at_beginning)
             : destructions_at_end * definitions_at_beginning =
         Label.Set.fold
@@ -140,6 +141,41 @@ end = struct
       let all_loop_predecessors : Label.Set.t =
         (Cfg.get_block_exn cfg header).predecessors
       in
+=======
+      let destructions_at_end : destructions_at_end =
+        Label.Set.fold
+          (fun label acc ->
+            Label.Map.update label
+              (function
+                | None -> None
+                | Some (kind, regs) -> Some (kind, Reg.Set.diff regs to_move))
+              acc)
+          loop destructions_at_end
+      in
+      let definitions_at_beginning : definitions_at_beginning =
+        (* CR xclerc for xclerc: merge with fold above. *)
+        Label.Set.fold
+          (fun label acc ->
+            Label.Map.update label
+              (function
+                | None -> None | Some regs -> Some (Reg.Set.diff regs to_move))
+              acc)
+          loop definitions_at_beginning
+      in
+      let all_loop_predecessors : Label.Set.t =
+        (Cfg.get_block_exn cfg header).predecessors
+      in
+      let all_loop_successors : Label.Set.t =
+        Label.Set.diff
+          (Label.Set.fold
+             (fun l acc ->
+               Label.Set.union acc
+                 (Cfg.successor_labels ~normal:true ~exn:true
+                    (Cfg.get_block_exn cfg l)))
+             loop Label.Set.empty)
+          loop
+      in
+>>>>>>> d80aa04a22 (Register allocators: move spills/reloads outside of loops when possible.)
       let destructions_at_end : destructions_at_end =
         Label.Set.fold
           (fun label acc ->
@@ -153,6 +189,7 @@ end = struct
               acc)
           all_loop_predecessors destructions_at_end
       in
+<<<<<<< HEAD
       (* Add definitions after the loop. *)
       let all_loop_successors : Label.Set.t =
         Label.Set.diff
@@ -164,6 +201,8 @@ end = struct
              loop Label.Set.empty)
           loop
       in
+=======
+>>>>>>> d80aa04a22 (Register allocators: move spills/reloads outside of loops when possible.)
       let definitions_at_beginning : definitions_at_beginning =
         Label.Set.fold
           (fun label acc ->
