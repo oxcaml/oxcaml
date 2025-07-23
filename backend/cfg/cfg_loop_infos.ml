@@ -55,10 +55,27 @@ let compute_loops_of_back_edges cfg back_edges =
 
 type header_map = loop list Label.Map.t
 
+let invariant_header_map dominators header_map =
+  Label.Map.iter
+    (fun header_label loops ->
+      List.iter loops ~f:(fun loop ->
+          Label.Set.iter
+            (fun loop_label ->
+              if not
+                   (Cfg_dominators.is_dominating dominators header_label
+                      loop_label)
+              then
+                fatal
+                  "Cfg_loop_infos.invariant_header_map: block %a is not \
+                   dominated by the loop header (%a)"
+                  Label.print loop_label Label.print header_label)
+            loop))
+    header_map
+
+let compare_loop_by_cardinal left right =
+  Int.compare (Label.Set.cardinal left) (Label.Set.cardinal right)
+
 let compute_header_map loops =
-  let compare_loop_by_cardinal left right =
-    Int.compare (Label.Set.cardinal left) (Label.Set.cardinal right)
-  in
   Cfg_edge.Map.fold
     (fun { Cfg_edge.src = _; dst = header } labels acc ->
       Label.Map.update header
@@ -105,6 +122,9 @@ let compute_loop_depths cfg header_map =
     (Label.Map.map merge_loops header_map)
     init
 
+(* CR-someday xclerc for xclerc: all uses of `header_map` do merge the loops, so
+   we should consider having the "merged" version in `header_map`, and maybe
+   also sort them. *)
 type t =
   { back_edges : Cfg_edge.Set.t;
     loops : loops;
@@ -117,6 +137,7 @@ let build : Cfg.t -> Cfg_dominators.t -> t =
   let back_edges = compute_back_edges cfg doms in
   let loops = compute_loops_of_back_edges cfg back_edges in
   let header_map = compute_header_map loops in
+  if debug then invariant_header_map doms header_map;
   let loop_depths = compute_loop_depths cfg header_map in
   if debug
   then (
@@ -134,5 +155,19 @@ let build : Cfg.t -> Cfg_dominators.t -> t =
       loops;
     Label.Map.iter
       (Format.eprintf "loop depth for %a is %d\n" Label.format)
-      loop_depths);
+      loop_depths;
+    Format.eprintf "headers:\n";
+    Label.Map.iter
+      (fun header_label loops ->
+        let block = Cfg.get_block_exn cfg header_label in
+        let num_predecessors = Label.Set.cardinal block.predecessors in
+        Format.eprintf "- %a (#predecessors = %d):\n" Label.print header_label
+          num_predecessors;
+        List.iter loops ~f:(fun loop ->
+            Format.eprintf "  . ";
+            Label.Set.iter
+              (fun loop_label -> Format.eprintf "  %a" Label.print loop_label)
+              loop;
+            Format.eprintf "  \n"))
+      header_map);
   { back_edges; loops; header_map; loop_depths }
