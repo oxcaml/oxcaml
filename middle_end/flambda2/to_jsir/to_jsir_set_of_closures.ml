@@ -16,7 +16,6 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
           let expr : Jsir.expr = Closure (params, (addr, []), None) in
           (* If this function slot is used, it should've already been added when
              the code using it was defined *)
-          (* CR selee: check *)
           let env, fn_var =
             match To_jsir_env.get_function_slot_exn env slot with
             | fn_var -> env, fn_var
