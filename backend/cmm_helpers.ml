@@ -1665,8 +1665,7 @@ let unboxed_mutable_int32_unboxed_product_array_set arr ~array_index ~new_value
                   dbg ))))
 
 let unboxed_float32_array_ref =
-  unboxed_packed_array_ref
-    ~memory_chunk:(Single { reg = Float32 })
+  unboxed_packed_array_ref ~memory_chunk:(Single { reg = Float32 })
 
 let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
@@ -1686,8 +1685,7 @@ let unboxed_int32_array_set =
   unboxed_packed_array_set ~memory_chunk:Thirtytwo_signed
 
 let unboxed_float32_array_set =
-  unboxed_packed_array_set
-    ~memory_chunk:(Single { reg = Float32 })
+  unboxed_packed_array_set ~memory_chunk:(Single { reg = Float32 })
 
 let unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg =
   bind "arr" arr (fun arr ->
