@@ -1420,6 +1420,7 @@ let custom_ops_unboxed_nativeint_array =
     (Cmm.global_symbol "caml_unboxed_nativeint_array_ops", Debuginfo.none)
 *)
 
+(* No longer needed - vec128, vec256 and vec512 arrays now use Abstract_tag
 let custom_ops_unboxed_vec128_array =
   Cconst_symbol
     (Cmm.global_symbol "caml_unboxed_vec128_array_ops", Debuginfo.none)
@@ -1431,6 +1432,7 @@ let custom_ops_unboxed_vec256_array =
 let custom_ops_unboxed_vec512_array =
   Cconst_symbol
     (Cmm.global_symbol "caml_unboxed_vec512_array_ops", Debuginfo.none)
+*)
 
 let unboxed_packed_array_length arr dbg ~custom_ops_base_symbol
     ~elements_per_word =
@@ -1475,6 +1477,7 @@ let unboxed_float32_array_length =
     ~custom_ops_base_symbol:custom_ops_unboxed_float32_array
     ~elements_per_word:2
 
+(* No longer needed - unboxed arrays no longer use custom blocks
 let unboxed_custom_array_length ~log2_element_words arr dbg =
   let res =
     bind "arr" arr (fun arr ->
@@ -1484,19 +1487,23 @@ let unboxed_custom_array_length ~log2_element_words arr dbg =
   if log2_element_words = 0
   then tag_int res dbg
   else tag_int (lsr_int res (int ~dbg log2_element_words) dbg) dbg
+*)
 
 let unboxed_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr ->
       tag_int (get_size arr dbg) dbg)
 
 let unboxed_vec128_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:1 arr dbg
+  bind "arr" arr (fun arr ->
+      tag_int (lsr_int (get_size arr dbg) (int ~dbg 1) dbg) dbg)
 
 let unboxed_vec256_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:2 arr dbg
+  bind "arr" arr (fun arr ->
+      tag_int (lsr_int (get_size arr dbg) (int ~dbg 2) dbg) dbg)
 
 let unboxed_vec512_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:3 arr dbg
+  bind "arr" arr (fun arr ->
+      tag_int (lsr_int (get_size arr dbg) (int ~dbg 3) dbg) dbg)
 
 let field_address_computed ptr ofs dbg =
   array_indexing log2_size_addr ptr ofs dbg
@@ -4906,35 +4913,33 @@ let allocate_unboxed_int64_array =
 let allocate_unboxed_nativeint_array =
   allocate_unboxed_int64_or_nativeint_array
 
-let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~custom_ops
+let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind
     ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let header =
-    let size =
-      1 (* custom_ops field *) + (ints_per_vec * List.length elements)
-    in
+    let size = ints_per_vec * List.length elements in
     match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+    | Heap -> block_header Obj.abstract_tag size
+    | Local -> local_block_header Obj.abstract_tag size
   in
   Cop
     ( Calloc (mode, alloc_kind),
-      Cconst_natint (header, dbg) :: custom_ops :: elements,
+      Cconst_natint (header, dbg) :: elements,
       dbg )
 
 let allocate_unboxed_vec128_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec128
     ~alloc_kind:Alloc_block_kind_vec128_u_array
-    ~custom_ops:custom_ops_unboxed_vec128_array ~elements mode dbg
+    ~elements mode dbg
 
 let allocate_unboxed_vec256_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec256
     ~alloc_kind:Alloc_block_kind_vec256_u_array
-    ~custom_ops:custom_ops_unboxed_vec256_array ~elements mode dbg
+    ~elements mode dbg
 
 let allocate_unboxed_vec512_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec512
     ~alloc_kind:Alloc_block_kind_vec512_u_array
-    ~custom_ops:custom_ops_unboxed_vec512_array ~elements mode dbg
+    ~elements mode dbg
 
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y
