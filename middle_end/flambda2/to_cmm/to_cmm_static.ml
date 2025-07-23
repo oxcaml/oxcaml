@@ -170,10 +170,12 @@ let immutable_unboxed_int_array env res updates maybe_int32 ~symbol ~elts
   let num_elts = List.length elts in
   let num_fields, update_kind, tag =
     match maybe_int32 with
-    | Int32 -> 
-        let fields = (1 + num_elts) / 2 in
-        let tag = if num_elts mod 2 = 0 then Obj.double_array_tag else Obj.abstract_tag in
-        fields, UK.naked_int32s, tag
+    | Int32 ->
+      let fields = (1 + num_elts) / 2 in
+      let tag =
+        if num_elts mod 2 = 0 then Obj.double_array_tag else Obj.abstract_tag
+      in
+      fields, UK.naked_int32s, tag
     | Int64_or_nativeint -> num_elts, UK.naked_int64s, Obj.abstract_tag
   in
   let header = C.black_block_header tag num_fields in
@@ -190,7 +192,9 @@ let immutable_unboxed_float32_array env res updates ~symbol ~elts =
   let sym = R.symbol res symbol in
   let num_elts = List.length elts in
   let num_fields = (1 + num_elts) / 2 in
-  let tag = if num_elts mod 2 = 0 then Obj.double_array_tag else Obj.abstract_tag in
+  let tag =
+    if num_elts mod 2 = 0 then Obj.double_array_tag else Obj.abstract_tag
+  in
   let header = C.black_block_header tag num_fields in
   let static_fields =
     (* If the array has odd length, the last 32 bits are implicitly initialized
@@ -215,7 +219,9 @@ let immutable_unboxed_vector_array ~default ~to_cmm ~update_kind
   let num_elts = List.length elts in
   let num_fields = num_elts * words_per_element in
   let header = C.black_block_header Obj.abstract_tag num_fields in
-  let static_fields = List.map (Or_variable.value_map ~default ~f:to_cmm) elts in
+  let static_fields =
+    List.map (Or_variable.value_map ~default ~f:to_cmm) elts
+  in
   let block = C.emit_block sym header static_fields in
   let env, res, updates =
     static_unboxed_array_updates sym env res updates update_kind 0 elts

@@ -64,7 +64,7 @@
 static_assert(sizeof(float) == sizeof(int32_t), "");
 
 #define Max_custom_array_wosize          (Max_wosize - 1)
-#define Max_unboxed_float32_array_wosize (Max_custom_array_wosize * (sizeof(intnat) / sizeof(float)))
+#define Max_unboxed_float32_array_wosize (Max_wosize * (sizeof(intnat) / sizeof(float)))
 
 intnat caml_float32_compare_unboxed(float f, float g)
 {
