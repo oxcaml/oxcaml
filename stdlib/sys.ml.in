@@ -54,7 +54,6 @@ let max_string_length = word_size / 8 * max_array_length - 1
    Using [max_floatarray_length] assumes flat float arrays are enabled. *)
 let max_unboxed_float_array_length = max_floatarray_length
 
-let max_custom_array_length = max_array_length - 1
 
 let max_unboxed_float32_array_length =
   match backend_type with
