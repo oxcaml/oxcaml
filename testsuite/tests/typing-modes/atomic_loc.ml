@@ -22,9 +22,8 @@ val atomic_loc_portable : 'a atomic @ portable -> 'a atomic_loc @ portable =
 
 let uses_unique (t @ unique) : _ @ unique =
   [%atomic.loc t.contents], [%atomic.loc t.contents]
+(* This is allowed because atomic mutable implies aliased *)
 [%%expect{|
-Line 2, characters 2-26:
-2 |   [%atomic.loc t.contents], [%atomic.loc t.contents]
-      ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "aliased" but expected to be "unique".
+val uses_unique :
+  'a atomic @ unique -> 'a atomic_loc * 'a atomic_loc @ unique = <fun>
 |}]
