@@ -151,7 +151,7 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
   (void*)(((uintnat)(p) + sizeof(ty) - 1) & -sizeof(ty))
 
 #define Hash_retaddr(addr, mask)                          \
-  (((uintnat)(addr) >> 3) & (mask))
+  (((uintnat)(addr) * 715827883) & (mask))
 
 #define Retaddr_frame(d) \
   ((uintnat)&(d)->retaddr_rel + \
