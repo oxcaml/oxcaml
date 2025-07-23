@@ -252,7 +252,7 @@ type error =
       wrong_kind_context * record_form_packed * type_expr
   | Expr_not_a_record_type of record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
-  | Submode_failed of Value.error * submode_reason
+  | Submode_failed of Value.error * submode_reason * Env.shared_context option
   | Submode_failed_alloc of Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -607,16 +607,16 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
 
 (* expected_mode.locality_context explains why expected_mode.mode is low;
    shared_context explains why mode.uniqueness is high *)
-let submode ~loc ~env ?(reason = Other) mode expected_mode =
+let submode ~loc ~env ?(reason = Other) ?shared_context mode expected_mode =
   let res = Value.submode mode (as_single_mode expected_mode) in
   match res with
   | Ok () -> ()
   | Error failure_reason ->
-      raise (Error(loc, env, Submode_failed (failure_reason, reason)))
+      raise (Error(loc, env, Submode_failed (failure_reason, reason, shared_context)))
 
 let actual_submode ~loc ~env ?reason (actual_mode : Env.actual_mode)
     expected_mode =
-  submode ~loc ~env ?reason actual_mode.mode
+  submode ~loc ~env ?reason ?shared_context:actual_mode.context actual_mode.mode
     expected_mode
 
 let escape ~loc ~env ~reason m =
@@ -5099,13 +5099,13 @@ let unique_use ~loc ~env mode_l mode_r  =
     | Ok () -> ()
     | Error e ->
         let e : Mode.Value.error = Error (Monadic Uniqueness, e) in
-        raise (Error(loc, env, Submode_failed (e, Other)))
+        raise (Error(loc, env, Submode_failed (e, Other, None)))
     );
     (match Linearity.submode linearity Linearity.many with
     | Ok () -> ()
     | Error e ->
         let e : Mode.Value.error = Error (Comonadic Linearity, e) in
-        raise (Error (loc, env, Submode_failed (e, Other)))
+        raise (Error (loc, env, Submode_failed (e, Other, None)))
     );
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
@@ -11039,9 +11039,15 @@ let report_error ~loc env =
          which is %s record rather than %s one."
         (Style.as_inline_code Printtyp.type_expr) ty
         actual expected
-  | Submode_failed(fail_reason, reason) ->
+  | Submode_failed(fail_reason, reason, shared_context) ->
     let sub =
       match fail_reason with
+        | Error (Comonadic Linearity, _) | Error (Monadic Uniqueness, _) ->
+            shared_context
+          |> Option.map
+              (fun context -> Location.mknoloc
+                (fun ppf -> Env.sharedness_hint ppf context))
+          |> Option.to_list
       | Error (Comonadic Areality, _) -> escaping_submode_reason_hint reason
       | _ -> []
     in

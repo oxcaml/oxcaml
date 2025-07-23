@@ -43,6 +43,8 @@ Line 5, characters 27-28:
 5 |         val k = unique_use s
                                ^
 Error: This value is expected to be "unique". However, it is actually "aliased".
+  Hint: This identifier cannot be used uniquely,
+  because it is defined in a class.
 |}]
 
 (* instance variables need to be defined as legacy *)

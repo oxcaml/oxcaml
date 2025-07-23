@@ -300,7 +300,7 @@ type error =
   | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
   | Expr_not_a_record_type of record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
-  | Submode_failed of Mode.Value.error * submode_reason
+  | Submode_failed of Mode.Value.error * submode_reason * Env.shared_context option
   | Submode_failed_alloc of Mode.Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
