@@ -125,7 +125,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over a function (at Line 3, characters 24-34)
+       because it closes over a value (at Line 3, characters 24-34)
        which is "nonportable".
        However, it is expected to be "portable".
 |}]
@@ -141,7 +141,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over a function (at Line 3, characters 25-26)
+       because it closes over a value (at Line 3, characters 25-26)
        which is of some unknown mode.
        However, it is expected to be "portable".
 |}]
@@ -156,7 +156,7 @@ Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over a function (at Line 2, characters 25-26)
+       because it closes over a value (at Line 2, characters 25-26)
        which is of some unknown mode.
        However, it is expected to be "portable".
 |}]
@@ -240,7 +240,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over a function (at Line 3, characters 27-28)
+       because it closes over a value (at Line 3, characters 27-28)
        which is of some unknown mode.
        However, it is expected to be "portable".
 |}]
@@ -256,7 +256,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over a function (at Line 3, characters 27-28)
+       because it closes over a value (at Line 3, characters 27-28)
        which is of some unknown mode.
        However, it is expected to be "portable".
 |}]
@@ -297,7 +297,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over a function (at Line 3, characters 25-26)
+       because it closes over a value (at Line 3, characters 25-26)
        which is "nonportable".
        However, it is expected to be "portable".
 |}]

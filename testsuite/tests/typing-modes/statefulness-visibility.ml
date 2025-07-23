@@ -395,7 +395,7 @@ Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
 Error: This value is "stateful"
-       because it closes over a function (at Line 3, characters 28-29)
+       because it closes over a value (at Line 3, characters 28-29)
        which is of some unknown mode.
        However, it is expected to be "stateless".
 |}]
@@ -483,7 +483,7 @@ Line 4, characters 22-25:
 4 |   let _ @ stateless = bar in
                           ^^^
 Error: This value is "observing"
-       because it closes over a function (at Line 3, characters 26-27)
+       because it closes over a value (at Line 3, characters 26-27)
        which is of some unknown mode.
        However, it is expected to be "stateless".
 |}]

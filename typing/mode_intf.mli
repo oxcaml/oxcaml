@@ -204,17 +204,27 @@ module type S = sig
       | Return
       | Stack
 
+    (** A description of what type of item is beign closed over *)
+    type lock_item =
+      | Value
+      | Module
+      | Class
+
+    val print_lock_item : Format.formatter -> lock_item -> unit
+
     (** A description of what type of closure is closing a value *)
     type closure_context =
       | Function
       | Functor
       | Lazy
 
-    type closing_loc =
-      { (* CR pdsouza: for now, this field will always be none and ignored. In future
-           we will include a one which should be used in the printing of [Is_closed_by] *)
-        closure : Location.t;  (** Location of the closing scope's definition *)
-        value : Location.t  (** Location of the value being closed over *)
+    (** Details of an item being closed by a context *)
+    type closure_details =
+      { (* CR pdsouza: add a field, [closure_loc], here for the location of the closing context *)
+        closure_context : closure_context;
+        value_loc : Location.t;  (** Location of the value being closed over *)
+        value_item : lock_item
+            (** The item type of the value being closed over *)
       }
 
     type 'd morph =
@@ -225,8 +235,8 @@ module type S = sig
       | Skip : (_ * _) morph
           (** An empty morphism hint, but telling the error reporter to continue the trace,
             instead of terminating it there, as it would for [None]. *)
-      | Close_over : closure_context * closing_loc -> ('l * disallowed) morph
-      | Is_closed_by : closure_context * closing_loc -> (disallowed * 'r) morph
+      | Close_over : closure_details -> ('l * disallowed) morph
+      | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Partial_application : (disallowed * 'r) morph
       | Adj_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph

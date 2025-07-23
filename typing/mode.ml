@@ -1567,6 +1567,18 @@ module Hint = struct
 
   let const_none = None
 
+  type lock_item =
+    | Value
+    | Module
+    | Class
+
+  let print_lock_item ppf =
+    let open Format in
+    function
+    | Module -> fprintf ppf "module"
+    | Class -> fprintf ppf "class"
+    | Value -> fprintf ppf "value"
+
   type closure_context =
     | Function
     | Functor
@@ -1579,17 +1591,18 @@ module Hint = struct
     | Functor -> fprintf ppf "functor"
     | Lazy -> fprintf ppf "lazy expression"
 
-  type closing_loc =
-    { closure : Location.t;
-      value : Location.t
+  type closure_details =
+    { closure_context : closure_context;
+      value_loc : Location.t;
+      value_item : lock_item
     }
 
   type 'd morph =
     | Debug : string -> (_ * _) morph
     | None : (_ * _) morph
     | Skip : (_ * _) morph
-    | Close_over : closure_context * closing_loc -> ('l * disallowed) morph
-    | Is_closed_by : closure_context * closing_loc -> (disallowed * 'r) morph
+    | Close_over : closure_details -> ('l * disallowed) morph
+    | Is_closed_by : closure_details -> (disallowed * 'r) morph
     | Partial_application : (disallowed * 'r) morph
     | Adj_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
@@ -1621,7 +1634,7 @@ module Hint = struct
     | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
-    | Is_closed_by (x, y) -> Close_over (x, y)
+    | Is_closed_by x -> Close_over x
     | Partial_application -> Adj_partial_application
     | Crossing_right -> Crossing_left
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
@@ -1631,7 +1644,7 @@ module Hint = struct
     | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
-    | Close_over (x, y) -> Is_closed_by (x, y)
+    | Close_over x -> Is_closed_by x
     | Adj_partial_application -> Partial_application
     | Crossing_left -> Crossing_right
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
@@ -1647,7 +1660,7 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Close_over (x, y) -> Close_over (x, y)
+       | Close_over x -> Close_over x
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
@@ -1658,7 +1671,7 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Is_closed_by (x, y) -> Is_closed_by (x, y)
+       | Is_closed_by x -> Is_closed_by x
        | Partial_application -> Partial_application
        | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
@@ -1669,8 +1682,8 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Close_over (x, y) -> Close_over (x, y)
-       | Is_closed_by (x, y) -> Is_closed_by (x, y)
+       | Close_over x -> Close_over x
+       | Is_closed_by x -> Is_closed_by x
        | Partial_application -> Partial_application
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
@@ -1683,8 +1696,8 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
-       | Close_over (x, y) -> Close_over (x, y)
-       | Is_closed_by (x, y) -> Is_closed_by (x, y)
+       | Close_over x -> Close_over x
+       | Is_closed_by x -> Is_closed_by x
        | Partial_application -> Partial_application
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
@@ -1805,13 +1818,14 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
     | Debug _ -> Skip
     | None -> Stop
     | Skip -> Skip
-    | Close_over (item, locs) ->
+    | Close_over closure ->
       PrintThenContinue
-        (dprintf "closes over a %a (at %a)" Hint.print_closure_context item
-           Location.print_loc locs.value)
-    | Is_closed_by (item, _locs) ->
+        (dprintf "closes over a %a (at %a)" Hint.print_lock_item
+           closure.value_item Location.print_loc closure.value_loc)
+    | Is_closed_by closure ->
       PrintThenContinue
-        (dprintf "is used inside a %a" Hint.print_closure_context item)
+        (dprintf "is used inside a %a" Hint.print_closure_context
+           closure.closure_context)
     | Partial_application ->
       PrintThenContinue (dprintf "is captured by a partial application")
     | Crossing_left | Crossing_right ->
