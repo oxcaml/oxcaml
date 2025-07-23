@@ -1553,15 +1553,15 @@ end
 module Hint = struct
   type const =
     | None
-    | Lazy
+    | Lazy_expression
     | Class
     | Tailcall_function
     | Tailcall_argument
-    | Read_mutable
-    | Write_mutable
-    | Force_lazy
-    | Return
-    | Stack
+    | Mutable_read
+    | Mutable_write
+    | Forces_lazy_expression
+    | Is_function_return
+    | Stack_expression
 
   let const_none = None
 
@@ -1605,6 +1605,8 @@ module Hint = struct
     | Adj_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
+    | Result_of : closure_context -> ('l * 'r) morph
+    | Returns : closure_context -> ('l * 'r) morph
     | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
@@ -1621,6 +1623,8 @@ module Hint = struct
     | Adj_partial_application -> true
     | Crossing_left -> false
     | Crossing_right -> false
+    | Result_of _ -> true
+    | Returns _ -> true
     | Compose (x, y) -> is_rigid x || is_rigid y
 
   let morph_none = None
@@ -1635,6 +1639,8 @@ module Hint = struct
     | Is_closed_by x -> Close_over x
     | Partial_application -> Adj_partial_application
     | Crossing_right -> Crossing_left
+    | Result_of x -> Returns x
+    | Returns x -> Result_of x
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
 
   let rec right_adjoint :
@@ -1645,9 +1651,32 @@ module Hint = struct
     | Close_over x -> Is_closed_by x
     | Adj_partial_application -> Partial_application
     | Crossing_left -> Crossing_right
+    | Result_of x -> Returns x
+    | Returns x -> Result_of x
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
-  let compose x y = Compose (x, y)
+  let rec maybe_compose :
+      type l r. (l * r) morph -> (l * r) morph -> (l * r) morph option =
+   fun x y ->
+    match x, y with
+    | Skip, y -> Some y
+    | x, Skip -> Some x
+    | Result_of _, Returns _ | Returns _, Result_of _ -> Some Skip
+    | Compose (x0, x1), y -> (
+      match maybe_compose x1 y with
+      | Some z -> Some (compose x0 z)
+      (* the check needed to prevent infinite loop *)
+      | Option.None -> None)
+    | x, Compose (y0, y1) -> (
+      match maybe_compose x y0 with
+      | Some z -> Some (compose z y1)
+      | Option.None -> None)
+    | _, _ -> None
+   [@@ocaml.warning "-4"]
+
+  and compose : type l r. (l * r) morph -> (l * r) morph -> (l * r) morph =
+   fun x y ->
+    match maybe_compose x y with Some z -> z | Option.None -> Compose (x, y)
 
   module Allow_disallow = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
@@ -1661,6 +1690,8 @@ module Hint = struct
        | Close_over x -> Close_over x
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
+       | Result_of x -> Result_of x
+       | Returns x -> Returns x
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
@@ -1672,6 +1703,8 @@ module Hint = struct
        | Is_closed_by x -> Is_closed_by x
        | Partial_application -> Partial_application
        | Crossing_right -> Crossing_right
+       | Result_of x -> Result_of x
+       | Returns x -> Returns x
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
@@ -1686,6 +1719,8 @@ module Hint = struct
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
+       | Result_of x -> Result_of x
+       | Returns x -> Returns x
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
@@ -1700,6 +1735,8 @@ module Hint = struct
        | Adj_partial_application -> Adj_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
+       | Result_of x -> Result_of x
+       | Returns x -> Returns x
        | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
   end)
 end
@@ -1754,8 +1791,8 @@ let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   let wrap_print_hint t = fprintf ppf " because %t" t in
   function
   | None -> NothingPrinted
-  | Lazy ->
-    wrap_print_hint (dprintf "it is the result of a lazy expression");
+  | Lazy_expression ->
+    wrap_print_hint (dprintf "lazy expressions are always %a" (C.print a_obj) a);
     HintPrinted
   | Class ->
     wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a);
@@ -1766,21 +1803,21 @@ let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   | Tailcall_argument ->
     wrap_print_hint (dprintf "it is an argument in a tail call");
     HintPrinted
-  | Read_mutable ->
+  | Mutable_read ->
     wrap_print_hint (dprintf "it has a mutable field read from");
     HintPrinted
-  | Write_mutable ->
+  | Mutable_write ->
     wrap_print_hint (dprintf "it has a mutable field written to");
     HintPrinted
-  | Force_lazy ->
+  | Forces_lazy_expression ->
     wrap_print_hint (dprintf "it forces a lazy expression");
     HintPrinted
-  | Return ->
+  | Is_function_return ->
     wrap_print_hint
       (dprintf "it is a function return value without an exclave annotation");
     HintPrinted
-  | Stack ->
-    wrap_print_hint (dprintf "it is in a stack expression");
+  | Stack_expression ->
+    wrap_print_hint (dprintf "it is a stack expression");
     HintPrinted
 
 type print_morph_hint =
@@ -1821,6 +1858,11 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
       PrintThenContinue (dprintf "crosses with something")
     | Adj_partial_application ->
       PrintThenContinue (dprintf "has a partial application capturing a value")
+    | Result_of closure_context ->
+      PrintThenContinue
+        (dprintf "is the result of a %a" Hint.print_closure_context
+           closure_context)
+    | Returns _closure_context -> PrintThenContinue (dprintf "returns a value")
     | Compose (hint1, hint2) -> (
       match print_morph_hint hint1 with
       | Skip -> print_morph_hint hint2
@@ -3418,6 +3460,12 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.disallow_right Monadic.min in
     let comonadic = Comonadic.disallow_right comonadic in
     { comonadic; monadic }
+
+  let apply_hint ~comonadic ~monadic
+      { comonadic = val_comonadic; monadic = val_monadic } =
+    let val_comonadic = Comonadic.apply_hint comonadic val_comonadic in
+    let val_monadic = Monadic.apply_hint monadic val_monadic in
+    { comonadic = val_comonadic; monadic = val_monadic }
 
   module List = struct
     type nonrec 'd t = 'd t list

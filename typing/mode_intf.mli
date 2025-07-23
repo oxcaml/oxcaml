@@ -192,15 +192,15 @@ module type S = sig
   module Hint : sig
     type const =
       | None
-      | Lazy
+      | Lazy_expression
       | Class
       | Tailcall_function
       | Tailcall_argument
-      | Read_mutable
-      | Write_mutable
-      | Force_lazy
-      | Return
-      | Stack
+      | Mutable_read
+      | Mutable_write
+      | Forces_lazy_expression
+      | Is_function_return
+      | Stack_expression
 
     (** A description of what type of item is beign closed over *)
     type lock_item =
@@ -239,6 +239,8 @@ module type S = sig
       | Adj_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph
       | Crossing_right : (disallowed * 'r) morph
+      | Result_of : closure_context -> ('l * 'r) morph
+      | Returns : closure_context -> ('l * 'r) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
@@ -730,6 +732,12 @@ module type S = sig
 
     (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C] *)
     val partial_apply : (allowed * 'r) t -> l
+
+    val apply_hint :
+      comonadic:('l * 'r) Hint.morph ->
+      monadic:('r * 'l) Hint.morph ->
+      ('l * 'r) t ->
+      ('l * 'r) t
   end
 
   (** The most general mode. Used in most type checking,

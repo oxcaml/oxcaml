@@ -545,7 +545,7 @@ let mode_coerce mode expected_mode =
 let mode_lazy expected_mode =
   let expected_mode =
     mode_coerce
-      (Value.of_const ~hint:Lazy { Value.Const.max with areality = Global; yielding = Unyielding })
+      (Value.of_const ~hint:Lazy_expression { Value.Const.max with areality = Global; yielding = Unyielding })
       expected_mode
   in
   let mode_crossing =
@@ -997,7 +997,7 @@ let mode_project_mutable =
     { Value.Const.max with
       visibility = Visibility.Const.Read;
       contention = Contention.Const.Shared }
-    |> Value.of_const ~hint:Read_mutable
+    |> Value.of_const ~hint:Mutable_read
   in
   mode_default mode
 
@@ -1007,7 +1007,7 @@ let mode_mutate_mutable =
     { Value.Const.max with
       visibility = Read_write;
       contention = Uncontended }
-    |> Value.of_const ~hint:Write_mutable
+    |> Value.of_const ~hint:Mutable_write
   in
   mode_default mode
 
@@ -1016,7 +1016,7 @@ let mode_force_lazy =
   let mode =
     { Value.Const.max with
       contention = Uncontended }
-    |> Value.of_const ~hint:Force_lazy
+    |> Value.of_const ~hint:Forces_lazy_expression
   in
   mode_default mode
 
@@ -6961,10 +6961,10 @@ and type_expect_
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
         begin
           submode ~loc ~env
-            Value.(of_const ~hint:Stack { Const.min with areality = Local })
+            Value.(of_const ~hint:Stack_expression { Const.min with areality = Local })
             expected_mode;
           match
-            Alloc.submode Alloc.(of_const ~hint:Stack { Const.min with areality = Local }) alloc_mode
+            Alloc.submode Alloc.(of_const ~hint:Stack_expression { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
           | Error failure_reason -> raise (Error (e.pexp_loc, env,
