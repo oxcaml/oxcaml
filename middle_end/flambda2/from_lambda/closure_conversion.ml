@@ -1187,7 +1187,7 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
   | Get_tag var ->
     let named = find_simple_from_id env var in
     let prim : Lambda_to_flambda_primitives_helpers.expr_primitive =
-      Unary (Tag_immediate, Prim (Unary (Get_tag, Simple named)))
+      Unary (Tag_immediate, Prim (Unary (Get_tag { variant_only = true }, Simple named)))
     in
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
       prim Debuginfo.none k

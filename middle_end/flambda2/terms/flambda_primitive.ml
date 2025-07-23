@@ -1097,7 +1097,7 @@ type unary_primitive =
       }
   | Is_int of { variant_only : bool }
   | Is_null
-  | Get_tag
+  | Get_tag of { variant_only : bool }
   | Array_length of Array_kind_for_length.t
   | Bigarray_length of { dimension : int }
   | String_length of string_or_bytes
@@ -1142,7 +1142,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Block_load _ -> false
   | Duplicate_array _ -> false
   | Duplicate_block { kind = _ } -> false
-  | Is_int _ | Is_null | Get_tag | Get_header -> true
+  | Is_int _ | Is_null | Get_tag _ | Get_header -> true
   | Array_length _ -> true
   | Bigarray_length _ -> false
   | String_length _ -> true
@@ -1174,7 +1174,7 @@ let compare_unary_primitive p1 p2 =
     | Duplicate_array _ -> 1
     | Duplicate_block _ -> 2
     | Is_int _ -> 3
-    | Get_tag -> 4
+    | Get_tag _ -> 4
     | Array_length _ -> 5
     | Bigarray_length _ -> 6
     | String_length _ -> 7
@@ -1233,7 +1233,9 @@ let compare_unary_primitive p1 p2 =
   | ( Is_int { variant_only = variant_only1 },
       Is_int { variant_only = variant_only2 } ) ->
     Bool.compare variant_only1 variant_only2
-  | Get_tag, Get_tag -> 0
+  | ( Get_tag { variant_only = variant_only1 },
+      Get_tag { variant_only = variant_only2 } ) ->
+    Bool.compare variant_only1 variant_only2
   | String_length kind1, String_length kind2 -> Stdlib.compare kind1 kind2
   | Int_arith (kind1, op1), Int_arith (kind2, op2) ->
     let c = K.Standard_int.compare kind1 kind2 in
@@ -1285,7 +1287,7 @@ let compare_unary_primitive p1 p2 =
   | Make_lazy lazy_tag1, Make_lazy lazy_tag2 ->
     Lazy_block_tag.compare lazy_tag1 lazy_tag2
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
-      | Is_null | Get_tag | String_length _ | Int_as_pointer _
+      | Is_null | Get_tag _ | String_length _ | Int_as_pointer _
       | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
       | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
       | Bigarray_length _ | Unbox_number _ | Box_number _ | Untag_immediate
@@ -1313,7 +1315,8 @@ let print_unary_primitive ppf p =
   | Is_int { variant_only } ->
     if variant_only then fprintf ppf "Is_int" else fprintf ppf "Is_int_generic"
   | Is_null -> fprintf ppf "Is_null"
-  | Get_tag -> fprintf ppf "Get_tag"
+  | Get_tag { variant_only } ->
+    if variant_only then fprintf ppf "Get_tag" else fprintf ppf "Get_tag_generic"
   | String_length _ -> fprintf ppf "String_length"
   | Int_as_pointer alloc_mode ->
     fprintf ppf "Int_as_pointer[%a]" Alloc_mode.For_allocations.print alloc_mode
@@ -1367,7 +1370,7 @@ let arg_kind_of_unary_primitive p =
   | Duplicate_array _ | Duplicate_block _ -> K.value
   | Is_int _ -> K.value
   | Is_null -> K.value
-  | Get_tag -> K.value
+  | Get_tag _ -> K.value
   | String_length _ -> K.value
   | Int_as_pointer _ -> K.value
   | Opaque_identity { middle_end_only = _; kind } -> kind
@@ -1401,7 +1404,7 @@ let result_kind_of_unary_primitive p : result_kind =
   | Block_load { kind; _ } ->
     Singleton (Block_access_kind.element_kind_for_load kind)
   | Duplicate_array _ | Duplicate_block _ -> Singleton K.value
-  | Is_int _ | Is_null | Get_tag -> Singleton K.naked_immediate
+  | Is_int _ | Is_null | Get_tag _ -> Singleton K.naked_immediate
   | String_length _ -> Singleton K.naked_immediate
   | Int_as_pointer _ ->
     (* This primitive is *only* to be used when the resulting pointer points at
@@ -1458,7 +1461,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
        isn't currently propagated from [Lambda].) *)
     Only_generative_effects Mutable, Has_coeffects, Strict
   | Is_int _ | Is_null -> No_effects, No_coeffects, Strict
-  | Get_tag ->
+  | Get_tag _ ->
     (* [Obj.truncate] has now been removed. *)
     No_effects, No_coeffects, Strict
   | String_length _ -> No_effects, No_coeffects, Strict
@@ -1529,7 +1532,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
 let unary_classify_for_printing p =
   match p with
   | Duplicate_array _ | Duplicate_block _ | Obj_dup -> Constructive
-  | String_length _ | Get_tag -> Destructive
+  | String_length _ | Get_tag _ -> Destructive
   | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
   | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ ->
     Neither
@@ -1558,7 +1561,7 @@ let free_names_unary_primitive p =
          value_slot Name_mode.normal)
       project_from Name_mode.normal
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
-  | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
+  | Get_tag _ | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
   | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
   | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
   | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
@@ -1580,7 +1583,7 @@ let apply_renaming_unary_primitive p renaming =
     in
     if alloc_mode == alloc_mode' then p else Int_as_pointer alloc_mode'
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
-  | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
+  | Get_tag _ | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
   | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
   | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
   | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
@@ -1594,7 +1597,7 @@ let ids_for_export_unary_primitive p =
   | Box_number (_, alloc_mode) | Int_as_pointer alloc_mode ->
     Alloc_mode.For_allocations.ids_for_export alloc_mode
   | Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _ | Is_null
-  | Get_tag | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
+  | Get_tag _ | String_length _ | Opaque_identity _ | Int_arith _ | Num_conv _
   | Boolean_not | Reinterpret_64_bit_word _ | Float_arith _ | Array_length _
   | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
   | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
@@ -2764,7 +2767,7 @@ end = struct
   let create_is_int ~variant_only ~immediate_or_block =
     Unary (Is_int { variant_only }, Simple.name immediate_or_block)
 
-  let create_get_tag ~block = Unary (Get_tag, Simple.name block)
+  let create_get_tag ~block = Unary (Get_tag { variant_only = true }, Simple.name block)
 
   let eligible t = match create t with None -> false | Some _ -> true
 

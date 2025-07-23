@@ -625,7 +625,7 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Is_int { variant_only = true }, arg), _dbg)
     when simple_is_unboxable env arg ->
     rewrite_field_access arg GFG.Field.Is_int
-  | Prim (Unary (Get_tag, arg), _dbg) when simple_is_unboxable env arg ->
+  | Prim (Unary (Get_tag { variant_only = true }, arg), _dbg) when simple_is_unboxable env arg ->
     rewrite_field_access arg GFG.Field.Get_tag
   | Prim (Unary (Block_load { kind; field; _ }, arg), dbg)
     when simple_changed_repr env arg ->
@@ -638,7 +638,7 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (Unary (Is_int { variant_only = true }, arg), dbg)
     when simple_changed_repr env arg ->
     rewrite_field_access_chg_repr arg GFG.Field.Is_int dbg
-  | Prim (Unary (Get_tag, arg), dbg) when simple_changed_repr env arg ->
+  | Prim (Unary (Get_tag { variant_only = true }, arg), dbg) when simple_changed_repr env arg ->
     rewrite_field_access_chg_repr arg GFG.Field.Get_tag dbg
   | Prim (prim, dbg) ->
     let prim = P.map_args (rewrite_simple env) prim in

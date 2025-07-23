@@ -239,10 +239,15 @@ let simplify_is_int ~variant_only dacc ~original_term ~arg:scrutinee
     | Unknown ->
       SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
 
-let simplify_get_tag dacc ~original_term ~arg:scrutinee ~arg_ty:scrutinee_ty
+let simplify_get_tag ~variant_only dacc ~original_term ~arg:scrutinee ~arg_ty:scrutinee_ty
     ~result_var =
-  simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
-    ~result_var ~add_relation:TE.add_get_tag_relation
+  match variant_only with
+  | true ->
+    simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
+      ~result_var ~add_relation:TE.add_get_tag_relation
+  | false ->
+    (* For variant_only=false, no special handling - just create the primitive *)
+    SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
 
 let simplify_array_length _array_kind dacc ~original_term ~arg:_
     ~arg_ty:array_ty ~result_var =
@@ -965,7 +970,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Untag_immediate -> simplify_untag_immediate
     | Is_int { variant_only } -> simplify_is_int ~variant_only
     | Is_null -> simplify_is_null
-    | Get_tag -> simplify_get_tag
+    | Get_tag { variant_only } -> simplify_get_tag ~variant_only
     | Array_length array_kind -> simplify_array_length array_kind
     | String_length _ -> simplify_string_length
     | Int_arith (kind, op) -> (

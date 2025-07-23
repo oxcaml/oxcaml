@@ -1027,7 +1027,7 @@ let unary_primitive env res dbg f arg =
         Cmm.typ_val [arg] )
   | Is_int _ -> None, res, C.and_int arg (C.int ~dbg 1) dbg
   | Is_null -> None, res, C.eq ~dbg arg (C.nativeint ~dbg 0n)
-  | Get_tag -> None, res, C.get_tag arg dbg
+  | Get_tag { variant_only = _ } -> None, res, C.get_tag arg dbg
   | Array_length (Array_kind array_kind) ->
     None, res, array_length ~dbg arg array_kind
   | Array_length Float_array_opt_dynamic ->
