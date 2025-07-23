@@ -3319,7 +3319,12 @@ let arg_label_equal l1 l2 =
   | Generic_optional(path1, str1), Generic_optional(path2, str2) ->
       str1 = str2 &&
         classify_module_path path1.txt = classify_module_path path2.txt
-  | _ -> l1 = l2
+  | Optional str1, Optional str2
+  | Position str1, Position str2
+  | Labelled str1, Labelled str2 -> str1 = str2
+  | Nolabel, Nolabel -> true
+  | (Generic_optional _ | Optional _ | Position _ | Labelled _ | Nolabel), _
+      -> false
 
 let equivalent_with_nolabels l1 l2 =
   arg_label_equal l1 l2 || (match l1, l2 with
@@ -4541,10 +4546,12 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
+(* CR generic-optional: Remove predef_ prefix when adding non-predef paths *)
 let predef_path_of_optional_module_path = function
   | Stdlib_option -> Predef.path_option
   | Stdlib_or_null -> Predef.path_or_null
 
+(* CR generic-optional: Remove predef_ prefix when adding non-predef jkinds *)
 let predef_jkind_of_optional_module_path = function
   | Stdlib_option -> Predef.option_argument_jkind
   | Stdlib_or_null -> Jkind.for_or_null_argument Predef.ident_or_null

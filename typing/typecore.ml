@@ -4164,8 +4164,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
             match sargs with
             | [] -> assert false
             | (l', sarg) :: remaining_sargs ->
-                if (arg_label_compatible l l')
-                  || (not omittable && l' = Nolabel)
+                if arg_label_compatible l l' || (not omittable && l' = Nolabel)
                 then
                   (remaining_sargs, use_arg ~commuted:false sarg l')
                 else if
@@ -7487,7 +7486,8 @@ and type_function
               match arg_label, classify_optionality_parsetree arg_label with
               | (Optional arg_label | Generic_optional (_, arg_label)),
                  Optional_arg mpath -> arg_label, mpath
-              | _ ->
+              | (Optional _ | Generic_optional _), Required_or_position_arg
+              | (Labelled _ | Nolabel), _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
             let default_arg_jkind, default_arg_sort =
@@ -8435,7 +8435,9 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       | Position _, Required_or_position_arg ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
-      | _ -> assert false)
+      | (Optional _| Generic_optional _), Required_or_position_arg
+      | (Position _ | Labelled _ | Nolabel), _
+          -> assert false)
   | Omitted _ as arg -> (lbl, arg)
 
 and type_application env app_loc expected_mode position_and_mode
