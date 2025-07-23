@@ -41,6 +41,35 @@ let foo () = malloc_ (1,2)
 val foo : unit -> (int * int) mallocd = <fun>
 |}]
 
+let f (x @ external_) (y @ external_) @ unique =
+  malloc_ (x,y)
+[%%expect {|
+val f : 'a @ unique -> 'b @ unique -> ('a * 'b) mallocd @ unique = <fun>
+|}]
+
+let f (x @ external_ aliased) (y @ external_) @ unique =
+  malloc_ (x,y)
+[%%expect {|
+Line 2, characters 11-12:
+2 |   malloc_ (x,y)
+               ^
+Error: This value is "aliased" but expected to be "unique".
+|}]
+
+let f (x @ external_ unique) @ unique =
+  malloc_ (x,x)
+[%%expect {|
+Line 2, characters 13-14:
+2 |   malloc_ (x,x)
+                 ^
+Error: This value is used here, but it is already being used as unique:
+Line 2, characters 11-12:
+2 |   malloc_ (x,x)
+               ^
+
+|}]
+
+
 let foo () = malloc_ (1,"Asdf")
 [%%expect {|
 val foo : unit -> (int * string) mallocd = <fun>
@@ -370,4 +399,33 @@ let glorb2 () = malloc_ (Foo (1,2))
 [%%expect {|
 type 'a t = Foo of 'a * 'a
 val glorb2 : unit -> int t mallocd = <fun>
+|}]
+
+type t = Pack : 'k. 'k -> t
+let f (x @ external_) = malloc_ (Pack x)
+[%%expect{|
+type t = Pack : 'k -> t
+val f : 'a -> t mallocd = <fun>
+|}]
+
+let f (x @ internal) = malloc_ (Pack x)
+[%%expect{|
+Line 1, characters 37-38:
+1 | let f (x @ internal) = malloc_ (Pack x)
+                                         ^
+Error: This value is "internal" but expected to be "external_".
+|}]
+
+type 'a t =
+| Foo : int * 'a -> int t
+| Bar : { x : char ; y : 'a } -> char t
+let f (x @ external_) = malloc_ (Foo (3,x))
+[%%expect{|
+type 'a t = Foo : int * 'a -> int t | Bar : { x : char; y : 'a; } -> char t
+val f : 'a -> int t mallocd = <fun>
+|}]
+
+let f (y @ external_) = malloc_ (Bar {x = 'c'; y })
+[%%expect{|
+val f : 'a -> char t mallocd = <fun>
 |}]

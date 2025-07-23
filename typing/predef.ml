@@ -538,9 +538,13 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_mallocd
        ~variance:Variance.covariant
        ~separability:Separability.Sep
-       ~param_jkind:(Jkind.Builtin.value_or_null ~why:(Type_argument {parent_path = path_mallocd; position = 1; arity = 1}))
+       ~param_jkind:(Jkind.Builtin.value_or_null
+                      ~why:(Type_argument
+                             {parent_path = path_mallocd;
+                              position = 1; arity = 1}))
        ~jkind:(fun _param ->
-         Jkind.of_builtin Jkind.Const.Builtin.bits64 ~why:(Primitive ident_mallocd) )
+         Jkind.of_builtin Jkind.Const.Builtin.bits64
+          ~why:(Primitive ident_mallocd))
   |> add_type_with_jkind ident_lexing_position
        ~kind:(
          let lbl (field, field_type) =

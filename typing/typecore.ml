@@ -431,10 +431,11 @@ type expected_mode =
     mode : Value.r;
     (** The upper bound, hence r (right) *)
 
-    (* CR-someday jcutler: This really should not be a part of the [expected_mode].
-    There are a bunch of places  where tying the current
-    allocator to the expected mode is a potential source of confusion or even bugs. *)
-
+    (* CR-someday jcutler: This really should not be a part of the
+       [expected_mode]. There are a bunch of places where tying the current
+       allocator to the expected mode is a potential source of confusion or even
+       bugs.
+    *)
     allocator : allocator;
     (** Indicates which allocator the expression was allocated with.  If
         [stack_], this will be Allocator_stack. If [malloc_], this will be
@@ -748,10 +749,10 @@ let register_allocation_mode ~loc ~env alloc_mode allocator =
     let res = Externality.submode Externality.internal externality in
     (match res with
     | Ok () -> ()
-    | Error failure_reason ->
+    | Error reason ->
         let error =
-          Submode_failed(Value.Error (Comonadic Externality,failure_reason), Other, None,
-            None, None, None)
+          Submode_failed(Value.Error
+            (Comonadic Externality,reason), Other, None, None, None, None)
         in
         raise (Error(loc, env, error)));
     let alloc_mode = Alloc.disallow_left alloc_mode in
@@ -770,7 +771,8 @@ let register_allocation_value_mode ~loc ~env mode allocator =
     of potential subcomponents. *)
 let register_allocation ~loc ~env (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    register_allocation_value_mode ~loc ~env expected_mode.mode expected_mode.allocator
+    register_allocation_value_mode ~loc ~env expected_mode.mode
+      expected_mode.allocator
   in
   let alloc_mode : alloc_mode =
     { mode = alloc_mode;
@@ -5610,7 +5612,10 @@ and type_expect_
             let exp, mode =
               with_local_level_if_principal begin fun () ->
                 let mode = Value.newvar () in
-                let exp = type_exp ~recarg env (mode_default mode ~allocator:Allocator_heap) sexp in
+                let exp =
+                  type_exp ~recarg env
+                    (mode_default mode ~allocator:Allocator_heap) sexp
+                in
                 exp, mode
               end ~post:(fun (exp, _) -> generalize_structure_exp exp)
             in
@@ -6399,7 +6404,9 @@ and type_expect_
         match label.lbl_mut with
         | Mutable m0 ->
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
-          let mode = mutable_mode m0 |> mode_default ~allocator:Allocator_heap in
+          let mode =
+            mutable_mode m0 |> mode_default ~allocator:Allocator_heap
+          in
           let mode = mode_modality label.lbl_modalities mode in
           type_label_exp ~overwrite:No_overwrite_label ~create:false env mode
             loc ty_record (lid, label, snewval) Legacy
@@ -7121,15 +7128,15 @@ and type_expect_
       let exp_extra = (Texp_stack, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
     | Pexp_malloc e ->
-      let unsupported category =
-        raise (Error (e.pexp_loc, env, Unsupported_external_allocation category))
+      let unsupported cat =
+        raise (Error (e.pexp_loc, env, Unsupported_external_allocation cat))
       in
       let not_alloc () =
         raise (Error (e.pexp_loc, env, Not_allocation))
       in
       (* If we do the same thing as Pexp_stack here and typecheck *anything*
          before checking if it's actually malloc-able, we get worse error
-         messages. Better to prune based on syntax first, and then type errors. *)
+         messages. Better to prune based on syntax first, then type errors. *)
        (match e.pexp_desc with
        | Pexp_function _ -> unsupported Function
        | Pexp_comprehension _ -> unsupported Comprehension
@@ -7145,15 +7152,24 @@ and type_expect_
        | _ -> not_alloc ()
        );
         let unify_as_mallocd ty_expected =
-          let inner_ty = newgenvar (Jkind.Builtin.value ~why:(Type_argument { parent_path = Predef.path_mallocd ; position = 1; arity = 1})) in
+          let inner_ty =
+            newvar (Jkind.Builtin.value_or_null ~why:(Type_argument
+              { parent_path = Predef.path_mallocd ; position = 1; arity = 1}))
+          in
           let to_unify = Predef.type_mallocd inner_ty in
           with_explanation (fun () ->
             unify_exp_types loc env to_unify ty_expected);
           inner_ty
         in
       let inner_ty = unify_as_mallocd ty_expected in
-      let expected_mode = mode_coerce (Value.max_with_comonadic Externality Externality.external_) expected_mode in
-      let exp = type_expect env {expected_mode with allocator = Allocator_malloc} e {ty = inner_ty; explanation} in
+      let expected_mode =
+        mode_coerce (Value.max_with_comonadic Externality Externality.external_)
+          expected_mode
+      in
+      let exp =
+        type_expect env {expected_mode with allocator = Allocator_malloc} e
+          {ty = inner_ty; explanation}
+      in
 
       let exp_desc = Texp_alloc (exp,Allocator_malloc) in
       re {
@@ -7191,7 +7207,10 @@ and type_expect_
         (* CR uniqueness: this could be the jkind of exp2 *)
         mk_expected (newvar (Jkind.for_non_float ~why:Boxed_record))
       in
-      let exp1 = type_expect ~recarg env (mode_default cell_mode ~allocator:Allocator_heap) exp1 cell_type in
+      let exp1 =
+          type_expect ~recarg env
+            (mode_default cell_mode ~allocator:Allocator_heap) exp1 cell_type
+      in
       let new_fields_mode =
         (* The newly-written fields have to be global to avoid heap-to-stack pointers.
            We enforce that here, by asking the allocation to be global.
@@ -7857,7 +7876,8 @@ and type_label_access
   let record =
     with_local_level_if_principal ~post:generalize_structure_exp
       (fun () ->
-         type_expect ~recarg:Allowed env (mode_default mode ~allocator:Allocator_heap) srecord
+         type_expect ~recarg:Allowed env
+           (mode_default mode ~allocator:Allocator_heap) srecord
            (mk_expected (newvar record_jkind)))
   in
   let ty_exp = record.exp_type in
@@ -8673,7 +8693,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
           List.map
-            (fun mode -> snd (register_allocation_value_mode ~loc ~env mode Allocator_heap))
+            (fun mode -> snd (register_allocation_value_mode ~loc ~env
+                                mode Allocator_heap))
             tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
@@ -8696,9 +8717,12 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         Option.iter (fun _ ->
              Language_extension.assert_enabled ~loc Labeled_tuples ())
           label;
-        let argument_mode = mode_default argument_mode ~allocator:Allocator_heap in
+        let argument_mode =
+          mode_default argument_mode ~allocator:Allocator_heap
+        in
         let argument_mode = expect_mode_cross env ty argument_mode in
-          (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
+          (label, type_expect ~overwrite env argument_mode body
+                    (mk_expected ty)))
       sexpl types_and_modes overwrites
   in
   re {
@@ -8753,7 +8777,9 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
         Option.iter (fun _ ->
              Language_extension.assert_enabled ~loc Labeled_tuples ())
           label;
-        let argument_mode = mode_default argument_mode ~allocator:Allocator_heap in
+        let argument_mode =
+          mode_default argument_mode ~allocator:Allocator_heap
+        in
         let argument_mode = expect_mode_cross env ty argument_mode in
           (label, type_expect env argument_mode body (mk_expected ty), sort))
       sexpl types_sorts_and_modes
@@ -8907,7 +8933,9 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     Misc.Stdlib.List.map3
       (fun e ({Types.ca_type=ty; ca_modalities=gf; _},t0) overwrite ->
          let argument_mode = mode_modality gf argument_mode in
-         let argument_mode = {argument_mode with allocator = argument_allocator} in
+         let argument_mode =
+            {argument_mode with allocator = argument_allocator}
+         in
          type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
   in
