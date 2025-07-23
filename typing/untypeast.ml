@@ -727,7 +727,7 @@ let expression sub exp =
         Pexp_overwrite(sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole _ -> Pexp_hole
     | Texp_alloc (exp,Allocator_malloc) -> Pexp_malloc (sub.expr sub exp)
-    (* CR external: Fix this when other allocators are supported. *)
+    (* CR external-mode: Fix this when other allocators are supported. *)
     | Texp_alloc (_,_) -> assert false
   in
   List.fold_right (exp_extra sub) exp.exp_extra

@@ -523,7 +523,7 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
-  (* CR external: at the moment, this is only ever Allocator_malloc. *)
+  (* CR external-mode: at the moment, this is only ever Allocator_malloc. *)
   | Texp_alloc of expression * allocator
 
 and function_curry =
