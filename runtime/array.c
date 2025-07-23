@@ -80,6 +80,7 @@ CAMLexport struct custom_operations caml_unboxed_int32_array_ops[2] = {
     custom_fixed_length_default },
 };
 
+/* No longer needed - int64 and nativeint arrays now use Abstract_tag
 CAMLexport struct custom_operations caml_unboxed_int64_array_ops = {
   "_unboxed_int64_array",
   custom_finalize_default,
@@ -101,6 +102,7 @@ CAMLexport struct custom_operations caml_unboxed_nativeint_array_ops = {
   custom_compare_ext_default,
   custom_fixed_length_default
 };
+*/
 
 /* returns number of elements (either fields or floats) */
 /* [ 'a array -> int ] */
@@ -691,12 +693,10 @@ static value caml_make_unboxed_int64_vect0(value len, int local)
   if (num_elements > Max_unboxed_int64_array_wosize)
     caml_invalid_argument("Array.make");
 
-  struct custom_operations* ops = &caml_unboxed_int64_array_ops;
-
   if (local)
-    return caml_alloc_custom_local(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc_local(num_elements, Abstract_tag);
   else
-    return caml_alloc_custom(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc(num_elements, Abstract_tag);
 }
 
 CAMLprim value caml_make_unboxed_int64_vect(value len)
@@ -722,12 +722,10 @@ static value caml_make_unboxed_nativeint_vect0(value len, int local)
   if (num_elements > Max_unboxed_nativeint_array_wosize)
     caml_invalid_argument("Array.make");
 
-  struct custom_operations* ops = &caml_unboxed_nativeint_array_ops;
-
   if (local)
-    return caml_alloc_custom_local(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc_local(num_elements, Abstract_tag);
   else
-    return caml_alloc_custom(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc(num_elements, Abstract_tag);
 }
 
 CAMLprim value caml_make_unboxed_nativeint_vect(value len)
@@ -866,9 +864,8 @@ CAMLprim value caml_unboxed_int64_vect_blit(value a1, value ofs1, value a2, valu
 {
   /* See memory model [MM] notes in memory.c */
   atomic_thread_fence(memory_order_acquire);
-  // Need to skip the custom_operations field
-  memmove((int64_t *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (int64_t *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((int64_t *)a2 + Long_val(ofs2),
+          (int64_t *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(int64_t));
   return Val_unit;
 }
@@ -878,9 +875,8 @@ CAMLprim value caml_unboxed_nativeint_vect_blit(value a1, value ofs1, value a2,
 {
   /* See memory model [MM] notes in memory.c */
   atomic_thread_fence(memory_order_acquire);
-  // Need to skip the custom_operations field
-  memmove((uintnat *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (uintnat *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((uintnat *)a2 + Long_val(ofs2),
+          (uintnat *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(uintnat));
   return Val_unit;
 }
