@@ -1,1 +1,1 @@
-Fatal error: exception extension_disabled: found 256-bit register during camlDisabled256__f_0_1_code, but AVX is not enabled.
+Fatal error: exception extension disabled: found 256-bit register while emitting camlDisabled256__f_0_1_code, but AVX is not enabled.
