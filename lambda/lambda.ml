@@ -2231,7 +2231,8 @@ let primitive_can_raise prim =
   | Punboxed_float_comp (_, _)
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu | Pbytessetu
   | Pmakearray _ | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
-  | Pisint _ | Pgettag _ | Pisout | Pisnull | Pbintofint _ | Pintofbint _ | Pcvtbint _
+  | Pisint _ | Pgettag _ | Pisout | Pisnull | Pbintofint _ | Pintofbint _
+  | Pcvtbint _
   | Pnegbint _ | Paddbint _ | Psubbint _ | Pmulbint _
   | Pdivbint { is_safe = Unsafe; _ }
   | Pmodbint { is_safe = Unsafe; _ }
@@ -2466,7 +2467,8 @@ let primitive_result_layout (p : primitive) =
   | Pfloatcomp (_, _) | Punboxed_float_comp (_, _)
   | Pstringlength | Pstringrefu | Pstringrefs
   | Pbyteslength | Pbytesrefu | Pbytesrefs
-  | Parraylength _ | Pisint _ | Pgettag _ | Pisnull | Pisout | Pintofbint _
+  | Parraylength _ | Pisint _ | Pgettag _ | Pisnull | Pisout
+  | Pintofbint _
   | Pbintcomp _ | Punboxed_int_comp _
   | Pstring_load_16 _ | Pbytes_load_16 _ | Pbigstring_load_16 _
   | Pprobe_is_enabled _ | Pbswap16
