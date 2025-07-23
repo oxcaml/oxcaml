@@ -138,15 +138,8 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
 and apply_expr ~env ~res e =
   let continuation = Apply_expr.continuation e in
   let exn_continuation = Apply_expr.exn_continuation e in
-  let expected_continuation : Apply_expr.Result_continuation.t =
-    Return (To_jsir_env.return_continuation env)
-  in
-  (* CR selee: Currently function applications are extremely limited and we're
-     not implementing proper CPS, it's only here essentially to test mutually
-     recursive closures. Will be coming back and fixing this later *)
-  if continuation <> expected_continuation
-     || Exn_continuation.exn_handler exn_continuation
-        <> To_jsir_env.exn_continuation env
+  if Exn_continuation.exn_handler exn_continuation
+     <> To_jsir_env.exn_continuation env
   then failwith "unimplemented for now";
   let f, res =
     match Apply_expr.callee e with
@@ -157,6 +150,16 @@ and apply_expr ~env ~res e =
   (* CR selee: assume exact = false for now, JSIR seems to assume false in the
      case that we don't know *)
   let var, res = apply_fn ~res ~f ~args ~exact:false in
+  let var, res =
+    match continuation with
+    | Never_returns -> var, res
+    | Return cont -> (
+      match To_jsir_env.get_continuation_exn env cont with
+      | Exception ->
+        failwith "unimplemented" (* CR selee: or should be disallowed? *)
+      | Return -> var, res
+      | Function f -> apply_fn ~res ~f ~args:[var] ~exact:true)
+  in
   env, To_jsir_result.end_block_with_last_exn res (Return var)
 
 and apply_cont ~env ~res apply_cont =
