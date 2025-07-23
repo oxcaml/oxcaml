@@ -37,18 +37,6 @@ CAMLextern intnat caml_unboxed_array_no_polymorphic_hash(value v);
 CAMLextern void caml_unboxed_array_serialize(value v, uintnat* bsize_32, uintnat* bsize_64);
 CAMLextern uintnat caml_unboxed_array_deserialize(void* dst);
 
-/* No longer needed - vec128 arrays now use Abstract_tag
-CAMLexport struct custom_operations caml_unboxed_vec128_array_ops = {
-  "_unboxed_vec128_array",
-  custom_finalize_default,
-  caml_unboxed_array_no_polymorphic_compare,
-  caml_unboxed_array_no_polymorphic_hash,
-  caml_unboxed_array_serialize,
-  caml_unboxed_array_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
-*/
 
 CAMLprim value caml_unboxed_vec128_vect_blit(value a1, value ofs1, value a2,
                                              value ofs2, value n) {
@@ -86,18 +74,6 @@ CAMLprim value caml_make_unboxed_vec128_vect_bytecode(value len) {
   caml_failwith("128-bit SIMD is not supported on this platform.");
 }
 
-/* No longer needed - vec256 arrays now use Abstract_tag
-CAMLexport struct custom_operations caml_unboxed_vec256_array_ops = {
-  "_unboxed_vec256_array",
-  custom_finalize_default,
-  caml_unboxed_array_no_polymorphic_compare,
-  caml_unboxed_array_no_polymorphic_hash,
-  caml_unboxed_array_serialize,
-  caml_unboxed_array_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
-*/
 
 CAMLprim value caml_unboxed_vec256_vect_blit(value a1, value ofs1, value a2,
                                              value ofs2, value n) {

@@ -847,26 +847,6 @@ CAMLextern void caml_unboxed_array_serialize(value v, uintnat* bsize_32, uintnat
 CAMLextern uintnat caml_unboxed_array_deserialize(void* dst);
 CAMLextern value caml_make_vect(value len, value init);
 
-/* No longer needed - float32 arrays now use Double_array_tag/Abstract_tag
-CAMLexport const struct custom_operations caml_unboxed_float32_array_ops[2] = {
-  { "_unboxed_float32_even_array",
-    custom_finalize_default,
-    caml_unboxed_array_no_polymorphic_compare,
-    caml_unboxed_array_no_polymorphic_hash,
-    caml_unboxed_array_serialize,
-    caml_unboxed_array_deserialize,
-    custom_compare_ext_default,
-    custom_fixed_length_default },
-  { "_unboxed_float32_odd_array",
-    custom_finalize_default,
-    caml_unboxed_array_no_polymorphic_compare,
-    caml_unboxed_array_no_polymorphic_hash,
-    caml_unboxed_array_serialize,
-    caml_unboxed_array_deserialize,
-    custom_compare_ext_default,
-    custom_fixed_length_default },
-};
-*/
 
 static value caml_make_unboxed_float32_vect0(value len, int local)
 {
