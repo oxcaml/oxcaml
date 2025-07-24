@@ -50,7 +50,7 @@ val spawn_on
   :   domain:int
   -> ('a @ unique portable -> unit) @ once portable unyielding
   -> 'a @ unique portable
-  -> 'a spawn_result @ unique
+  -> 'a spawn_result @ unique portable
 
 (** [spawn action] spawns [action] as a thread running on some domain.
 
@@ -65,4 +65,4 @@ val spawn_on
 val spawn
   :  ('a @ unique portable -> unit) @ once portable unyielding
   -> 'a @ unique portable
-  -> 'a spawn_result @ unique
+  -> 'a spawn_result @ unique portable

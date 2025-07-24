@@ -211,6 +211,9 @@ let () =
   done
 ;;
 
+external magic_unique__portable
+  : 'a @ portable -> 'a @ portable unique @@ portable
+  = "%identity"
 
 (** Run some function on a new thread. *)
 let thread (Request { action; argument; _ })=
@@ -223,14 +226,8 @@ let thread (Request { action; argument; _ })=
          We must wakeup the manager to potentially allow it to exit. *)
       wakeup_manager t
   in
-  let open struct
-    (* SAFETY: We know each value is only popped from the request stack
-       once *)
-    external magic_unique_argument
-      : 'a @ portable -> 'a @ portable unique
-      = "%identity"
-  end in
-  match action (magic_unique_argument argument) with
+  (* SAFETY: We know each value is only popped from the request stack once *)
+  match action (magic_unique__portable argument) with
   | () -> decr ()
   | exception exn ->
     let bt = Printexc.get_raw_backtrace () in
@@ -348,7 +345,7 @@ let spawn_on ~domain:i f a =
   Mutex.unlock mutex;
   (* SAFETY: We know that if we got an error here, the thread failed to spawn
      and hence no longer has a reference to [a] *)
-  Obj.magic_unique request_inner.result
+  magic_unique__portable request_inner.result
 ;;
 
 let spawn f =
