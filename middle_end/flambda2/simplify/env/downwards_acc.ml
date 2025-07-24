@@ -104,7 +104,7 @@ let create denv slot_offsets continuation_uses_env =
     code_ids_to_never_delete = Code_id.Set.empty;
     code_ids_never_simplified = Code_id.Set.empty;
     debuginfo_rewrites = Simple.Map.empty;
-    are_lifting_conts = Are_lifting_conts.no_lifting;
+    are_lifting_conts = Are_lifting_conts.no_lifting At_toplevel;
     lifted_continuations = [];
     continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
     continuations_to_specialize = Continuation.Set.empty;
@@ -312,7 +312,8 @@ let prepare_for_speculative_inlining dacc =
           Speculative_inlining)
       dacc
   in
-  with_are_lifting_conts dacc Are_lifting_conts.no_lifting
+  with_are_lifting_conts dacc
+    (Are_lifting_conts.no_lifting In_speculative_inlining)
 
 let continuations_to_specialize t = t.continuations_to_specialize
 
