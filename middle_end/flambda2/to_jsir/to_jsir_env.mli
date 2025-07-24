@@ -86,8 +86,6 @@ val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t
     If it exists, the environment is unchanged. Otherwise, we create a fresh variable,
     and add the mapping to the environment. *)
 
-val add_continuation_if_not_found : t -> Continuation.t -> t
-
 val add_symbol_if_not_found : t -> Symbol.t -> t
 
 val add_function_slot_if_not_found : t -> Function_slot.t -> t

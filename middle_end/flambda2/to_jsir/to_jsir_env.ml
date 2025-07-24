@@ -86,9 +86,6 @@ let add_if_not_found t item ~get ~add =
     let var = Jsir.Var.fresh () in
     add t item var
 
-let add_continuation_if_not_found =
-  add_if_not_found ~get:get_continuation_exn ~add:add_continuation
-
 let add_symbol_if_not_found =
   add_if_not_found ~get:get_symbol_exn ~add:add_symbol
 
