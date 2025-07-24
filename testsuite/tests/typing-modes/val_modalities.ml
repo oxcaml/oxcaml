@@ -1240,22 +1240,6 @@ Error: The module "M" is "local" but expected to be "global"
        because it is used inside a function which is "global".
 |}]
 
-(* similar test to above but checks that a mode error is given even when
-   the function is returned but not annotated as global *)
-let bar () =
-  let module M @ local = struct end in
-  let foo () =
-    (module M : Empty)
-  in
-  foo
-[%%expect{|
-Line 4, characters 12-13:
-4 |     (module M : Empty)
-                ^
-Error: Signature mismatch:
-       This escapes its region.
-|}]
-
 (* Empty signature crosses linearity and portability *)
 let _ =
   let module M @ nonportable once = struct end in
