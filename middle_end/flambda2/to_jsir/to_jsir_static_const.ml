@@ -93,16 +93,6 @@ let block_like ~env ~res symbol const =
   let expr, env, res = block_like' ~env ~res const in
   To_jsir_shared.bind_expr_to_symbol ~env ~res symbol expr
 
-let add_to_env_if_not_found env items ~fold ~get_from_env ~add_to_env =
-  fold
-    (fun item env ->
-      match get_from_env env item with
-      | _var -> env
-      | exception Not_found ->
-        let var = Jsir.Var.fresh () in
-        add_to_env env item var)
-    items env
-
 let code ~env ~res ~translate_body ~code_id code =
   let free_names = Code0.free_names code in
   let function_slots = Name_occurrences.all_function_slots free_names in
@@ -114,19 +104,19 @@ let code ~env ~res ~translate_body ~code_id code =
      will make sure later (when translating [Set_of_closures]) that the closures
      or values representing these slots are bound to the correct variables. *)
   let env =
-    add_to_env_if_not_found env function_slots ~fold:Function_slot.Set.fold
-      ~get_from_env:To_jsir_env.get_function_slot_exn
-      ~add_to_env:To_jsir_env.add_function_slot
+    Function_slot.Set.fold
+      (fun slot env -> To_jsir_env.add_function_slot_if_not_found env slot)
+      function_slots env
   in
   let env =
-    add_to_env_if_not_found env value_slots ~fold:Value_slot.Set.fold
-      ~get_from_env:To_jsir_env.get_value_slot_exn
-      ~add_to_env:To_jsir_env.add_value_slot
+    Value_slot.Set.fold
+      (fun slot env -> To_jsir_env.add_value_slot_if_not_found env slot)
+      value_slots env
   in
   let env =
-    add_to_env_if_not_found env symbols ~fold:Symbol.Set.fold
-      ~get_from_env:To_jsir_env.get_symbol_exn
-      ~add_to_env:To_jsir_env.add_symbol
+    Symbol.Set.fold
+      (fun symbol env -> To_jsir_env.add_symbol_if_not_found env symbol)
+      symbols env
   in
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body

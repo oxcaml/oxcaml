@@ -78,3 +78,19 @@ let add_alias_of_var_exn t ~var ~alias_of =
 let add_alias_of_symbol_exn t ~var ~alias_of =
   let jvar = get_symbol_exn t alias_of in
   { t with vars = Variable.Map.add var jvar t.vars }
+
+let add_if_not_found t item ~get ~add =
+  match get t item with
+  | _var -> t
+  | exception Not_found ->
+    let var = Jsir.Var.fresh () in
+    add t item var
+
+let add_symbol_if_not_found =
+  add_if_not_found ~get:get_symbol_exn ~add:add_symbol
+
+let add_function_slot_if_not_found =
+  add_if_not_found ~get:get_function_slot_exn ~add:add_function_slot
+
+let add_value_slot_if_not_found =
+  add_if_not_found ~get:get_value_slot_exn ~add:add_value_slot
