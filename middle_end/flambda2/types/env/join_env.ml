@@ -248,7 +248,7 @@ end = struct
     match shared_name with Some raw_name -> raw_name | None -> "join_var"
 
   let kind (t : t) =
-    match Index.Map.min_binding_opt (t :> Simple.t Index.Map.t) with
+    match Index.Map.choose_opt (t :> Simple.t Index.Map.t) with
     | Some (_, s) -> Simple.kind s
     | None -> Misc.fatal_error "Simple_in_joined_envs.kind: No binding"
 

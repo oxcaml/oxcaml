@@ -3564,8 +3564,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       List.init module_block_size_in_words (fun pos ->
           let pos_str = string_of_int pos in
           ( pos,
-            Variable.create ("field_" ^ pos_str)
-              K.value (* TODO: handle non-value layouts in modules *) ))
+            Variable.create ("field_" ^ pos_str) K.value
+            (* CR mixed-modules: Find the right kind from the module block
+               shape *) ))
     in
     let acc, body =
       let static_const : Static_const.t =

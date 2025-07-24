@@ -73,6 +73,9 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       (if Code.is_tupled code then 1 else Flambda_arity.num_params arity)
       (fun i ->
         Code_id_or_name.var
+          (* These witnesses are not going to end up as actual program
+             variables; giving them kind Value is a bit misleading but should
+             not cause any issue. *)
           (Variable.create
              (Printf.sprintf "witness_%d_for_%s" i (Code_id.name code_id))
              Flambda_kind.value))
