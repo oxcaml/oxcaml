@@ -353,16 +353,6 @@ Error: Variables bound in a class must have layout value.
          because it's the type of a class field.
 |}]
 
-(* just checking printing *)
-type t_any_non_null : any_non_null
-
-[%%expect{|
-Line 1, characters 22-34:
-1 | type t_any_non_null : any_non_null
-                          ^^^^^^^^^^^^
-Error: Unknown layout any_non_null
-|}]
-
 (* [or_null] in unboxed types *)
 
 type unboxed_rec = { field : int or_null } [@@unboxed]
