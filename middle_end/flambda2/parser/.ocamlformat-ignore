@@ -1,2 +1,2 @@
-flambda_lex.*
-flambda_parser.*
+flambda_lex.ml
+flambda_parser.ml
