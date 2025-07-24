@@ -35,17 +35,8 @@ module Typing_env = struct
               non_null = Ok scrutinee_head_of_kind_value_non_null
             }
         in
-        let t =
-          add_equation_on_simple ~meet_type:(Meet.meet_type ()) t scrutinee
-            scrutinee_ty
-        in
-        if Flambda_features.debug_flambda2 ()
-        then (
-          Format.eprintf "====== Adding %a = Is_int(%a) ======@." Name.print
-            name Simple.print scrutinee;
-          Format.eprintf "%a@." print (Meet_env.typing_env t);
-          Format.eprintf "====================================@.");
-        t)
+        add_equation_on_simple ~meet_type:(Meet.meet_type ()) t scrutinee
+          scrutinee_ty)
 
   let add_get_tag_relation t name ~scrutinee =
     use_meet_env t ~f:(fun t ->
@@ -64,17 +55,8 @@ module Typing_env = struct
               non_null = Ok scrutinee_head_of_kind_value_non_null
             }
         in
-        let t =
-          add_equation_on_simple ~meet_type:(Meet.meet_type ()) t scrutinee
-            scrutinee_ty
-        in
-        if Flambda_features.debug_flambda2 ()
-        then (
-          Format.eprintf "====== Adding %a = Is_int(%a) ======@." Name.print
-            name Simple.print scrutinee;
-          Format.eprintf "%a@." print (Meet_env.typing_env t);
-          Format.eprintf "====================================@.");
-        t)
+        add_equation_on_simple ~meet_type:(Meet.meet_type ()) t scrutinee
+          scrutinee_ty)
 
   let add_equation t name ty =
     use_meet_env t ~f:(fun t ->
