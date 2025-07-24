@@ -127,6 +127,8 @@ let ge_component comp1 comp2 =
 
 type exttype =
   | XInt
+  | XInt8
+  | XInt16
   | XInt32
   | XInt64
   | XFloat32
@@ -137,6 +139,8 @@ type exttype =
 
 let machtype_of_exttype = function
   | XInt -> typ_int
+  | XInt8 -> typ_int
+  | XInt16 -> typ_int
   | XInt32 -> typ_int
   | XInt64 -> typ_int
   | XFloat -> typ_float
@@ -754,25 +758,12 @@ let equal_machtype_component
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
-let equal_exttype left right =
-  match left, right with
-  | XInt, XInt -> true
-  | XInt32, XInt32 -> true
-  | XInt64, XInt64 -> true
-  | XFloat32, XFloat32 -> true
-  | XFloat, XFloat -> true
-  | XVec128, XVec128 -> true
-  | XVec256, XVec256 -> true
-  | XVec512, XVec512 -> true
-  | XInt, (XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XInt32, (XInt | XInt64 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XInt64, (XInt | XInt32 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XFloat, (XInt | XInt32 | XFloat32 | XInt64 | XVec128 | XVec256 | XVec512)
-  | XVec128, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec256 | XVec512)
-  | XVec256, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec512)
-  | XVec512, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256)
-  | XFloat32, (XInt | XInt32 | XInt64 | XFloat | XVec128 | XVec256 | XVec512) ->
-    false
+let equal_exttype
+    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
+     | XVec256 | XVec512 ) as left) right =
+  (* we can use polymorphic compare as long as exttype is all constant
+     constructors *)
+  Stdlib.( = ) left right
 
 let equal_vec128_type v1 v2 =
   match v1, v2 with

@@ -82,10 +82,6 @@ module Range : sig
   val print : Format.formatter -> t -> unit
 
   val overlap : t list -> t list -> bool
-
-  val is_live : t list -> pos:int -> bool
-
-  val remove_expired : t list -> pos:int -> t list
 end
 
 module Interval : sig

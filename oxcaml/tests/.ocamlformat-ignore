@@ -17,3 +17,5 @@ backend/zero_alloc_checker/test_remove_inferred_assume_workaround.ml
 backend/zero_alloc_checker/test_flambda2_invalid.ml
 backend/address_sanitizer/address_sanitizer.ml
 backend/caml_apply_split_max_arity/stack.ml
+backend/llvmize/float_ops.ml
+backend/llvmize/float_ops_main.ml

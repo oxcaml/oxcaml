@@ -249,7 +249,7 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
-let select_addressing (_chunk : Cmm.memory_chunk) exp :
+let select_addressing' (_chunk : Cmm.memory_chunk) exp :
     addressing_mode * Cmm.expression =
   let a, d = select_addr exp in
   (* PR#4625: displacement must be a signed 32-bit immediate *)
@@ -266,6 +266,11 @@ let select_addressing (_chunk : Cmm.memory_chunk) exp :
     | Aadd (e1, e2) -> Iindexed2 d, Ctuple [e1; e2]
     | Ascale (e, scale) -> Iscaled (scale, d), e
     | Ascaledadd (e1, e2, scale) -> Iindexed2scaled (scale, d), Ctuple [e1; e2]
+
+let select_addressing chunk exp : addressing_mode * Cmm.expression =
+  if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
+  else select_addressing' chunk exp
 
 let select_store ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
@@ -329,7 +334,7 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
   | _ -> assert false
 
-let select_operation
+let select_operation'
     ~(generic_select_condition :
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after:_ :
@@ -430,6 +435,15 @@ let select_operation
     let addr, eloc = select_addressing Word_int (one_arg "prefetch" args) in
     Rewritten (specific (Iprefetch { is_write; addr; locality }), [eloc])
   | _ -> Use_default
+
+let select_operation
+    ~(generic_select_condition :
+       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
+    (args : Cmm.expression list) dbg ~label_after :
+    Cfg_selectgen_target_intf.select_operation_result =
+  if !Oxcaml_flags.llvm_backend
+  then Use_default
+  else select_operation' ~generic_select_condition op args dbg ~label_after
 
 (* Deal with register constraints *)
 

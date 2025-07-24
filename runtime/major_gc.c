@@ -1633,10 +1633,14 @@ static bool should_compact_from_stw_single(int compaction_mode)
   struct gc_stats s;
   caml_compute_gc_stats(&s);
 
-  uintnat heap_words = s.heap_stats.pool_words + s.heap_stats.large_words;
+  uintnat heap_words = s.global_stats.chunk_words + s.heap_stats.large_words;
 
-  if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize())
+  if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize()) {
+    CAML_GC_MESSAGE (POLICY,
+                     "Heap is only %"ARCH_INTNAT_PRINTF_FORMAT"u words: "
+                     "compaction off.\n", heap_words);
     return false;
+  }
 
   uintnat live_words = s.heap_stats.pool_live_words + s.heap_stats.large_words;
   uintnat free_words = heap_words - live_words;
@@ -1644,8 +1648,11 @@ static bool should_compact_from_stw_single(int compaction_mode)
 
   bool compacting = current_overhead >= caml_max_percent_free;
   CAML_GC_MESSAGE (POLICY, "Current overhead: %"
+                   ARCH_INTNAT_PRINTF_FORMAT "u/%"
+                   ARCH_INTNAT_PRINTF_FORMAT "u = %"
                    ARCH_INTNAT_PRINTF_FORMAT "u%% %s %"
                    ARCH_INTNAT_PRINTF_FORMAT "u%%: %scompacting.\n",
+                   free_words, live_words,
                    (uintnat) current_overhead,
                    compacting ? ">=" : "<",
                    caml_max_percent_free,
@@ -2026,8 +2033,15 @@ mark_again:
 
   if (mode != Slice_opportunistic && caml_marking_started()) {
     /* Finalisers */
+
+    /* TODO: various improvement work here:
+     * - updating finalisers should be made incremental;
+     * - we should measure and account for the work of it against work meters.
+     * - but until it is made incremental, don't gate it on available work,
+     *   because we have to do it (and therefore advance the phase) in domains
+     *   which don't allocate. */
+
     if (caml_gc_phase == Phase_mark_final &&
-        get_major_slice_markwork(mode) > 0 &&
         caml_final_update_first(domain_state)) {
       /* This domain has updated finalise first values */
       atomic_fetch_add_verify_ge0(&num_domains_to_final_update_first, -1);
@@ -2036,9 +2050,9 @@ mark_again:
         goto mark_again;
     }
 
-    /* TODO measure and account for the work of updating finalisers */
+    /* TODO finaliser improvement work as listed above. */
+
     if (caml_gc_phase == Phase_sweep_ephe &&
-        get_major_slice_markwork(mode) > 0 &&
         caml_final_update_last(domain_state)) {
       /* This domain has updated finalise last values */
       atomic_fetch_add_verify_ge0(&num_domains_to_final_update_last, -1);

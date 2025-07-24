@@ -202,6 +202,7 @@ let collect_out_stats (cfg_with_infos : Cfg_with_infos.t) =
         | None -> 1
       in
       let update_cost curr =
+        (* note: keep in sync with the compiler heuristics *)
         if Misc.no_overflow_add curr cost then curr + cost else max_int
       in
       DLL.fold_left block.body ~init:acc

@@ -318,6 +318,22 @@ let num_args_addressing = function
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
 
+let addressing_displacement_for_llvmize addr =
+  if not !Oxcaml_flags.llvm_backend
+  then
+    Misc.fatal_error
+      "Arch.displacement_addressing_for_llvmize: should only be called with \
+        -llvm-backend"
+  else
+    match addr with
+    | Iindexed d -> d
+    | Ibased _
+    | Iindexed2 _
+    | Iscaled _
+    | Iindexed2scaled _ ->
+      Misc.fatal_error
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
+
 (* Printing operations and addressing modes *)
 
 let string_of_prefetch_temporal_locality_hint = function
