@@ -142,11 +142,9 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             (fun k handler (env, res) ->
               Continuation_handler.pattern_match handler
                 ~f:(fun params ~handler:cont_body ->
-                  let params =
-                    Bound_parameters.append invariant_params params
-                  in
                   let params, env =
-                    To_jsir_shared.bound_parameters ~env params
+                    To_jsir_shared.bound_parameters ~env
+                      (Bound_parameters.append invariant_params params)
                   in
                   let addr =
                     match To_jsir_env.get_continuation_exn env k with
