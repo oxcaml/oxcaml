@@ -79,4 +79,15 @@ val get_code_id_exn : t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list
 (** Return the variable corresponding to a function slot. *)
 val get_function_slot_exn : t -> Function_slot.t -> Jsir.Var.t
 
+(** Return the variable corresponding to a value slot. *)
 val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t
+
+(** These functions first check whether the given item exists in the environment.
+    If it exists, the environment is unchanged. Otherwise, we create a fresh variable,
+    and add the mapping to the environment. *)
+
+val add_symbol_if_not_found : t -> Symbol.t -> t
+
+val add_function_slot_if_not_found : t -> Function_slot.t -> t
+
+val add_value_slot_if_not_found : t -> Value_slot.t -> t
