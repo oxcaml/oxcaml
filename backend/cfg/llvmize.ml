@@ -140,9 +140,12 @@ type t =
     mutable data : Cmm.data_item list;
         (* Collects data items as they come and processes them at the end *)
     mutable defined_symbols : String.Set.t;
-        (* Keeps track of all function symbols defined so far *)
-    mutable referenced_symbols : String.Set.t
-        (* Keeps track of all global symbols referenced so far *)
+        (* Function symbols defined so far *)
+    mutable referenced_symbols : String.Set.t;
+        (* Global symbols referenced so far *)
+    mutable called_functions :
+      (Llvm_typ.t list * Llvm_typ.t option) String.Map.t
+        (* Names + signatures (args, ret) of functions called so far *)
   }
 
 let create_fun_info () =
@@ -164,7 +167,8 @@ let create ~llvmir_filename ~ppf_dump =
     current_fun_info = create_fun_info ();
     data = [];
     defined_symbols = String.Set.empty;
-    referenced_symbols = String.Set.empty
+    referenced_symbols = String.Set.empty;
+    called_functions = String.Map.empty
   }
 
 let reset_fun_info t = t.current_fun_info <- create_fun_info ()
@@ -194,6 +198,11 @@ let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 (* CR yusumez: Write to this ppf alongside the normal one when -dllvmir is
    passed *)
 let _get_ppf_dump t = t.ppf_dump
+
+(* Runtime registers are passed explicitly as arguments to all functions *)
+let domainstate_ident = Ident.named "ds"
+
+let runtime_regs = [domainstate_ident]
 
 module F = struct
   open Format
@@ -284,8 +293,8 @@ module F = struct
     let ident = get_ident_for_reg t reg in
     pp_ident ppf ident
 
-  let pp_fun_arg ppf (reg, ident) =
-    fprintf ppf "%a %a" pp_machtyp_component reg.Reg.typ pp_ident ident
+  let pp_fun_arg ppf (typ, ident) =
+    fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_ident ident
 
   let pp_fun_args ppf fun_args =
     pp_print_list ~pp_sep:pp_comma pp_fun_arg ppf fun_args
@@ -295,7 +304,7 @@ module F = struct
 
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
-    line t.ppf "define %a @%s(%a) %a {" pp_machtyp fun_ret_type fun_name
+    line t.ppf "define cc 104 %a @%s(%a) %a {" pp_machtyp fun_ret_type fun_name
       pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}";
@@ -326,8 +335,6 @@ module F = struct
 
   let ins_branch t label = ins t "br %a" (pp_label t) label
 
-  (* [dbg] is used to print the [Reg.t] the allocated identifier corresponds to
-     in the preamble *)
   let ins_alloca ?regname t (reg : Reg.t) =
     let pp_regname ppf () =
       match regname with
@@ -369,6 +376,18 @@ module F = struct
   let ins_fcmp t cond arg1 arg2 res typ =
     ins t "%a = fcmp %s %a %a, %a" pp_ident res cond Llvm_typ.pp_t typ pp_ident
       arg1 pp_ident arg2
+
+  let ins_call ~pp_name t name args res =
+    let pp_call res_typ ppf () =
+      fprintf ppf "call cc 104 %s %a(%a)" res_typ pp_name name
+        (pp_print_list ~pp_sep:pp_comma (fun ppf (arg, typ) ->
+             fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_ident arg))
+        args
+    in
+    match res with
+    | Some (res, res_typ) ->
+      ins t "%a = %a" pp_ident res (pp_call (Llvm_typ.to_string res_typ)) ()
+    | None -> ins t "%a" (pp_call "void") ()
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
@@ -507,8 +526,46 @@ module F = struct
       line t.ppf "%a:" Ident.print eq_or_uo;
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
-    | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ | Call _
-    | Prim _ ->
+    | Call { op; label_after } ->
+      let arg_regs =
+        (* [Indirect] has the function in i.arg.(0) *)
+        (match op with
+        | Direct _ -> Array.to_list i.arg
+        | Indirect -> Array.to_list i.arg |> List.tl)
+        (* Regs in domainstate are already stored in that address. *)
+        |> List.filter (fun reg -> not (Reg.is_domainstate reg))
+      in
+      let arg_idents = List.map (load_reg_to_temp t) arg_regs in
+      let arg_types =
+        List.map
+          (fun (reg : Reg.t) -> Llvm_typ.of_machtyp_component reg.typ)
+          arg_regs
+      in
+      let args =
+        List.map (fun ident -> ident, Llvm_typ.ptr) runtime_regs
+        @ List.combine arg_idents arg_types
+      in
+      let res =
+        if Array.length i.res = 0
+        then None
+        else Some (fresh_ident t, Llvm_typ.of_machtyp_component i.res.(0).typ)
+      in
+      (match op with
+      | Direct { sym_name; sym_global = _ } ->
+        t.called_functions
+          <- String.Map.add sym_name
+               (arg_types, Option.map snd res)
+               t.called_functions;
+        ins_call t ~pp_name:pp_global sym_name args res
+      | Indirect ->
+        let fun_temp = load_reg_to_temp t i.arg.(0) in
+        ins_call t ~pp_name:pp_ident fun_temp args res);
+      Option.iter
+        (fun (res_temp, _) -> ins_store_into_reg t res_temp i.res.(0))
+        res;
+      ins_branch t label_after
+    | Prim _ | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
+      ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -720,6 +777,14 @@ module F = struct
   let empty_fun_decl t sym =
     line t.ppf "define void %a() { ret void }" pp_global
       (Cmm_helpers.make_symbol sym)
+
+  let fun_decl t sym args ret =
+    let ret_str =
+      match ret with Some ret -> Llvm_typ.to_string ret | None -> "void"
+    in
+    line t.ppf "declare cc 104 %s %a(%a)" ret_str pp_global sym
+      (pp_print_list ~pp_sep:pp_comma Llvm_typ.pp_t)
+      args
 end
 
 let current_compilation_unit = ref None
@@ -767,21 +832,48 @@ let collect_body_regs cfg =
       Reg.add_set_array body_regs terminator_regs |> Reg.Set.union regs)
     ~init:Reg.Set.empty
 
-(* Allocates every reg in [cfg] on the stack and fills up the [reg2ident] table
-   in [t]. Note that args are assigned an identifier in the argument list but
-   the body will use the alloca'd idents instead. *)
-let alloca_regs t cfg old_arg_idents =
-  let arg_regs = List.map fst old_arg_idents |> Reg.Set.of_list in
+(* Allocates regs in [cfg] on the stack and fills up the [reg2ident] table in
+   [t]. Note that:
+
+   - Arguments are assigned an identifier in the argument list but the body will
+   use the alloca'd idents instead.
+
+   - Arguments not passed in registers (e.g. in Domainstate) will point to that
+   block of memory instead of being allocated on the stack *)
+let make_temps_for_regs t cfg args_and_signature_idents =
+  let make_temp (reg : Reg.t) ident_opt =
+    match reg.loc with
+    | Unknown | Reg _ -> (
+      (* This will reserve a fresh ident *)
+      F.ins_alloca ~regname:(Format.asprintf "%a" Printreg.reg reg) t reg;
+      match ident_opt with
+      | None -> () (* not an argument *)
+      | Some old_ident -> F.ins_store_into_reg t old_ident reg)
+    | Stack (Domainstate idx) ->
+      (* Compute pointer to where [reg] is located *)
+      let offset = idx + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
+      let temp1 = fresh_ident t in
+      let temp2 = fresh_ident t in
+      let res = fresh_ident t in
+      F.ins_conv t "ptrtoint" ~src:domainstate_ident ~dst:temp1
+        ~src_typ:Llvm_typ.ptr ~dst_typ:Llvm_typ.i64;
+      F.ins_binop_imm t "add" temp1 (Int.to_string offset) temp2 Llvm_typ.i64;
+      F.ins_conv t "inttoptr" ~src:temp2 ~dst:res ~src_typ:Llvm_typ.i64
+        ~dst_typ:Llvm_typ.ptr;
+      (* Create entry in the [reg2ident] table *)
+      Reg.Tbl.add t.current_fun_info.reg2ident reg res
+    | Stack (Local _) | Stack (Incoming _) | Stack (Outgoing _) ->
+      Misc.fatal_error "Llvmize: unexpected register location"
+  in
+  let arg_regs = List.map fst args_and_signature_idents |> Reg.Set.of_list in
   let body_regs = collect_body_regs cfg in
   let temp_regs = Reg.Set.diff body_regs arg_regs in
-  let alloca (reg : Reg.t) =
-    F.ins_alloca ~regname:(Format.asprintf "%a" Printreg.reg reg) t reg
-  in
-  Reg.Set.iter alloca arg_regs;
-  Reg.Set.iter alloca temp_regs;
   List.iter
-    (fun (reg, old_ident) -> F.ins_store_into_reg t old_ident reg)
-    old_arg_idents
+    (fun (reg, ident_opt) -> make_temp reg ident_opt)
+    args_and_signature_idents;
+  Reg.Set.iter (fun reg -> make_temp reg None) temp_regs
+(* List.iter (fun (reg, old_ident) -> F.ins_store_into_reg t old_ident reg)
+   old_arg_idents *)
 
 let cfg (cl : CL.t) =
   let t = get_current_compilation_unit "cfg" in
@@ -809,7 +901,17 @@ let cfg (cl : CL.t) =
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
   let fun_args_with_idents =
-    Array.to_list fun_args |> List.map (fun arg -> arg, fresh_ident t)
+    Array.to_list fun_args
+    |> List.map (fun (arg : Reg.t) ->
+           let is_listed_in_signature =
+             match arg.loc with
+             | Reg _ -> true
+             | Stack _ -> false
+             | Unknown -> Misc.fatal_error "Llvmize: unknown parameter location"
+           in
+           if is_listed_in_signature
+           then arg, Some (fresh_ident t)
+           else arg, None)
   in
   let pp_block label =
     let block = Label.Tbl.find blocks label in
@@ -824,13 +926,21 @@ let cfg (cl : CL.t) =
     (* First unused numbered identifier after the argument list is reserved, so
        we cannot use it. We explicitly skip it here *)
     let (_ : Ident.t) = Ident.Gen.get_fresh t.current_fun_info.ident_gen in
-    alloca_regs t cfg fun_args_with_idents;
-    F.ins t "br %a" (F.pp_label t) entry_label;
+    make_temps_for_regs t cfg fun_args_with_idents;
+    F.ins_branch t entry_label;
     DLL.iter ~f:pp_block layout
   in
   let fun_attrs = fun_attrs t fun_codegen_options in
-  F.define t ~fun_name ~fun_args:fun_args_with_idents ~fun_ret_type ~fun_dbg
-    ~fun_attrs pp_body
+  let fun_args =
+    List.map (fun ident -> Llvm_typ.ptr, ident) runtime_regs
+    @ List.filter_map
+        (fun ((reg : Reg.t), ident) ->
+          match ident with
+          | None -> None
+          | Some ident -> Some (Llvm_typ.of_machtyp_component reg.typ, ident))
+        fun_args_with_idents
+  in
+  F.define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body
 
 (* CR yusumez: Implement this *)
 let data ds =
@@ -882,6 +992,13 @@ let emit_data t =
   in
   Option.iter (fun cur_sym -> declare cur_sym ds) cur_sym;
   emit_data_extern t
+
+let declare_functions t =
+  String.Map.iter
+    (fun sym (args, res) ->
+      if not (String.Set.mem sym t.defined_symbols)
+      then F.fun_decl t sym args res)
+    t.called_functions
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
@@ -937,6 +1054,8 @@ let begin_assembly ~sourcefile =
 
 let end_assembly () =
   let t = get_current_compilation_unit "end_asm" in
+  (* Declare functions not already defined *)
+  declare_functions t;
   (* Emit data declarations *)
   emit_data t;
   Format.pp_print_newline t.ppf ();
