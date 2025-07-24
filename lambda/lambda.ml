@@ -360,6 +360,9 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  (* Raw field access - bypasses some safety checks *)
+  | Prawfield
+  | Psetrawfield
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -2140,6 +2143,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Prawfield
+  | Psetrawfield
   | Pdls_get
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
@@ -2310,7 +2315,8 @@ let primitive_can_raise prim =
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ 
+  | Prawfield | Psetrawfield -> false
   | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
   | Pdls_get | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
@@ -2587,6 +2593,8 @@ let primitive_result_layout (p : primitive) =
   | Patomic_lor_field
   | Patomic_lxor_field
   | Ppoll -> layout_unit
+  | Prawfield -> layout_any_value
+  | Psetrawfield -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63 -> layout_int

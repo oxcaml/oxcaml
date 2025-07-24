@@ -961,6 +961,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lor_field" -> Atomic(Lor, Field)
     | "%atomic_lxor" -> Atomic(Lxor, Ref)
     | "%atomic_lxor_field" -> Atomic(Lxor, Field)
+    | "%raw_field" -> Primitive (Prawfield, 2)
+    | "%set_raw_field" -> Primitive (Psetrawfield, 3)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
     | "%runstack" ->
       if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
@@ -2091,6 +2093,7 @@ let lambda_primitive_needs_event_after = function
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field | Patomic_load_field _ | Patomic_set_field _
+  | Prawfield | Psetrawfield
   | Pcpu_relax | Pintofbint _ | Pctconst _ | Pbswap16 | Pint_as_pointer _
   | Popaque _ | Pdls_get
   | Pobj_magic _ | Punbox_float _ | Punbox_int _ | Punbox_vector _

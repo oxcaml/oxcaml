@@ -691,6 +691,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
     | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
+    | Prawfield -> binary (Ccall "caml_obj_raw_field")
+    | Psetrawfield -> ternary (Ccall "caml_obj_set_raw_field")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
