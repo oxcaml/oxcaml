@@ -1,5 +1,4 @@
 (* TEST
-  flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
    runtime5;
    multidomain;
    { bytecode; }
@@ -8,6 +7,9 @@
 
 open Effect
 open Effect.Deep
+
+[@@@ocaml.alert "-unsafe_multidomain"]
+[@@@ocaml.alert "-unsafe_parallelism"]
 
 type _ t += Stop : unit t
 
