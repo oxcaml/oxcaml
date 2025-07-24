@@ -114,7 +114,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
   | arg -> Iindexed 0, arg
 
 let select_addressing chunk exp : addressing_mode * Cmm.expression =
-  if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
   then Iindexed 0, exp
   else select_addressing' chunk exp
 
