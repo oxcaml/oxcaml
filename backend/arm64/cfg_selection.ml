@@ -98,7 +98,6 @@ let effects_of (expr : Cmm.expression) :
 let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
-  | arg when !Clflags.llvm_backend -> Iindexed 0, arg
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
     when use_direct_addressing s ->
     Ibased (s.sym_name, n), Ctuple []

@@ -195,10 +195,6 @@ let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
    passed *)
 let _get_ppf_dump t = t.ppf_dump
 
-(* CR yusumez: Write to this ppf alongside the normal one when -dllvmir is
-   passed *)
-let _get_ppf_dump t = t.ppf_dump
-
 module F = struct
   open Format
 
@@ -455,7 +451,6 @@ module F = struct
      instructions *)
 
   let terminator t (i : Cfg.terminator Cfg.instruction) =
-    pp_dbg_instr_terminator t.ppf i;
     pp_dbg_instr_terminator t.ppf i;
     match i.desc with
     | Never -> assert false
