@@ -958,7 +958,8 @@ struct
     mk_disable_precise_zero_alloc_checker F.disable_precise_zero_alloc_checker;
     mk_zero_alloc_checker_details_cutoff F.zero_alloc_checker_details_cutoff;
     mk_zero_alloc_checker_details_extra F.zero_alloc_checker_details_extra;
-    mk_no_zero_alloc_checker_details_extra F.no_zero_alloc_checker_details_extra;
+    mk_no_zero_alloc_checker_details_extra
+      F.no_zero_alloc_checker_details_extra;
     mk_zero_alloc_checker_join F.zero_alloc_checker_join;
 
     mk_function_layout F.function_layout;
