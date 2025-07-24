@@ -145,15 +145,8 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         let env =
           (* See explanation in [To_jsir_static_const.code]: we first create
              variables representing each continuation, so that mutually
-             recursive continuations can refer to them . *)
-          List.fold_left
-            (fun env cont ->
-              match To_jsir_env.get_continuation_exn env cont with
-              | _var -> env
-              | exception Not_found ->
-                let var = Jsir.Var.fresh () in
-                To_jsir_env.add_continuation env cont var)
-            env domain
+             recursive continuations can refer to them. *)
+          List.fold_left To_jsir_env.add_continuation_if_not_found env domain
         in
         let env, res =
           Continuation.Lmap.fold
