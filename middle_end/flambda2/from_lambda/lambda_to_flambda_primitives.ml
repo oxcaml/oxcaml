@@ -2745,11 +2745,15 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     (* Convert untagged immediate to naked int64 for Read_offset *)
     let byte_offset_int64 =
-      H.Prim (Unary (Num_conv { src = Naked_immediate; dst = Naked_int64 }, byte_offset))
+      H.Prim
+        (Unary
+           (Num_conv { src = Naked_immediate; dst = Naked_int64 }, byte_offset))
     in
     (* Wrap block in Opaque_identity to prevent Flambda2 from analyzing it *)
     let opaque_block =
-      H.Prim (Unary (Opaque_identity { middle_end_only = true; kind = K.value }, block))
+      H.Prim
+        (Unary
+           (Opaque_identity { middle_end_only = true; kind = K.value }, block))
     in
     [ Binary
         ( Read_offset (K.With_subkind.naked_nativeint, Asttypes.Mutable),
@@ -2773,11 +2777,15 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     (* Convert untagged immediate to naked int64 for Write_offset *)
     let byte_offset_int64 =
-      H.Prim (Unary (Num_conv { src = Naked_immediate; dst = Naked_int64 }, byte_offset))
+      H.Prim
+        (Unary
+           (Num_conv { src = Naked_immediate; dst = Naked_int64 }, byte_offset))
     in
     (* Wrap block in Opaque_identity to prevent Flambda2 from analyzing it *)
     let opaque_block =
-      H.Prim (Unary (Opaque_identity { middle_end_only = true; kind = K.value }, block))
+      H.Prim
+        (Unary
+           (Opaque_identity { middle_end_only = true; kind = K.value }, block))
     in
     [ Ternary
         ( Write_offset

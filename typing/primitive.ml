@@ -846,9 +846,11 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.value]
     
     | "%raw_field" ->
-      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.word]
+      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.value; 
+               Same_as_ocaml_repr C.word]
     | "%set_raw_field" ->
-      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.word; Same_as_ocaml_repr C.value]
+      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.value; 
+               Same_as_ocaml_repr C.word; Same_as_ocaml_repr C.value]
 
     | name -> (
         match String.Map.find_opt name stringlike_indexing_primitives with
