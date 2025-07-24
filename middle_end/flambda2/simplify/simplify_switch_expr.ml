@@ -700,6 +700,183 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
     let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
     arms, dacc
 
+let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
+  match DA.are_lifting_conts dacc with
+  | Lifting_out_of _ ->
+    Misc.fatal_errorf
+      "[Are_lifting_cont] values in the dacc cannot be [Lifting_out_of _] when \
+       going downwards through a [Switch] expression. See the explanation in \
+       [are_lifting_conts.mli]."
+  | Not_lifting _ -> dacc, `Not_lifting
+  | Analyzing { continuation; uses; is_exn_handler } -> (
+    (* Some preliminary requirements. We do **not** specialize continuations if
+       one of the following conditions are true:
+
+       - they have only one (or less) use
+
+       - they are an exception handler. To handle this case, the existing
+       mechanism used to rewrite specialized calls on the way up should be
+       extended to also rewrite pop_traps and other uses of exn handlers (which
+       is not currently the case).
+
+       - we are at toplevel, in which case there can be symbols which we might
+       duplicate by specializing (which would be an error). More generally, the
+       benefits of specialization at unit toplevel do not seem that great,
+       because partial evaluation would be better. *)
+    let n_uses = Continuation_uses.number_of_uses uses in
+    if n_uses <= 1
+    then dacc, `Single_use
+    else if is_exn_handler
+    then dacc, `Exn_handler
+    else if DE.at_unit_toplevel (DA.denv dacc)
+    then dacc, `Toplevel
+    else
+      let denv = DA.denv dacc in
+      match DE.specialization_cost denv with
+      | Cannot_specialize { reason = _ } ->
+        (* CR gbury: we could try and emit something analog to the inlining
+           report, but for other optimizations at one point ? *)
+        dacc, `Cannot_specialize
+      | Can_specialize spec_cost as spec_cost' -> (
+        (* Estimate the cost of lifting: this mainly comes from adding new
+           parameters, which increase the work done by the typing env, as well
+           as the flow analysis. We then only do the lifting if the cost is
+           within the budget for the current function. *)
+        let lifting_budget = DA.get_continuation_lifting_budget dacc in
+        let lifting_cost =
+          DE.cost_of_lifting_continuations_out_of_current_one denv
+        in
+        (* is_lifting_allowed_by_budget ? *)
+        if not (lifting_budget > 0 && lifting_cost <= lifting_budget)
+        then dacc, `Insuficient_lifting_budget
+        else
+          (* Main Criterion: whether all callsites (but one) of the continuation
+             determine the value of the scrutinee (and therefore the specialized
+             versions will eliminate the switch in favor of an apply_cont
+             directly). *)
+          let join_info =
+            match DA.get_join_id_for_continuation dacc continuation with
+            | Some join_id -> DE.get_join_info denv join_id
+            | None -> None
+          in
+          let join_info =
+            match join_info with
+            | None -> None
+            | Some join_info ->
+              Some
+                (Flambda2_types.Join_info.reduce join_info (DE.typing_env denv))
+          in
+          if Flambda_features.debug_flambda2 ()
+          then
+            Option.iter
+              (fun join_info ->
+                Format.eprintf "Scrutinee: %a@." Simple.print scrutinee;
+                Format.eprintf "%a@." Join_info.print join_info)
+              join_info;
+          let join_analysis_result =
+            match join_info with
+            | None -> `Not_enough_join_info
+            | Some join_info ->
+              let scrutinee =
+                TE.get_canonical_simple_exn (DE.typing_env denv)
+                  ~min_name_mode:Name_mode.in_types scrutinee
+              in
+              if Flambda_features.debug_flambda2 ()
+              then Format.eprintf "Real scrutinee: %a@." Simple.print scrutinee;
+              Simple.pattern_match scrutinee
+                ~name:(fun name ~coercion:_ ->
+                  match Join_info.known_values_at_uses name join_info with
+                  | Unknown -> `Not_enough_join_info
+                  | Known { unknown_at_uses; known_at_uses } -> (
+                    match
+                      Apply_cont_rewrite_id.Map.cardinal unknown_at_uses
+                    with
+                    | 0 | 1 -> `Spec (join_info, known_at_uses, unknown_at_uses)
+                    | _ ->
+                      if Apply_cont_rewrite_id.Map.is_empty known_at_uses
+                      then `All_unknown
+                      else `Too_many_unknown_uses))
+                ~const:(fun _ ->
+                  (* in this case, we don't need to specialize to know the
+                     scrutinee, or to simplify the switch, it will hapen without
+                     specialization. *)
+                  `No_reason_to_spec)
+          in
+          match join_analysis_result with
+          | ( `No_reason_to_spec | `Too_many_unknown_uses | `All_unknown
+            | `Not_enough_join_info ) as res ->
+            dacc, res
+          | `Spec (join_info, known_at_use, unknown_at_use) ->
+            (* Specialization benefit estimation: we use heuristics similar to
+               that of inlining to estimate the benefit based on code size and
+               removed operations.
+
+               CR gbury/bclement: currently the size of primtives do not include
+               some primitives that we expect to be simplified away (e.g.
+               Tag_immediate and Get_tag) and thus we often times expect
+               [size_of_primitives] to be 0. We should/could try to use info
+               from the typing env to know which primitives will have their
+               result determined by the values that are known at call_site (and
+               thus will disappear from the specialized versions). *)
+            let cost_metrics =
+              Specialization_cost.cost_metrics (DE.typing_env denv) spec_cost
+                ~switch ~join_info ~specialized:known_at_use
+                ~generic:unknown_at_use
+            in
+            let final_cost =
+              Cost_metrics.evaluate
+                ~args:(DE.inlining_arguments denv)
+                cost_metrics
+            in
+            let threshold = Flambda_features.Expert.cont_spec_threshold () in
+            if debug ()
+            then
+              Format.eprintf
+                "*** Continuation specialization %a@\n\
+                 analysis result: %f / %f@\n\
+                 known: %a @\n\
+                 unknown: %a @\n\
+                 spec cost: %a@\n\
+                 %a@."
+                Continuation.print continuation final_cost threshold
+                (Apply_cont_rewrite_id.Map.print Reg_width_const.print)
+                known_at_use
+                (Apply_cont_rewrite_id.Map.print Simple.print)
+                unknown_at_use Specialization_cost.print spec_cost'
+                Inlining_report.Context.print_cost_metrics cost_metrics;
+            if Float.compare threshold 0. < 0
+               || Float.compare final_cost threshold > 0
+            then dacc, `Too_costly
+            else
+              let dacc =
+                DA.decrease_continuation_lifting_budget dacc lifting_cost
+              in
+              let dacc =
+                DA.with_are_lifting_conts dacc
+                  (Are_lifting_conts.lift_continuations_out_of continuation)
+              in
+              let dacc = DA.add_continuation_to_specialize dacc continuation in
+              dacc, `Specialized))
+
+let decide_continuation_specialization ~dacc ~switch ~scrutinee =
+  Profile.record_with_counters ~accumulate:true "continuation_specialization"
+    (fun () -> decide_continuation_specialization0 ~dacc ~switch ~scrutinee)
+    ()
+    ~counter_f:(fun (_, result) ->
+      let counters = Profile.Counters.create () in
+      match result with
+      | `Single_use | `Exn_handler | `Toplevel | `All_unknown
+      | `No_reason_to_spec | `Not_lifting ->
+        counters
+      | `Cannot_specialize -> Profile.Counters.incr "cannot_spec" counters
+      | `Insuficient_lifting_budget ->
+        Profile.Counters.incr "no_lifting_budget" counters
+      | `Not_enough_join_info -> Profile.Counters.incr "no_join_info" counters
+      | `Too_many_unknown_uses ->
+        Profile.Counters.incr "too_much_unknown" counters
+      | `Too_costly -> Profile.Counters.incr "not_beneficial" counters
+      | `Specialized -> Profile.Counters.incr "specialized" counters)
+
 let simplify_switch0 dacc switch ~down_to_up =
   let scrutinee = Switch.scrutinee switch in
   let scrutinee_ty, scrutinee =
@@ -722,159 +899,7 @@ let simplify_switch0 dacc switch ~down_to_up =
   let condition_dbg =
     DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
   in
-  let dacc =
-    match DA.are_lifting_conts dacc with
-    | Lifting_out_of _ ->
-      Misc.fatal_errorf
-        "[Are_lifting_cont] values in the dacc cannot be [Lifting_out_of _] \
-         when going downwards through a [Switch] expression. See the \
-         explanation in [are_lifting_conts.mli]."
-    | Not_lifting -> dacc
-    | Analyzing { continuation; uses; is_exn_handler } -> (
-      (* Some preliminary requirements. We do **not** specialize continuations
-         if one of the following conditions are true:
-
-         - they have only one (or less) use
-
-         - they are an exception handler. To handle this case, the existing
-         mechanism used to rewrite specialized calls on the way up should be
-         extended to also rewrite pop_traps and other uses of exn handlers
-         (which is not currently the case).
-
-         - we are at toplevel, in which case there can be symbols which we might
-         duplicate by specializing (which would be an error). More generally,
-         the benefits of specialization at unit toplevel do not seem that great,
-         because partial evaluation would be better. *)
-      let n_uses = Continuation_uses.number_of_uses uses in
-      if is_exn_handler || n_uses <= 1 || DE.at_unit_toplevel (DA.denv dacc)
-      then dacc
-      else
-        let denv = DA.denv dacc in
-        match DE.specialization_cost denv with
-        | Cannot_specialize { reason = _ } ->
-          (* CR gbury: we could try and emit something analog to the inlining
-             report, but for other optimizations at one point ? *)
-          dacc
-        | Can_specialize spec_cost as spec_cost' -> (
-          (* Estimate the cost of lifting: this mainly comes from adding new
-             parameters, which increase the work done by the typing env, as well
-             as the flow analysis. We then only do the lifting if the cost is
-             within the budget for the current function. *)
-          let lifting_budget = DA.get_continuation_lifting_budget dacc in
-          let lifting_cost =
-            DE.cost_of_lifting_continuations_out_of_current_one denv
-          in
-          (* is_lifting_allowed_by_budget ? *)
-          if not (lifting_budget > 0 && lifting_cost <= lifting_budget)
-          then dacc
-          else
-            (* Main Criterion: whether all callsites (but one) of the
-               continuation determine the value of the scrutinee (and therefore
-               the specialized versions will eliminate the switch in favor of an
-               apply_cont directly). *)
-            let join_info =
-              match DA.get_join_id_for_continuation dacc continuation with
-              | Some join_id -> DE.get_join_info denv join_id
-              | None -> None
-            in
-            let join_info =
-              match join_info with
-              | None -> None
-              | Some join_info ->
-                Some
-                  (Flambda2_types.Join_info.reduce join_info
-                     (DE.typing_env denv))
-            in
-            if Flambda_features.debug_flambda2 ()
-            then
-              Option.iter
-                (fun join_info ->
-                  Format.eprintf "Scrutinee: %a@." Simple.print scrutinee;
-                  Format.eprintf "%a@." Join_info.print join_info)
-                join_info;
-            let join_analysis_result =
-              match join_info with
-              | None -> None
-              | Some join_info ->
-                let scrutinee =
-                  TE.get_canonical_simple_exn (DE.typing_env denv)
-                    ~min_name_mode:Name_mode.in_types scrutinee
-                in
-                if Flambda_features.debug_flambda2 ()
-                then
-                  Format.eprintf "Real scrutinee: %a@." Simple.print scrutinee;
-                Simple.pattern_match scrutinee
-                  ~name:(fun name ~coercion:_ ->
-                    match Join_info.known_values_at_uses name join_info with
-                    | Unknown -> None
-                    | Known { unknown_at_uses; known_at_uses } -> (
-                      match
-                        Apply_cont_rewrite_id.Map.cardinal unknown_at_uses
-                      with
-                      | 0 | 1 -> Some (join_info, known_at_uses, unknown_at_uses)
-                      | _ -> None))
-                  ~const:(fun _ ->
-                    (* in this case, we don't need to specialize to know the
-                       scrutinee, or to simplify the switch, it will hapen
-                       without specialization. *)
-                    None)
-            in
-            match join_analysis_result with
-            | None -> dacc
-            | Some (join_info, known_at_use, unknown_at_use) ->
-              (* Specialization benefit estimation: we use heuristics similar to
-                 that of inlining to estimate the benefit based on code size and
-                 removed operations.
-
-                 CR gbury/bclement: currently the size of primtives do not
-                 include some primitives that we expect to be simplified away
-                 (e.g. Tag_immediate and Get_tag) and thus we often times expect
-                 [size_of_primitives] to be 0. We should/could try to use info
-                 from the typing env to know which primitives will have their
-                 result determined by the values that are known at call_site
-                 (and thus will disappear from the specialized versions). *)
-              let cost_metrics =
-                Specialization_cost.cost_metrics (DE.typing_env denv) spec_cost
-                  ~switch ~join_info ~specialized:known_at_use
-                  ~generic:unknown_at_use
-              in
-              let final_cost =
-                Cost_metrics.evaluate
-                  ~args:(DE.inlining_arguments denv)
-                  cost_metrics
-              in
-              let threshold = Flambda_features.Expert.cont_spec_threshold () in
-              if debug ()
-              then
-                Format.eprintf
-                  "*** Continuation specialization %a@\n\
-                   analysis result: %f / %f@\n\
-                   known: %a @\n\
-                   unknown: %a @\n\
-                   spec cost: %a@\n\
-                   %a@."
-                  Continuation.print continuation final_cost threshold
-                  (Apply_cont_rewrite_id.Map.print Reg_width_const.print)
-                  known_at_use
-                  (Apply_cont_rewrite_id.Map.print Simple.print)
-                  unknown_at_use Specialization_cost.print spec_cost'
-                  Inlining_report.Context.print_cost_metrics cost_metrics;
-              if Float.compare threshold 0. < 0
-                 || Float.compare final_cost threshold > 0
-              then dacc
-              else
-                let dacc =
-                  DA.decrease_continuation_lifting_budget dacc lifting_cost
-                in
-                let dacc =
-                  DA.with_are_lifting_conts dacc
-                    (Are_lifting_conts.lift_continuations_out_of continuation)
-                in
-                let dacc =
-                  DA.add_continuation_to_specialize dacc continuation
-                in
-                dacc))
-  in
+  let dacc, _ = decide_continuation_specialization ~dacc ~switch ~scrutinee in
   down_to_up dacc
     ~rebuild:
       (rebuild_switch ~original:switch ~arms ~condition_dbg ~scrutinee

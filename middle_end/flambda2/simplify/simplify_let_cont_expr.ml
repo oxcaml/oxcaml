@@ -1089,7 +1089,10 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
     (* Set the adequate state for lifting. Note that this must be done **after**
        the call to {prepare_dacc_for_handlers} as that function can sometimes
        set some of these values for the generic case. *)
-    let dacc = DA.with_are_lifting_conts dacc Are_lifting_conts.no_lifting in
+    let dacc =
+      DA.with_are_lifting_conts dacc
+        (Are_lifting_conts.no_lifting In_continuation_specialization)
+    in
     simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler ~params cont
       dacc original.handler ~invariant_params:Bound_parameters.empty
       (fun dacc rebuild_handler cont_uses_env_in_handler ->
@@ -1331,7 +1334,8 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
          fields. *)
       | None ->
         let dacc =
-          DA.with_are_lifting_conts dacc Are_lifting_conts.no_lifting
+          DA.with_are_lifting_conts dacc
+            (Are_lifting_conts.no_lifting In_inlinable_continuation)
         in
         handler_env, do_not_unbox (), false, dacc)
     | Normal_or_exn | Define_root_symbol ->
@@ -1646,7 +1650,10 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
      * the continuation would be beneficial, and require lifting some continuations
      * out of a recursive continuation.
      *)
-    let dacc = DA.with_are_lifting_conts dacc Are_lifting_conts.no_lifting in
+    let dacc =
+      DA.with_are_lifting_conts dacc
+        (Are_lifting_conts.no_lifting In_recursive_continuation)
+    in
     let denv = DE.set_at_unit_toplevel_state denv false in
     let all_conts_set =
       Continuation.Set.of_list @@ Continuation.Lmap.keys continuation_handlers
@@ -1715,7 +1722,7 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
       DA.add_to_lifted_constant_accumulator dacc data.prior_lifted_constants
     in
     down_to_up dacc ~rebuild:rebuild_body
-  | Not_lifting | Analyzing _ ->
+  | Not_lifting _ | Analyzing _ ->
     simplify_handlers data dacc ~simplify_expr ~down_to_up ~denv_for_join
       ~rebuild_body
 
