@@ -110,7 +110,8 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
         let handler = Non_recursive_let_cont_handler.handler handler in
-        Continuation_handler.pattern_match handler ~f:(fun params ~handler ->
+        Continuation_handler.pattern_match handler
+          ~f:(fun params ~handler:cont_body ->
             let params, env = To_jsir_shared.bound_parameters ~env params in
             let res, addr = To_jsir_result.new_block res ~params in
             let _env, res = expr ~env ~res handler in
