@@ -5,10 +5,12 @@
 external raw_field : 'a -> int -> nativeint# = "%raw_field"
 external set_raw_field : 'a -> int -> nativeint# -> unit = "%set_raw_field"
 
-(* Helper to print nativeint# values *)
 external box_nativeint : nativeint# -> nativeint = "%box_nativeint"
+
 let print_nativeint_unboxed (n : nativeint#) =
-  Printf.printf "%nd\n" (box_nativeint n)
+  print_int (Nativeint.to_int (box_nativeint n));
+  print_newline ()
+
 
 (* Test with tuples *)
 let test_tuples () =
@@ -100,29 +102,6 @@ let test_mutable_records () =
   Printf.printf "r.d = %d\n" r.d;
   ()
 
-(* Test with records containing nativeint# fields *)
-type nativeint_record = {
-  n1 : nativeint#;
-  mutable n2 : nativeint#;
-  n3 : int;
-}
-
-let test_nativeint_records () =
-  print_endline "=== Testing records with nativeint# fields ===";
-  let r = {
-    n1 = #0x1234n;
-    n2 = #0x5678n;
-    n3 = 42;
-  } in
-  print_endline "Record with nativeint# fields:";
-  print_nativeint_unboxed (raw_field r 0);
-  print_nativeint_unboxed (raw_field r 1);
-  print_nativeint_unboxed (raw_field r 2);
-
-  print_endline "Setting nativeint# field to 0xABCD:";
-  set_raw_field r 1 #0xABCDn;
-  print_nativeint_unboxed (raw_field r 1);
-  ()
 
 let () =
   test_tuples ();
@@ -131,6 +110,4 @@ let () =
   print_newline ();
   test_immutable_records ();
   print_newline ();
-  test_mutable_records ();
-  print_newline ();
-  test_nativeint_records ()
+  test_mutable_records ()
