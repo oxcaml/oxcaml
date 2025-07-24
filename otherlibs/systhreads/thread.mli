@@ -39,12 +39,6 @@ module Portable : sig
 
      See also {!Domain.spawn} if you want parallel execution instead.
      *)
-
-  val create2
-    : ('a : value_or_null & value_or_null) 'b.
-        ('a -> 'b) @ once portable -> 'a -> t
-  (** [create2] is like [create], but the argument to the thread is an unboxed
-      pair *)
 end
 
 val create : ('a -> 'b) -> 'a -> t @@ nonportable
@@ -63,12 +57,6 @@ val create : ('a -> 'b) -> 'a -> t @@ nonportable
 
    See also {!Domain.spawn} if you want parallel execution instead.
    *)
-
-val create2
-  : ('a : value_or_null & value_or_null) 'b.
-      ('a -> 'b) @ once portable -> 'a -> t
-(** [create2] is like [create], but the argument to the thread is an unboxed
-    pair *)
 
 val self : unit -> t
 (** Return the handle for the thread currently executing. *)

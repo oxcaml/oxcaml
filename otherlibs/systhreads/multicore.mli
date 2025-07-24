@@ -48,8 +48,8 @@ type 'a spawn_result =
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn_on
   :   domain:int
-  -> ('a @ unique -> unit) @ once portable unyielding
-  -> 'a @ unique
+  -> ('a @ unique portable -> unit) @ once portable unyielding
+  -> 'a @ unique portable
   -> 'a spawn_result @ unique
 
 (** [spawn action] spawns [action] as a thread running on some domain.
@@ -63,6 +63,6 @@ val spawn_on
 
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn
-  :  ('a @ unique -> unit) @ once portable unyielding
-  -> 'a @ unique
+  :  ('a @ unique portable -> unit) @ once portable unyielding
+  -> 'a @ unique portable
   -> 'a spawn_result @ unique

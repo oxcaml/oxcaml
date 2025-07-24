@@ -96,18 +96,24 @@ module Await_atomic_bitset = struct
     ;;
 end
 
-type request : value mod contended portable =
-    Request :
-      { action : 'a @ unique -> unit @@ portable
-      ; argument : 'a
-      ; mutable error : (exn * Printexc.raw_backtrace) Modes.Portable.t option
-      ; mutable ready : bool
-      ; mutex : Mutex.t
-      ; condition : Condition.t
-      }
-      -> request
+type 'a spawn_result =
+  | Spawned
+  | Failed of 'a * exn @@ aliased * Printexc.raw_backtrace @@ aliased
+
+type 'a request_inner : value mod contended portable  =
+  { action : 'a @ unique portable -> unit @@ portable
+  ; argument : 'a @@ portable
+  ; mutable result : 'a spawn_result @@ portable
+  ; mutable ready : bool
+  ; mutex : Mutex.t
+  ; condition : Condition.t
+  }
 [@@unsafe_allow_any_mode_crossing
    (* The mutable fields are synchronized via [mutex] and [condition]. *)]
+
+type request : value mod contended portable =
+    Request : 'a request_inner -> request
+[@@unboxed]
 
 type t : value mod contended portable =
   { index : int
@@ -205,8 +211,9 @@ let () =
   done
 ;;
 
+
 (** Run some function on a new thread. *)
-let thread #(action, argument) =
+let thread (Request { action; argument; _ })=
   let decr () =
     let t = get (current_domain ()) in
     let threads_before_decr = Atomic.fetch_and_add t.threads (-1) in
@@ -216,12 +223,14 @@ let thread #(action, argument) =
          We must wakeup the manager to potentially allow it to exit. *)
       wakeup_manager t
   in
-  match
-    action
-      (* SAFETY: We know each value is only popped from the request stack
-         once *)
-      (Obj.magic_unique argument)
-  with
+  let open struct
+    (* SAFETY: We know each value is only popped from the request stack
+       once *)
+    external magic_unique_argument
+      : 'a @ portable -> 'a @ portable unique
+      = "%identity"
+  end in
+  match action (magic_unique_argument argument) with
   | () -> decr ()
   | exception exn ->
     let bt = Printexc.get_raw_backtrace () in
@@ -248,12 +257,8 @@ let rec manager_loop t =
       manager_loop t
     | _ ->
       let requests = Atomic.exchange t.incoming [] in
-      List.iter (fun (Request request : request) ->
-        (match
-           Thread.Portable.create2
-             thread
-             #(request.action, request.argument)
-         with
+      List.iter (fun ((Request req) as request) ->
+        (match Thread.Portable.create thread request with
          | _ -> ()
          | exception exn ->
            (* This might fail if the user tries to create too many threads *)
@@ -264,11 +269,13 @@ let rec manager_loop t =
               function. In other words, the [exn] and [bt] are in fact portable
               and uncontended meaning that they do not contain shared mutable
               state being potentially accessed by multiple threads. *)
-           request.error <- Some { portable = Obj.magic_portable (exn, bt) });
-        Mutex.lock request.mutex;
-        request.ready <- true;
-        Condition.signal request.condition;
-        Mutex.unlock request.mutex)
+           req.result <-
+             Failed (
+               req.argument, Obj.magic_portable exn, Obj.magic_portable bt));
+        Mutex.lock req.mutex;
+        req.ready <- true;
+        Condition.signal req.condition;
+        Mutex.unlock req.mutex)
         requests;
       manager_loop t)
 ;;
@@ -286,10 +293,6 @@ let create_initial_manager =
     if Atomic.Contended.get need_manager &&
        Atomic.Contended.exchange need_manager false
     then ignore (Thread.Portable.create manager (get 0))
-
-type 'a spawn_result =
-  | Spawned
-  | Failed of 'a * exn @@ aliased * Printexc.raw_backtrace @@ aliased
 
 let spawn_on ~domain:i f a =
   if i < 0 || max_domains () <= i
@@ -313,11 +316,11 @@ let spawn_on ~domain:i f a =
   let threads_before_incr = Atomic.fetch_and_add t.threads 1 in
   let mutex = Mutex.create () in
   let condition = Condition.create () in
-  let request =
-    Request
-      { action = f; argument = a; error = None; ready = false; mutex;
-        condition }
+  let request_inner =
+    { action = f; argument = a; result = Spawned; ready = false; mutex;
+      condition }
   in
+  let request = Request request_inner in
   push t.incoming request;
   if threads_before_incr = 0
   then (
@@ -339,17 +342,13 @@ let spawn_on ~domain:i f a =
   (* We have added incoming work and must wakeup the manager thread. *)
   wakeup_manager t;
   Mutex.lock mutex;
-  while let Request { ready; _ } = request in not ready do
+  while not request_inner.ready do
     Condition.wait condition mutex
   done;
   Mutex.unlock mutex;
-  match request with
-  | Request { error = None; _ } -> Spawned
-  | Request { error = Some { portable = exn, bt }; _ } ->
-    Failed (
-      (* SAFETY: We know that if we got an error here, the thread failed to spawn and
-         hence no longer has a reference to [a] *)
-      Obj.magic_unique a, exn, bt)
+  (* SAFETY: We know that if we got an error here, the thread failed to spawn
+     and hence no longer has a reference to [a] *)
+  Obj.magic_unique request_inner.result
 ;;
 
 let spawn f =
