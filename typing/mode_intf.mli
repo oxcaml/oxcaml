@@ -240,9 +240,6 @@ module type S = sig
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
-      | Crossing_left : ('l * disallowed) morph
-        (* TODO - consider renaming to more descriptive name (and [Crossing_right] too) *)
-      | Crossing_right : (disallowed * 'r) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
