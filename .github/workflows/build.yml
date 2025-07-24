@@ -299,7 +299,7 @@ jobs:
       if: matrix.run_regalloc_tool == true
       run: |
         for allocator in irc ls gi; do \
-          find _build -name \*.cmir-cfg-regalloc -exec ./_build/default/tools/regalloc/regalloc.exe \
+          find _build -name \*.cmir-cfg-regalloc -exec ./_build/main/tools/regalloc/regalloc.exe \
             -validate -regalloc $allocator {} \; ; \
         done
 
