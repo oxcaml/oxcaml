@@ -168,10 +168,8 @@ module type Solver_mono = sig
       comments on [Lattices_mono.morph]. *)
   type ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
-  (** Hints describing the reasons for morphisms *)
   type 'd hint_morph constraint 'd = 'l * 'r
 
-  (** Hints describing the reasons for constants *)
   type hint_const
 
   (** The object type from the [Lattices_mono] we're working with *)
@@ -182,7 +180,9 @@ module type Solver_mono = sig
     | Morph :
         'd hint_morph * ('b, 'a, 'd) morph * ('b, 'd) hint
         -> ('a, 'd) hint
-        (** [Morph m f x_hint] says the current bound is derived by applying morphism [f] (explained by [m]) to another bound explained by [x_hint] *)
+        (** [Morph morph_hint morph x_hint] says the current bound is derived by applying
+            morphism [morph] (explained by [morph_hint]) to another bound explained by
+            [x_hint] *)
     | Const : hint_const -> ('a, 'd) hint
         (** [Const c] says the current bound is explained by [c] *)
     | Branch : 'a * ('a, 'd) hint * 'a * ('a, 'd) hint -> ('a, 'd) hint
@@ -190,7 +190,8 @@ module type Solver_mono = sig
 
   (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
    can be, and [right] will be the highest mode [b] can be. And [left <= right]
-   will be false, which is why the submode failed. *)
+   will be false, which is why the submode failed.  [left_hint] explains
+   [left] and [right_hint] explains [right] *)
   type 'a error =
     { left : 'a;
       left_hint : ('a, left_only) hint;
@@ -302,23 +303,26 @@ module type Solver_mono = sig
     ('b, 'l * 'r) mode
 end
 
+(** Interface for hints, as needed by the solver *)
 module type Hint = sig
-  (** The type of hints for mode constants *)
+  (** Hints describing the reasons for constants *)
   type const
 
   (** The empty mode constant hint *)
   val const_none : const
 
-  (** The type of hints for mode variables with morphisms *)
+  (** Hints describing the reasons for morphisms applied to modes.
+      The type parameter gives the allowance of the hint, which should correspond
+      to the allowance of the morphism. *)
   type 'd morph constraint 'd = 'l * 'r
 
-  (** The empty mode morphism hint: an empty morphism hint.
-      The error reporter should terminate the trace on seeing this. *)
+  (** The empty mode morphism hint. The error reporter should terminate
+      the trace on seeing this. *)
   val morph_none : 'd morph
 
-  (** The skip mode morphism hint: an empty morphism hint,
-      but telling the error reporter to continue the trace,
-      instead of terminating it there, as it would for [morph_none]. *)
+  (** The skip mode morphism hint. No output is printed for this but it tells the
+      error reporter to continue the trace, instead of terminating it there, as
+      it would for [morph_none]. *)
   val morph_skip : 'd morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
