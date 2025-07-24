@@ -102,35 +102,20 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   in
   expr ~env ~res body
 
-(** Convert a [Continuation_handler.t] into a code block containing the body
-    of the continuation, and return the address of the new block. *)
-and continuation_handler ~env ~res ~invariant_params handler =
-  Continuation_handler.pattern_match handler
-    ~f:(fun params ~handler:cont_body ->
-      let params =
-        match invariant_params with
-        | None -> params
-        | Some invariant_params ->
-          Bound_parameters.append invariant_params params
-      in
-      let params, env = To_jsir_shared.bound_parameters ~env params in
-      let res, addr = To_jsir_result.new_block res ~params in
-      let _env, res = expr ~env ~res cont_body in
-      addr, env, res)
-
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
   (* We treat continuations as normal functions (i.e. a code block and a
      corresponding [Closure]. *)
   match e with
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
-    let continuation = Non_recursive_let_cont_handler.handler handler in
-    let addr, env, res =
-      continuation_handler ~env ~res ~invariant_params:None continuation
-    in
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
-        let env = To_jsir_env.add_continuation env k addr in
-        expr ~env ~res body)
+        let handler = Non_recursive_let_cont_handler.handler handler in
+        Continuation_handler.pattern_match handler ~f:(fun params ~handler ->
+            let params, env = To_jsir_shared.bound_parameters ~env params in
+            let res, addr = To_jsir_result.new_block res ~params in
+            let _env, res = expr ~env ~res handler in
+            let env = To_jsir_env.add_continuation env k addr in
+            expr ~env ~res body))
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
       ~f:(fun ~invariant_params ~body conts ->
@@ -140,22 +125,43 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             "Recursive continuation bindings cannot involve exception \
              handlers:@ %a"
             Let_cont.print e;
-        (* let domain = Flambda.Continuation_handlers.domain conts in
-         * let env =
-         *   (* See explanation in [To_jsir_static_const.code]: we first create
-         *      variables representing each continuation, so that mutually
-         *      recursive continuations can refer to them. *)
-         *   List.fold_left To_jsir_env.add_continuation_if_not_found env domain
-         * in *)
+        let domain = Flambda.Continuation_handlers.domain conts in
         let env, res =
-          Continuation.Lmap.fold
-            (fun k continuation (env, res) ->
-              let addr, env, res =
-                continuation_handler ~env ~res
-                  ~invariant_params:(Some invariant_params) continuation
-              in
+          (* See explanation in [To_jsir_static_const.code]: we first reserve
+             addresses representing each continuation, so that mutually
+             recursive continuations can refer to them. *)
+          List.fold_left
+            (fun (env, res) k ->
+              let res, addr = To_jsir_result.reserve_address res in
               let env = To_jsir_env.add_continuation env k addr in
               env, res)
+            (env, res) domain
+        in
+        let env, res =
+          Continuation.Lmap.fold
+            (fun k handler (env, res) ->
+              Continuation_handler.pattern_match handler
+                ~f:(fun params ~handler:cont_body ->
+                  let params =
+                    Bound_parameters.append invariant_params params
+                  in
+                  let params, env =
+                    To_jsir_shared.bound_parameters ~env params
+                  in
+                  let addr =
+                    match To_jsir_env.get_continuation_exn env k with
+                    | Return | Exception ->
+                      Misc.fatal_errorf
+                        "Continuation %a is unexpectedly a return or exception \
+                         continuation of the current environment"
+                        Continuation.print k
+                    | Block addr -> addr
+                  in
+                  let res =
+                    To_jsir_result.new_block_with_addr_exn res ~params ~addr
+                  in
+                  let _env, res = expr ~env ~res cont_body in
+                  env, res))
             (Flambda.Continuation_handlers.to_map conts)
             (env, res)
         in
