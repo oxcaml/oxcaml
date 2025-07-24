@@ -132,8 +132,6 @@ module type Common_axis = sig
 
   type hint_const
 
-  type 'a axhint
-
   type 'a axerror
 
   include
@@ -167,8 +165,6 @@ module type Common_product = sig
   type 'd hint_morph constraint 'd = 'l * 'r
 
   type hint_const
-
-  type 'a axhint
 
   type 'a axerror
 
@@ -311,7 +307,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val global : lr
@@ -351,7 +346,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val global : lr
@@ -376,7 +370,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val many : lr
@@ -399,7 +392,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
   end
 
@@ -420,7 +412,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd neg) mode
          and type 'd hint_morph := 'd Hint.neg_morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val aliased : lr
@@ -446,7 +437,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd neg) mode
          and type 'd hint_morph := 'd Hint.neg_morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
   end
 
@@ -465,7 +455,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val yielding : lr
@@ -489,7 +478,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val stateless : lr
@@ -517,7 +505,6 @@ module type S = sig
          and type 'd t = (Const.t, 'd neg) mode
          and type 'd hint_morph := 'd Hint.neg_morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
 
     val immutable : lr
@@ -571,7 +558,6 @@ module type S = sig
            and type 'a Axis.t = (monadic, 'a) Axis.t
            and type 'd hint_morph := 'd Hint.neg_morph
            and type hint_const := Hint.const
-           and type 'a axhint := 'a axhint
            and type 'a axerror := 'a axerror
            and type lock_item := Hint.lock_item
 
@@ -584,7 +570,6 @@ module type S = sig
          and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
          and type 'd hint_morph := 'd Hint.morph
          and type hint_const := Hint.const
-         and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
          and type lock_item := Hint.lock_item
 
