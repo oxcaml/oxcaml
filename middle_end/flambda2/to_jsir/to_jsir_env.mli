@@ -29,8 +29,8 @@ val enter_function_body :
 (** Symbol corresponding to the module currently compiling. *)
 val module_symbol : t -> Symbol.t
 
-(** Map a Flambda2 continuation to a JSIR variable (bound to the corresponding function). *)
-val add_continuation : t -> Continuation.t -> Jsir.Var.t -> t
+(** Map a Flambda2 continuation to the address of the corresponding block. *)
+val add_continuation : t -> Continuation.t -> Jsir.Addr.t -> t
 
 (** Map a Flambda2 variable to a JSIR variable. *)
 val add_var : t -> Variable.t -> Jsir.Var.t -> t
@@ -58,7 +58,7 @@ val add_value_slot : t -> Value_slot.t -> Jsir.Var.t -> t
 type continuation =
   | Return
   | Exception
-  | Function of Jsir.Var.t
+  | Block of Jsir.Addr.t
 
 (** Return the block address for the given continuation. Raises if given an
     unbound continuation. *)

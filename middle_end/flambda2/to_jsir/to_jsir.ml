@@ -112,16 +112,10 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
     Continuation_handler.pattern_match continuation
       ~f:(fun params ~handler:cont_body ->
         let params, env = To_jsir_shared.bound_parameters ~env params in
-        let res, addr = To_jsir_result.new_block res ~params:[] in
+        let res, addr = To_jsir_result.new_block res ~params in
         let _env, res = expr ~env ~res cont_body in
         Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
-            (* CR selee: thread through debug information *)
-            let closure_expr : Jsir.expr = Closure (params, (addr, []), None) in
-            let var = Jsir.Var.fresh () in
-            let env = To_jsir_env.add_continuation env k var in
-            let res =
-              To_jsir_result.add_instr_exn res (Let (var, closure_expr))
-            in
+            let env = To_jsir_env.add_continuation env k addr in
             expr ~env ~res body))
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
@@ -150,17 +144,16 @@ and apply_expr ~env ~res e =
   (* CR selee: assume exact = false for now, JSIR seems to assume false in the
      case that we don't know *)
   let var, res = apply_fn ~res ~f ~args ~exact:false in
-  let var, res =
-    match continuation with
-    | Never_returns -> var, res
-    | Return cont -> (
-      match To_jsir_env.get_continuation_exn env cont with
-      | Exception ->
-        failwith "unimplemented" (* CR selee: or should be disallowed? *)
-      | Return -> var, res
-      | Function f -> apply_fn ~res ~f ~args:[var] ~exact:true)
-  in
-  env, To_jsir_result.end_block_with_last_exn res (Return var)
+  match continuation with
+  | Never_returns ->
+    env, To_jsir_result.end_block_with_last_exn res (Return var)
+  | Return cont -> (
+    match To_jsir_env.get_continuation_exn env cont with
+    | Exception ->
+      failwith "unimplemented" (* CR selee: or should be disallowed? *)
+    | Return -> env, To_jsir_result.end_block_with_last_exn res (Return var)
+    | Block addr ->
+      env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var])))
 
 and apply_cont ~env ~res apply_cont =
   let args, res =
@@ -214,9 +207,8 @@ and apply_cont ~env ~res apply_cont =
           Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
             Continuation.print continuation)
       | Exception -> failwith "unimplemented"
-      | Function f ->
-        let var, res = apply_fn ~res ~f ~args ~exact:true in
-        To_jsir_result.end_block_with_last_exn res (Jsir.Return var))
+      | Block addr ->
+        To_jsir_result.end_block_with_last_exn res (Jsir.Branch (addr, args)))
     | Some (Push { exn_handler }) ->
       ignore exn_handler;
       failwith "unimplemented"
