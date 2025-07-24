@@ -1799,9 +1799,6 @@ type print_morph_hint =
   | Stop
       (** [Stop] means we don't print anything for this line,
       and stop the trace here *)
-  | PrintThenStop of (Format.formatter -> unit)
-      (** [PrintThenStop pp] means we print this line, using [pp] to print the
-      morph hint, then stop the trace here *)
   | PrintThenContinue of (Format.formatter -> unit)
       (** [PrintThenContinue pp] means we print this line, using [pp] to print the
       morph hint, then continue onto the next hint *)
@@ -1812,9 +1809,17 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
   let open Format in
   fun hint ->
     match hint with
-    (* | Debug s -> PrintThenContinue (dprintf "DEBUG[%s]" s) *)
+    (* | Debug s ->
+       let _ = Skip in
+       PrintThenContinue (dprintf "DEBUG[%s]" s) *)
     | Debug _ -> Skip
+    (* | None ->
+       let _ = Stop in
+       PrintThenContinue (dprintf "[None]") *)
     | None -> Stop
+    (* | Skip ->
+       let _ = Skip in
+       PrintThenContinue (dprintf "[Skip]") *)
     | Skip -> Skip
     | Close_over closure ->
       (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
@@ -1835,12 +1840,10 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
       match print_morph_hint hint1 with
       | Skip -> print_morph_hint hint2
       | Stop -> Stop
-      | PrintThenStop pp1 -> PrintThenStop pp1
       | PrintThenContinue pp1 -> (
         match print_morph_hint hint2 with
         | Skip -> PrintThenContinue pp1
-        | Stop -> PrintThenStop pp1
-        | PrintThenStop pp2 -> PrintThenStop (dprintf "%t@ which %t" pp1 pp2)
+        | Stop -> Stop
         | PrintThenContinue pp2 ->
           PrintThenContinue (dprintf "%t@ which %t" pp1 pp2)))
 
@@ -1898,10 +1901,6 @@ let rec print_axhint_chain :
       | Stop ->
         print_mode a_obj a;
         NothingPrinted
-      | PrintThenStop pp ->
-        print_mode a_obj a;
-        fprintf ppf "@ because it %t@ which is of some mode" pp;
-        HintPrinted
       | PrintThenContinue pp ->
         print_mode a_obj a;
         fprintf ppf "@ because it %t@ which is " pp;

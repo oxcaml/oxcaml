@@ -394,10 +394,7 @@ let foo () =
 Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
-Error: This value is "stateful"
-       because it closes over a value (at Line 3, characters 28-29)
-       which is of some mode.
-       However, it is expected to be "stateless".
+Error: This value is "stateful" but expected to be "stateless".
 |}]
 
 let foo : int Atomic.t @ read_write -> (unit -> unit) @ stateless =
@@ -482,10 +479,7 @@ let foo () =
 Line 4, characters 22-25:
 4 |   let _ @ stateless = bar in
                           ^^^
-Error: This value is "observing"
-       because it closes over a value (at Line 3, characters 26-27)
-       which is of some mode.
-       However, it is expected to be "stateless".
+Error: This value is "observing" but expected to be "stateless".
 |}]
 
 (* Closing over a observing value also gives observing. *)

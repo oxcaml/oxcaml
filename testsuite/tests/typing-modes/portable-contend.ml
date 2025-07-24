@@ -140,10 +140,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
-       because it closes over a value (at Line 3, characters 25-26)
-       which is of some mode.
-       However, it is expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* Closing over reading mutable field from shared value is nonportable *)
@@ -155,10 +152,7 @@ let foo (r @ shared) =
 Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
-       because it closes over a value (at Line 2, characters 25-26)
-       which is of some mode.
-       However, it is expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* Closing over reading immutable field is OK *)
@@ -239,10 +233,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
-       because it closes over a value (at Line 3, characters 27-28)
-       which is of some mode.
-       However, it is expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* Closing over read gives nonportable *)
@@ -255,10 +246,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
-       because it closes over a value (at Line 3, characters 27-28)
-       which is of some mode.
-       However, it is expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* Closing over Array.length doesn't force nonportable; but that needs a
