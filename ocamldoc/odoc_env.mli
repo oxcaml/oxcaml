@@ -25,12 +25,19 @@ val empty : env
 (** Extending an environment *)
 
 val add_signature : env -> string -> ?rel:string -> Types.signature -> env
+
 val add_extension : env -> Odoc_name.t -> env
+
 val add_type : env -> Odoc_name.t -> env
+
 val add_value : env -> Odoc_name.t -> env
+
 val add_module : env -> Odoc_name.t -> env
+
 val add_module_type : env -> Odoc_name.t -> env
+
 val add_class : env -> Odoc_name.t -> env
+
 val add_class_type : env -> Odoc_name.t -> env
 
 (** Retrieving fully qualified names from an environment *)

@@ -1,7 +1,7 @@
 (* TEST
- plugins = "odoc_test.ml";
- flags = "-I ${ocamlsrcdir}/ocamldoc -I ${ocamlsrcdir}/typing";
- ocamldoc;
+   plugins = "odoc_test.ml";
+   flags = "-I ${ocamlsrcdir}/ocamldoc -I ${ocamlsrcdir}/typing";
+   ocamldoc;
 *)
 
 (** Testing display of types.
@@ -11,23 +11,31 @@
 
 let x = 1
 
-
 module M = struct
   let y = 2
-
 end
 
 module type MT = sig
-  type t = string -> int -> string -> (string * string * string) ->
-    (string * string * string) ->
-      (string * string * string) -> unit
+  type t =
+    string ->
+    int ->
+    string ->
+    string * string * string ->
+    string * string * string ->
+    string * string * string ->
+    unit
+
   val y : int
 
   type ob = < f : int >
 
   type obj_type =
-     < foo : int ; bar : float -> string ; ob ; gee : int -> (int * string) >
+    < foo : int ; bar : float -> string ; ob ; gee : int -> int * string >
 
   type g = [`A]
-  type h = [`B of int | g | `C of string]
+
+  type h =
+    [ `B of int
+    | g
+    | `C of string ]
 end

@@ -18,7 +18,9 @@
 open Format
 
 val loadfile : formatter -> string -> unit
+
 val install_printer : formatter -> Longident.t -> unit
+
 val remove_printer : Longident.t -> unit
 
 (* Error report *)
@@ -32,4 +34,4 @@ type error =
 
 exception Error of error
 
-val report_error: formatter -> error -> unit
+val report_error : formatter -> error -> unit

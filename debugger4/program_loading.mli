@@ -25,11 +25,13 @@ val launching_func : (unit -> unit) ref
 
 val load_program : unit -> unit
 
-type launching_function = (unit -> unit)
+type launching_function = unit -> unit
 
 val loading_modes : (string * launching_function) list
+
 val set_launching_function : launching_function -> unit
 
 (** Connection **)
 val connection : Primitives.io_channel ref
+
 val connection_opened : bool ref

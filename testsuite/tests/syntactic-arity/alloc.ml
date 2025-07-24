@@ -1,18 +1,18 @@
 (* TEST
- setup-ocamlopt.byte-build-env;
- ocamlopt.byte;
- run;
- check-program-output;
+   setup-ocamlopt.byte-build-env;
+   ocamlopt.byte;
+   run;
+   check-program-output;
 *)
 
 type a = { mutable a : int }
 
-let mutable_pat1 {a} b = a + b
+let mutable_pat1 { a } b = a + b
 
-let mutable_pat2 b {a} = b + a
+let mutable_pat2 b { a } = b + a
 
 let measure name f =
-  let a = {a = 1} in
+  let a = { a = 1 } in
   let b = 2 in
   let before = Gc.minor_words () in
   let (_ : int) = f ~a ~b in

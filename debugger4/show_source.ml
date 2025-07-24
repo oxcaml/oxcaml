@@ -24,33 +24,32 @@ open Source
 (* Print a line; return the beginning of the next line *)
 let print_line buffer line_number start point before =
   let linefeed = next_linefeed buffer start
-  and content = buffer_content buffer
+  and content = buffer_content buffer in
+  printf "%i " line_number;
+  let line_end =
+    if linefeed > 0 && content.[linefeed - 1] = '\r'
+    then linefeed - 1
+    else linefeed
   in
-    printf "%i " line_number;
-    let line_end =
-      if linefeed > 0 && content.[linefeed - 1] = '\r' then
-        linefeed - 1
-      else
-        linefeed in
-    if point <= line_end && point >= start then
-      (print_string (String.sub content start (point - start));
-       print_string (if before then event_mark_before else event_mark_after);
-       print_string (String.sub content point (line_end - point)))
-    else
-      print_string (String.sub content start (line_end - start));
-    print_newline ();
-    linefeed
+  if point <= line_end && point >= start
+  then (
+    print_string (String.sub content start (point - start));
+    print_string (if before then event_mark_before else event_mark_after);
+    print_string (String.sub content point (line_end - point)))
+  else print_string (String.sub content start (line_end - start));
+  print_newline ();
+  linefeed
 
 (* Tell Emacs we are nowhere in the source. *)
-let show_no_point () =
-  if !emacs then printf "\026\026H\n"
+let show_no_point () = if !emacs then printf "\026\026H\n"
 
 (* Print the line containing the point *)
 let show_point ev selected =
   let mdle = ev.ev_module in
-  let before = (ev.ev_kind = Event_before) in
-  if !emacs && selected then
-    begin try
+  let before = ev.ev_kind = Event_before in
+  if !emacs && selected
+  then (
+    try
       let buffer = get_buffer (Events.get_pos ev) mdle in
       let source = source_of_module ev.ev_loc.Location.loc_start mdle in
       printf "\026\026M%s:%i:%i" source
@@ -58,37 +57,43 @@ let show_point ev selected =
         (snd (start_and_cnum buffer ev.ev_loc.Location.loc_end));
       printf "%s\n" (if before then ":before" else ":after")
     with
-      Out_of_range -> (* point_of_coord *)
-        prerr_endline "Position out of range."
-    | Not_found    -> (* Events.get_pos || get_buffer *)
-        prerr_endline ("No source file for " ^ mdle ^ ".");
-        show_no_point ()
-    end
+    | Out_of_range ->
+      (* point_of_coord *)
+      prerr_endline "Position out of range."
+    | Not_found ->
+      (* Events.get_pos || get_buffer *)
+      prerr_endline ("No source file for " ^ mdle ^ ".");
+      show_no_point ())
   else
-    begin try
+    try
       let pos = Events.get_pos ev in
       let buffer = get_buffer pos mdle in
       let start, point = start_and_cnum buffer pos in
-      ignore(print_line buffer pos.Lexing.pos_lnum start point before)
+      ignore (print_line buffer pos.Lexing.pos_lnum start point before)
     with
-      Out_of_range -> (* point_of_coord *)
-        prerr_endline "Position out of range."
-    | Not_found    -> (* Events.get_pos || get_buffer *)
-        prerr_endline ("No source file for " ^ mdle ^ ".")
-    end
+    | Out_of_range ->
+      (* point_of_coord *)
+      prerr_endline "Position out of range."
+    | Not_found ->
+      (* Events.get_pos || get_buffer *)
+      prerr_endline ("No source file for " ^ mdle ^ ".")
 
 (* Display part of the source. *)
 let show_listing pos mdle start stop point before =
   try
     let buffer = get_buffer pos mdle in
-      let rec aff (line_start, line_number) =
-        if line_number <= stop then
-          aff (print_line buffer line_number line_start point before + 1,
-               line_number + 1)
-      in
-        aff (pos_of_line buffer start)
+    let rec aff (line_start, line_number) =
+      if line_number <= stop
+      then
+        aff
+          ( print_line buffer line_number line_start point before + 1,
+            line_number + 1 )
+    in
+    aff (pos_of_line buffer start)
   with
-    Out_of_range -> (* pos_of_line *)
-      prerr_endline "Position out of range."
-  | Not_found    -> (* get_buffer *)
-      prerr_endline ("No source file for " ^ mdle ^ ".")
+  | Out_of_range ->
+    (* pos_of_line *)
+    prerr_endline "Position out of range."
+  | Not_found ->
+    (* get_buffer *)
+    prerr_endline ("No source file for " ^ mdle ^ ".")

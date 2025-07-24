@@ -67,24 +67,41 @@ external rem : t -> t -> t = "caml_fmod_float32_bytecode" "fmodf"
 external abs : (t[@local_opt]) -> (t[@local_opt]) = "%absfloat32"
 
 let zero = 0.s
+
 let one = 1.s
+
 let minus_one = -1.s
+
 let infinity = float32_of_bits 0x7f800000l
+
 let neg_infinity = float32_of_bits 0xff800000l
+
 let quiet_nan = float32_of_bits 0x7fc00001l
+
 let signaling_nan = float32_of_bits 0x7f800001l
+
 let nan = quiet_nan
+
 let is_finite (x : t) = sub x x = 0.s
+
 let is_infinite (x : t) = div 1.s x = 0.s
+
 let is_nan (x : t) = x <> x
+
 let pi = 0x1.921fb6p+1s
+
 let max_float = float32_of_bits 0x7f7fffffl
+
 let min_float = float32_of_bits 0x00800000l
+
 let epsilon = float32_of_bits 0x34000000l
 
 external of_int : int -> t = "%float32ofint"
+
 external to_int : (t[@local_opt]) -> int = "%intoffloat32"
+
 external of_float : (float[@local_opt]) -> t = "%float32offloat"
+
 external to_float : (t[@local_opt]) -> float = "%floatoffloat32"
 
 external of_int64 : (int64[@local_opt]) -> t
@@ -216,6 +233,7 @@ external next_after : t -> t -> t
   [@@unboxed] [@@noalloc]
 
 let succ x = next_after x infinity
+
 let pred x = next_after x neg_infinity
 
 external copy_sign : t -> t -> t = "caml_copysign_float32_bytecode" "copysignf"
@@ -232,18 +250,23 @@ external ldexp : (t[@unboxed]) -> (int[@untagged]) -> (t[@unboxed])
   [@@noalloc]
 
 external modf : t -> t * t = "caml_modf_float32"
+
 external compare : t -> t -> int = "%compare"
 
 let equal x y = compare x y = 0
 
 let[@inline] min (x : t) (y : t) =
-  if y > x || ((not (sign_bit y)) && sign_bit x) then if is_nan y then y else x
-  else if is_nan x then x
+  if y > x || ((not (sign_bit y)) && sign_bit x)
+  then if is_nan y then y else x
+  else if is_nan x
+  then x
   else y
 
 let[@inline] max (x : t) (y : t) =
-  if y > x || ((not (sign_bit y)) && sign_bit x) then if is_nan x then x else y
-  else if is_nan y then y
+  if y > x || ((not (sign_bit y)) && sign_bit x)
+  then if is_nan x then x else y
+  else if is_nan y
+  then y
   else x
 
 module With_weird_nan_behavior = struct
@@ -257,25 +280,34 @@ module With_weird_nan_behavior = struct
 end
 
 let[@inline] min_max (x : t) (y : t) =
-  if is_nan x || is_nan y then (nan, nan)
-  else if y > x || ((not (sign_bit y)) && sign_bit x) then (x, y)
-  else (y, x)
+  if is_nan x || is_nan y
+  then nan, nan
+  else if y > x || ((not (sign_bit y)) && sign_bit x)
+  then x, y
+  else y, x
 
 let[@inline] min_num (x : t) (y : t) =
-  if y > x || ((not (sign_bit y)) && sign_bit x) then if is_nan x then y else x
-  else if is_nan y then x
+  if y > x || ((not (sign_bit y)) && sign_bit x)
+  then if is_nan x then y else x
+  else if is_nan y
+  then x
   else y
 
 let[@inline] max_num (x : t) (y : t) =
-  if y > x || ((not (sign_bit y)) && sign_bit x) then if is_nan y then x else y
-  else if is_nan x then y
+  if y > x || ((not (sign_bit y)) && sign_bit x)
+  then if is_nan y then x else y
+  else if is_nan x
+  then y
   else x
 
 let[@inline] min_max_num (x : t) (y : t) =
-  if is_nan x then (y, y)
-  else if is_nan y then (x, x)
-  else if y > x || ((not (sign_bit y)) && sign_bit x) then (x, y)
-  else (y, x)
+  if is_nan x
+  then y, y
+  else if is_nan y
+  then x, x
+  else if y > x || ((not (sign_bit y)) && sign_bit x)
+  then x, y
+  else y, x
 
 external iround_current : t -> int64
   = "caml_simd_cast_float32_int64_bytecode" "caml_simd_cast_float32_int64"
@@ -301,11 +333,14 @@ external seeded_hash_param : int -> int -> int -> 'a -> int = "caml_hash_exn"
   [@@noalloc]
 
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
+
 let hash x = seeded_hash_param 10 100 0 x
 
 module Bytes = struct
   external get : bytes -> pos:int -> float32 = "%caml_bytes_getf32"
+
   external unsafe_get : bytes -> pos:int -> float32 = "%caml_bytes_getf32u"
+
   external set : bytes -> pos:int -> float32 -> unit = "%caml_bytes_setf32"
 
   external unsafe_set : bytes -> pos:int -> float32 -> unit
@@ -314,6 +349,7 @@ end
 
 module String = struct
   external get : string -> pos:int -> float32 = "%caml_string_getf32"
+
   external unsafe_get : string -> pos:int -> float32 = "%caml_string_getf32u"
 end
 
@@ -323,7 +359,9 @@ module Bigstring = struct
   type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
   external get : t -> pos:int -> float32 = "%caml_bigstring_getf32"
+
   external unsafe_get : t -> pos:int -> float32 = "%caml_bigstring_getf32u"
+
   external set : t -> pos:int -> float32 -> unit = "%caml_bigstring_setf32"
 
   external unsafe_set : t -> pos:int -> float32 -> unit

@@ -21,8 +21,7 @@ val include_toplevel_directory : string
 
 val c_includes : string
 
-val runtime_flags :
-  Environments.t -> Ocaml_backends.t -> bool -> string
+val runtime_flags : Environments.t -> Ocaml_backends.t -> bool -> string
 
 val toplevel_default_flags : string
 

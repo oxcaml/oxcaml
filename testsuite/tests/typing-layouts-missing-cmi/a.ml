@@ -7,5 +7,6 @@ module Value : sig
 end = struct
   type t = unit
 end
+
 type a_value = Value.t
 (* type a_void : void *)

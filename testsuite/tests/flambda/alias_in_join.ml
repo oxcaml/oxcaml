@@ -1,5 +1,5 @@
 (* TEST
- native;
+   native;
 *)
 
 (* This test checks for an issue when joining two branches in flambda2.
@@ -8,15 +8,14 @@
 
 (* Original example extracted from real code.
    Triggers the bug when CSE equations on parameters are propagated. *)
-let[@inline] m (x : float) y =
-  if x > y then x else y
+let[@inline] m (x : float) y = if x > y then x else y
 
-let[@inline] foo x c n =
-  if x then c +. n else c -. n
+let[@inline] foo x c n = if x then c +. n else c -. n
 
 let[@inline] g a b n x b' =
   let c = m a b in
-  let d = foo x c n in  (* d is the boxed float that should be removed *)
+  let d = foo x c n in
+  (* d is the boxed float that should be removed *)
   if b' then m 0. d else d
 
 let[@opaque] h a b n x b' p =
@@ -25,13 +24,14 @@ let[@opaque] h a b n x b' p =
 
 (* Simplified example triggering the bug without CSE *)
 let[@opaque] f x y z =
-  let[@local] k a b =
-    a +. b
-  in
-  if x then
-    let arg = y -. z in k arg arg
+  let[@local] k a b = a +. b in
+  if x
+  then
+    let arg = y -. z in
+    k arg arg
   else
-    let arg = z -. y in k arg arg
+    let arg = z -. y in
+    k arg arg
 
 (* Both examples are supposed to allocate a single float at the end *)
 let check_cost =

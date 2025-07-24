@@ -1,11 +1,16 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* PR#7324 *)
 
-module rec T : sig type t = T.t end = T;;
-[%%expect{|
+module rec T : sig
+  type t = T.t
+end =
+  T
+
+[%%expect
+{|
 Line 1, characters 0-39:
 1 | module rec T : sig type t = T.t end = T;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -14,9 +19,14 @@ Error: The type abbreviation "T.t" is cyclic:
 |}]
 
 (* Cyclic module type definitions should throw an error *)
-module rec X : (sig module type A = X.A end)
-  = struct module type A end
-[%%expect {|
+module rec X : sig
+  module type A = X.A
+end = struct
+  module type A
+end
+
+[%%expect
+{|
 Line 1, characters 36-39:
 1 | module rec X : (sig module type A = X.A end)
                                         ^^^
@@ -26,9 +36,12 @@ Error: This module type is recursive. This use of the recursive module "X"
 |}]
 
 (* Cyclic module type definitions should throw an error *)
-module rec X : (sig module type A := X.A end)
-  = struct end
-[%%expect {|
+module rec X : sig
+  module type A := X.A
+end = struct end
+
+[%%expect
+{|
 Line 1, characters 37-40:
 1 | module rec X : (sig module type A := X.A end)
                                          ^^^

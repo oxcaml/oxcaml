@@ -27,17 +27,17 @@
 
 open Lambda
 
-val simplify_lambda: lambda -> lambda
+val simplify_lambda : lambda -> lambda
 
-val split_default_wrapper
-   : id:Ident.t
-  -> debug_uid: debug_uid
-  -> kind:function_kind
-  -> params:Lambda.lparam list
-  -> return:Lambda.layout
-  -> body:lambda
-  -> attr:function_attribute
-  -> loc:Lambda.scoped_location
-  -> mode:Lambda.locality_mode
-  -> ret_mode:Lambda.locality_mode
-  -> rec_binding list
+val split_default_wrapper :
+  id:Ident.t ->
+  debug_uid:debug_uid ->
+  kind:function_kind ->
+  params:Lambda.lparam list ->
+  return:Lambda.layout ->
+  body:lambda ->
+  attr:function_attribute ->
+  loc:Lambda.scoped_location ->
+  mode:Lambda.locality_mode ->
+  ret_mode:Lambda.locality_mode ->
+  rec_binding list

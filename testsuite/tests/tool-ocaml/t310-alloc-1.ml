@@ -1,19 +1,16 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
-let rec f a n =
-  if n <= 0 then a
-  else f (1::a) (n-1)
-in
+
+let rec f a n = if n <= 0 then a else f (1 :: a) (n - 1) in
 let l = f [] 30000 in
-if List.fold_left (+) 0 l <> 30000 then raise Not_found
-;;
+if List.fold_left ( + ) 0 l <> 30000 then raise Not_found
 
 (**
        0 CONSTINT 42

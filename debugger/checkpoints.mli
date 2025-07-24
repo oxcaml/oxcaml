@@ -22,7 +22,7 @@ open Debugcom
 (*** A type for checkpoints. ***)
 
 type checkpoint_state =
-    C_stopped
+  | C_stopped
   | C_running of int64
 
 (* `c_valid' is true if and only if the corresponding
@@ -34,17 +34,18 @@ type checkpoint_state =
  * c_pid = -1 for kill checkpoints.
  *)
 type checkpoint =
-  {mutable c_time : int64;
-   mutable c_pid : int;
-   mutable c_fd : io_channel;
-   mutable c_valid : bool;
-   mutable c_report : report option;
-   mutable c_state : checkpoint_state;
-   mutable c_parent : checkpoint;
-   mutable c_breakpoint_version : int;
-   mutable c_breakpoints : (pc * int ref) list;
-   mutable c_trap_barrier : Sp.t;
-   mutable c_code_fragments : int list}
+  { mutable c_time : int64;
+    mutable c_pid : int;
+    mutable c_fd : io_channel;
+    mutable c_valid : bool;
+    mutable c_report : report option;
+    mutable c_state : checkpoint_state;
+    mutable c_parent : checkpoint;
+    mutable c_breakpoint_version : int;
+    mutable c_breakpoints : (pc * int ref) list;
+    mutable c_trap_barrier : Sp.t;
+    mutable c_code_fragments : int list
+  }
 
 (*** Pseudo-checkpoint `root'. ***)
 (* --- Parents of all checkpoints which have no parent. *)
@@ -52,9 +53,13 @@ val root : checkpoint
 
 (*** Current state ***)
 val checkpoints : checkpoint list ref
+
 val current_checkpoint : checkpoint ref
 
 val current_time : unit -> int64
+
 val current_report : unit -> report option
+
 val current_pc : unit -> pc option
+
 val current_pc_sp : unit -> (pc * Sp.t) option

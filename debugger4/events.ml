@@ -20,7 +20,8 @@ open Instruct
 
 type code_event =
   { ev_frag : int;
-    ev_ev : Instruct.debug_event }
+    ev_ev : Instruct.debug_event
+  }
 
 let get_pos ev =
   match ev.ev_kind with
@@ -28,25 +29,18 @@ let get_pos ev =
   | Event_after _ -> ev.ev_loc.Location.loc_end
   | _ -> ev.ev_loc.Location.loc_start
 
-
 (*** Current events. ***)
 
 (* Event at current position *)
-let current_event =
-  ref (None : code_event option)
+let current_event = ref (None : code_event option)
 
 (* Current position in source. *)
 (* Raise `Not_found' if not on an event (beginning or end of program). *)
 let get_current_event () =
-  match !current_event with
-  | None -> raise Not_found
-  | Some ev -> ev
+  match !current_event with None -> raise Not_found | Some ev -> ev
 
 let current_event_is_before () =
   match !current_event with
-    None ->
-      raise Not_found
-  | Some {ev_ev = {ev_kind = Event_before}} ->
-      true
-  | _ ->
-      false
+  | None -> raise Not_found
+  | Some { ev_ev = { ev_kind = Event_before } } -> true
+  | _ -> false

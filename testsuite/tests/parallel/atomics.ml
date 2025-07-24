@@ -1,22 +1,23 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
 *)
 
 type u = U of unit
+
 let () =
   (* See https://github.com/ocaml-multicore/ocaml-multicore/issues/252 *)
   let make_cell (x : unit) : u Atomic.t =
     let cell = Atomic.make (U x) in
-    Atomic.set cell (U x) ;
-    cell in
+    Atomic.set cell (U x);
+    cell
+  in
   (* the error shows up with an array of length 256 or larger *)
   let a = Array.make 256 (make_cell ()) in
   ignore (Sys.opaque_identity a)
-
 
 let test_fetch_add () =
   let ndoms = 4 in
@@ -29,20 +30,16 @@ let test_fetch_add () =
     let self = (Domain.self () :> int) in
     for i = 1 to count do
       let n = Atomic.fetch_and_add r step mod Array.length arr in
-      assert (arr.(n) == (-1));
+      assert (arr.(n) == -1);
       arr.(n) <- self
-    done in
-  let _ = Array.init 4 (fun i ->
-      Domain.spawn loop)
-      |> Array.map Domain.join in
+    done
+  in
+  let _ = Array.init 4 (fun i -> Domain.spawn loop) |> Array.map Domain.join in
   assert (Array.for_all (fun x -> x >= 0) arr)
 
 let () =
   test_fetch_add ();
   print_endline "ok"
-
-
-
 
 let test v =
   let open Atomic in

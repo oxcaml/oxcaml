@@ -1,16 +1,21 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* PR#6394 *)
 
 module rec X : sig
- type t = int * bool
+  type t = int * bool
 end = struct
- type t = A | B
- let f = function A | B -> 0
-end;;
-[%%expect{|
+  type t =
+    | A
+    | B
+
+  let f = function A | B -> 0
+end
+
+[%%expect
+{|
 Lines 3-6, characters 6-3:
 3 | ......struct
 4 |  type t = A | B
@@ -26,16 +31,25 @@ Error: Signature mismatch:
        is not included in
          type t = int * bool
        The type "X.t" is not equal to the type "int * bool"
-|}];;
-
+|}]
 
 (* PR#7838 *)
 
-module Make (X : sig val f : [ `A ] -> unit end) = struct
- let make f1 f2 arg = match arg with `A -> f1 arg; f2 arg
- let f = make X.f (fun _ -> ())
-end;;
-[%%expect{|
+module Make (X : sig
+  val f : [`A] -> unit
+end) =
+struct
+  let make f1 f2 arg =
+    match arg with
+    | `A ->
+      f1 arg;
+      f2 arg
+
+  let f = make X.f (fun _ -> ())
+end
+
+[%%expect
+{|
 module Make :
   functor (X : sig val f : [ `A ] -> unit end) ->
     sig
@@ -44,12 +58,13 @@ module Make :
     end
 |}]
 
-
 (* reexport *)
-type ('a,'b) def = X of int constraint 'b = [> `A]
+type ('a, 'b) def = X of int constraint 'b = [> `A]
 
-type arity = (int, [`A]) def = X of int;;
-[%%expect{|
+type arity = (int, [`A]) def = X of int
+
+[%%expect
+{|
 type ('a, 'b) def = X of int constraint 'b = [> `A ]
 Line 3, characters 0-39:
 3 | type arity = (int, [`A]) def = X of int;;
@@ -59,8 +74,10 @@ Error: This variant or record definition does not match that of type
        They have different arities.
 |}]
 
-type ('a,'b) ct = (int,'b) def = X of int;;
-[%%expect{|
+type ('a, 'b) ct = (int, 'b) def = X of int
+
+[%%expect
+{|
 Line 1, characters 0-41:
 1 | type ('a,'b) ct = (int,'b) def = X of int;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -70,8 +87,10 @@ Error: This variant or record definition does not match that of type
        The type "int" is not equal to the type "'a"
 |}]
 
-type ('a,'b) kind = ('a, 'b) def = {a:int} constraint 'b = [> `A];;
-[%%expect{|
+type ('a, 'b) kind = ('a, 'b) def = { a : int } constraint 'b = [> `A]
+
+[%%expect
+{|
 Line 1, characters 0-65:
 1 | type ('a,'b) kind = ('a, 'b) def = {a:int} constraint 'b = [> `A];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -80,10 +99,14 @@ Error: This variant or record definition does not match that of type
        The original is a variant, but this is a record.
 |}]
 
-type d = X of int | Y of int
+type d =
+  | X of int
+  | Y of int
 
 type missing = d = X of int
-[%%expect{|
+
+[%%expect
+{|
 type d = X of int | Y of int
 Line 3, characters 0-27:
 3 | type missing = d = X of int
@@ -93,7 +116,9 @@ Error: This variant or record definition does not match that of type "d"
 |}]
 
 type wrong_type = d = X of float
-[%%expect{|
+
+[%%expect
+{|
 Line 1, characters 0-32:
 1 | type wrong_type = d = X of float
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -107,8 +132,11 @@ Error: This variant or record definition does not match that of type "d"
 |}]
 
 type mono = Foo of float
+
 type unboxed = mono = Foo of float [@@unboxed]
-[%%expect{|
+
+[%%expect
+{|
 type mono = Foo of float
 Line 2, characters 0-46:
 2 | type unboxed = mono = Foo of float [@@unboxed]
@@ -118,8 +146,12 @@ Error: This variant or record definition does not match that of type "mono"
        this definition uses unboxed representation.
 |}]
 
-type perm = d = Y of int | X of int
-[%%expect{|
+type perm = d =
+  | Y of int
+  | X of int
+
+[%%expect
+{|
 Line 1, characters 0-35:
 1 | type perm = d = Y of int | X of int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -131,8 +163,10 @@ module M : sig
   type t = Foo of int
 end = struct
   type t = Foo : int -> t
-end;;
-[%%expect{|
+end
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = Foo : int -> t

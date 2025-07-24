@@ -25,58 +25,85 @@ open Types
 module Signature_names : sig
   type t
 
-  val simplify: Env.t -> t -> signature -> signature
+  val simplify : Env.t -> t -> signature -> signature
 end
 
 (* In the following, the optional [expected_mode] is for better error messages
-and not strictly enforced. The caller is reponsible to enforce mode constraint
-by inspecting the returned mode. *)
+   and not strictly enforced. The caller is reponsible to enforce mode constraint
+   by inspecting the returned mode. *)
 (* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
 
-val type_module:
-        Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.module_expr ->
-        Typedtree.module_expr * Shape.t
-val type_structure:
-  Env.t -> ?expected_mode:Mode.Value.r -> Parsetree.structure ->
-  Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
-  Shape.t * Env.t
-val type_toplevel_phrase:
-  Env.t -> Types.signature -> Parsetree.structure ->
-  Typedtree.structure * Types.signature * Signature_names.t * Shape.t *
-  Env.t
-val type_implementation:
-  Unit_info.t -> Compilation_unit.t -> Env.t ->
-  Parsetree.structure -> Typedtree.implementation
-val type_interface:
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
-  Parsetree.signature -> Typedtree.signature
-val check_nongen_signature:
-        Env.t -> Types.signature -> unit
-        (*
+val type_module :
+  Env.t ->
+  ?expected_mode:Mode.Value.r ->
+  Parsetree.module_expr ->
+  Typedtree.module_expr * Shape.t
+
+val type_structure :
+  Env.t ->
+  ?expected_mode:Mode.Value.r ->
+  Parsetree.structure ->
+  Typedtree.structure
+  * Types.signature
+  * Mode.Value.lr
+  * Signature_names.t
+  * Shape.t
+  * Env.t
+
+val type_toplevel_phrase :
+  Env.t ->
+  Types.signature ->
+  Parsetree.structure ->
+  Typedtree.structure * Types.signature * Signature_names.t * Shape.t * Env.t
+
+val type_implementation :
+  Unit_info.t ->
+  Compilation_unit.t ->
+  Env.t ->
+  Parsetree.structure ->
+  Typedtree.implementation
+
+val type_interface :
+  sourcefile:string ->
+  Compilation_unit.t ->
+  Env.t ->
+  Parsetree.signature ->
+  Typedtree.signature
+
+val check_nongen_signature : Env.t -> Types.signature -> unit
+(*
 val type_open_:
         ?used_slot:bool ref -> ?toplevel:bool ->
         Asttypes.override_flag ->
         Env.t -> Location.t -> Longident.t Asttypes.loc -> Path.t * Env.t
         *)
-val modtype_of_package:
-        Env.t -> Location.t ->
-        Path.t -> (Longident.t * type_expr) list -> module_type
+
+val modtype_of_package :
+  Env.t -> Location.t -> Path.t -> (Longident.t * type_expr) list -> module_type
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
-val save_signature:
-  Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->
-  Env.t -> Cmi_format.cmi_infos_lazy -> unit
+val save_signature :
+  Unit_info.t ->
+  Compilation_unit.t ->
+  Typedtree.signature ->
+  Env.t ->
+  Cmi_format.cmi_infos_lazy ->
+  unit
 
-val package_units:
-  Env.t -> string list -> Unit_info.Artifact.t -> Compilation_unit.t
-  -> Typedtree.module_coercion
+val package_units :
+  Env.t ->
+  string list ->
+  Unit_info.Artifact.t ->
+  Compilation_unit.t ->
+  Typedtree.module_coercion
 
 (* Should be in Envaux, but it breaks the build of the debugger *)
-val initial_env:
+val initial_env :
   loc:Location.t ->
   initially_opened_module:string option ->
-  open_implicit_modules:string list -> Env.t
+  open_implicit_modules:string list ->
+  Env.t
 
 module Sig_component_kind : sig
   type t =
@@ -95,25 +122,25 @@ module Sig_component_kind : sig
 end
 
 type hiding_error =
-  | Illegal_shadowing of {
-      shadowed_item_id: Ident.t;
-      shadowed_item_kind: Sig_component_kind.t;
-      shadowed_item_loc: Location.t;
-      shadower_id: Ident.t;
-      user_id: Ident.t;
-      user_kind: Sig_component_kind.t;
-      user_loc: Location.t;
-    }
-  | Appears_in_signature of {
-      opened_item_id: Ident.t;
-      opened_item_kind: Sig_component_kind.t;
-      user_id: Ident.t;
-      user_kind: Sig_component_kind.t;
-      user_loc: Location.t;
-    }
+  | Illegal_shadowing of
+      { shadowed_item_id : Ident.t;
+        shadowed_item_kind : Sig_component_kind.t;
+        shadowed_item_loc : Location.t;
+        shadower_id : Ident.t;
+        user_id : Ident.t;
+        user_kind : Sig_component_kind.t;
+        user_loc : Location.t
+      }
+  | Appears_in_signature of
+      { opened_item_id : Ident.t;
+        opened_item_kind : Sig_component_kind.t;
+        user_id : Ident.t;
+        user_kind : Sig_component_kind.t;
+        user_loc : Location.t
+      }
 
 type functor_dependency_error =
-    Functor_applied
+  | Functor_applied
   | Functor_included
 
 (** Modules that are required to be legacy mode *)
@@ -128,7 +155,7 @@ type unsupported_modal_module =
   | Functor_res
 
 type error =
-    Cannot_apply of module_type
+  | Cannot_apply of module_type
   | Not_included of Includemod.explanation
   | Not_included_functor of Includemod.explanation
   | Cannot_eliminate_dependency of functor_dependency_error * module_type
@@ -146,9 +173,15 @@ type error =
   | With_cannot_remove_constrained_type
   | With_package_manifest of Longident.t * type_expr
   | Repeated_name of Sig_component_kind.t * string
-  | Non_generalizable of { vars : type_expr list; expression : type_expr }
+  | Non_generalizable of
+      { vars : type_expr list;
+        expression : type_expr
+      }
   | Non_generalizable_module of
-      { vars : type_expr list; item : value_description; mty : module_type }
+      { vars : type_expr list;
+        item : value_description;
+        mty : module_type
+      }
   | Implementation_is_required of string
   | Interface_not_compiled of string
   | Not_allowed_in_functor_body
@@ -174,11 +207,11 @@ type error =
   | Cannot_implement_parameter of Compilation_unit.Name.t * Misc.filepath
   | Argument_for_non_parameter of Global_module.Name.t * Misc.filepath
   | Cannot_find_argument_type of Global_module.Parameter_name.t
-  | Inconsistent_argument_types of {
-      new_arg_type: Global_module.Parameter_name.t option;
-      old_arg_type: Global_module.Parameter_name.t option;
-      old_source_file: Misc.filepath;
-    }
+  | Inconsistent_argument_types of
+      { new_arg_type : Global_module.Parameter_name.t option;
+        old_arg_type : Global_module.Parameter_name.t option;
+        old_source_file : Misc.filepath
+      }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Submode_failed of Mode.Value.error
   | Item_weaker_than_structure of Mode.Value.error
@@ -186,9 +219,10 @@ type error =
   | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
+
 exception Error_forward of Location.error
 
-val report_error: Env.t -> loc:Location.t -> error -> Location.error
+val report_error : Env.t -> loc:Location.t -> error -> Location.error
 
 (** Clear several bits of global state that may retain large amounts of memory
     after typechecking is finished. *)

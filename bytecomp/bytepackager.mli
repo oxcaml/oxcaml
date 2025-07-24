@@ -16,11 +16,11 @@
 (* "Package" a set of .cmo files into one .cmo file having the
    original compilation units as sub-modules. *)
 
-val package_files:
+val package_files :
   ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 
 type error =
-    Forward_reference of string * Compilation_unit.t
+  | Forward_reference of string * Compilation_unit.t
   | Multiple_definition of string * Compilation_unit.t
   | Not_an_object_file of string
   | Illegal_renaming of Compilation_unit.t * string * Compilation_unit.t
@@ -28,4 +28,4 @@ type error =
 
 exception Error of error
 
-val report_error: Format.formatter -> error -> unit
+val report_error : Format.formatter -> error -> unit

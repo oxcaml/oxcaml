@@ -1,16 +1,16 @@
 (* TEST
- runtime5;
- flags = "-alert -unsafe_multidomain";
- include runtime_events;
- include unix;
- hasunix;
- not-windows;
- {
-   bytecode;
- }
- {
-   native;
- }
+   runtime5;
+   flags = "-alert -unsafe_multidomain";
+   include runtime_events;
+   include unix;
+   hasunix;
+   not-windows;
+   {
+     bytecode;
+   }
+   {
+     native;
+   }
 *)
 
 (* Check that emitting a custom event from a signal handler works (see #12900).
@@ -27,6 +27,7 @@ let unit =
   Runtime_events.Type.register ~encode ~decode
 
 type Runtime_events.User.tag += My_event
+
 let my_event = Runtime_events.User.register "event" My_event unit
 
 let handle_signal _ =

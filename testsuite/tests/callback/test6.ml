@@ -1,6 +1,6 @@
 (* TEST
- modules = "test6_.c";
- flags = "-alert -unsafe_multidomain";
+   modules = "test6_.c";
+   flags = "-alert -unsafe_multidomain";
 *)
 
 (* Tests nested calls from C (main C) to OCaml (main OCaml) to C (caml_to_c) to
@@ -25,7 +25,9 @@ let _ =
     printf "[Caml] Call caml_to_c\n%!";
     caml_to_c ();
     printf "[Caml] Return from caml_to_c\n%!"
-  with E ->
-    (printf "[Caml] Caught exception\n%!";
-     try caml_to_c() with E -> printf "[Caml] Caught exceception again\n%!";
-     printf "[Caml] Done\n%!")
+  with E -> (
+    printf "[Caml] Caught exception\n%!";
+    try caml_to_c ()
+    with E ->
+      printf "[Caml] Caught exceception again\n%!";
+      printf "[Caml] Done\n%!")

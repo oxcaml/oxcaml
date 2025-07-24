@@ -89,15 +89,12 @@ let create_symbol (symbol : X86_binary_emitter.symbol) symbol_table sections
     | None -> 0
   in
   let st_binding =
-    match symbol.sy_binding with
-    | Sy_local -> 0
-    | Sy_global -> 1
-    | Sy_weak -> 2
+    match symbol.sy_binding with Sy_local -> 0 | Sy_global -> 1 | Sy_weak -> 2
   in
   let symbol_entry =
     { st_name = String_table.current_length string_table;
       st_info = (st_binding lsl 4) lor st_type;
-      st_other = if symbol.sy_protected then 3 else 0;
+      st_other = (if symbol.sy_protected then 3 else 0);
       st_shndx =
         Section_table.get_sec_idx sections
           (X86_proc.Section_name.of_string symbol.sy_sec.sec_name);

@@ -1,10 +1,11 @@
 (* TEST
- modules = "custom_finalize.c";
+   modules = "custom_finalize.c";
 *)
 
 type t
 
 external test_alloc : unit -> t = "caml_test_pr3612_alloc"
+
 external get_counter : unit -> int = "caml_test_pr3612_counter"
 (* The number of deserialized blocks minus the number of freed blocks *)
 
@@ -22,4 +23,5 @@ let f () =
   Gc.full_major ();
   print_int (get_counter ());
   print_newline ()
+
 let () = (f [@inlined never]) ()

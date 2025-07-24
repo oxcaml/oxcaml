@@ -1,35 +1,41 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* A bug in typecore leading to extra expansion led this to be rejected. *)
 
 type (_, _) refl = Refl : ('a, 'a) refl
 
-[%%expect{|
+[%%expect {|
 type (_, _) refl = Refl : ('a, 'a) refl
 |}]
 
 let apply (_ : unit -> 'a) : 'a = assert false
+
 let go (type a) (Refl : (unit, a) refl) = apply (fun () : a -> ())
 
-[%%expect{|
+[%%expect
+{|
 val apply : (unit -> 'a) -> 'a = <fun>
 val go : (unit, 'a) refl -> 'a = <fun>
 |}]
 
 let apply (_ : x:unit -> unit -> 'a) : 'a = assert false
+
 let go (type a) (Refl : (unit, a) refl) = apply (fun ~x:_ () : a -> ())
 
-[%%expect{|
+[%%expect
+{|
 val apply : (x:unit -> unit -> 'a) -> 'a = <fun>
 val go : (unit, 'a) refl -> 'a = <fun>
 |}]
 
 let apply (_ : ?x:unit -> unit -> 'a) : 'a = assert false
+
 let go (type a) (Refl : (unit, a) refl) = apply (fun ?x:_ () : a -> ())
 
-[%%expect{|
+[%%expect
+{|
 val apply : (?x:unit -> unit -> 'a) -> 'a = <fun>
 Line 2, characters 42-71:
 2 | let go (type a) (Refl : (unit, a) refl) = apply (fun ?x:_ () : a -> ())
@@ -41,17 +47,21 @@ Error: This expression has type "a" = "unit"
 |}]
 
 let apply (_ : unit -> x:unit -> 'a) : 'a = assert false
+
 let go (type a) (Refl : (unit, a) refl) = apply (fun () ~x:_ : a -> ())
 
-[%%expect{|
+[%%expect
+{|
 val apply : (unit -> x:unit -> 'a) -> 'a = <fun>
 val go : (unit, 'a) refl -> 'a = <fun>
 |}]
 
 let apply (_ : unit -> ?x:unit -> 'a) : 'a = assert false
+
 let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())
 
-[%%expect{|
+[%%expect
+{|
 val apply : (unit -> ?x:unit -> 'a) -> 'a = <fun>
 Line 2, characters 59-60:
 2 | let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())

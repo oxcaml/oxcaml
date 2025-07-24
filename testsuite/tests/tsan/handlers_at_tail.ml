@@ -1,11 +1,10 @@
 (* TEST
 
- ocamlopt_flags = "-g";
- set TSAN_OPTIONS="detect_deadlocks=0";
+   ocamlopt_flags = "-g";
+   set TSAN_OPTIONS="detect_deadlocks=0";
 
- tsan;
- native;
-
+   tsan;
+   native;
 *)
 
 (* This is a regression test for a bug that incorrectly instrumented two nested
@@ -18,9 +17,8 @@ let g () = raise Exit [@@inline never]
 
 let rec f n =
   try
-    try
-      if n >= 1000 then () else g ()
+    try if n >= 1000 then () else g ()
     with Exit -> g () (* Innermost handler *)
-  with Exit -> f (n+1)
+  with Exit -> f (n + 1)
 
 let () = f 1

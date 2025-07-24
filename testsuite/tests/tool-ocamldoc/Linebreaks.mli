@@ -1,8 +1,8 @@
 (* TEST
- ocamldoc with html;
- output = "type_Linebreaks.html";
- reference = "${test_source_directory}/type_Linebreaks.reference";
- check-program-output;
+   ocamldoc with html;
+   output = "type_Linebreaks.html";
+   reference = "${test_source_directory}/type_Linebreaks.reference";
+   check-program-output;
 *)
 
 (**
@@ -32,21 +32,26 @@
 *)
 
 type a = A
-type 'a b = {field:'a}
-type c = C: 'a -> c
+
+type 'a b = { field : 'a }
+
+type c = C : 'a -> c
 
 type s = ..
+
 type s += B
 
 val x : a
 
-module S: sig module I:sig end end
+module S : sig
+  module I : sig end
+end
+
 module type s = sig end
 
 class type d = object end
 
-exception E of {inline:int}
-
+exception E of { inline : int }
 
 (** type_Linebreaks.html should contain
 

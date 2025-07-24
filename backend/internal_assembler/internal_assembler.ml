@@ -24,7 +24,6 @@
 [@@@ocaml.warning "-27-32"]
 
 open! Int_replace_polymorphic_compare
-
 module String = Misc.Stdlib.String
 module Section_name = X86_proc.Section_name
 module StringMap = X86_binary_emitter.StringMap
@@ -159,29 +158,30 @@ let make_relocation_section sections ~sym_tbl_idx relocation_table
   let idx = Section_table.get_sec_idx sections name in
   make_section sections
     (Section_name.of_string (".rela" ^ Section_name.to_string name))
-    ~sh_type:4 (* SHT_RELA *) ~size ~entsize:24L
-    ~flags:0x40L (* SHF_INFO_LINK *) ~sh_link:sym_tbl_idx sh_string_table
-    ~align:8L ~sh_info:idx
+    ~sh_type:4 (* SHT_RELA *)
+    ~size ~entsize:24L ~flags:0x40L (* SHF_INFO_LINK *)
+    ~sh_link:sym_tbl_idx sh_string_table ~align:8L ~sh_info:idx
 
 let assemble_one_section ~name instructions =
   let align =
     List.fold_left
       (fun acc i ->
         match i with
-        | X86_ast.Directive (Align { bytes=n; _ }) when n > acc -> n
+        | X86_ast.Directive (Align { bytes = n; _ }) when n > acc -> n
         | _ -> acc)
       0 instructions
   in
-  align,
-  X86_binary_emitter.assemble_section X64
-    { X86_binary_emitter.sec_name = X86_proc.Section_name.to_string name;
-      sec_instrs = Array.of_list instructions
-    }
+  ( align,
+    X86_binary_emitter.assemble_section X64
+      { X86_binary_emitter.sec_name = X86_proc.Section_name.to_string name;
+        sec_instrs = Array.of_list instructions
+      } )
 
 let get_sections ~delayed sections =
   let get acc sections =
-    List.fold_left (fun acc (name, instructions) ->
-      Section_name.Map.add name (assemble_one_section ~name instructions) acc)
+    List.fold_left
+      (fun acc (name, instructions) ->
+        Section_name.Map.add name (assemble_one_section ~name instructions) acc)
       acc sections
   in
   (* DWARF sections must be emitted after .text and .data because they
@@ -254,7 +254,8 @@ let create_relocation_tables compiler_sections symbol_table string_table =
     (Section_name.Map.bindings compiler_sections)
 
 let write buf header section_table symbol_table relocation_tables string_table =
-  Compiler_owee.Owee_elf.write_elf buf header (Section_table.get_sections section_table);
+  Compiler_owee.Owee_elf.write_elf buf header
+    (Section_table.get_sections section_table);
   Section_table.write_bodies section_table buf;
   let symtab =
     Section_table.get_section section_table
@@ -299,7 +300,8 @@ let assemble unix ~delayed asm output_file =
   let strtabidx = 1 + Section_table.num_sections sections in
   make_section sections
     (Section_name.of_string ".symtab")
-    ~sh_type:2 (* SHT_PROGBITS *) ~entsize:24L (* symbol entry size *)
+    ~sh_type:2 (* SHT_PROGBITS *)
+    ~entsize:24L (* symbol entry size *)
     ~size:(Int64.of_int (24 * Symbol_table.num_symbols symbol_table))
     ~align:8L ~sh_link:strtabidx ~sh_info:num_locals sh_string_table;
   make_section sections

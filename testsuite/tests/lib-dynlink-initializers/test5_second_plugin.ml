@@ -1,2 +1,1 @@
-let () =
-  assert (!Test5_plugin_a.x = 1)
+let () = assert (!Test5_plugin_a.x = 1)

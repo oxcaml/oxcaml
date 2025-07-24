@@ -6,17 +6,19 @@
    takes both sides into account. *)
 
 (* GADTs allow us to hide kind information *)
-type _ t = A : (int * int) t | B : (int * int) t
+type _ t =
+  | A : (int * int) t
+  | B : (int * int) t
 
 let[@inline never] f (type a) (x : a) (cond : a t) =
   let result : a =
     match cond with
-    | A -> (0, 1) (* Known tag *)
-    | B -> begin
-        let r = fst x in (* Creates an equation on [x] with unknown tag *)
-        ignore (Sys.opaque_identity r);
-        x
-      end
+    | A -> 0, 1 (* Known tag *)
+    | B ->
+      let r = fst x in
+      (* Creates an equation on [x] with unknown tag *)
+      ignore (Sys.opaque_identity r);
+      x
   in
   (* At this point, [result] has been joined with no kind information.
      If everything went well, we should know that:
@@ -29,7 +31,7 @@ let[@inline never] f (type a) (x : a) (cond : a t) =
   let result : int * int = match cond with A -> result | B -> result in
   (* Then we need to actually introduce the constraint on the tag.
      This is done by storing it into a block with a known shape: *)
-  let ignored : (unit * (int * int)) = (), result in
+  let ignored : unit * (int * int) = (), result in
   (* Now, if we wrongly assumed that only branch A has tag 0,
      we would be able to propagate that information here and replace
      [a + b] by the constant 1.*)

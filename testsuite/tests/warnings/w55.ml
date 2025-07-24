@@ -1,28 +1,10 @@
 (* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+   (* Blank lines added here to preserve locations. *)
 *)
 
 [@@@ocaml.flambda_o3]
 
-let f = (fun x -> x + 1) [@inline never]
+let f = fun [@inline never] x -> x + 1
 
 let g x = (f [@inlined]) x
 
@@ -41,6 +23,7 @@ let a x =
 let b x y = (a [@inlined]) x y
 
 let c x = x + 1 [@@inline never]
+
 let d x = (c [@inlined]) x
 
 let g' x = (f [@inlined hint]) x
@@ -54,22 +37,22 @@ let b' x y = (a [@inlined hint]) x y
 let d' x = (c [@inlined hint]) x
 
 (* TEST
- flags = "-w +A-70";
- compile_only = "true";
- {
-   setup-ocamlc.byte-build-env;
-   ocamlc.byte;
-   check-ocamlc.byte-output;
- }{
-   no-flambda;
-   setup-ocamlopt.byte-build-env;
-   ocamlopt.byte;
-   check-ocamlopt.byte-output;
- }{
-   compiler_reference = "${test_source_directory}/w55.flambda.reference";
-   flambda;
-   setup-ocamlopt.byte-build-env;
-   ocamlopt.byte;
-   check-ocamlopt.byte-output;
- }
+   flags = "-w +A-70";
+   compile_only = "true";
+   {
+     setup-ocamlc.byte-build-env;
+     ocamlc.byte;
+     check-ocamlc.byte-output;
+   }{
+     no-flambda;
+     setup-ocamlopt.byte-build-env;
+     ocamlopt.byte;
+     check-ocamlopt.byte-output;
+   }{
+     compiler_reference = "${test_source_directory}/w55.flambda.reference";
+     flambda;
+     setup-ocamlopt.byte-build-env;
+     ocamlopt.byte;
+     check-ocamlopt.byte-output;
+   }
 *)

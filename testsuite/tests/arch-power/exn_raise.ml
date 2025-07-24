@@ -1,8 +1,8 @@
 (* TEST
- arch_power;
- native;
- ocamlopt.byte;
- run;
+   arch_power;
+   native;
+   ocamlopt.byte;
+   run;
 *)
 
 (* GPR#8506
@@ -13,6 +13,4 @@
    that will not fail.
 *)
 
-let () =
-  try failwith "foo"
-  with (Failure _) -> ()
+let () = try failwith "foo" with Failure _ -> ()

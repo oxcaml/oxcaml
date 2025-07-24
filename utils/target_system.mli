@@ -69,7 +69,7 @@ type system = private
   | BeOS
   | Unknown
 
-val system: unit -> system
+val system : unit -> system
 
 val windows : unit -> bool
 

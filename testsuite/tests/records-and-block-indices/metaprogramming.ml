@@ -134,10 +134,7 @@ module Tree = struct
                 let min_num_trees = Int.max 0 (min_num_trees - 1) in
                 assert (cost >= min_num_trees);
                 List.map (enumerate_forest_shapes ~cost ~min_num_trees)
-                  ~f:(fun rest_trees -> first_tree :: rest_trees
-                )
-            )
-        )
+                  ~f:(fun rest_trees -> first_tree :: rest_trees)))
 
     and enumerate_shapes ~cost : unit t list =
       assert (cost >= 1);
@@ -149,8 +146,7 @@ module Tree = struct
           (enumerate_shapes ~cost:(cost - 1))
           ~f:(fun shape -> Branch [shape])
         @ List.map (enumerate_forest_shapes ~cost ~min_num_trees:2)
-            ~f:(fun forest -> Branch forest
-          )
+            ~f:(fun forest -> Branch forest)
   end
 
   module By_num_nodes = struct
@@ -169,10 +165,7 @@ module Tree = struct
               then [[first_tree]]
               else
                 List.map (enumerate_forest_shapes rest_num_nodes)
-                  ~f:(fun rest_trees -> first_tree :: rest_trees
-                )
-          )
-      )
+                  ~f:(fun rest_trees -> first_tree :: rest_trees)))
 
     and enumerate_shapes ~num_nodes : unit t list =
       assert (num_nodes >= 1);
@@ -187,16 +180,14 @@ module Tree = struct
   let enumerate_shapes ~max_num_nodes =
     let num_nodes_list = List.init ~f:(fun i -> i + 1) ~len:max_num_nodes in
     List.concat_map num_nodes_list ~f:(fun num_nodes ->
-        By_num_nodes.enumerate_shapes ~num_nodes
-    )
+        By_num_nodes.enumerate_shapes ~num_nodes)
 
   let enumerate_shapes' ~max_leaves_and_singleton_branches =
     let costs =
       List.init ~f:(fun i -> i + 1) ~len:max_leaves_and_singleton_branches
     in
     List.concat_map costs ~f:(fun cost ->
-        By_leaves_and_singleton_branches.enumerate_shapes ~cost
-    )
+        By_leaves_and_singleton_branches.enumerate_shapes ~cost)
 
   let rec compare f t1 t2 =
     match t1, t2 with
@@ -213,7 +204,8 @@ module Tree = struct
     match shape with
     | Leaf () -> List.map leaves ~f:(fun x -> Leaf x)
     | Branch forest ->
-      List.map (enumerate_forests forest leaves) ~f:(fun forest -> Branch forest)
+      List.map (enumerate_forests forest leaves) ~f:(fun forest ->
+          Branch forest)
 
   and enumerate_forests (forest : unit t list) (leaves : 'a list) :
       'a t list list =
@@ -223,8 +215,7 @@ module Tree = struct
       let trees = enumerate ~shape:tree ~leaves in
       let forests = enumerate_forests forest leaves in
       List.concat_map trees ~f:(fun tree ->
-          List.map forests ~f:(fun forest -> tree :: forest)
-      )
+          List.map forests ~f:(fun forest -> tree :: forest))
 
   let rec to_string f t =
     match t with
@@ -342,8 +333,7 @@ module Type_structure = struct
       in
       "(| "
       ^ (List.map constructors ~f:constructor_to_string
-        |> String.concat ~sep:" | "
-        )
+        |> String.concat ~sep:" | ")
       ^ ")"
     | Option t -> sprintf "%s option" (to_string t)
     | String -> "string"
@@ -378,8 +368,7 @@ module Type_structure = struct
       then List.length ts
       else
         List.fold_left ts ~init:0 ~f:(fun acc t ->
-            acc + layout_size_in_block (layout t)
-        )
+            acc + layout_size_in_block (layout t))
     | _ -> failwith "unimplemented"
 end
 
@@ -416,9 +405,7 @@ module Path = struct
     String.concat ~sep:""
       (List.map t ~f:(function
         | Field s -> "." ^ s
-        | Unboxed_field s -> ".#" ^ s
-        )
-        )
+        | Unboxed_field s -> ".#" ^ s))
 end
 
 module Type = struct
@@ -462,8 +449,7 @@ module Type = struct
       | Field lbl, Record { name = _; fields; boxing = Boxed }
       | Unboxed_field lbl, Record { name = _; fields; boxing = Unboxed } ->
         follow_path (List.assoc lbl fields) rest
-      | _ -> invalid_arg "bad path"
-    )
+      | _ -> invalid_arg "bad path")
 
   let compare : t -> t -> int = Stdlib.compare
 
@@ -549,17 +535,14 @@ module Type = struct
               if !seen
               then acc
               else if String.equal s lbl
-              then begin
+              then (
                 seen := true;
-                acc + num_subvals_left_of_path t rest
-              end
-              else acc + num_subvals t
-          )
+                acc + num_subvals_left_of_path t rest)
+              else acc + num_subvals t)
         in
         assert !seen;
         acc
-      | _ -> invalid_arg "bad path"
-    )
+      | _ -> invalid_arg "bad path")
 
   let rec value_code (t : t) (i : int) : string =
     match t with
@@ -567,8 +550,7 @@ module Type = struct
       let _, xs =
         List.fold_left_map fields ~init:i ~f:(fun acc (_, t) ->
             let x = value_code t acc in
-            acc + num_subvals t, x
-        )
+            acc + num_subvals t, x)
       in
       let labels = List.map ~f:fst fields in
       assemble_record_expr boxing name labels xs
@@ -579,16 +561,14 @@ module Type = struct
       let _, xs =
         List.fold_left_map constructor.args ~init:i ~f:(fun acc t ->
             let x = value_code t acc in
-            acc + num_subvals t, x
-        )
+            acc + num_subvals t, x)
       in
       assemble_constructor constructor.name xs
     | Tuple (tys, boxing) ->
       let _, xs =
         List.fold_left_map tys ~init:i ~f:(fun acc t ->
             let x = value_code t acc in
-            acc + num_subvals t, x
-        )
+            acc + num_subvals t, x)
       in
       assemble_tuple ~sep:", " boxing xs
     | Option t -> if Int.equal i 0 then "None" else "Some " ^ value_code t i
@@ -616,8 +596,7 @@ module Type = struct
       let _, xs =
         List.fold_left_map fields ~init:i ~f:(fun acc (_, t) ->
             let x = mk_value_body_code t acc in
-            acc + num_subvals t, x
-        )
+            acc + num_subvals t, x)
       in
       let labels = List.map ~f:fst fields in
       assemble_record_expr boxing name labels xs
@@ -625,8 +604,7 @@ module Type = struct
       let _, xs =
         List.fold_left_map tys ~init:i ~f:(fun acc t ->
             let x = mk_value_body_code t acc in
-            acc + num_subvals t, x
-        )
+            acc + num_subvals t, x)
       in
       assemble_tuple ~sep:", " boxing xs
     | Variant { name; constructors } -> (
@@ -640,12 +618,10 @@ module Type = struct
               let _, args =
                 List.fold_left_map constructor.args ~init:i ~f:(fun acc t ->
                     let x = mk_value_body_code t acc in
-                    acc + num_subvals t, x
-                )
+                    acc + num_subvals t, x)
               in
               let expr = assemble_constructor constructor.name args in
-              cond, expr
-          )
+              cond, expr)
         in
         match cases with
         | [] -> assert false
@@ -658,8 +634,7 @@ module Type = struct
           List.fold_left
             (List.rev (List.tl (List.rev rest)))
             ~init:(sprintf "(if %s then %s else %s)" cond1 expr1 last_expr)
-            ~f:build_if_else
-    )
+            ~f:build_if_else)
     | Option t ->
       sprintf "(if (i + %d) == 0 then None else Some (%s))" i
         (mk_value_body_code t i)
@@ -723,16 +698,14 @@ module Type = struct
               in
               let comparisons =
                 List.mapi args ~f:(fun i t ->
-                    sprintf "%s a%d b%d" (eq_code t) i i
-                )
+                    sprintf "%s a%d b%d" (eq_code t) i i)
               in
               let body =
                 match comparisons with
                 | [] -> "true"
                 | _ -> String.concat ~sep:" && " comparisons
               in
-              sprintf "%s, %s -> %s" a_pat b_pat body
-        )
+              sprintf "%s, %s -> %s" a_pat b_pat body)
       in
       let extra_cases =
         match List.length cases with
@@ -773,8 +746,7 @@ module Type = struct
       List.fold_left fields ~init:acc ~f:(fun acc (s, t) ->
           let cur_path = Path.Unboxed_field s :: cur_path in
           let acc = cur_path :: acc in
-          reverse_unboxed_paths t acc cur_path
-      )
+          reverse_unboxed_paths t acc cur_path)
     | _ -> acc
 
   let unboxed_paths_by_depth ty =
@@ -788,8 +760,7 @@ module Type = struct
           | Some paths -> path :: paths
           | None -> [path]
         in
-        Int_map.add depth paths acc
-      )
+        Int_map.add depth paths acc)
       ~init:Int_map.empty
     |> Int_map.bindings
 end
@@ -813,8 +784,7 @@ module Type_naming = struct
         let t, tys =
           List.fold_left_mapi ~init:t tys ~f:(fun t i ty ->
               let t, ty = add_names t ty in
-              t, ty
-          )
+              t, ty)
         in
         let id = t.next_id in
         let t = { t with next_id = id + 1 } in
@@ -823,8 +793,7 @@ module Type_naming = struct
               let field_name =
                 sprintf "%c%d" (Char.unsafe_chr (Char.code 'a' + i)) id
               in
-              field_name, ty
-          )
+              field_name, ty)
         in
         let name = sprintf "t%d" id in
         let ty : Type.t = Record { name; fields; boxing } in
@@ -834,8 +803,7 @@ module Type_naming = struct
         let t, tys =
           List.fold_left_mapi ~init:t tys ~f:(fun t i ty ->
               let t, ty = add_names t ty in
-              t, ty
-          )
+              t, ty)
         in
         t, Tuple (tys, boxing)
       | Option ty ->
@@ -861,11 +829,9 @@ module Type_naming = struct
               let t, args =
                 List.fold_left_map args ~init:t ~f:(fun t ty ->
                     let t, ty = add_names t ty in
-                    t, ty
-                )
+                    t, ty)
               in
-              t, args
-          )
+              t, args)
         in
         let id = t.next_id in
         let t = { t with next_id = id + 1 } in
@@ -873,13 +839,11 @@ module Type_naming = struct
         let constructors : Type.constructor list =
           List.mapi constructors ~f:(fun i args ->
               let cname = sprintf "C%d_%d" id i in
-              { Type.name = cname; args }
-          )
+              { Type.name = cname; args })
         in
         let ty : Type.t = Variant { name; constructors } in
         ( { t with cache = Type_structure_map.add ty_structure (id, ty) t.cache },
-          ty )
-    )
+          ty ))
 
   let decls_code t =
     let decls =
@@ -902,8 +866,7 @@ module Type_naming = struct
                     | [] -> c.name
                     | args ->
                       sprintf "%s of %s" c.name
-                        (String.concat ~sep:" * " (List.map args ~f:Type.code))
-                )
+                        (String.concat ~sep:" * " (List.map args ~f:Type.code)))
               in
               String.concat ~sep:" | " constructor_defs
             | _ -> assert false
@@ -911,10 +874,8 @@ module Type_naming = struct
           let type_name = Type.code ty in
           ( id,
             sprintf "type %s = %s (* %s *)" type_name type_definition
-              (Type_structure.to_string (Type.structure ty))
-          )
-          :: acc
-        )
+              (Type_structure.to_string (Type.structure ty)) )
+          :: acc)
         t.cache []
     in
     (* Sort by type id *)

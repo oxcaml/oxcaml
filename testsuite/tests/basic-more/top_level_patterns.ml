@@ -1,5 +1,5 @@
 (* TEST
- include testing;
+   include testing;
 *)
 
 type t =
@@ -8,4 +8,6 @@ type t =
 
 let (A (a, _, b) | B (b, a)) = A (1, 2, 3)
 
-let () = print_int a; print_int b
+let () =
+  print_int a;
+  print_int b

@@ -1,12 +1,15 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* PR#5907 *)
 
-type 'a t = 'a;;
-let f (g : 'a list -> 'a t -> 'a) s = g s s;;
-[%%expect{|
+type 'a t = 'a
+
+let f (g : 'a list -> 'a t -> 'a) s = g s s
+
+[%%expect
+{|
 type 'a t = 'a
 Line 2, characters 42-43:
 2 | let f (g : 'a list -> 'a t -> 'a) s = g s s;;
@@ -14,34 +17,42 @@ Line 2, characters 42-43:
 Error: This expression has type "'a list"
        but an expression was expected of type "'a t" = "'a"
        The type variable "'a" occurs inside "'a list"
-|}];;
+|}]
 
-let f (g : 'a * 'b -> 'a t -> 'a) s = g s s;;
-[%%expect{|
+let f (g : 'a * 'b -> 'a t -> 'a) s = g s s
+
+[%%expect
+{|
 Line 1, characters 42-43:
 1 | let f (g : 'a * 'b -> 'a t -> 'a) s = g s s;;
                                               ^
 Error: This expression has type "'a * 'b"
        but an expression was expected of type "'a t" = "'a"
        The type variable "'a" occurs inside "'a * 'b"
-|}];;
+|}]
 
 (* #12971 *)
 
 module Seq : sig
   type 'a t = unit -> 'a node
+
   and 'a node
 
   val empty : 'a t
+
   val cons : 'a -> 'a t -> 'a t
 end = struct
   type 'a t = unit -> 'a node
+
   and 'a node = unit
 
   let empty () = ()
+
   let cons x xs () = ()
-end;;
-[%%expect{|
+end
+
+[%%expect
+{|
 module Seq :
   sig
     type 'a t = unit -> 'a node
@@ -49,18 +60,20 @@ module Seq :
     val empty : 'a t
     val cons : 'a -> 'a t -> 'a t
   end
-|}];;
+|}]
 
-type 'a t = T of 'a;;
+type 'a t = T of 'a
+
 let wrong_to_seq (xt : 'a t) : 'a Seq.t =
-  let T x = xt in
+  let (T x) = xt in
   Seq.cons Seq.empty x
-;;
+
 (* Note: the current behavior of this function is believed to be
    a bug, in the sense that it creates an equi-recursive type even in
    absence of the -rectypes flag. On the other hand, it does not fail
    with the Ctype.Escape exception, as it did from 4.13 to 5.1. *)
-[%%expect{|
+[%%expect
+{|
 type 'a t = T of 'a
 Line 4, characters 2-22:
 4 |   Seq.cons Seq.empty x
@@ -73,10 +86,12 @@ Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
          "unit -> 'a Seq.t Seq.node"
        Type "'a" is not compatible with type "'a Seq.t" = "unit -> 'a Seq.node"
        The type variable "'a" occurs inside "'a Seq.t"
-|}];;
+|}]
 
-let strange x = Seq.[cons x empty; cons empty x];;
-[%%expect{|
+let strange x = Seq.[cons x empty; cons empty x]
+
+[%%expect
+{|
 Line 1, characters 35-47:
 1 | let strange x = Seq.[cons x empty; cons empty x];;
                                        ^^^^^^^^^^^^
@@ -87,7 +102,9 @@ Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
          "unit -> 'a Seq.t Seq.node"
        Type "'a" is not compatible with type "'a Seq.t" = "unit -> 'a Seq.node"
        The type variable "'a" occurs inside "'a Seq.t"
-|}, Principal{|
+|},
+  Principal
+    {|
 Line 1, characters 35-47:
 1 | let strange x = Seq.[cons x empty; cons empty x];;
                                        ^^^^^^^^^^^^
@@ -99,4 +116,4 @@ Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
          "unit -> 'a Seq.t Seq.node"
        Type "'a" is not compatible with type "'a Seq.t" = "unit -> 'a Seq.node"
        The type variable "'a" occurs inside "'a Seq.t"
-|}];;
+|}]

@@ -1,41 +1,37 @@
 (* TEST
- unset FOO;
- unset FOO2;
- include unix;
- flags += "-strict-sequence -w +A-70 -warn-error +A";
- modules = "stubs.c";
- libwin32unix;
- {
-   bytecode;
- }{
-   native;
- }
+   unset FOO;
+   unset FOO2;
+   include unix;
+   flags += "-strict-sequence -w +A-70 -warn-error +A";
+   modules = "stubs.c";
+   libwin32unix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
-external set_environment_variable: string -> string -> unit
+external set_environment_variable : string -> string -> unit
   = "stub_SetEnvironmentVariable"
 
 let find_env s =
   let env = Unix.environment () in
   let rec loop i =
-    if i >= Array.length env then
-      None
-    else begin
+    if i >= Array.length env
+    then None
+    else
       let e = env.(i) in
       let pos = String.index e '=' in
-      if String.sub e 0 pos = s then
-        Some (String.sub e (pos+1) (String.length e - pos - 1))
-      else
-        loop (i+1)
-    end
+      if String.sub e 0 pos = s
+      then Some (String.sub e (pos + 1) (String.length e - pos - 1))
+      else loop (i + 1)
   in
   loop 0
 
 let print title = function
-  | None ->
-      Printf.printf "%s -> None\n%!" title
-  | Some s ->
-      Printf.printf "%s -> Some %S\n%!" title s
+  | None -> Printf.printf "%s -> None\n%!" title
+  | Some s -> Printf.printf "%s -> Some %S\n%!" title s
 
 let () =
   set_environment_variable "FOO" "BAR";

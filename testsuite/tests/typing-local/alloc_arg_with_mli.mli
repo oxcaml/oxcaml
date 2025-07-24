@@ -1,4 +1,7 @@
-type t = { a : int; b : int }
+type t =
+  { a : int;
+    b : int
+  }
 
 module M1 : sig
   val take_unrestricted : t -> int

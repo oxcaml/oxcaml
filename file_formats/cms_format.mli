@@ -19,25 +19,24 @@
 
 module Uid = Shape.Uid
 
-type cms_infos = {
-  cms_modname : Compilation_unit.t;
-  cms_comments : (string * Location.t) list;
-  cms_sourcefile : string option;
-  cms_builddir : string;
-  cms_source_digest : string option;
-  cms_initial_env : Env.t option;
-  cms_uid_to_loc : string Location.loc Shape.Uid.Tbl.t;
-  cms_uid_to_attributes : Parsetree.attributes Shape.Uid.Tbl.t;
-  cms_impl_shape : Shape.t option; (* None for mli *)
-  cms_ident_occurrences :
-    (Longident.t Location.loc * Shape_reduce.result) array;
-  cms_declaration_dependencies :
-    (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
-  cms_externals: Vicuna_value_shapes.extfun array;
-}
+type cms_infos =
+  { cms_modname : Compilation_unit.t;
+    cms_comments : (string * Location.t) list;
+    cms_sourcefile : string option;
+    cms_builddir : string;
+    cms_source_digest : string option;
+    cms_initial_env : Env.t option;
+    cms_uid_to_loc : string Location.loc Shape.Uid.Tbl.t;
+    cms_uid_to_attributes : Parsetree.attributes Shape.Uid.Tbl.t;
+    cms_impl_shape : Shape.t option; (* None for mli *)
+    cms_ident_occurrences :
+      (Longident.t Location.loc * Shape_reduce.result) array;
+    cms_declaration_dependencies :
+      (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+    cms_externals : Vicuna_value_shapes.extfun array
+  }
 
-type error =
-  Not_a_shape of string
+type error = Not_a_shape of string
 
 exception Error of error
 
@@ -50,18 +49,17 @@ val read : string -> cms_infos
     writes a cms(i) file.  *)
 val save_cms :
   Unit_info.Artifact.t ->
-  Compilation_unit.t ->  (* module name *)
+  Compilation_unit.t ->
+  (* module name *)
   Cmt_format.binary_annots ->
-  Env.t -> (* initial env *)
+  Env.t ->
+  (* initial env *)
   Shape.t option ->
   (Cmt_format.dependency_kind * Uid.t * Uid.t) list ->
   unit
 
 val register_toplevel_attributes :
-  Shape.Uid.t ->
-  attributes:Parsetree.attribute list ->
-  loc:Location.t ->
-  unit
+  Shape.Uid.t -> attributes:Parsetree.attribute list -> loc:Location.t -> unit
 
 (* Miscellaneous functions *)
 

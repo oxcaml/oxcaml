@@ -5,7 +5,7 @@ let i = ref 0
 let f x y =
   Printf.printf "%d %d\n" x y;
   0
-[@@inline never]
+  [@@inline never]
 
 let foo _ = ()
 
@@ -20,5 +20,4 @@ let foobar baz =
   let x = f a b in
   x + 1
 
-let () =
-  ignore ((foobar 0) : int)
+let () = ignore (foobar 0 : int)

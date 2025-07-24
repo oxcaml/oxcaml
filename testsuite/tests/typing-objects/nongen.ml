@@ -1,15 +1,16 @@
 (* TEST
- expect;
+   expect;
 *)
 
 let x = ref None
 
 class test =
-object
-  method b v = x := Some v
-end
+  object
+    method b v = x := Some v
+  end
 
-[%%expect{|
+[%%expect
+{|
 val x : '_weak1 option ref = {contents = None}
 Lines 3-6, characters 0-3:
 3 | class test =

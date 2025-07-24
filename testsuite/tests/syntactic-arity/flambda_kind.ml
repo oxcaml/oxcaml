@@ -16,9 +16,7 @@ let[@inline never] get (type a) : a value -> a = function
   | Float -> 3.
 
 let[@inline] update (type a) (v : a value) (x : a) : a =
-  match v with
-  | Int -> x + 1
-  | Float -> x +. 1.
+  match v with Int -> x + 1 | Float -> x +. 1.
 
 let run x = update x (get x)
 

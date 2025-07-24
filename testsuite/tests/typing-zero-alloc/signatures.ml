@@ -14,21 +14,23 @@
 (*******************************************)
 (* Test 1: Allowed and disallowed payloads *)
 module type S_payloads_base = sig
-  val[@zero_alloc] f : int -> int
+  val f : int -> int [@@zero_alloc]
 end
 
 module type S_payloads_opt = sig
-  val[@zero_alloc opt] f : int -> int
+  val f : int -> int [@@zero_alloc opt]
 end
 
 module type S_payloads_strict = sig
-  val[@zero_alloc strict] f : int -> int
+  val f : int -> int [@@zero_alloc strict]
 end
 
 module type S_payloads_strict_opt = sig
-  val[@zero_alloc strict opt] f : int -> int
+  val f : int -> int [@@zero_alloc strict opt]
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S_payloads_base = sig val f : int -> int [@@zero_alloc] end
 module type S_payloads_opt = sig val f : int -> int [@@zero_alloc opt] end
 module type S_payloads_strict =
@@ -38,9 +40,11 @@ module type S_payloads_strict_opt =
 |}]
 
 module type S_payloads_assume = sig
-  val[@zero_alloc assume] f : int -> int
+  val f : int -> int [@@zero_alloc assume]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 2-40:
 2 |   val[@zero_alloc assume] f : int -> int
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,9 +52,11 @@ Error: zero_alloc "assume" attributes are not supported in signatures
 |}]
 
 module type S_payloads_assume_unless_opt = sig
-  val[@zero_alloc assume_unless_opt] f : int -> int
+  val f : int -> int [@@zero_alloc assume_unless_opt]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 7-17:
 2 |   val[@zero_alloc assume_unless_opt] f : int -> int
            ^^^^^^^^^^
@@ -64,7 +70,7 @@ module type S_payloads_assume_unless_opt =
 (******************************)
 (* Test 2: allowed inclusions *)
 module type S_good_inc_base = sig
-  val[@zero_alloc] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc]
 end
 
 module M_absent : S_good_inc_base = struct
@@ -97,7 +103,8 @@ module M_assume_strict_nrn : S_good_inc_base = struct
   let[@zero_alloc assume strict never_returns_normally] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_good_inc_base = sig val f : 'a -> 'a [@@zero_alloc] end
 module M_absent : S_good_inc_base
 module M_base : S_good_inc_base
@@ -109,7 +116,7 @@ module M_assume_strict_nrn : S_good_inc_base
 |}]
 
 module type S_good_inc_opt = sig
-  val[@zero_alloc opt] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc opt]
 end
 
 module M_absent : S_good_inc_opt = struct
@@ -150,7 +157,8 @@ module M_assume_strict_nrn : S_good_inc_opt = struct
   let[@zero_alloc assume strict never_returns_normally] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_good_inc_opt = sig val f : 'a -> 'a [@@zero_alloc opt] end
 module M_absent : S_good_inc_opt
 module M_base : S_good_inc_opt
@@ -164,7 +172,7 @@ module M_assume_strict_nrn : S_good_inc_opt
 |}]
 
 module type S_good_inc_strict = sig
-  val[@zero_alloc strict] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc strict]
 end
 
 module M_absent : S_good_inc_strict = struct
@@ -185,7 +193,8 @@ module M_assume_strict_nrn : S_good_inc_strict = struct
   let[@zero_alloc assume strict never_returns_normally] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_good_inc_strict =
   sig val f : 'a -> 'a [@@zero_alloc strict] end
 module M_absent : S_good_inc_strict
@@ -195,7 +204,7 @@ module M_assume_strict_nrn : S_good_inc_strict
 |}]
 
 module type S_good_inc_strict_opt = sig
-  val[@zero_alloc strict opt] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc strict opt]
 end
 
 module M_absent : S_good_inc_strict_opt = struct
@@ -220,7 +229,8 @@ module M_assume_strict_nrn : S_good_inc_strict_opt = struct
   let[@zero_alloc assume strict never_returns_normally] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_good_inc_strict_opt =
   sig val f : 'a -> 'a [@@zero_alloc strict opt] end
 module M_absent : S_good_inc_strict_opt
@@ -230,19 +240,19 @@ module M_assume_strict : S_good_inc_strict_opt
 module M_assume_strict_nrn : S_good_inc_strict_opt
 |}]
 
-
 (*********************************)
 (* Test 3: disallowed inclusions *)
 
 module type S_bad_inc_base = sig
-  val[@zero_alloc] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc]
 end
 
 module M_opt : S_bad_inc_base = struct
   let[@zero_alloc opt] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_bad_inc_base = sig val f : 'a -> 'a [@@zero_alloc] end
 Lines 5-7, characters 32-3:
 5 | ................................struct
@@ -261,13 +271,15 @@ Error: Signature mismatch:
 |}]
 
 module type S_bad_inc_strict = sig
-  val[@zero_alloc strict] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc strict]
 end
 
 module M_base : S_bad_inc_strict = struct
   let[@zero_alloc] f x = x
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S_bad_inc_strict = sig val f : 'a -> 'a [@@zero_alloc strict] end
 Lines 5-7, characters 35-3:
 5 | ...................................struct
@@ -289,7 +301,8 @@ module M_assume : S_bad_inc_strict = struct
   let[@zero_alloc assume] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-3, characters 37-3:
 1 | .....................................struct
 2 |   let[@zero_alloc assume] f x = x
@@ -310,7 +323,8 @@ module M_opt : S_bad_inc_strict = struct
   let[@zero_alloc opt] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-3, characters 34-3:
 1 | ..................................struct
 2 |   let[@zero_alloc opt] f x = x
@@ -331,7 +345,8 @@ module M_strict_opt : S_bad_inc_strict = struct
   let[@zero_alloc strict opt] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-3, characters 41-3:
 1 | .........................................struct
 2 |   let[@zero_alloc strict opt] f x = x
@@ -352,7 +367,8 @@ module M_assume_nrn : S_bad_inc_strict = struct
   let[@zero_alloc assume never_returns_normally] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-3, characters 41-3:
 1 | .........................................struct
 2 |   let[@zero_alloc assume never_returns_normally] f x = x
@@ -370,14 +386,15 @@ Error: Signature mismatch:
 |}]
 
 module type S_strict_opt = sig
-  val[@zero_alloc strict opt] f : 'a -> 'a
+  val f : 'a -> 'a [@@zero_alloc strict opt]
 end
 
 module M_assume : S_strict_opt = struct
   let[@zero_alloc assume] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_strict_opt = sig val f : 'a -> 'a [@@zero_alloc strict opt] end
 Lines 5-7, characters 33-3:
 5 | .................................struct
@@ -399,7 +416,8 @@ module M_opt : S_strict_opt = struct
   let[@zero_alloc opt] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-3, characters 30-3:
 1 | ..............................struct
 2 |   let[@zero_alloc opt] f x = x
@@ -420,7 +438,8 @@ module M_assume_nrn : S_strict_opt = struct
   let[@zero_alloc assume never_returns_normally] f x = x
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-3, characters 37-3:
 1 | .....................................struct
 2 |   let[@zero_alloc assume never_returns_normally] f x = x
@@ -441,9 +460,11 @@ Error: Signature mismatch:
 (* Test 4: Requires valid arity, inferred or provided, without expansion *)
 
 module type S_non_func_int = sig
-  val[@zero_alloc] x : int
+  val x : int [@@zero_alloc]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 2-26:
 2 |   val[@zero_alloc] x : int
       ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -455,9 +476,12 @@ Error: In signatures, zero_alloc is only supported on function declarations.
 
 module type S_non_func_alias = sig
   type t = string
-  val[@zero_alloc] x : t
+
+  val x : t [@@zero_alloc]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 3, characters 2-24:
 3 |   val[@zero_alloc] x : t
       ^^^^^^^^^^^^^^^^^^^^^^
@@ -469,10 +493,14 @@ Error: In signatures, zero_alloc is only supported on function declarations.
 
 module type S_func_alias = sig
   type t = int -> int
+
   type s = t
-  val[@zero_alloc] x : s
+
+  val x : s [@@zero_alloc]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 4, characters 2-24:
 4 |   val[@zero_alloc] x : s
       ^^^^^^^^^^^^^^^^^^^^^^
@@ -484,9 +512,12 @@ Error: In signatures, zero_alloc is only supported on function declarations.
 
 module type S_func_alias = sig
   type t = int -> int
-  val[@zero_alloc arity 0] x : t
+
+  val x : t [@@zero_alloc arity 0]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 3, characters 2-32:
 3 |   val[@zero_alloc arity 0] x : t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -497,9 +528,11 @@ Error: In signatures, zero_alloc is only supported on function declarations.
 |}]
 
 module type S_arity_0 = sig
-  val[@zero_alloc arity 0] f : int -> int
+  val f : int -> int [@@zero_alloc arity 0]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 2-41:
 2 |   val[@zero_alloc arity 0] f : int -> int
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -507,9 +540,11 @@ Error: Invalid zero_alloc attribute: arity must be greater than 0.
 |}]
 
 module type S_arity_negative = sig
-  val[@zero_alloc arity (-1)] f : int -> int
+  val f : int -> int [@@zero_alloc arity (-1)]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 2-44:
 2 |   val[@zero_alloc arity (-1)] f : int -> int
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -522,7 +557,7 @@ Error: Invalid zero_alloc attribute: arity must be greater than 0.
 type t_two_args = int -> int -> int
 
 module type S_arity_int_int = sig
-  val[@zero_alloc] f : int -> int -> int
+  val f : int -> int -> int [@@zero_alloc]
 end
 
 module M_int_int_params : S_arity_int_int = struct
@@ -530,15 +565,15 @@ module M_int_int_params : S_arity_int_int = struct
 end
 
 module M_int_param_int_case : S_arity_int_int = struct
-  let[@zero_alloc] f x =
-    function 0 -> x + x
-           | n -> x + n
+  let[@zero_alloc] f x = function 0 -> x + x | n -> x + n
 end
 
 module M_nested_functions : S_arity_int_int = struct
-  let[@zero_alloc] f x = fun y -> x + y
+  let[@zero_alloc] f x y = x + y
 end
-[%%expect{|
+
+[%%expect
+{|
 type t_two_args = int -> int -> int
 module type S_arity_int_int =
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -564,9 +599,11 @@ Error: Signature mismatch:
 |}]
 
 module type S_alias_no_arity = sig
-  val[@zero_alloc] f : t_two_args
+  val f : t_two_args [@@zero_alloc]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 2-33:
 2 |   val[@zero_alloc] f : t_two_args
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -577,22 +614,26 @@ Error: In signatures, zero_alloc is only supported on function declarations.
 |}]
 
 module type S_alias_explicit_arity_2 = sig
-  val[@zero_alloc arity 2] f : t_two_args
+  val f : t_two_args [@@zero_alloc arity 2]
 end
 
 module M_good_explicit_arity_2 : S_alias_explicit_arity_2 = struct
   let[@zero_alloc] f x y = x + y
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S_alias_explicit_arity_2 =
   sig val f : t_two_args [@@zero_alloc arity 2] end
 module M_good_explicit_arity_2 : S_alias_explicit_arity_2
 |}]
 
 module M_bad_explicit_arity_2 : S_alias_explicit_arity_2 = struct
-  let[@zero_alloc] f x = fun y -> x + y
+  let[@zero_alloc] f x y = x + y
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 1-3, characters 59-3:
 1 | ...........................................................struct
 2 |   let[@zero_alloc] f x = fun y -> x + y
@@ -613,13 +654,15 @@ Error: Signature mismatch:
 |}]
 
 module type S_alias_explicit_arity_1 = sig
-  val[@zero_alloc arity 1] f : t_two_args
+  val f : t_two_args [@@zero_alloc arity 1]
 end
 
 module M_bad_explicit_arity_1 : S_alias_explicit_arity_1 = struct
   let[@zero_alloc] f x y = x + y
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S_alias_explicit_arity_1 =
   sig val f : t_two_args [@@zero_alloc arity 1] end
 Lines 5-7, characters 59-3:
@@ -642,9 +685,10 @@ Error: Signature mismatch:
 |}]
 
 module M_good_explicit_arity_1 : S_alias_explicit_arity_1 = struct
-  let[@zero_alloc] f x = fun y -> x + y
+  let[@zero_alloc] f x y = x + y
 end
-[%%expect{|
+
+[%%expect {|
 module M_good_explicit_arity_1 : S_alias_explicit_arity_1
 |}]
 
@@ -653,26 +697,32 @@ module M_good_explicit_arity_1 : S_alias_explicit_arity_1
 
 module type S_abstract = sig
   type t
-  val[@zero_alloc] f : int -> t
+
+  val f : int -> t [@@zero_alloc]
 end
 
 module M_abstract : S_abstract = struct
   type t = int
+
   let[@zero_alloc] f x = x
 end
 
 module type S_subst = S_abstract with type t = int -> int
 
-module M_subst_good : S_subst  = struct
+module M_subst_good : S_subst = struct
   type t = int -> int
-  let[@zero_alloc] f x = fun y -> x + y
-end
 
-module M_subst_bad : S_subst  = struct
-  type t = int -> int
   let[@zero_alloc] f x y = x + y
 end
-[%%expect{|
+
+module M_subst_bad : S_subst = struct
+  type t = int -> int
+
+  let[@zero_alloc] f x y = x + y
+end
+
+[%%expect
+{|
 module type S_abstract = sig type t val f : int -> t [@@zero_alloc] end
 module M_abstract : S_abstract
 module type S_subst =
@@ -702,23 +752,22 @@ Error: Signature mismatch:
 (* Test 7: A practicalish example of a non-obvious zero_alloc arity *)
 
 module type S_fun_in_fun = sig
-  val[@zero_alloc arity 2] f : int -> int -> int -> int*int
+  val f : int -> int -> int -> int * int [@@zero_alloc arity 2]
 end
 
 (* The expected behavior from the backend analysis for the two funtions below
    is checked in [tests/backend/checkmach/test_arity.ml] *)
 
 module M_fun_in_fun_good : S_fun_in_fun = struct
-  let[@zero_alloc] f x y =
-    if x = y+1 then fun z -> (z,z) else fun z -> (z,0)
+  let[@zero_alloc] f x y = if x = y + 1 then fun z -> z, z else fun z -> z, 0
 end
 
 module M_fun_in_fun_bad : S_fun_in_fun = struct
-  let[@zero_alloc] f x y z =
-    if x = y+1 then (z,z) else (z,0)
+  let[@zero_alloc] f x y z = if x = y + 1 then z, z else z, 0
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_fun_in_fun =
   sig val f : int -> int -> int -> int * int [@@zero_alloc arity 2] end
 module M_fun_in_fun_good : S_fun_in_fun
@@ -746,30 +795,31 @@ Error: Signature mismatch:
 (* Test 8: Parsing "arity n" works *)
 
 module type S_arity_42 = sig
-  val[@zero_alloc arity 42] f : int -> int
+  val f : int -> int [@@zero_alloc arity 42]
 end
 
 module type S_arity_42_strict = sig
-  val[@zero_alloc arity 42 strict] f : int -> int
+  val f : int -> int [@@zero_alloc arity 42 strict]
 end
 
 module type S_strict_arity_42 = sig
-  val[@zero_alloc strict arity 42] f : int -> int
+  val f : int -> int [@@zero_alloc strict arity 42]
 end
 
 module type S_arity_42_opt_strict = sig
-  val[@zero_alloc arity 42 opt strict] f : int -> int
+  val f : int -> int [@@zero_alloc arity 42 opt strict]
 end
 
 module type S_opt_arity_42_strict = sig
-  val[@zero_alloc opt arity 42 strict] f : int -> int
+  val f : int -> int [@@zero_alloc opt arity 42 strict]
 end
 
 module type S_opt_strict_arity_42 = sig
-  val[@zero_alloc opt strict arity 42] f : int -> int
+  val f : int -> int [@@zero_alloc opt strict arity 42]
 end
 
-[%%expect{|
+[%%expect
+{|
 module type S_arity_42 = sig val f : int -> int [@@zero_alloc arity 42] end
 module type S_arity_42_strict =
   sig val f : int -> int [@@zero_alloc strict arity 42] end
@@ -790,7 +840,8 @@ module M_struct_arity_let_1 = struct
   let[@zero_alloc arity 2] f x y = x + y
 end
 
-[%%expect{|
+[%%expect
+{|
 Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f x y = x + y
            ^^^^^^^^^^
@@ -802,9 +853,11 @@ module M_struct_arity_let_1 :
 |}]
 
 module M_struct_arity_let_2 = struct
-  let[@zero_alloc arity 2] f = fun x y -> x + y
+  let[@zero_alloc arity 2] f x y = x + y
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f = fun x y -> x + y
            ^^^^^^^^^^
@@ -816,9 +869,11 @@ module M_struct_arity_let_2 :
 |}]
 
 module M_struct_arity_let_fun_1 = struct
-  let f = fun[@zero_alloc arity 2]  x y -> x + y
+  let f = fun [@zero_alloc arity 2] x y -> x + y
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 15-25:
 2 |   let f = fun[@zero_alloc arity 2]  x y -> x + y
                    ^^^^^^^^^^
@@ -830,13 +885,11 @@ module M_struct_arity_let_fun_1 :
 |}]
 
 module M_struct_arity_let_fun_2 = struct
-  let f x =
-    if x = 42 then
-      fun[@zero_alloc arity 1] y -> y
-    else
-      fun y -> y + 1
+  let f x = if x = 42 then fun [@zero_alloc arity 1] y -> y else fun y -> y + 1
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 4, characters 11-21:
 4 |       fun[@zero_alloc arity 1] y -> y
                ^^^^^^^^^^
@@ -850,7 +903,7 @@ module M_struct_arity_let_fun_2 : sig val f : int -> int -> int end
 (* Test 10: module type of works *)
 
 module M_base_for_mto = struct
-  let[@zero_alloc] f x = x+1
+  let[@zero_alloc] f x = x + 1
 end
 
 module type S_base_mto = module type of M_base_for_mto
@@ -863,7 +916,8 @@ module M_mto_base_bad : S_base_mto = struct
   let[@zero_alloc opt] f x = x + 3
 end
 
-[%%expect{|
+[%%expect
+{|
 module M_base_for_mto : sig val f : int -> int [@@zero_alloc] end
 module type S_base_mto =
   sig val f : int -> int @@ portable [@@zero_alloc] end
@@ -885,7 +939,7 @@ Error: Signature mismatch:
 |}]
 
 module M_strict_for_mto = struct
-  let[@zero_alloc strict] f x = x+1
+  let[@zero_alloc strict] f x = x + 1
 end
 
 module type S_strict_mto = module type of M_strict_for_mto
@@ -898,7 +952,8 @@ module M_mto_strict_bad : S_strict_mto = struct
   let[@zero_alloc] f x = x + 3
 end
 
-[%%expect{|
+[%%expect
+{|
 module M_strict_for_mto : sig val f : int -> int [@@zero_alloc strict] end
 module type S_strict_mto =
   sig val f : int -> int @@ portable [@@zero_alloc strict] end
@@ -926,18 +981,19 @@ Error: Signature mismatch:
    (At the moment the backend doesn't allow for checking never_return_normally,
    but it wouldn't be hard to add, and then we could revisit this). *)
 module M_assume_for_mto = struct
-  let[@zero_alloc assume] f x = (x+1,x+2)
+  let[@zero_alloc assume] f x = x + 1, x + 2
 end
 
 module type S_no_assume = module type of M_assume_for_mto
 
 module M_nrn_for_mto = struct
-  let[@zero_alloc assume never_returns_normally] f x = (x+1,x+2)
+  let[@zero_alloc assume never_returns_normally] f x = x + 1, x + 2
 end
 
 module type S_no_nrn = module type of M_nrn_for_mto
 
-[%%expect{|
+[%%expect
+{|
 module M_assume_for_mto : sig val f : int -> int * int [@@zero_alloc] end
 module type S_no_assume =
   sig val f : int -> int * int @@ portable [@@zero_alloc] end
@@ -957,20 +1013,26 @@ module type S_no_nrn =
 
 (* Should work by setting zero_alloc variables in f and g. *)
 module M_infer1 : sig
-  val[@zero_alloc] f : int -> int
+  val f : int -> int [@@zero_alloc]
+
   val g : int -> int
 end = struct
   let f x = x
+
   let g x = x
 end
 
 (* Should be rejected because the signature we have for M_infer1 doesn't have
    vars in it (and its zero_alloc values are too weak). *)
 module M_infer1' : sig
-  val[@zero_alloc] f : int -> int
-  val[@zero_alloc] g : int -> int
-end = M_infer1
-[%%expect{|
+  val f : int -> int [@@zero_alloc]
+
+  val g : int -> int [@@zero_alloc]
+end =
+  M_infer1
+
+[%%expect
+{|
 module M_infer1 :
   sig val f : int -> int [@@zero_alloc] val g : int -> int end
 Line 14, characters 6-14:
@@ -994,33 +1056,48 @@ Error: Signature mismatch:
 
 module M_infer2 = struct
   let f x = x
+
   let g x = x
 end
 
 (* Should work by updating the variables. *)
 module M_infer2' : sig
-  val[@zero_alloc opt] f : int -> int
-  val[@zero_alloc] g : int -> int
-end = M_infer2 (* 1 *)
+  val f : int -> int [@@zero_alloc opt]
+
+  val g : int -> int [@@zero_alloc]
+end =
+  M_infer2
+(* 1 *)
 
 (* Should work by zero-alloc subtyping. *)
 module M_infer2'' : sig
-  val[@zero_alloc opt] f : int -> int
-  val[@zero_alloc opt] g : int -> int
-end = M_infer2 (* 2 *)
+  val f : int -> int [@@zero_alloc opt]
+
+  val g : int -> int [@@zero_alloc opt]
+end =
+  M_infer2
+(* 2 *)
 
 (* Should work by updating the variables again. *)
 module M_infer2''' : sig
-  val[@zero_alloc] f : int -> int
-  val[@zero_alloc] g : int -> int
-end = M_infer2 (* 3 *)
+  val f : int -> int [@@zero_alloc]
+
+  val g : int -> int [@@zero_alloc]
+end =
+  M_infer2
+(* 3 *)
 
 (* Here we update the variable on [f] but [g] works by subtyping. *)
 module M_infer2'''' : sig
-  val[@zero_alloc strict] f : int -> int
-  val[@zero_alloc opt] g : int -> int
-end = M_infer2 (* 4 *)
-[%%expect{|
+  val f : int -> int [@@zero_alloc strict]
+
+  val g : int -> int [@@zero_alloc opt]
+end =
+  M_infer2
+(* 4 *)
+
+[%%expect
+{|
 module M_infer2 : sig val f : 'a -> 'a val g : 'a -> 'a end
 module M_infer2' :
   sig
@@ -1048,7 +1125,9 @@ module M_infer2'''' :
    the constraint for [M_infer2''''] was done we modified [f]'s variable but
    didn't accidentally weaken the variable on [g]. *)
 module type S = module type of M_infer2
-[%%expect{|
+
+[%%expect
+{|
 module type S =
   sig
     val f : 'a -> 'a @@ stateless [@@zero_alloc strict]
@@ -1062,14 +1141,19 @@ module type S =
 (* If the arity doesn't match the signature, you get an error. *)
 module M_inf_too_many_args = struct
   type t = int -> int
+
   let f : int -> t = fun x _ -> x
 end
 
 module _ : sig
   type t
-  val[@zero_alloc] f : int -> t
-end = M_inf_too_many_args
-[%%expect{|
+
+  val f : int -> t [@@zero_alloc]
+end =
+  M_inf_too_many_args
+
+[%%expect
+{|
 module M_inf_too_many_args : sig type t = int -> int val f : int -> t end
 Line 9, characters 6-25:
 9 | end = M_inf_too_many_args
@@ -1090,13 +1174,16 @@ Error: Signature mismatch:
 |}]
 
 module M_inf_too_few_args = struct
-  let f x = fun y -> x + y
+  let f x y = x + y
 end
 
 module _ : sig
-  val[@zero_alloc] f : int -> int -> int
-end = M_inf_too_few_args
-[%%expect{|
+  val f : int -> int -> int [@@zero_alloc]
+end =
+  M_inf_too_few_args
+
+[%%expect
+{|
 module M_inf_too_few_args : sig val f : int -> int -> int end
 Line 7, characters 6-24:
 7 | end = M_inf_too_few_args
@@ -1119,16 +1206,21 @@ Error: Signature mismatch:
 (* You can fix it with an explicit arity. *)
 module M_explicit_arity_2 = struct
   type t = int -> int
+
   let f : int -> t = fun x _ -> x
 end
 
 module _ : sig
   type t
-  val[@zero_alloc (arity 2)] f : int -> t
-end = M_explicit_arity_2
+
+  val f : int -> t [@@zero_alloc arity 2]
+end =
+  M_explicit_arity_2
 
 module type S = module type of M_explicit_arity_2
-[%%expect{|
+
+[%%expect
+{|
 module M_explicit_arity_2 : sig type t = int -> int val f : int -> t end
 module type S =
   sig
@@ -1146,19 +1238,26 @@ module type S =
    got the first time, just the signature you'll get if you do [module type of]
    again). *)
 module M_for_mto = struct
-  let f x = x+1
+  let f x = x + 1
 end
 
 (* The current state of the variables is "no check" *)
 module type S = module type of M_for_mto
-[%%expect{|
+
+[%%expect
+{|
 module M_for_mto : sig val f : int -> int end
 module type S = sig val f : int -> int @@ portable end
 |}]
 
 (* [S] itself is fixed. *)
-module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
-[%%expect{|
+module F (X : S) : sig
+  val f : int -> int [@@zero_alloc]
+end =
+  X
+
+[%%expect
+{|
 Line 1, characters 61-62:
 1 | module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
                                                                  ^
@@ -1178,13 +1277,24 @@ Error: Signature mismatch:
 (* But [M_for_mto] retains its variables.  Changing them changes what you get
    next time you do [module type of] on it, but not [S]. *)
 module _ : sig
-  val[@zero_alloc] f : int -> int
-end = M_for_mto
+  val f : int -> int [@@zero_alloc]
+end =
+  M_for_mto
 
 module type S' = module type of M_for_mto
-module F' (X : S') : sig val[@zero_alloc] f : int -> int end = X
-module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
-[%%expect{|
+
+module F' (X : S') : sig
+  val f : int -> int [@@zero_alloc]
+end =
+  X
+
+module F (X : S) : sig
+  val f : int -> int [@@zero_alloc]
+end =
+  X
+
+[%%expect
+{|
 module type S' = sig val f : int -> int @@ portable [@@zero_alloc] end
 module F' : functor (X : S') -> sig val f : int -> int [@@zero_alloc] end
 Line 7, characters 61-62:
@@ -1224,12 +1334,14 @@ module N1 : sig
   module type S_plain1 = S1 with module M1 = Plain1
 end = struct
   module Plain1 = struct
-    let f x = x+1
+    let f x = x + 1
   end
 
   module type S_plain1 = S1 with module M1 = Plain1
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S1 = sig module M1 : sig val f : int -> int end end
 module N1 :
   sig
@@ -1250,18 +1362,20 @@ end
 
 module N2 : sig
   module Plain2 : sig
-    val[@zero_alloc] f : int -> int
+    val f : int -> int [@@zero_alloc]
   end
 
   module type S_plain2 = S2 with module M2 = Plain2
 end = struct
   module Plain2 = struct
-    let f x = x+1
+    let f x = x + 1
   end
 
   module type S_plain2 = S2 with module M2 = Plain2
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S2 = sig module M2 : sig val f : int -> int end end
 Lines 13-19, characters 6-3:
 13 | ......struct
@@ -1321,18 +1435,20 @@ end
 
 module N3 : sig
   module Plain3 : sig
-    val[@zero_alloc] f : int -> int
+    val f : int -> int [@@zero_alloc]
   end
 
   module type S_plain3 = S3 with module M3 = Plain3
 end = struct
   module Plain3 = struct
-    let[@zero_alloc] f x = x+1
+    let[@zero_alloc] f x = x + 1
   end
 
   module type S_plain3 = S3 with module M3 = Plain3
 end
-[%%expect{|
+
+[%%expect
+{|
 module type S3 = sig module M3 : sig val f : int -> int end end
 module N3 :
   sig
@@ -1348,6 +1464,7 @@ module N3 :
 module M_outer = struct
   module M_inner = struct
     type t
+
     let f () = () (* this has a zero_alloc variable (and a modality variable) *)
   end
 end
@@ -1360,8 +1477,8 @@ end
 
 (* As a result of the destructive substition, we'll eliminate the alias.  When
    this happens, we shouldn't keep the zero_alloc variables on [f] *)
-module type M_outer_subst = M_outer_strong
-  with type M_inner.t := M_outer.M_inner.t
+module type M_outer_subst =
+  M_outer_strong with type M_inner.t := M_outer.M_inner.t
 
 (* If we had kept the zero_alloc or modality variables, this would give an
    error. *)
@@ -1370,7 +1487,9 @@ module M : M_outer_subst = struct
     let f () = ()
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 module M_outer : sig module M_inner : sig type t val f : unit -> unit end end
 module type M_outer_strong = sig module M_inner = M_outer.M_inner end
 module type M_outer_subst =
@@ -1384,6 +1503,7 @@ module M : M_outer_subst
 module M_outer = struct
   module M_inner = struct
     module M_innest = struct end
+
     let f () = () (* this has a zero_alloc variable (and a modality variable) *)
   end
 end
@@ -1396,8 +1516,8 @@ end
 
 (* As a result of the destructive substition, we'll eliminate the alias.  When
    this happens, we shouldn't keep the zero_alloc variables on [f] *)
-module type S_outer_subst = S_outer_strong
-  with module M_inner.M_innest := M_outer.M_inner.M_innest
+module type S_outer_subst =
+  S_outer_strong with module M_inner.M_innest := M_outer.M_inner.M_innest
 
 (* If we had kept the zero_alloc or modality variables, this would give an
    error. *)
@@ -1406,7 +1526,9 @@ module M : S_outer_subst = struct
     let f () = ()
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 module M_outer :
   sig
     module M_inner : sig module M_innest : sig end val f : unit -> unit end
@@ -1423,6 +1545,7 @@ module M : S_outer_subst
 module M_outer = struct
   module M_inner = struct
     module type S = sig end
+
     let f () = () (* this has a zero_alloc variable (and a modality variable *)
   end
 end
@@ -1435,8 +1558,8 @@ end
 
 (* As a result of the destructive substition, we'll eliminate the alias.  When
    this happens, we shouldn't keep the zero_alloc variables on [f] *)
-module type S_outer_subst = S_outer_strong
-  with module type M_inner.S := M_outer.M_inner.S
+module type S_outer_subst =
+  S_outer_strong with module type M_inner.S := M_outer.M_inner.S
 
 (* If we had kept the zero_alloc or modality variables, this would give an
    error. *)
@@ -1445,7 +1568,9 @@ module M : S_outer_subst = struct
     let f () = ()
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 module M_outer :
   sig
     module M_inner : sig module type S = sig end val f : unit -> unit end
@@ -1462,9 +1587,12 @@ module M : S_outer_subst
 (* Aliases for use below. *)
 module M_aliases = struct
   type t_one_arg = int -> int
+
   type t_two_args = int -> t_one_arg
 end
-[%%expect{|
+
+[%%expect
+{|
 module M_aliases :
   sig type t_one_arg = int -> int type t_two_args = int -> t_one_arg end
 |}]
@@ -1477,23 +1605,30 @@ module type S_all = sig
      surprising arity, but any mismatch would be an error at the time of
      comparing against the module. *)
   val f_no_warn_1 : M_aliases.t_one_arg -> int
+
   val f_no_warn_2 : int -> M_aliases.t_one_arg
 
   (* These should warn - they aren't syntactically function types so would
      get no attribute, but are function types after expanding. *)
   val f_warn_one_arg : M_aliases.t_one_arg
+
   val f_warn_two_args : M_aliases.t_two_args
 
   (* These should not warn - they are resolved by having an explicit
      attribute. (The arity doesn't have to match, that's handled by the module
      inclusion check, we just want to check they aren't silently getting the
      default no check. *)
-  val[@zero_alloc ignore] f_no_warn_3 : M_aliases.t_one_arg
-  val[@zero_alloc arity 1] f_no_warn_4 : M_aliases.t_one_arg
-  val[@zero_alloc arity 2] f_no_warn_5 : M_aliases.t_two_args
-  val[@zero_alloc arity 45] f_no_warn_5 : M_aliases.t_two_args
+  val f_no_warn_3 : M_aliases.t_one_arg [@@zero_alloc ignore]
+
+  val f_no_warn_4 : M_aliases.t_one_arg [@@zero_alloc arity 1]
+
+  val f_no_warn_5 : M_aliases.t_two_args [@@zero_alloc arity 2]
+
+  val f_no_warn_5 : M_aliases.t_two_args [@@zero_alloc arity 45]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 12, characters 2-42:
 12 |   val f_warn_one_arg : M_aliases.t_one_arg
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1535,23 +1670,30 @@ module type S_all = sig
      surprising arity, but any mismatch would be an error at the time of
      comparing against the module. *)
   val f_no_warn_1 : M_aliases.t_one_arg -> int
+
   val f_no_warn_2 : int -> M_aliases.t_one_arg
 
   (* These should warn - they aren't syntactically function types so would
      get no attribute, but are function types after expanding. *)
   val f_warn_one_arg : M_aliases.t_one_arg
+
   val f_warn_two_args : M_aliases.t_two_args
 
   (* These should not warn - they are resolved by having an explicit
      attribute. (The arity doesn't have to match, that's handled by the module
      inclusion check, we just want to check they aren't silently getting the
      default no check. *)
-  val[@zero_alloc ignore] f_no_warn_3 : M_aliases.t_one_arg
-  val[@zero_alloc arity 1] f_no_warn_4 : M_aliases.t_one_arg
-  val[@zero_alloc arity 2] f_no_warn_5 : M_aliases.t_two_args
-  val[@zero_alloc arity 45] f_no_warn_5 : M_aliases.t_two_args
+  val f_no_warn_3 : M_aliases.t_one_arg [@@zero_alloc ignore]
+
+  val f_no_warn_4 : M_aliases.t_one_arg [@@zero_alloc arity 1]
+
+  val f_no_warn_5 : M_aliases.t_two_args [@@zero_alloc arity 2]
+
+  val f_no_warn_5 : M_aliases.t_two_args [@@zero_alloc arity 45]
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 12, characters 2-42:
 12 |   val f_warn_one_arg : M_aliases.t_one_arg
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1588,22 +1730,27 @@ module type S_all =
    module inclusion check*)
 module type S_all = sig
   [@@@zero_alloc all]
+
   val f : int -> int
 end
 
 module type S_all_opt = sig
   [@@@zero_alloc all_opt]
+
   val f : int -> int
 end
 
 module type S = sig
   [@@@zero_alloc all]
+
   val f : int -> int
 end
 
 (* This should be accepted *)
 module F (X : S_all) : S = X
-[%%expect{|
+
+[%%expect
+{|
 module type S_all = sig val f : int -> int [@@zero_alloc] end
 module type S_all_opt = sig val f : int -> int [@@zero_alloc opt] end
 module type S = sig val f : int -> int [@@zero_alloc] end
@@ -1612,7 +1759,9 @@ module F : functor (X : S_all) -> S
 
 (* This should be rejected *)
 module F (X : S_all_opt) : S = X
-[%%expect{|
+
+[%%expect
+{|
 Line 1, characters 31-32:
 1 | module F (X : S_all_opt) : S = X
                                    ^
@@ -1628,25 +1777,29 @@ Error: Signature mismatch:
        The former provides a weaker "zero_alloc" guarantee than the latter.
 |}]
 
-
-
 (* [@@@zero_alloc all] and [@@@zero_alloc all_opt] in signatures that only declare
    non-function values: module inclusion check *)
 module type S_all = sig
   [@@@zero_alloc all]
+
   type t
+
   val f : t
 end
 
 module type S_all_opt = sig
   [@@@zero_alloc all_opt]
+
   type t
+
   val f : t
 end
 
 module type S = sig
   [@@@zero_alloc all]
+
   type t
+
   val f : t
 end
 
@@ -1654,7 +1807,9 @@ end
    [include_mod] for modules that declare only non-function values and therefore both examples
    below are accepted. *)
 module F (X : S_all) : S = X
-[%%expect{|
+
+[%%expect
+{|
 module type S_all = sig type t val f : t end
 module type S_all_opt = sig type t val f : t end
 module type S = sig type t val f : t end
@@ -1662,10 +1817,10 @@ module F : functor (X : S_all) -> S
 |}]
 
 module F (X : S_all_opt) : S = X
-[%%expect{|
+
+[%%expect {|
 module F : functor (X : S_all_opt) -> S
 |}]
-
 
 (* [@zero_alloc ignore]: module inclusion check *)
 module type S_all = sig
@@ -1677,12 +1832,14 @@ end
 module type S_all_ignored = sig
   [@@@zero_alloc all]
 
-  val[@zero_alloc ignore] f_warn_one_arg : int -> int
+  val f_warn_one_arg : int -> int [@@zero_alloc ignore]
 end
 
 (* This should be rejected *)
 module F (X : S_all_ignored) : S_all = X
-[%%expect{|
+
+[%%expect
+{|
 module type S_all = sig val f_warn_one_arg : int -> int [@@zero_alloc] end
 module type S_all_ignored = sig val f_warn_one_arg : int -> int end
 Line 14, characters 39-40:
@@ -1702,36 +1859,38 @@ Error: Signature mismatch:
 
 (* This should be accepted *)
 module F (X : S_all) : S_all_ignored = X
-[%%expect{|
+
+[%%expect {|
 module F : functor (X : S_all) -> S_all_ignored
 |}]
-
 
 (* [@zero_alloc custom_error_message "string"] in signatures: module inclusion
    results in concatenated messages. *)
 module T1 = struct
   module type S1 = sig
-    val f : 'a -> ('a * 'a) [@@zero_alloc custom_error_message "foo"]
+    val f : 'a -> 'a * 'a [@@zero_alloc custom_error_message "foo"]
   end
 
   module type S2 = sig
-    val f : 'a -> ('a * 'a) [@@zero_alloc custom_error_message "bar"]
+    val f : 'a -> 'a * 'a [@@zero_alloc custom_error_message "bar"]
   end
 
   module M1 = struct
-    let f x = (x,x)
+    let f x = x, x
   end
 
   module M' : S1 = M1
 
   module M'' : S2 = M1
 end
+
 (* The signature for [M1] below shows the inferred attribute but for some
    reason it doesn't print the associated custom_error_message.
    We ahve a copy of this test in the backend test directory to confirm
    that the combined "foo\nbar" is propagate correctly and printed by the
    zero_alloc checker as part of the user error message. *)
-[%%expect{|
+[%%expect
+{|
 module T1 :
   sig
     module type S1 =
@@ -1748,22 +1907,24 @@ module T1 :
    error message), throw away the custom message string from the signature. *)
 module T2 = struct
   module type S1 = sig
-    val f : 'a -> ('a * 'a) [@@zero_alloc custom_error_message "foo"]
+    val f : 'a -> 'a * 'a [@@zero_alloc custom_error_message "foo"]
   end
 
   module type S2 = sig
-    val f : 'a -> ('a * 'a) [@@zero_alloc custom_error_message "bar"]
+    val f : 'a -> 'a * 'a [@@zero_alloc custom_error_message "bar"]
   end
 
   module M2 = struct
-    let[@zero_alloc] f x = (x,x)
+    let[@zero_alloc] f x = x, x
   end
 
   module M' : S1 = M2
 
   module M'' : S2 = M2
 end
-[%%expect{|
+
+[%%expect
+{|
 module T2 :
   sig
     module type S1 =
@@ -1778,23 +1939,26 @@ module T2 :
 
 module T3 = struct
   module type S1 = sig
-    val f : 'a -> ('a * 'a) [@@zero_alloc custom_error_message "foo"]
+    val f : 'a -> 'a * 'a [@@zero_alloc custom_error_message "foo"]
   end
 
   module type S2 = sig
-    val f : 'a -> ('a * 'a) [@@zero_alloc custom_error_message "bar"]
+    val f : 'a -> 'a * 'a [@@zero_alloc custom_error_message "bar"]
   end
 
   module M3 = struct
-    let[@zero_alloc custom_error_message "use this, throw the others away"] f x =
-      (x,x)
+    let[@zero_alloc custom_error_message "use this, throw the others away"] f x
+        =
+      x, x
   end
 
   module M' : S1 = M3
 
   module M'' : S2 = M3
 end
-[%%expect{|
+
+[%%expect
+{|
 module T3 :
   sig
     module type S1 =

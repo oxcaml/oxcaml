@@ -54,43 +54,45 @@ type type_forcing_context =
    with such a type fails, then the "explanation" field explains why it was
    required, in order to display a more enlightening error message.
 *)
-type type_expected = private {
-  ty: type_expr;
-  explanation: type_forcing_context option;
-}
+type type_expected = private
+  { ty : type_expr;
+    explanation : type_forcing_context option
+  }
 
 (* Variables in patterns *)
 type pattern_variable =
-  {
-    pv_id: Ident.t;
-    pv_uid: Uid.t;
-    pv_mode: Mode.Value.l;
-    pv_kind: value_kind;
-    pv_type: type_expr;
-    pv_loc: Location.t;
-    pv_as_var: bool;
-    pv_attributes: Typedtree.attributes;
+  { pv_id : Ident.t;
+    pv_uid : Uid.t;
+    pv_mode : Mode.Value.l;
+    pv_kind : value_kind;
+    pv_type : type_expr;
+    pv_loc : Location.t;
+    pv_as_var : bool;
+    pv_attributes : Typedtree.attributes
   }
 
-val mk_expected:
-  ?explanation:type_forcing_context ->
-  type_expr ->
-  type_expected
+val mk_expected :
+  ?explanation:type_forcing_context -> type_expr -> type_expected
 
-val is_nonexpansive: Typedtree.expression -> bool
+val is_nonexpansive : Typedtree.expression -> bool
 
 module Datatype_kind : sig
-  type t = Record | Record_unboxed_product | Variant
+  type t =
+    | Record
+    | Record_unboxed_product
+    | Variant
+
   val type_name : t -> string
+
   val label_name : t -> string
 end
 
-type wrong_name = {
-  type_path: Path.t;
-  kind: Datatype_kind.t;
-  name: string loc;
-  valid_names: string list;
-}
+type wrong_name =
+  { type_path : Path.t;
+    kind : Datatype_kind.t;
+    name : string loc;
+    valid_names : string list
+  }
 
 type wrong_kind_context =
   | Pattern
@@ -105,89 +107,126 @@ type wrong_kind_sort =
   | Unit
 
 type existential_restriction =
-  | At_toplevel (** no existential types at the toplevel *)
-  | In_group (** nor with [let ... and ...] *)
-  | In_rec (** or recursive definition *)
-  | With_attributes (** or [let[@any_attribute] = ...] *)
-  | In_class_args (** or in class arguments [class c (...) = ...] *)
-  | In_class_def (** or in [class c = let ... in ...] *)
-  | In_self_pattern (** or in self pattern *)
+  | At_toplevel  (** no existential types at the toplevel *)
+  | In_group  (** nor with [let ... and ...] *)
+  | In_rec  (** or recursive definition *)
+  | With_attributes  (** or [let[@any_attribute] = ...] *)
+  | In_class_args  (** or in class arguments [class c (...) = ...] *)
+  | In_class_def  (** or in [class c = let ... in ...] *)
+  | In_self_pattern  (** or in self pattern *)
 
 type mutable_restriction =
   | In_group
   | In_rec
 
 type module_patterns_restriction =
-  | Modules_allowed of { scope: int }
+  | Modules_allowed of { scope : int }
   | Modules_rejected
   | Modules_ignored
 
-val type_binding:
-        Env.t -> mutable_flag -> rec_flag ->
-          ?force_toplevel:bool ->
-          Parsetree.value_binding list ->
-          Typedtree.value_binding list * Env.t
-val type_let:
-        existential_restriction -> Env.t -> mutable_flag -> rec_flag ->
-          Parsetree.value_binding list ->
-          Typedtree.value_binding list * Env.t
-val type_expression:
-        Env.t -> Parsetree.expression -> Typedtree.expression
-val type_representable_expression:
-        why:Jkind.History.concrete_creation_reason ->
-        Env.t -> Parsetree.expression -> Typedtree.expression * Jkind.sort
-val type_class_arg_pattern:
-        string -> Env.t -> Env.t -> arg_label -> Parsetree.pattern ->
-        Typedtree.pattern *
-        (Ident.t * Ident.t * type_expr) list *
-        Env.t * Env.t
-val type_self_pattern:
-        Env.t -> Parsetree.pattern ->
-        Typedtree.pattern * pattern_variable list
-val check_partial:
-        ?lev:int -> Env.t -> type_expr ->
-        Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
-val type_expect:
-        Env.t -> ?mode:Mode.Value.r -> Parsetree.expression -> type_expected ->
-          Typedtree.expression
-val type_exp:
-        Env.t -> ?mode: Mode.Value.r -> Parsetree.expression ->
-          Typedtree.expression
-val type_approx:
-        Env.t -> Parsetree.expression -> type_expr -> unit
-val type_argument:
-        Env.t -> Parsetree.expression ->
-        type_expr -> type_expr -> Typedtree.expression
+val type_binding :
+  Env.t ->
+  mutable_flag ->
+  rec_flag ->
+  ?force_toplevel:bool ->
+  Parsetree.value_binding list ->
+  Typedtree.value_binding list * Env.t
 
-val type_option_some:
-        Env.t -> Parsetree.expression ->
-        type_expr-> type_expr -> Typedtree.expression
-val type_option_none:
-        Env.t -> type_expr -> Location.t -> Typedtree.expression
-val generalizable: int -> type_expr -> bool
-val generalize_structure_exp: Typedtree.expression -> unit
-val reset_delayed_checks: unit -> unit
-val force_delayed_checks: unit -> unit
+val type_let :
+  existential_restriction ->
+  Env.t ->
+  mutable_flag ->
+  rec_flag ->
+  Parsetree.value_binding list ->
+  Typedtree.value_binding list * Env.t
 
-val reset_allocations: unit -> unit
-val optimise_allocations: unit -> unit
+val type_expression : Env.t -> Parsetree.expression -> Typedtree.expression
+
+val type_representable_expression :
+  why:Jkind.History.concrete_creation_reason ->
+  Env.t ->
+  Parsetree.expression ->
+  Typedtree.expression * Jkind.sort
+
+val type_class_arg_pattern :
+  string ->
+  Env.t ->
+  Env.t ->
+  arg_label ->
+  Parsetree.pattern ->
+  Typedtree.pattern * (Ident.t * Ident.t * type_expr) list * Env.t * Env.t
+
+val type_self_pattern :
+  Env.t -> Parsetree.pattern -> Typedtree.pattern * pattern_variable list
+
+val check_partial :
+  ?lev:int ->
+  Env.t ->
+  type_expr ->
+  Location.t ->
+  Typedtree.value Typedtree.case list ->
+  Typedtree.partial
+
+val type_expect :
+  Env.t ->
+  ?mode:Mode.Value.r ->
+  Parsetree.expression ->
+  type_expected ->
+  Typedtree.expression
+
+val type_exp :
+  Env.t -> ?mode:Mode.Value.r -> Parsetree.expression -> Typedtree.expression
+
+val type_approx : Env.t -> Parsetree.expression -> type_expr -> unit
+
+val type_argument :
+  Env.t ->
+  Parsetree.expression ->
+  type_expr ->
+  type_expr ->
+  Typedtree.expression
+
+val type_option_some :
+  Env.t ->
+  Parsetree.expression ->
+  type_expr ->
+  type_expr ->
+  Typedtree.expression
+
+val type_option_none : Env.t -> type_expr -> Location.t -> Typedtree.expression
+
+val generalizable : int -> type_expr -> bool
+
+val generalize_structure_exp : Typedtree.expression -> unit
+
+val reset_delayed_checks : unit -> unit
+
+val force_delayed_checks : unit -> unit
+
+val reset_allocations : unit -> unit
+
+val optimise_allocations : unit -> unit
 
 val has_poly_constraint : Parsetree.pattern -> bool
 
-
 val name_pattern : string -> Typedtree.pattern list -> Ident.t * Uid.t
+
 val name_cases :
-          string -> Typedtree.value Typedtree.case list -> Ident.t * Uid.t
+  string -> Typedtree.value Typedtree.case list -> Ident.t * Uid.t
 
 (* Why are we calling [submode]? This tells us why. *)
 type submode_reason =
   | Application of type_expr
-      (* Check that the result of an application is a submode of the expected mode
-         from the context *)
-
+    (* Check that the result of an application is a submode of the expected mode
+       from the context *)
   | Other (* add more cases here for better hints *)
 
-val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.Value.t -> unit
+val escape :
+  loc:Location.t ->
+  env:Env.t ->
+  reason:submode_reason ->
+  (Mode.allowed * 'r) Mode.Value.t ->
+  unit
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
@@ -213,7 +252,8 @@ type error =
   | Partial_tuple_pattern_bad_type
   | Extra_tuple_label of string option * type_expr
   | Missing_tuple_label of string option * type_expr
-  | Label_mismatch of record_form_packed * Longident.t * Errortrace.unification_error
+  | Label_mismatch of
+      record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
       Errortrace.unification_error * Parsetree.pattern_desc option
       -> error
@@ -221,20 +261,21 @@ type error =
   | Multiply_bound_variable of string
   | Orpat_vars of Ident.t * Ident.t list
   | Expr_type_clash of
-      Errortrace.unification_error * type_forcing_context option
+      Errortrace.unification_error
+      * type_forcing_context option
       * Parsetree.expression_desc option
   | Function_arity_type_clash of
-      { syntactic_arity :  int;
+      { syntactic_arity : int;
         type_constraint : type_expr;
-        trace : Errortrace.unification_error;
+        trace : Errortrace.unification_error
       }
-  | Apply_non_function of {
-      funct : Typedtree.expression;
-      func_ty : type_expr;
-      res_ty : type_expr;
-      previous_arg_loc : Location.t;
-      extra_arg_loc : Location.t;
-    }
+  | Apply_non_function of
+      { funct : Typedtree.expression;
+        func_ty : type_expr;
+        res_ty : type_expr;
+        previous_arg_loc : Location.t;
+        extra_arg_loc : Location.t
+      }
   | Apply_wrong_label of arg_label * type_expr * bool
   | Label_multiply_defined of string
   | Label_missing of record_form_packed * Ident.t list
@@ -262,10 +303,10 @@ type error =
   | Not_a_function of type_expr * type_forcing_context option
   | Too_many_arguments of type_expr * type_forcing_context option
   | Abstract_wrong_label of
-      { got           : arg_label
-      ; expected      : arg_label
-      ; expected_type : type_expr
-      ; explanation   : type_forcing_context option
+      { got : arg_label;
+        expected : arg_label;
+        expected_type : type_expr;
+        explanation : type_forcing_context option
       }
   | Scoping_let_module of string * type_expr
   | Not_a_polymorphic_variant_type of Longident.t
@@ -306,23 +347,25 @@ type error =
   | Unbound_existential of Ident.t list * type_expr
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
-  | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
+  | Wrong_expected_record_boxing of
+      wrong_kind_context * record_form_packed * type_expr
   | Expr_not_a_record_type of record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
   | Submode_failed of
-      Mode.Value.error * submode_reason *
-      Env.locality_context option *
-      contention_context option *
-      visibility_context option *
-      Env.shared_context option
+      Mode.Value.error
+      * submode_reason
+      * Env.locality_context option
+      * contention_context option
+      * visibility_context option
+      * Env.shared_context option
   | Curried_application_complete of
-      arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
+      arg_label * Mode.Alloc.error * [`Prefix | `Single_arg | `Entire_apply]
   | Param_mode_mismatch of Mode.Alloc.equate_error
   | Uncurried_function_escapes of Mode.Alloc.error
   | Local_return_annotation_mismatch of Location.t
   | Function_returns_local
   | Tail_call_local_returning
-  | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
+  | Bad_tail_annotation of [`Conflict | `Not_a_tailcall]
   | Optional_poly_param
   | Exclave_in_nontail_position
   | Exclave_returns_not_local
@@ -337,42 +380,65 @@ type error =
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
   | Impossible_function_jkind of
-      { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
+      { some_args_ok : bool;
+        ty_fun : type_expr;
+        jkind : jkind_lr
+      }
   | Overwrite_of_invalid_term
   | Unexpected_hole
 
 exception Error of Location.t * Env.t * error
+
 exception Error_forward of Location.error
 
-val report_error: loc:Location.t -> Env.t -> error -> Location.error
- (** @deprecated.  Use {!Location.error_of_exn}, {!Location.print_report}. *)
+(** @deprecated.  Use {!Location.error_of_exn}, {!Location.print_report}. *)
+val report_error : loc:Location.t -> Env.t -> error -> Location.error
 
 (* Forward declaration, to be filled in by Typemod.type_module *)
-val type_module:
+val type_module :
   (Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t) ref
-(* Forward declaration, to be filled in by Typemod.type_open *)
-val type_open:
-  (?used_slot:bool ref -> override_flag -> Env.t -> Location.t ->
-   Longident.t loc -> Path.t * Env.t)
-    ref
-(* Forward declaration, to be filled in by Typemod.type_open_decl *)
-val type_open_decl:
-  (?used_slot:bool ref -> Env.t -> Parsetree.open_declaration ->
-   Typedtree.open_declaration * Env.t)
-    ref
-(* Forward declaration, to be filled in by Typeclass.class_structure *)
-val type_object:
-  (Env.t -> Location.t -> Parsetree.class_structure ->
-   Typedtree.class_structure * string list) ref
-val type_package:
-  (Env.t -> Parsetree.module_expr -> Path.t -> (Longident.t * type_expr) list ->
-  Typedtree.module_expr * (Longident.t * type_expr) list) ref
 
-val constant: Parsetree.constant -> (Typedtree.constant, error) result
+(* Forward declaration, to be filled in by Typemod.type_open *)
+val type_open :
+  (?used_slot:bool ref ->
+  override_flag ->
+  Env.t ->
+  Location.t ->
+  Longident.t loc ->
+  Path.t * Env.t)
+  ref
+
+(* Forward declaration, to be filled in by Typemod.type_open_decl *)
+val type_open_decl :
+  (?used_slot:bool ref ->
+  Env.t ->
+  Parsetree.open_declaration ->
+  Typedtree.open_declaration * Env.t)
+  ref
+
+(* Forward declaration, to be filled in by Typeclass.class_structure *)
+val type_object :
+  (Env.t ->
+  Location.t ->
+  Parsetree.class_structure ->
+  Typedtree.class_structure * string list)
+  ref
+
+val type_package :
+  (Env.t ->
+  Parsetree.module_expr ->
+  Path.t ->
+  (Longident.t * type_expr) list ->
+  Typedtree.module_expr * (Longident.t * type_expr) list)
+  ref
+
+val constant : Parsetree.constant -> (Typedtree.constant, error) result
 
 val annotate_recursive_bindings :
   Env.t -> Typedtree.value_binding list -> Typedtree.value_binding list
+
 val check_recursive_class_bindings :
   Env.t -> Ident.t list -> Typedtree.class_expr list -> unit
 
-val src_pos : Location.t -> Typedtree.attributes -> Env.t -> Typedtree.expression
+val src_pos :
+  Location.t -> Typedtree.attributes -> Env.t -> Typedtree.expression

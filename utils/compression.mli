@@ -13,7 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val output_value : out_channel -> 'a -> unit
 (** [Compression.output_value chan v] writes the representation
     of [v] on channel [chan].
     If compression is supported, the marshaled data
@@ -21,14 +20,15 @@ val output_value : out_channel -> 'a -> unit
     channel [chan].
     If compression is not supported, this function behaves like
     {!Stdlib.output_value}. *)
+val output_value : out_channel -> 'a -> unit
 
-val input_value : in_channel -> 'a
 (** [Compression.input_value chan] reads from channel [chan] the
     byte representation of a structured value, as produced by
     [Compression.output_value], and reconstructs and
     returns the corresponding value.
     If compression is not supported, this function behaves like
     {!Stdlib.input_value}. *)
+val input_value : in_channel -> 'a
 
-val compression_supported : bool
 (** Reports whether compression is supported. *)
+val compression_supported : bool

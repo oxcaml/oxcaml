@@ -1,11 +1,16 @@
 (* TEST
- flags = "-keep-original-error-size";
- expect;
+   flags = "-keep-original-error-size";
+   expect;
 *)
 
-
 module A = struct
-  type a and b and c and d
+  type a
+
+  and b
+
+  and c
+
+  and d
 end
 
 module type S = sig
@@ -14,10 +19,26 @@ end
 
 module C : S = struct
   module B = struct
-    type a and b and c and d and e and f and g and h
+    type a
+
+    and b
+
+    and c
+
+    and d
+
+    and e
+
+    and f
+
+    and g
+
+    and h
   end
 end
-[%%expect {|
+
+[%%expect
+{|
 module A : sig type a and b and c and d end
 module type S = sig module B = A end
 Lines 9-13, characters 15-3:
@@ -52,12 +73,30 @@ Error: Signature mismatch:
 
 module C : S = struct
   module B = struct
-    type a and b and c and d and e and f and g and h
+    type a
+
+    and b
+
+    and c
+
+    and d
+
+    and e
+
+    and f
+
+    and g
+
+    and h
+
     and a_type_with_extremely_long_long_long_long_long_long_long_long_name
+
     and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
   end
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 1-7, characters 15-3:
 1 | ...............struct
 2 |   module B = struct
@@ -89,7 +128,13 @@ Error: Signature mismatch:
 |}]
 
 module A = struct
-  type a and b and c and d
+  type a
+
+  and b
+
+  and c
+
+  and d
 end
 
 module type S = sig
@@ -100,12 +145,28 @@ end
 
 module D : S = struct
   module type B = sig
-    module C: sig
-      type a and b and c and d and e and f and g and h
+    module C : sig
+      type a
+
+      and b
+
+      and c
+
+      and d
+
+      and e
+
+      and f
+
+      and g
+
+      and h
     end
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 module A : sig type a and b and c and d end
 module type S = sig module type B = sig module C = A end end
 Lines 11-17, characters 15-3:
@@ -161,14 +222,32 @@ Error: Signature mismatch:
 
 module D : S = struct
   module type B = sig
-    module C: sig
-      type a and b and c and d and e and f and g and h
+    module C : sig
+      type a
+
+      and b
+
+      and c
+
+      and d
+
+      and e
+
+      and f
+
+      and g
+
+      and h
+
       and a_type_with_extremely_long_long_long_long_long_long_long_long_name
+
       and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
     end
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 1-9, characters 15-3:
 1 | ...............struct
 2 |   module type B = sig

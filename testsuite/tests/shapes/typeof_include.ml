@@ -1,17 +1,20 @@
 (* TEST
- flags = "-dshape";
- expect;
+   flags = "-dshape";
+   expect;
 *)
 
 module type S = sig
-  module M: sig
+  module M : sig
     (** A module M *)
   end
 
-  module type T = module type of struct include M end
+  module type T = module type of struct
+    include M
+  end
 end
 
-[%%expect{|
+[%%expect
+{|
 {
  "S"[module type] -> <.2>;
  }

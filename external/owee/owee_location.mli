@@ -21,8 +21,7 @@ val lookup : (module Unix_intf.S) -> t -> (string * int * int) option
 
 (** Convenience function composing lookup and extract, to immediately turn a
     function into a position. *)
-val locate : (module Unix_intf.S) -> (_ -> _)
-  -> (string * int * int) option
+val locate : (module Unix_intf.S) -> (_ -> _) -> (string * int * int) option
 
 val nearest_symbol : t -> string
 

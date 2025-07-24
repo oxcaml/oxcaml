@@ -16,8 +16,8 @@
 (* Pretty-print lists of instructions *)
 
 open Instruct
-
 open Format
 
-val instruction: formatter -> instruction -> unit
-val instrlist: formatter -> instruction list -> unit
+val instruction : formatter -> instruction -> unit
+
+val instrlist : formatter -> instruction list -> unit

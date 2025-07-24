@@ -21,24 +21,27 @@ open Debugger_config
 
 let history = ref ([] : int64 list)
 
-let empty_history () =
-  history := []
+let empty_history () = history := []
 
 let add_current_time () =
   let time = current_time () in
-    if !history = [] then
-      history := [time]
-    else if time <> List.hd !history then
-      history := list_truncate !history_size (time::!history)
+  if !history = []
+  then history := [time]
+  else if time <> List.hd !history
+  then history := list_truncate !history_size (time :: !history)
 
 let previous_time_1 () =
   match !history with
-    _::((time::_) as hist) ->
-      history := hist; time
+  | _ :: (time :: _ as hist) ->
+    history := hist;
+    time
   | _ ->
-      prerr_endline "No more information."; raise Toplevel
+    prerr_endline "No more information.";
+    raise Toplevel
 
 let rec previous_time n =
   if n = _1
-  then previous_time_1()
-  else begin ignore(previous_time_1()); previous_time(pre64 n) end
+  then previous_time_1 ()
+  else (
+    ignore (previous_time_1 ());
+    previous_time (pre64 n))

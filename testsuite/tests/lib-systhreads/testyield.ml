@@ -1,16 +1,16 @@
 (* TEST
- include systhreads;
- hassysthreads;
- not-windows;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   hassysthreads;
+   not-windows;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
-   (* Test that yielding between busy threads reliably triggers a thread
-      switch. *)
+(* Test that yielding between busy threads reliably triggers a thread
+   switch. *)
 
 let threads = 4
 
@@ -30,27 +30,27 @@ let report thread run_length =
   if run_length > 3
   then Printf.printf "Thread %d ran %d consecutive iters\n" thread run_length
 
-
 let threads =
-  List.init threads (Thread.create (fun i ->
-    incr are_ready;
-    (* Don't make any progress until all threads are spawned and properly
-       contending for the Ocaml lock. *)
-    while !are_ready < threads do
-      Thread.yield ()
-    done;
-    let consecutive = ref 0 in
-    while !yields < iters do
-      incr yields;
-      last := i;
-      Thread.yield ();
-      incr consecutive;
-      if not (!last = i)
-      then (
-        report i !consecutive;
-        consecutive := 0)
-    done;
-    if !consecutive > 0 then report i !consecutive;
-  ));;
+  List.init threads
+    (Thread.create (fun i ->
+         incr are_ready;
+         (* Don't make any progress until all threads are spawned and properly
+            contending for the Ocaml lock. *)
+         while !are_ready < threads do
+           Thread.yield ()
+         done;
+         let consecutive = ref 0 in
+         while !yields < iters do
+           incr yields;
+           last := i;
+           Thread.yield ();
+           incr consecutive;
+           if not (!last = i)
+           then (
+             report i !consecutive;
+             consecutive := 0)
+         done;
+         if !consecutive > 0 then report i !consecutive))
+;;
 
 List.iter Thread.join threads

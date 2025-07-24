@@ -1,12 +1,12 @@
 (* TEST
- include systhreads;
- hassysthreads;
- not-windows;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   hassysthreads;
+   not-windows;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 (* this test checks that the domain lock is properly reinitialized
@@ -18,8 +18,8 @@ let () =
   let fd = Unix.dup Unix.stdout in
   match Unix.fork () with
   | 0 ->
-     Unix.close fd;
-     print_endline "OK"
+    Unix.close fd;
+    print_endline "OK"
   | _ ->
-     Unix.close fd;
-     Thread.join th
+    Unix.close fd;
+    Thread.join th

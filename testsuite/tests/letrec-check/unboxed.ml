@@ -1,68 +1,77 @@
 (* TEST
- expect;
+   expect;
 *)
 (* CR layouts: Using layout annotations here is not backward-compatible.
    We can delete this when internal ticket 1110 is resolved.
 *)
 
 type r = R of r list [@@unboxed]
-let rec a = R [a];;
-[%%expect{|
+
+let rec a = R [a]
+
+[%%expect {|
 type r = R of r list [@@unboxed]
 val a : r = R [<cycle>]
-|}];;
+|}]
 
+type t = { x : int64 } [@@unboxed]
 
-type t = {x: int64} [@@unboxed]
-let rec x = {x = y} and y = 3L;;
-[%%expect{|
+let rec x = { x = y }
+
+and y = 3L
+
+[%%expect
+{|
 type t = { x : int64; } [@@unboxed]
 Line 2, characters 12-19:
 2 | let rec x = {x = y} and y = 3L;;
                 ^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
+|}]
 
 (* This test was made to error by disallowing singleton recursive unboxed types.
    We keep it in case these are re-allowed, in which case it should error with:
    [This kind of expression is not allowed as right-hand side of "let rec"] *)
 type r = A of r [@@unboxed]
-let rec y = A y;;
-[%%expect{|
+
+let rec y = A y
+
+[%%expect
+{|
 Line 1, characters 0-27:
 1 | type r = A of r [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The definition of "r" is recursive without boxing:
          "r" contains "r"
-|}];;
+|}]
 
 (* This test is not allowed if 'a' is unboxed, but should be accepted
    as written *)
-type a = {a: b}
-and b = X of a | Y
+type a = { a : b }
 
-let rec a =
-  {a=
-    (if Sys.opaque_identity true then
-       X a
-     else
-       Y)};;
-[%%expect{|
+and b =
+  | X of a
+  | Y
+
+let rec a = { a = (if Sys.opaque_identity true then X a else Y) }
+
+[%%expect
+{|
 type a = { a : b; }
 and b = X of a | Y
 val a : a = {a = X <cycle>}
-|}];;
+|}]
 
-type a = {a: b }[@@unboxed]
-and b = X of a | Y
+type a = { a : b } [@@unboxed]
 
-let rec a =
-  {a=
-    (if Sys.opaque_identity true then
-       X a
-     else
-       Y)};;
-[%%expect{|
+and b =
+  | X of a
+  | Y
+
+let rec a = { a = (if Sys.opaque_identity true then X a else Y) }
+
+[%%expect
+{|
 type a = { a : b; } [@@unboxed]
 and b = X of a | Y
 Lines 5-9, characters 2-10:
@@ -72,37 +81,37 @@ Lines 5-9, characters 2-10:
 8 |      else
 9 |        Y)}..
 Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
+|}]
 
 (* This test is not allowed if 'c' is unboxed, but should be accepted
    as written *)
 type d = D of e
-and e = V of d | W;;
-[%%expect{|
+
+and e =
+  | V of d
+  | W
+
+[%%expect {|
 type d = D of e
 and e = V of d | W
-|}];;
+|}]
 
-let rec d =
-  D
-    (if Sys.opaque_identity true then
-       V d
-     else
-       W);;
-[%%expect{|
+let rec d = D (if Sys.opaque_identity true then V d else W)
+
+[%%expect {|
 val d : d = D (V <cycle>)
-|}];;
+|}]
 
 type d = D of e [@@unboxed]
-and e = V of d | W;;
 
-let rec d =
-  D
-    (if Sys.opaque_identity true then
-       V d
-     else
-       W);;
-[%%expect{|
+and e =
+  | V of d
+  | W
+
+let rec d = D (if Sys.opaque_identity true then V d else W)
+
+[%%expect
+{|
 type d = D of e [@@unboxed]
 and e = V of d | W
 Lines 5-9, characters 2-9:
@@ -112,4 +121,4 @@ Lines 5-9, characters 2-9:
 8 |      else
 9 |        W)..
 Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
+|}]

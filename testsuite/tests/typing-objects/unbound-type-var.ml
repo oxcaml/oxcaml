@@ -1,13 +1,14 @@
 (* TEST
- expect;
+   expect;
 *)
 
 class test a c =
-object
-  method b = c
-end
+  object
+    method b = c
+  end
 
-[%%expect{|
+[%%expect
+{|
 Lines 1-4, characters 0-3:
 1 | class test a c =
 2 | object

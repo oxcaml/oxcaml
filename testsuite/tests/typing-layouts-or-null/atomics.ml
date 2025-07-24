@@ -1,16 +1,16 @@
 (* TEST
- flambda2;
- {
-   native;
- } {
-   flags = "-O3";
-   native;
- } {
-   flags = "-Oclassic";
-   native;
- } {
-   bytecode;
- }
+   flambda2;
+   {
+     native;
+   } {
+     flags = "-O3";
+     native;
+   } {
+     flags = "-Oclassic";
+     native;
+   } {
+     bytecode;
+   }
 *)
 
 external get_int : int or_null Atomic.t -> int or_null = "%atomic_load"
@@ -18,16 +18,13 @@ external get_int : int or_null Atomic.t -> int or_null = "%atomic_load"
 external exchange_int : int or_null Atomic.t -> int or_null -> int or_null
   = "%atomic_exchange"
 
-external compare_and_exchange_int
-  : int or_null Atomic.t -> int or_null -> int or_null -> int or_null
+external compare_and_exchange_int :
+  int or_null Atomic.t -> int or_null -> int or_null -> int or_null
   = "%atomic_compare_exchange"
 
 let () =
   let x = Sys.opaque_identity (Atomic.make Null) in
-  match get_int x with
-  | Null -> ()
-  | This _ -> assert false
-;;
+  match get_int x with Null -> () | This _ -> assert false
 
 let () =
   let x = Sys.opaque_identity (Atomic.make (This 47)) in
@@ -35,7 +32,6 @@ let () =
   | This 47 -> ()
   | This _ -> assert false
   | Null -> assert false
-;;
 
 let () =
   let x = Sys.opaque_identity (Atomic.make Null) in
@@ -45,14 +41,10 @@ let () =
   | This 7 -> ()
   | Null -> assert false
   | This _ -> assert false
-;;
 
 let () =
   let x = Sys.opaque_identity (Atomic.make Null) in
-  match exchange_int x (This 11) with
-  | Null -> ()
-  | This _ -> assert false
-;;
+  match exchange_int x (This 11) with Null -> () | This _ -> assert false
 
 let () =
   let x = Sys.opaque_identity (Atomic.make (This 11)) in
@@ -60,17 +52,13 @@ let () =
   | This 11 -> ()
   | This _ -> assert false
   | Null -> assert false);
-  match exchange_int x (This 0) with
-  | Null -> ()
-  | This _ -> assert false
-;;
+  match exchange_int x (This 0) with Null -> () | This _ -> assert false
 
 let () =
   let x = Sys.opaque_identity (Atomic.make Null) in
   match compare_and_exchange_int x (This 5) (This 8) with
   | Null -> ()
   | This _ -> assert false
-;;
 
 let () =
   let x = Sys.opaque_identity (Atomic.make Null) in
@@ -81,7 +69,6 @@ let () =
   | This 42 -> ()
   | This _ -> assert false
   | Null -> assert false
-;;
 
 let () =
   let aaa = This (ref "aaa") in
@@ -95,4 +82,3 @@ let () =
   assert (Atomic.compare_exchange y aaa Null == bb);
   assert (Atomic.compare_exchange y bb arr == bb);
   assert (Atomic.compare_and_set y arr Null)
-;;

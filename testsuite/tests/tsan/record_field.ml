@@ -1,17 +1,18 @@
 (* TEST
 
- set TSAN_OPTIONS="detect_deadlocks=0";
+   set TSAN_OPTIONS="detect_deadlocks=0";
 
- tsan;
- readonly_files = "waitgroup_stubs.c";
- all_modules = "${readonly_files} waitgroup.ml record_field.ml";
- native;
-
+   tsan;
+   readonly_files = "waitgroup_stubs.c";
+   all_modules = "${readonly_files} waitgroup.ml record_field.ml";
+   native;
 *)
 type t = { mutable x : int }
 
 let wg1 = Waitgroup.create 2
+
 let wg2 = Waitgroup.create 2
+
 let v = { x = 0 }
 
 let writer () =

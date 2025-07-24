@@ -1,5 +1,5 @@
 (* TEST
- ocamldoc with latex;
+   ocamldoc with latex;
 *)
 
 (** Ten comments for tests *)
@@ -20,8 +20,8 @@
 
 (** Encore! Encore! *)
 
-
 (**/**)
+
 module Silence : sig
   (** At last *)
 end

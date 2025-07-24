@@ -3,6 +3,9 @@ module Packed : sig
   module B = LibB
   module C = LibC
 end
-include (module type of struct include Packed end)
+
+include module type of struct
+  include Packed
+end
 
 val imp : int -> int

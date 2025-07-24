@@ -1,6 +1,7 @@
 (* TEST *)
 
 type 'a box = Box of 'a
+
 module X : sig
   val f : int -> string -> local_ int box
 end = struct

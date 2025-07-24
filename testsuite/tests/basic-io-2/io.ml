@@ -1,17 +1,18 @@
 (* TEST
- arguments = "io.ml";
- readonly_files = "test-file-short-lines";
+   arguments = "io.ml";
+   readonly_files = "test-file-short-lines";
 *)
 
 (* Test a file copy function *)
 
 let test msg funct f1 f2 =
-  print_string msg; print_newline();
+  print_string msg;
+  print_newline ();
   funct f1 f2;
   if Sys.command ("cmp " ^ f1 ^ " " ^ f2) = 0
   then print_string "passed"
   else print_string "FAILED";
-  print_newline()
+  print_newline ()
 
 (* File copy with constant-sized chunks *)
 
@@ -21,11 +22,13 @@ let copy_file sz infile ofile =
   let buffer = Bytes.create sz in
   let rec copy () =
     let n = input ic buffer 0 sz in
-    if n = 0 then () else begin
+    if n = 0
+    then ()
+    else (
       output oc buffer 0 n;
-      copy ()
-    end in
-  copy();
+      copy ())
+  in
+  copy ();
   close_in ic;
   close_out oc
 
@@ -38,11 +41,13 @@ let copy_random sz infile ofile =
   let rec copy () =
     let s = 1 + Random.int sz in
     let n = input ic buffer 0 s in
-    if n = 0 then () else begin
+    if n = 0
+    then ()
+    else (
       output oc buffer 0 n;
-      copy ()
-    end in
-  copy();
+      copy ())
+  in
+  copy ();
   close_in ic;
   close_out oc
 
@@ -53,7 +58,8 @@ let copy_line infile ofile =
   let oc = open_out_bin ofile in
   try
     while true do
-      output_string oc (input_line ic); output_char oc '\n'
+      output_string oc (input_line ic);
+      output_char oc '\n'
     done
   with End_of_file ->
     close_in ic;
@@ -80,7 +86,8 @@ let copy_seek chunksize infile ofile =
 let make_lines ofile =
   let oc = open_out_bin ofile in
   for i = 1 to 256 do
-    output_string oc (String.make (i*64) '.'); output_char oc '\n'
+    output_string oc (String.make (i * 64) '.');
+    output_char oc '\n'
   done;
   close_out oc
 

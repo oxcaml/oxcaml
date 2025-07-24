@@ -1,2 +1,1 @@
-let () =
-  ignore (Api.f 10)
+let () = ignore (Api.f 10)

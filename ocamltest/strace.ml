@@ -16,6 +16,7 @@
 (* Implementation of the strace feature *)
 
 let strace = Variables.make ("strace", "Whether to use strace")
+
 let strace_flags =
   Variables.make ("strace_flags", "Which flags to pass to strace")
 
@@ -24,7 +25,7 @@ let (counters : (string, int) Hashtbl.t) = Hashtbl.create 10
 let get_logfile_name base =
   let n = try Hashtbl.find counters base with Not_found -> 1 in
   let filename = Printf.sprintf "strace-%s_%d.log" base n in
-  Hashtbl.replace counters base (n+1);
+  Hashtbl.replace counters base (n + 1);
   filename
 
 let init () =

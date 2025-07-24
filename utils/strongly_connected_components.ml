@@ -19,7 +19,7 @@ module Int = Numbers.Int
 module Kosaraju : sig
   type component_graph =
     { sorted_connected_components : int list array;
-      component_edges : int list array;
+      component_edges : int list array
     }
 
   val component_graph : int list array -> component_graph
@@ -28,8 +28,7 @@ end = struct
     let size = Array.length graph in
     let transposed = Array.make size [] in
     let add src dst = transposed.(src) <- dst :: transposed.(src) in
-    Array.iteri (fun src dsts -> List.iter (fun dst -> add dst src) dsts)
-      graph;
+    Array.iteri (fun src dsts -> List.iter (fun dst -> add dst src) dsts) graph;
     transposed
 
   let depth_first_order (graph : int list array) : int array =
@@ -43,11 +42,10 @@ end = struct
     in
     let rec aux node =
       if not marked.(node)
-      then begin
+      then (
         marked.(node) <- true;
         List.iter aux graph.(node);
-        push node
-      end
+        push node)
     in
     for i = 0 to size - 1 do
       aux i
@@ -62,19 +60,17 @@ end = struct
     let count = ref 0 in
     let rec aux node =
       if not marked.(node)
-      then begin
+      then (
         marked.(node) <- true;
         id.(node) <- !count;
-        List.iter aux graph.(node)
-      end
+        List.iter aux graph.(node))
     in
     for i = size - 1 downto 0 do
       let node = order.(i) in
       if not marked.(node)
-      then begin
+      then (
         aux order.(i);
-        incr count
-      end
+        incr count)
     done;
     id, !count
 
@@ -85,7 +81,7 @@ end = struct
 
   type component_graph =
     { sorted_connected_components : int list array;
-      component_edges : int list array;
+      component_edges : int list array
     }
 
   let component_graph graph =
@@ -94,16 +90,18 @@ end = struct
     let component_graph = Array.make ncomponents Int.Set.empty in
     let add_component_dep node set =
       let node_deps = graph.(node) in
-      List.fold_left (fun set dep -> Int.Set.add components.(dep) set)
+      List.fold_left
+        (fun set dep -> Int.Set.add components.(dep) set)
         set node_deps
     in
-    Array.iteri (fun node component ->
+    Array.iteri
+      (fun node component ->
         id_scc.(component) <- node :: id_scc.(component);
-        component_graph.(component) <-
-          add_component_dep node (component_graph.(component)))
+        component_graph.(component)
+          <- add_component_dep node component_graph.(component))
       components;
     { sorted_connected_components = id_scc;
-      component_edges = Array.map Int.Set.elements component_graph;
+      component_edges = Array.map Int.Set.elements component_graph
     }
 end
 
@@ -160,13 +158,11 @@ module type S = sig
     | Has_loop of Id.t list
     | No_loop of Id.t
 
-  val stable_connected_components_sorted_from_roots_to_leaf
-    : (Id.t * Id.Set.t) list
-    -> component array
+  val stable_connected_components_sorted_from_roots_to_leaf :
+    (Id.t * Id.Set.t) list -> component array
 
-  val connected_components_sorted_from_roots_to_leaf
-     : directed_graph
-    -> component array
+  val connected_components_sorted_from_roots_to_leaf :
+    directed_graph -> component array
 
   val component_graph : directed_graph -> (component * int list) array
 end
@@ -181,13 +177,16 @@ module Make (Id : Id) = struct
   (* Ensure that the dependency graph does not have external dependencies. *)
   (* Note: this function is currently not used. *)
   let _check dependencies =
-    Id.Map.iter (fun id set ->
-        Id.Set.iter (fun v ->
+    Id.Map.iter
+      (fun id set ->
+        Id.Set.iter
+          (fun v ->
             if not (Id.Map.mem v dependencies)
             then
-              Misc.fatal_errorf "Strongly_connected_components.check: the \
-                  graph has external dependencies (%a -> %a)"
-               Id.print id Id.print v)
+              Misc.fatal_errorf
+                "Strongly_connected_components.check: the graph has external \
+                 dependencies (%a -> %a)"
+                Id.print id Id.print v)
           set)
       dependencies
 
@@ -198,27 +197,29 @@ module Make (Id : Id) = struct
     let back =
       let back = ref Id.Map.empty in
       for i = 0 to size - 1 do
-        back := Id.Map.add forth.(i) i !back;
+        back := Id.Map.add forth.(i) i !back
       done;
       !back
     in
     let integer_graph =
       Array.init size (fun i ->
-        let _, dests = a.(i) in
-        let integer_dests =
-          Id.Set.fold (fun dest acc ->
-              let v =
-                try Id.Map.find dest back
-                with Not_found ->
-                  Misc.fatal_errorf
-                    "Strongly_connected_components: missing dependency %a"
-                    Id.print dest
-              in
-              v :: acc)
-            dests []
-        in
-        if not stable then integer_dests
-        else List.sort Int.compare integer_dests)
+          let _, dests = a.(i) in
+          let integer_dests =
+            Id.Set.fold
+              (fun dest acc ->
+                let v =
+                  try Id.Map.find dest back
+                  with Not_found ->
+                    Misc.fatal_errorf
+                      "Strongly_connected_components: missing dependency %a"
+                      Id.print dest
+                in
+                v :: acc)
+              dests []
+          in
+          if not stable
+          then integer_dests
+          else List.sort Int.compare integer_dests)
     in
     forth, integer_graph
 
@@ -228,21 +229,21 @@ module Make (Id : Id) = struct
     | x' :: xs -> if Int.equal x x' then true else int_list_mem x xs
 
   let numbered_component_graph (forth, integer_graph) =
-    let { Kosaraju. sorted_connected_components;
-          component_edges } =
+    let { Kosaraju.sorted_connected_components; component_edges } =
       Kosaraju.component_graph integer_graph
     in
-    Array.mapi (fun component nodes ->
+    Array.mapi
+      (fun component nodes ->
         match nodes with
         | [] -> assert false
         | [node] ->
-          (if int_list_mem node integer_graph.(node)
-           then Has_loop [forth.(node)]
-           else No_loop forth.(node)),
-            component_edges.(component)
-        | _::_ ->
-          (Has_loop (List.map (fun node -> forth.(node)) nodes)),
-            component_edges.(component))
+          ( (if int_list_mem node integer_graph.(node)
+            then Has_loop [forth.(node)]
+            else No_loop forth.(node)),
+            component_edges.(component) )
+        | _ :: _ ->
+          ( Has_loop (List.map (fun node -> forth.(node)) nodes),
+            component_edges.(component) ))
       sorted_connected_components
 
   let stable_component_graph graph =

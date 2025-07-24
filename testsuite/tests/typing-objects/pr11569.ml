@@ -1,10 +1,16 @@
 (* TEST
- expect;
+   expect;
 *)
 
-class ['a] c = object constraint 'a = int method m (x: bool #c) = () end;;
+class ['a] c =
+  object
+    constraint 'a = int
 
-[%%expect{|
+    method m (x : bool #c) = ()
+  end
+
+[%%expect
+{|
 Line 1, characters 0-72:
 1 | class ['a] c = object constraint 'a = int method m (x: bool #c) = () end;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -13,9 +19,15 @@ Error: The class type "#c" is used with parameter(s) "bool ",
        "int "
 |}]
 
-class ['a, 'b] c = object constraint 'a = int method m (x: (bool, 'b) #c) = () end;;
+class ['a, 'b] c =
+  object
+    constraint 'a = int
 
-[%%expect{|
+    method m (x : (bool, 'b) #c) = ()
+  end
+
+[%%expect
+{|
 Line 1, characters 0-82:
 1 | class ['a, 'b] c = object constraint 'a = int method m (x: (bool, 'b) #c) = () end;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -24,9 +36,13 @@ Error: The class type "#c" is used with parameter(s) "(bool, 'b) ",
        "(int, 'b) "
 |}]
 
-class c = object method m (x: #c) = int_of_string x#m end;;
+class c =
+  object
+    method m (x : #c) = int_of_string x#m
+  end
 
-[%%expect{|
+[%%expect
+{|
 Line 1, characters 0-57:
 1 | class c = object method m (x: #c) = int_of_string x#m end;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

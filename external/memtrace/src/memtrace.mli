@@ -18,10 +18,7 @@ type tracer
 
 (** Manually start tracing *)
 val start_tracing :
-  context:string option ->
-  sampling_rate:float ->
-  filename:string ->
-  tracer
+  context:string option -> sampling_rate:float -> filename:string -> tracer
 
 (** Manually stop tracing *)
 val stop_tracing : tracer -> unit
@@ -47,6 +44,7 @@ module External : sig
 
       This function is very fast in the common case where it returns [None] *)
   val alloc : bytes:int -> token option
+
   val free : token -> unit
 end
 

@@ -5,11 +5,11 @@ module Ornament = Ornament
 module PI = PI
 module Util = Util
 
-type t = {
-  basic : Basic.t;
-  flourish : Flourish.t;
-  ornament : Ornament.t;
-}
+type t =
+  { basic : Basic.t;
+    flourish : Flourish.t;
+    ornament : Ornament.t
+  }
 
 let create p flourish ornament =
   let basic = Basic.create p in

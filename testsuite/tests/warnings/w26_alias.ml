@@ -1,14 +1,15 @@
 (* TEST
- expect;
+   expect;
 *)
 type t =
-  { x : int
-  ; y : int
+  { x : int;
+    y : int
   }
 
 let sum ({ x; y } as t) = x + y
 
-[%%expect{|
+[%%expect
+{|
 type t = { x : int; y : int; }
 Line 6, characters 21-22:
 6 | let sum ({ x; y } as t) = x + y

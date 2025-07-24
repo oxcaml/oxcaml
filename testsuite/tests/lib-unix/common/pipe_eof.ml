@@ -1,27 +1,27 @@
 (* TEST
- include unix;
- hasunix;
- {
-   bytecode;
- }{
-   native;
- }
+   include unix;
+   hasunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let drain pipe =
   let max = 2048 in
   let buf = Buffer.create 2048 in
   let tmp = Bytes.create max in
-  while begin
+  while
     try
       let len = Unix.read pipe tmp 0 max in
       Buffer.add_subbytes buf tmp 0 len;
       len > 0
-    with Unix.Unix_error (Unix.EPIPE, _, _) when false ->
-      false
-  end do () done;
+    with Unix.Unix_error (Unix.EPIPE, _, _) when false -> false
+  do
+    ()
+  done;
   Buffer.contents buf
-;;
 
 let run exe args =
   let out_in, out_out = Unix.pipe () in
@@ -34,11 +34,9 @@ let run exe args =
   let error = drain err_in in
   Unix.close out_in;
   Unix.close err_in;
-  let _pid, status = Unix.waitpid [ ] pid in
+  let _pid, status = Unix.waitpid [] pid in
   status, output, error
-;;
 
 let _ =
   ignore (run "cp" [||]);
   print_endline "success"
-;;

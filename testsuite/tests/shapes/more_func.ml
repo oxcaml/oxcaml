@@ -1,11 +1,14 @@
 (* TEST
- flags = "-dshape";
- expect;
+   flags = "-dshape";
+   expect;
 *)
 module M = struct end (* uid 0 *)
-module F(X : sig end) = M
-module App = F(List)
-[%%expect{|
+
+module F (X : sig end) = M
+module App = F (List)
+
+[%%expect
+{|
 {
  "M"[module] -> {<.0>};
  }
@@ -20,11 +23,18 @@ module F : functor (X : sig end) -> sig end
 module App : sig end
 |}]
 
-
 module M = struct end (* uid 4 *)
-module F(X : sig end) = struct include M type t end
-module App = F(List)
-[%%expect{|
+
+module F (X : sig end) = struct
+  include M
+
+  type t
+end
+
+module App = F (List)
+
+[%%expect
+{|
 {
  "M"[module] -> {<.4>};
  }
@@ -44,9 +54,12 @@ module App : sig type t = F(List).t end
 |}]
 
 module M = struct end (* uid 9 *)
-module F(X : sig end) = X
-module App = F(M)
-[%%expect{|
+
+module F (X : sig end) = X
+module App = F (M)
+
+[%%expect
+{|
 {
  "M"[module] -> {<.9>};
  }
@@ -61,11 +74,14 @@ module F : functor (X : sig end) -> sig end
 module App : sig end
 |}]
 
-module Id(X : sig end) = X
+module Id (X : sig end) = X
+
 module Struct = struct
   module L = List
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "Id"[module] -> Abs<.14>(X, X<.13>);
  }
@@ -80,10 +96,12 @@ module Id : functor (X : sig end) -> sig end
 module Struct : sig module L = List end
 |}]
 
-module App = Id(List) (* this should have the App uid *)
+module App = Id (List) (* this should have the App uid *)
 module Proj = Struct.L
-  (* this should have the Proj uid and be an alias to Struct.L *)
-[%%expect{|
+(* this should have the Proj uid and be an alias to Struct.L *)
+
+[%%expect
+{|
 {
  "App"[module] -> (CU Stdlib . "List"[module])<.17>;
  }
@@ -96,10 +114,16 @@ module App : sig end
 module Proj = Struct.L
 |}]
 
-module F (X :sig end ) = struct module M = X end
-module N = F(struct end)
+module F (X : sig end) = struct
+  module M = X
+end
+
+module N = F ()
+
 module O = N.M
-[%%expect{|
+
+[%%expect
+{|
 {
  "F"[module] -> Abs<.21>(X, {
                              "M"[module] -> X<.19>;

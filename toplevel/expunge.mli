@@ -15,5 +15,5 @@
 
 (* Interface to expunge's main entry point *)
 
-val main : unit -> unit
 (** The entry point for expunge *)
+val main : unit -> unit

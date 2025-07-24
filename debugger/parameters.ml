@@ -19,15 +19,19 @@
 open Debugger_config
 
 let program_name = ref ""
+
 let socket_name = ref ""
+
 let arguments = ref ""
 
-let default_load_path =
-  ref [ Filename.current_dir_name; Config.standard_library ]
+let default_load_path = ref [Filename.current_dir_name; Config.standard_library]
 
 let breakpoint = ref true
+
 let prompt = ref true
+
 let time = ref true
+
 let version = ref true
 
 let add_path dir =

@@ -1,14 +1,18 @@
 (* TEST
- expect;
+   expect;
 *)
 
-type 'p pair = 'a * 'b constraint 'p = < left:'a; right:'b>
+type 'p pair = 'a * 'b constraint 'p = < left : 'a ; right : 'b >
 
 (* New in 4.11 *)
-let error: 'left 'right.
-  <left:'left; right:'right> pair -> <left:'right; right:'left> pair =
-  fun (x,y) -> (y,x)
-[%%expect{|
+let error :
+      'left 'right.
+      < left : 'left ; right : 'right > pair ->
+      < left : 'right ; right : 'left > pair =
+ fun (x, y) -> y, x
+
+[%%expect
+{|
 type 'c pair = 'a * 'b constraint 'c = < left : 'a; right : 'b >
 val error :
   < left : 'left; right : 'right > pair ->
@@ -17,13 +21,15 @@ val error :
 
 (* Known problem with polymorphic methods *)
 let foo :
-  < m : 'left 'right. <left:'left; right:'right> pair >
-   -> < m : 'left 'right. <left:'left; right:'right> pair >
-= fun x -> x
+    < m : 'left 'right. < left : 'left ; right : 'right > pair > ->
+    < m : 'left 'right. < left : 'left ; right : 'right > pair > =
+ fun x -> x
+
 (* CR layouts v2.8: This got worse once we enabled with-kinds for tuples, because of
    Cannot_subst turning into Missing_cmi in estimate_type_jkind. When we fix that, this
    should change back to a better error message. *)
-[%%expect{|
+[%%expect
+{|
 Line 2, characters 4-53:
 2 |   < m : 'left 'right. <left:'left; right:'right> pair >
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

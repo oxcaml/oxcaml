@@ -23,7 +23,7 @@ val string_of_variance : Odoc_type.t_type -> Types.Variance.t -> string
    with a given separator.
    @param par can be used to force the addition or not of parentheses around the returned string.
 *)
-val string_of_type_list : ?par: bool -> string -> Types.type_expr list -> string
+val string_of_type_list : ?par:bool -> string -> Types.type_expr list -> string
 
 (** This function returns a string to represent the list of type parameters
    for the given type. *)
@@ -31,7 +31,8 @@ val string_of_type_param_list : Odoc_type.t_type -> string
 
 (** This function returns a string to represent the list of type parameters
    for the given type extension. *)
-val string_of_type_extension_param_list : Odoc_extension.t_type_extension -> string
+val string_of_type_extension_param_list :
+  Odoc_extension.t_type_extension -> string
 
 (** This function returns a string to represent the given list of
    type parameters of a class or class type,

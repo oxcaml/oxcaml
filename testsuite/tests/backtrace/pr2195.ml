@@ -1,18 +1,5 @@
 (* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
-
-
-
-
-
-
-
-
-
+   (* Blank lines added here to preserve locations. *)
 *)
 
 let () =
@@ -29,24 +16,24 @@ let () =
     Printexc.raise_with_backtrace Exit bt
 
 (* TEST
- flags += "-g";
- exit_status = "2";
- no-tsan; (* Exhausting file descriptors kills TSan support (libunwind fails) *)
- {
-   ocamlrunparam += ",b=0";
-   reference = "${test_source_directory}/pr2195-nolocs.byte.reference";
-   bytecode;
- }{
-   ocamlrunparam += ",b=1";
-   reference = "${test_source_directory}/pr2195-nolocs.byte.reference";
-   bytecode;
- }{
-   ocamlrunparam += ",b=2";
-   reference = "${test_source_directory}/pr2195-locs.byte.reference";
-   bytecode;
- }{
-   reference = "${test_source_directory}/pr2195.opt.reference";
-   compare_programs = "false";
-   native;
- }
+   flags += "-g";
+   exit_status = "2";
+   no-tsan; (* Exhausting file descriptors kills TSan support (libunwind fails) *)
+   {
+     ocamlrunparam += ",b=0";
+     reference = "${test_source_directory}/pr2195-nolocs.byte.reference";
+     bytecode;
+   }{
+     ocamlrunparam += ",b=1";
+     reference = "${test_source_directory}/pr2195-nolocs.byte.reference";
+     bytecode;
+   }{
+     ocamlrunparam += ",b=2";
+     reference = "${test_source_directory}/pr2195-locs.byte.reference";
+     bytecode;
+   }{
+     reference = "${test_source_directory}/pr2195.opt.reference";
+     compare_programs = "false";
+     native;
+   }
 *)

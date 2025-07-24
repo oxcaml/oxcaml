@@ -1,12 +1,13 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let x = true in
 let y = false in
 let z = false in
@@ -15,7 +16,6 @@ let b = false in
 let c = false in
 ();
 if not x then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

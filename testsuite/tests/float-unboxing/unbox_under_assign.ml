@@ -6,11 +6,8 @@ module Float = struct
     | F : float t
 
   let bar : type a. a t -> float -> int -> a =
-    fun t f i ->
-      match t with
-      | IO -> Some i
-      | F -> f
-  [@@inline always]
+   fun t f i -> match t with IO -> Some i | F -> f
+   [@@inline always]
 
   let foo (t : float t) f i =
     let r = ref 0. in
@@ -28,11 +25,8 @@ module Int32 = struct
     | F : int32 t
 
   let bar : type a. a t -> int32 -> int -> a =
-    fun t f i ->
-      match t with
-      | IO -> Some i
-      | F -> f
-  [@@inline always]
+   fun t f i -> match t with IO -> Some i | F -> f
+   [@@inline always]
 
   let foo (t : int32 t) f i =
     let r = ref 0l in
@@ -45,11 +39,8 @@ module Int64 = struct
     | F : int64 t
 
   let bar : type a. a t -> int64 -> int -> a =
-    fun t f i ->
-      match t with
-      | IO -> Some i
-      | F -> f
-  [@@inline always]
+   fun t f i -> match t with IO -> Some i | F -> f
+   [@@inline always]
 
   let foo (t : int64 t) f i =
     let r = ref 0L in
@@ -62,11 +53,8 @@ module Nativeint = struct
     | F : nativeint t
 
   let bar : type a. a t -> nativeint -> int -> a =
-    fun t f i ->
-      match t with
-      | IO -> Some i
-      | F -> f
-  [@@inline always]
+   fun t f i -> match t with IO -> Some i | F -> f
+   [@@inline always]
 
   let foo (t : nativeint t) f i =
     let r = ref 0n in

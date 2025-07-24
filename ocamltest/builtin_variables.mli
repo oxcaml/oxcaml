@@ -40,6 +40,7 @@ val ocamltest_log : Variables.t
 val output : Variables.t
 
 val program : Variables.t
+
 val program2 : Variables.t
 
 val promote : Variables.t
@@ -49,6 +50,7 @@ val reason : Variables.t
 val reference : Variables.t
 
 val skip_header_lines : Variables.t
+
 val skip_header_bytes : Variables.t
 
 val script : Variables.t
@@ -56,12 +58,15 @@ val script : Variables.t
 val src : Variables.t
 
 val stdin : Variables.t
+
 val stdout : Variables.t
+
 val stderr : Variables.t
 
 val subdirectories : Variables.t
 
 val test_build_directory : Variables.t
+
 val test_build_directory_prefix : Variables.t
 
 val test_file : Variables.t

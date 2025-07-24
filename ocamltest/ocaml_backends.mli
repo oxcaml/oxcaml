@@ -15,7 +15,9 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+type t =
+  | Native
+  | Bytecode
 
 val is_bytecode : t -> bool
 

@@ -19,20 +19,21 @@ module type Toplevel = sig
   include Ocaml_tools.Tool
 
   val backend : Ocaml_backends.t
+
   val compiler : Ocaml_compilers.compiler
 end
 
 type toplevel = (module Toplevel)
 
 val toplevel :
-  name : string ->
-  flags : string ->
-  directory : string ->
-  exit_status_variable : Variables.t ->
-  reference_variable : Variables.t ->
-  output_variable : Variables.t ->
-  backend : Ocaml_backends.t ->
-  compiler : Ocaml_compilers.compiler ->
+  name:string ->
+  flags:string ->
+  directory:string ->
+  exit_status_variable:Variables.t ->
+  reference_variable:Variables.t ->
+  output_variable:Variables.t ->
+  backend:Ocaml_backends.t ->
+  compiler:Ocaml_compilers.compiler ->
   toplevel
 
 val ocaml : toplevel

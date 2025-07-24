@@ -1,24 +1,25 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module M = struct
   type 'a s = 'a
+
   type t = T : 'a s -> t
 end
 
 module N = struct
   type 'a s = 'a
+
   type t = T : 'a s -> t
 end
 
 type (_, _) eq = Refl : ('a, 'a) eq
 
-let f (x : (M.t, N.t) eq)=
-  match x with
-  | Refl -> ()
+let f (x : (M.t, N.t) eq) = match x with Refl -> ()
 
-[%%expect{|
+[%%expect
+{|
 module M : sig type 'a s = 'a type t = T : 'a s -> t end
 module N : sig type 'a s = 'a type t = T : 'a s -> t end
 type (_, _) eq = Refl : ('a, 'a) eq

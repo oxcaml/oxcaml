@@ -20,13 +20,18 @@
 
 *)
 
-val command: string -> int
-val run_command: string -> unit
-val compile_file:
+val command : string -> int
+
+val run_command : string -> unit
+
+val compile_file :
   ?output:string -> ?opt:string -> ?stable_name:string -> string -> int
-val create_archive: string -> string list -> int
-val quote_files: response_files:bool -> string list -> string
-val quote_optfile: string option -> string
+
+val create_archive : string -> string list -> int
+
+val quote_files : response_files:bool -> string list -> string
+
+val quote_optfile : string option -> string
 (*val make_link_options: string list -> string*)
 
 type link_mode =
@@ -41,7 +46,7 @@ type link_mode =
    case. *)
 (* CR-someday ccasinghino: the argument above equally applies to all cases when
    `link_mode` is `Dll`, but that didn't seem to work.  Understand why. *)
-val call_linker:
+val call_linker :
   ?native_toplevel:bool -> link_mode -> string -> string list -> string -> int
 
 val linker_is_flexlink : bool

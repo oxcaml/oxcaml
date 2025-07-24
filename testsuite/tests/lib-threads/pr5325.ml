@@ -1,11 +1,11 @@
 (* TEST
- include systhreads;
- hassysthreads;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   hassysthreads;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 open Printf
@@ -22,7 +22,7 @@ open Printf
 *)
 
 let server sock =
-  let (s, _) = Unix.accept sock in
+  let s, _ = Unix.accept sock in
   let buf = Bytes.make 1024 '>' in
   let n = Unix.read s buf 2 (Bytes.length buf - 2) in
   ignore (Unix.write s buf 0 (n + 2));
@@ -31,24 +31,23 @@ let server sock =
 let reader s =
   let buf = Bytes.make 1024 ' ' in
   let n = Unix.read s buf 0 (Bytes.length buf) in
-  print_bytes (Bytes.sub buf 0 n); flush stdout
+  print_bytes (Bytes.sub buf 0 n);
+  flush stdout
 
 let writer s msg =
   ignore (Unix.write_substring s msg 0 (String.length msg));
   Unix.shutdown s Unix.SHUTDOWN_SEND
 
 let _ =
-  let addr = Unix.ADDR_INET(Unix.inet_addr_loopback, 0) in
-  let serv =
-    Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
+  let addr = Unix.ADDR_INET (Unix.inet_addr_loopback, 0) in
+  let serv = Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
   Unix.setsockopt serv Unix.SO_REUSEADDR true;
   Unix.bind serv addr;
   let addr = Unix.getsockname serv in
   Unix.listen serv 5;
   let tserv = Thread.create server serv in
   Thread.delay 0.05;
-  let client =
-    Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
+  let client = Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
   Unix.connect client addr;
   let rd = Thread.create reader client in
   Thread.delay 0.05;

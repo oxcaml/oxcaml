@@ -1,7 +1,7 @@
 (* TEST
- runtime5;
- { bytecode; }
- { native; }
+   runtime5;
+   { bytecode; }
+   { native; }
 *)
 
 (* Test that inputting bytes from a closed in_channel triggers an exception *)
@@ -21,16 +21,14 @@ let () =
       false
     with
     | Sys_error _ -> true
-    | _           -> false)
+    | _ -> false)
 
 (* A variant of #11878, which #11965 failed to fix. *)
 let () =
   let ic = open_in_bin Sys.argv.(0) in
   close_in ic;
-  begin try
+  try
     seek_in ic (-1);
     ignore (input_byte ic);
-    assert false;
-  with
-  | Sys_error _ -> ()
-  end
+    assert false
+  with Sys_error _ -> ()

@@ -1,3 +1,3 @@
- type _ t =
-     X of string
-   | Y : bytes t
+type _ t =
+  | X of string
+  | Y : bytes t

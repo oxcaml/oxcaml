@@ -1,14 +1,18 @@
 (* TEST
- expect;
+   expect;
 *)
 
 type t = int
-module M : sig type t end with type t = [`T of t] =
-struct
-  type t = [`T of t]
-end;;
 
-[%%expect{|
+module M : sig
+  type t
+end
+with type t = [`T of t] = struct
+  type t = [`T of t]
+end
+
+[%%expect
+{|
 type t = int
 Lines 3-5, characters 0-3:
 3 | struct

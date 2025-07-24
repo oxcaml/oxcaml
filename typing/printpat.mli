@@ -13,15 +13,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val pretty_const : Typedtree.constant -> string
 
-
-val pretty_const
-  : Typedtree.constant -> string
 val pretty_val : Format.formatter -> 'k Typedtree.general_pattern -> unit
 
-val pretty_pat
-    : Format.formatter -> 'k Typedtree.general_pattern -> unit
-val pretty_line
-    : Format.formatter -> 'k Typedtree.general_pattern list -> unit
-val pretty_matrix
-    : Format.formatter -> 'k Typedtree.general_pattern list list -> unit
+val pretty_pat : Format.formatter -> 'k Typedtree.general_pattern -> unit
+
+val pretty_line : Format.formatter -> 'k Typedtree.general_pattern list -> unit
+
+val pretty_matrix :
+  Format.formatter -> 'k Typedtree.general_pattern list list -> unit

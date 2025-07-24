@@ -6,11 +6,11 @@ We define a Length module to implement positive integers.
 
 *)
 
-type t = int;;
+type t = int
 
 let make x =
-  if x >= 0 then x else
-  failwith (Printf.sprintf "cannot build negative length : %i" x)
-;;
+  if x >= 0
+  then x
+  else failwith (Printf.sprintf "cannot build negative length : %i" x)
 
-external from : t -> int = "%identity";;
+external from : t -> int = "%identity"

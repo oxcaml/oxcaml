@@ -1,13 +1,14 @@
 (* TEST
- include unix;
- hasunix;
- libunix;
- expect;
+   include unix;
+   hasunix;
+   libunix;
+   expect;
 *)
 
 (* Test that [include] works in expect tests: the Unix module is not
    available by default. *)
-Unix.sleepf 0.01;;
+Unix.sleepf 0.01
+
 [%%expect {|
 - : unit = ()
 |}]

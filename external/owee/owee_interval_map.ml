@@ -5,17 +5,14 @@
    Therefore we can use tagged integers for better performance.
 *)
 
-type 'a interval = {
-  lbound: int;
-  rbound: int;
-  value: 'a;
-}
+type 'a interval =
+  { lbound : int;
+    rbound : int;
+    value : 'a
+  }
 
-let interval l r value = {
-  lbound = Int64.to_int l;
-  rbound = Int64.to_int r;
-  value
-}
+let interval l r value =
+  { lbound = Int64.to_int l; rbound = Int64.to_int r; value }
 
 (* A specialized implementation of a balanced-binary tree
    that lazily prune out-of-bound intervals during rebalancing.
@@ -29,6 +26,7 @@ module Tree : sig
     | Node of int * 'a t * 'a interval * 'a t
 
   val leaf : 'a t
+
   val node : 'a t -> 'a interval -> 'a t -> 'a t
 
   (* [set_bound l] will cause [node] to prune intervals that end before [l]
@@ -39,26 +37,23 @@ end = struct
     | Leaf
     | Node of int * 'a t * 'a interval * 'a t
 
-  let size = function
-    | Node (s, _, _, _) -> s
-    | Leaf -> 0
+  let size = function Node (s, _, _, _) -> s | Leaf -> 0
 
-  let smaller_ell smin smax = (smin < smax) && ((smin land smax) lsl 1 < smax)
+  let smaller_ell smin smax = smin < smax && (smin land smax) lsl 1 < smax
+
   let disbalanced smin smax = smaller_ell smin (smax lsr 1)
+
   let node_ l x r = Node (size l + 1 + size r, l, x, r)
 
-  let rot_left l x r k = match r with
-    | Node (_, rl, y, rr) ->
-      k (k l x rl) y rr
-    | _ -> assert false
+  let rot_left l x r k =
+    match r with Node (_, rl, y, rr) -> k (k l x rl) y rr | _ -> assert false
 
-  let rot_right l y r k = match l with
-    | Node (_, ll, x, lr) ->
-      k ll x (k lr y r)
-    | _ -> assert false
+  let rot_right l y r k =
+    match l with Node (_, ll, x, lr) -> k ll x (k lr y r) | _ -> assert false
 
   let inc_left l x r k =
-    let r = match r with
+    let r =
+      match r with
       | Node (_, rl, y, rr) when smaller_ell (size rr) (size rl) ->
         rot_right rl y rr k
       | _ -> r
@@ -66,7 +61,8 @@ end = struct
     rot_left l x r k
 
   let inc_right l y r k =
-    let l = match l with
+    let l =
+      match l with
       | Node (_, ll, x, lr) when smaller_ell (size ll) (size lr) ->
         rot_left ll x lr k
       | _ -> l
@@ -74,16 +70,14 @@ end = struct
     rot_right l y r k
 
   let rec node_left l x r =
-    if disbalanced (size l) (size r) then
-      inc_left l x r node_left
-    else
-      node_ l x r
+    if disbalanced (size l) (size r)
+    then inc_left l x r node_left
+    else node_ l x r
 
   let rec node_right l y r =
-    if disbalanced (size r) (size l) then
-      inc_right l y r node_right
-    else
-      node_ l y r
+    if disbalanced (size r) (size l)
+    then inc_right l y r node_right
+    else node_ l y r
 
   let leaf = Leaf
 
@@ -92,22 +86,19 @@ end = struct
   let set_bound x = bound := x
 
   let rec node l x r =
-    if x.rbound < !bound then
-      join l r
-    else match l, r with
-    | Leaf, Leaf -> node_ leaf x leaf
-    | l, r when size l < size r ->
-      node_left l x r
-    | l, r ->
-      node_right l x r
+    if x.rbound < !bound
+    then join l r
+    else
+      match l, r with
+      | Leaf, Leaf -> node_ leaf x leaf
+      | l, r when size l < size r -> node_left l x r
+      | l, r -> node_right l x r
 
-  and join l r = match l, r with
+  and join l r =
+    match l, r with
     | Leaf, t | t, Leaf -> t
     | Node (sl, ll, x, lr), Node (sr, rl, y, rr) ->
-      if sl <= sr then
-        node (join l rl) y rr
-      else
-        node ll x (join lr r)
+      if sl <= sr then node (join l rl) y rr else node ll x (join lr r)
 end
 
 let int_compare : int -> int -> int = compare
@@ -116,15 +107,14 @@ let int_compare : int -> int -> int = compare
 
 module RMap = struct
   type 'a t = 'a Tree.t
+
   let empty = Tree.leaf
 
   let rec add i = function
     | Tree.Leaf -> Tree.node empty i empty
     | Tree.Node (_, l, j, r) ->
       let c = int_compare i.rbound j.rbound in
-      if c < 0
-      then Tree.node (add i l) j r
-      else Tree.node l j (add i r)
+      if c < 0 then Tree.node (add i l) j r else Tree.node l j (add i r)
 
   let add i t =
     Tree.set_bound i.lbound;
@@ -134,15 +124,13 @@ module RMap = struct
     | Tree.Leaf -> acc
     | Tree.Node (_, l, i, r) ->
       let c = int_compare i.rbound bound in
-      if c >= 0 then
-        build_spine bound ((i, r) :: acc) l
-      else
-        build_spine bound acc r
+      if c >= 0
+      then build_spine bound ((i, r) :: acc) l
+      else build_spine bound acc r
 
   let rec expand_spine acc = function
     | Tree.Leaf -> acc
-    | Tree.Node (_, l, i, r) ->
-      expand_spine ((i, r) :: acc) l
+    | Tree.Node (_, l, i, r) -> expand_spine ((i, r) :: acc) l
 
   let list_from rmap bound =
     let rec loop acc = function
@@ -172,49 +160,44 @@ end
   This is done by [initialize_until].
 *)
 
-type 'a t = {
-  intervals: 'a interval array;
-  maps: 'a RMap.t array;
-  mutable last: int;
-}
+type 'a t =
+  { intervals : 'a interval array;
+    maps : 'a RMap.t array;
+    mutable last : int
+  }
 
 let create count ~f =
   let intervals = Array.init count f in
   Array.fast_sort (fun i1 i2 -> int_compare i1.lbound i2.lbound) intervals;
   { intervals; maps = Array.make count RMap.empty; last = -1 }
 
-let iter (t : _ t) ~f =
-  Array.iter f t.intervals
+let iter (t : _ t) ~f = Array.iter f t.intervals
 
 (* Lazy initialization of [t.maps] *)
 
 let initialize_until t j =
   let last = t.last in
-  if j > last then (
+  if j > last
+  then (
     let cumulative = ref (if last < 0 then RMap.empty else t.maps.(last)) in
     for i = last + 1 to j do
       let interval = t.intervals.(i) in
       cumulative := RMap.add interval !cumulative;
       (*Printf.eprintf "size: %d\n" (Tree.size !cumulative);*)
-      t.maps.(i) <- !cumulative;
+      t.maps.(i) <- !cumulative
     done;
-    t.last <- j;
-  )
+    t.last <- j)
 
 (* Left-leaning binary search on array of intervals *)
 let closest_key intervals (addr : int) =
   let l = ref 0 in
   let r = ref (Array.length intervals - 1) in
   while !l <= !r do
-    let m = !l + (!r - !l) / 2 in
+    let m = !l + ((!r - !l) / 2) in
     let lb = intervals.(m).lbound in
-    if lb < addr then
-      l := m + 1
-    else
-      r := m - 1
+    if lb < addr then l := m + 1 else r := m - 1
   done;
-  if (!l = Array.length intervals) || (intervals.(!l).lbound > addr) then
-    decr l;
+  if !l = Array.length intervals || intervals.(!l).lbound > addr then decr l;
   assert (!l = -1 || intervals.(!l).lbound <= addr);
   !l
 
@@ -224,10 +207,11 @@ let closest_key intervals (addr : int) =
 let query t (addr : int64) =
   let addr = Int64.to_int addr in
   let l = closest_key t.intervals addr in
-  if l = -1 then [] else (
+  if l = -1
+  then []
+  else (
     initialize_until t l;
-    RMap.list_from t.maps.(l) addr
-  )
+    RMap.list_from t.maps.(l) addr)
 
 (*
   Uncomment: switch to eager creation and print counters on interval

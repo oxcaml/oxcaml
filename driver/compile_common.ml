@@ -17,45 +17,45 @@ open Misc
 
 (* CR lmaurer: No longer need both [target] and [module_name] here (true in lots
    of places) *)
-type info = {
-  target: Unit_info.t;
-  module_name : Compilation_unit.t;
-  env : Env.t;
-  ppf_dump : Format.formatter;
-  tool_name : string;
-  native : bool;
-}
+type info =
+  { target : Unit_info.t;
+    module_name : Compilation_unit.t;
+    env : Env.t;
+    ppf_dump : Format.formatter;
+    tool_name : string;
+    native : bool
+  }
 
 type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
-let with_info ~native ~tool_name ~source_file ~output_prefix
-      ~compilation_unit ~kind ~dump_ext k =
+let with_info ~native ~tool_name ~source_file ~output_prefix ~compilation_unit
+    ~kind ~dump_ext k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
   let target =
     match compilation_unit with
     | Exactly compilation_unit ->
-        Unit_info.make_with_known_compilation_unit ~source_file kind
-          output_prefix compilation_unit
+      Unit_info.make_with_known_compilation_unit ~source_file kind output_prefix
+        compilation_unit
     | Inferred_from_output_prefix ->
-        let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
-        Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
+      let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+      Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
   in
   let compilation_unit = Unit_info.modname target in
   Env.set_unit_name (Some target);
-  let env = Compmisc.initial_env() in
+  let env = Compmisc.initial_env () in
   let dump_file = String.concat "." [output_prefix; dump_ext] in
   Compmisc.with_ppf_dump ~file_prefix:dump_file (fun ppf_dump ->
-  k {
-    target;
-    module_name = compilation_unit;
-    env;
-    ppf_dump;
-    tool_name;
-    native;
-  })
+      k
+        { target;
+          module_name = compilation_unit;
+          env;
+          ppf_dump;
+          tool_name;
+          native
+        })
 
 (** Compile a .mli file *)
 
@@ -81,13 +81,16 @@ let typecheck_intf info ast =
   in
   let alerts = Builtin_attributes.alerts_of_sig ~mark:true ast in
   let sg = tsg.Typedtree.sig_type in
-  if !Clflags.print_types then
+  if !Clflags.print_types
+  then
     Printtyp.wrap_printing_env ~error:false info.env (fun () ->
-        Format.(fprintf std_formatter) "%a@."
+        Format.(fprintf std_formatter)
+          "%a@."
           (Printtyp.printed_signature (Unit_info.source_file info.target))
           sg);
-  ignore (Includemod.signatures info.env ~mark:true
-    ~modes:Includemod.modes_unit sg sg);
+  ignore
+    (Includemod.signatures info.env ~mark:true ~modes:Includemod.modes_unit sg
+       sg);
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
@@ -96,35 +99,33 @@ let typecheck_intf info ast =
 let emit_signature info alerts tsg =
   let sg =
     let kind : Cmi_format.kind =
-      if !Clflags.as_parameter then
-        Parameter
-      else begin
+      if !Clflags.as_parameter
+      then Parameter
+      else
         let cmi_arg_for =
           !Clflags.as_argument_for
           |> Option.map Global_module.Parameter_name.of_string
         in
         Normal { cmi_impl = info.module_name; cmi_arg_for }
-      end
     in
     Env.save_signature ~alerts tsg.Typedtree.sig_type
-      (Compilation_unit.name info.module_name) kind
+      (Compilation_unit.name info.module_name)
+      kind
       (Unit_info.cmi info.target)
   in
   Typemod.save_signature info.target info.module_name tsg info.env sg
 
 let interface ~hook_parse_tree ~hook_typed_tree info =
-  Profile.(record_call (annotate_file_name (
-    Unit_info.source_file info.target))) @@ fun () ->
+  Profile.(record_call (annotate_file_name (Unit_info.source_file info.target)))
+  @@ fun () ->
   let ast = parse_intf info in
   hook_parse_tree ast;
-  if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
+  if Clflags.(should_stop_after Compiler_pass.Parsing)
+  then ()
+  else
     let alerts, tsg = typecheck_intf info ast in
     hook_typed_tree tsg;
-    if not !Clflags.print_types then begin
-      emit_signature info alerts tsg
-    end
-  end
-
+    if not !Clflags.print_types then emit_signature info alerts tsg
 
 (** Frontend for a .ml file *)
 
@@ -137,41 +138,39 @@ let parse_impl i =
 let typecheck_impl i parsetree =
   parsetree
   |> Profile.(
-    record_with_counters
-      ~counter_f:(fun (typed_tree : Typedtree.implementation) ->
-        Profile_counters_functions.(
-          count_language_extensions
-            (Typedtree_implementation_output typed_tree)))
-      typing)
-    (Typemod.type_implementation i.target i.module_name i.env)
+       record_with_counters
+         ~counter_f:(fun (typed_tree : Typedtree.implementation) ->
+           Profile_counters_functions.(
+             count_language_extensions
+               (Typedtree_implementation_output typed_tree)))
+         typing)
+       (Typemod.type_implementation i.target i.module_name i.env)
   |> print_if i.ppf_dump Clflags.dump_typedtree
-    Printtyped.implementation_with_coercion
-  |> print_if i.ppf_dump Clflags.dump_shape
-    (fun fmt {Typedtree.shape; _} -> Shape.print fmt shape)
+       Printtyped.implementation_with_coercion
+  |> print_if i.ppf_dump Clflags.dump_shape (fun fmt { Typedtree.shape; _ } ->
+         Shape.print fmt shape)
 
 let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
-  Profile.(record_call (annotate_file_name (
-    Unit_info.source_file info.target))) @@ fun () ->
+  Profile.(record_call (annotate_file_name (Unit_info.source_file info.target)))
+  @@ fun () ->
   let exceptionally () =
-    let sufs =
-      if info.native then Unit_info.[ cmx; obj ]
-      else Unit_info.[ cmo ] in
+    let sufs = if info.native then Unit_info.[cmx; obj] else Unit_info.[cmo] in
     List.iter
       (fun suf -> remove_file (Unit_info.Artifact.filename @@ suf info.target))
-      sufs;
+      sufs
   in
   Misc.try_finally ?always:None ~exceptionally (fun () ->
-    let parsed = parse_impl info in
-    hook_parse_tree parsed;
-    if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
-      let typed = typecheck_impl info parsed in
-      hook_typed_tree typed;
-      if Clflags.(should_stop_after Compiler_pass.Typing) then () else begin
-        backend info typed;
-      end;
-    end;
-    Builtin_attributes.warn_unused ();
-    if not (Clflags.(should_stop_after Compiler_pass.Selection)) then
-      Builtin_attributes.warn_unchecked_zero_alloc_attribute ();
-    Warnings.check_fatal ();
-  )
+      let parsed = parse_impl info in
+      hook_parse_tree parsed;
+      (if Clflags.(should_stop_after Compiler_pass.Parsing)
+      then ()
+      else
+        let typed = typecheck_impl info parsed in
+        hook_typed_tree typed;
+        if Clflags.(should_stop_after Compiler_pass.Typing)
+        then ()
+        else backend info typed);
+      Builtin_attributes.warn_unused ();
+      if not Clflags.(should_stop_after Compiler_pass.Selection)
+      then Builtin_attributes.warn_unchecked_zero_alloc_attribute ();
+      Warnings.check_fatal ())

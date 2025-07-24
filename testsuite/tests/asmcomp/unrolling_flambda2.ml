@@ -1,24 +1,24 @@
 (* TEST
- flambda;
- native;
+   flambda;
+   native;
 *)
 
 type t = { fn : t -> t -> int -> unit -> unit }
 
 let rec foo f b n x =
-  if n < 0 then ()
-  else begin
+  if n < 0
+  then ()
+  else (
     foo f b (n - 1) x;
-    b.fn f b (n - 1) x
-  end
-[@@specialise always]
+    b.fn f b (n - 1) x)
+  [@@specialise always]
 
 let rec bar f b n x =
-  if n < 0 then ()
-  else begin
+  if n < 0
+  then ()
+  else (
     bar f b (n - 1) x;
-    f.fn f b (n - 1) x
-  end
-[@@specialise always]
+    f.fn f b (n - 1) x)
+  [@@specialise always]
 
-let () = foo {fn = foo} {fn = bar} 10 ()
+let () = foo { fn = foo } { fn = bar } 10 ()

@@ -1,21 +1,22 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
-open Lib;;
-type t = {
-  mutable a : float;
-  mutable b : float;
-};;
+open Lib
+
+type t =
+  { mutable a : float;
+    mutable b : float
+  }
+;;
 
 let x = { a = 0.1; b = 0.2 } in
 x.a <- 0.3;
 if x.a <> 0.3 then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

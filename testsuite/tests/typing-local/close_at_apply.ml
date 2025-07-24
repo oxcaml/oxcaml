@@ -13,26 +13,24 @@
 external local_stack_offset : unit -> int = "caml_local_stack_offset"
 
 external ignore : ('a[@local_opt]) -> unit = "%ignore"
+
 external opaque_identity : ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
 
-external ( +. )
-  :  (float[@local_opt])
-  -> (float[@local_opt])
-  -> (float[@local_opt])
+external ( +. ) :
+  (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
   = "%addfloat"
 
 let locally_allocate =
   let f = 1.0 in
   fun [@inline never] () -> ignore (opaque_identity (f +. 1.0) : float)
-;;
 
 let saved_stack_offset = ref 0
 
 let foo list =
   (* The Simplif local function optimization will transform [run] and
      [wrapper] into continuations. *)
-  let[@inline never][@local] run f = f () in
-  let[@inline never][@local] wrapper f =
+  let[@inline never] [@local] run f = f () in
+  let[@inline never] [@local] wrapper f =
     match Sys.opaque_identity true with
     | true ->
       (* Make a local allocation *)
@@ -45,13 +43,12 @@ let foo list =
       f ()
     | false -> run (fun () -> f ()) [@nontail]
   in
-  let f = fun _ ->
+  let f _ =
     assert (local_stack_offset () = !saved_stack_offset);
     locally_allocate ();
     Stdlib.List.hd list
   in
   saved_stack_offset := local_stack_offset ();
   wrapper f [@nontail]
-;;
 
-let _ : int = foo [ 1 ]
+let (_ : int) = foo [1]

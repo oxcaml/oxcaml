@@ -16,21 +16,39 @@
    Must be kept in sync with stdlib/obj.ml and runtime/caml/mlvalues.h *)
 
 let first_non_constant_constructor_tag = 0
+
 let last_non_constant_constructor_tag = 243
+
 let forcing_tag = 244
+
 let cont_tag = 245
+
 let lazy_tag = 246
+
 let closure_tag = 247
+
 let object_tag = 248
+
 let infix_tag = 249
+
 let forward_tag = 250
+
 let no_scan_tag = 251
+
 let abstract_tag = 251
+
 let string_tag = 252
+
 let double_tag = 253
+
 let double_array_tag = 254
+
 let custom_tag = 255
+
 let int_tag = 1000
+
 let out_of_heap_tag = 1001
+
 let unaligned_tag = 1002
+
 let null_tag = 1010

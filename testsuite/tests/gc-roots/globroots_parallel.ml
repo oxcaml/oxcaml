@@ -1,9 +1,9 @@
 (* TEST
- flags += " -w a -alert -do_not_spawn_domains -alert -unsafe_multidomain ";
- modules = "globrootsprim.c globroots.ml";
- runtime5;
- { bytecode; }
- { native; }
+   flags += " -w a -alert -do_not_spawn_domains -alert -unsafe_multidomain ";
+   modules = "globrootsprim.c globroots.ml";
+   runtime5;
+   { bytecode; }
+   { native; }
 *)
 
 open Globroots
@@ -16,18 +16,23 @@ let num_domains =
   match test_size with
   | 3 -> 8
   | 2 -> 4
-  | _ -> print_string "ok\n"; exit 0
+  | _ ->
+    print_string "ok\n";
+    exit 0
 
 let n = 125
 
 let _ =
-  let domains = Array.init (num_domains - 1) (fun _ ->
-    Domain.spawn(fun () ->
-      let module TestClassic = Test(Classic) () in
-      let module TestGenerational = Test(Generational) () in
-      TestClassic.test n;
-      TestGenerational.test n)) in
-  young2old (); Gc.full_major ();
+  let domains =
+    Array.init (num_domains - 1) (fun _ ->
+        Domain.spawn (fun () ->
+            let module TestClassic = Test (Classic) () in
+            let module TestGenerational = Test (Generational) () in
+            TestClassic.test n;
+            TestGenerational.test n))
+  in
+  young2old ();
+  Gc.full_major ();
   assert (static2young (1, 1) Gc.full_major == 0x42);
   TestClassic.test n;
   TestGenerational.test n;

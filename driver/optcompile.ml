@@ -27,8 +27,8 @@ let interface ~source_file ~output_prefix =
     ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
   @@ fun info ->
   Compile_common.interface
-  ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_intf)
-  ~hook_typed_tree:(Compiler_hooks.execute Compiler_hooks.Typed_tree_intf)
+    ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_intf)
+    ~hook_typed_tree:(Compiler_hooks.execute Compiler_hooks.Typed_tree_intf)
     info
 
 (** Native compilation backend for .ml files. *)
@@ -42,41 +42,37 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 
 let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
   raw_lambda
-  |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
-        (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
+  |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
+         Type_shape.print_debug_uid_tables ppf)
   |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
   |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
-  |> Profile.(record generate)
-   (fun (program : Lambda.program) ->
-      Builtin_attributes.warn_unused ();
-      let code = Simplif.simplify_lambda program.Lambda.code in
-      { program with Lambda.code }
-      |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
-      |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda
-      |> (fun (program : Lambda.program) ->
-           if Clflags.(should_stop_after Compiler_pass.Lambda) then ()
-           else begin
-             Asmgen.compile_implementation
-               unix
-               ~pipeline
-               ~sourcefile:(Some (Unit_info.source_file i.target))
-               ~prefixname:(Unit_info.prefix i.target)
-               ~ppf_dump:i.ppf_dump
-               program;
-             let arg_descr =
-               make_arg_descr ~param:as_arg_for
-                 ~arg_block_idx:program.arg_block_idx
-             in
-             Compilenv.save_unit_info
-               (Unit_info.Artifact.filename (Unit_info.cmx i.target))
-               ~main_module_block_format:program.main_module_block_format
-               ~arg_descr
-           end))
+  |> Profile.(record generate) (fun (program : Lambda.program) ->
+         Builtin_attributes.warn_unused ();
+         let code = Simplif.simplify_lambda program.Lambda.code in
+         { program with Lambda.code }
+         |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
+         |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda
+         |> fun (program : Lambda.program) ->
+         if Clflags.(should_stop_after Compiler_pass.Lambda)
+         then ()
+         else (
+           Asmgen.compile_implementation unix ~pipeline
+             ~sourcefile:(Some (Unit_info.source_file i.target))
+             ~prefixname:(Unit_info.prefix i.target)
+             ~ppf_dump:i.ppf_dump program;
+           let arg_descr =
+             make_arg_descr ~param:as_arg_for
+               ~arg_block_idx:program.arg_block_idx
+           in
+           Compilenv.save_unit_info
+             (Unit_info.Artifact.filename (Unit_info.cmx i.target))
+             ~main_module_block_format:program.main_module_block_format
+             ~arg_descr))
 
 let compile_from_typed i typed ~transl_style ~unix ~pipeline ~as_arg_for =
   typed
   |> Profile.(record transl)
-    (Translmod.transl_implementation i.module_name ~style:transl_style)
+       (Translmod.transl_implementation i.module_name ~style:transl_style)
   |> compile_from_raw_lambda i ~unix ~pipeline ~as_arg_for
 
 type flambda2 =
@@ -96,24 +92,26 @@ let emit unix i =
 type starting_point =
   | Parsing
   | Emit
-  | Instantiation of {
-      runtime_args : Translmod.runtime_arg list;
-      main_module_block_size : int;
-      arg_descr : Lambda.arg_descr option;
-  }
+  | Instantiation of
+      { runtime_args : Translmod.runtime_arg list;
+        main_module_block_size : int;
+        arg_descr : Lambda.arg_descr option
+      }
 
-let starting_point_of_compiler_pass start_from  =
-  match (start_from:Clflags.Compiler_pass.t) with
+let starting_point_of_compiler_pass start_from =
+  match (start_from : Clflags.Compiler_pass.t) with
   | Parsing -> Parsing
   | Emit -> Emit
-  | _ -> Misc.fatal_errorf "Cannot start from %s"
-           (Clflags.Compiler_pass.to_string start_from)
+  | _ ->
+    Misc.fatal_errorf "Cannot start from %s"
+      (Clflags.Compiler_pass.to_string start_from)
 
-let implementation_aux unix ~(flambda2 : flambda2) ~start_from
-      ~source_file ~output_prefix ~keep_symbol_tables
-      ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
+let implementation_aux unix ~(flambda2 : flambda2) ~start_from ~source_file
+    ~output_prefix ~keep_symbol_tables
+    ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
   let transl_style : Translmod.compilation_unit_style =
-    if Config.flambda || Config.flambda2 then Plain_block
+    if Config.flambda || Config.flambda2
+    then Plain_block
     else Set_individual_fields
   in
   let pipeline : Asmgen.pipeline =
@@ -122,12 +120,13 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
   with_info ~source_file ~output_prefix ~dump_ext:"cmx" ~compilation_unit
     ~kind:Impl
   @@ fun info ->
-  if !Oxcaml_flags.internal_assembler then
-      Emitaux.binary_backend_available := true;
+  if !Oxcaml_flags.internal_assembler
+  then Emitaux.binary_backend_available := true;
   match start_from with
   | Parsing ->
-    let backend info ({ structure; coercion; argument_interface; _ }
-                      : Typedtree.implementation) =
+    let backend info
+        ({ structure; coercion; argument_interface; _ } :
+          Typedtree.implementation) =
       Compilenv.reset info.target;
       let argument_coercion =
         match argument_interface with
@@ -151,14 +150,12 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
   | Emit -> emit unix info ~ppf_dump:info.ppf_dump
   | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
     Compilenv.reset info.target;
-    begin
-      match !Clflags.as_argument_for with
-      | Some _ ->
-        (* CR lmaurer: Needs nicer error message (this is a user error) *)
-        Misc.fatal_error
-          "-as-argument-for is not allowed (and not needed) with -instantiate"
-      | None -> ()
-    end;
+    (match !Clflags.as_argument_for with
+    | Some _ ->
+      (* CR lmaurer: Needs nicer error message (this is a user error) *)
+      Misc.fatal_error
+        "-as-argument-for is not allowed (and not needed) with -instantiate"
+    | None -> ());
     let as_arg_for, arg_block_idx =
       match (arg_descr : Lambda.arg_descr option) with
       | Some { arg_param; arg_block_idx } -> Some arg_param, Some arg_block_idx
@@ -171,19 +168,16 @@ let implementation_aux unix ~(flambda2 : flambda2) ~start_from
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
     compile_from_raw_lambda info impl ~unix ~pipeline ~as_arg_for
 
-let implementation unix ~flambda2 ~start_from ~source_file
-      ~output_prefix ~keep_symbol_tables =
+let implementation unix ~flambda2 ~start_from ~source_file ~output_prefix
+    ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in
-  implementation_aux unix ~flambda2 ~start_from ~source_file
-    ~output_prefix ~keep_symbol_tables
-    ~compilation_unit:Inferred_from_output_prefix
+  implementation_aux unix ~flambda2 ~start_from ~source_file ~output_prefix
+    ~keep_symbol_tables ~compilation_unit:Inferred_from_output_prefix
 
-let instance unix ~flambda2 ~source_file
-      ~output_prefix ~compilation_unit ~runtime_args ~main_module_block_size
-      ~arg_descr ~keep_symbol_tables =
+let instance unix ~flambda2 ~source_file ~output_prefix ~compilation_unit
+    ~runtime_args ~main_module_block_size ~arg_descr ~keep_symbol_tables =
   let start_from =
     Instantiation { runtime_args; main_module_block_size; arg_descr }
   in
-  implementation_aux unix ~flambda2 ~start_from ~source_file
-    ~output_prefix ~keep_symbol_tables
-    ~compilation_unit:(Exactly compilation_unit)
+  implementation_aux unix ~flambda2 ~start_from ~source_file ~output_prefix
+    ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)

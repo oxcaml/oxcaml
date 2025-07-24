@@ -1,10 +1,11 @@
 (* TEST
- flags = "-dshape";
- expect;
+   flags = "-dshape";
+   expect;
 *)
 
 let x = ()
-[%%expect{|
+
+[%%expect {|
 {
  "x"[value] -> <.0>;
  }
@@ -12,7 +13,8 @@ val x : unit = ()
 |}]
 
 external y : int -> int = "%identity"
-[%%expect{|
+
+[%%expect {|
 {
  "y"[value] -> <.1>;
  }
@@ -20,8 +22,11 @@ external y : int -> int = "%identity"
 |}]
 
 type t = A of foo
+
 and foo = Bar
-[%%expect{|
+
+[%%expect
+{|
 {
  "foo"[type] -> {<.3>
                  "Bar"[constructor] -> {<.5>};
@@ -37,7 +42,8 @@ and foo = Bar
 module type S = sig
   type t
 end
-[%%expect{|
+
+[%%expect {|
 {
  "S"[module type] -> <.7>;
  }
@@ -45,7 +51,8 @@ module type S = sig type t end
 |}]
 
 exception E
-[%%expect{|
+
+[%%expect {|
 {
  "E"[extension constructor] -> {<.8>};
  }
@@ -53,7 +60,8 @@ exception E
 |}]
 
 type ext = ..
-[%%expect{|
+
+[%%expect {|
 {
  "ext"[type] -> <.9>;
  }
@@ -61,7 +69,9 @@ type ext = ..
 |}]
 
 type ext += A | B
-[%%expect{|
+
+[%%expect
+{|
 {
  "A"[extension constructor] -> {<.10>};
  "B"[extension constructor] -> {<.11>};
@@ -72,7 +82,9 @@ type ext += A | B
 module M = struct
   type ext += C
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "M"[module] -> {<.13>
                  "C"[extension constructor] -> {<.12>};
@@ -84,7 +96,8 @@ module M : sig type ext += C end
 module _ = struct
   type t = Should_not_appear_in_shape
 end
-[%%expect{|
+
+[%%expect {|
 {}
 |}]
 
@@ -96,12 +109,16 @@ end
 
 and M2 : sig
   type t
+
   val x : t
 end = struct
   type t = T
+
   let x = T
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "M1"[module] -> {
                   "t"[type] -> {<.27>
@@ -121,7 +138,9 @@ and M2 : sig type t val x : t end
 |}]
 
 class c = object end
-[%%expect{|
+
+[%%expect
+{|
 {
  "c"[type] -> <.32>;
  "c"[class] -> <.32>;
@@ -131,7 +150,9 @@ class c : object  end
 |}]
 
 class type c = object end
-[%%expect{|
+
+[%%expect
+{|
 {
  "c"[type] -> <.35>;
  "c"[class type] -> <.35>;
@@ -140,7 +161,8 @@ class type c = object  end
 |}]
 
 type u = t
-[%%expect{|
+
+[%%expect {|
 {
  "u"[type] -> <.36>;
  }

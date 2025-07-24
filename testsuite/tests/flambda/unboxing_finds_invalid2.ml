@@ -26,8 +26,4 @@ let test () =
   in
   let aux = Sys.opaque_identity Int in
   let t : t = T (aux, 0) in
-  match t with
-  | T (Int, i) -> foo true (I i)
-  | T (Float, f) -> foo false (F f)
-
-
+  match t with T (Int, i) -> foo true (I i) | T (Float, f) -> foo false (F f)

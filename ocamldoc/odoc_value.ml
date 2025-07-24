@@ -17,40 +17,40 @@
 
 module Name = Odoc_name
 
-type t_value = {
-    val_name : Name.t ;
-    mutable val_info : Odoc_types.info option ;
-    val_type : Types.type_expr ;
-    val_recursive : bool ;
-    mutable val_parameters : Odoc_parameter.parameter list ;
-    mutable val_code : string option ;
-    mutable val_loc : Odoc_types.location ;
+type t_value =
+  { val_name : Name.t;
+    mutable val_info : Odoc_types.info option;
+    val_type : Types.type_expr;
+    val_recursive : bool;
+    mutable val_parameters : Odoc_parameter.parameter list;
+    mutable val_code : string option;
+    mutable val_loc : Odoc_types.location
   }
 
-type t_attribute = {
-    att_value : t_value ; (** an attribute has almost all the same information
+type t_attribute =
+  { att_value : t_value;
+        (** an attribute has almost all the same information
                              as a value *)
-    att_mutable : bool ;
-    att_virtual : bool ;
+    att_mutable : bool;
+    att_virtual : bool
   }
 
-type t_method = {
-    met_value : t_value ; (** a method has almost all the same information
+type t_method =
+  { met_value : t_value;
+        (** a method has almost all the same information
                              as a value *)
-    met_private : bool ;
-    met_virtual : bool ;
+    met_private : bool;
+    met_virtual : bool
   }
 
 let value_parameter_text_by_name v name =
   match v.val_info with
-    None -> None
-  | Some i ->
-      try
-        let t = List.assoc name i.Odoc_types.i_params in
-        Some t
-      with
-        Not_found ->
-          None
+  | None -> None
+  | Some i -> (
+    try
+      let t = List.assoc name i.Odoc_types.i_params in
+      Some t
+    with Not_found -> None)
 
 let update_value_parameters_text v =
   let f p =
@@ -63,24 +63,13 @@ let update_value_parameters_text v =
 let parameter_list_from_arrows typ =
   let rec iter t =
     match Types.get_desc t with
-      Types.Tarrow ((l,_,_), t1, t2, _) ->
-        (l, t1) :: (iter t2)
-    | Types.Tlink texp
-    | Types.Tpoly (texp, _) -> iter texp
-    | Types.Tvar _
-    | Types.Ttuple _
-    | Types.Tunboxed_tuple _
-    | Types.Tconstr _
-    | Types.Tobject _
-    | Types.Tfield _
-    | Types.Tnil
-    | Types.Tunivar _
-    | Types.Tpackage _
-    | Types.Tvariant _
-    | Types.Tof_kind _ ->
-        []
-    | Types.Tsubst _ ->
-        assert false
+    | Types.Tarrow ((l, _, _), t1, t2, _) -> (l, t1) :: iter t2
+    | Types.Tlink texp | Types.Tpoly (texp, _) -> iter texp
+    | Types.Tvar _ | Types.Ttuple _ | Types.Tunboxed_tuple _ | Types.Tconstr _
+    | Types.Tobject _ | Types.Tfield _ | Types.Tnil | Types.Tunivar _
+    | Types.Tpackage _ | Types.Tvariant _ | Types.Tof_kind _ ->
+      []
+    | Types.Tsubst _ -> assert false
   in
   iter typ
 
@@ -90,35 +79,33 @@ let dummy_parameter_list typ =
   let rec iter (label, t) =
     match Types.get_desc t with
     | Types.Ttuple l ->
-        if label = Types.Nolabel then
-          Odoc_parameter.Tuple
-            (List.map (fun t2 -> iter (Types.Nolabel, t2)) (List.map snd l), t)
-        else
-          (* if there is a label, then we don't want to decompose the tuple *)
-          Odoc_parameter.Simple_name
-            { Odoc_parameter.sn_name = normal_name label ;
-              Odoc_parameter.sn_type = t ;
-              Odoc_parameter.sn_text = None }
-    | Types.Tlink t2 ->
-        (iter (label, t2))
-    | Types.Tsubst _ ->
-        assert false
-    | _ ->
+      if label = Types.Nolabel
+      then
+        Odoc_parameter.Tuple
+          (List.map (fun t2 -> iter (Types.Nolabel, t2)) (List.map snd l), t)
+      else
+        (* if there is a label, then we don't want to decompose the tuple *)
         Odoc_parameter.Simple_name
-          { Odoc_parameter.sn_name = normal_name label ;
-             Odoc_parameter.sn_type = t ;
-            Odoc_parameter.sn_text = None }
+          { Odoc_parameter.sn_name = normal_name label;
+            Odoc_parameter.sn_type = t;
+            Odoc_parameter.sn_text = None
+          }
+    | Types.Tlink t2 -> iter (label, t2)
+    | Types.Tsubst _ -> assert false
+    | _ ->
+      Odoc_parameter.Simple_name
+        { Odoc_parameter.sn_name = normal_name label;
+          Odoc_parameter.sn_type = t;
+          Odoc_parameter.sn_text = None
+        }
   in
   List.map iter liste_param
 
 let is_function v =
   let rec f t =
     match Types.get_desc t with
-      Types.Tarrow _ ->
-        true
-    | Types.Tlink t ->
-        f t
-        | _ ->
-            false
-      in
+    | Types.Tarrow _ -> true
+    | Types.Tlink t -> f t
+    | _ -> false
+  in
   f v.val_type

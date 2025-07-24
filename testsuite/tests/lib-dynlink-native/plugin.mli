@@ -1,1 +1,1 @@
-val facts: int list
+val facts : int list

@@ -20,18 +20,14 @@ open Ocamltest_stdlib
 let srcdir =
   Sys.getenv_with_default_value "OCAMLSRCDIR" Ocamltest_config.ocamlsrcdir
 
-let stdlib =
-  Filename.make_path [srcdir; "stdlib"]
+let stdlib = Filename.make_path [srcdir; "stdlib"]
 
-let libunix =
-  Filename.make_path [srcdir; "otherlibs"; "unix"]
+let libunix = Filename.make_path [srcdir; "otherlibs"; "unix"]
 
-let toplevel =
-  Filename.make_path [srcdir; "toplevel"]
+let toplevel = Filename.make_path [srcdir; "toplevel"]
 
 let runtime =
   let suffix = if Config.runtime5 then "" else "4" in
   Filename.make_path [srcdir; "runtime" ^ suffix]
 
-let tools =
-  Filename.make_path [srcdir; "tools"]
+let tools = Filename.make_path [srcdir; "tools"]

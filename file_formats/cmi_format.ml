@@ -21,10 +21,10 @@ type pers_flags =
   | Opaque
 
 type kind =
-  | Normal of {
-      cmi_impl : Compilation_unit.t;
-      cmi_arg_for : Global_module.Parameter_name.t option;
-    }
+  | Normal of
+      { cmi_impl : Compilation_unit.t;
+        cmi_arg_for : Global_module.Parameter_name.t option
+      }
   | Parameter
 
 type error =
@@ -36,72 +36,77 @@ exception Error of error
 
 (* A serialized cmi file has the following format.contents
 
-  - magic number
-  - size of data block
-  - data block (serialized bits of signature)
-  - compilation unit name
-  - serialized signature with offsets into data block in wrapped positions
-  - crcs
-  - flags
+   - magic number
+   - size of data block
+   - data block (serialized bits of signature)
+   - compilation unit name
+   - serialized signature with offsets into data block in wrapped positions
+   - crcs
+   - flags
 
-  The serialized signature contains only the top level, with wrapped (cf. Types)
-  values represented as offsets into the data block where their serialized
-  (again, shallowly) representation can be found. When deserializing, we read
-  the entire data block into memory as one blob and then deserialize from it as
-  needed when values are forced.
+   The serialized signature contains only the top level, with wrapped (cf. Types)
+   values represented as offsets into the data block where their serialized
+   (again, shallowly) representation can be found. When deserializing, we read
+   the entire data block into memory as one blob and then deserialize from it as
+   needed when values are forced.
 
-  Note that we are deliberately using int for offsets here because int64 is more
-  expensive. On 32 bits architectures, this imposes a constraint on the size of
-  .cmi files. *)
-module Serialized = Types.Make_wrapped(struct type 'a t = int end)
+   Note that we are deliberately using int for offsets here because int64 is more
+   expensive. On 32 bits architectures, this imposes a constraint on the size of
+   .cmi files. *)
+module Serialized = Types.Make_wrapped (struct
+  type 'a t = int
+end)
 
 (* these type abbreviations are not exported;
    they are used to provide consistency across
    input_value and output_value usage. *)
-type crcs = Import_info.t array  (* smaller on disk than using a list *)
+type crcs = Import_info.t array (* smaller on disk than using a list *)
+
 type flags = pers_flags list
-type header = {
-    header_name : Compilation_unit.Name.t;
+
+type header =
+  { header_name : Compilation_unit.Name.t;
     header_kind : kind;
     header_globals : Global_module.With_precision.t array;
     header_sign : Serialized.signature;
-    header_params : Global_module.Parameter_name.t list;
-}
+    header_params : Global_module.Parameter_name.t list
+  }
 
-type 'sg cmi_infos_generic = {
-    cmi_name : Compilation_unit.Name.t;
+type 'sg cmi_infos_generic =
+  { cmi_name : Compilation_unit.Name.t;
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : crcs;
-    cmi_flags : flags;
-}
+    cmi_flags : flags
+  }
 
 type cmi_infos_lazy = Subst.Lazy.signature cmi_infos_generic
+
 type cmi_infos = Types.signature cmi_infos_generic
 
 let force_cmi_infos cmi =
   { cmi with cmi_sign = Subst.Lazy.force_signature cmi.cmi_sign }
 
-module Deserialize = Types.Map_wrapped(Serialized)(Subst.Lazy)
+module Deserialize = Types.Map_wrapped (Serialized) (Subst.Lazy)
 
 let deserialize data =
   (* Values are offsets into `data` *)
   let map_signature fn n =
-    lazy(Marshal.from_bytes data n |> List.map (Deserialize.signature_item fn))
+    lazy (Marshal.from_bytes data n |> List.map (Deserialize.signature_item fn))
     |> Subst.Lazy.of_lazy
   in
   let map_type_expr _ n =
-    lazy(Marshal.from_bytes data n : Types.type_expr) |> Subst.Lazy.of_lazy
+    lazy (Marshal.from_bytes data n : Types.type_expr) |> Subst.Lazy.of_lazy
   in
-  Deserialize.signature {map_signature; map_type_expr}
+  Deserialize.signature { map_signature; map_type_expr }
 
-module Serialize = Types.Map_wrapped(Subst.Lazy)(Serialized)
+module Serialize = Types.Map_wrapped (Subst.Lazy) (Serialized)
 
 let serialize oc base =
   (* Serialize values into the stream and produce their offsets within the data
-    block (which starts at `base`). *)
+     block (which starts at `base`). *)
   let marshal x =
     let pos = Out_channel.pos oc in
     Marshal.to_channel oc x [];
@@ -113,7 +118,7 @@ let serialize oc base =
     |> marshal
   in
   let map_type_expr _ ty = Subst.Lazy.force_type_expr ty |> marshal in
-  Serialize.signature {map_signature; map_type_expr}
+  Serialize.signature { map_signature; map_type_expr }
 
 let input_cmi_lazy ic =
   let read_bytes n =
@@ -124,25 +129,25 @@ let input_cmi_lazy ic =
   in
   let data_len = Bytes.get_int64_ne (read_bytes 8) 0 |> Int64.to_int in
   let data = read_bytes data_len in
-  let {
-      header_name = name;
-      header_kind = kind;
-      header_globals = globals;
-      header_sign = sign;
-      header_params = params;
-    } = (input_value ic : header) in
+  let ({ header_name = name;
+         header_kind = kind;
+         header_globals = globals;
+         header_sign = sign;
+         header_params = params
+       }) =
+    (input_value ic : header)
+  in
   let crcs = (input_value ic : crcs) in
   let flags = (input_value ic : flags) in
   (* CR ocaml 5 compressed-marshal mshinwell: upstream uses [Compression] *)
-  {
-      cmi_name = name;
-      cmi_kind = kind;
-      cmi_globals = globals;
-      cmi_sign = deserialize data sign;
-      cmi_params = params;
-      cmi_crcs = crcs;
-      cmi_flags = flags;
-    }
+  { cmi_name = name;
+    cmi_kind = kind;
+    cmi_globals = globals;
+    cmi_sign = deserialize data sign;
+    cmi_params = params;
+    cmi_crcs = crcs;
+    cmi_flags = flags
+  }
 
 let read_cmi_lazy filename =
   let ic = open_in_bin filename in
@@ -150,31 +155,31 @@ let read_cmi_lazy filename =
     let buffer =
       really_input_string ic (String.length Config.cmi_magic_number)
     in
-    if buffer <> Config.cmi_magic_number then begin
+    if buffer <> Config.cmi_magic_number
+    then (
       close_in ic;
       let pre_len = String.length Config.cmi_magic_number - 3 in
       if String.sub buffer 0 pre_len
-          = String.sub Config.cmi_magic_number 0 pre_len then
-      begin
+         = String.sub Config.cmi_magic_number 0 pre_len
+      then
         let msg =
-          if buffer < Config.cmi_magic_number then "an older" else "a newer" in
+          if buffer < Config.cmi_magic_number then "an older" else "a newer"
+        in
         raise (Error (Wrong_version_interface (filename, msg)))
-      end else begin
-        raise(Error(Not_an_interface filename))
-      end
-    end;
+      else raise (Error (Not_an_interface filename)));
     let cmi = input_cmi_lazy ic in
     close_in ic;
     cmi
-  with End_of_file | Failure _ ->
-      close_in ic;
-      raise(Error(Corrupted_interface(filename)))
-    | Error e ->
-      close_in ic;
-      raise (Error e)
+  with
+  | End_of_file | Failure _ ->
+    close_in ic;
+    raise (Error (Corrupted_interface filename))
+  | Error e ->
+    close_in ic;
+    raise (Error e)
 
 let output_cmi filename oc cmi =
-(* beware: the provided signature must have been substituted for saving *)
+  (* beware: the provided signature must have been substituted for saving *)
   output_string oc Config.cmi_magic_number;
   let output_int64 oc n =
     let buf = Bytes.create 8 in
@@ -193,12 +198,11 @@ let output_cmi filename oc cmi =
   output_int64 oc len;
   Out_channel.seek oc val_pos;
   output_value oc
-    {
-      header_name = cmi.cmi_name;
+    { header_name = cmi.cmi_name;
       header_kind = cmi.cmi_kind;
       header_globals = cmi.cmi_globals;
       header_sign = sign;
-      header_params = cmi.cmi_params;
+      header_params = cmi.cmi_params
     };
   flush oc;
   let crc = Digest.file filename in
@@ -206,16 +210,15 @@ let output_cmi filename oc cmi =
     match cmi.cmi_kind with
     | Normal { cmi_impl } ->
       Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
-    | Parameter ->
-      Import_info.Intf.create_parameter cmi.cmi_name ~crc
+    | Parameter -> Import_info.Intf.create_parameter cmi.cmi_name ~crc
   in
   let crcs = Array.append [| my_info |] cmi.cmi_crcs in
   output_value oc (crcs : crcs);
   output_value oc (cmi.cmi_flags : flags);
   crc
 
-
 let input_cmi ic = input_cmi_lazy ic |> force_cmi_infos
+
 let read_cmi filename = read_cmi_lazy filename |> force_cmi_infos
 
 (* Error report *)
@@ -225,20 +228,21 @@ module Style = Misc.Style
 
 let report_error ppf = function
   | Not_an_interface filename ->
-      fprintf ppf "%a@ is not a compiled interface"
-        (Style.as_inline_code Location.print_filename) filename
+    fprintf ppf "%a@ is not a compiled interface"
+      (Style.as_inline_code Location.print_filename)
+      filename
   | Wrong_version_interface (filename, older_newer) ->
-      fprintf ppf
-        "%a@ is not a compiled interface for this version of OCaml.@.\
-         It seems to be for %s version of OCaml."
-        (Style.as_inline_code  Location.print_filename) filename older_newer
+    fprintf ppf
+      "%a@ is not a compiled interface for this version of OCaml.@.It seems to \
+       be for %s version of OCaml."
+      (Style.as_inline_code Location.print_filename)
+      filename older_newer
   | Corrupted_interface filename ->
-      fprintf ppf "Corrupted compiled interface@ %a"
-        (Style.as_inline_code Location.print_filename) filename
+    fprintf ppf "Corrupted compiled interface@ %a"
+      (Style.as_inline_code Location.print_filename)
+      filename
 
 let () =
-  Location.register_error_of_exn
-    (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
-      | _ -> None
-    )
+  Location.register_error_of_exn (function
+    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | _ -> None)

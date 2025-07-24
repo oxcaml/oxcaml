@@ -20,4 +20,6 @@ val output_lexdef :
   Syntax.location ->
   Syntax.location option ->
   (string list, Syntax.location) Lexgen.automata_entry list ->
-  Lexgen.automata array -> Syntax.location -> unit
+  Lexgen.automata array ->
+  Syntax.location ->
+  unit

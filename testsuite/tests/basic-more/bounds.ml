@@ -1,5 +1,5 @@
 (* TEST
- include testing;
+   include testing;
 *)
 
 (* Test bound checks *)
@@ -11,20 +11,34 @@ let trail = ref []
 let test n =
   let result =
     try
-      trail := n :: !trail; ignore a.(n); "doesn't fail"
-    with Invalid_argument s ->
-           (* Check well-formedness of s *)
-           if String.length s = 19
-           && s = "index out of bounds"
-           then "fails"
-           else "bad Invalid_argument"
-       | _ -> "bad exception"
+      trail := n :: !trail;
+      ignore a.(n);
+      "doesn't fail"
+    with
+    | Invalid_argument s ->
+      (* Check well-formedness of s *)
+      if String.length s = 19 && s = "index out of bounds"
+      then "fails"
+      else "bad Invalid_argument"
+    | _ -> "bad exception"
   in
-    print_int n; print_string ": "; print_string result; print_newline()
+  print_int n;
+  print_string ": ";
+  print_string result;
+  print_newline ()
 
 let _ =
-  test 0; test 1; test 2; test 3; test 4; test (-1);
-  Gc.full_major();
+  test 0;
+  test 1;
+  test 2;
+  test 3;
+  test 4;
+  test (-1);
+  Gc.full_major ();
   print_string "Trail:";
-  List.iter (fun n -> print_string " "; print_int n) !trail;
-  print_newline()
+  List.iter
+    (fun n ->
+      print_string " ";
+      print_int n)
+    !trail;
+  print_newline ()

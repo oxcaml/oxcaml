@@ -5,12 +5,12 @@
 *)
 
 (* Tests various valid and invalid orderings of start/stop/discard
-statmemprof calls. Doesn't test any callbacks or count any allocations,
-etc.*)
+   statmemprof calls. Doesn't test any callbacks or count any allocations,
+   etc.*)
 
 module MP = Gc.Memprof
 
-let prof () = MP.start  ~sampling_rate:1. MP.null_tracker
+let prof () = MP.start ~sampling_rate:1. MP.null_tracker
 
 (* Null test: start/stop/discard *)
 let _ =
@@ -20,37 +20,33 @@ let _ =
   print_endline "Null test."
 
 (* Stop without starting *)
-let _ = try
-  MP.stop ()
-with
-  Failure s -> Printf.printf "Stop without starting fails with \"%s\"\n" s
+let _ =
+  try MP.stop ()
+  with Failure s ->
+    Printf.printf "Stop without starting fails with \"%s\"\n" s
 
 (* Second start without stopping. *)
 let _ =
   try
-    Fun.protect ~finally:MP.stop
-      (fun () -> (ignore (prof ());
-                  ignore (prof ())))
-  with
-    Failure s -> Printf.printf "Start without stopping fails with \"%s\"\n" s
+    Fun.protect ~finally:MP.stop (fun () ->
+        ignore (prof ());
+        ignore (prof ()))
+  with Failure s ->
+    Printf.printf "Start without stopping fails with \"%s\"\n" s
 
 (* Discard without stopping. *)
 let _ =
-  try
-    Fun.protect ~finally:MP.stop
-      (fun () -> MP.discard (prof()))
-  with
-    Failure s -> Printf.printf "Discard without stopping fails with \"%s\"\n" s
+  try Fun.protect ~finally:MP.stop (fun () -> MP.discard (prof ()))
+  with Failure s ->
+    Printf.printf "Discard without stopping fails with \"%s\"\n" s
 
 (* Discard same profile twice. *)
 let _ =
   let profile = prof () in
   MP.stop ();
   MP.discard profile;
-  try
-      MP.discard profile;
-  with
-    Failure s -> Printf.printf "Second discard fails with \"%s\"\n" s
+  try MP.discard profile
+  with Failure s -> Printf.printf "Second discard fails with \"%s\"\n" s
 
 (* Double profile *)
 let _ =

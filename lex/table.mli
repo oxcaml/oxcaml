@@ -24,11 +24,8 @@ val iter : 'a t -> ('a -> unit) -> unit
 
 val trim : 'a t -> 'a array
 
-
 exception Error
 
 val get : 'a t -> int -> 'a
-
-
 
 val size : 'a t -> int

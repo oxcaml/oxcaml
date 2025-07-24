@@ -24,14 +24,8 @@ let[@inline never] bar b = b
    by the unboxing. *)
 let test f g =
   let[@local] foo (type a) z (x : a bar) =
-    match x with
-    | I i -> z i
-    | F f -> z (int_of_float f)
+    match x with I i -> z i | F f -> z (int_of_float f)
   in
   let aux = Sys.opaque_identity Int in
   let t : t = T (aux, 0) in
-  match t with
-  | T (Int, i) -> foo f (I i)
-  | T (Float, f) -> foo g (F f)
-
-
+  match t with T (Int, i) -> foo f (I i) | T (Float, f) -> foo g (F f)

@@ -1,9 +1,9 @@
 (* TEST
- runtime5;
- frame_pointers;
- readonly_files = "fp_backtrace.c";
- all_modules = "${readonly_files} exception_handler.ml";
- native;
+   runtime5;
+   frame_pointers;
+   readonly_files = "fp_backtrace.c";
+   all_modules = "${readonly_files} exception_handler.ml";
+   native;
 *)
 
 (* Force -O3 to ensure the "_code" symbols are present (see the
@@ -14,22 +14,23 @@
 external fp_backtrace : string -> unit = "fp_backtrace" [@@noalloc]
 
 exception Exn1
+
 exception Exn2
 
 (* We want to be sure to use some stack space so that rbp is shifted,
-* preventing inlining seems enough *)
+   * preventing inlining seems enough *)
 let[@inline never] raiser i =
   match i with
   | 1 -> raise Exn1
   | 2 -> raise Exn2
   | _ -> 42 (* shouldn't happen *)
 
-let[@inline never][@local never] f x = x
+let[@inline never] [@local never] f x = x
 
 (* This give us a chance to overwrite the memory address pointed by rbp if it
-* is still within 'raiser' stack frame.
-* Technically we don't need to overwrite it but by doing so we avoid some
-* infinite loop while walking the stack. *)
+   * is still within 'raiser' stack frame.
+   * Technically we don't need to overwrite it but by doing so we avoid some
+   * infinite loop while walking the stack. *)
 let[@inline never] handler () =
   (* Force spilling of x0, x1, x2 *)
   let x0 = Sys.opaque_identity 0x6f56df77 (* 0xdeadbeef *) in
@@ -44,24 +45,14 @@ let[@inline never] handler () =
   fp_backtrace Sys.argv.(0)
 
 let[@inline never] nested i =
-  begin
-    try
-      try ignore (raiser i) with Exn1 -> handler ()
-    with
-    | Exn2 -> handler ()
-  end;
+  (try try ignore (raiser i) with Exn1 -> handler () with Exn2 -> handler ());
   i
 
 (* Check that we haven't broken anything by raising directly from this
-* function, it doesn't require rbp to be adjusted *)
+   * function, it doesn't require rbp to be adjusted *)
 let[@inline never] bare i =
-  begin
-    try
-      try (if i == 1 then raise Exn1 else raise Exn2) with
-      | Exn1 -> handler ()
-    with
-    | Exn2 -> handler ()
-  end;
+  (try try if i == 1 then raise Exn1 else raise Exn2 with Exn1 -> handler ()
+   with Exn2 -> handler ());
   i
 
 let () =

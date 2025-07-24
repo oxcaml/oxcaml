@@ -1,10 +1,11 @@
 module M = struct
- type t = string
+  type t = string
 
- let x = 0
- let x = 1
+  let x = 0
 
- module Set = Set.Make(String)
+  let x = 1
+
+  module Set = Set.Make (String)
 end
 
 include M

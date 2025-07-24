@@ -22,28 +22,31 @@ type runtime_variant =
   | Debug
   | Instrumented
 
-let runtime_variant() =
+let runtime_variant () =
   let use_runtime = Sys.safe_getenv "USE_RUNTIME" in
-  if use_runtime="d" then Debug
-  else if use_runtime="i" then Instrumented
+  if use_runtime = "d"
+  then Debug
+  else if use_runtime = "i"
+  then Instrumented
   else Normal
 
 let runtime_suffix = if Config.runtime5 then "" else "4"
 
 let ocamlrun =
-  let runtime = match runtime_variant () with
+  let runtime =
+    match runtime_variant () with
     | Normal -> "ocamlrun"
     | Debug -> "ocamlrund"
-    | Instrumented -> "ocamlruni" in
+    | Instrumented -> "ocamlruni"
+  in
   let ocamlrunfile = Filename.mkexe runtime in
-  Filename.make_path [Ocaml_directories.srcdir; "runtime" ^ runtime_suffix;
-    ocamlrunfile]
+  Filename.make_path
+    [Ocaml_directories.srcdir; "runtime" ^ runtime_suffix; ocamlrunfile]
 
 let ocamlc =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlc"]
 
-let ocaml =
-  Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocaml"]
+let ocaml = Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocaml"]
 
 let ocamlc_dot_opt =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlc.opt"]
@@ -58,17 +61,14 @@ let ocamlnat =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlnat"]
 
 let cmpbyt =
-  Filename.make_path
-    [Ocaml_directories.srcdir; "tools"; Filename.mkexe "cmpbyt"]
+  Filename.make_path [Ocaml_directories.srcdir; "tools"; Filename.mkexe "cmpbyt"]
 
 let expect =
   Filename.make_path
-    [Ocaml_directories.srcdir; "testsuite"; "tools";
-     Filename.mkexe "expect"]
+    [Ocaml_directories.srcdir; "testsuite"; "tools"; Filename.mkexe "expect"]
 
 let ocamllex =
-  Filename.make_path
-    [Ocaml_directories.srcdir; "lex"; Filename.mkexe "ocamllex"]
+  Filename.make_path [Ocaml_directories.srcdir; "lex"; Filename.mkexe "ocamllex"]
 
 let ocamlyacc =
   Filename.make_path
@@ -80,8 +80,9 @@ let ocamldoc =
 
 let ocamldebug =
   Filename.make_path
-    [Ocaml_directories.srcdir; "debugger" ^ runtime_suffix;
-     Filename.mkexe "ocamldebug"]
+    [ Ocaml_directories.srcdir;
+      "debugger" ^ runtime_suffix;
+      Filename.mkexe "ocamldebug" ]
 
 let ocamlobjinfo =
   Filename.make_path

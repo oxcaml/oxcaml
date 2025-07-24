@@ -1,12 +1,12 @@
 (* TEST
- include unix;
- readonly_files = "utimes.txt";
- hasunix;
- {
-   bytecode;
- }{
-   native;
- }
+   include unix;
+   readonly_files = "utimes.txt";
+   hasunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 (* We do not check setting the "last access time" because it is hard to do so on
@@ -20,8 +20,7 @@ let txt = "utimes.txt"
 (* To account for filesystems with large timestamp resolution (e.g. FAT - 2
    seconds for mtime)
 *)
-let close s t =
-  abs_float (s -. t) < 10.
+let close s t = abs_float (s -. t) < 10.
 
 let check tm =
   let tm' = (Unix.stat txt).Unix.st_mtime in

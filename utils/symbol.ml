@@ -18,28 +18,32 @@
 
 module CU = Compilation_unit
 
-type t = {
-  compilation_unit : Compilation_unit.t;
-  linkage_name : Linkage_name.t;
-  hash : int;
-}
+type t =
+  { compilation_unit : Compilation_unit.t;
+    linkage_name : Linkage_name.t;
+    hash : int
+  }
 
 include Identifiable.Make (struct
   type nonrec t = t
 
   let compare t1 t2 =
-    if t1 == t2 then 0
+    if t1 == t2
+    then 0
     else
       let c = compare t1.hash t2.hash in
-      if c <> 0 then c
+      if c <> 0
+      then c
       else
         (* Linkage names are unique across a whole project, so just comparing
            those is sufficient. *)
         Linkage_name.compare t1.linkage_name t2.linkage_name
 
   let equal t1 t2 = compare t1 t2 = 0
+
   let output chan t = Linkage_name.output chan t.linkage_name
-  let hash { hash; } = hash
+
+  let hash { hash } = hash
 
   (* CR mshinwell: maybe print all fields *)
   let print ppf t = Linkage_name.print ppf t.linkage_name
@@ -50,6 +54,7 @@ let caml_symbol_prefix = "caml"
 (* CR ocaml 5 all-runtime5: Remove this_is_ocamlc and force_runtime4_symbols
    once fully on runtime5 *)
 let this_is_ocamlc = ref false
+
 let force_runtime4_symbols = ref true
 
 let upstream_runtime5_symbol_separator =
@@ -58,19 +63,22 @@ let upstream_runtime5_symbol_separator =
   | _ -> '.'
 
 let separator () =
-  if !this_is_ocamlc then
-    Misc.fatal_error "Didn't expect utils/symbol.ml to be used in ocamlc";
-  if Config.runtime5 && not !force_runtime4_symbols then
-    Printf.sprintf "%c" upstream_runtime5_symbol_separator
-  else
-    "__"
+  if !this_is_ocamlc
+  then Misc.fatal_error "Didn't expect utils/symbol.ml to be used in ocamlc";
+  if Config.runtime5 && not !force_runtime4_symbols
+  then Printf.sprintf "%c" upstream_runtime5_symbol_separator
+  else "__"
 
 let this_is_ocamlc () = this_is_ocamlc := true
+
 let force_runtime4_symbols () = force_runtime4_symbols := true
 
 let pack_separator = separator
+
 let instance_separator = "____"
+
 let instance_separator_depth_char = '_'
+
 let member_separator = separator
 
 let linkage_name t = t.linkage_name
@@ -79,8 +87,7 @@ let linkage_name_for_ocamlobjinfo t =
   (* For legacy compatibility, even though displaying "Foo.Bar" is nicer
      than "Foo__Bar" *)
   let linkage_name = linkage_name t |> Linkage_name.to_string in
-  assert (Misc.Stdlib.String.begins_with linkage_name
-            ~prefix:caml_symbol_prefix);
+  assert (Misc.Stdlib.String.begins_with linkage_name ~prefix:caml_symbol_prefix);
   let prefix_len = String.length caml_symbol_prefix in
   String.sub linkage_name prefix_len (String.length linkage_name - prefix_len)
 
@@ -98,53 +105,44 @@ let linkage_name_for_compilation_unit comp_unit =
   let name = CU.Name.to_string name in
   let suffix =
     if not (CU.Prefix.is_empty for_pack_prefix)
-    then begin
+    then (
       assert (flattened_instance_args = []);
       let pack_names =
         CU.Prefix.to_list for_pack_prefix |> List.map CU.Name.to_string
       in
-      String.concat (pack_separator ()) (pack_names @ [name])
-    end else begin
+      String.concat (pack_separator ()) (pack_names @ [name]))
+    else
       let arg_segments =
         List.map
           (fun (depth, _param, value) ->
-             let extra_separators =
-               String.make depth instance_separator_depth_char
-             in
-             let value = value |> CU.Name.to_string in
-             String.concat "" [instance_separator; extra_separators; value])
+            let extra_separators =
+              String.make depth instance_separator_depth_char
+            in
+            let value = value |> CU.Name.to_string in
+            String.concat "" [instance_separator; extra_separators; value])
           flattened_instance_args
       in
       String.concat "" arg_segments
-    end
   in
-  caml_symbol_prefix ^ name ^ suffix
-  |> Linkage_name.of_string
+  caml_symbol_prefix ^ name ^ suffix |> Linkage_name.of_string
 
 let for_predef_ident id =
   assert (Ident.is_predef id);
   let linkage_name = "caml_exn_" ^ Ident.name id |> Linkage_name.of_string in
   let compilation_unit = CU.predef_exn in
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name;
-  }
+  { compilation_unit; linkage_name; hash = Hashtbl.hash linkage_name }
 
 let unsafe_create compilation_unit linkage_name =
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name; }
+  { compilation_unit; linkage_name; hash = Hashtbl.hash linkage_name }
 
 let for_name compilation_unit name =
   let prefix =
     linkage_name_for_compilation_unit compilation_unit |> Linkage_name.to_string
   in
   let linkage_name =
-    prefix ^ (member_separator ()) ^ name |> Linkage_name.of_string
+    prefix ^ member_separator () ^ name |> Linkage_name.of_string
   in
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name; }
+  { compilation_unit; linkage_name; hash = Hashtbl.hash linkage_name }
 
 let for_local_ident id =
   assert (not (Ident.is_global_or_predef id));
@@ -153,13 +151,9 @@ let for_local_ident id =
 
 let for_compilation_unit compilation_unit =
   let linkage_name = linkage_name_for_compilation_unit compilation_unit in
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name;
-  }
+  { compilation_unit; linkage_name; hash = Hashtbl.hash linkage_name }
 
-let for_current_unit () =
-  for_compilation_unit (CU.get_current_exn ())
+let for_current_unit () = for_compilation_unit (CU.get_current_exn ())
 
 let const_label = ref 0
 
@@ -167,5 +161,4 @@ let for_new_const_in_current_unit () =
   incr const_label;
   for_name (Compilation_unit.get_current_exn ()) (Int.to_string !const_label)
 
-let is_predef_exn t =
-  CU.equal t.compilation_unit CU.predef_exn
+let is_predef_exn t = CU.equal t.compilation_unit CU.predef_exn

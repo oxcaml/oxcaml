@@ -1,8 +1,8 @@
-type 'a interval = {
-  lbound: int;
-  rbound: int;
-  value: 'a;
-}
+type 'a interval =
+  { lbound : int;
+    rbound : int;
+    value : 'a
+  }
 
 val interval : int64 -> int64 -> 'a -> 'a interval
 

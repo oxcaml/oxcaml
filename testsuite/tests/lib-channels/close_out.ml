@@ -9,11 +9,7 @@
 let () =
   let oc = open_out_bin Sys.argv.(1) in
   close_out oc;
-  begin match output_byte oc 0 with
+  (match output_byte oc 0 with
   | exception Sys_error _ -> ()
-  | () -> assert false
-  end;
-  begin match output_byte oc 0 with
-  | exception Sys_error _ -> ()
-  | () -> assert false
-  end
+  | () -> assert false);
+  match output_byte oc 0 with exception Sys_error _ -> () | () -> assert false

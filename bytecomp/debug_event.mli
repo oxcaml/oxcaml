@@ -21,17 +21,21 @@ type closure_entry =
 
 type closure_env =
   | Not_in_closure
-  | In_closure of {
-      entries: closure_entry Ident.tbl; (* Offsets of the free variables and
-                                           recursive functions from the start of
-                                           the block *)
-      env_pos: int;                     (* Offset of the current function from
-                                           the start of the block *)
-    }
+  | In_closure of
+      { entries : closure_entry Ident.tbl;
+            (* Offsets of the free variables and
+               recursive functions from the start of
+               the block *)
+        env_pos : int
+            (* Offset of the current function from
+               the start of the block *)
+      }
 
 type compilation_env =
-  { ce_stack: int Ident.tbl;  (* Positions of variables in the stack *)
-    ce_closure: closure_env } (* Structure of the heap-allocated env *)
+  { ce_stack : int Ident.tbl; (* Positions of variables in the stack *)
+    ce_closure : closure_env
+  }
+(* Structure of the heap-allocated env *)
 
 (* The ce_stack component gives locations of variables residing
    in the stack. The locations are offsets w.r.t. the origin of the
@@ -49,29 +53,31 @@ type compilation_env =
 
 (* Warning: when you change these types, check runtime/backtrace_byt.c *)
 type debug_event =
-  { mutable ev_pos: int;                (* Position in bytecode *)
-    ev_module: string;                  (* Name of defining module *)
-    ev_loc: Location.t;                 (* Location in source file *)
-    ev_kind: debug_event_kind;          (* Before/after event *)
-    ev_defname: string;                 (* Enclosing definition *)
-    ev_info: debug_event_info;          (* Extra information *)
-    ev_typenv: Env.summary;             (* Typing environment *)
-    ev_typsubst: Subst.t;               (* Substitution over types *)
-    ev_compenv: compilation_env;        (* Compilation environment *)
-    ev_stacksize: int;                  (* Size of stack frame *)
-    ev_repr: debug_event_repr }         (* Position of the representative *)
+  { mutable ev_pos : int; (* Position in bytecode *)
+    ev_module : string; (* Name of defining module *)
+    ev_loc : Location.t; (* Location in source file *)
+    ev_kind : debug_event_kind; (* Before/after event *)
+    ev_defname : string; (* Enclosing definition *)
+    ev_info : debug_event_info; (* Extra information *)
+    ev_typenv : Env.summary; (* Typing environment *)
+    ev_typsubst : Subst.t; (* Substitution over types *)
+    ev_compenv : compilation_env; (* Compilation environment *)
+    ev_stacksize : int; (* Size of stack frame *)
+    ev_repr : debug_event_repr
+  }
+(* Position of the representative *)
 
 and debug_event_kind =
-    Event_before
+  | Event_before
   | Event_after of Types.type_expr
   | Event_pseudo
 
 and debug_event_info =
-    Event_function
+  | Event_function
   | Event_return of int
   | Event_other
 
 and debug_event_repr =
-    Event_none
+  | Event_none
   | Event_parent of int ref
   | Event_child of int ref

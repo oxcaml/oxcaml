@@ -14,9 +14,10 @@ open Effect.Deep
 type _ t += E : int -> int t
 
 external fp_backtrace : string -> unit = "fp_backtrace" [@@noalloc]
+
 external c_fun : unit -> int = "c_fun"
 
-let[@inline never][@local never] f x = x
+let[@inline never] [@local never] f x = x
 
 let[@inline never] consume_stack () =
   (* TODO Somehow get a value that would always cause a stack reallocation
@@ -25,7 +26,7 @@ let[@inline never] consume_stack () =
    * and Stack_threshold_words = 32 *)
   (* in words *)
   let size = 128 in
-  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved rbp *) in
+  let allocated = (2 * 2) (* 2 spilled registers *) + 1 (* saved rbp *) in
   let count = size / allocated in
   let[@inline never] rec gobbler i =
     (* Force spilling of x0 and x1 *)
@@ -57,13 +58,9 @@ let[@inline never] f () =
       consume_stack ();
       continue k (v + 1)
     in
-    match eff with
-    | E v -> Some (f_effc_e v)
-    | e -> None
+    match eff with E v -> Some (f_effc_e v) | e -> None
   in
   match_with f_comp ()
-  { retc = (fun v -> v);
-    exnc = (fun e -> raise e);
-    effc = f_effc }
+    { retc = (fun v -> v); exnc = (fun e -> raise e); effc = f_effc }
 
 let () = assert (f () == 3)

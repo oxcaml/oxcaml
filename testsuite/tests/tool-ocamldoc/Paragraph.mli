@@ -1,5 +1,5 @@
 (* TEST
- ocamldoc with html;
+   ocamldoc with html;
 *)
 
 (** This file tests the generation of paragraph within module comments.
@@ -46,9 +46,9 @@
 
 (** *)
 
-type t
 (**
     And cross-reference {! t}.
    {!modules: Paragraph}
    {!indexlist}
 *)
+type t

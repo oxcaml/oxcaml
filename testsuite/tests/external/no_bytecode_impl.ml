@@ -8,4 +8,4 @@ let () =
   try
     foo ();
     assert false
-  with (Failure _) -> ()
+  with Failure _ -> ()

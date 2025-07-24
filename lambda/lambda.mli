@@ -20,7 +20,10 @@ open Asttypes
 type constant = Typedtree.constant
 
 (* Overriding Asttypes.mutable_flag *)
-type mutable_flag = Immutable | Immutable_unique | Mutable
+type mutable_flag =
+  | Immutable
+  | Immutable_unique
+  | Mutable
 
 type compile_time_constant =
   | Big_endian
@@ -63,7 +66,7 @@ type initialization_or_assignment =
      only once. *)
   | Heap_initialization
   (* Initialization of roots only. Compiles to a simple store.
-     No checks are done to preserve GC invariants.  *)
+     No checks are done to preserve GC invariants. *)
   | Root_initialization
 
 type is_safe =
@@ -80,8 +83,8 @@ type has_initializer =
 
 (* Tail calls can close their enclosing region early *)
 type region_close =
-  | Rc_normal         (* do not close region, may TCO if in tail position *)
-  | Rc_nontail        (* do not close region, must not TCO *)
+  | Rc_normal (* do not close region, may TCO if in tail position *)
+  | Rc_nontail (* do not close region, must not TCO *)
   | Rc_close_at_apply (* close region and tail call *)
 
 (** Notes about applytail (as emitted by Printlambda) a.k.a. Rc_close_at_apply:
@@ -132,22 +135,22 @@ type primitive =
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
-      * field_read_semantics
-    (** The index to [Pmixedfield] corresponds to an element of the shape, not
+  | Pmixedfield of
+      int list * mixed_block_shape_with_locality_mode * field_read_semantics
+      (** The index to [Pmixedfield] corresponds to an element of the shape, not
         necessarily the index of the field at runtime, as reordering may take
         place on entry to Flambda 2. *)
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
-  | Psetmixedfield of int list * mixed_block_shape
-      * initialization_or_assignment
-    (** The same comment about the index as for [Pmixedfield] applies to
+  | Psetmixedfield of
+      int list * mixed_block_shape * initialization_or_assignment
+      (** The same comment about the index as for [Pmixedfield] applies to
         [Psetmixedfield]. *)
   | Pduprecord of Types.record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
-  | Punboxed_product_field of int * (layout list)
-      (* the [layout list] is the layout of the whole product *)
+  | Punboxed_product_field of int * layout list
+    (* the [layout list] is the layout of the whole product *)
   | Parray_element_size_in_bytes of array_kind
   (* Context switches *)
   | Prunstack
@@ -159,12 +162,22 @@ type primitive =
   (* Exceptions *)
   | Praise of raise_kind
   (* Boolean operations *)
-  | Psequand | Psequor | Pnot
+  | Psequand
+  | Psequor
+  | Pnot
   (* Integer operations *)
-  | Pnegint | Paddint | Psubint | Pmulint
-  | Pdivint of is_safe | Pmodint of is_safe
-  | Pandint | Porint | Pxorint
-  | Plslint | Plsrint | Pasrint
+  | Pnegint
+  | Paddint
+  | Psubint
+  | Pmulint
+  | Pdivint of is_safe
+  | Pmodint of is_safe
+  | Pandint
+  | Porint
+  | Pxorint
+  | Plslint
+  | Plsrint
+  | Pasrint
   | Pintcomp of integer_comparison
   (* Comparisons that return int (not bool like above) for ordering *)
   | Pcompare_ints
@@ -186,22 +199,28 @@ type primitive =
   | Pfloatcomp of boxed_float * float_comparison
   | Punboxed_float_comp of unboxed_float * float_comparison
   (* String operations *)
-  | Pstringlength | Pstringrefu  | Pstringrefs
-  | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets
+  | Pstringlength
+  | Pstringrefu
+  | Pstringrefs
+  | Pbyteslength
+  | Pbytesrefu
+  | Pbytessetu
+  | Pbytesrefs
+  | Pbytessets
   (* Array operations *)
   | Pmakearray of array_kind * mutable_flag * locality_mode
   | Pmakearray_dynamic of array_kind * locality_mode * has_initializer
-  (** For [Pmakearray_dynamic], if the array kind specifies an unboxed
+      (** For [Pmakearray_dynamic], if the array kind specifies an unboxed
       product, the float array optimization will never apply. *)
   | Pduparray of array_kind * mutable_flag
-  (** For [Pduparray], the argument must be an immutable array.
+      (** For [Pduparray], the argument must be an immutable array.
       The arguments of [Pduparray] give the kind and mutability of the
       array being *produced* by the duplication. *)
-  | Parrayblit of {
-      src_mutability : mutable_flag;
-      dst_array_set_kind : array_set_kind;
-    }
-  (** For [Parrayblit], we record the [array_set_kind] of the destination
+  | Parrayblit of
+      { src_mutability : mutable_flag;
+        dst_array_set_kind : array_set_kind
+      }
+      (** For [Parrayblit], we record the [array_set_kind] of the destination
       array. We check that the source array has the same shape, but do not
       need to know anything about its locality. We do however request the
       mutability of the source array. *)
@@ -219,14 +238,22 @@ type primitive =
   (* Operations on boxed integers (Nativeint.t, Int32.t, Int64.t) *)
   | Pbintofint of boxed_integer * locality_mode
   | Pintofbint of boxed_integer
-  | Pcvtbint of boxed_integer (*source*) * boxed_integer (*destination*)
-                * locality_mode
+  | Pcvtbint of
+      boxed_integer (*source*) * boxed_integer (*destination*) * locality_mode
   | Pnegbint of boxed_integer * locality_mode
   | Paddbint of boxed_integer * locality_mode
   | Psubbint of boxed_integer * locality_mode
   | Pmulbint of boxed_integer * locality_mode
-  | Pdivbint of { size : boxed_integer; is_safe : is_safe; mode: locality_mode }
-  | Pmodbint of { size : boxed_integer; is_safe : is_safe; mode: locality_mode }
+  | Pdivbint of
+      { size : boxed_integer;
+        is_safe : is_safe;
+        mode : locality_mode
+      }
+  | Pmodbint of
+      { size : boxed_integer;
+        is_safe : is_safe;
+        mode : locality_mode
+      }
   | Pandbint of boxed_integer * locality_mode
   | Porbint of boxed_integer * locality_mode
   | Pxorbint of boxed_integer * locality_mode
@@ -241,101 +268,252 @@ type primitive =
   (* size of the nth dimension of a Bigarray *)
   | Pbigarraydim of int
   (* load/set 16,32,64 bits from a string: (unsafe)*)
-  | Pstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
-  | Pstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pstring_load_f32 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
+  | Pstring_load_16 of
+      { unsafe : bool;
+        index_kind : array_index_kind
+      }
+  | Pstring_load_32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pstring_load_f32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pstring_load_64 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
   | Pstring_load_vec of
-      { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
-        mode : locality_mode; boxed : bool }
-  | Pbytes_load_16 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbytes_load_32 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pbytes_load_f32 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pbytes_load_64 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbytes_load_16 of
+      { unsafe : bool;
+        index_kind : array_index_kind
+      }
+  | Pbytes_load_32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbytes_load_f32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbytes_load_64 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
   | Pbytes_load_vec of
-      { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
-        mode : locality_mode; boxed : bool }
-  | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbytes_set_32 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  | Pbytes_set_f32 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  | Pbytes_set_64 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
-                        index_kind : array_index_kind; boxed : bool }
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbytes_set_16 of
+      { unsafe : bool;
+        index_kind : array_index_kind
+      }
+  | Pbytes_set_32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pbytes_set_f32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pbytes_set_64 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pbytes_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
   (* load/set 16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
-  | Pbigstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbigstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pbigstring_load_f32 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pbigstring_load_64 of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
-  | Pbigstring_load_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; mode : locality_mode; boxed : bool }
-  | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
-  | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  | Pbigstring_set_f32 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  | Pbigstring_set_64 of { unsafe : bool; index_kind : array_index_kind;
-      boxed : bool }
-  | Pbigstring_set_vec of { size : boxed_vector; aligned : bool; unsafe : bool;
-      index_kind : array_index_kind; boxed : bool }
+  | Pbigstring_load_16 of
+      { unsafe : bool;
+        index_kind : array_index_kind
+      }
+  | Pbigstring_load_32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbigstring_load_f32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbigstring_load_64 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbigstring_load_vec of
+      { size : boxed_vector;
+        aligned : bool;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pbigstring_set_16 of
+      { unsafe : bool;
+        index_kind : array_index_kind
+      }
+  | Pbigstring_set_32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pbigstring_set_f32 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pbigstring_set_64 of
+      { unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pbigstring_set_vec of
+      { size : boxed_vector;
+        aligned : bool;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
   (* load/set SIMD vectors in GC-managed arrays *)
-  | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
-                              index_kind : array_index_kind;
-                              mode : locality_mode; boxed : bool }
-  | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
-                               index_kind : array_index_kind;
-                               mode : locality_mode; boxed : bool }
-  | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
-                             index_kind : array_index_kind;
-                             mode : locality_mode; boxed : bool }
-  | Punboxed_float_array_load_vec of { size : boxed_vector; unsafe : bool;
-                                       index_kind : array_index_kind;
-                                       mode : locality_mode; boxed : bool }
-  | Punboxed_float32_array_load_vec of { size : boxed_vector; unsafe : bool;
-                                         index_kind : array_index_kind;
-                                         mode : locality_mode; boxed : bool }
-  | Punboxed_int32_array_load_vec of { size : boxed_vector; unsafe : bool;
-                                       index_kind : array_index_kind;
-                                       mode : locality_mode; boxed : bool }
-  | Punboxed_int64_array_load_vec of { size : boxed_vector; unsafe : bool;
-                                       index_kind : array_index_kind;
-                                       mode : locality_mode; boxed : bool }
-  | Punboxed_nativeint_array_load_vec of { size : boxed_vector; unsafe : bool;
-                                           index_kind : array_index_kind;
-                                           mode : locality_mode; boxed : bool }
-  | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
-                             index_kind : array_index_kind; boxed : bool }
-  | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
-                              index_kind : array_index_kind; boxed : bool }
-  | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
-                            index_kind : array_index_kind; boxed : bool }
-  | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
-                                      index_kind : array_index_kind;
-                                      boxed : bool }
-  | Punboxed_float32_array_set_vec of { size : boxed_vector; unsafe : bool;
-                                        index_kind : array_index_kind;
-                                        boxed : bool }
-  | Punboxed_int32_array_set_vec of { size : boxed_vector; unsafe : bool;
-                                      index_kind : array_index_kind;
-                                      boxed : bool }
-  | Punboxed_int64_array_set_vec of { size : boxed_vector; unsafe : bool;
-                                      index_kind : array_index_kind;
-                                      boxed : bool }
-  | Punboxed_nativeint_array_set_vec of { size : boxed_vector; unsafe : bool;
-                                          index_kind : array_index_kind;
-                                          boxed : bool }
+  | Pfloatarray_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pfloat_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pint_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Punboxed_float_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Punboxed_float32_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Punboxed_int32_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Punboxed_int64_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Punboxed_nativeint_array_load_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        mode : locality_mode;
+        boxed : bool
+      }
+  | Pfloatarray_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pfloat_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Pint_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Punboxed_float_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Punboxed_float32_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Punboxed_int32_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Punboxed_int64_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
+  | Punboxed_nativeint_array_set_vec of
+      { size : boxed_vector;
+        unsafe : bool;
+        index_kind : array_index_kind;
+        boxed : bool
+      }
   (* Compile time constants *)
   | Pctconst of compile_time_constant
   (* byte swap *)
@@ -349,7 +527,7 @@ type primitive =
   | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_compare_exchange_field of
-    { immediate_or_pointer : immediate_or_pointer }
+      { immediate_or_pointer : immediate_or_pointer }
   | Patomic_compare_set_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_fetch_add_field
   | Patomic_add_field
@@ -360,7 +538,7 @@ type primitive =
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
-  | Pprobe_is_enabled of { name: string }
+  | Pprobe_is_enabled of { name : string }
   (* Primitives for [Obj] *)
   | Pobj_dup
   | Pobj_magic of layout
@@ -375,7 +553,7 @@ type primitive =
   | Pbox_vector of boxed_vector * locality_mode
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
-    (** At present [Preinterpret_unboxed_int64_as_tagged_int63] and
+      (** At present [Preinterpret_unboxed_int64_as_tagged_int63] and
         [Preinterpret_tagged_int63_as_unboxed_int64] will cause a fatal error
         if the target system is 32-bit bytecode.
 
@@ -385,10 +563,12 @@ type primitive =
         with 1 on machine words, to ensure that the tag bit is always set in
         the result, just in case it was not in the incoming unboxed int64. *)
   (* Jane Street extensions *)
-  | Parray_to_iarray (* Unsafely reinterpret a mutable array as an immutable
-                        one; O(1) *)
-  | Parray_of_iarray (* Unsafely reinterpret an immutable array as a mutable
-                        one; O(1) *)
+  | Parray_to_iarray
+    (* Unsafely reinterpret a mutable array as an immutable
+       one; O(1) *)
+  | Parray_of_iarray
+    (* Unsafely reinterpret an immutable array as a mutable
+       one; O(1) *)
   | Pget_header of locality_mode
   | Ppeek of peek_or_poke
   | Ppoke of peek_or_poke
@@ -417,19 +597,36 @@ and extern_repr =
 and external_call_description = extern_repr Primitive.description_gen
 
 and integer_comparison =
-    Ceq | Cne | Clt | Cgt | Cle | Cge
+  | Ceq
+  | Cne
+  | Clt
+  | Cgt
+  | Cle
+  | Cge
 
 and float_comparison =
-    CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge | CFnge
+  | CFeq
+  | CFneq
+  | CFlt
+  | CFnlt
+  | CFgt
+  | CFngt
+  | CFle
+  | CFnle
+  | CFge
+  | CFnge
 
 and array_kind =
-    Pgenarray | Paddrarray | Pintarray | Pfloatarray
+  | Pgenarray
+  | Paddrarray
+  | Pintarray
+  | Pfloatarray
   | Punboxedfloatarray of unboxed_float
   | Punboxedintarray of unboxed_integer
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
-  (* Invariant: the product element kind lists have length >= 2 *)
+(* Invariant: the product element kind lists have length >= 2 *)
 
 (** When accessing a flat float array, we need to know the mode which we should
     box the resulting float at. *)
@@ -443,7 +640,7 @@ and array_ref_kind =
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
-  (* Invariant: the product element kind lists have length >= 2 *)
+(* Invariant: the product element kind lists have length >= 2 *)
 
 (** When updating an array that might contain pointers, we need to know what
     mode they're at; otherwise, access is uniform. *)
@@ -458,20 +655,20 @@ and array_set_kind =
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
-  (* Invariant: the product element kind lists have length >= 2 *)
+(* Invariant: the product element kind lists have length >= 2 *)
 
 and ignorable_product_element_kind =
   | Pint_ignorable
   | Punboxedfloat_ignorable of unboxed_float
   | Punboxedint_ignorable of unboxed_integer
   | Pproduct_ignorable of ignorable_product_element_kind list
-  (* Invariant: the product element kind list has length >= 2 *)
+(* Invariant: the product element kind list has length >= 2 *)
 
 and scannable_product_element_kind =
   | Pint_scannable
   | Paddr_scannable
   | Pproduct_scannable of scannable_product_element_kind list
-  (* Invariant: the product element kind list has length >= 2 *)
+(* Invariant: the product element kind list has length >= 2 *)
 
 and array_index_kind =
   | Ptagged_int_index
@@ -486,7 +683,7 @@ and nullable =
 
 and value_kind =
   { raw_kind : value_kind_non_null;
-    nullable : nullable;
+    nullable : nullable
   }
 
 and value_kind_non_null =
@@ -494,13 +691,13 @@ and value_kind_non_null =
   | Pintval
   | Pboxedfloatval of boxed_float
   | Pboxedintval of boxed_integer
-  | Pvariant of {
-      consts : int list;
-      non_consts : (int * constructor_shape) list;
-      (** [non_consts] must be non-empty.  For constant variants [Pintval]
+  | Pvariant of
+      { consts : int list;
+        non_consts : (int * constructor_shape) list
+            (** [non_consts] must be non-empty.  For constant variants [Pintval]
           must be used.  This causes a small loss of precision but it is not
           expected to be significant. *)
-    }
+      }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
 
@@ -515,8 +712,7 @@ and layout =
   | Punboxed_product of layout list
   | Pbottom
 
-and block_shape =
-  value_kind list option
+and block_shape = value_kind list option
 
 and 'a mixed_block_element =
   | Value of value_kind
@@ -535,8 +731,8 @@ and 'a mixed_block_element =
 
 and mixed_block_shape = unit mixed_block_element array
 
-and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
+and mixed_block_shape_with_locality_mode =
+  locality_mode mixed_block_element array
 
 and constructor_shape =
   | Constructor_uniform of value_kind list
@@ -583,18 +779,24 @@ and peek_or_poke =
   | Ppp_unboxed_nativeint
 
 and bigarray_kind =
-    Pbigarray_unknown
+  | Pbigarray_unknown
   | Pbigarray_float16
-  | Pbigarray_float32 | Pbigarray_float32_t
+  | Pbigarray_float32
+  | Pbigarray_float32_t
   | Pbigarray_float64
-  | Pbigarray_sint8 | Pbigarray_uint8
-  | Pbigarray_sint16 | Pbigarray_uint16
-  | Pbigarray_int32 | Pbigarray_int64
-  | Pbigarray_caml_int | Pbigarray_native_int
-  | Pbigarray_complex32 | Pbigarray_complex64
+  | Pbigarray_sint8
+  | Pbigarray_uint8
+  | Pbigarray_sint16
+  | Pbigarray_uint16
+  | Pbigarray_int32
+  | Pbigarray_int64
+  | Pbigarray_caml_int
+  | Pbigarray_native_int
+  | Pbigarray_complex32
+  | Pbigarray_complex64
 
 and bigarray_layout =
-    Pbigarray_unknown_layout
+  | Pbigarray_unknown_layout
   | Pbigarray_c_layout
   | Pbigarray_fortran_layout
 
@@ -627,7 +829,7 @@ val generic_value : value_kind
 val layout_of_extern_repr : extern_repr -> layout
 
 type structured_constant =
-    Const_base of constant
+  | Const_base of constant
   | Const_block of int * structured_constant list
   | Const_mixed_block of int * mixed_block_shape * structured_constant list
   | Const_float_array of string list
@@ -658,9 +860,14 @@ type inlined_attribute =
   | Default_inlined (* no [@inlined] attribute *)
 
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
+
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
 
-type probe_desc = { name: string; enabled_at_init: bool; }
+type probe_desc =
+  { name : string;
+    enabled_at_init : bool
+  }
+
 type probe = probe_desc option
 
 type specialise_attribute =
@@ -668,10 +875,8 @@ type specialise_attribute =
   | Never_specialise (* [@specialise never] *)
   | Default_specialise (* no [@specialise] attribute *)
 
-val equal_specialise_attribute
-   : specialise_attribute
-  -> specialise_attribute
-  -> bool
+val equal_specialise_attribute :
+  specialise_attribute -> specialise_attribute -> bool
 
 type local_attribute =
   | Always_local (* [@local] or [@local always] *)
@@ -684,27 +889,28 @@ type poll_attribute =
 
 type zero_alloc_attribute =
   | Default_zero_alloc
-  | Check of { strict: bool;
-               (* [strict=true] property holds on all paths.
-                  [strict=false] if the function returns normally,
-                  then the property holds (but property violations on
-                  exceptional returns or divering loops are ignored).
-                  This definition may not be applicable to new properties. *)
-               loc: Location.t;
-               custom_error_msg: string option;
-             }
-  | Assume of { strict: bool;
-                never_returns_normally: bool;
-                never_raises: bool;
-                loc: Location.t;
-              }
+  | Check of
+      { strict : bool;
+        (* [strict=true] property holds on all paths.
+           [strict=false] if the function returns normally,
+           then the property holds (but property violations on
+           exceptional returns or divering loops are ignored).
+           This definition may not be applicable to new properties. *)
+        loc : Location.t;
+        custom_error_msg : string option
+      }
+  | Assume of
+      { strict : bool;
+        never_returns_normally : bool;
+        never_raises : bool;
+        loc : Location.t
+      }
 
 type loop_attribute =
   | Always_loop (* [@loop] or [@loop always] *)
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
-type curried_function_kind = { nlocal: int } [@@unboxed]
 (** A well-formed function parameter list is of the form
      [G @ L @ [ Final_arg ]],
     where the values of G and L are of the form [More_args { partial_mode }],
@@ -717,6 +923,7 @@ type curried_function_kind = { nlocal: int } [@@unboxed]
           or the function itself is allocated locally, then {v nlocal = 1 v}.
         * otherwise, {v nlocal = 0 v}.
 *)
+type curried_function_kind = { nlocal : int } [@@unboxed]
 
 (* CR-someday: Now that some functions' arity won't be changed downstream of
    lambda (see [may_fuse_arity = false]), we could change [nlocal] to be
@@ -733,9 +940,14 @@ type curried_function_kind = { nlocal: int } [@@unboxed]
    this in a follow-on PR.
 *)
 
-type function_kind = Curried of curried_function_kind | Tupled
+type function_kind =
+  | Curried of curried_function_kind
+  | Tupled
 
-type let_kind = Strict | Alias | StrictOpt
+type let_kind =
+  | Strict
+  | Alias
+  | StrictOpt
 (* Meaning of kinds for let x = e in e':
     Strict: e may have side-effects; always evaluate e first
       (If e is a simple expression, e.g. a variable or constant,
@@ -745,69 +957,70 @@ type let_kind = Strict | Alias | StrictOpt
       the binding (not inside a lambda nor an exclave)
     StrictOpt: e does not have side-effects, but depend on the store;
       we can discard e if x does not appear in e'
- *)
+*)
 
 type unique_barrier =
   | May_be_pushed_down
   | Must_stay_here
 
-val add_barrier_to_read : unique_barrier -> field_read_semantics -> field_read_semantics
+val add_barrier_to_read :
+  unique_barrier -> field_read_semantics -> field_read_semantics
 
 val add_barrier_to_let_kind : unique_barrier -> let_kind -> let_kind
 
-type meth_kind = Self | Public | Cached
+type meth_kind =
+  | Self
+  | Public
+  | Cached
 
 val equal_meth_kind : meth_kind -> meth_kind -> bool
 
-type shared_code = (int * int) list     (* stack size -> code label *)
+type shared_code = (int * int) list (* stack size -> code label *)
 
 type static_label = int
 
-type function_attribute = {
-  inline : inline_attribute;
-  specialise : specialise_attribute;
-  local: local_attribute;
-  zero_alloc : zero_alloc_attribute;
-  poll: poll_attribute;
-  loop: loop_attribute;
-  is_a_functor: bool;
-  is_opaque: bool;
-  stub: bool;
-  tmc_candidate: bool;
-  (* [simplif.ml] (in the `simplif` function within `simplify_lets`) attempts to
-     fuse nested functions, rewriting e.g. [fun x -> fun y -> e] to
-     [fun x y -> e]. This fusion is allowed only when the [may_fuse_arity] field
-     on *both* functions involved is [true]. *)
-  may_fuse_arity: bool;
-  unbox_return: bool;
-}
+type function_attribute =
+  { inline : inline_attribute;
+    specialise : specialise_attribute;
+    local : local_attribute;
+    zero_alloc : zero_alloc_attribute;
+    poll : poll_attribute;
+    loop : loop_attribute;
+    is_a_functor : bool;
+    is_opaque : bool;
+    stub : bool;
+    tmc_candidate : bool;
+    (* [simplif.ml] (in the `simplif` function within `simplify_lets`) attempts to
+       fuse nested functions, rewriting e.g. [fun x -> fun y -> e] to
+       [fun x y -> e]. This fusion is allowed only when the [may_fuse_arity] field
+       on *both* functions involved is [true]. *)
+    may_fuse_arity : bool;
+    unbox_return : bool
+  }
 
-type parameter_attribute = {
-  unbox_param: bool;
-}
+type parameter_attribute = { unbox_param : bool }
 
-type debug_uid = Shape.Uid.t
 (** The [debug_uid] values track typed-tree level identifiers that are then
     passed down to the lower level IRs and eventually emitted into dwarf output.
     WARNING: Unlike the name sugggests, these identifiers are not always unique.
     Instead, in many cases, we use [debug_uid_none] below, and multiple
     variables at the level of Lambda or below can use the same [debug_uid]. *)
+type debug_uid = Shape.Uid.t
 (* CR sspies: This comment is currently not accurate, since we do not yet
-  emit these ids into dwarf code. *)
+   emit these ids into dwarf code. *)
 
-val debug_uid_none : debug_uid
 (** [debug_uid_none] should be used for those identifiers that are not
     user visible (i.e., that are created internally in the compiler and do not
     mean anything to users writing OCaml code).   *)
+val debug_uid_none : debug_uid
 
-
-type lparam = {
-  name : Ident.t;
-  debug_uid : debug_uid;
-  layout : layout;
-  attributes : parameter_attribute;
-  mode : locality_mode
-}
+type lparam =
+  { name : Ident.t;
+    debug_uid : debug_uid;
+    layout : layout;
+    attributes : parameter_attribute;
+    mode : locality_mode
+  }
 
 type scoped_location = Debuginfo.Scoped_location.t
 
@@ -816,7 +1029,7 @@ type pop_region =
   | Same_region
 
 type lambda =
-    Lvar of Ident.t
+  | Lvar of Ident.t
   | Lmutvar of Ident.t
   | Lconst of structured_constant
   | Lapply of lambda_apply
@@ -826,8 +1039,8 @@ type lambda =
   | Lletrec of rec_binding list * lambda
   | Lprim of primitive * lambda list * scoped_location
   | Lswitch of lambda * lambda_switch * scoped_location * layout
-(* switch on strings, clauses are sorted by string order,
-   strings are pairwise distinct *)
+  (* switch on strings, clauses are sorted by string order,
+     strings are pairwise distinct *)
   | Lstringswitch of
       lambda * (string * lambda) list * lambda option * scoped_location * layout
   | Lstaticraise of static_label * lambda list
@@ -844,18 +1057,28 @@ type lambda =
      it means that we consider the top region at the point of the [Lstaticcatch] to not be
      considered open inside the handler. *)
   | Lstaticcatch of
-      lambda * (static_label * (Ident.t * debug_uid * layout) list) * lambda
-      * pop_region * layout
+      lambda
+      * (static_label * (Ident.t * debug_uid * layout) list)
+      * lambda
+      * pop_region
+      * layout
   | Ltrywith of lambda * Ident.t * debug_uid * lambda * layout
-(* Lifthenelse (e, t, f, layout) evaluates t if e evaluates to 0, and evaluates f if
-   e evaluates to any other value; layout must be the layout of [t] and [f] *)
+  (* Lifthenelse (e, t, f, layout) evaluates t if e evaluates to 0, and evaluates f if
+     e evaluates to any other value; layout must be the layout of [t] and [f] *)
   | Lifthenelse of lambda * lambda * lambda * layout
   | Lsequence of lambda * lambda
   | Lwhile of lambda_while
   | Lfor of lambda_for
   | Lassign of Ident.t * lambda
-  | Lsend of meth_kind * lambda * lambda * lambda list
-             * region_close * locality_mode * scoped_location * layout
+  | Lsend of
+      meth_kind
+      * lambda
+      * lambda
+      * lambda list
+      * region_close
+      * locality_mode
+      * scoped_location
+      * layout
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -863,31 +1086,31 @@ type lambda =
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
 
-and rec_binding = {
-  id : Ident.t;
-  debug_uid : debug_uid;
-  def : lfunction;
-  (* Generic recursive bindings have been removed from Lambda in 5.2.
-     [Value_rec_compiler.compile_letrec] deals with transforming generic
-     definitions into basic Lambda code. *)
-}
+and rec_binding =
+  { id : Ident.t;
+    debug_uid : debug_uid;
+    def : lfunction
+        (* Generic recursive bindings have been removed from Lambda in 5.2.
+           [Value_rec_compiler.compile_letrec] deals with transforming generic
+           definitions into basic Lambda code. *)
+  }
 
 and lfunction = private
-  { kind: function_kind;
-    params: lparam list;
-    return: layout;
-    body: lambda;
-    attr: function_attribute; (* specified with [@inline] attribute *)
+  { kind : function_kind;
+    params : lparam list;
+    return : layout;
+    body : lambda;
+    attr : function_attribute; (* specified with [@inline] attribute *)
     loc : scoped_location;
-    mode : locality_mode;     (* locality of the closure itself *)
-    ret_mode: locality_mode;
-    (** alloc mode of the returned value. Also indicates if the function might
+    mode : locality_mode; (* locality of the closure itself *)
+    ret_mode : locality_mode
+        (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
   }
 
 and lambda_while =
   { wh_cond : lambda;
-    wh_body : lambda;
+    wh_body : lambda
   }
 
 and lambda_for =
@@ -897,7 +1120,7 @@ and lambda_for =
     for_from : lambda;
     for_to : lambda;
     for_dir : direction_flag;
-    for_body : lambda;
+    for_body : lambda
   }
 
 and lambda_apply =
@@ -910,24 +1133,27 @@ and lambda_apply =
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)
     ap_specialised : specialise_attribute;
-    ap_probe : probe;
+    ap_probe : probe
   }
 
 and lambda_switch =
-  { sw_numconsts: int;                  (* Number of integer cases *)
-    sw_consts: (int * lambda) list;     (* Integer cases *)
-    sw_numblocks: int;                  (* Number of tag block cases *)
-    sw_blocks: (int * lambda) list;     (* Tag block cases *)
-    sw_failaction : lambda option}      (* Action to take if failure *)
+  { sw_numconsts : int; (* Number of integer cases *)
+    sw_consts : (int * lambda) list; (* Integer cases *)
+    sw_numblocks : int; (* Number of tag block cases *)
+    sw_blocks : (int * lambda) list; (* Tag block cases *)
+    sw_failaction : lambda option
+  }
+(* Action to take if failure *)
 
 and lambda_event =
-  { lev_loc: scoped_location;
-    lev_kind: lambda_event_kind;
-    lev_repr: int ref option;
-    lev_env: Env.t }
+  { lev_loc : scoped_location;
+    lev_kind : lambda_event_kind;
+    lev_repr : int ref option;
+    lev_env : Env.t
+  }
 
 and lambda_event_kind =
-    Lev_before
+  | Lev_before
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
@@ -937,37 +1163,39 @@ and lambda_event_kind =
    that produces an instance when invoked. [-instantiate] reads these as
    instructions for creating lambda terms. *)
 type runtime_param =
-  | Rp_argument_block of Global_module.t  (* [Rp_argument_block P] means take
-                                             the argument being passed for the
-                                             parameter [P] and pass in its
-                                             argument block *)
+  | Rp_argument_block of Global_module.t
+    (* [Rp_argument_block P] means take
+       the argument being passed for the
+       parameter [P] and pass in its
+       argument block *)
   | Rp_main_module_block of Global_module.t
-                                          (* [Rp_main_module_block M] means that
-                                             [M] is a parameterised module (not
-                                             itself a parameter) that this
-                                             module depends on and we should
-                                             pass in the main module block of
-                                             (the relevant instantiation of)
-                                             [M]. [M] must not be complete (if
-                                             it were, it would be a compile-time
-                                             constant and therefore not needed
-                                             as a parameter). *)
-  | Rp_unit                               (* The unit value (only used when
-                                             there are no other parameters) *)
+    (* [Rp_main_module_block M] means that
+       [M] is a parameterised module (not
+       itself a parameter) that this
+       module depends on and we should
+       pass in the main module block of
+       (the relevant instantiation of)
+       [M]. [M] must not be complete (if
+       it were, it would be a compile-time
+       constant and therefore not needed
+       as a parameter). *)
+  | Rp_unit
+(* The unit value (only used when
+   there are no other parameters) *)
 
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
    compiled to an [Mb_instantiating_functor]. *)
 type main_module_block_format =
-  | Mb_struct of { mb_size : int }        (* A block with [mb_size] fields *)
+  | Mb_struct of { mb_size : int } (* A block with [mb_size] fields *)
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
-        mb_returned_size : int;
+        mb_returned_size : int
       }
-                                          (* A block with exactly one field: a
-                                             function taking [mb_runtime_params]
-                                             and returning a block with
-                                             [mb_returned_size] fields *)
+(* A block with exactly one field: a
+   function taking [mb_runtime_params]
+   and returning a block with
+   [mb_returned_size] fields *)
 
 (* The number of words in the main module block. *)
 val main_module_block_size : main_module_block_format -> int
@@ -975,19 +1203,21 @@ val main_module_block_size : main_module_block_format -> int
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;         (* Index of argument block (see
-                                           [arg_descr]). If
-                                           [main_module_block_format] is
-                                           [Mb_struct], this is an index into
-                                           the main module block of the
-                                           compilation unit. For
-                                           [Mb_instantiating_functor], this is
-                                           an index into the module returned by
-                                           the instantiating functor. *)
+    arg_block_idx : int option;
+        (* Index of argument block (see
+           [arg_descr]). If
+           [main_module_block_format] is
+           [Mb_struct], this is an index into
+           the main module block of the
+           compilation unit. For
+           [Mb_instantiating_functor], this is
+           an index into the module returned by
+           the instantiating functor. *)
     required_globals : Compilation_unit.Set.t;
-                                        (* Modules whose initializer side effects
-                                           must occur before [code]. *)
-    code : lambda }
+        (* Modules whose initializer side effects
+           must occur before [code]. *)
+    code : lambda
+  }
 (* Lambda code for the middle-end. Here [mbf] is the value of the
    [main_module_block_format] field.
    * In the closure case the code is a sequence of assignments to a
@@ -1006,85 +1236,119 @@ type program =
    parameterised, this information (in particular [arg_block_idx]) describes
    instances rather than the base CU gs. *)
 type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-                                        (* The parameter implemented (the [P] in
-                                           [-as-argument-for P]) *)
-    arg_block_idx: int; }               (* The index within the main module
-                                           block of the _argument block_. If
-                                           this compilation unit is used as an
-                                           argument when instantiating,
-                                           [-instantiate] will pass the argument
-                                           block to the instantiating functor
-                                           (see [main_module_block_format]). The
-                                           argument block's signature is exactly
-                                           that of the parameter, which is in
-                                           general a supertype of this
-                                           compilation unit's signature. *)
+  { arg_param : Global_module.Parameter_name.t;
+        (* The parameter implemented (the [P] in
+           [-as-argument-for P]) *)
+    arg_block_idx : int
+  }
+(* The index within the main module
+   block of the _argument block_. If
+   this compilation unit is used as an
+   argument when instantiating,
+   [-instantiate] will pass the argument
+   block to the instantiating functor
+   (see [main_module_block_format]). The
+   argument block's signature is exactly
+   that of the parameter, which is in
+   general a supertype of this
+   compilation unit's signature. *)
 
 (* Sharing key *)
-val make_key: lambda -> lambda option
+val make_key : lambda -> lambda option
 
-val const_unit: structured_constant
+val const_unit : structured_constant
+
 val const_int : int -> structured_constant
-val lambda_unit: lambda
+
+val lambda_unit : lambda
 
 val of_bool : bool -> lambda
 
 val layout_unit : layout
+
 val layout_int : layout
+
 val layout_array : array_kind -> layout
+
 val layout_block : layout
+
 val layout_list : layout
+
 val layout_exception : layout
+
 val layout_function : layout
+
 val layout_object : layout
+
 val layout_class : layout
+
 val layout_module : layout
+
 val layout_functor : layout
+
 val layout_module_field : layout
+
 val layout_string : layout
+
 val layout_boxed_float : boxed_float -> layout
+
 val layout_unboxed_float : unboxed_float -> layout
+
 val layout_boxed_int : boxed_integer -> layout
+
 val layout_boxed_vector : boxed_vector -> layout
+
 (* A layout that is Pgenval because it is the field of a tuple *)
 val layout_tuple_element : layout
+
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
+
 (* A layout that is Pgenval because it is the field of a block being considered
    for the tmc transformation
 *)
 val layout_tmc_field : layout
+
 (* A layout that is Pgenval because it is an optional argument *)
 val layout_optional_arg : layout
+
 val layout_value_field : layout
+
 val layout_lazy : layout
+
 val layout_lazy_contents : layout
+
 (* A layout that is Pgenval because we are missing layout polymorphism *)
 val layout_any_value : layout
+
 (* A layout that is Pgenval because it is bound by a letrec *)
 val layout_letrec : layout
+
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
 
 val layout_unboxed_product : layout list -> layout
 
 val layout_top : layout
-val layout_bottom : layout
 
+val layout_bottom : layout
 
 (** [dummy_constant] produces a placeholder value with a recognizable
     bit pattern (currently 0xBBBB in its tagged form) *)
-val dummy_constant: lambda
-val name_lambda: let_kind -> lambda -> layout -> (Ident.t -> lambda) -> lambda
-val name_lambda_list: (lambda * layout) list -> (lambda list -> lambda) -> lambda
+val dummy_constant : lambda
+
+val name_lambda : let_kind -> lambda -> layout -> (Ident.t -> lambda) -> lambda
+
+val name_lambda_list :
+  (lambda * layout) list -> (lambda list -> lambda) -> lambda
 
 val lfunction :
   kind:function_kind ->
   params:lparam list ->
   return:layout ->
   body:lambda ->
-  attr:function_attribute -> (* specified with [@inline] attribute *)
+  attr:function_attribute ->
+  (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
   ret_mode:locality_mode ->
@@ -1095,58 +1359,57 @@ val lfunction' :
   params:lparam list ->
   return:layout ->
   body:lambda ->
-  attr:function_attribute -> (* specified with [@inline] attribute *)
+  attr:function_attribute ->
+  (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
   ret_mode:locality_mode ->
   lfunction
 
-
-val iter_head_constructor: (lambda -> unit) -> lambda -> unit
 (** [iter_head_constructor f lam] apply [f] to only the first level of
     sub expressions of [lam]. It does not recursively traverse the
     expression.
 *)
+val iter_head_constructor : (lambda -> unit) -> lambda -> unit
 
-val shallow_iter:
-  tail:(lambda -> unit) ->
-  non_tail:(lambda -> unit) ->
-  lambda -> unit
 (** Same as [iter_head_constructor], but use a different callback for
     sub-terms which are in tail position or not. *)
+val shallow_iter :
+  tail:(lambda -> unit) -> non_tail:(lambda -> unit) -> lambda -> unit
 
-val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
 
     {[
       transl_internal_value "CamlinternalLazy" "force"
     ]}
 *)
+val transl_prim : string -> string -> lambda
 
-val free_variables: lambda -> Ident.Set.t
+val free_variables : lambda -> Ident.Set.t
 
-val transl_module_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_value_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_extension_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_class_path: scoped_location -> Env.t -> Path.t -> lambda
+val transl_module_path : scoped_location -> Env.t -> Path.t -> lambda
+
+val transl_value_path : scoped_location -> Env.t -> Path.t -> lambda
+
+val transl_extension_path : scoped_location -> Env.t -> Path.t -> lambda
+
+val transl_class_path : scoped_location -> Env.t -> Path.t -> lambda
 
 val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape :
-  get_value_kind:(int -> value_kind)
-  -> Types.mixed_product_shape -> mixed_block_shape
+  get_value_kind:(int -> value_kind) ->
+  Types.mixed_product_shape ->
+  mixed_block_shape
 
 val transl_mixed_product_shape_for_read :
-  get_value_kind:(int -> value_kind) -> get_mode:(int -> locality_mode)
-  -> Types.mixed_product_shape
-  -> mixed_block_shape_with_locality_mode
+  get_value_kind:(int -> value_kind) ->
+  get_mode:(int -> locality_mode) ->
+  Types.mixed_product_shape ->
+  mixed_block_shape_with_locality_mode
 
-val make_sequence: ('a -> lambda) -> 'a list -> lambda
+val make_sequence : ('a -> lambda) -> 'a list -> lambda
 
-val subst:
-  (Ident.t -> Subst.Lazy.value_description * Mode.Value.l -> Env.t -> Env.t) ->
-  ?freshen_bound_variables:bool ->
-  lambda Ident.Map.t -> lambda -> lambda
 (** [subst update_env ?freshen_bound_variables s lt]
     applies a substitution [s] to the lambda-term [lt].
 
@@ -1159,57 +1422,68 @@ val subst:
     [freshen_bound_variables], which defaults to [false], freshens
     the bound variables within [lt].
  *)
+val subst :
+  (Ident.t -> Subst.Lazy.value_description * Mode.Value.l -> Env.t -> Env.t) ->
+  ?freshen_bound_variables:bool ->
+  lambda Ident.Map.t ->
+  lambda ->
+  lambda
 
-val rename : Ident.t Ident.Map.t -> lambda -> lambda
 (** A version of [subst] specialized for the case where we're just renaming
     idents. *)
+val rename : Ident.t Ident.Map.t -> lambda -> lambda
 
-val duplicate_function : lfunction -> lfunction
 (** Duplicate a term, freshening all locally-bound identifiers. *)
+val duplicate_function : lfunction -> lfunction
 
-val map : (lambda -> lambda) -> lambda -> lambda
-  (** Bottom-up rewriting, applying the function on
+(** Bottom-up rewriting, applying the function on
       each node from the leaves to the root. *)
+val map : (lambda -> lambda) -> lambda -> lambda
 
+(** Apply the given transformation on the function's body *)
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
-  (** Apply the given transformation on the function's body *)
 
-val shallow_map  :
-  tail:(lambda -> lambda) ->
-  non_tail:(lambda -> lambda) ->
-  lambda -> lambda
-  (** Rewrite each immediate sub-term with the function. *)
+(** Rewrite each immediate sub-term with the function. *)
+val shallow_map :
+  tail:(lambda -> lambda) -> non_tail:(lambda -> lambda) -> lambda -> lambda
 
-val bind_with_layout:
-  let_kind -> (Ident.t * debug_uid * layout) -> lambda -> lambda -> lambda
+val bind_with_layout :
+  let_kind -> Ident.t * debug_uid * layout -> lambda -> lambda -> lambda
 
 val negate_integer_comparison : integer_comparison -> integer_comparison
+
 val swap_integer_comparison : integer_comparison -> integer_comparison
 
 val negate_float_comparison : float_comparison -> float_comparison
+
 val swap_float_comparison : float_comparison -> float_comparison
 
 val default_function_attribute : function_attribute
+
 val default_stub_attribute : function_attribute
+
 val default_param_attribute : parameter_attribute
 
 val find_exact_application :
   function_kind -> arity:int -> lambda list -> lambda list option
 
-val max_arity : unit -> int
-  (** Maximal number of parameters for a function, or in other words,
+(** Maximal number of parameters for a function, or in other words,
       maximal length of the [params] list of a [lfunction] record.
       This is unlimited ([max_int]) for bytecode, but limited
       (currently to 126) for native code. *)
+val max_arity : unit -> int
 
 val join_locality_mode : locality_mode -> locality_mode -> locality_mode
+
 val sub_locality_mode : locality_mode -> locality_mode -> bool
+
 val eq_locality_mode : locality_mode -> locality_mode -> bool
+
 val is_local_mode : locality_mode -> bool
+
 val is_heap_mode : locality_mode -> bool
 
-val primitive_may_allocate : primitive -> locality_mode option
-  (** Whether and where a primitive may allocate.
+(** Whether and where a primitive may allocate.
       [Some Alloc_local] permits both options: that is, primitives that
       may allocate on both the GC heap and locally report this value.
 
@@ -1220,10 +1494,11 @@ val primitive_may_allocate : primitive -> locality_mode option
       want to use this for another purpose in bytecode, it will need to be
       revised.
   *)
+val primitive_may_allocate : primitive -> locality_mode option
 
+(** Like [primitive_may_allocate], for [external] calls. *)
 val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option
-  (** Like [primitive_may_allocate], for [external] calls. *)
 
 (***********************)
 (* For static failures *)
@@ -1235,30 +1510,30 @@ val next_raise_count : unit -> static_label
 val staticfail : lambda (* Anticipated static failure *)
 
 (* Check anticipated failure, substitute its final value *)
-val is_guarded: lambda -> bool
+val is_guarded : lambda -> bool
+
 val patch_guarded : lambda -> lambda -> lambda
 
-val raise_kind: raise_kind -> string
+val raise_kind : raise_kind -> string
 
-val merge_inline_attributes
-   : inline_attribute
-  -> inline_attribute
-  -> inline_attribute option
+val merge_inline_attributes :
+  inline_attribute -> inline_attribute -> inline_attribute option
 
-val reset: unit -> unit
+val reset : unit -> unit
 
 (** Helpers for module block accesses.
     Module accesses are always immutable, except in translobj where the
     method cache is stored in a mutable module field.
 *)
-val mod_field: ?read_semantics: field_read_semantics -> int -> primitive
-val mod_setfield: int -> primitive
+val mod_field : ?read_semantics:field_read_semantics -> int -> primitive
+
+val mod_setfield : int -> primitive
 
 val structured_constant_layout : structured_constant -> layout
 
 val primitive_result_layout : primitive -> layout
 
-val array_ref_kind_result_layout: array_ref_kind -> layout
+val array_ref_kind_result_layout : array_ref_kind -> layout
 
 val compute_expr_layout : (Ident.t -> layout option) -> lambda -> layout
 
@@ -1270,25 +1545,24 @@ val array_set_kind : modify_mode -> array_kind -> array_set_kind
 
 (** Any mode information in the given [array_set_kind] is ignored.  Any mode
     in the return value always comes from the [locality_mode] parameter. *)
-val array_ref_kind_of_array_set_kind
-  : array_set_kind -> locality_mode -> array_ref_kind
+val array_ref_kind_of_array_set_kind :
+  array_set_kind -> locality_mode -> array_ref_kind
 
 (* Returns true if the given lambda can allocate on the local stack *)
 val may_allocate_in_region : lambda -> bool
 
 (* Returns [external_call_description] for [Pccall] assuming arguments
    and result all have layout [value] *)
-val simple_prim_on_values
-:  name:string
--> arity:int
--> alloc:bool
--> external_call_description
+val simple_prim_on_values :
+  name:string -> arity:int -> alloc:bool -> external_call_description
 
 val try_to_find_location : lambda -> scoped_location
+
 val try_to_find_debuginfo : lambda -> Debuginfo.t
 
 val primitive_can_raise : primitive -> bool
 
 val count_initializers_array_kind : array_kind -> int
+
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool

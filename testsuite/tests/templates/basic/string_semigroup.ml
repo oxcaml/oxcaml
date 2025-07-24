@@ -1,3 +1,3 @@
 type t = string
 
-let op = (^)
+let op = ( ^ )

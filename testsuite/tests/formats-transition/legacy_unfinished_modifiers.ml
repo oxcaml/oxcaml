@@ -1,6 +1,6 @@
 (* TEST
- flags = "-no-strict-formats";
- toplevel;
+   flags = "-no-strict-formats";
+   toplevel;
 *)
 
 (* test whether padding modifiers are accepted without any padding
@@ -14,10 +14,9 @@
 *)
 
 let () = Printf.printf "%0d\n" 3
-;;
+
 let () = Printf.printf "%-d\n" 3
-;;
+
 let () = Printf.printf "%.d\n" 3
-;;
+
 let () = Printf.printf "%.f\n" 3.
-;;

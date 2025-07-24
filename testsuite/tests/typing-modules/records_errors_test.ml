@@ -1,15 +1,21 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module M1 : sig
-  type t = {f0 : unit * unit * unit * int * unit * unit * unit;
-            f1 : unit * unit * unit * int * unit * unit * unit}
+  type t =
+    { f0 : unit * unit * unit * int * unit * unit * unit;
+      f1 : unit * unit * unit * int * unit * unit * unit
+    }
 end = struct
-  type t = {f0 : unit * unit * unit * float* unit * unit * unit;
-            f1 : unit * unit * unit * string * unit * unit * unit}
-end;;
-[%%expect{|
+  type t =
+    { f0 : unit * unit * unit * float * unit * unit * unit;
+      f1 : unit * unit * unit * string * unit * unit * unit
+    }
+end
+
+[%%expect
+{|
 Lines 4-7, characters 6-3:
 4 | ......struct
 5 |   type t = {f0 : unit * unit * unit * float* unit * unit * unit;
@@ -54,17 +60,22 @@ Error: Signature mismatch:
        The type "unit * unit * unit * string * unit * unit * unit"
        is not equal to the type "unit * unit * unit * int * unit * unit * unit"
        Type "string" is not equal to type "int"
-|}];;
-
+|}]
 
 module M2 : sig
-  type t = {mutable f0 : unit * unit * unit * int * unit * unit * unit;
-            f1 : unit * unit * unit * int * unit * unit * unit}
+  type t =
+    { mutable f0 : unit * unit * unit * int * unit * unit * unit;
+      f1 : unit * unit * unit * int * unit * unit * unit
+    }
 end = struct
-  type t = {f0 : unit * unit * unit * float* unit * unit * unit;
-            f1 : unit * unit * unit * string * unit * unit * unit}
-end;;
-[%%expect{|
+  type t =
+    { f0 : unit * unit * unit * float * unit * unit * unit;
+      f1 : unit * unit * unit * string * unit * unit * unit
+    }
+end
+
+[%%expect
+{|
 Lines 4-7, characters 6-3:
 4 | ......struct
 5 |   type t = {f0 : unit * unit * unit * float* unit * unit * unit;
@@ -107,14 +118,16 @@ Error: Signature mismatch:
        The type "unit * unit * unit * string * unit * unit * unit"
        is not equal to the type "unit * unit * unit * int * unit * unit * unit"
        Type "string" is not equal to type "int"
-|}];;
+|}]
 
 module M3 : sig
-  type t = {f0 : unit}
+  type t = { f0 : unit }
 end = struct
-  type t = {f1 : unit}
-end;;
-[%%expect{|
+  type t = { f1 : unit }
+end
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = {f1 : unit}
@@ -129,14 +142,19 @@ Error: Signature mismatch:
        is not included in
          type t = { f0 : unit; }
        Fields have different names, "f1" and "f0".
-|}];;
+|}]
 
 module M4 : sig
-  type t = {f0 : unit; f1 : unit}
+  type t =
+    { f0 : unit;
+      f1 : unit
+    }
 end = struct
-  type t = {f0 : unit}
-end;;
-[%%expect{|
+  type t = { f0 : unit }
+end
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = {f0 : unit}
@@ -151,17 +169,29 @@ Error: Signature mismatch:
        is not included in
          type t = { f0 : unit; f1 : unit; }
        A field, "f1", is missing in the first declaration.
-|}];;
-
+|}]
 
 (** Random additions and deletions of fields *)
 
 module Addition : sig
-  type t = {a : unit; b : unit; c : unit; d : unit}
+  type t =
+    { a : unit;
+      b : unit;
+      c : unit;
+      d : unit
+    }
 end = struct
-  type t = {a : unit; b : unit; beta : unit; c : unit; d: unit}
+  type t =
+    { a : unit;
+      b : unit;
+      beta : unit;
+      c : unit;
+      d : unit
+    }
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 5-7, characters 6-3:
 5 | ......struct
 6 |   type t = {a : unit; b : unit; beta : unit; c : unit; d: unit}
@@ -180,13 +210,23 @@ Error: Signature mismatch:
        An extra field, "beta", is provided in the first declaration.
 |}]
 
-
 module Deletion : sig
-  type t = {a : unit; b : unit; c : unit; d : unit}
+  type t =
+    { a : unit;
+      b : unit;
+      c : unit;
+      d : unit
+    }
 end = struct
-  type t = {a : unit; c : unit; d : unit}
+  type t =
+    { a : unit;
+      c : unit;
+      d : unit
+    }
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = {a : unit; c : unit; d : unit}
@@ -203,31 +243,31 @@ Error: Signature mismatch:
        A field, "b", is missing in the first declaration.
 |}]
 
-
-module Multi: sig
-  type t = {
-    a : unit;
-    b : unit;
-    c : unit;
-    d : unit;
-    e : unit;
-    f : unit;
-    g : unit
-  }
+module Multi : sig
+  type t =
+    { a : unit;
+      b : unit;
+      c : unit;
+      d : unit;
+      e : unit;
+      f : unit;
+      g : unit
+    }
 end = struct
-  type t = {
-    a : unit;
-    b : unit;
-    beta: int;
-    c : unit;
-    d : unit;
-    f : unit;
-    g : unit;
-    phi : unit;
-  }
+  type t =
+    { a : unit;
+      b : unit;
+      beta : int;
+      c : unit;
+      d : unit;
+      f : unit;
+      g : unit;
+      phi : unit
+    }
 end
 
-[%%expect {|
+[%%expect
+{|
 Lines 11-22, characters 6-3:
 11 | ......struct
 12 |   type t = {
@@ -291,15 +331,28 @@ Error: Signature mismatch:
        8. An extra field, "phi", is provided in the first declaration.
 |}]
 
-
 (** Multiple errors *)
 
 module M : sig
-  type t = { a:int; e:int; c:int; d:int; b:int }
+  type t =
+    { a : int;
+      e : int;
+      c : int;
+      d : int;
+      b : int
+    }
 end = struct
-  type t = { alpha:int; b:int; c:int; d:int; e:int }
+  type t =
+    { alpha : int;
+      b : int;
+      c : int;
+      d : int;
+      e : int
+    }
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 5-7, characters 6-3:
 5 | ......struct
 6 |   type t = { alpha:int; b:int; c:int; d:int; e:int }
@@ -319,14 +372,28 @@ Error: Signature mismatch:
        2<->5. Fields "b" and "e" have been swapped.
 |}]
 
-
-module M: sig
-  type t = { a:int; b:int; c:int; d:int; e:int; f:float }
-end =
-struct
-  type t = { b:int; c:int; d:int; e:int; a:int; f:int }
+module M : sig
+  type t =
+    { a : int;
+      b : int;
+      c : int;
+      d : int;
+      e : int;
+      f : float
+    }
+end = struct
+  type t =
+    { b : int;
+      c : int;
+      d : int;
+      e : int;
+      a : int;
+      f : int
+    }
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 4-6, characters 0-3:
 4 | struct
 5 |   type t = { b:int; c:int; d:int; e:int; a:int; f:int }
@@ -363,13 +430,26 @@ Error: Signature mismatch:
     when diffing
 *)
 
-
 module Eq : sig
-  type t = A: { a:'a; b:'b; x:'a } -> t
+  type t =
+    | A :
+        { a : 'a;
+          b : 'b;
+          x : 'a
+        }
+        -> t
 end = struct
-  type t = A: { a:'a; b:'b; x:'x } -> t
+  type t =
+    | A :
+        { a : 'a;
+          b : 'b;
+          x : 'x
+        }
+        -> t
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 8-10, characters 6-3:
  8 | ......struct
  9 |   type t = A: { a:'a; b:'b; x:'x } -> t
@@ -394,13 +474,28 @@ Error: Signature mismatch:
        The type "'x" is not equal to the type "'a"
 |}]
 
-
-module Not_a_swap: sig
-  type t = A: { x:'a; a:'a; b:'b; y:'b} -> t
+module Not_a_swap : sig
+  type t =
+    | A :
+        { x : 'a;
+          a : 'a;
+          b : 'b;
+          y : 'b
+        }
+        -> t
 end = struct
-  type t = A: { y:'a; a:'a; b:'b; x:'b} -> t
+  type t =
+    | A :
+        { y : 'a;
+          a : 'a;
+          b : 'b;
+          x : 'b
+        }
+        -> t
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = A: { y:'a; a:'a; b:'b; x:'b} -> t
@@ -422,12 +517,28 @@ Error: Signature mismatch:
        4. Fields have different names, "x" and "y".
 |}]
 
-module Swap: sig
-  type t = A: { x:'a; a:'a; b:'b; y:'b} -> t
+module Swap : sig
+  type t =
+    | A :
+        { x : 'a;
+          a : 'a;
+          b : 'b;
+          y : 'b
+        }
+        -> t
 end = struct
-  type t = A: { y:'b; a:'a; b:'b; x:'a} -> t
+  type t =
+    | A :
+        { y : 'b;
+          a : 'a;
+          b : 'b;
+          x : 'a
+        }
+        -> t
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = A: { y:'b; a:'a; b:'b; x:'a} -> t
@@ -448,13 +559,26 @@ Error: Signature mismatch:
        Fields "x" and "y" have been swapped.
 |}]
 
-
-module Not_a_move: sig
-  type t = A: { a:'a; b:'b; x:'b} -> t
+module Not_a_move : sig
+  type t =
+    | A :
+        { a : 'a;
+          b : 'b;
+          x : 'b
+        }
+        -> t
 end = struct
-  type t = A: { x:'a; a:'a; b:'b} -> t
+  type t =
+    | A :
+        { x : 'a;
+          a : 'a;
+          b : 'b
+        }
+        -> t
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = A: { x:'a; a:'a; b:'b} -> t
@@ -476,13 +600,26 @@ Error: Signature mismatch:
        3. A field, "x", is missing in the first declaration.
 |}]
 
-
-module Move: sig
-  type t = A: { a:'a; b:'b; x:'b} -> t
+module Move : sig
+  type t =
+    | A :
+        { a : 'a;
+          b : 'b;
+          x : 'b
+        }
+        -> t
 end = struct
-  type t = A: { x:'b; a:'a; b:'b} -> t
+  type t =
+    | A :
+        { x : 'b;
+          a : 'a;
+          b : 'b
+        }
+        -> t
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = A: { x:'b; a:'a; b:'b} -> t

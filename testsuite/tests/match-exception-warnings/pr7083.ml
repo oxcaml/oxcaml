@@ -1,13 +1,9 @@
 (* TEST
- expect;
+   expect;
 *)
 
-let f x =
-  match x with
-  | `A -> ()
-  | exception Not_found -> ()
-;;
+let f x = match x with `A -> () | exception Not_found -> ()
 
-[%%expect{|
+[%%expect {|
 val f : [< `A ] -> unit = <fun>
 |}]

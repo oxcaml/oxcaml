@@ -8,7 +8,7 @@ module type S = sig
   type file_descr
 
   type open_flag =
-      O_RDONLY
+    | O_RDONLY
     | O_WRONLY
     | O_RDWR
     | O_NONBLOCK
@@ -31,7 +31,7 @@ module type S = sig
   val close : file_descr -> unit
 
   type seek_command =
-      SEEK_SET
+    | SEEK_SET
     | SEEK_CUR
     | SEEK_END
 
@@ -41,7 +41,9 @@ module type S = sig
     file_descr ->
     ?pos:int64 ->
     ('a, 'b) Stdlib.Bigarray.kind ->
-    'c Stdlib.Bigarray.layout -> bool -> int array ->
+    'c Stdlib.Bigarray.layout ->
+    bool ->
+    int array ->
     ('a, 'b, 'c) Stdlib.Bigarray.Genarray.t
 
   val getpid : unit -> int

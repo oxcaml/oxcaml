@@ -1,9 +1,9 @@
 (* TEST
- runtime5;
- frame_pointers;
- readonly_files = "fp_backtrace.c c_call_.c";
- all_modules = "${readonly_files} c_call.ml";
- native;
+   runtime5;
+   frame_pointers;
+   readonly_files = "fp_backtrace.c c_call_.c";
+   all_modules = "${readonly_files} c_call.ml";
+   native;
 *)
 
 (* Force -O3 to ensure the "_code" symbols are present (see the
@@ -11,10 +11,23 @@
 [@@@ocaml.flambda_o3]
 
 external fp_backtrace : string -> unit = "fp_backtrace"
+
 external fp_backtrace_no_alloc : string -> unit = "fp_backtrace" [@@noalloc]
-external fp_backtrace_many_args : string -> int -> int -> int -> int -> int
-  -> int -> int -> int -> int -> int -> int -> unit =
-  "fp_backtrace_many_args_argv" "fp_backtrace_many_args"
+
+external fp_backtrace_many_args :
+  string ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  int ->
+  unit = "fp_backtrace_many_args_argv" "fp_backtrace_many_args"
 
 let[@inline never] f () =
   (* Check backtrace through caml_c_call_stack_args *)

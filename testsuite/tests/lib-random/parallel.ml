@@ -1,14 +1,14 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- include unix;
- runtime5;
- multidomain;
- libunix;
- {
-   bytecode;
- }{
-   native;
- }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   include unix;
+   runtime5;
+   multidomain;
+   libunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let () = Random.init 42
@@ -17,8 +17,8 @@ let domain_count = 10
 
 let delays =
   (* These Random calls are intentionally:
-   - taken from an independent Random state, not the global state we are testing
-   - initialized with make_self_init, to return different delays on each tst run
+     - taken from an independent Random state, not the global state we are testing
+     - initialized with make_self_init, to return different delays on each tst run
   *)
   let delay_rng = Random.State.make_self_init () in
   List.init domain_count (fun _i -> Random.State.float delay_rng 0.5)
@@ -34,7 +34,7 @@ let f delay () =
   let a = Random.int 100 in
   let b = Random.int 100 in
   let c = Random.int 100 in
-  (a, b, c)
+  a, b, c
 
 let () =
   delays
@@ -44,5 +44,6 @@ let () =
 
 let () =
   print_endline
-    "Note: we observe in this output that the random numbers of each child domain\n\
+    "Note: we observe in this output that the random numbers of each child \
+     domain\n\
      appear uncorrelated, yet are produced deterministically."

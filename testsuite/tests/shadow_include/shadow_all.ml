@@ -1,6 +1,6 @@
 (* TEST
- flags = "-nopervasives"; (* can't pass -nostdlib because of objects. *)
- expect;
+   flags = "-nopervasives"; (* can't pass -nostdlib because of objects. *)
+   expect;
 *)
 
 (* Signatures *)
@@ -14,21 +14,25 @@ module type S = sig
 
   external e : unit -> unit = "%identity"
 
-  module M : sig type t end
+  module M : sig
+    type t
+  end
 
   module type T
 
   exception E
 
   type ext = ..
+
   type ext += C
 
   class c : object end
 
   class type ct = object end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type S =
   sig
     type t
@@ -46,10 +50,12 @@ module type S =
 
 module type SS = sig
   include S
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type SS =
   sig
     type t
@@ -69,11 +75,14 @@ module type SS =
 
 module type Type = sig
   include S
+
   type u = t
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Type =
   sig
     type u
@@ -92,11 +101,14 @@ module type Type =
 
 module type Type_fail = sig
   include S
+
   val ignore : t -> unit
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
@@ -113,11 +125,14 @@ Line 3, characters 2-24:
 
 module type Module = sig
   include S
+
   module N = M
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Module =
   sig
     module N : sig type t end
@@ -136,11 +151,14 @@ module type Module =
 
 module type Module_fail = sig
   include S
+
   val ignore : M.t -> unit
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
@@ -155,14 +173,16 @@ Line 3, characters 2-26:
   The value "ignore" has no valid type if "M/2" is shadowed.
 |}]
 
-
 module type Module_type = sig
   include S
+
   module type U = T
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Module_type =
   sig
     module type U
@@ -181,11 +201,14 @@ module type Module_type =
 
 module type Module_type_fail = sig
   include S
+
   module F : functor (_ : T) -> sig end
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
@@ -202,11 +225,14 @@ Line 3, characters 2-39:
 
 module type Extension = sig
   include S
+
   type ext += C2
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
@@ -223,11 +249,14 @@ Line 3, characters 14-16:
 
 module type Class = sig
   include S
+
   class parametrized : int -> c
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Class =
   sig
     class parametrized : int -> object  end
@@ -246,11 +275,14 @@ module type Class =
 
 module type Class_type = sig
   include S
+
   class type parametrized = ct
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Class_type =
   sig
     class type parametrized = object  end
@@ -285,14 +317,16 @@ module N = struct
   exception E
 
   type ext = ..
+
   type ext += C
 
   class c = object end
 
   class type ct = object end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module N :
   sig
     type t
@@ -312,8 +346,9 @@ module NN = struct
   include N
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module NN :
   sig
     type t = N.t
@@ -333,11 +368,14 @@ module NN :
 
 module Type = struct
   include N
+
   type u = t
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Type :
   sig
     type u = N.t
@@ -359,8 +397,9 @@ module Module = struct
   module O = M
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Module :
   sig
     module O = N.M
@@ -379,11 +418,14 @@ module Module :
 
 module Module_type = struct
   include N
+
   module type U = T
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Module_type :
   sig
     module type U = N.T
@@ -402,11 +444,14 @@ module Module_type :
 
 module Exception = struct
   include N
+
   exception Exn = E
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Exception :
   sig
     exception Exn
@@ -425,11 +470,14 @@ module Exception :
 
 module Extension = struct
   include N
+
   type ext += C2
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Extension :
   sig
     type N.ext += C2
@@ -448,11 +496,14 @@ module Extension :
 
 module Class = struct
   include N
+
   class parametrized _ = c
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Class :
   sig
     class parametrized : 'a -> object  end
@@ -471,11 +522,14 @@ module Class :
 
 module Class_type = struct
   include N
+
   class type parametrized = ct
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Class_type :
   sig
     class type parametrized = object  end
@@ -496,13 +550,23 @@ module Class_type :
 module M = struct
   include struct
     type t = A
+
     let x = A
   end
-  open struct type t end
-  open struct type t end
+
+  open struct
+    type t
+  end
+
+  open struct
+    type t
+  end
+
   type t
 end
-[%%expect {|
+
+[%%expect
+{|
 Line 8, characters 2-8:
 8 |   type t
       ^^^^^^

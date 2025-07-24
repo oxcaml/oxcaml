@@ -4,14 +4,13 @@ module MP = Gc.Memprof
 
 (* This is a stress-test for weird behaviour when the minor heap is just about to
    overflow, which is easier to trigger when the minor heap is small *)
-let () =
-  Gc.set { (Gc.get ()) with minor_heap_size = 2000 }
+let () = Gc.set { (Gc.get ()) with minor_heap_size = 2000 }
 
 let f () =
   let n_allocated = ref 0 in
   let n_promoted = ref 0 in
   let n_deallocated = ref 0 in
-  let _:MP.t =
+  let (_ : MP.t) =
     let alloc_minor _info =
       incr n_allocated;
       for i = 1 to Random.int 500 do
@@ -36,11 +35,59 @@ let f () =
     incr r;
     (* This is a largeish, combined, non-constant allocation,
        so goes through caml_memprof_track_young *)
-    s := [| 0; 0; 0; 0; 0; 0; 0; 0; 0; 0;
-            0; 0; 0; 0; 0; 0; 0; 0; 0; 0;
-            0; 0; 0; 0; 0; 0; 0; 0; 0; 0;
-            0; 0; 0; 0; 0; 0; 0; 0; 0; 0;
-            0; 0; 0; 0; 0; 0; 0; 0; 0; !r; |] :: !s;
+    s
+      := [| 0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            !r
+         |]
+         :: !s
   done;
   (* make sure all values are promoted *)
   Gc.full_major ();

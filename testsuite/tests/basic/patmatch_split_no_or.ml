@@ -1,6 +1,6 @@
 (* TEST
- flags = "-nostdlib -nopervasives -dlambda";
- expect;
+   flags = "-nostdlib -nopervasives -dlambda";
+   expect;
 *)
 
 (******************************************************************************)
@@ -8,12 +8,10 @@
 (* Check that the extra split indeed happens when the last row is made of
    "variables" only *)
 
-let last_is_anys = function
-  | true, false -> 1
-  | _, false -> 2
-  | _, _ -> 3
-;;
-[%%expect{|
+let last_is_anys = function true, false -> 1 | _, false -> 2 | _, _ -> 3
+
+[%%expect
+{|
 (let
   (last_is_anys/14 =
      (function {nlocal = 0}
@@ -27,12 +25,10 @@ let last_is_anys = function
 val last_is_anys : bool * bool -> int = <fun>
 |}]
 
-let last_is_vars = function
-  | true, false -> 1
-  | _, false -> 2
-  | _x, _y -> 3
-;;
-[%%expect{|
+let last_is_vars = function true, false -> 1 | _, false -> 2 | _x, _y -> 3
+
+[%%expect
+{|
 (let
   (last_is_vars/21 =
      (function {nlocal = 0}
@@ -51,8 +47,11 @@ val last_is_vars : bool * bool -> int = <fun>
 (* Check that the [| _, false, true -> 12] gets raised. *)
 
 type t = ..
-type t += A | B of unit | C of bool * int;;
-[%%expect{|
+
+type t += A | B of unit | C of bool * int
+
+[%%expect
+{|
 0
 type t = ..
 (let
@@ -72,8 +71,9 @@ let f = function
   | C _, true, _ -> 3
   | _, false, true -> 12
   | _ -> 4
-;;
-[%%expect{|
+
+[%%expect
+{|
 (let
   (C/31 =? (apply (field_imm 0 (global Toploop!)) "C/31")
    B/30 =? (apply (field_imm 0 (global Toploop!)) "B/30")

@@ -16,6 +16,7 @@
 (** The lexer for string to build text structures. *)
 
 val line_number : int ref
+
 val char_number : int ref
 
 val init : unit -> unit

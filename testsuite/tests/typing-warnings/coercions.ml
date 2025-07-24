@@ -1,14 +1,18 @@
 (* TEST
- flags = " -w +A -strict-sequence ";
- expect;
+   flags = " -w +A -strict-sequence ";
+   expect;
 *)
 
 (* comment 9644 of PR#6000 *)
 
 fun b -> if b then format_of_string "x" else "y"
-[%%expect {|
+
+[%%expect
+{|
 - : bool -> ('a, 'b, 'c, 'd, 'd, 'a) format6 = <fun>
-|}, Principal{|
+|},
+  Principal
+    {|
 Line 1, characters 45-48:
 1 | fun b -> if b then format_of_string "x" else "y"
                                                  ^^^
@@ -19,7 +23,9 @@ Warning 18 [not-principal]: this coercion to format6 is not principal.
 ;;
 
 fun b -> if b then "x" else format_of_string "y"
-[%%expect {|
+
+[%%expect
+{|
 Line 1, characters 28-48:
 1 | fun b -> if b then "x" else format_of_string "y"
                                 ^^^^^^^^^^^^^^^^^^^^
@@ -30,22 +36,28 @@ Error: This expression has type
 |}]
 ;;
 
-fun b : (_,_,_) format -> if b then "x" else "y"
+fun b : (_, _, _) format -> if b then "x" else "y"
+
 [%%expect {|
 - : bool -> ('a, 'b, 'a) format = <fun>
 |}]
-;;
 
 (* PR#7135 *)
 
 module PR7135 = struct
-  module M : sig type t = private int end =  struct type t = int end
+  module M : sig
+    type t = private int
+  end = struct
+    type t = int
+  end
+
   include M
 
-  let lift2 (f : int -> int -> int) (x : t) (y : t) =
-    f (x :> int) (y :> int)
-end;;
-[%%expect {|
+  let lift2 (f : int -> int -> int) (x : t) (y : t) = f (x :> int) (y :> int)
+end
+
+[%%expect
+{|
 module PR7135 :
   sig
     module M : sig type t = private int end
@@ -58,11 +70,18 @@ module PR7135 :
 
 module Test1 = struct
   type t = private int
-  let f x = let y = if true then x else (x:t) in (y :> int)
-end;;
-[%%expect {|
+
+  let f x =
+    let y = if true then x else (x : t) in
+    (y :> int)
+end
+
+[%%expect
+{|
 module Test1 : sig type t = private int val f : t -> int end
-|}, Principal{|
+|},
+  Principal
+    {|
 Line 3, characters 49-59:
 3 |   let f x = let y = if true then x else (x:t) in (y :> int)
                                                      ^^^^^^^^^^

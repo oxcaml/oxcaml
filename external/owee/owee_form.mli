@@ -42,8 +42,7 @@ type t =
   | `addrx1
   | `addrx2
   | `addrx3
-  | `addrx4
-  ]
+  | `addrx4 ]
 
 (* [read cursor] reads a form code out of an Owee_buf, and advance the buffer past it. *)
 val read : Owee_buf.cursor -> t

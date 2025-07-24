@@ -56,12 +56,14 @@ val isprefix : string -> string -> bool
 
 (*** I/O channels ***)
 
-type io_channel = {
-  io_in : in_channel;
-  io_out : out_channel;
-  io_fd : Unix.file_descr
+type io_channel =
+  { io_in : in_channel;
+    io_out : out_channel;
+    io_fd : Unix.file_descr
   }
 
 val io_channel_of_descr : Unix.file_descr -> io_channel
+
 val close_io : io_channel -> unit
+
 val std_io : io_channel

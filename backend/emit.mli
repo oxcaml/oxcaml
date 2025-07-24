@@ -17,7 +17,10 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-val fundecl: Linear.fundecl -> unit
-val data: Cmm.data_item list -> unit
-val begin_assembly: (module Compiler_owee.Unix_intf.S) -> unit
-val end_assembly: unit -> unit
+val fundecl : Linear.fundecl -> unit
+
+val data : Cmm.data_item list -> unit
+
+val begin_assembly : (module Compiler_owee.Unix_intf.S) -> unit
+
+val end_assembly : unit -> unit

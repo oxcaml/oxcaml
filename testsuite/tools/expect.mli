@@ -13,13 +13,13 @@
 (**************************************************************************)
 
 type string_constant =
-  { str : string
-  ; tag : string
+  { str : string;
+    tag : string
   }
 
 type expectation =
-  { extid_loc   : Location.t (* Location of "expect" in "[%%expect ...]" *)
-  ; payload_loc : Location.t  (* Location of the whole payload *)
-  ; normal      : string_constant  (* expectation without -principal *)
-  ; principal   : string_constant  (* expectation with -principal *)
+  { extid_loc : Location.t; (* Location of "expect" in "[%%expect ...]" *)
+    payload_loc : Location.t; (* Location of the whole payload *)
+    normal : string_constant; (* expectation without -principal *)
+    principal : string_constant (* expectation with -principal *)
   }

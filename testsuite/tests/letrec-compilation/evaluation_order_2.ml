@@ -8,14 +8,23 @@
 type tree = Tree of tree list
 
 let test =
-  let rec x = (Tree [(print_endline "effect"; y); z])
-  and y = Tree (print_endline "effect"; [])
-  and z = Tree (print_endline "effect"; [x])
+  let rec x =
+    Tree
+      [ (print_endline "effect";
+         y);
+        z ]
+  and y =
+    Tree
+      (print_endline "effect";
+       [])
+  and z =
+    Tree
+      (print_endline "effect";
+       [x])
   in
-  match (x, y, z) with
-    | (Tree [y1; z1], Tree[], Tree[x1]) ->
-      assert (y1 == y);
-      assert (z1 == z);
-      assert (x1 == x)
-    | _ ->
-      assert false
+  match x, y, z with
+  | Tree [y1; z1], Tree [], Tree [x1] ->
+    assert (y1 == y);
+    assert (z1 == z);
+    assert (x1 == x)
+  | _ -> assert false

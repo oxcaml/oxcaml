@@ -19,15 +19,15 @@
    "caml_plugin_header" containing the following info
    (as an externed record) *)
 
-type dynunit = {
-  dynu_name: Compilation_unit.t;
-  dynu_crc: Digest.t;
-  dynu_imports_cmi: Import_info.t array;
-  dynu_imports_cmx: Import_info.t array;
-  dynu_defines: Compilation_unit.t list;
-}
+type dynunit =
+  { dynu_name : Compilation_unit.t;
+    dynu_crc : Digest.t;
+    dynu_imports_cmi : Import_info.t array;
+    dynu_imports_cmx : Import_info.t array;
+    dynu_defines : Compilation_unit.t list
+  }
 
-type dynheader = {
-  dynu_magic: string;
-  dynu_units: dynunit list;
-}
+type dynheader =
+  { dynu_magic : string;
+    dynu_units : dynunit list
+  }

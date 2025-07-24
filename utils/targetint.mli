@@ -29,150 +29,149 @@
 
 *)
 
-type t
 (** The type of target integers. *)
+type t
 
-val zero : t
 (** The target integer 0.*)
+val zero : t
 
-val one : t
 (** The target integer 1.*)
+val one : t
 
-val minus_one : t
 (** The target integer -1.*)
+val minus_one : t
 
-val neg : t -> t
 (** Unary negation. *)
+val neg : t -> t
 
-val add : t -> t -> t
 (** Addition. *)
+val add : t -> t -> t
 
-val sub : t -> t -> t
 (** Subtraction. *)
+val sub : t -> t -> t
 
-val mul : t -> t -> t
 (** Multiplication. *)
+val mul : t -> t -> t
 
-val div : t -> t -> t
 (** Integer division.  Raise [Division_by_zero] if the second
    argument is zero.  This division rounds the real quotient of
    its arguments towards zero, as specified for {!Stdlib.(/)}. *)
+val div : t -> t -> t
 
-val unsigned_div : t -> t -> t
 (** Same as {!div}, except that arguments and result are interpreted as {e
     unsigned} integers. *)
+val unsigned_div : t -> t -> t
 
-val rem : t -> t -> t
 (** Integer remainder.  If [y] is not zero, the result
    of [Targetint.rem x y] satisfies the following properties:
    [Targetint.zero <= Nativeint.rem x y < Targetint.abs y] and
    [x = Targetint.add (Targetint.mul (Targetint.div x y) y)
                       (Targetint.rem x y)].
    If [y = 0], [Targetint.rem x y] raises [Division_by_zero]. *)
+val rem : t -> t -> t
 
-val unsigned_rem : t -> t -> t
 (** Same as {!rem}, except that arguments and result are interpreted as {e
     unsigned} integers. *)
+val unsigned_rem : t -> t -> t
 
-val succ : t -> t
 (** Successor.
    [Targetint.succ x] is [Targetint.add x Targetint.one]. *)
+val succ : t -> t
 
-val pred : t -> t
 (** Predecessor.
    [Targetint.pred x] is [Targetint.sub x Targetint.one]. *)
+val pred : t -> t
 
-val abs : t -> t
 (** [abs x] is the absolute value of [x]. On [min_int] this
    is [min_int] itself and thus remains negative. *)
+val abs : t -> t
 
-val size : int
 (** The size in bits of a target native integer. *)
+val size : int
 
-val max_int : t
 (** The greatest representable target integer,
     either 2{^31} - 1 on a 32-bit platform,
     or 2{^63} - 1 on a 64-bit platform. *)
+val max_int : t
 
-val min_int : t
 (** The smallest representable target integer,
    either -2{^31} on a 32-bit platform,
    or -2{^63} on a 64-bit platform. *)
+val min_int : t
 
-val logand : t -> t -> t
 (** Bitwise logical and. *)
+val logand : t -> t -> t
 
-val logor : t -> t -> t
 (** Bitwise logical or. *)
+val logor : t -> t -> t
 
-val logxor : t -> t -> t
 (** Bitwise logical exclusive or. *)
+val logxor : t -> t -> t
 
-val lognot : t -> t
 (** Bitwise logical negation. *)
+val lognot : t -> t
 
-val shift_left : t -> int -> t
 (** [Targetint.shift_left x y] shifts [x] to the left by [y] bits.
     The result is unspecified if [y < 0] or [y >= bitsize],
     where [bitsize] is [32] on a 32-bit platform and
     [64] on a 64-bit platform. *)
+val shift_left : t -> int -> t
 
-val shift_right : t -> int -> t
 (** [Targetint.shift_right x y] shifts [x] to the right by [y] bits.
     This is an arithmetic shift: the sign bit of [x] is replicated
     and inserted in the vacated bits.
     The result is unspecified if [y < 0] or [y >= bitsize]. *)
+val shift_right : t -> int -> t
 
-val shift_right_logical : t -> int -> t
 (** [Targetint.shift_right_logical x y] shifts [x] to the right
     by [y] bits.
     This is a logical shift: zeroes are inserted in the vacated bits
     regardless of the sign of [x].
     The result is unspecified if [y < 0] or [y >= bitsize]. *)
+val shift_right_logical : t -> int -> t
 
-val of_int : int -> t
 (** Convert the given integer (type [int]) to a target integer
     (type [t]), module the target word size. *)
+val of_int : int -> t
 
-val of_int_exn : int -> t
 (** Convert the given integer (type [int]) to a target integer
     (type [t]).  Raises a fatal error if the conversion is not exact. *)
+val of_int_exn : int -> t
 
-val to_int : t -> int
 (** Convert the given target integer (type [t]) to an
     integer (type [int]).  The high-order bit is lost during
     the conversion. *)
+val to_int : t -> int
 
-val of_float : float -> t
 (** Convert the given floating-point number to a target integer,
    discarding the fractional part (truncate towards 0).
    The result of the conversion is undefined if, after truncation,
    the number is outside the range
    \[{!Targetint.min_int}, {!Targetint.max_int}\]. *)
+val of_float : float -> t
 
-val to_float : t -> float
 (** Convert the given target integer to a floating-point number. *)
+val to_float : t -> float
 
-val of_int32 : int32 -> t
 (** Convert the given 32-bit integer (type [int32])
     to a target integer. *)
+val of_int32 : int32 -> t
 
-val to_int32 : t -> int32
 (** Convert the given target integer to a
     32-bit integer (type [int32]).  On 64-bit platforms,
     the 64-bit native integer is taken modulo 2{^32},
     i.e. the top 32 bits are lost.  On 32-bit platforms,
     the conversion is exact. *)
+val to_int32 : t -> int32
 
-val of_int64 : int64 -> t
 (** Convert the given 64-bit integer (type [int64])
     to a target integer. *)
+val of_int64 : int64 -> t
 
-val to_int64 : t -> int64
 (** Convert the given target integer to a
     64-bit integer (type [int64]). *)
+val to_int64 : t -> int64
 
-val of_string : string -> t
 (** Convert the given string to a target integer.
     The string is read in decimal (by default) or in hexadecimal,
     octal or binary if the string begins with [0x], [0o] or [0b]
@@ -180,35 +179,36 @@ val of_string : string -> t
     Raise [Failure "int_of_string"] if the given string is not
     a valid representation of an integer, or if the integer represented
     exceeds the range of integers representable in type [nativeint]. *)
+val of_string : string -> t
 
-val to_string : t -> string
 (** Return the string representation of its argument, in decimal. *)
+val to_string : t -> string
 
-val compare: t -> t -> int
 (** The comparison function for target integers, with the same specification as
     {!Stdlib.compare}.  Along with the type [t], this function [compare]
     allows the module [Targetint] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
+val compare : t -> t -> int
 
-val unsigned_compare: t -> t -> int
 (** Same as {!compare}, except that arguments are interpreted as {e unsigned}
     integers. *)
+val unsigned_compare : t -> t -> int
 
-val equal: t -> t -> bool
 (** The equal function for target ints. *)
+val equal : t -> t -> bool
 
 type repr =
   | Int32 of int32
   | Int64 of int64
 
-val repr : t -> repr
 (** The concrete representation of a native integer. *)
+val repr : t -> repr
 
-val print : Format.formatter -> t -> unit
 (** Print a target integer to a formatter. *)
+val print : Format.formatter -> t -> unit
 
-val size_in_bytes_as_targetint : t
 (** The width of a target integer in bytes, expressed as a value of type [t]. *)
+val size_in_bytes_as_targetint : t
 
-val nonnegative_to_uint64_exn : t -> Numbers.Uint64.t
 (** Convert the non-negative given target integer to an unsigned 64-bit integer. *)
+val nonnegative_to_uint64_exn : t -> Numbers.Uint64.t

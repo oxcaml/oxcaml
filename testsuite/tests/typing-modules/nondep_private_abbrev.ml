@@ -1,75 +1,89 @@
 (* TEST
- expect;
+   expect;
 *)
 
-module F(_ : sig end) : sig
+module F (_ : sig end) : sig
   type t = private int
 end = struct
   type t = int
-end;;
-[%%expect{|
+end
+
+[%%expect {|
 module F : sig end -> sig type t = private int end
 |}]
 
-module Direct = F(struct end);;
-[%%expect{|
+module Direct = F ()
+
+[%%expect {|
 module Direct : sig type t = private int end
 |}]
 
-module G(X : sig end) : sig
+module G (X : sig end) : sig
   type t = F(X).t
-end = F(X);;
-[%%expect{|
+end =
+  F (X)
+
+[%%expect {|
 module G : functor (X : sig end) -> sig type t = F(X).t end
 |}]
 
-module Indirect = G(struct end);;
-[%%expect{|
+module Indirect = G ()
+
+[%%expect {|
 module Indirect : sig type t = private int end
 |}]
 
 (* unroll_abbrev *)
 
-module Pub(_ : sig end) = struct
-  type t = [ `Foo of t ]
-end;;
-[%%expect{|
+module Pub (_ : sig end) = struct
+  type t = [`Foo of t]
+end
+
+[%%expect {|
 module Pub : sig end -> sig type t = [ `Foo of t ] end
 |}]
 
-module Priv(_ : sig end) = struct
-  type t = private [ `Foo of t ]
-end;;
-[%%expect{|
+module Priv (_ : sig end) = struct
+  type t = private [`Foo of t]
+end
+
+[%%expect {|
 module Priv : sig end -> sig type t = private [ `Foo of t ] end
 |}]
 
-module DirectPub = Pub(struct end);;
-[%%expect{|
+module DirectPub = Pub ()
+
+[%%expect {|
 module DirectPub : sig type t = [ `Foo of t ] end
 |}]
 
-module DirectPriv = Priv(struct end);;
-[%%expect{|
+module DirectPriv = Priv ()
+
+[%%expect {|
 module DirectPriv : sig type t = private [ `Foo of t ] end
 |}]
 
-module H(X : sig end) : sig
+module H (X : sig end) : sig
   type t = Pub(X).t
-end = Pub(X);;
-[%%expect{|
+end =
+  Pub (X)
+
+[%%expect {|
 module H : functor (X : sig end) -> sig type t = Pub(X).t end
 |}]
 
-module I(X : sig end) : sig
+module I (X : sig end) : sig
   type t = Priv(X).t
-end = Priv(X);;
-[%%expect{|
+end =
+  Priv (X)
+
+[%%expect {|
 module I : functor (X : sig end) -> sig type t = Priv(X).t end
 |}]
 
-module IndirectPub = H(struct end);;
-[%%expect{|
+module IndirectPub = H ()
+
+[%%expect {|
 module IndirectPub : sig type t = [ `Foo of 'a ] as 'a end
 |}]
 
@@ -77,23 +91,24 @@ module IndirectPub : sig type t = [ `Foo of 'a ] as 'a end
    {[
      type t = private [ `Foo of t ]
    ]}
-   if we were unrolling the abbrev.  *)
-module IndirectPriv = I(struct end);;
-[%%expect{|
+   if we were unrolling the abbrev. *)
+module IndirectPriv = I ()
+
+[%%expect {|
 module IndirectPriv : sig type t : value mod non_float end
 |}]
 
 (* These two behave as though a functor was defined *)
-module DirectPrivEta =
-  (functor (X : sig end) -> Priv(X))(struct end);;
+module DirectPrivEta = (functor (X : sig end) -> Priv (X)) ()
+
 (* CR layouts v2.8: examine the interaction between kinds and nondep. *)
-[%%expect{|
+[%%expect {|
 module DirectPrivEta : sig type t : value mod non_float end
 |}]
 
-module DirectPrivEtaUnit =
-  (functor (_ : sig end) -> Priv)(struct end)(struct end);;
-[%%expect{|
+module DirectPrivEtaUnit = (functor (_ : sig end) -> Priv) () ()
+
+[%%expect {|
 module DirectPrivEtaUnit : sig type t : value mod non_float end
 |}]
 
@@ -102,17 +117,22 @@ module DirectPrivEtaUnit : sig type t : value mod non_float end
 
 (* Baseline *)
 
-type t = private [ `Bar of int | `Foo of t -> int ];;
-[%%expect{|
+type t = private
+  [ `Bar of int
+  | `Foo of t -> int ]
+
+[%%expect {|
 type t = private [ `Bar of int | `Foo of t -> int ]
 |}]
 
 module M : sig
-  type s = private [ `Bar of int | `Foo of 'a -> int ] as 'a
+  type s = private [`Bar of int | `Foo of 'a -> int] as 'a
 end = struct
   type s = t
-end;;
-[%%expect{|
+end
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type s = t
@@ -133,23 +153,30 @@ Error: Signature mismatch:
 
 (* nondep_type_decl + nondep_type_rec *)
 
-module Priv(_ : sig end) = struct
-  type t = private [ `Foo of t -> int | `Bar of int ]
-end;;
-[%%expect{|
+module Priv (_ : sig end) = struct
+  type t = private
+    [ `Foo of t -> int
+    | `Bar of int ]
+end
+
+[%%expect
+{|
 module Priv :
   sig end -> sig type t = private [ `Bar of int | `Foo of t -> int ] end
 |}]
 
-module I(X : sig end) : sig
+module I (X : sig end) : sig
   type t = Priv(X).t
-end = Priv(X);;
-[%%expect{|
+end =
+  Priv (X)
+
+[%%expect {|
 module I : functor (X : sig end) -> sig type t = Priv(X).t end
 |}]
 
-module IndirectPriv = I(struct end);;
+module IndirectPriv = I ()
+
 (* CR layouts v2.8: normalize away [with int]. *)
-[%%expect{|
+[%%expect {|
 module IndirectPriv : sig type t : value mod non_float end
 |}]

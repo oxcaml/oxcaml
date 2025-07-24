@@ -16,7 +16,10 @@
 
 exception Int_overflow
 
-val line: Lexing.lexbuf -> string
-val lexeme: Lexing.lexbuf -> Debugger_parser.token
-val argument: Lexing.lexbuf -> Debugger_parser.token
-val line_argument: Lexing.lexbuf -> Debugger_parser.token
+val line : Lexing.lexbuf -> string
+
+val lexeme : Lexing.lexbuf -> Debugger_parser.token
+
+val argument : Lexing.lexbuf -> Debugger_parser.token
+
+val line_argument : Lexing.lexbuf -> Debugger_parser.token

@@ -1,5 +1,5 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module X : sig
@@ -10,14 +10,18 @@ end
 
 type 'a t
 
-type (_,_) eq = Refl : ('a,'a) eq
-[%%expect{|
+type (_, _) eq = Refl : ('a, 'a) eq
+
+[%%expect
+{|
 module X : sig type 'a t end
 type 'a t
 type (_, _) eq = Refl : ('a, 'a) eq
 |}]
 
 let () =
-  let (Refl : (bool X.t, bool t) eq) as t = Obj.magic  () in ignore t
-[%%expect{|
+  let ((Refl : (bool X.t, bool t) eq) as t) = Obj.magic () in
+  ignore t
+
+[%%expect {|
 |}]

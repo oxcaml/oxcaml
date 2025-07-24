@@ -17,28 +17,21 @@
 
 open Types
 
-let class_types env cty1 cty2 =
-  Ctype.match_class_types env cty1 cty2
+let class_types env cty1 cty2 = Ctype.match_class_types env cty1 cty2
 
 let class_type_declarations ~loc env cty1 cty2 =
-  Builtin_attributes.check_alerts_inclusion
-    ~def:cty1.clty_loc
-    ~use:cty2.clty_loc
-    loc
-    cty1.clty_attributes cty2.clty_attributes
+  Builtin_attributes.check_alerts_inclusion ~def:cty1.clty_loc
+    ~use:cty2.clty_loc loc cty1.clty_attributes cty2.clty_attributes
     (Path.last cty1.clty_path);
-  Ctype.match_class_declarations env
-    cty1.clty_params cty1.clty_type
+  Ctype.match_class_declarations env cty1.clty_params cty1.clty_type
     cty2.clty_params cty2.clty_type
 
 let class_declarations env cty1 cty2 =
   match cty1.cty_new, cty2.cty_new with
-    None, Some _ ->
-      [Ctype.CM_Virtual_class]
+  | None, Some _ -> [Ctype.CM_Virtual_class]
   | _ ->
-      Ctype.match_class_declarations env
-        cty1.cty_params cty1.cty_type
-        cty2.cty_params cty2.cty_type
+    Ctype.match_class_declarations env cty1.cty_params cty1.cty_type
+      cty2.cty_params cty2.cty_type
 
 open Format
 open Ctype
@@ -49,70 +42,62 @@ let rec hide_params = function
   | cty -> cty
 *)
 
-let include_err mode ppf =
-  function
+let include_err mode ppf = function
   | CM_Virtual_class ->
-      fprintf ppf "A class cannot be changed from virtual to concrete"
+    fprintf ppf "A class cannot be changed from virtual to concrete"
   | CM_Parameter_arity_mismatch _ ->
-      fprintf ppf
-        "The classes do not have the same number of type parameters"
+    fprintf ppf "The classes do not have the same number of type parameters"
   | CM_Type_parameter_mismatch (n, env, err) ->
-      Printtyp.report_equality_error ppf mode env err
-        (function ppf ->
-           fprintf ppf "The %d%s type parameter has type"
-             n (Misc.ordinal_suffix n))
-        (function ppf ->
-           fprintf ppf "but is expected to have type")
+    Printtyp.report_equality_error ppf mode env err
+      (function
+        | ppf ->
+          fprintf ppf "The %d%s type parameter has type" n
+            (Misc.ordinal_suffix n))
+      (function ppf -> fprintf ppf "but is expected to have type")
   | CM_Class_type_mismatch (env, cty1, cty2) ->
-      Printtyp.wrap_printing_env ~error:true env (fun () ->
-        fprintf ppf
-          "@[The class type@;<1 2>%a@ %s@;<1 2>%a@]"
-          Printtyp.class_type cty1
-          "is not matched by the class type"
+    Printtyp.wrap_printing_env ~error:true env (fun () ->
+        fprintf ppf "@[The class type@;<1 2>%a@ %s@;<1 2>%a@]"
+          Printtyp.class_type cty1 "is not matched by the class type"
           Printtyp.class_type cty2)
   | CM_Parameter_mismatch (n, env, err) ->
-      Printtyp.report_moregen_error ppf mode env err
-        (function ppf ->
-           fprintf ppf "The %d%s parameter has type"
-             n (Misc.ordinal_suffix n))
-        (function ppf ->
-          fprintf ppf "but is expected to have type")
+    Printtyp.report_moregen_error ppf mode env err
+      (function
+        | ppf ->
+          fprintf ppf "The %d%s parameter has type" n (Misc.ordinal_suffix n))
+      (function ppf -> fprintf ppf "but is expected to have type")
   | CM_Val_type_mismatch (lab, env, err) ->
-      Printtyp.report_comparison_error ppf mode env err
-        (function ppf ->
-          fprintf ppf "The instance variable %s@ has type" lab)
-        (function ppf ->
-          fprintf ppf "but is expected to have type")
+    Printtyp.report_comparison_error ppf mode env err
+      (function ppf -> fprintf ppf "The instance variable %s@ has type" lab)
+      (function ppf -> fprintf ppf "but is expected to have type")
   | CM_Meth_type_mismatch (lab, env, err) ->
-      Printtyp.report_comparison_error ppf mode env err
-        (function ppf ->
-          fprintf ppf "The method %s@ has type" lab)
-        (function ppf ->
-          fprintf ppf "but is expected to have type")
+    Printtyp.report_comparison_error ppf mode env err
+      (function ppf -> fprintf ppf "The method %s@ has type" lab)
+      (function ppf -> fprintf ppf "but is expected to have type")
   | CM_Non_mutable_value lab ->
-      fprintf ppf
-       "@[The non-mutable instance variable %s cannot become mutable@]" lab
+    fprintf ppf "@[The non-mutable instance variable %s cannot become mutable@]"
+      lab
   | CM_Non_concrete_value lab ->
-      fprintf ppf
-       "@[The virtual instance variable %s cannot become concrete@]" lab
+    fprintf ppf "@[The virtual instance variable %s cannot become concrete@]"
+      lab
   | CM_Missing_value lab ->
-      fprintf ppf "@[The first class type has no instance variable %s@]" lab
+    fprintf ppf "@[The first class type has no instance variable %s@]" lab
   | CM_Missing_method lab ->
-      fprintf ppf "@[The first class type has no method %s@]" lab
+    fprintf ppf "@[The first class type has no method %s@]" lab
   | CM_Hide_public lab ->
-     fprintf ppf "@[The public method %s cannot be hidden@]" lab
+    fprintf ppf "@[The public method %s cannot be hidden@]" lab
   | CM_Hide_virtual (k, lab) ->
-      fprintf ppf "@[The virtual %s %s cannot be hidden@]" k lab
+    fprintf ppf "@[The virtual %s %s cannot be hidden@]" k lab
   | CM_Public_method lab ->
-      fprintf ppf "@[The public method %s cannot become private@]" lab
+    fprintf ppf "@[The public method %s cannot become private@]" lab
   | CM_Virtual_method lab ->
-      fprintf ppf "@[The virtual method %s cannot become concrete@]" lab
+    fprintf ppf "@[The virtual method %s cannot become concrete@]" lab
   | CM_Private_method lab ->
-      fprintf ppf "@[The private method %s cannot become public@]" lab
+    fprintf ppf "@[The private method %s cannot become public@]" lab
 
 let report_error mode ppf = function
-  |  [] -> ()
+  | [] -> ()
   | err :: errs ->
-      let print_errs ppf errs =
-        List.iter (fun err -> fprintf ppf "@ %a" (include_err mode) err) errs in
-      fprintf ppf "@[<v>%a%a@]" (include_err mode) err print_errs errs
+    let print_errs ppf errs =
+      List.iter (fun err -> fprintf ppf "@ %a" (include_err mode) err) errs
+    in
+    fprintf ppf "@[<v>%a%a@]" (include_err mode) err print_errs errs

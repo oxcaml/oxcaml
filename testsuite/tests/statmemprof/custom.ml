@@ -1,6 +1,7 @@
 (* TEST *)
 
 module MP = Gc.Memprof
+
 let () = Gc.set { (Gc.get ()) with minor_heap_size = 262144 }
 
 let bigstring_create sz =
@@ -15,17 +16,21 @@ let test sampling_rate =
   let alloc = ref 0 and collect = ref 0 and promote = ref 0 in
   let tracker =
     { MP.null_tracker with
-      alloc_minor = (fun info ->
-        if info.source <> Custom then None
-        else begin
-          alloc := !alloc + info.n_samples;
-          Some info.n_samples
-        end);
-      promote = (fun ns ->
-        promote := !promote + ns; None);
-      dealloc_minor = (fun ns ->
-        collect := !collect + ns) } in
-  let _:MP.t = MP.start ~sampling_rate tracker in
+      alloc_minor =
+        (fun info ->
+          if info.source <> Custom
+          then None
+          else (
+            alloc := !alloc + info.n_samples;
+            Some info.n_samples));
+      promote =
+        (fun ns ->
+          promote := !promote + ns;
+          None);
+      dealloc_minor = (fun ns -> collect := !collect + ns)
+    }
+  in
+  let (_ : MP.t) = MP.start ~sampling_rate tracker in
   for i = 1 to iters do
     let str = Sys.opaque_identity bigstring_create size in
     if i mod 10 = 0 then keep := str :: !keep
@@ -37,9 +42,7 @@ let test sampling_rate =
   let iters = float_of_int iters and size_words = float_of_int size_words in
   (* see comballoc.ml for notes on precision *)
   Printf.printf "%.2f %.1f\n"
-    ((float_of_int !alloc /. iters) /. size_words)
-    ((float_of_int !promote /. iters) /. size_words *. 10.)
+    (float_of_int !alloc /. iters /. size_words)
+    (float_of_int !promote /. iters /. size_words *. 10.)
 
-
-let () =
-  [0.01; 0.5; 0.17] |> List.iter test
+let () = [0.01; 0.5; 0.17] |> List.iter test

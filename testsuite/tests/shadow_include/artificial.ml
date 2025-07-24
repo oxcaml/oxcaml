@@ -1,6 +1,6 @@
 (* TEST
- flags = "-nostdlib -nopervasives";
- expect;
+   flags = "-nostdlib -nopervasives";
+   expect;
 *)
 
 module Foo : sig
@@ -11,7 +11,8 @@ module Foo : sig
   end
 
   val to_ : t -> Bar.t
-  val from: Bar.t -> t
+
+  val from : Bar.t -> t
 end = struct
   type t
 
@@ -20,10 +21,12 @@ end = struct
   end
 
   let to_ x = x
+
   let from x = x
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Foo :
   sig
     type t
@@ -35,13 +38,16 @@ module Foo :
 
 module Extended = struct
   include Foo
+
   module Bar = struct
     include Bar
+
     let int = 42
   end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Extended :
   sig
     type t = Foo.t
@@ -52,14 +58,21 @@ module Extended :
 |}]
 
 module type Extended = sig
-  include module type of struct include Foo end
+  include module type of struct
+    include Foo
+  end
+
   module Bar : sig
-    include module type of struct include Bar end
+    include module type of struct
+      include Bar
+    end
+
     val int : int
   end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Extended =
   sig
     type t = Foo.t

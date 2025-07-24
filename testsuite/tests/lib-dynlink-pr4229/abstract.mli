@@ -1,3 +1,5 @@
 type t
-val print: t -> unit
-val x: t
+
+val print : t -> unit
+
+val x : t

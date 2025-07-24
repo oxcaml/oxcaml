@@ -15,12 +15,12 @@
 
 (* Auxiliary functions for parsing *)
 
-type error =
-    Unbound of string
+type error = Unbound of string
 
 exception Error of error
 
 let tbl_ident = (Hashtbl.create 57 : (string, Backend_var.t) Hashtbl.t)
+
 let tbl_label = (Hashtbl.create 57 : (string, int) Hashtbl.t)
 
 let ident_name s =
@@ -34,29 +34,25 @@ let bind_ident s =
   Backend_var.With_provenance.create id
 
 let find_ident s =
-  try
-    Hashtbl.find tbl_ident s
-  with Not_found ->
-    raise(Error(Unbound s))
+  try Hashtbl.find tbl_ident s with Not_found -> raise (Error (Unbound s))
 
 let unbind_ident id =
   Hashtbl.remove tbl_ident (Backend_var.With_provenance.name id)
 
 let find_label s =
-  try
-    Hashtbl.find tbl_label s
+  try Hashtbl.find tbl_label s
   with Not_found ->
     let lbl = Lambda.next_raise_count () in
     Hashtbl.add tbl_label s lbl;
     lbl
 
 let report_error = function
-    Unbound s ->
-      prerr_string "Unbound identifier "; prerr_string s; prerr_endline "."
+  | Unbound s ->
+    prerr_string "Unbound identifier ";
+    prerr_string s;
+    prerr_endline "."
 
-let debuginfo ?(loc=Location.symbol_rloc ()) () =
-  Debuginfo.(from_location
-               (Scoped_location.of_location
-                  ~scopes:Scoped_location.empty_scopes loc
-               )
-            )
+let debuginfo ?(loc = Location.symbol_rloc ()) () =
+  Debuginfo.(
+    from_location
+      (Scoped_location.of_location ~scopes:Scoped_location.empty_scopes loc))

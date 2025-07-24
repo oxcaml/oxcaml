@@ -1,4 +1,5 @@
 [@@@alert foo "foo"] (* accepted *)
+
 [@@@alert bar "bar"] (* accepted *)
 
 let x = 42
@@ -7,5 +8,6 @@ let x = 42
 
 module Sub = struct
   [@@@alert foo "foo"] (* rejected *)
+
   let x = 42
 end

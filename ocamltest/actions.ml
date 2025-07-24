@@ -17,13 +17,13 @@
 
 type code = out_channel -> Environments.t -> Result.t * Environments.t
 
-type t = {
-  name : string;
-  action_description : string;
-  body : code;
-  does_something : bool;
-  mutable hook : code option
-}
+type t =
+  { name : string;
+    action_description : string;
+    body : code;
+    does_something : bool;
+    mutable hook : code option
+  }
 
 let name a = a.name
 
@@ -34,8 +34,7 @@ let does_something t = t.does_something
 let action_name = Variables.make ("action_name", "Name of the current action")
 
 let make ~name ~description ~does_something body =
-  { name; body; action_description = description; hook = None;
-    does_something }
+  { name; body; action_description = description; hook = None; does_something }
 
 let update action code = { action with body = code }
 
@@ -43,24 +42,21 @@ let compare a1 a2 = String.compare a1.name a2.name
 
 let (actions : (string, t) Hashtbl.t) = Hashtbl.create 10
 
-let register action =
-  Hashtbl.add actions action.name action
+let register action = Hashtbl.add actions action.name action
 
 let get_registered_actions () =
-  let f _name action acc = action::acc in
+  let f _name action acc = action :: acc in
   let unsorted_actions = Hashtbl.fold f actions [] in
   List.sort compare unsorted_actions
 
-let lookup name =
-  try Some (Hashtbl.find actions name)
-  with Not_found -> None
+let lookup name = try Some (Hashtbl.find actions name) with Not_found -> None
 
 let set_hook name hook =
-  let action = (Hashtbl.find actions name) in
+  let action = Hashtbl.find actions name in
   action.hook <- Some hook
 
 let clear_hook name =
-  let action = (Hashtbl.find actions name) in
+  let action = Hashtbl.find actions name in
   action.hook <- None
 
 let clear_all_hooks () =
@@ -68,15 +64,13 @@ let clear_all_hooks () =
   Hashtbl.iter f actions
 
 let run log env action =
-  let code = match action.hook with
-    | None -> action.body
-    | Some code -> code in
+  let code = match action.hook with None -> action.body | Some code -> code in
   let env = Environments.add action_name action.name env in
   code log env
 
-module ActionSet = Set.Make
-(struct
+module ActionSet = Set.Make (struct
   type nonrec t = t
+
   let compare = compare
 end)
 

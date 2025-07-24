@@ -19,22 +19,25 @@ module type Compiler = sig
   include Ocaml_tools.Tool
 
   val host : Ocaml_backends.t
+
   val target : Ocaml_backends.t
+
   val program_variable : Variables.t
+
   val program_output_variable : Variables.t option
 end
 
 type compiler = (module Compiler)
 
 val compiler :
-  name : string ->
-  flags : string ->
-  directory : string ->
-  exit_status_variable : Variables.t ->
-  reference_variable : Variables.t ->
-  output_variable : Variables.t ->
-  host : Ocaml_backends.t ->
-  target : Ocaml_backends.t ->
+  name:string ->
+  flags:string ->
+  directory:string ->
+  exit_status_variable:Variables.t ->
+  reference_variable:Variables.t ->
+  output_variable:Variables.t ->
+  host:Ocaml_backends.t ->
+  target:Ocaml_backends.t ->
   compiler
 
 val ocamlc_byte : compiler

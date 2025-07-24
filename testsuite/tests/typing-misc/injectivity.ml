@@ -1,19 +1,29 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* Syntax *)
 
-type ! 'a t = private 'a ref
-type +! 'a t = private 'a
+type !'a t = private 'a ref
+
+type +!'a t = private 'a
+
 type -!'a t = private 'a -> unit
-type + !'a t = private 'a
-type - ! 'a t = private 'a -> unit
-type !+ 'a t = private 'a
+
+type +!'a t = private 'a
+
+type -!'a t = private 'a -> unit
+
+type !+'a t = private 'a
+
 type !-'a t = private 'a -> unit
-type ! +'a t = private 'a
-type ! -'a t = private 'a -> unit
-[%%expect{|
+
+type !+'a t = private 'a
+
+type !-'a t = private 'a -> unit
+
+[%%expect
+{|
 type 'a t = private 'a ref
 type +'a t = private 'a
 type -'a t = private 'a -> unit
@@ -25,32 +35,49 @@ type +'a t = private 'a
 type -'a t = private 'a -> unit
 |}]
 (* Expect doesn't support syntax errors
-type -+ 'a t
-[%%expect]
-type -!! 'a t
-[%%expect]
+   type -+ 'a t
+   [%%expect]
+   type -!! 'a t
+   [%%expect]
 *)
 
 (* Define an injective abstract type, and use it in a GADT
    and a constrained type *)
-module M : sig type +!'a t end = struct type 'a t = 'a list end
-[%%expect{|
+module M : sig
+  type +!'a t
+end = struct
+  type 'a t = 'a list
+end
+
+[%%expect {|
 module M : sig type +!'a t end
 |}]
+
 type _ t = M : 'a -> 'a M.t t (* OK *)
+
 type 'a u = 'b constraint 'a = 'b M.t
-[%%expect{|
+
+[%%expect
+{|
 type _ t = M : 'a -> 'a M.t t
 type 'a u = 'b constraint 'a = 'b M.t
 |}]
 
 (* Without the injectivity annotation, the cannot be defined *)
-module N : sig type +'a t end = struct type 'a t = 'a list end
-[%%expect{|
+module N : sig
+  type +'a t
+end = struct
+  type 'a t = 'a list
+end
+
+[%%expect {|
 module N : sig type +'a t end
 |}]
+
 type _ t = N : 'a -> 'a N.t t (* KO *)
-[%%expect{|
+
+[%%expect
+{|
 Line 1, characters 0-29:
 1 | type _ t = N : 'a -> 'a N.t t (* KO *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -58,8 +85,11 @@ Error: In the GADT constructor
          "N : 'a -> 'a N.t t"
        the type variable "'a" cannot be deduced from the type parameters.
 |}]
+
 type 'a u = 'b constraint 'a = 'b N.t
-[%%expect{|
+
+[%%expect
+{|
 Line 1, characters 0-37:
 1 | type 'a u = 'b constraint 'a = 'b N.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -69,8 +99,15 @@ Error: In the definition
 |}]
 
 (* Of course, the internal type should be injective in this parameter *)
-module M : sig type +!'a t end = struct type 'a t = int end (* KO *)
-[%%expect{|
+module M : sig
+  type +!'a t
+end = struct
+  type 'a t = int
+end
+(* KO *)
+
+[%%expect
+{|
 Line 1, characters 33-59:
 1 | module M : sig type +!'a t end = struct type 'a t = int end (* KO *)
                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -88,8 +125,11 @@ Error: Signature mismatch:
 
 (* Annotations in type abbreviations allow to check injectivity *)
 type !'a t = 'a list
+
 type !'a u = int
-[%%expect{|
+
+[%%expect
+{|
 type 'a t = 'a list
 Line 2, characters 0-16:
 2 | type !'a u = int
@@ -98,9 +138,13 @@ Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
        but it is unrestricted.
 |}]
+
 type !'a t = private 'a list
+
 type !'a t = private int
-[%%expect{|
+
+[%%expect
+{|
 type 'a t = private 'a list
 Line 2, characters 0-24:
 2 | type !'a t = private int
@@ -111,17 +155,30 @@ Error: In this definition, expected parameter variances are not satisfied.
 |}]
 
 (* Can also use to add injectivity in private row types *)
-module M : sig type !'a t = private < m : int ; .. > end =
-  struct type 'a t = < m : int ; n : 'a > end
+module M : sig
+  type !'a t = private < m : int ; .. >
+end = struct
+  type 'a t = < m : int ; n : 'a >
+end
+
 type 'a u = M : 'a -> 'a M.t u
-[%%expect{|
+
+[%%expect
+{|
 module M : sig type !'a t = private < m : int; .. > end
 type 'a u = M : 'a -> 'a M.t u
 |}]
-module M : sig type 'a t = private < m : int ; .. > end =
-  struct type 'a t = < m : int ; n : 'a > end
+
+module M : sig
+  type 'a t = private < m : int ; .. >
+end = struct
+  type 'a t = < m : int ; n : 'a >
+end
+
 type 'a u = M : 'a -> 'a M.t u
-[%%expect{|
+
+[%%expect
+{|
 module M : sig type 'a t = private < m : int; .. > end
 Line 3, characters 0-30:
 3 | type 'a u = M : 'a -> 'a M.t u
@@ -130,9 +187,15 @@ Error: In the GADT constructor
          "M : 'a -> 'a M.t u"
        the type variable "'a" cannot be deduced from the type parameters.
 |}]
-module M : sig type !'a t = private < m : int ; .. > end =
-  struct type 'a t = < m : int > end
-[%%expect{|
+
+module M : sig
+  type !'a t = private < m : int ; .. >
+end = struct
+  type 'a t = < m : int >
+end
+
+[%%expect
+{|
 Line 2, characters 2-36:
 2 |   struct type 'a t = < m : int > end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -149,33 +212,50 @@ Error: Signature mismatch:
 |}]
 
 (* Injectivity annotations are inferred correctly for constrained parameters *)
-type 'a t = 'b constraint 'a = <b:'b>
-type !'b u = <b:'b> t
-[%%expect{|
+type 'a t = 'b constraint 'a = < b : 'b >
+
+type !'b u = < b : 'b > t
+
+[%%expect
+{|
 type 'a t = 'b constraint 'a = < b : 'b >
 type 'b u = < b : 'b > t
 |}]
 
 (* Ignore injectivity for nominal types *)
 type !_ t = X
-[%%expect{|
+
+[%%expect {|
 type _ t = X
 |}]
 
 (* Beware of constrained parameters *)
-type (_,_) eq = Refl : ('a,'a) eq
-type !'a t = private 'b constraint 'a = < b : 'b > (* OK *)
-[%%expect{|
+type (_, _) eq = Refl : ('a, 'a) eq
+
+type !'a t = private 'b constraint 'a = < b : 'b >
+
+(* OK *)
+[%%expect
+{|
 type (_, _) eq = Refl : ('a, 'a) eq
 type 'a t = private 'b constraint 'a = < b : 'b >
 |}]
 
-type !'a t = private 'b constraint 'a = < b : 'b; c : 'c > (* KO *)
-module M : sig type !'a t constraint 'a = < b : 'b; c : 'c > end =
-  struct type nonrec 'a t = 'a t end
-let inj_t : type a b. (<b:_; c:a> M.t, <b:_; c:b> M.t) eq -> (a, b) eq =
-  fun Refl -> Refl
-[%%expect{|
+type !'a t = private 'b constraint 'a = < b : 'b ; c : 'c >
+
+(* KO *)
+module M : sig
+  type !'a t constraint 'a = < b : 'b ; c : 'c >
+end = struct
+  type nonrec 'a t = 'a t
+end
+
+let inj_t :
+    type a b. (< b : _ ; c : a > M.t, < b : _ ; c : b > M.t) eq -> (a, b) eq =
+ fun Refl -> Refl
+
+[%%expect
+{|
 Line 1, characters 0-58:
 1 | type !'a t = private 'b constraint 'a = < b : 'b; c : 'c > (* KO *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -185,13 +265,23 @@ Error: In this definition, expected parameter variances are not satisfied.
 |}]
 
 (* One cannot assume that abstract types are not injective *)
-module F(X : sig type 'a t end) = struct
+module F (X : sig
+  type 'a t
+end) =
+struct
   type 'a u = unit constraint 'a = 'b X.t
+
   type _ x = G : 'a -> 'a u x
 end
-module M = F(struct type 'a t = 'a end)
-let M.G (x : bool) = M.G 3
-[%%expect{|
+
+module M = F (struct
+  type 'a t = 'a
+end)
+
+let (M.G (x : bool)) = M.G 3
+
+[%%expect
+{|
 Line 3, characters 2-29:
 3 |   type _ x = G : 'a -> 'a u x
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -202,24 +292,38 @@ Error: In the GADT constructor
 
 (* Try to be clever *)
 type 'a t = unit
+
 type !'a u = int constraint 'a = 'b t
-[%%expect{|
+
+[%%expect {|
 type 'a t = unit
 type 'a u = int constraint 'a = 'b t
 |}]
-module F(X : sig type 'a t end) = struct
-  type !'a u = 'b constraint 'a = <b : 'b> constraint 'b = _ X.t
+
+module F (X : sig
+  type 'a t
+end) =
+struct
+  type !'a u = 'b constraint 'a = < b : 'b > constraint 'b = _ X.t
 end
-[%%expect{|
+
+[%%expect
+{|
 module F :
   functor (X : sig type 'a t end) ->
     sig type 'a u = 'b X.t constraint 'a = < b : 'b X.t > end
 |}]
+
 (* But not too clever *)
-module F(X : sig type 'a t end) = struct
-  type !'a u = 'b X.t constraint 'a = <b : 'b X.t>
+module F (X : sig
+  type 'a t
+end) =
+struct
+  type !'a u = 'b X.t constraint 'a = < b : 'b X.t >
 end
-[%%expect{|
+
+[%%expect
+{|
 Line 2, characters 2-50:
 2 |   type !'a u = 'b X.t constraint 'a = <b : 'b X.t>
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -227,14 +331,22 @@ Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
        but it is unrestricted.
 |}]
-module F(X : sig type 'a t end) = struct
-  type !'a u = 'b constraint 'a = <b : _ X.t as 'b>
+
+module F (X : sig
+  type 'a t
+end) =
+struct
+  type !'a u = 'b constraint 'a = < b : (_ X.t as 'b) >
 end
-[%%expect{|
+
+[%%expect
+{|
 module F :
   functor (X : sig type 'a t end) ->
     sig type 'a u = 'b X.t constraint 'a = < b : 'b X.t > end
-|}, Principal{|
+|},
+  Principal
+    {|
 Line 2, characters 2-51:
 2 |   type !'a u = 'b constraint 'a = <b : _ X.t as 'b>
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -245,15 +357,19 @@ Error: In this definition, expected parameter variances are not satisfied.
 
 (* Motivating examples with GADTs *)
 
-type (_,_) eq = Refl : ('a,'a) eq
+type (_, _) eq = Refl : ('a, 'a) eq
 
 module Vec : sig
   type +!'a t
+
   val make : int -> (int -> 'a) -> 'a t
+
   val get : 'a t -> int -> 'a
 end = struct
   type 'a t = Vec of Obj.t array
+
   let make n f = Vec (Obj.magic Array.init n f)
+
   let get (Vec v) n = Obj.obj (Array.get v n)
 end
 
@@ -264,35 +380,32 @@ type _ ty =
 
 type dyn = Dyn : 'a ty * 'a -> dyn
 
-let rec eq_ty : type a b. a ty -> b ty -> (a,b) eq option =
-  fun t1 t2 -> match t1, t2 with
+let rec eq_ty : type a b. a ty -> b ty -> (a, b) eq option =
+ fun t1 t2 ->
+  match t1, t2 with
   | Int, Int -> Some Refl
-  | Fun (t11, t12), Fun (t21, t22) ->
-      begin match eq_ty t11 t21, eq_ty t12 t22 with
-      | Some Refl, Some Refl -> Some Refl
-      | _ -> None
-      end
-  | Vec t1, Vec t2 ->
-      begin match eq_ty t1 t2 with
-      | Some Refl -> Some Refl
-      | None -> None
-      end
+  | Fun (t11, t12), Fun (t21, t22) -> (
+    match eq_ty t11 t21, eq_ty t12 t22 with
+    | Some Refl, Some Refl -> Some Refl
+    | _ -> None)
+  | Vec t1, Vec t2 -> (
+    match eq_ty t1 t2 with Some Refl -> Some Refl | None -> None)
   | _ -> None
 
 let undyn : type a. a ty -> dyn -> a option =
-  fun t1 (Dyn (t2, v)) ->
-    match eq_ty t1 t2 with
-    | Some Refl -> Some v
-    | None -> None
+ fun t1 (Dyn (t2, v)) ->
+  match eq_ty t1 t2 with Some Refl -> Some v | None -> None
 
-let v = Vec.make 3 (fun n -> Vec.make n (fun m -> (m*n)))
+let v = Vec.make 3 (fun n -> Vec.make n (fun m -> m * n))
 
 let int_vec_vec = Vec (Vec Int)
 
 let d = Dyn (int_vec_vec, v)
 
-let Some v' = undyn int_vec_vec d
-[%%expect{|
+let (Some v') = undyn int_vec_vec d
+
+[%%expect
+{|
 type (_, _) eq = Refl : ('a, 'a) eq
 module Vec :
   sig
@@ -323,9 +436,11 @@ val v' : int Vec.t Vec.t = <abstr>
 (* Break it (using magic) *)
 module Vec : sig
   type +!'a t
+
   val eqt : ('a t, 'b t) eq
 end = struct
   type 'a t = 'a
+
   let eqt = Obj.magic Refl (* Never do that! *)
 end
 
@@ -333,12 +448,16 @@ type _ ty =
   | Int : int ty
   | Vec : 'a ty -> 'a Vec.t ty
 
-let coe : type a b. (a,b) eq -> a ty -> b ty =
-  fun Refl x -> x
-let eq_int_any : type a.  unit -> (int, a) eq = fun () ->
+let coe : type a b. (a, b) eq -> a ty -> b ty = fun Refl x -> x
+
+let eq_int_any : type a. unit -> (int, a) eq =
+ fun () ->
   let vec_ty : a Vec.t ty = coe Vec.eqt (Vec Int) in
-  let Vec Int = vec_ty in Refl
-[%%expect{|
+  let (Vec Int) = vec_ty in
+  Refl
+
+[%%expect
+{|
 module Vec : sig type +!'a t val eqt : ('a t, 'b t) eq end
 type _ ty = Int : int ty | Vec : 'a ty -> 'a Vec.t ty
 val coe : ('a, 'b) eq -> 'a ty -> 'b ty = <fun>
@@ -353,25 +472,39 @@ val eq_int_any : unit -> (int, 'a) eq = <fun>
 |}]
 
 (* Not directly related: injectivity and constraints *)
-type 'a t = 'b constraint 'a = <b : 'b>
-class type ['a] ct = object method m : 'b constraint 'a = < b : 'b > end
-[%%expect{|
+type 'a t = 'b constraint 'a = < b : 'b >
+
+class type ['a] ct =
+  object
+    method m : 'b
+
+    constraint 'a = < b : 'b >
+  end
+
+[%%expect
+{|
 type 'a t = 'b constraint 'a = < b : 'b >
 class type ['a] ct = object constraint 'a = < b : 'b > method m : 'b end
 |}]
 
 type _ u = M : 'a -> 'a t u (* OK *)
-[%%expect{|
+
+[%%expect {|
 type _ u = M : < b : 'a > -> < b : 'a > t u
 |}]
+
 type _ v = M : 'a -> 'a ct v (* OK *)
-[%%expect{|
+
+[%%expect {|
 type _ v = M : < b : 'a > -> < b : 'a > ct v
 |}]
 
-type 'a t = 'b constraint 'a = <b : 'b; c : 'c>
+type 'a t = 'b constraint 'a = < b : 'b ; c : 'c >
+
 type _ u = M : 'a -> 'a t u (* KO *)
-[%%expect{|
+
+[%%expect
+{|
 type 'a t = 'b constraint 'a = < b : 'b; c : 'c >
 Line 2, characters 0-27:
 2 | type _ u = M : 'a -> 'a t u (* KO *)
@@ -381,19 +514,24 @@ Error: In the GADT constructor
        the type variable "'b" cannot be deduced from the type parameters.
 |}]
 
-
 (* #9721 by Jeremy Yallop *)
 
 (* First, some standard bits and pieces for equality & injectivity: *)
 
-type (_,_) eql = Refl : ('a, 'a) eql
+type (_, _) eql = Refl : ('a, 'a) eql
 
-module Uninj(X: sig type !'a t end) :
-sig val uninj : ('a X.t, 'b X.t) eql -> ('a, 'b) eql end =
-struct let uninj : type a b. (a X.t, b X.t) eql -> (a, b) eql = fun Refl -> Refl end
+module Uninj (X : sig
+  type !'a t
+end) : sig
+  val uninj : ('a X.t, 'b X.t) eql -> ('a, 'b) eql
+end = struct
+  let uninj : type a b. (a X.t, b X.t) eql -> (a, b) eql = fun Refl -> Refl
+end
 
-let coerce : type a b. (a, b) eql -> a -> b = fun Refl x -> x;;
-[%%expect{|
+let coerce : type a b. (a, b) eql -> a -> b = fun Refl x -> x
+
+[%%expect
+{|
 type (_, _) eql = Refl : ('a, 'a) eql
 module Uninj :
   functor (X : sig type !'a t end) ->
@@ -407,9 +545,18 @@ val coerce : ('a, 'b) eql -> 'a -> 'b = <fun>
    accepted when defined as follows:
 *)
 
-module rec R : sig type !'a t = [ `A of 'a S.t] end = R
-       and S : sig type !'a t = 'a R.t end = S ;;
-[%%expect{|
+module rec R : sig
+  type !'a t = [`A of 'a S.t]
+end =
+  R
+
+and S : sig
+  type !'a t = 'a R.t
+end =
+  S
+
+[%%expect
+{|
 Line 1, characters 19-47:
 1 | module rec R : sig type !'a t = [ `A of 'a S.t] end = R
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -422,9 +569,13 @@ Error: In this definition, expected parameter variances are not satisfied.
    for any instantiation: *)
 
 let x_eq_y : (int R.t, string R.t) eql = Refl
-let boom = let module U = Uninj(R) in print_endline (coerce (U.uninj x_eq_y) 0)
-;;
-[%%expect{|
+
+let boom =
+  let module U = Uninj (R) in
+  print_endline (coerce (U.uninj x_eq_y) 0)
+
+[%%expect
+{|
 Line 1, characters 18-21:
 1 | let x_eq_y : (int R.t, string R.t) eql = Refl
                       ^^^
@@ -435,28 +586,33 @@ Error: Unbound module "R"
 
 module rec A : sig
   type _ t = Foo : 'a -> 'a A.s t
+
   type 'a s = T of 'a
 end =
   A
-;;
-[%%expect{|
+
+[%%expect
+{|
 module rec A : sig type _ t = Foo : 'a -> 'a A.s t type 'a s = T of 'a end
 |}]
 
 (* #12878 *)
-module Priv1 :
-sig
+module Priv1 : sig
   type !'a t = private [`T of 'a t]
+
   val eql : (int t, string t) eql
-end =
-struct
+end = struct
   type 'a t = [`T of 'a t]
+
   let eql = Refl
 end
 
-let boom_1 = let module U = Uninj (Priv1) in print_endline (coerce (U.uninj Priv1.eql) 0)
-;;
-[%%expect{|
+let boom_1 =
+  let module U = Uninj (Priv1) in
+  print_endline (coerce (U.uninj Priv1.eql) 0)
+
+[%%expect
+{|
 Line 3, characters 2-35:
 3 |   type !'a t = private [`T of 'a t]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -465,19 +621,22 @@ Error: In this definition, expected parameter variances are not satisfied.
        but it is invariant.
 |}]
 
-module Priv2 :
-sig
-  type !'a t = private <m:'a t>
+module Priv2 : sig
+  type !'a t = private < m : 'a t >
+
   val eql : (int t, string t) eql
-end =
-struct
-  type 'a t = <m:'a t>
+end = struct
+  type 'a t = < m : 'a t >
+
   let eql = Refl
 end
 
-let boom_2 = let module U = Uninj (Priv2) in print_endline (coerce (U.uninj Priv2.eql) 0)
-;;
-[%%expect{|
+let boom_2 =
+  let module U = Uninj (Priv2) in
+  print_endline (coerce (U.uninj Priv2.eql) 0)
+
+[%%expect
+{|
 Line 3, characters 2-31:
 3 |   type !'a t = private <m:'a t>
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

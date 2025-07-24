@@ -31,22 +31,21 @@
 type 'result service = ..
 
 type _ service +=
-   | Name : string service
-   (** A user-friendly label for your object / class of objects *)
-   | Traverse : ((Obj.t -> 'acc -> 'acc) -> 'acc -> 'acc) service
-   (** Run a fold functions on object leafs, useful to traverse structure
+  | Name : string service
+        (** A user-friendly label for your object / class of objects *)
+  | Traverse : ((Obj.t -> 'acc -> 'acc) -> 'acc -> 'acc) service
+        (** Run a fold functions on object leafs, useful to traverse structure
        which are partially opaque. *)
-   | Locate : Owee_location.t list service
-   (** Return a list of locations relevant to the object *)
+  | Locate : Owee_location.t list service
+        (** Return a list of locations relevant to the object *)
 
 (** Possible outcomes for the execution of a service *)
 type 'a service_result =
-  | Success of 'a
-  (** Object implements the service, here is your answer *)
+  | Success of 'a  (** Object implements the service, here is your answer *)
   | Unsupported_service
-  (** Service is not supported / unknown, but object is marked *)
+      (** Service is not supported / unknown, but object is marked *)
   | Unmanaged_object
-  (** No marker has been found on the object, you can't run any query on it *)
+      (** No marker has been found on the object, you can't run any query on it *)
 
 (** {1 Manipulating objects}
 
@@ -55,6 +54,7 @@ type 'a service_result =
 
 (** Type of object marked with the safe interface *)
 type 'a marked
+
 val get : 'a marked -> 'a
 
 (** Query an object for a service *)
@@ -77,7 +77,8 @@ val end_cycle : cycle -> unit
 
 (** Mark an object as seen in a cycle.
     An integer uniquely identifying the object in this cycle is returned. *)
-val mark_seen : cycle -> Obj.t -> [`Already_seen of int | `Now_seen of int | `Unmanaged]
+val mark_seen :
+  cycle -> Obj.t -> [`Already_seen of int | `Now_seen of int | `Unmanaged]
 
 (** Was the object already seen during this traversal?
     If seen, the integer resulting from the call to [mark_seen] is returned. *)
@@ -109,6 +110,7 @@ end
 (** {2 Unsafe api} *)
 
 type 'a marker
+
 module Unsafe0 (M : T0) : sig
   (** The marker should only appear as a field of an object of type [M.t].
 
@@ -134,23 +136,30 @@ end
 
 module type T1 = sig
   type 'x t
+
   val service : 'x t -> 'result service -> 'result service_result
 end
+
 module type T2 = sig
   type ('x, 'y) t
+
   val service : ('x, 'y) t -> 'result service -> 'result service_result
 end
+
 module type T3 = sig
   type ('x, 'y, 'z) t
+
   val service : ('x, 'y, 'z) t -> 'result service -> 'result service_result
 end
 
 module Safe1 (M : T1) : sig
   val mark : 'a M.t -> 'a M.t marked
 end
+
 module Safe2 (M : T2) : sig
   val mark : ('a, 'b) M.t -> ('a, 'b) M.t marked
 end
+
 module Safe3 (M : T3) : sig
   val mark : ('a, 'b, 'c) M.t -> ('a, 'b, 'c) M.t marked
 end
@@ -158,9 +167,11 @@ end
 module Unsafe1 (M : T1) : sig
   val marker : 'x M.t marker
 end
+
 module Unsafe2 (M : T2) : sig
   val marker : ('x, 'y) M.t marker
 end
+
 module Unsafe3 (M : T3) : sig
   val marker : ('x, 'y, 'z) M.t marker
 end

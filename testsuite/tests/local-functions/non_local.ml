@@ -13,7 +13,7 @@ let local_multiple x b =
 (* Calls in an inner scope work *)
 let local_inner_scope x =
   let[@local] f y = x + y in
-  (f 0, 1)
+  f 0, 1
 
 (* Calls inside another function should not be optimised,
    and produce a warning *)

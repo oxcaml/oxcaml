@@ -39,78 +39,82 @@ val update_search_path_from_env : unit -> unit
 (* Management and helpers for the execution *)
 
 val toplevel_env : Env.t ref
-        (* Typing environment for the toplevel *)
-val toplevel_sig : Types.signature ref
-val initialize_toplevel_env : unit -> unit
-        (* Initialize the typing environment for the toplevel *)
-val preprocess_phrase :
-      formatter -> Parsetree.toplevel_phrase ->  Parsetree.toplevel_phrase
-        (* Preprocess the given toplevel phrase using regular and ppx
-           preprocessors. Return the updated phrase. *)
-val record_backtrace : unit -> unit
+(* Typing environment for the toplevel *)
 
+val toplevel_sig : Types.signature ref
+
+val initialize_toplevel_env : unit -> unit
+(* Initialize the typing environment for the toplevel *)
+
+val preprocess_phrase :
+  formatter -> Parsetree.toplevel_phrase -> Parsetree.toplevel_phrase
+(* Preprocess the given toplevel phrase using regular and ppx
+   preprocessors. Return the updated phrase. *)
+
+val record_backtrace : unit -> unit
 
 (* Printing of values *)
 
 val find_eval_phrase :
   Typedtree.structure ->
-    (Typedtree.expression * Jkind.sort * Typedtree.attributes * Location.t) option
+  (Typedtree.expression * Jkind.sort * Typedtree.attributes * Location.t) option
 
-val max_printer_depth: int ref
-val max_printer_steps: int ref
+val max_printer_depth : int ref
 
-val print_out_value :
-  (formatter -> Outcometree.out_value -> unit) ref
-val print_out_type :
-  (formatter -> Outcometree.out_type -> unit) ref
-val print_out_class_type :
-  (formatter -> Outcometree.out_class_type -> unit) ref
+val max_printer_steps : int ref
+
+val print_out_value : (formatter -> Outcometree.out_value -> unit) ref
+
+val print_out_type : (formatter -> Outcometree.out_type -> unit) ref
+
+val print_out_class_type : (formatter -> Outcometree.out_class_type -> unit) ref
+
 val print_out_module_type :
   (formatter -> Outcometree.out_module_type -> unit) ref
+
 val print_out_type_extension :
   (formatter -> Outcometree.out_type_extension -> unit) ref
-val print_out_sig_item :
-  (formatter -> Outcometree.out_sig_item -> unit) ref
+
+val print_out_sig_item : (formatter -> Outcometree.out_sig_item -> unit) ref
+
 val print_out_signature :
   (formatter -> Outcometree.out_sig_item list -> unit) ref
-val print_out_phrase :
-  (formatter -> Outcometree.out_phrase -> unit) ref
 
+val print_out_phrase : (formatter -> Outcometree.out_phrase -> unit) ref
 
 exception Undefined_global of string
 
 module type EVAL_BASE = sig
-
-  val eval_compilation_unit: Compilation_unit.t -> Obj.t
+  val eval_compilation_unit : Compilation_unit.t -> Obj.t
 
   (* Return the value referred to by a base ident
      @raise [Undefined_global] if not found *)
-  val eval_ident: Ident.t -> Obj.t
-
+  val eval_ident : Ident.t -> Obj.t
 end
 
-
 module MakeEvalPrinter (_ : EVAL_BASE) : sig
+  val eval_address : Env.address -> Obj.t
+  (* Used for printers *)
 
-  val eval_address: Env.address -> Obj.t
-    (* Used for printers *)
+  val eval_module_path : Env.t -> Path.t -> Obj.t
 
-  val eval_module_path: Env.t -> Path.t -> Obj.t
-  val eval_value_path: Env.t -> Path.t -> Obj.t
-  val eval_extension_path: Env.t -> Path.t -> Obj.t
-  val eval_class_path: Env.t -> Path.t -> Obj.t
-    (* Return the toplevel object referred to by the given path *)
+  val eval_value_path : Env.t -> Path.t -> Obj.t
 
-  module Printer: Genprintval.S with type t = Obj.t
+  val eval_extension_path : Env.t -> Path.t -> Obj.t
 
-  val print_value: Env.t -> Printer.t -> formatter -> Types.type_expr -> unit
+  val eval_class_path : Env.t -> Path.t -> Obj.t
+  (* Return the toplevel object referred to by the given path *)
 
-  val print_untyped_exception: formatter -> Printer.t -> unit
+  module Printer : Genprintval.S with type t = Obj.t
+
+  val print_value : Env.t -> Printer.t -> formatter -> Types.type_expr -> unit
+
+  val print_untyped_exception : formatter -> Printer.t -> unit
 
   val print_exception_outcome : formatter -> exn -> unit
-    (* Print an exception resulting from the evaluation of user code. *)
+  (* Print an exception resulting from the evaluation of user code. *)
 
-  val outval_of_value:
+  val outval_of_value :
     Env.t -> Printer.t -> Types.type_expr -> Outcometree.out_value
 
   type ('a, 'b) gen_printer =
@@ -119,17 +123,24 @@ module MakeEvalPrinter (_ : EVAL_BASE) : sig
 
   val install_printer :
     Path.t -> Types.type_expr -> (formatter -> Printer.t -> unit) -> unit
+
   val install_generic_printer :
-    Path.t -> Path.t ->
-    (int -> (int -> Printer.t -> Outcometree.out_value,
-            Printer.t-> Outcometree.out_value) gen_printer) -> unit
+    Path.t ->
+    Path.t ->
+    (int ->
+    ( int -> Printer.t -> Outcometree.out_value,
+      Printer.t -> Outcometree.out_value )
+    gen_printer) ->
+    unit
+
   val install_generic_printer' :
-    Path.t -> Path.t -> (formatter -> Printer.t -> unit,
-                         formatter -> Printer.t -> unit) gen_printer -> unit
+    Path.t ->
+    Path.t ->
+    (formatter -> Printer.t -> unit, formatter -> Printer.t -> unit) gen_printer ->
+    unit
+
   val remove_printer : Path.t -> unit
-
 end
-
 
 (* Interface with toplevel directives *)
 
@@ -140,10 +151,10 @@ type directive_fun =
   | Directive_ident of (Longident.t -> unit)
   | Directive_bool of (bool -> unit)
 
-type directive_info = {
-  section: string;
-  doc: string;
-}
+type directive_info =
+  { section : string;
+    doc : string
+  }
 
 (* Add toplevel directive and its documentation.
    @since 4.03 *)
@@ -158,21 +169,26 @@ val all_directive_names : unit -> string list
 val try_run_directive :
   formatter -> string -> Parsetree.directive_argument option -> bool
 
-val[@deprecated] directive_table : (string, directive_fun) Hashtbl.t
-  (* @deprecated please use [add_directive] instead of inserting
-     in this table directly. *)
+val directive_table : (string, directive_fun) Hashtbl.t [@@deprecated]
+(* @deprecated please use [add_directive] instead of inserting
+   in this table directly. *)
 
-val[@deprecated] directive_info_table : (string, directive_info) Hashtbl.t
-  (* @deprecated please use [add_directive] instead of inserting
-     in this table directly. *)
+val directive_info_table : (string, directive_info) Hashtbl.t [@@deprecated]
+(* @deprecated please use [add_directive] instead of inserting
+   in this table directly. *)
 
 (* Hooks for external parsers and printers *)
 
 val parse_toplevel_phrase : (Lexing.lexbuf -> Parsetree.toplevel_phrase) ref
+
 val parse_use_file : (Lexing.lexbuf -> Parsetree.toplevel_phrase list) ref
+
 val print_location : formatter -> Location.t -> unit
+
 val print_error : formatter -> Location.error -> unit
+
 val print_warning : Location.t -> formatter -> Warnings.t -> unit
+
 val input_name : string ref
 
 (* Hooks for external line editor *)
@@ -192,13 +208,12 @@ val read_interactive_input : (string -> bytes -> int -> int * bool) ref
 val toplevel_startup_hook : (unit -> unit) ref
 
 type event = ..
-type event +=
-  | Startup
-  | After_setup
-  (* Just after the setup, when the toplevel is ready to evaluate user
-     input. This happens before the toplevel has evaluated any kind of
-     user input, in particular this happens before loading the
-     [.ocamlinit] file. *)
+
+type event += Startup | After_setup
+(* Just after the setup, when the toplevel is ready to evaluate user
+   input. This happens before the toplevel has evaluated any kind of
+   user input, in particular this happens before loading the
+   [.ocamlinit] file. *)
 
 val add_hook : (event -> unit) -> unit
 (* Add a function that will be called at key points of the toplevel
@@ -226,13 +241,15 @@ val is_command_like_name : string -> bool
 
 (* internal functions used by [Topeval] *)
 
-type evaluation_outcome = Result of Obj.t | Exception of exn
+type evaluation_outcome =
+  | Result of Obj.t
+  | Exception of exn
 
-val backtrace: string option ref
+val backtrace : string option ref
 
-val parse_mod_use_file:
+val parse_mod_use_file :
   string -> Lexing.lexbuf -> Parsetree.toplevel_phrase list
 
 val comment_prompt_override : bool ref
 
-val refill_lexbuf: bytes -> int -> int
+val refill_lexbuf : bytes -> int -> int

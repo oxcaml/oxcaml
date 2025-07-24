@@ -1,33 +1,52 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (** Basic *)
-module type x = sig type t = int end
+module type x = sig
+  type t = int
+end
 
 module type t = sig
   module type x
-  module M:x
+
+  module M : x
 end
 
 module type t' = t with module type x = x
-[%%expect {|
+
+[%%expect
+{|
 module type x = sig type t = int end
 module type t = sig module type x module M : x end
 module type t' = sig module type x = x module M : x end
 |}]
 
 module type t'' = t with module type x := x
+
 [%%expect {|
 module type t'' = sig module M : x end
 |}]
 
-module type t3 = t with module type x = sig type t end
-[%%expect {|
+module type t3 =
+  t
+    with
+      module type x = sig
+        type t
+      end
+
+[%%expect
+{|
 module type t3 = sig module type x = sig type t end module M : x end
 |}]
 
-module type t4 = t with module type x := sig type t end
+module type t4 =
+  t
+    with
+      module type x := sig
+        type t
+      end
+
 [%%expect {|
 module type t4 = sig module M : sig type t end end
 |}]
@@ -35,15 +54,19 @@ module type t4 = sig module M : sig type t end end
 (** nested *)
 
 module type ENDO = sig
-  module Inner:
-  sig
+  module Inner : sig
     module type T
-    module F: T -> T
+
+    module F (_ : T) : T
   end
 end
+
 module type ENDO_2 = ENDO with module type Inner.T = ENDO
+
 module type ENDO_2' = ENDO with module type Inner.T := ENDO
-[%%expect {|
+
+[%%expect
+{|
 module type ENDO =
   sig module Inner : sig module type T module F : T -> T end end
 module type ENDO_2 =
@@ -51,52 +74,74 @@ module type ENDO_2 =
 module type ENDO_2' = sig module Inner : sig module F : ENDO -> ENDO end end
 |}]
 
-
 module type S = sig
-  module M: sig
+  module M : sig
     module type T
   end
-  module N: M.T
+
+  module N : M.T
 end
+
 module type R = S with module type M.T := sig end
-[%%expect {|
+
+[%%expect
+{|
 module type S = sig module M : sig module type T end module N : M.T end
 module type R = sig module M : sig end module N : sig end end
 |}]
 
-
 (** Adding equalities *)
 
-module type base = sig type t = X of int | Y of float end
+module type base = sig
+  type t =
+    | X of int
+    | Y of float
+end
 
 module type u = sig
-  module type t = sig type t = X of int | Y of float end
-  module M: t
+  module type t = sig
+    type t =
+      | X of int
+      | Y of float
+  end
+
+  module M : t
 end
 
 module type s = u with module type t := base
-[%%expect {|
+
+[%%expect
+{|
 module type base = sig type t = X of int | Y of float end
 module type u =
   sig module type t = sig type t = X of int | Y of float end module M : t end
 module type s = sig module M : base end
 |}]
 
-
-module type base = sig type t = X of int | Y of float end
+module type base = sig
+  type t =
+    | X of int
+    | Y of float
+end
 
 module type u = sig
   type x
+
   type y
-  module type t = sig type t = X of x | Y of y end
-  module M: t
+
+  module type t = sig
+    type t =
+      | X of x
+      | Y of y
+  end
+
+  module M : t
 end
 
-module type r =
-  u with type x = int
-     and type y = float
-     and module type t = base
-[%%expect {|
+module type r = u with type x = int and type y = float and module type t = base
+
+[%%expect
+{|
 module type base = sig type t = X of int | Y of float end
 module type u =
   sig
@@ -109,29 +154,26 @@ module type r =
   sig type x = int type y = float module type t = base module M : t end
 |}]
 
-module type r =
-  u with type x = int
-     and type y = float
-     and module type t := base
-[%%expect {|
+module type r = u with type x = int and type y = float and module type t := base
+
+[%%expect
+{|
 module type r = sig type x = int type y = float module M : base end
 |}]
 
-
 module type r =
-  u with type x := int
-     and type y := float
-     and module type t := base
+  u with type x := int and type y := float and module type t := base
+
 [%%expect {|
 module type r = sig module M : base end
 |}]
 
 (** error *)
 
-module type r =
-  u with module type t := base
+module type r = u with module type t := base
 
-[%%expect {|
+[%%expect
+{|
 Line 4, characters 2-30:
 4 |   u with module type t := base
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -163,23 +205,28 @@ Error: In this "with" constraint, the new definition of "t"
 
 module type fst = sig
   module type t
-  val x: (module t)
+
+  val x : (module t)
 end
 
 module type ext
+
 module type fst_ext = fst with module type t = ext
+
 module type fst_ext = fst with module type t := ext
-[%%expect {|
+
+[%%expect
+{|
 module type fst = sig module type t val x : (module t) end
 module type ext
 module type fst_ext = sig module type t = ext val x : (module t) end
 module type fst_ext = sig val x : (module ext) end
 |}]
 
-
-
 module type fst_erased = fst with module type t := sig end
-[%%expect {|
+
+[%%expect
+{|
 Line 1, characters 25-58:
 1 | module type fst_erased = fst with module type t := sig end
                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -188,19 +235,24 @@ Error: This "with" constraint "t := sig end" makes a packed module ill-formed.
 |}]
 
 module type fst_ok = fst with module type t = sig end
-[%%expect {|
+
+[%%expect
+{|
 module type fst_ok = sig module type t = sig end val x : (module t) end
 |}]
 
 module type S = sig
-  module M: sig
+  module M : sig
     module type T
   end
-  val x: (module M.T)
+
+  val x : (module M.T)
 end
 
 module type R = S with module type M.T := sig end
-[%%expect {|
+
+[%%expect
+{|
 module type S = sig module M : sig module type T end val x : (module M.T) end
 Line 8, characters 16-49:
 8 | module type R = S with module type M.T := sig end
@@ -209,16 +261,18 @@ Error: This "with" constraint "M.T := sig end" makes a packed module ill-formed.
        (see manual section 12.7.3)
 |}]
 
-
 module type S = sig
-  module M: sig
+  module M : sig
     module type T
-    val x: (module T)
+
+    val x : (module T)
   end
 end
 
 module type R = S with module type M.T := sig end
-[%%expect {|
+
+[%%expect
+{|
 module type S = sig module M : sig module type T val x : (module T) end end
 Line 8, characters 16-49:
 8 | module type R = S with module type M.T := sig end
@@ -227,15 +281,32 @@ Error: This "with" constraint "T := sig end" makes a packed module ill-formed.
        (see manual section 12.7.3)
 |}]
 
-
 (** local module type substitutions *)
 
 module type s = sig
-  module type u := sig type a type b type c end
-  module type r = sig type r include u end
-  module type s = sig include u type a = A end
+  module type u := sig
+    type a
+
+    type b
+
+    type c
+  end
+
+  module type r = sig
+    type r
+
+    include u
+  end
+
+  module type s = sig
+    include u
+
+    type a = A
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type s =
   sig
     module type r = sig type r type a type b type c end
@@ -243,12 +314,24 @@ module type s =
   end
 |}]
 
-
 module type s = sig
-  module type u := sig type a type b type c end
-  module type wrong = sig type a include u end
+  module type u := sig
+    type a
+
+    type b
+
+    type c
+  end
+
+  module type wrong = sig
+    type a
+
+    include u
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 Line 3, characters 33-42:
 3 |   module type wrong = sig type a include u end
                                      ^^^^^^^^^
@@ -260,29 +343,41 @@ Error: Multiple definition of the type name "a".
    be used in first class modules. *)
 
 module X = struct
-  module type s = sig type t end
-  module Y(Z : s) = struct
+  module type s = sig
+    type t
+  end
+
+  module Y (Z : s) = struct
     module type Ys = sig end
   end
 end
 
 module type fcm_path = sig
   module type t_s := X.s
-  module Z : sig type t end
+
+  module Z : sig
+    type t
+  end
+
   module type t_Ys := X.Y(Z).Ys
 
   module F : functor (Z : module type of Z) -> sig
-    module type t_F = sig type ff end
+    module type t_F = sig
+      type ff
+    end
   end
 
   module type t_FF := F(Z).t_F
 
-  val x_s: (module t_s)
-  val x_sY: (module t_Ys)
+  val x_s : (module t_s)
+
+  val x_sY : (module t_Ys)
+
   val x_sFF : (module t_FF)
 end
 
-[%%expect {|
+[%%expect
+{|
 module X :
   sig
     module type s = sig type t end
@@ -302,9 +397,12 @@ module type fcm_path =
 
 module type fcm_signature = sig
   module type t := sig end
-  val x: (module t)
+
+  val x : (module t)
 end
-[%%expect {|
+
+[%%expect
+{|
 Line 3, characters 2-19:
 3 |   val x: (module t)
       ^^^^^^^^^^^^^^^^^
@@ -313,23 +411,30 @@ Error: The module type "t" is not a valid type for a packed module:
        for an anonymous module type. (see manual section 12.7.3)
 |}]
 
-
 module type hidden = sig
-  module type t := sig type u end
+  module type t := sig
+    type u
+  end
+
   include t
-  val x: (module t)
-  val x: int
+
+  val x : (module t)
+
+  val x : int
 end
+
 [%%expect {|
 module type hidden = sig type u val x : int end
 |}]
 
-
 module type s = sig
   module type t := sig end
+
   type s := (module t)
 end
-[%%expect {|
+
+[%%expect
+{|
 Line 3, characters 2-22:
 3 |   type s := (module t)
       ^^^^^^^^^^^^^^^^^^^^
@@ -340,10 +445,14 @@ Error: The module type "t" is not a valid type for a packed module:
 
 module type s = sig
   module type t := sig end
+
   module type r := t
+
   type s := (module r)
 end
-[%%expect {|
+
+[%%expect
+{|
 Line 4, characters 2-22:
 4 |   type s := (module r)
       ^^^^^^^^^^^^^^^^^^^^
@@ -354,12 +463,16 @@ Error: The module type "r" is not a valid type for a packed module:
 
 module type s = sig
   module type t := sig end
+
   module type r := sig
-      type s = (module t)
+    type s = (module t)
   end
+
   module type k = r
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 3-5, characters 2-5:
 3 | ..module type r := sig
 4 |       type s = (module t)
@@ -376,13 +489,24 @@ Error: The module type "t" is not a valid type for a packed module:
 module type Test_Abstract = sig
   module type S := sig
     module type A
+
     module X' : A
   end
 
-  module rec X : (S with module type A = sig type t end)
-  and Y : sig type u = X.X'.t end
+  module rec X :
+    (S
+      with
+        module type A = sig
+          type t
+        end)
+
+  and Y : sig
+    type u = X.X'.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Abstract =
   sig
     module rec X : sig module type A = sig type t end module X' : A end
@@ -390,19 +514,29 @@ module type Test_Abstract =
   end
 |}]
 
-
 (* Approximating a signature with a constraint should merge the approximated
    constraint (abstract, destructive case) *)
 module type Test_Abstract_Destructive = sig
   module type S := sig
     module type A
+
     module X' : A
   end
 
-  module rec X : (S with module type A := sig type t end)
-  and Y : sig type u = X.X'.t end
+  module rec X :
+    (S
+      with
+        module type A := sig
+          type t
+        end)
+
+  and Y : sig
+    type u = X.X'.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Abstract_Destructive =
   sig
     module rec X : sig module X' : sig type t end end
@@ -410,19 +544,35 @@ module type Test_Abstract_Destructive =
   end
 |}]
 
-
 (* Approximating a signature with a constraint should merge the approximated
    constraint (concrete, non destructive case) *)
 module type Test_Concrete = sig
   module type S := sig
-    module type A = sig type t type u end
+    module type A = sig
+      type t
+
+      type u
+    end
+
     module X' : A
   end
 
-  module rec X : (S with module type A = sig type u type t end)
-  and Y : sig type v = X.X'.t end
+  module rec X :
+    (S
+      with
+        module type A = sig
+          type u
+
+          type t
+        end)
+
+  and Y : sig
+    type v = X.X'.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Concrete =
   sig
     module rec X :
@@ -435,14 +585,31 @@ module type Test_Concrete =
    constraint (concrete, destructive case) *)
 module type Test_Concrete_Destructive = sig
   module type S := sig
-    module type A = sig type t type u end
+    module type A = sig
+      type t
+
+      type u
+    end
+
     module X' : A
   end
 
-  module rec X : (S with module type A := sig type u type t end)
-  and Y : sig type v = X.X'.t end
+  module rec X :
+    (S
+      with
+        module type A := sig
+          type u
+
+          type t
+        end)
+
+  and Y : sig
+    type v = X.X'.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Concrete_Destructive =
   sig
     module rec X : sig module X' : sig type u type t end end
@@ -450,22 +617,33 @@ module type Test_Concrete_Destructive =
   end
 |}]
 
-
 (* Approximating a signature with a constraint should merge the approximated
    constraint (deep, abstract, non destructive case) *)
 module type Test_Deep_Abstract = sig
   module type S := sig
     module M : sig
       module type A
+
       module X1 : A
     end
+
     module X2 : M.A
   end
 
-  module rec X : (S with module type M.A = sig type t end)
-  and Y : sig type u = X.X2.t * X.M.X1.t end
+  module rec X :
+    (S
+      with
+        module type M.A = sig
+          type t
+        end)
+
+  and Y : sig
+    type u = X.X2.t * X.M.X1.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Deep_Abstract =
   sig
     module rec X :
@@ -477,22 +655,33 @@ module type Test_Deep_Abstract =
   end
 |}]
 
-
 (* Approximating a signature with a constraint should merge the approximated
    constraint (deep, abstract, destructive case) *)
 module type Test_Deep_Abstract_Destructive = sig
   module type S := sig
     module M : sig
       module type A
+
       module X1 : A
     end
+
     module X2 : M.A
   end
 
-  module rec X : (S with module type M.A := sig type t end)
-  and Y : sig type u = X.X2.t * X.M.X1.t end
+  module rec X :
+    (S
+      with
+        module type M.A := sig
+          type t
+        end)
+
+  and Y : sig
+    type u = X.X2.t * X.M.X1.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Deep_Abstract_Destructive =
   sig
     module rec X :
@@ -504,22 +693,39 @@ module type Test_Deep_Abstract_Destructive =
   end
 |}]
 
-
 (* Approximating a signature with a constraint should merge the approximated
    constraint (deep, concrete, non destructive case) *)
 module type Test_Deep_Concrete = sig
   module type S := sig
     module M : sig
-      module type A = sig type t type u end
+      module type A = sig
+        type t
+
+        type u
+      end
+
       module X1 : A
     end
+
     module X2 : M.A
   end
 
-  module rec X : (S with module type M.A = sig type u type t end)
-  and Y : sig type u = X.X2.t * X.M.X1.t end
+  module rec X :
+    (S
+      with
+        module type M.A = sig
+          type u
+
+          type t
+        end)
+
+  and Y : sig
+    type u = X.X2.t * X.M.X1.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Deep_Concrete =
   sig
     module rec X :
@@ -532,22 +738,39 @@ module type Test_Deep_Concrete =
   end
 |}]
 
-
 (* Approximating a signature with a constraint should merge the approximated
    constraint (deep, concrete, destructive case) *)
 module type Test_Deep_Concrete_Destructive = sig
   module type S := sig
     module M : sig
-      module type A = sig type t type u end
+      module type A = sig
+        type t
+
+        type u
+      end
+
       module X1 : A
     end
+
     module X2 : M.A
   end
 
-  module rec X : (S with module type M.A := sig type u type t end)
-  and Y : sig type u = X.X2.t * X.M.X1.t end
+  module rec X :
+    (S
+      with
+        module type M.A := sig
+          type u
+
+          type t
+        end)
+
+  and Y : sig
+    type u = X.X2.t * X.M.X1.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 module type Test_Deep_Concrete_Destructive =
   sig
     module rec X :
@@ -559,18 +782,29 @@ module type Test_Deep_Concrete_Destructive =
   end
 |}]
 
-
 (* Invalid substitutions might be accepted during the approximation phase, but
    should be rejected during typechecking of signatures (before typechecking of
    module bodies) *)
 module type Test = sig
   module rec X : (sig
-      module type A = sig type t = bool end
-      module X' : A
-    end with module type A = sig type t = int end)
-  and Y : sig type u = X.X'.t end
+    module type A = sig
+      type t = bool
+    end
+
+    module X' : A
+  end
+  with
+    module type A = sig
+      type t = int
+    end)
+
+  and Y : sig
+    type u = X.X'.t
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 2-5, characters 18-49:
 2 | ..................sig
 3 |       module type A = sig type t = bool end

@@ -6,8 +6,8 @@ We define a Length module to implement positive integers.
 
 *)
 
-type t = private int;;
+type t = private int
 
-val make : int -> t;;
+val make : int -> t
 
-external from : t -> int = "%identity";;
+external from : t -> int = "%identity"

@@ -27,7 +27,7 @@ val add_file : io_channel -> (io_channel -> unit) -> unit
 val remove_file : io_channel -> unit
 
 (* Return the controller currently attached to the given file. *)
-val current_controller : io_channel -> (io_channel -> unit)
+val current_controller : io_channel -> io_channel -> unit
 
 (* Execute a function with `controller' attached to `file'. *)
 (* ### controller file funct *)

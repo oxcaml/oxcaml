@@ -1,6 +1,8 @@
 (* TEST *)
 
-type t = Leaf of int | Branch of t * t
+type t =
+  | Leaf of int
+  | Branch of t * t
 
 type floatref = { mutable f : float }
 
@@ -8,7 +10,7 @@ let a = { f = 0.0 }
 
 let rec allocate_lots m = function
   | 0 -> Leaf m
-  | n -> Branch (allocate_lots m (n-1), allocate_lots (m+1) (n-1))
+  | n -> Branch (allocate_lots m (n - 1), allocate_lots (m + 1) (n - 1))
 
 let measure f =
   let a = Gc.minor_words () in

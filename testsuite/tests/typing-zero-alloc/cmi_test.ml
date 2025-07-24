@@ -11,9 +11,12 @@
    have zero_alloc variables - we can't add further zero_alloc constraints, but
    we do get the ones already present in the cmi. *)
 module M1 : sig
-  val[@zero_alloc] f_unconstrained_variable : int -> int
-end = Cmi_test_lib
-[%%expect{|
+  val f_unconstrained_variable : int -> int [@@zero_alloc]
+end =
+  Cmi_test_lib
+
+[%%expect
+{|
 Line 3, characters 6-18:
 3 | end = Cmi_test_lib
           ^^^^^^^^^^^^
@@ -37,9 +40,12 @@ Error: Signature mismatch:
 |}]
 
 module M2 : sig
-  val[@zero_alloc strict] f : int -> int
-end = Cmi_test_lib.M_constrained_variable
-[%%expect{|
+  val f : int -> int [@@zero_alloc strict]
+end =
+  Cmi_test_lib.M_constrained_variable
+
+[%%expect
+{|
 Line 3, characters 6-41:
 3 | end = Cmi_test_lib.M_constrained_variable
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -57,16 +63,21 @@ Error: Signature mismatch:
 |}]
 
 module M3 : sig
-  val[@zero_alloc] f : int -> int
-end = Cmi_test_lib.M_constrained_variable
-        [%%expect{|
+  val f : int -> int [@@zero_alloc]
+end =
+  Cmi_test_lib.M_constrained_variable
+
+[%%expect {|
 module M3 : sig val f : int -> int [@@zero_alloc] end
 |}]
 
 module M4 : sig
-  val[@zero_alloc] f : int -> int
-end = Cmi_test_lib.M_no_variable
-[%%expect{|
+  val f : int -> int [@@zero_alloc]
+end =
+  Cmi_test_lib.M_no_variable
+
+[%%expect
+{|
 Line 3, characters 6-32:
 3 | end = Cmi_test_lib.M_no_variable
           ^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -17,8 +17,13 @@
    Thanks to Daniel de Rauglaudre. *)
 
 type 'a dag = { mutable dag : 'a node array }
+
 and 'a node =
-  { mutable pare : idag list; valu : 'a; mutable chil : idag list }
+  { mutable pare : idag list;
+    valu : 'a;
+    mutable chil : idag list
+  }
+
 and idag = int
 
 (** This function returns the html code to represent the given dag. *)
@@ -26,6 +31,6 @@ val html_of_dag : string dag -> string
 
 (** This function takes a list of classes and a list of class types and creates the associate dag. *)
 val create_class_dag :
-    Odoc_info.Class.t_class list ->
-      Odoc_info.Class.t_class_type list ->
-        (Odoc_info.Name.t * Odoc_info.Class.cct option) dag
+  Odoc_info.Class.t_class list ->
+  Odoc_info.Class.t_class_type list ->
+  (Odoc_info.Name.t * Odoc_info.Class.cct option) dag

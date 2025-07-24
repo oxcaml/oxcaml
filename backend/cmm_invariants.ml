@@ -15,7 +15,6 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-
 module Int = Numbers.Int
 
 (* Check a number of continuation-related invariants *)
@@ -31,15 +30,16 @@ module Env : sig
 
   val report : Format.formatter -> bool
 end = struct
-  type t = {
-    bound_handlers : int Int.Map.t;
-  }
+  type t = { bound_handlers : int Int.Map.t }
 
   type error =
-    | Unbound_handler of { cont: int }
-    | Multiple_handlers of { cont: int; }
+    | Unbound_handler of { cont : int }
+    | Multiple_handlers of { cont : int }
     | Wrong_arguments_number of
-        { cont: int; handler_args: int; jump_args: int; }
+        { cont : int;
+          handler_args : int;
+          jump_args : int
+        }
 
   module Error = struct
     type t = error
@@ -47,84 +47,70 @@ end = struct
     let compare = Stdlib.compare
   end
 
-  module ErrorSet = Set.Make(Error)
+  module ErrorSet = Set.Make (Error)
 
-  type persistent_state = {
-    mutable all_handlers : Int.Set.t;
-    mutable errors : ErrorSet.t;
-  }
+  type persistent_state =
+    { mutable all_handlers : Int.Set.t;
+      mutable errors : ErrorSet.t
+    }
 
-  let state = {
-    all_handlers = Int.Set.empty;
-    errors = ErrorSet.empty;
-  }
+  let state = { all_handlers = Int.Set.empty; errors = ErrorSet.empty }
 
-  let record_error error =
-    state.errors <- ErrorSet.add error state.errors
+  let record_error error = state.errors <- ErrorSet.add error state.errors
 
-  let unbound_handler cont =
-    record_error (Unbound_handler { cont; })
+  let unbound_handler cont = record_error (Unbound_handler { cont })
 
-  let multiple_handler cont =
-    record_error (Multiple_handlers { cont; })
+  let multiple_handler cont = record_error (Multiple_handlers { cont })
 
   let wrong_arguments cont handler_args jump_args =
-    record_error (Wrong_arguments_number { cont; handler_args; jump_args; })
+    record_error (Wrong_arguments_number { cont; handler_args; jump_args })
 
   let init () =
     state.all_handlers <- Int.Set.empty;
     state.errors <- ErrorSet.empty;
-    {
-      bound_handlers = Int.Map.empty;
-    }
+    { bound_handlers = Int.Map.empty }
 
   let handler t ~cont ~arg_num =
     if Int.Set.mem cont state.all_handlers then multiple_handler cont;
     state.all_handlers <- Int.Set.add cont state.all_handlers;
     let bound_handlers = Int.Map.add cont arg_num t.bound_handlers in
-    { bound_handlers; }
+    { bound_handlers }
 
   let jump t ~exit_label ~arg_num =
     match (exit_label : Cmm.exit_label) with
     | Return_lbl -> ()
-    | Lbl cont ->
+    | Lbl cont -> (
       match Int.Map.find cont t.bound_handlers with
       | handler_args ->
-        if arg_num <> handler_args then
-          wrong_arguments cont handler_args arg_num
-      | exception Not_found -> unbound_handler cont
+        if arg_num <> handler_args
+        then wrong_arguments cont handler_args arg_num
+      | exception Not_found -> unbound_handler cont)
 
   let print_error ppf error =
     match error with
     | Unbound_handler { cont } ->
-      if Int.Set.mem cont state.all_handlers then
+      if Int.Set.mem cont state.all_handlers
+      then
         Format.fprintf ppf
-          "Continuation %d was used outside the scope of its handler"
-          cont
-      else
-        Format.fprintf ppf
-          "Continuation %d was used but never bound"
-          cont
-    | Multiple_handlers { cont; } ->
-      Format.fprintf ppf
-        "Continuation %d was declared in more than one handler"
+          "Continuation %d was used outside the scope of its handler" cont
+      else Format.fprintf ppf "Continuation %d was used but never bound" cont
+    | Multiple_handlers { cont } ->
+      Format.fprintf ppf "Continuation %d was declared in more than one handler"
         cont
     | Wrong_arguments_number { cont; handler_args; jump_args } ->
       Format.fprintf ppf
-        "Continuation %d was declared with %d arguments but called with %d"
-        cont
-        handler_args
-        jump_args
+        "Continuation %d was declared with %d arguments but called with %d" cont
+        handler_args jump_args
 
   let print_error_newline ppf error =
     Format.fprintf ppf "%a@." print_error error
 
   let report ppf =
-    if ErrorSet.is_empty state.errors then false
-    else begin
+    if ErrorSet.is_empty state.errors
+    then false
+    else (
       ErrorSet.iter (fun err -> print_error_newline ppf err) state.errors;
-      true
-    end
+      true)
 end
 
 let rec check env (expr : Cmm.expression) =
@@ -136,12 +122,9 @@ let rec check env (expr : Cmm.expression) =
   | Clet (_, expr, body) ->
     check env expr;
     check env body
-  | Cphantom_let (_, _, expr) ->
-    check env expr
-  | Ctuple exprs ->
-    List.iter (check env) exprs
-  | Cop (_, args, _) ->
-    List.iter (check env) args;
+  | Cphantom_let (_, _, expr) -> check env expr
+  | Ctuple exprs -> List.iter (check env) exprs
+  | Cop (_, args, _) -> List.iter (check env) args
   | Csequence (expr1, expr2) ->
     check env expr1;
     check env expr2
@@ -156,15 +139,12 @@ let rec check env (expr : Cmm.expression) =
     let env_extended =
       List.fold_left
         (fun env (cont, args, _, _, _) ->
-           Env.handler env ~cont ~arg_num:(List.length args))
-        env
-        handlers
+          Env.handler env ~cont ~arg_num:(List.length args))
+        env handlers
     in
     check env_extended body;
     let env_handler =
-      match flag with
-      | Recursive -> env_extended
-      | Normal | Exn_handler -> env
+      match flag with Recursive -> env_extended | Normal | Exn_handler -> env
     in
     List.iter (fun (_, _, handler, _, _) -> check env_handler handler) handlers
   | Cexit (exit_label, args, _trap_actions) ->

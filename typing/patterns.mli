@@ -18,64 +18,64 @@ open Asttypes
 open Typedtree
 open Types
 
-val omega : pattern
 (** aka. "Tpat_any" or "_"  *)
+val omega : pattern
 
-val omegas : int -> pattern list
 (** [List.init (fun _ -> omega)] *)
+val omegas : int -> pattern list
 
-val omega_list : 'a list -> pattern list
 (** [List.map (fun _ -> omega)] *)
+val omega_list : 'a list -> pattern list
 
 module Non_empty_row : sig
   type 'a t = 'a * Typedtree.pattern list
 
-  val of_initial : Typedtree.pattern list -> Typedtree.pattern t
   (** 'assert false' on empty rows *)
+  val of_initial : Typedtree.pattern list -> Typedtree.pattern t
 
   val map_first : ('a -> 'b) -> 'a t -> 'b t
 end
 
 module Simple : sig
-  type view = [
-    | `Any
+  type view =
+    [ `Any
     | `Constant of constant
     | `Tuple of (string option * pattern) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
-    | `Construct of
-        Longident.t loc * constructor_description * pattern list
+    | `Construct of Longident.t loc * constructor_description * pattern list
     | `Variant of label * pattern option * row_desc ref
     | `Record of
-        (Longident.t loc * label_description * pattern) list * closed_flag
+      (Longident.t loc * label_description * pattern) list * closed_flag
     | `Record_unboxed_product of
-        (Longident.t loc * unboxed_label_description * pattern) list * closed_flag
+      (Longident.t loc * unboxed_label_description * pattern) list * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
-    | `Lazy of pattern
-  ]
+    | `Lazy of pattern ]
+
   type pattern = view pattern_data
 
-  val omega : [> view ] pattern_data
+  val omega : [> view] pattern_data
 end
 
 module Half_simple : sig
-  type view = [
-    | Simple.view
-    | `Or of pattern * pattern * row_desc option
-  ]
+  type view =
+    [ Simple.view
+    | `Or of pattern * pattern * row_desc option ]
+
   type pattern = view pattern_data
 end
 
 module General : sig
-  type view = [
-    | Half_simple.view
+  type view =
+    [ Half_simple.view
     | `Var of Ident.t * string loc * Uid.t * Mode.Value.l
-    | `Alias of pattern * Ident.t * string loc * Uid.t
-                * Mode.Value.l * Types.type_expr
-  ]
+    | `Alias of
+      pattern * Ident.t * string loc * Uid.t * Mode.Value.l * Types.type_expr ]
+
   type pattern = view pattern_data
 
   val view : Typedtree.pattern -> pattern
-  val erase : [< view ] pattern_data -> Typedtree.pattern
+
+  val erase : [< view] pattern_data -> Typedtree.pattern
 
   val strip_vars : pattern -> Half_simple.pattern
 end
@@ -90,11 +90,13 @@ module Head : sig
     | Record of label_description list
     | Record_unboxed_product of unboxed_label_description list
     | Variant of
-        { tag: label; has_arg: bool;
-          cstr_row: row_desc ref;
-          type_row : unit -> row_desc; }
-          (* the row of the type may evolve if [close_variant] is called,
-             hence the (unit -> ...) delay *)
+        { tag : label;
+          has_arg : bool;
+          cstr_row : row_desc ref;
+          type_row : unit -> row_desc
+        }
+      (* the row of the type may evolve if [close_variant] is called,
+         hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Lazy
 
@@ -111,5 +113,4 @@ module Head : sig
   val to_omega_pattern : t -> pattern
 
   val omega : t
-
 end

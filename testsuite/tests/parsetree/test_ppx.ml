@@ -1,16 +1,16 @@
 (* TEST
- readonly_files = "source_jane_street.ml ppx_no_op.ml";
- include ocamlcommon;
- include stdlib_upstream_compatible;
- setup-ocamlc.byte-build-env;
- program = "${test_build_directory}/ppx_no_op.exe";
- all_modules = "ppx_no_op.ml";
- ocamlc.byte;
- module = "source_jane_street.ml";
- ocamlc_byte_exit_status = "2";
- flags = "-I ${test_build_directory} -w -26 -extension-universe alpha -ppx ${program}";
- ocamlc.byte;
- check-ocamlc.byte-output;
+   readonly_files = "source_jane_street.ml ppx_no_op.ml";
+   include ocamlcommon;
+   include stdlib_upstream_compatible;
+   setup-ocamlc.byte-build-env;
+   program = "${test_build_directory}/ppx_no_op.exe";
+   all_modules = "ppx_no_op.ml";
+   ocamlc.byte;
+   module = "source_jane_street.ml";
+   ocamlc_byte_exit_status = "2";
+   flags = "-I ${test_build_directory} -w -26 -extension-universe alpha -ppx ${program}";
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)
 
 (* This test ensures that Jane Street syntax continues to be

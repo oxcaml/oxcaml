@@ -1,10 +1,17 @@
 (* TEST
- expect;
+   expect;
 *)
 
 let x = ref []
-module M = struct type t let _ = (x : t list ref) end;;
-[%%expect{|
+
+module M = struct
+  type t
+
+  let _ = (x : t list ref)
+end
+
+[%%expect
+{|
 val x : '_weak1 list ref = {contents = []}
 Line 2, characters 34-35:
 2 | module M = struct type t let _ = (x : t list ref) end;;

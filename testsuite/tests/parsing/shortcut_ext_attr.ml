@@ -1,128 +1,169 @@
 (* TEST_BELOW
-Filler_text_added_
-to_preserve_locations_while_tran
-slating_from_old_syntax__Filler_
-text_added_to_pre
-serve_locations_while_translati
+   Filler_text_added_
+   to_preserve_locations_while_tran
+   slating_from_old_syntax__Filler_
+   text_added_to_pre
+   serve_locations_while_translati
 *)
 (* Expressions *)
 let () =
-  let%foo[@foo] x = 3
-  and[@foo] y = 4 in
-  (let module%foo[@foo] M = M in ()) ;
-  (let open%foo[@foo] M in ()) ;
-  (fun%foo[@foo] x -> ()) ;
-  (function%foo[@foo] x -> ()) ;
-  (try%foo[@foo] () with _ -> ()) ;
-  (if%foo[@foo] () then () else ()) ;
-  while%foo[@foo] () do () done ;
-  for%foo[@foo] x = () to () do () done ;
-  () ;%foo () ;
-  assert%foo[@foo] true ;
-  lazy%foo[@foo] x ;
-  object%foo[@foo] end ;
-  begin%foo[@foo] 3 end ;
-  new%foo[@foo] x ;
-
-  match%foo[@foo] () with
-  (* Pattern expressions *)
-  | lazy%foo[@foo] x -> ()
-  | exception%foo[@foo] x -> ()
-
+  let%foo[@foo] x = 3 and[@foo] y = 4 in
+  [%foo
+    (let module M = M in
+    ())
+    [@foo]];
+  [%foo
+    (let open M in
+    ()) [@foo]];
+  [%foo fun [@foo] x -> ()];
+  [%foo function[@foo] x -> ()];
+  [%foo try[@foo] () with _ -> ()];
+  [%foo if [@foo] () then () else ()];
+  [%foo
+    while () do
+      ()
+    done
+    [@foo]];
+  [%foo
+    for x = () to () do
+      ()
+    done
+    [@foo]];
+  ();%foo
+  ();
+  [%foo assert true [@foo]];
+  [%foo lazy x [@foo]];
+  [%foo object end [@foo]];
+  [%foo
+    begin
+      3
+    end
+    [@foo]];
+  [%foo new x [@foo]];
+  [%foo
+    match[@foo] () with
+    | [%foo? (* Pattern expressions *)
+        ((lazy x) [@foo])] -> ()
+    | [%foo? ((exception x) [@foo])] -> ()]
 
 (* Class expressions *)
 class x =
-  fun[@foo] x ->
-  let[@foo] x = 3 in
-  object[@foo]
-    inherit[@foo] x
-    val[@foo] x = 3
-    val[@foo] virtual x : t
-    val![@foo] mutable x = 3
-    method[@foo] x = 3
-    method[@foo] virtual x : t
-    method![@foo] private x = 3
-    initializer[@foo] x
-  end
+  fun [@foo] x ->
+    let[@foo] x = 3 in
+    object
+      inherit x [@@foo]
+
+      val x = 3 [@@foo]
+
+      val virtual x : t [@@foo]
+
+      val! mutable x = 3 [@@foo]
+
+      method x = 3 [@@foo]
+
+      method virtual x : t [@@foo]
+
+      method! private x = 3 [@@foo]
+
+      initializer x [@@foo]
+    end
+    [@foo]
 
 (* Class type expressions *)
 class type t =
-  object[@foo]
-    inherit[@foo] t
-    val[@foo] x : t
-    val[@foo] mutable x : t
-    method[@foo] x : t
-    method[@foo] private x : t
-    constraint[@foo] t = t'
-  end
+  object
+    inherit t [@@foo]
+
+    val x : t [@@foo]
+
+    val mutable x : t [@@foo]
+
+    method x : t [@@foo]
+
+    method private x : t [@@foo]
+
+    constraint t = t' [@@foo]
+  end[@foo]
 
 (* Type expressions *)
-type t =
-  (module%foo[@foo] M)
+type t = [%foo: ((module M)[@foo])]
 
 (* Module expressions *)
-module M =
-  functor[@foo] (M : S) ->
-    (val[@foo] x)
-    (struct[@foo] end)
+module M = (functor [@foo] (M : S) -> (val x) [@foo] (struct end [@foo]))
 
 (* Module type expression *)
-module type S =
-  functor[@foo] (M:S) ->
-    (module type of[@foo] M) ->
-    (sig[@foo] end)
+module type S = functor [@foo]
+  (M : S)
+  -> functor
+  (_ : (module type of M) [@foo])
+  -> sig end [@foo]
 
 (* Structure items *)
 let%foo[@foo] x = 4
+
 and[@foo] y = x
 
-type%foo[@foo] t = int
-and[@foo] t = int
-type%foo[@foo] t += T
+type%foo t = int [@@foo]
 
-class%foo[@foo] x = x
-class type%foo[@foo] x = x
-external%foo[@foo] x : _  = ""
-exception%foo[@foo] X
+and t = int [@@foo]
 
-module%foo[@foo] M = M
-module%foo[@foo] rec M : S = M
-and[@foo] M : S = M
-module type%foo[@foo] S = S
+type%foo t += T [@@foo]
 
-include%foo[@foo] M
-open%foo[@foo] M
+class%foo x = x [@@foo]
+
+class type%foo x = x [@@foo]
+
+external%foo x : _ = "" [@@foo]
+
+exception%foo X [@foo]
+
+module%foo M = M [@@foo]
+
+module%foo rec M : S = M [@@foo]
+and M : S = M [@@foo]
+
+module type%foo S = S [@@foo]
+
+include%foo M [@@foo]
+
+open%foo M [@@foo]
 
 (* Signature items *)
 module type S = sig
-  val%foo[@foo] x : t
-  external%foo[@foo] x : t = ""
+  val%foo x : t [@@foo]
 
-  type%foo[@foo] t = int
-  and[@foo] t' = int
-  type%foo[@foo] t += T
+  external%foo x : t = "" [@@foo]
 
-  exception%foo[@foo] X
+  type%foo t = int [@@foo]
 
-  module%foo[@foo] M : S
-  module%foo[@foo] rec M : S
-  and[@foo] M : S
-  module%foo[@foo] M = M
+  and t' = int [@@foo]
 
-  module type%foo[@foo] S = S
+  type%foo t += T [@@foo]
 
-  include%foo[@foo] M
-  open%foo[@foo] M
+  exception%foo X [@foo]
 
-  class%foo[@foo] x : t
-  class type%foo[@foo] x = x
+  module%foo M : S [@@foo]
 
+  module%foo rec M : S [@@foo]
+  and M : S [@@foo]
+
+  module%foo M = M [@@foo]
+
+  module type%foo S = S [@@foo]
+
+  include%foo M [@@foo]
+
+  open%foo M [@@foo]
+
+  class%foo x : t [@@foo]
+
+  class type%foo x = x [@@foo]
 end
 
 (* TEST
- flags = "-dparsetree";
- ocamlc_byte_exit_status = "2";
- setup-ocamlc.byte-build-env;
- ocamlc.byte;
- check-ocamlc.byte-output;
+   flags = "-dparsetree";
+   ocamlc_byte_exit_status = "2";
+   setup-ocamlc.byte-build-env;
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)

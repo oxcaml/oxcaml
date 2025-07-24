@@ -1,17 +1,15 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
-let rec f _ = g f
-    and g _ = 10
-in
+
+let rec f _ = g f and g _ = 10 in
 if f 3 <> 10 then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

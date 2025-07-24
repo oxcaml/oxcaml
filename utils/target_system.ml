@@ -22,13 +22,8 @@ let architecture () : architecture =
 
 let is_64_bit () =
   match architecture () with
-  | X86_64
-  | AArch64
-  | POWER
-  | Z
-  | Riscv -> true
-  | IA32
-  | ARM -> false
+  | X86_64 | AArch64 | POWER | Z | Riscv -> true
+  | IA32 | ARM -> false
 
 let is_32_bit () = not (is_64_bit ())
 
@@ -167,17 +162,10 @@ let system () : system =
   | BeOS -> BeOS
   | Unknown -> Unknown
 
-let windows () =
-  match system () with
-  | Windows _ -> true
-  | _ -> false
+let windows () = match system () with Windows _ -> true | _ -> false
 
 let is_macos () =
-  match assembler () with
-  | MASM | GAS_like -> false
-  | MacOS -> true
+  match assembler () with MASM | GAS_like -> false | MacOS -> true
 
 let is_gas () =
-  match assembler () with
-  | MASM | MacOS -> false
-  | GAS_like -> true
+  match assembler () with MASM | MacOS -> false | GAS_like -> true

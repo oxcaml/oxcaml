@@ -18,5 +18,6 @@
 val gen_annot :
   string option ->
   sourcefile:string option ->
-  use_summaries:bool -> Cmt_format.binary_annots ->
+  use_summaries:bool ->
+  Cmt_format.binary_annots ->
   unit

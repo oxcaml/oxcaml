@@ -1,25 +1,24 @@
 (* TEST
- include config;
- include testing;
- binary_modules = "config build_path_prefix_map misc identifiable numbers";
- bytecode;
+   include config;
+   include testing;
+   binary_modules = "config build_path_prefix_map misc identifiable numbers";
+   bytecode;
 *)
 
 let edit_distance = Misc.edit_distance
 
-let show_cutoff n =
-  if n = max_int then "max_int" else Printf.sprintf "%d" n
-;;
+let show_cutoff n = if n = max_int then "max_int" else Printf.sprintf "%d" n
 
 let test =
   let counter = ref 0 in
   fun a b cutoff expected ->
     let show_result = function
       | None -> "None"
-      | Some d -> "Some " ^ Int.to_string d in
+      | Some d -> "Some " ^ Int.to_string d
+    in
     incr counter;
-    Printf.printf "[%02d] (edit_distance %S %S %s), expected %s\n"
-      !counter a b (show_cutoff cutoff) (show_result expected);
+    Printf.printf "[%02d] (edit_distance %S %S %s), expected %s\n" !counter a b
+      (show_cutoff cutoff) (show_result expected);
     let result = edit_distance a b cutoff in
     if result = expected
     then print_endline "OK"
@@ -36,20 +35,16 @@ let () =
   test "swap" "sawp" 3 (Some 1);
   test "abbb" "bbba" 3 (Some 2);
   test "abbb" "bbba" 1 None;
-
   (* check for bugs where a small common suffix, or common prefix, is
      enough to make the distance goes down *)
   test "xyzwabc" "mnpqrabc" 10 (Some 5);
   test "abcxyzw" "abcmnpqr" 10 (Some 5);
-
   (* check that using "max_int" as cutoff works *)
   test "a" "a" max_int (Some 0);
   test "a" "b" max_int (Some 1);
   test "abc" "ade" max_int (Some 2);
-
   (* check empty strings*)
   test "" "" 3 (Some 0);
   test "" "abc" 3 (Some 3);
   test "abcd" "" 3 None;
-
   ()

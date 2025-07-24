@@ -16,8 +16,8 @@
 (* Translate a test file from old to new syntax. *)
 
 type style =
-| Plain
-| Lines
-| Chars
+  | Plain
+  | Lines
+  | Chars
 
 val file : style:style -> compact:bool -> string -> unit

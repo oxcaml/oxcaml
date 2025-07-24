@@ -1,13 +1,13 @@
 (* TEST
- {
-   runtime4;
-   skip;
- }{
-   include runtime_events;
-   runtime5;
-   { bytecode; }
-   { native; }
- }
+   {
+     runtime4;
+     skip;
+   }{
+     include runtime_events;
+     runtime5;
+     { bytecode; }
+     { native; }
+   }
 *)
 open Runtime_events
 
@@ -50,20 +50,20 @@ let () =
 (* consumer *)
 
 let got_event = ref false
+
 let got_span_begin = ref false
+
 let got_span_end = ref false
+
 let counter_value = ref 0
+
 let custom_value = ref ""
 
 let event_handler domain_id ts e () =
-  match User.tag e with
-  | Libname -> got_event := true
-  | _ -> ()
+  match User.tag e with Libname -> got_event := true | _ -> ()
 
 let counter_handler domain_id ts e v =
-  match User.tag e with
-  | Counters 2 -> counter_value := v
-  | _ -> ()
+  match User.tag e with Counters 2 -> counter_value := v | _ -> ()
 
 let span_handler domain_id ts e v =
   match User.tag e with
@@ -72,9 +72,7 @@ let span_handler domain_id ts e v =
   | _ -> ()
 
 let custom_handler domain_id ts e v =
-  match User.tag e with
-  | Libname -> custom_value := v
-  | _ -> ()
+  match User.tag e with Libname -> custom_value := v | _ -> ()
 
 let () =
   let cursor = create_cursor None in
@@ -86,10 +84,10 @@ let () =
     |> Callbacks.add_user_event custom_type custom_handler
   in
   for _ = 0 to 100 do
-    ignore(read_poll cursor callbacks None)
+    ignore (read_poll cursor callbacks None)
   done;
-  assert (!got_event);
+  assert !got_event;
   assert (!counter_value = 18);
-  assert (!got_span_begin);
-  assert (!got_span_end);
+  assert !got_span_begin;
+  assert !got_span_end;
   assert (!custom_value = "hello")

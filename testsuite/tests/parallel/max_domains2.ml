@@ -1,9 +1,9 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- ocamlrunparam += ",d=129";
- runtime5;
- multidomain;
- { native; }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   ocamlrunparam += ",d=129";
+   runtime5;
+   multidomain;
+   { native; }
 *)
 
 let m = Mutex.create ()

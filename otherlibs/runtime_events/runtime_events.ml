@@ -13,95 +13,96 @@
 (**************************************************************************)
 
 external runtime_events_are_active : unit -> bool
-  = "caml_ml_runtime_events_are_active" [@@noalloc]
+  = "caml_ml_runtime_events_are_active"
+  [@@noalloc]
 
 type runtime_counter =
-| EV_C_FORCE_MINOR_ALLOC_SMALL
-| EV_C_FORCE_MINOR_MAKE_VECT
-| EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE
-| EV_C_FORCE_MINOR_MEMPROF
-| EV_C_MINOR_PROMOTED
-| EV_C_MINOR_ALLOCATED
-| EV_C_REQUEST_MAJOR_ALLOC_SHR
-| EV_C_REQUEST_MAJOR_ADJUST_GC_SPEED
-| EV_C_REQUEST_MINOR_REALLOC_REF_TABLE
-| EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE
-| EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE
-| EV_C_MAJOR_HEAP_POOL_WORDS
-| EV_C_MAJOR_HEAP_POOL_LIVE_WORDS
-| EV_C_MAJOR_HEAP_LARGE_WORDS
-| EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
-| EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS
-| EV_C_MAJOR_HEAP_LARGE_BLOCKS
-| EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
-| EV_C_MAJOR_SLICE_ALLOC_WORDS
-| EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
-| EV_C_MAJOR_SLICE_NEW_WORK
-| EV_C_MAJOR_SLICE_TOTAL_WORK
-| EV_C_MAJOR_SLICE_BUDGET
-| EV_C_MAJOR_SLICE_WORK_DONE
+  | EV_C_FORCE_MINOR_ALLOC_SMALL
+  | EV_C_FORCE_MINOR_MAKE_VECT
+  | EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE
+  | EV_C_FORCE_MINOR_MEMPROF
+  | EV_C_MINOR_PROMOTED
+  | EV_C_MINOR_ALLOCATED
+  | EV_C_REQUEST_MAJOR_ALLOC_SHR
+  | EV_C_REQUEST_MAJOR_ADJUST_GC_SPEED
+  | EV_C_REQUEST_MINOR_REALLOC_REF_TABLE
+  | EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE
+  | EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE
+  | EV_C_MAJOR_HEAP_POOL_WORDS
+  | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS
+  | EV_C_MAJOR_HEAP_LARGE_WORDS
+  | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
+  | EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS
+  | EV_C_MAJOR_HEAP_LARGE_BLOCKS
+  | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
+  | EV_C_MAJOR_SLICE_ALLOC_WORDS
+  | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
+  | EV_C_MAJOR_SLICE_NEW_WORK
+  | EV_C_MAJOR_SLICE_TOTAL_WORK
+  | EV_C_MAJOR_SLICE_BUDGET
+  | EV_C_MAJOR_SLICE_WORK_DONE
 
 type runtime_phase =
-| EV_EXPLICIT_GC_SET
-| EV_EXPLICIT_GC_STAT
-| EV_EXPLICIT_GC_MINOR
-| EV_EXPLICIT_GC_MAJOR
-| EV_EXPLICIT_GC_FULL_MAJOR
-| EV_EXPLICIT_GC_COMPACT
-| EV_MAJOR
-| EV_MAJOR_SWEEP
-| EV_MAJOR_MARK_ROOTS
-| EV_MAJOR_MEMPROF_ROOTS
-| EV_MAJOR_MARK
-| EV_MINOR
-| EV_MINOR_LOCAL_ROOTS
-| EV_MINOR_MEMPROF_ROOTS
-| EV_MINOR_MEMPROF_CLEAN
-| EV_MINOR_FINALIZED
-| EV_EXPLICIT_GC_MAJOR_SLICE
-| EV_FINALISE_UPDATE_FIRST
-| EV_FINALISE_UPDATE_LAST
-| EV_INTERRUPT_REMOTE
-| EV_MAJOR_EPHE_MARK
-| EV_MAJOR_EPHE_SWEEP
-| EV_MAJOR_FINISH_MARKING
-| EV_MAJOR_GC_CYCLE_DOMAINS
-| EV_MAJOR_GC_PHASE_CHANGE
-| EV_MAJOR_GC_STW
-| EV_MAJOR_MARK_OPPORTUNISTIC
-| EV_MAJOR_SLICE
-| EV_MAJOR_FINISH_CYCLE
-| EV_MINOR_CLEAR
-| EV_MINOR_FINALIZERS_OLDIFY
-| EV_MINOR_GLOBAL_ROOTS
-| EV_MINOR_LEAVE_BARRIER
-| EV_STW_API_BARRIER
-| EV_STW_HANDLER
-| EV_STW_LEADER
-| EV_MAJOR_FINISH_SWEEPING
-| EV_MAJOR_MEMPROF_CLEAN
-| EV_MINOR_FINALIZERS_ADMIN
-| EV_MINOR_REMEMBERED_SET
-| EV_MINOR_REMEMBERED_SET_PROMOTE
-| EV_MINOR_LOCAL_ROOTS_PROMOTE
-| EV_DOMAIN_CONDITION_WAIT
-| EV_DOMAIN_RESIZE_HEAP_RESERVATION
-| EV_COMPACT
-| EV_COMPACT_EVACUATE
-| EV_COMPACT_FORWARD
-| EV_COMPACT_RELEASE
-| EV_MINOR_EPHE_CLEAN
-| EV_MINOR_DEPENDENT
+  | EV_EXPLICIT_GC_SET
+  | EV_EXPLICIT_GC_STAT
+  | EV_EXPLICIT_GC_MINOR
+  | EV_EXPLICIT_GC_MAJOR
+  | EV_EXPLICIT_GC_FULL_MAJOR
+  | EV_EXPLICIT_GC_COMPACT
+  | EV_MAJOR
+  | EV_MAJOR_SWEEP
+  | EV_MAJOR_MARK_ROOTS
+  | EV_MAJOR_MEMPROF_ROOTS
+  | EV_MAJOR_MARK
+  | EV_MINOR
+  | EV_MINOR_LOCAL_ROOTS
+  | EV_MINOR_MEMPROF_ROOTS
+  | EV_MINOR_MEMPROF_CLEAN
+  | EV_MINOR_FINALIZED
+  | EV_EXPLICIT_GC_MAJOR_SLICE
+  | EV_FINALISE_UPDATE_FIRST
+  | EV_FINALISE_UPDATE_LAST
+  | EV_INTERRUPT_REMOTE
+  | EV_MAJOR_EPHE_MARK
+  | EV_MAJOR_EPHE_SWEEP
+  | EV_MAJOR_FINISH_MARKING
+  | EV_MAJOR_GC_CYCLE_DOMAINS
+  | EV_MAJOR_GC_PHASE_CHANGE
+  | EV_MAJOR_GC_STW
+  | EV_MAJOR_MARK_OPPORTUNISTIC
+  | EV_MAJOR_SLICE
+  | EV_MAJOR_FINISH_CYCLE
+  | EV_MINOR_CLEAR
+  | EV_MINOR_FINALIZERS_OLDIFY
+  | EV_MINOR_GLOBAL_ROOTS
+  | EV_MINOR_LEAVE_BARRIER
+  | EV_STW_API_BARRIER
+  | EV_STW_HANDLER
+  | EV_STW_LEADER
+  | EV_MAJOR_FINISH_SWEEPING
+  | EV_MAJOR_MEMPROF_CLEAN
+  | EV_MINOR_FINALIZERS_ADMIN
+  | EV_MINOR_REMEMBERED_SET
+  | EV_MINOR_REMEMBERED_SET_PROMOTE
+  | EV_MINOR_LOCAL_ROOTS_PROMOTE
+  | EV_DOMAIN_CONDITION_WAIT
+  | EV_DOMAIN_RESIZE_HEAP_RESERVATION
+  | EV_COMPACT
+  | EV_COMPACT_EVACUATE
+  | EV_COMPACT_FORWARD
+  | EV_COMPACT_RELEASE
+  | EV_MINOR_EPHE_CLEAN
+  | EV_MINOR_DEPENDENT
 
 type lifecycle =
-  EV_RING_START
-| EV_RING_STOP
-| EV_RING_PAUSE
-| EV_RING_RESUME
-| EV_FORK_PARENT
-| EV_FORK_CHILD
-| EV_DOMAIN_SPAWN
-| EV_DOMAIN_TERMINATE
+  | EV_RING_START
+  | EV_RING_STOP
+  | EV_RING_PAUSE
+  | EV_RING_RESUME
+  | EV_FORK_PARENT
+  | EV_FORK_CHILD
+  | EV_DOMAIN_SPAWN
+  | EV_DOMAIN_TERMINATE
 
 let runtime_counter_name counter =
   match counter with
@@ -115,35 +116,24 @@ let runtime_counter_name counter =
   | EV_C_REQUEST_MAJOR_ADJUST_GC_SPEED -> "request_major_adjust_gc_speed"
   | EV_C_REQUEST_MINOR_REALLOC_REF_TABLE -> "request_minor_realloc_ref_table"
   | EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE ->
-      "request_minor_realloc_ephe_ref_table"
+    "request_minor_realloc_ephe_ref_table"
   | EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE ->
-      "request_minor_realloc_custom_table"
-  | EV_C_MAJOR_HEAP_POOL_WORDS ->
-      "major_heap_pool_words"
-  | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS ->
-      "major_heap_pool_live_words"
-  | EV_C_MAJOR_HEAP_LARGE_WORDS ->
-      "major_heap_large_words"
-  | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS ->
-      "major_heap_pool_frag_words"
-  | EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS ->
-      "major_heap_pool_live_blocks"
-  | EV_C_MAJOR_HEAP_LARGE_BLOCKS ->
-      "major_heap_large_blocks"
+    "request_minor_realloc_custom_table"
+  | EV_C_MAJOR_HEAP_POOL_WORDS -> "major_heap_pool_words"
+  | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS -> "major_heap_pool_live_words"
+  | EV_C_MAJOR_HEAP_LARGE_WORDS -> "major_heap_large_words"
+  | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS -> "major_heap_pool_frag_words"
+  | EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS -> "major_heap_pool_live_blocks"
+  | EV_C_MAJOR_HEAP_LARGE_BLOCKS -> "major_heap_large_blocks"
   | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE ->
-      "request_minor_realloc_dependent_table"
-  | EV_C_MAJOR_SLICE_ALLOC_WORDS ->
-    "major_slice_alloc_words"
+    "request_minor_realloc_dependent_table"
+  | EV_C_MAJOR_SLICE_ALLOC_WORDS -> "major_slice_alloc_words"
   | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS ->
     "major_slice_alloc_dependent_words"
-  | EV_C_MAJOR_SLICE_NEW_WORK ->
-    "major_slice_new_work"
-  | EV_C_MAJOR_SLICE_TOTAL_WORK ->
-    "major_slice_total_work"
-  | EV_C_MAJOR_SLICE_BUDGET ->
-    "major_slice_budget"
-  | EV_C_MAJOR_SLICE_WORK_DONE ->
-    "major_slice_work_done"
+  | EV_C_MAJOR_SLICE_NEW_WORK -> "major_slice_new_work"
+  | EV_C_MAJOR_SLICE_TOTAL_WORK -> "major_slice_total_work"
+  | EV_C_MAJOR_SLICE_BUDGET -> "major_slice_budget"
+  | EV_C_MAJOR_SLICE_WORK_DONE -> "major_slice_work_done"
 
 let runtime_phase_name phase =
   match phase with
@@ -154,7 +144,7 @@ let runtime_phase_name phase =
   | EV_EXPLICIT_GC_FULL_MAJOR -> "explicit_gc_full_major"
   | EV_EXPLICIT_GC_COMPACT -> "explicit_gc_compact"
   | EV_MAJOR -> "major"
-    | EV_MAJOR_SWEEP -> "major_sweep"
+  | EV_MAJOR_SWEEP -> "major_sweep"
   | EV_MAJOR_MARK_ROOTS -> "major_mark_roots"
   | EV_MAJOR_MEMPROF_ROOTS -> "major_memprof_roots"
   | EV_MAJOR_MARK -> "major_mark"
@@ -200,7 +190,7 @@ let runtime_phase_name phase =
 
 let lifecycle_name lifecycle =
   match lifecycle with
-    EV_RING_START -> "ring_start"
+  | EV_RING_START -> "ring_start"
   | EV_RING_STOP -> "ring_stop"
   | EV_RING_PAUSE -> "ring_pause"
   | EV_RING_RESUME -> "ring_resume"
@@ -214,27 +204,28 @@ type cursor
 module Timestamp = struct
   type t = int64
 
-  let to_int64 t =
-    t
+  let to_int64 t = t
 end
 
 module Type = struct
-
   (* the data structure is primarily managed in C *)
-  type[@warning "-unused-field"] 'a custom = {
-    serialize: bytes -> 'a -> int;
-    deserialize: bytes -> int -> 'a;
-    (* id is used for the callback table *)
-    id: int;
-  }
+  type 'a custom =
+    { serialize : bytes -> 'a -> int;
+      deserialize : bytes -> int -> 'a;
+      (* id is used for the callback table *)
+      id : int
+    }
+  [@@warning "-unused-field"]
 
-  type span = Begin | End
+  type span =
+    | Begin
+    | End
 
   type 'a t =
-  | Unit : unit t
-  | Int : int t
-  | Span : span t
-  | Custom : 'a custom -> 'a t
+    | Unit : unit t
+    | Int : int t
+    | Span : span t
+    | Custom : 'a custom -> 'a t
 
   let unit = Unit
 
@@ -246,14 +237,13 @@ module Type = struct
 
   let register ~encode ~decode =
     incr next_id;
-    Custom { serialize = encode; deserialize = decode; id = !next_id - 1}
+    Custom { serialize = encode; deserialize = decode; id = !next_id - 1 }
 
-  let id: type a. a t -> int = function
+  let id : type a. a t -> int = function
     | Unit -> 0
     | Int -> 1
     | Span -> 2
-    | Custom {id; _} -> id
-
+    | Custom { id; _ } -> id
 end
 
 module User = struct
@@ -264,15 +254,17 @@ module User = struct
   type tag += UNK : tag
 
   (* the data structure is primarily managed in C *)
-  type [@warning "-unused-field"] 'a t = {
-    id: int;
-    name: string;
-    typ: 'a Type.t;
-    tag: tag option;
-  }
+  type 'a t =
+    { id : int;
+      name : string;
+      typ : 'a Type.t;
+      tag : tag option
+    }
+  [@@warning "-unused-field"]
 
   external user_register : string -> tag option -> 'a Type.t -> 'a t
     = "caml_runtime_events_user_register"
+
   external user_write : bytes -> 'a t -> 'a -> unit
     = "caml_runtime_events_user_write"
 
@@ -298,15 +290,18 @@ module User = struct
       (* begin atomic *)
       match !buffers with
       | [] ->
-          (* end atomic *)
-          create_buffer ()
-      | b::bs ->
-          buffers := bs;
-          (* end atomic *)
-          b
+        (* end atomic *)
+        create_buffer ()
+      | b :: bs ->
+        buffers := bs;
+        (* end atomic *)
+        b
     in
     let[@poll error] compare_and_set r old_val new_val =
-      if !r == old_val then (r := new_val; true)
+      if !r == old_val
+      then (
+        r := new_val;
+        true)
       else false
     in
     let rec push buffers buf =
@@ -321,17 +316,16 @@ module User = struct
     fun consumer ->
       let buffers = Domain.DLS.get write_buffer_cache in
       let buf = pop_or_create buffers in
-      Fun.protect ~finally:(fun () -> push buffers buf)
-        (fun () -> consumer buf)
+      Fun.protect ~finally:(fun () -> push buffers buf) (fun () -> consumer buf)
 
   let write (type a) (event : a t) (value : a) =
-    if runtime_events_are_active () then
-    (* only custom events need a write buffer *)
-    match event.typ with
-    | Type.Custom _ ->
+    if runtime_events_are_active ()
+    then
+      (* only custom events need a write buffer *)
+      match event.typ with
+      | Type.Custom _ ->
         with_write_buffer (fun buf -> user_write buf event value)
-    | Type.Unit | Type.Int | Type.Span ->
-        user_write Bytes.empty event value
+      | Type.Unit | Type.Int | Type.Span -> user_write Bytes.empty event value
 
   let name ev = ev.name
 
@@ -339,48 +333,51 @@ module User = struct
 end
 
 module Callbacks = struct
-
   type 'a callback = int -> Timestamp.t -> 'a User.t -> 'a -> unit
+
   (* Callbacks are bound to a specific event type *)
   type any_callback = U : 'a callback -> any_callback
 
   (* these record callbacks are only called from C code in the runtime
       so we suppress the unused field warning *)
-  type[@warning "-unused-field"] t = {
-    runtime_begin: (int -> Timestamp.t -> runtime_phase -> unit) option;
-    runtime_end: (int -> Timestamp.t -> runtime_phase -> unit) option;
-    runtime_counter: (int -> Timestamp.t -> runtime_counter
-                      -> int -> unit) option;
-    alloc: (int -> Timestamp.t -> int array -> unit) option;
-    lifecycle: (int -> Timestamp.t -> lifecycle
-                -> int option -> unit) option;
-    lost_events: (int -> int -> unit) option;
-    (* user event callbacks is an array containing at each indice [i] a list
-        of functions to call when an event of type id [i] happen *)
-    user_events: any_callback list array;
-  }
+  type t =
+    { runtime_begin : (int -> Timestamp.t -> runtime_phase -> unit) option;
+      runtime_end : (int -> Timestamp.t -> runtime_phase -> unit) option;
+      runtime_counter :
+        (int -> Timestamp.t -> runtime_counter -> int -> unit) option;
+      alloc : (int -> Timestamp.t -> int array -> unit) option;
+      lifecycle :
+        (int -> Timestamp.t -> lifecycle -> int option -> unit) option;
+      lost_events : (int -> int -> unit) option;
+      (* user event callbacks is an array containing at each indice [i] a list
+          of functions to call when an event of type id [i] happen *)
+      user_events : any_callback list array
+    }
+  [@@warning "-unused-field"]
 
   let create ?runtime_begin ?runtime_end ?runtime_counter ?alloc ?lifecycle
-             ?lost_events () =
-    { runtime_begin; runtime_end; runtime_counter;
-        alloc; lifecycle; lost_events; user_events = Array.make 1 [] }
-
+      ?lost_events () =
+    { runtime_begin;
+      runtime_end;
+      runtime_counter;
+      alloc;
+      lifecycle;
+      lost_events;
+      user_events = Array.make 1 []
+    }
 
   (* returns an array that is sufficiently large to contain a value of given
      index *)
   let fit_or_grow array index =
     let size = Array.length array in
-    if index < size then
-      (* array is large enough *)
+    if index < size
+    then (* array is large enough *)
       array
     else
       (* array is too small. we resize it by finding the power of two that is
          big enough to contain the index *)
       let rec find_new_size sz =
-        if index < sz then
-          sz
-        else
-          find_new_size (2 * sz)
+        if index < sz then sz else find_new_size (2 * sz)
       in
       let new_size = find_new_size size in
       let new_array = Array.make new_size [] in
@@ -391,17 +388,21 @@ module Callbacks = struct
     let id = Type.id ty in
     let user_events = fit_or_grow t.user_events id in
     user_events.(id) <- U callback :: user_events.(id);
-    {t with user_events}
-
+    { t with user_events }
 end
 
 external start : unit -> unit = "caml_ml_runtime_events_start"
+
 external pause : unit -> unit = "caml_ml_runtime_events_pause"
+
 external resume : unit -> unit = "caml_ml_runtime_events_resume"
+
 external path : unit -> string option = "caml_ml_runtime_events_path"
 
 external create_cursor : (string * int) option -> cursor
-                                        = "caml_ml_runtime_events_create_cursor"
+  = "caml_ml_runtime_events_create_cursor"
+
 external free_cursor : cursor -> unit = "caml_ml_runtime_events_free_cursor"
+
 external read_poll : cursor -> Callbacks.t -> int option -> int
-                                        = "caml_ml_runtime_events_read_poll"
+  = "caml_ml_runtime_events_read_poll"

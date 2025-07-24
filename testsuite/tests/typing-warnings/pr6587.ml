@@ -1,28 +1,32 @@
 (* TEST
- flags = " -w +A -strict-sequence ";
- expect;
+   flags = " -w +A -strict-sequence ";
+   expect;
 *)
 
+module A : sig
+  val f : fpclass -> fpclass
+end = struct
+  let f _ = FP_normal
+end
 
-module A: sig val f: fpclass -> fpclass end =
-  struct
-    let f _ = FP_normal
-  end;;
 [%%expect {|
 module A : sig val f : fpclass -> fpclass end
 |}]
 
-type fpclass = A ;;
+type fpclass = A
+
 [%%expect {|
 type fpclass = A
 |}]
 
-module B: sig val f: fpclass -> fpclass end =
-  struct
-    let f A = FP_normal
-  end
-    ;;
-[%%expect {|
+module B : sig
+  val f : fpclass -> fpclass
+end = struct
+  let f A = FP_normal
+end
+
+[%%expect
+{|
 Lines 2-4, characters 2-5:
 2 | ..struct
 3 |     let f A = FP_normal

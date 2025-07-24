@@ -1,13 +1,13 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- set OCAMLRUNPARAM = "Xmain_stack_size=1000";
- {
-   bytecode;
- }{
-   native;
- }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   runtime5;
+   multidomain;
+   set OCAMLRUNPARAM = "Xmain_stack_size=1000";
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 open Effect
@@ -33,12 +33,10 @@ let run =
     with_mutex run_m (fun () -> Queue.take_opt run_q)
     |> Option.iter (fun k -> continue k ())
   in
-
   let rec spawn f =
     (* Effect handler => instantiates fiber *)
     match_with f ()
-      {
-        retc = (fun () -> dequeue ());
+      { retc = (fun () -> dequeue ());
         exnc =
           (fun e ->
             print_string (Printexc.to_string e);
@@ -47,11 +45,11 @@ let run =
           (fun (type a) (e : a Effect.t) ->
             match e with
             | Fork f ->
-                Some
-                  (fun (k : (a, unit) continuation) ->
-                    enqueue k;
-                    spawn f)
-            | _ -> None);
+              Some
+                (fun (k : (a, unit) continuation) ->
+                  enqueue k;
+                  spawn f)
+            | _ -> None)
       }
   in
   let domains =

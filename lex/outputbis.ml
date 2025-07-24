@@ -19,20 +19,22 @@ open Printf
 open Lexgen
 open Common
 
-type ctx = {
-  oc: out_channel;
-  has_refill: bool;
-  goto_state: (ctx -> string -> int -> unit);
-  last_action: int option;
-}
+type ctx =
+  { oc : out_channel;
+    has_refill : bool;
+    goto_state : ctx -> string -> int -> unit;
+    last_action : int option
+  }
 
 let pr ctx = fprintf ctx.oc
 
 let output_auto_defs ctx =
-  if ctx.has_refill then begin
+  if ctx.has_refill
+  then (
     pr ctx "\n";
-    pr ctx "let rec __ocaml_lex_refill_buf lexbuf _buf _len _curr _last \
-                                           _last_action state k =\n";
+    pr ctx
+      "let rec __ocaml_lex_refill_buf lexbuf _buf _len _curr _last \
+       _last_action state k =\n";
     pr ctx "  if lexbuf.Lexing.lex_eof_reached then\n";
     pr ctx "    state lexbuf _last_action _buf _len _curr _last k 256\n";
     pr ctx "  else begin\n";
@@ -45,18 +47,18 @@ let output_auto_defs ctx =
     pr ctx "        let _len = lexbuf.Lexing.lex_buffer_len in\n";
     pr ctx "        let _buf = lexbuf.Lexing.lex_buffer in\n";
     pr ctx "        if _curr < _len then\n";
-    pr ctx "          state lexbuf _last_action _buf _len (_curr + 1) \
-                            _last k\n";
+    pr ctx "          state lexbuf _last_action _buf _len (_curr + 1) _last k\n";
     pr ctx "            (Char.code (Bytes.unsafe_get _buf _curr))\n";
     pr ctx "        else\n";
-    pr ctx "          __ocaml_lex_refill_buf lexbuf _buf _len _curr _last \
-                                             _last_action\n";
+    pr ctx
+      "          __ocaml_lex_refill_buf lexbuf _buf _len _curr _last \
+       _last_action\n";
     pr ctx "            state k\n";
     pr ctx "      )\n";
     pr ctx "      lexbuf\n";
     pr ctx "  end\n";
-    pr ctx "\n";
-  end else begin
+    pr ctx "\n")
+  else (
     pr ctx "\n";
     pr ctx "let rec __ocaml_lex_refill_buf lexbuf _buf _len _curr _last =\n";
     pr ctx "  if lexbuf.Lexing.lex_eof_reached then\n";
@@ -70,37 +72,34 @@ let output_auto_defs ctx =
     pr ctx "    let _len = lexbuf.Lexing.lex_buffer_len in\n";
     pr ctx "    let _buf = lexbuf.Lexing.lex_buffer in\n";
     pr ctx "    if _curr < _len then\n";
-    pr ctx "      Char.code (Bytes.unsafe_get _buf _curr), _buf, _len, \
-                            (_curr + 1), _last\n";
+    pr ctx
+      "      Char.code (Bytes.unsafe_get _buf _curr), _buf, _len, (_curr + 1), \
+       _last\n";
     pr ctx "    else\n";
     pr ctx "      __ocaml_lex_refill_buf lexbuf _buf _len _curr _last\n";
     pr ctx "  end\n";
-    pr ctx "\n";
-  end
+    pr ctx "\n")
 
 let output_memory_actions pref oc = function
-  | []  -> ()
+  | [] -> ()
   | mvs ->
     output_string oc pref;
-    output_string oc "(* " ;
-    fprintf oc "L=%d " (List.length mvs) ;
+    output_string oc "(* ";
+    fprintf oc "L=%d " (List.length mvs);
     List.iter
-      (fun mv -> match mv with
-         | Copy (tgt, src) ->
-             fprintf oc "[%d] <- [%d] ;" tgt src
-         | Set tgt ->
-             fprintf oc "[%d] <- p ; " tgt)
-      mvs ;
-    output_string oc " *)\n" ;
+      (fun mv ->
+        match mv with
+        | Copy (tgt, src) -> fprintf oc "[%d] <- [%d] ;" tgt src
+        | Set tgt -> fprintf oc "[%d] <- p ; " tgt)
+      mvs;
+    output_string oc " *)\n";
     List.iter
-      (fun mv -> match mv with
-         | Copy (tgt, src) ->
-             fprintf oc
-               "%s%a <- %a ;\n"
-               pref output_mem_access tgt output_mem_access src
-         | Set tgt ->
-             fprintf oc "%s%a <- _curr;\n"
-               pref output_mem_access tgt)
+      (fun mv ->
+        match mv with
+        | Copy (tgt, src) ->
+          fprintf oc "%s%a <- %a ;\n" pref output_mem_access tgt
+            output_mem_access src
+        | Set tgt -> fprintf oc "%s%a <- _curr;\n" pref output_mem_access tgt)
       mvs
 
 let output_pats ctx = function
@@ -116,22 +115,18 @@ let output_action ctx pref mems r =
   output_memory_actions pref ctx.oc mems;
   match r with
   | Backtrack ->
-      pr ctx "%slet _curr = _last in\n\
-              %slexbuf.Lexing.lex_curr_pos <- _curr;\n\
-              %slexbuf.Lexing.lex_last_pos <- _last;\n"
-        pref pref pref;
-      if ctx.has_refill then
-        pr ctx "%sk lexbuf %s\n" pref (last_action ctx)
-      else
-        pr ctx "%s%s\n" pref (last_action ctx)
-  | Goto n ->
-      ctx.goto_state ctx pref n
+    pr ctx
+      "%slet _curr = _last in\n\
+       %slexbuf.Lexing.lex_curr_pos <- _curr;\n\
+       %slexbuf.Lexing.lex_last_pos <- _last;\n"
+      pref pref pref;
+    if ctx.has_refill
+    then pr ctx "%sk lexbuf %s\n" pref (last_action ctx)
+    else pr ctx "%s%s\n" pref (last_action ctx)
+  | Goto n -> ctx.goto_state ctx pref n
 
 let output_pat ctx i =
-  if i >= 256 then
-    pr ctx "|eof"
-  else
-    pr ctx "|'%s'" (Char.escaped (Char.chr i))
+  if i >= 256 then pr ctx "|eof" else pr ctx "|'%s'" (Char.escaped (Char.chr i))
 
 let output_clause ctx pref pats mems r =
   pr ctx "%s(* " pref;
@@ -139,136 +134,129 @@ let output_clause ctx pref pats mems r =
   pr ctx " *)\n%s" pref;
   output_pats ctx pats;
   pr ctx " ->\n";
-  output_action ctx ("  "^pref) mems r
+  output_action ctx ("  " ^ pref) mems r
 
 let output_default_clause ctx pref mems r =
   pr ctx "%s| _ ->\n" pref;
-  output_action ctx ("  "^pref) mems r
+  output_action ctx ("  " ^ pref) mems r
 
 let output_moves ctx pref moves =
   let t = Hashtbl.create 17 in
-  let add_move i (m,mems) =
-    let mems,r = try Hashtbl.find t m with Not_found -> mems,[] in
-    Hashtbl.replace t m (mems,(i::r)) in
-
+  let add_move i (m, mems) =
+    let mems, r = try Hashtbl.find t m with Not_found -> mems, [] in
+    Hashtbl.replace t m (mems, i :: r)
+  in
   for i = 0 to 256 do
     add_move i moves.(i)
-  done ;
-
-  let most_frequent = ref Backtrack
-  and most_mems = ref []
-  and size = ref 0 in
+  done;
+  let most_frequent = ref Backtrack and most_mems = ref [] and size = ref 0 in
   Hashtbl.iter
-    (fun m (mems,pats) ->
+    (fun m (mems, pats) ->
       let size_m = List.length pats in
-      if size_m > !size then begin
-        most_frequent := m ;
-        most_mems := mems ;
-        size := size_m
-      end)
-    t ;
+      if size_m > !size
+      then (
+        most_frequent := m;
+        most_mems := mems;
+        size := size_m))
+    t;
   Hashtbl.iter
-    (fun m (mems,pats) ->
-       if m <> !most_frequent then
-         output_clause ctx pref (List.rev pats) mems m)
-    t ;
+    (fun m (mems, pats) ->
+      if m <> !most_frequent then output_clause ctx pref (List.rev pats) mems m)
+    t;
   output_default_clause ctx pref !most_mems !most_frequent
-
 
 let output_tag_actions pref ctx mvs =
   pr ctx "%s(*" pref;
   List.iter
-    (fun i -> match i with
-    | SetTag (t,m) -> pr ctx " t%d <- [%d] ;" t m
-    | EraseTag t -> pr ctx " t%d <- -1 ;" t)
-    mvs ;
-  pr ctx " *)\n" ;
+    (fun i ->
+      match i with
+      | SetTag (t, m) -> pr ctx " t%d <- [%d] ;" t m
+      | EraseTag t -> pr ctx " t%d <- -1 ;" t)
+    mvs;
+  pr ctx " *)\n";
   List.iter
-    (fun i ->  match i with
-    | SetTag (t,m) ->
-        pr ctx "%s%a <- %a ;\n"
-          pref output_mem_access t output_mem_access m
-    | EraseTag t ->
-        pr ctx "%s%a <- -1 ;\n"
-          pref output_mem_access t)
+    (fun i ->
+      match i with
+      | SetTag (t, m) ->
+        pr ctx "%s%a <- %a ;\n" pref output_mem_access t output_mem_access m
+      | EraseTag t -> pr ctx "%s%a <- -1 ;\n" pref output_mem_access t)
     mvs
 
 let output_trans_body pref ctx = function
-  | Perform (n,mvs) ->
-      output_tag_actions pref ctx mvs ;
-      pr ctx "%slexbuf.Lexing.lex_curr_pos <- _curr;\n" pref;
-      pr ctx "%slexbuf.Lexing.lex_last_pos <- _last;\n" pref;
-      pr ctx "%s%s%d\n" pref (if ctx.has_refill then "k lexbuf " else "") n
+  | Perform (n, mvs) ->
+    output_tag_actions pref ctx mvs;
+    pr ctx "%slexbuf.Lexing.lex_curr_pos <- _curr;\n" pref;
+    pr ctx "%slexbuf.Lexing.lex_last_pos <- _last;\n" pref;
+    pr ctx "%s%s%d\n" pref (if ctx.has_refill then "k lexbuf " else "") n
   | Shift (trans, move) ->
-      let ctx =
-        match trans with
-        | Remember (n,mvs) ->
-            output_tag_actions pref ctx mvs ;
-            pr ctx "%slet _last = _curr in\n" pref;
-            begin match ctx.last_action with
-            | Some i when i = n ->
-                pr ctx "%s(* let _last_action = %d in*)\n" pref n;
-                ctx
-            | _ ->
-                pr ctx "%slet _last_action = %d in\n" pref n;
-                {ctx with last_action = Some n}
-            end
-        | No_remember ->
-            ctx
-      in
-      if ctx.has_refill then begin
-        (* TODO: bind this 'state' function at toplevel instead *)
-        pr ctx
-          "%slet state lexbuf _last_action _buf _len _curr _last k = function\n"
-          pref;
-        output_moves ctx pref move;
-        pr ctx "%sin\n\
-                %sif _curr >= _len then\n\
-                %s  __ocaml_lex_refill_buf lexbuf _buf _len _curr _last \
-                                                  _last_action state k\n\
-                %selse\n\
-                %s  state lexbuf _last_action _buf _len (_curr + 1) _last k\n\
-                %s    (Char.code (Bytes.unsafe_get _buf _curr))\n"
-        pref pref pref pref pref pref
-      end
-      else begin
-        pr ctx "%slet next_char, _buf, _len, _curr, _last =\n\
-                %s  if _curr >= _len then\n\
-                %s    __ocaml_lex_refill_buf lexbuf _buf _len _curr _last\n\
-                %s  else\n\
-                %s    Char.code (Bytes.unsafe_get _buf _curr),\n\
-                %s    _buf, _len, (_curr + 1), _last\n\
-                %sin\n\
-                %sbegin match next_char with\n"
-          pref pref pref pref pref pref pref pref;
-        output_moves ctx (pref ^ "  ") move;
-        pr ctx "%send\n" pref
-      end
+    let ctx =
+      match trans with
+      | Remember (n, mvs) -> (
+        output_tag_actions pref ctx mvs;
+        pr ctx "%slet _last = _curr in\n" pref;
+        match ctx.last_action with
+        | Some i when i = n ->
+          pr ctx "%s(* let _last_action = %d in*)\n" pref n;
+          ctx
+        | _ ->
+          pr ctx "%slet _last_action = %d in\n" pref n;
+          { ctx with last_action = Some n })
+      | No_remember -> ctx
+    in
+    if ctx.has_refill
+    then (
+      (* TODO: bind this 'state' function at toplevel instead *)
+      pr ctx
+        "%slet state lexbuf _last_action _buf _len _curr _last k = function\n"
+        pref;
+      output_moves ctx pref move;
+      pr ctx
+        "%sin\n\
+         %sif _curr >= _len then\n\
+         %s  __ocaml_lex_refill_buf lexbuf _buf _len _curr _last _last_action \
+         state k\n\
+         %selse\n\
+         %s  state lexbuf _last_action _buf _len (_curr + 1) _last k\n\
+         %s    (Char.code (Bytes.unsafe_get _buf _curr))\n"
+        pref pref pref pref pref pref)
+    else (
+      pr ctx
+        "%slet next_char, _buf, _len, _curr, _last =\n\
+         %s  if _curr >= _len then\n\
+         %s    __ocaml_lex_refill_buf lexbuf _buf _len _curr _last\n\
+         %s  else\n\
+         %s    Char.code (Bytes.unsafe_get _buf _curr),\n\
+         %s    _buf, _len, (_curr + 1), _last\n\
+         %sin\n\
+         %sbegin match next_char with\n"
+        pref pref pref pref pref pref pref pref;
+      output_moves ctx (pref ^ "  ") move;
+      pr ctx "%send\n" pref)
 
 let output_automata ctx auto inline =
   output_auto_defs ctx;
   let n = Array.length auto in
   let first = ref true in
-  for i = 0 to n-1 do
-    if not inline.(i) then begin
+  for i = 0 to n - 1 do
+    if not inline.(i)
+    then (
       pr ctx
         "%s __ocaml_lex_state%d lexbuf _last_action _buf _len _curr _last %s=\n"
         (if !first then "let rec" else "\nand")
         i
         (if ctx.has_refill then "k " else "");
       output_trans_body "  " ctx auto.(i);
-      first := false;
-    end
+      first := false)
   done;
   pr ctx "\n\n"
-
 
 (* Output the entries *)
 
 let output_init ctx pref e init_moves =
-  if e.auto_mem_size > 0 then
-    pr ctx "%slexbuf.Lexing.lex_mem <- Array.make %d (-1);\n"
-      pref e.auto_mem_size;
+  if e.auto_mem_size > 0
+  then
+    pr ctx "%slexbuf.Lexing.lex_mem <- Array.make %d (-1);\n" pref
+      e.auto_mem_size;
   pr ctx "%slet _curr = lexbuf.Lexing.lex_curr_pos in\n" pref;
   pr ctx "%slet _last = _curr in\n" pref;
   pr ctx "%slet _len = lexbuf.Lexing.lex_buffer_len in\n" pref;
@@ -284,8 +272,7 @@ let output_rules ic ctx pref tr e =
   pr ctx "%s    lexbuf.Lexing.lex_start_p <- _curr_p;\n" pref;
   pr ctx "%s    lexbuf.Lexing.lex_curr_p <-\n" pref;
   pr ctx "%s      {_curr_p with Lexing.pos_cnum =\n" pref;
-  pr ctx "%s       lexbuf.Lexing.lex_abs_pos+lexbuf.Lexing.lex_curr_pos}\n"
-         pref;
+  pr ctx "%s       lexbuf.Lexing.lex_abs_pos+lexbuf.Lexing.lex_curr_pos}\n" pref;
   pr ctx "%s  end\n" pref;
   pr ctx "%send;\n" pref;
   pr ctx "%smatch __ocaml_lex_result with\n" pref;
@@ -301,22 +288,20 @@ let output_rules ic ctx pref tr e =
 let output_entry ic ctx tr e =
   let init_num, init_moves = e.auto_initial_state in
   pr ctx "%s %alexbuf =\n" e.auto_name output_args e.auto_args;
-
-  if ctx.has_refill then begin
+  if ctx.has_refill
+  then (
     pr ctx "  let k lexbuf __ocaml_lex_result =\n";
     output_rules ic ctx "    " tr e;
     pr ctx "  in\n";
     output_init ctx "  " e init_moves;
-    ctx.goto_state ctx "  " init_num
-  end else begin
+    ctx.goto_state ctx "  " init_num)
+  else (
     pr ctx "  let __ocaml_lex_result =\n";
     output_init ctx "    " e init_moves;
     ctx.goto_state ctx "    " init_num;
     pr ctx "  in\n";
-    output_rules ic ctx "  " tr e
-  end;
+    output_rules ic ctx "  " tr e);
   pr ctx "\n\n"
-
 
 (* Determine which states to inline *)
 
@@ -327,59 +312,51 @@ let choose_inlining entry_points transitions =
   Array.iter
     (function
       | Shift (_, a) ->
-          let tbl = Hashtbl.create 8 in
-          Array.iter
-            (function
-              | (Goto i, _) when not (Hashtbl.mem tbl i) ->
-                  Hashtbl.add tbl i (); count i
-              | _ -> ()
-            )
-            a
-      | Perform _ -> ()
-    )
+        let tbl = Hashtbl.create 8 in
+        Array.iter
+          (function
+            | Goto i, _ when not (Hashtbl.mem tbl i) ->
+              Hashtbl.add tbl i ();
+              count i
+            | _ -> ())
+          a
+      | Perform _ -> ())
     transitions;
   Array.mapi
-    (fun i -> function
-       | Perform _ -> true
-       | Shift _ -> counters.(i) = 1
-    )
+    (fun i -> function Perform _ -> true | Shift _ -> counters.(i) = 1)
     transitions
 
 let goto_state inline transitions ctx pref n =
-  if inline.(n) then
-    output_trans_body pref ctx transitions.(n)
+  if inline.(n)
+  then output_trans_body pref ctx transitions.(n)
   else
-    pr ctx "%s__ocaml_lex_state%d lexbuf %s _buf _len _curr _last%s\n"
-      pref n
+    pr ctx "%s__ocaml_lex_state%d lexbuf %s _buf _len _curr _last%s\n" pref n
       (last_action ctx)
       (if ctx.has_refill then " k" else "")
 
 (* Main output function *)
 
-let output_lexdef ic oc tr header rh
-                  entry_points transitions trailer =
-
+let output_lexdef ic oc tr header rh entry_points transitions trailer =
   copy_chunk ic oc tr header false;
   let has_refill = output_refill_handler ic oc tr rh in
   let inline = choose_inlining entry_points transitions in
   let ctx =
-    {
-      has_refill;
+    { has_refill;
       oc;
       goto_state = goto_state inline transitions;
-      last_action = None;
+      last_action = None
     }
   in
   output_automata ctx transitions inline;
-  begin match entry_points with
-    [] -> ()
+  (match entry_points with
+  | [] -> ()
   | entry1 :: entries ->
     output_string oc "let rec ";
     output_entry ic ctx tr entry1;
-      List.iter
-        (fun e -> output_string oc "and ";
-          output_entry ic ctx tr e)
-        entries;
-      output_string oc ";;\n\n";
-  end;
+    List.iter
+      (fun e ->
+        output_string oc "and ";
+        output_entry ic ctx tr e)
+      entries;
+    output_string oc ";;\n\n");
   copy_chunk ic oc tr trailer false

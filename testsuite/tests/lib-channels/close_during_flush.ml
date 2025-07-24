@@ -1,9 +1,9 @@
 (* TEST
- not-windows;
- include unix;
- hasunix;
- runtime5;
- native;
+   not-windows;
+   include unix;
+   hasunix;
+   runtime5;
+   native;
 *)
 
 let () =
@@ -11,15 +11,13 @@ let () =
   (* create a full pipe (so that writes block) *)
   Unix.set_nonblock wr;
   let buf = Bytes.make 1000 '!' in
-  begin match
-    for i = 1 to 1000 do
-      ignore (Unix.write wr buf 0 1000)
-    done
-  with
+  (match
+     for i = 1 to 1000 do
+       ignore (Unix.write wr buf 0 1000)
+     done
+   with
   | () -> failwith "pipe doesn't seem to fill on this OS?!"
-  | exception Unix.Unix_error((EAGAIN|EWOULDBLOCK), _, _) -> ()
-  end;
-
+  | exception Unix.Unix_error ((EAGAIN | EWOULDBLOCK), _, _) -> ());
   (* block in a write, then unblock & close from a signal handler *)
   Unix.clear_nonblock wr;
   let ch = Unix.out_channel_of_descr wr in

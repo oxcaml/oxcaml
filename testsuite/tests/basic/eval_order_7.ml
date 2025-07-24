@@ -6,6 +6,6 @@ let p i x =
   x
 
 let _ =
-  for i = (p 13 0) to (p 25 3) do
+  for i = p 13 0 to p 25 3 do
     p i ()
   done

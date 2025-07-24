@@ -1,9 +1,9 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
 *)
 
 open Domain
@@ -17,16 +17,16 @@ let test_size =
 
 (* Don't run the test if we have only 2 cores available, it times out often. *)
 
-let _  =
-  if test_size <= 1 then begin print_endline "ok"; exit 0 end
+let _ =
+  if test_size <= 1
+  then (
+    print_endline "ok";
+    exit 0)
 
-let (list_size, num_domains) =
-  if test_size >= 2 then (14, 25) else (13, 12)
+let list_size, num_domains = if test_size >= 2 then 14, 25 else 13, 12
 
 let rec burn l =
-  if List.hd l > list_size then ()
-  else
-    burn (l @ l |> List.map (fun x -> x + 1))
+  if List.hd l > list_size then () else burn (l @ l |> List.map (fun x -> x + 1))
 
 let test_parallel_spawn () =
   for i = 1 to 20 do
@@ -38,17 +38,23 @@ let () =
   let running = Atomic.make true in
   let rec run_until_stop fn () =
     while Atomic.get running do
-      fn ();
+      fn ()
     done
   in
-
-  let domain_minor_gc = Domain.spawn (run_until_stop (fun () -> burn [8]; Gc.minor ())) in
-  let domain_major_gc = Domain.spawn (run_until_stop (fun () -> burn [8]; Gc.major ())) in
-
+  let domain_minor_gc =
+    Domain.spawn
+      (run_until_stop (fun () ->
+           burn [8];
+           Gc.minor ()))
+  in
+  let domain_major_gc =
+    Domain.spawn
+      (run_until_stop (fun () ->
+           burn [8];
+           Gc.major ()))
+  in
   test_parallel_spawn ();
-
   Atomic.set running false;
   join domain_minor_gc;
   join domain_major_gc;
-
   print_endline "ok"

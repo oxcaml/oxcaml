@@ -17,16 +17,18 @@ open Misc
 
 (* Link .cmo files and produce a bytecode executable. *)
 
-module Dep : Set.OrderedType with
-  type t = Compilation_unit.t * Compilation_unit.t
+module Dep :
+  Set.OrderedType with type t = Compilation_unit.t * Compilation_unit.t
+
 module DepSet : Set.S with type elt = Dep.t
 
 val link : filepath list -> filepath -> unit
+
 val reset : unit -> unit
 
-val check_consistency: filepath -> Cmo_format.compilation_unit_descr -> unit
+val check_consistency : filepath -> Cmo_format.compilation_unit_descr -> unit
 
-val extract_crc_interfaces: unit -> Import_info.t list
+val extract_crc_interfaces : unit -> Import_info.t list
 
 type error =
   | File_not_found of filepath
@@ -46,4 +48,4 @@ exception Error of error
 
 open Format
 
-val report_error: formatter -> error -> unit
+val report_error : formatter -> error -> unit

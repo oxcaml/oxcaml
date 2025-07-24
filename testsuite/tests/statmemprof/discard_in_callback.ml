@@ -17,7 +17,7 @@ module MP = Gc.Memprof
 (* A combined 7-block 33-word allocation *)
 
 let[@inline never] f33 n =
-  ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,0))))
+  (n, n, (n, n, n, (n, n, n, n, n))), (n, n, (n, n, n, (n, n, n, n, 0)))
 
 (* Repeatedly stop sampling and discard the profile in an allocation
    callback. If `restart` is `true, start a fresh profile in the same
@@ -35,61 +35,66 @@ let[@inline never] f33 n =
 
    In the bytecode backend, there are no combined allocations, so
    that special case doesn't apply.
- *)
+*)
 
 let discard_in_alloc restart =
-  let n_prof = ref 0 in (* number of profiles *)
-  let n_alloc = ref 0 in (* allocations in current profile *)
-  let allocs = ref 0 in  (* number of sampled allocations *)
-  let words = ref 0 in (* total size of sampled allocations *)
-
+  let n_prof = ref 0 in
+  (* number of profiles *)
+  let n_alloc = ref 0 in
+  (* allocations in current profile *)
+  let allocs = ref 0 in
+  (* number of sampled allocations *)
+  let words = ref 0 in
+  (* total size of sampled allocations *)
   let tref = ref MP.null_tracker in
   let pref = ref (MP.start ~sampling_rate:0.0 MP.null_tracker) in
-  let _ = MP.stop() in
-  let start () = (incr n_prof;
-                  n_alloc := 0;
-                  pref := (MP.start ~sampling_rate:1.0 !tref)) in
-  let stop () = (MP.stop ();
-                 MP.discard (!pref)) in
+  let _ = MP.stop () in
+  let start () =
+    incr n_prof;
+    n_alloc := 0;
+    pref := MP.start ~sampling_rate:1.0 !tref
+  in
+  let stop () =
+    MP.stop ();
+    MP.discard !pref
+  in
+  let alloc_minor (info : MP.allocation) =
+    incr allocs;
+    incr n_alloc;
+    words := !words + info.size + 1;
+    (* add 1 for header word *)
+    (* stop/discard profile N after N allocations *)
+    if !n_alloc >= !n_prof
+    then (
+      stop ();
+      if restart then start ());
+    Some !words
+  in
+  (* return a tracker value so entry survives *)
 
-  let alloc_minor (info:MP.allocation) =
-      (incr allocs;
-       incr n_alloc;
-       words := !words + info.size + 1; (* add 1 for header word *)
-       (* stop/discard profile N after N allocations *)
-       if (!n_alloc) >= (!n_prof) then (stop(); if restart then start());
-       Some (!words)) in (* return a tracker value so entry survives *)
-
- (* We don't expect any other callbacks *)
-  let promote minor = (assert false) in
-  let dealloc_minor minor = (assert false) in
-  let dealloc_major major = (assert false) in
-  let alloc_major info = (assert false) in
-
-  let tracker = { MP.alloc_minor ;
-                  dealloc_minor ;
-                  promote ;
-                  alloc_major ;
-                  dealloc_major } in
-
+  (* We don't expect any other callbacks *)
+  let promote minor = assert false in
+  let dealloc_minor minor = assert false in
+  let dealloc_major major = assert false in
+  let alloc_major info = assert false in
+  let tracker =
+    { MP.alloc_minor; dealloc_minor; promote; alloc_major; dealloc_major }
+  in
   let res = ref [] in
-
   tref := tracker;
   start ();
-  res := (f33 42) :: (!res);
+  res := f33 42 :: !res;
   if not restart then start ();
-  res := (f33 42) :: (!res);
+  res := f33 42 :: !res;
   if not restart then start ();
-  res := (f33 42) :: (!res);
+  res := f33 42 :: !res;
   if not restart then start ();
-  res := (f33 42) :: (!res);
-  if restart then stop();
-  Gc.minor();
+  res := f33 42 :: !res;
+  if restart then stop ();
+  Gc.minor ();
   res := [];
-  Gc.full_major();
-
+  Gc.full_major ();
   let bytecode = Sys.(backend_type == Bytecode) in
-
   (* Computations. Each call to f33 allocates 7 blocks of 33 words,
      (sizes 6, 5, 4, 6, 5, 4, 3) plus the 3 words for the cons cell to
      add the result to !res, making 8 blocks of 36 words. We do it 4
@@ -118,18 +123,23 @@ let discard_in_alloc restart =
      If this were a better test, it would automatically incorporate
      these calculations, rather than hard-wiring them here. But at least
      I've shown my working. *)
-
-  assert (!allocs = (if restart then (if bytecode then 4 * (7 + 1)
-                                         else 1 + 2 + 3 + 4 + 1)
-                        else (1 + 2 + 3 + 4)));
-
-  assert (!words = (if restart then (if bytecode
-                                        then (4 * (6 + 5 + 4 +
-                                                     6 + 5 + 4 + 3 + 3))
-                                        else (6 + (3 + 6) + (3 + 6 + 5)
-                                                + (3 + 6 + 5 + 4) + 3))
-                       else (6 + (6 + 5) + (6 + 5 + 4) + (6 + 5 + 4 + 6))));
+  assert (
+    !allocs
+    =
+    if restart
+    then if bytecode then 4 * (7 + 1) else 1 + 2 + 3 + 4 + 1
+    else 1 + 2 + 3 + 4);
+  assert (
+    !words
+    =
+    if restart
+    then
+      if bytecode
+      then 4 * (6 + 5 + 4 + 6 + 5 + 4 + 3 + 3)
+      else 6 + (3 + 6) + (3 + 6 + 5) + (3 + 6 + 5 + 4) + 3
+    else 6 + (6 + 5) + (6 + 5 + 4) + (6 + 5 + 4 + 6));
   res
 
 let _ = discard_in_alloc true
+
 let _ = discard_in_alloc false

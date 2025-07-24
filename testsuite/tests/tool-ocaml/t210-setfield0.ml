@@ -1,21 +1,19 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
-open Lib;;
-type t = {
-  mutable a : int;
-};;
+open Lib
 
-let x = {a = 7} in
+type t = { mutable a : int };;
+
+let x = { a = 7 } in
 x.a <- 11;
 if x.a <> 11 then raise Not_found;
 x
-;;
 
 (**
        0 CONSTINT 42

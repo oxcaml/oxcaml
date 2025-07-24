@@ -1,16 +1,18 @@
 (* TEST
- include unix;
- libwin32unix;
- has_symlink;
- {
-   bytecode;
- }{
-   native;
- }
+   include unix;
+   libwin32unix;
+   has_symlink;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let create_symlink barrier src dst () =
-  while not (Atomic.get barrier) do Domain.cpu_relax() done;
+  while not (Atomic.get barrier) do
+    Domain.cpu_relax ()
+  done;
   Unix.symlink ~to_dir:false src dst
 
 let create_symlink_parallel src name1 name2 =
@@ -35,9 +37,11 @@ let test () =
   Sys.remove "link1.txt";
   Sys.remove "link2.txt";
   Sys.remove "link3.txt";
-  Sys.remove "link4.txt";
-;;
+  Sys.remove "link4.txt"
 
 let _ =
-  if Unix.has_symlink () then
-    for _ = 1 to 50 do test () done
+  if Unix.has_symlink ()
+  then
+    for _ = 1 to 50 do
+      test ()
+    done

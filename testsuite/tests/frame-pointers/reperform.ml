@@ -11,38 +11,41 @@ open Effect.Deep
 
 external fp_backtrace : string -> unit = "fp_backtrace" [@@noalloc]
 
-type _ Effect.t += E : unit t
-                 | F : unit t
+type _ Effect.t += E : unit t | F : unit t
 
 let rec foo n =
-  if n = 10 then 0
-  else begin
-    if n = 5 then begin
+  if n = 10
+  then 0
+  else (
+    if n = 5
+    then (
       perform E;
       print_endline "# resumed...";
-      fp_backtrace Sys.argv.(0)
-    end;
-    foo (n + 1) + n
-  end
+      fp_backtrace Sys.argv.(0));
+    foo (n + 1) + n)
 
 let rec bar n =
-  if n = 10 then 0
-  else begin
-    if n = 5 then begin
+  if n = 10
+  then 0
+  else (
+    if n = 5
+    then
       match_with foo 0
-      { retc = ignore;
-        exnc = raise;
-        effc = fun (type a) (eff : a t) ->
-          match eff with
-          | F -> Some (fun (k : (a, _) continuation) -> continue k ())
-          | _ -> None }
-    end;
-    bar (n + 1) + n
-  end
+        { retc = ignore;
+          exnc = raise;
+          effc =
+            (fun (type a) (eff : a t) ->
+              match eff with
+              | F -> Some (fun (k : (a, _) continuation) -> continue k ())
+              | _ -> None)
+        };
+    bar (n + 1) + n)
 
 let _ =
   try_with bar 0
-  { effc = fun (type a) (eff : a t) ->
-      match eff with
-      | E -> Some (fun (k : (a, _) continuation) -> continue k ())
-      | _ -> None }
+    { effc =
+        (fun (type a) (eff : a t) ->
+          match eff with
+          | E -> Some (fun (k : (a, _) continuation) -> continue k ())
+          | _ -> None)
+    }

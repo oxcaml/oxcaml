@@ -15,7 +15,10 @@
 
 (* Types of files involved in an OCaml project and related functions *)
 
-type backend_specific = Object | Library | Program
+type backend_specific =
+  | Object
+  | Library
+  | Program
 
 type t =
   | Implementation
@@ -45,8 +48,9 @@ let string_of_filetype = function
   | Binary_interface -> "binary interface"
   | Obj -> "object"
   | Backend_specific (backend, filetype) ->
-    ((Ocaml_backends.string_of_backend backend) ^ " " ^
-      (string_of_backend_specific filetype))
+    Ocaml_backends.string_of_backend backend
+    ^ " "
+    ^ string_of_backend_specific filetype
   | Text -> "text"
   | Other s -> Printf.sprintf "unknown (%s)" s
 
@@ -59,15 +63,14 @@ let extension_of_filetype = function
   | Grammar -> "mly"
   | Binary_interface -> "cmi"
   | Obj -> Ocamltest_config.objext
-  | Backend_specific (backend, filetype) ->
-    begin match (backend, filetype) with
-      | (Ocaml_backends.Native, Object) -> "cmx"
-      | (Ocaml_backends.Native, Library) -> "cmxa"
-      | (Ocaml_backends.Native, Program) -> "opt"
-      | (Ocaml_backends.Bytecode, Object) -> "cmo"
-      | (Ocaml_backends.Bytecode, Library) -> "cma"
-      | (Ocaml_backends.Bytecode, Program) -> "byte"
-    end
+  | Backend_specific (backend, filetype) -> (
+    match backend, filetype with
+    | Ocaml_backends.Native, Object -> "cmx"
+    | Ocaml_backends.Native, Library -> "cmxa"
+    | Ocaml_backends.Native, Program -> "opt"
+    | Ocaml_backends.Bytecode, Object -> "cmo"
+    | Ocaml_backends.Bytecode, Library -> "cma"
+    | Ocaml_backends.Bytecode, Program -> "byte")
   | Text -> "txt"
   | Other s -> s
 
@@ -94,17 +97,20 @@ let split_filename name =
   let l = String.length name in
   let is_dir_sep name i = name.[i] = Filename.dir_sep.[0] in
   let rec search_dot i =
-    if i < 0 || is_dir_sep name i then (name, "")
-    else if name.[i] = '.' then
+    if i < 0 || is_dir_sep name i
+    then name, ""
+    else if name.[i] = '.'
+    then
       let basename = String.sub name 0 i in
-      let extension = String.sub name (i+1) (l-i-1) in
-      (basename, extension)
-    else search_dot (i - 1) in
+      let extension = String.sub name (i + 1) (l - i - 1) in
+      basename, extension
+    else search_dot (i - 1)
+  in
   search_dot (l - 1)
 
 let filetype filename =
-  let (basename, extension) = split_filename filename in
-  (basename, filetype_of_extension extension)
+  let basename, extension = split_filename filename in
+  basename, filetype_of_extension extension
 
 let make_filename (basename, filetype) =
   let extension = extension_of_filetype filetype in
@@ -117,4 +123,4 @@ let[@ocaml.warning "-fragile-match"] action_of_filetype = function
   | C_minus_minus -> "Processing C-- file"
   | Lexer -> "Generating lexer"
   | Grammar -> "Generating parser"
-  | filetype -> ("nothing to do for " ^ (string_of_filetype filetype))
+  | filetype -> "nothing to do for " ^ string_of_filetype filetype

@@ -17,12 +17,18 @@
 
 open Types
 
-type position = First | Second
+type position =
+  | First
+  | Second
 
 val swap_position : position -> position
+
 val print_pos : Format.formatter -> position -> unit
 
-type expanded_type = { ty: type_expr; expanded: type_expr }
+type expanded_type =
+  { ty : type_expr;
+    expanded : type_expr
+  }
 
 (** [trivial_expansion ty] creates an [expanded_type] whose expansion is also
     [ty].  Usually, you want [Ctype.expand_type] instead, since the expansion
@@ -31,10 +37,13 @@ type expanded_type = { ty: type_expr; expanded: type_expr }
     expansion produces more confusing or inaccurate output. *)
 val trivial_expansion : type_expr -> expanded_type
 
-type 'a diff = { got: 'a; expected: 'a }
+type 'a diff =
+  { got : 'a;
+    expected : 'a
+  }
 
 (** [map_diff f {expected;got}] is [{expected=f expected; got=f got}] *)
-val map_diff: ('a -> 'b) -> 'a diff -> 'b diff
+val map_diff : ('a -> 'b) -> 'a diff -> 'b diff
 
 (** Scope escape related errors *)
 type 'a escape_kind =
@@ -49,17 +58,17 @@ type 'a escape_kind =
 
 type 'a escape =
   { kind : 'a escape_kind;
-    context : type_expr option }
+    context : type_expr option
+  }
 
 val map_escape : ('a -> 'b) -> 'a escape -> 'b escape
 
-val explain: 'a list ->
-  (prev:'a option -> 'a -> 'b option) ->
-  'b option
+val explain : 'a list -> (prev:'a option -> 'a -> 'b option) -> 'b option
 
 (** Type indices *)
 type unification = private Unification
-type comparison  = private Comparison
+
+type comparison = private Comparison
 
 type fixed_row_case =
   | Cannot_be_closed
@@ -72,7 +81,8 @@ type 'variety variant =
   (* Unification *)
   | No_intersection : unification variant
   | Fixed_row :
-      position * fixed_row_case * fixed_explanation -> unification variant
+      position * fixed_row_case * fixed_explanation
+      -> unification variant
   (* Equality & Moregen *)
   | Presence_not_guaranteed_for : position * string -> comparison variant
   | Openness : position (* Always [Second] for Moregen *) -> comparison variant
@@ -90,18 +100,24 @@ type ('a, 'variety) elt =
   | Variant : 'variety variant -> ('a, 'variety) elt
   | Obj : 'variety obj -> ('a, 'variety) elt
   | Escape : 'a escape -> ('a, _) elt
-  | Incompatible_fields : { name:string; diff: type_expr diff } -> ('a, _) elt
+  | Incompatible_fields :
+      { name : string;
+        diff : type_expr diff
+      }
+      -> ('a, _) elt
   (* Unification & Moregen; included in Equality for simplicity *)
   | Rec_occur : type_expr * type_expr -> ('a, _) elt
   | Bad_jkind : type_expr * Jkind.Violation.t -> ('a, _) elt
   | Bad_jkind_sort : type_expr * Jkind.Violation.t -> ('a, _) elt
   | Unequal_var_jkinds :
-      type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
+      type_expr * jkind_lr * type_expr * jkind_lr
+      -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
-type 'variety trace = (type_expr,     'variety) t
+type 'variety trace = (type_expr, 'variety) t
+
 type 'variety error = (expanded_type, 'variety) t
 
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
@@ -125,7 +141,8 @@ type unification_error = private { trace : unification error } [@@unboxed]
 
 type equality_error = private
   { trace : comparison error;
-    subst : (type_expr * type_expr) list }
+    subst : (type_expr * type_expr) list
+  }
 
 type moregen_error = private { trace : comparison error } [@@unboxed]
 
@@ -139,14 +156,13 @@ val moregen_error : trace:comparison error -> moregen_error
 (** Wraps up the two different kinds of [comparison] errors in one type *)
 type comparison_error =
   | Equality_error of equality_error
-  | Moregen_error  of moregen_error
+  | Moregen_error of moregen_error
 
 (** Lift [swap_trace] to [unification_error] *)
 val swap_unification_error : unification_error -> unification_error
 
 module Subtype : sig
-  type 'a elt =
-    | Diff of 'a diff
+  type 'a elt = Diff of 'a diff
 
   type 'a t = 'a elt list
 
@@ -157,14 +173,17 @@ module Subtype : sig
       type has the invariant that the subtype trace is nonempty; note that no
       such invariant is imposed on the unification trace. *)
 
-  type trace       = type_expr t
+  type trace = type_expr t
+
   type error_trace = expanded_type t
 
-  type unification_error_trace = unification error (** To avoid shadowing *)
+  (** To avoid shadowing *)
+  type unification_error_trace = unification error
 
   type nonrec error = private
-    { trace             : error_trace
-    ; unification_trace : unification error }
+    { trace : error_trace;
+      unification_trace : unification error
+    }
 
   val error :
     trace:error_trace -> unification_trace:unification_error_trace -> error

@@ -1,1 +1,3 @@
-open D;; let f (C {f}) = ()
+open D
+
+let f (C { f }) = ()

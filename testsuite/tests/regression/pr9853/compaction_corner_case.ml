@@ -1,11 +1,11 @@
 (* TEST
- no-tsan; (* Takes too much time with tsan *)
- {
- bytecode;
- }
- {
- native;
- }
+   no-tsan; (* Takes too much time with tsan *)
+   {
+   bytecode;
+   }
+   {
+   native;
+   }
 *)
 
 (* Compaction crash when there is only one heap chunk and it is fully used. *)

@@ -1,1 +1,1 @@
-let f (x : C.t1) = (x : C.t2)
+let f (x : C.t1) : C.t2 = x

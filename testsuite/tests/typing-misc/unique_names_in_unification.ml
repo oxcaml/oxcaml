@@ -1,14 +1,18 @@
 (* TEST
- expect;
+   expect;
 *)
 type t = A
+
 let x = A
+
 module M = struct
   type t = B
-  let f: t -> t = fun B -> x
-end;;
 
-[%%expect{|
+  let f : t -> t = fun B -> x
+end
+
+[%%expect
+{|
 type t = A
 val x : t = A
 Line 5, characters 27-28:
@@ -22,16 +26,22 @@ Error: This expression has type "t/2" but an expression was expected of type
          Definition of type "t/2"
 |}]
 
-module M = struct type t = B end
+module M = struct
+  type t = B
+end
+
 let y = M.B
+
 module N = struct
   module M = struct
-     type t = C
+    type t = C
   end
-  let f : M.t -> M.t = fun M.C -> y
-end;;
 
-[%%expect{|
+  let f : M.t -> M.t = fun M.C -> y
+end
+
+[%%expect
+{|
 module M : sig type t = B end
 val y : M.t = M.B
 Line 7, characters 34-35:
@@ -46,10 +56,11 @@ Error: This expression has type "M/2.t" but an expression was expected of type
 |}]
 
 type t = D
-let f: t -> t = fun D -> x;;
 
+let f : t -> t = fun D -> x
 
-[%%expect{|
+[%%expect
+{|
 type t = D
 Line 2, characters 25-26:
 2 | let f: t -> t = fun D -> x;;
@@ -63,17 +74,30 @@ Error: This expression has type "t/2" but an expression was expected of type
 |}]
 
 type ttt
-type ttt = A of ttt | B of uuu
-and uuu  = C of uuu | D of ttt;;
-[%%expect{|
+
+type ttt =
+  | A of ttt
+  | B of uuu
+
+and uuu =
+  | C of uuu
+  | D of ttt
+
+[%%expect
+{|
 type ttt
 type ttt = A of ttt | B of uuu
 and uuu = C of uuu | D of ttt
 |}]
 
 type nonrec ttt = X of ttt
-let x: ttt = let rec y = A y in y;;
-[%%expect{|
+
+let x : ttt =
+  let rec y = A y in
+  y
+
+[%%expect
+{|
 type nonrec ttt = X of ttt
 Line 2, characters 32-33:
 2 | let x: ttt = let rec y = A y in y;;

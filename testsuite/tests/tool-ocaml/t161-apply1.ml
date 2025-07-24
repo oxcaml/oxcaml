@@ -1,18 +1,18 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let f _ = raise End_of_file in
 try
   f 0;
-  raise Not_found;
+  raise Not_found
 with End_of_file -> 0
-;;
 
 (**
        0 CONSTINT 42

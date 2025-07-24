@@ -9,39 +9,24 @@ let test_multiple_handlers =
   let collect v = trace := v :: !trace in
   let _ =
     match
-      begin
-        match
-          begin
-            collect "one";
-            failwith "two"
-          end
-        with
-          () -> collect "failure one"
-        | exception (Failure x) ->
-          collect x;
-          failwith "three"
-      end
+      match
+        collect "one";
+        failwith "two"
+      with
+      | () -> collect "failure one"
+      | exception Failure x ->
+        collect x;
+        failwith "three"
     with
-      () ->
-        collect "failure two";
-    | exception (Failure x) ->
+    | () -> collect "failure two"
+    | exception Failure x -> (
       collect x;
       match
-        begin
-          collect "four";
-          failwith "five"
-        end
+        collect "four";
+        failwith "five"
       with
-        () -> collect "failure three"
-      | exception (Failure x) ->
-        collect x
+      | () -> collect "failure three"
+      | exception Failure x -> collect x)
   in
   print_endline (String.concat " " !trace);
-  assert (!trace = [
-    "five";
-    "four";
-    "three";
-    "two";
-    "one";
-  ])
-;;
+  assert (!trace = ["five"; "four"; "three"; "two"; "one"])

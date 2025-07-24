@@ -1,23 +1,32 @@
 (* TEST
- flags = "-dshape";
- expect;
+   flags = "-dshape";
+   expect;
 *)
 
 module M : sig
-
   exception Exn of { lbl_exn : int }
+
   type l = { lbl : int }
+
   type ext = ..
+
   type ext += Ext of { lbl_ext : int }
+
   type t = C of { lbl_cstr : int }
 end = struct
   exception Exn of { lbl_exn : int }
+
   type l = { lbl : int }
+
   type ext = ..
+
   type ext += Ext of { lbl_ext : int }
+
   type t = C of { lbl_cstr : int }
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "M"[module] ->
    {<.39>

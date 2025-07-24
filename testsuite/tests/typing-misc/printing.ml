@@ -1,65 +1,89 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* PR#7012 *)
 
-type t = [ 'A_name | `Hi ];;
-[%%expect{|
+type t =
+  [ 'A_name
+  | `Hi ]
+
+[%%expect
+{|
 Line 1, characters 11-18:
 1 | type t = [ 'A_name | `Hi ];;
                ^^^^^^^
 Error: The type "'A_name" does not expand to a polymorphic variant type
 Hint: Did you mean "`A_name"?
-|}];;
+|}]
 
-let f (x:'id_arg) = x;;
-[%%expect{|
+let f (x : 'id_arg) = x
+
+[%%expect {|
 val f : 'id_arg -> 'id_arg = <fun>
-|}];;
+|}]
 
-let f (x:'Id_arg) = x;;
-[%%expect{|
+let f (x : 'Id_arg) = x
+
+[%%expect {|
 val f : 'Id_arg -> 'Id_arg = <fun>
-|}];;
+|}]
 
 (* GPR#1204, GPR#1329 *)
 type 'a id = 'a
-let f (x : [< [`Foo] id]) = ();;
-[%%expect{|
+
+let f (x : [< [`Foo] id]) = ()
+
+[%%expect {|
 type 'a id = 'a
 val f : [< [ `Foo ] id ] -> unit = <fun>
-|}];;
+|}]
 
-module M = struct module N = struct type t = [`A] end end;;
-let f x = (x :> M.N.t);;
-[%%expect{|
+module M = struct
+  module N = struct
+    type t = [`A]
+  end
+end
+
+let f x = (x :> M.N.t)
+
+[%%expect
+{|
 module M : sig module N : sig type t = [ `A ] end end
 val f : [< M.N.t ] -> M.N.t = <fun>
 |}]
-module G = M.N;;
-let f x = (x :> G.t);;
-[%%expect{|
+
+module G = M.N
+
+let f x = (x :> G.t)
+
+[%%expect {|
 module G = M.N
 val f : [< G.t ] -> G.t = <fun>
 |}]
 
-
 (* GPR#2034 *)
 
-type (+' a', -' a'b, 'cd') t = ' a'b -> ' a'  * 'cd';;
-[%%expect{|
-type (' a', ' a'b, 'cd') t = ' a'b -> ' a' * 'cd'
-|}];;
+type (+' a', -' a'b, 'cd') t = ' a'b -> ' a' * 'cd'
 
+[%%expect {|
+type (' a', ' a'b, 'cd') t = ' a'b -> ' a' * 'cd'
+|}]
 
 (* #8856: cycles in types expressions could trigger stack overflows
    when printing subpart of error messages *)
 
 type 'a t = private X of 'a
-let zeros = object(self) method next = 0, self end
-let x = X zeros;;
-[%%expect {|
+
+let zeros =
+  object (self)
+    method next = 0, self
+  end
+
+let x = X zeros
+
+[%%expect
+{|
 type 'a t = private X of 'a
 val zeros : < next : int * 'a > as 'a = <obj>
 Line 3, characters 8-15:
@@ -68,12 +92,15 @@ Line 3, characters 8-15:
 Error: Cannot create values of the private type "(< next : int * 'a > as 'a) t"
 |}]
 
+type ('a, 'b) eq = Refl : ('a, 'a) eq
 
-type ('a,'b) eq = Refl: ('a,'a) eq
-type t = <m : int * 't> as 't
-let f (x:t) (type a) (y:a) (witness:(a,t) eq) = match witness with
-  | Refl -> if true then x else y
-[%%expect {|
+type t = < m : int * 't > as 't
+
+let f (x : t) (type a) (y : a) (witness : (a, t) eq) =
+  match witness with Refl -> if true then x else y
+
+[%%expect
+{|
 type ('a, 'b) eq = Refl : ('a, 'a) eq
 type t = < m : int * 'a > as 'a
 Line 4, characters 32-33:
@@ -84,11 +111,14 @@ Error: This expression has type "a" but an expression was expected of type "t"
        it would escape the scope of its equation
 |}]
 
+type t1 = < m : 'b. 'b * ('b * < m : 'c. 'c * 'bar > as 'bar) >
 
-type t1 = <m : 'b. 'b * ('b * <m:'c. 'c * 'bar> as 'bar)>
-type t2 = <m : 'a. 'a * ('a * 'foo)> as 'foo
-let f (x : t1) : t2 = x;;
-[%%expect {|
+type t2 = < m : 'a. 'a * ('a * 'foo) > as 'foo
+
+let f (x : t1) : t2 = x
+
+[%%expect
+{|
 type t1 = < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) >
 type t2 = < m : 'a. 'a * ('a * 'b) > as 'b
 Line 3, characters 22-23:
@@ -106,10 +136,13 @@ Error: This expression has type "t1" but an expression was expected of type "t2"
 *)
 
 let rec foo () = [42]
+
 and bar () =
   let x = foo () in
   x |> List.fold_left max 0 x
-[%%expect {|
+
+[%%expect
+{|
 Line 4, characters 26-27:
 4 |   x |> List.fold_left max 0 x
                               ^
@@ -117,20 +150,27 @@ Error: This expression has type "int" but an expression was expected of type
          "'a -> 'b"
 |}]
 
-
 (* PR#8917
    In nested recursive definitions, we have to remember all recursive items
    under definitions, not just the last one
- *)
+*)
 
 module RecMod = struct
-  module A= struct end
+  module A = struct end
+
   module type s = sig
-    module rec A: sig type t end
-    and B: sig type t = A.t end
+    module rec A : sig
+      type t
+    end
+
+    and B : sig
+      type t = A.t
+    end
   end
 end
-[%%expect {|
+
+[%%expect
+{|
 module RecMod :
   sig
     module A : sig end

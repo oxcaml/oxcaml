@@ -1,24 +1,21 @@
 (* TEST
- include systhreads;
- hassysthreads;
-   (*
-     On Windows, we use Sleep(0) for triggering preemption of threads.
-     However, this does not seem very reliable, so that this test fails
-     on some Windows configurations. See GPR #1533.
-   *)
- not-windows;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   hassysthreads;
+     (*
+       On Windows, we use Sleep(0) for triggering preemption of threads.
+       However, this does not seem very reliable, so that this test fails
+       on some Windows configurations. See GPR #1533.
+     *)
+   not-windows;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let rec generate_list n =
-  let rec aux acc = function
-    | 0 -> acc
-    | n -> aux (float n :: acc) (n-1)
-  in
+  let rec aux acc = function 0 -> acc | n -> aux (float n :: acc) (n - 1) in
   aux [] n
 
 let finished = ref false
@@ -26,8 +23,8 @@ let finished = ref false
 let rec long_computation time0 =
   let long_list = generate_list 100000 in
   let res = List.length (List.rev_map sin long_list) in
-  if Sys.time () -. time0 > 1. || !finished then
-    Printf.printf "Long computation result: %d\n%!" res
+  if Sys.time () -. time0 > 1. || !finished
+  then Printf.printf "Long computation result: %d\n%!" res
   else long_computation time0
 
 let interaction () =

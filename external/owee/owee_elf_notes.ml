@@ -1,8 +1,8 @@
-type header = {
-  owner : string;
-  typ : int;  (** each owner defines its own types *)
-  size : int;
-}
+type header =
+  { owner : string;
+    typ : int;  (** each owner defines its own types *)
+    size : int
+  }
 
 module Read = Owee_buf.Read
 
@@ -19,14 +19,15 @@ let padding n = (4 - (n land 3)) land 3
    Executable and Linking Format (ELF) Specification" *)
 let gulp_padding cursor size =
   let unread = padding size in
-  if unread > 0 then begin
+  if unread > 0
+  then (
     Owee_buf.ensure cursor unread "Not found padding after note name";
-    Owee_buf.advance cursor unread
-  end
+    Owee_buf.advance cursor unread)
 
 let check_string_length size str =
   let len = String.length str + (* terminating zero char *) 1 in
-  if not (len = size) then
+  if not (len = size)
+  then
     Owee_buf.invalid_format
       (Printf.sprintf "Unexpected length of %s instead of %d\n" str size)
 
@@ -36,20 +37,22 @@ let read_desc_size cursor ~expected_owner ~expected_type =
   check_string_length namesz expected_owner;
   let descsz = Read.u32 cursor in
   let typ = Read.u32 cursor in
-  if not (typ = expected_type) then
+  if not (typ = expected_type)
+  then
     Owee_buf.invalid_format
-      (Printf.sprintf "Unexpected note type %d instead of %d\n"
-         typ expected_type);
+      (Printf.sprintf "Unexpected note type %d instead of %d\n" typ
+         expected_type);
   Owee_buf.ensure cursor namesz "Note owner name truncated";
   (match Read.zero_string cursor ~maxlen:namesz () with
-   | None ->
-     Owee_buf.invalid_format
-       (Printf.sprintf "Cannot read note owner of length %d\n" namesz)
-   | Some owner ->
-     if not (String.equal owner expected_owner) then
-       Owee_buf.invalid_format
-         (Printf.sprintf "Unexpected note owner %s instead of %s\n"
-            owner expected_owner));
+  | None ->
+    Owee_buf.invalid_format
+      (Printf.sprintf "Cannot read note owner of length %d\n" namesz)
+  | Some owner ->
+    if not (String.equal owner expected_owner)
+    then
+      Owee_buf.invalid_format
+        (Printf.sprintf "Unexpected note owner %s instead of %s\n" owner
+           expected_owner));
   gulp_padding cursor namesz;
   Owee_buf.ensure cursor descsz
     (Printf.sprintf "Cannot read note description of size %d\n" descsz);
@@ -63,41 +66,40 @@ let read_header cursor =
   Owee_buf.ensure cursor namesz "Note owner name truncated";
   let owner =
     match Read.zero_string cursor ~maxlen:namesz () with
-   | None ->
-     Owee_buf.invalid_format
-       (Printf.sprintf "Cannot read owner of length %d\n" namesz)
-   | Some str ->
-     check_string_length namesz str;
-     str
+    | None ->
+      Owee_buf.invalid_format
+        (Printf.sprintf "Cannot read owner of length %d\n" namesz)
+    | Some str ->
+      check_string_length namesz str;
+      str
   in
   gulp_padding cursor namesz;
   Owee_buf.ensure cursor descsz
     (Printf.sprintf "Cannot read note description of size %d\n" descsz);
-  { owner;
-    size = descsz;
-    typ;
-  }
+  { owner; size = descsz; typ }
 
 exception Section_not_found of string
 
 let find_notes_section sections name =
   match Owee_elf.find_section sections name with
   | None -> raise (Section_not_found name)
-  | Some s ->
+  | Some s -> (
     match s.sh_type with
     | 7 (* SHT_NOTE *) -> s
     | _ ->
       Owee_buf.invalid_format
-        (Printf.sprintf "Unexpected type %d of %s section, instead of SHT_NOTE=7\n"
-           s.sh_type s.sh_name_str)
+        (Printf.sprintf
+           "Unexpected type %d of %s section, instead of SHT_NOTE=7\n" s.sh_type
+           s.sh_name_str))
 
 module Stapsdt = struct
   type t =
-    { addr : int64 (** address of the probe site *)
-    ; semaphore : int64 option (** address of the semaphore corresponding to the probe *)
-    ; provider : string
-    ; name : string
-    ; args : string (** probe arguments  *)
+    { addr : int64;  (** address of the probe site *)
+      semaphore : int64 option;
+          (** address of the semaphore corresponding to the probe *)
+      provider : string;
+      name : string;
+      args : string  (** probe arguments  *)
     }
 
   (* Arguments can be tricky to parse: [s] can be empty or ":" or space separated list of
@@ -109,14 +111,14 @@ module Stapsdt = struct
     Int64.add (Int64.sub actual_base recorded_base) addr
 
   let read cursor ~actual_base =
-    let descsz = read_desc_size
-                 ~expected_owner:"stapsdt"
-                 ~expected_type:3 (* stapsdt v3 *)
-                 cursor
+    let descsz =
+      read_desc_size ~expected_owner:"stapsdt" ~expected_type:3 (* stapsdt v3 *)
+        cursor
     in
     if descsz < 8 * 3
-    then Owee_buf.invalid_format
-           (Printf.sprintf "Too small size of note %d\n" descsz);
+    then
+      Owee_buf.invalid_format
+        (Printf.sprintf "Too small size of note %d\n" descsz);
     let addr = Read.u64 cursor in
     let recorded_base = Read.u64 cursor in
     let semaphore =
@@ -143,14 +145,14 @@ module Stapsdt = struct
     in
     (* skip padding of description to 4-byte boundary *)
     gulp_padding cursor descsz;
-    { addr = adjust addr ~actual_base ~recorded_base
-    ; semaphore = begin match semaphore with
+    { addr = adjust addr ~actual_base ~recorded_base;
+      semaphore =
+        (match semaphore with
         | None -> None
-        | Some s -> Some (adjust s ~actual_base ~recorded_base)
-      end
-    ; provider
-    ; name
-    ; args
+        | Some s -> Some (adjust s ~actual_base ~recorded_base));
+      provider;
+      name;
+      args
     }
 
   let find_base_address sections =
@@ -163,8 +165,7 @@ module Stapsdt = struct
     match find_base_address sections with
     | None ->
       Owee_buf.invalid_format
-        (Printf.sprintf
-           "Found .note.stapsdt but not .stapsdt.base section\n")
+        (Printf.sprintf "Found .note.stapsdt but not .stapsdt.base section\n")
     | Some actual_base ->
       let body = Owee_elf.section_body map s in
       let cursor = Owee_buf.cursor body in
@@ -175,15 +176,15 @@ module Stapsdt = struct
 end
 
 let char_hex n =
-  Char.unsafe_chr (n + if n < 10 then Char.code '0' else (Char.code 'a' - 10))
+  Char.unsafe_chr (n + if n < 10 then Char.code '0' else Char.code 'a' - 10)
 
 let hex_to_string cursor size =
   (* read desc byte by byte and convert hex to string *)
-  let result = Bytes.create (size*2) in
+  let result = Bytes.create (size * 2) in
   for i = 0 to size - 1 do
     let x = Read.u8 cursor in
-    Bytes.unsafe_set result (i*2) (char_hex (x lsr 4));
-    Bytes.unsafe_set result (i*2+1) (char_hex (x land 0x0f));
+    Bytes.unsafe_set result (i * 2) (char_hex (x lsr 4));
+    Bytes.unsafe_set result ((i * 2) + 1) (char_hex (x land 0x0f))
   done;
   Bytes.unsafe_to_string result
 
@@ -191,14 +192,12 @@ let read_buildid map sections =
   let s = find_notes_section sections ".note.gnu.build-id" in
   let body = Owee_elf.section_body map s in
   let cursor = Owee_buf.cursor body in
-  let descsz = read_desc_size cursor
-                 ~expected_owner:"GNU"
-                 ~expected_type:(* NT_GNU_BUILD_ID *) 3 in
+  let descsz =
+    read_desc_size cursor ~expected_owner:"GNU"
+      ~expected_type:(* NT_GNU_BUILD_ID *) 3
+  in
   let buildid = hex_to_string cursor descsz in
   gulp_padding cursor descsz;
-  if not (Owee_buf.at_end cursor) then
-    Owee_buf.invalid_format "Unexpected data after buildid";
+  if not (Owee_buf.at_end cursor)
+  then Owee_buf.invalid_format "Unexpected data after buildid";
   buildid
-
-
-

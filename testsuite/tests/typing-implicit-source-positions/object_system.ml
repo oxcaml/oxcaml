@@ -1,82 +1,94 @@
 (* TEST_BELOW
-Fille
+   Fille
 *)
 
-let object_with_a_method_with_a_positional_parameter = object 
-  method m ~(call_pos : [%call_pos]) () = call_pos
-end
+let object_with_a_method_with_a_positional_parameter =
+  object
+    method m ~(call_pos : [%call_pos]) () = call_pos
+  end
 
-[%%expect{|
+[%%expect
+{|
 val object_with_a_method_with_a_positional_parameter :
   < m : call_pos:[%call_pos] -> unit -> lexing_position > = <obj>
 |}]
 
-let position = object_with_a_method_with_a_positional_parameter#m ();;
+let position = object_with_a_method_with_a_positional_parameter#m ()
 
-[%%expect{|
+[%%expect
+{|
 val position : lexing_position =
   {pos_fname = ""; pos_lnum = 1; pos_bol = 281; pos_cnum = 296}
 |}]
 
-class class_with_a_method_with_a_positional_parameter = object 
-  method m ~(call_pos : [%call_pos]) () = call_pos
-end
+class class_with_a_method_with_a_positional_parameter =
+  object
+    method m ~(call_pos : [%call_pos]) () = call_pos
+  end
 
-[%%expect{|
+[%%expect
+{|
 class class_with_a_method_with_a_positional_parameter :
   object method m : call_pos:[%call_pos] -> unit -> lexing_position end
 |}]
 
-let o = new class_with_a_method_with_a_positional_parameter;;
+let o = new class_with_a_method_with_a_positional_parameter
 
-[%%expect{|
+[%%expect {|
 val o : class_with_a_method_with_a_positional_parameter = <obj>
 |}]
 
-let position = o#m ();;
+let position = o#m ()
 
-[%%expect{|
+[%%expect
+{|
 val position : lexing_position =
   {pos_fname = ""; pos_lnum = 1; pos_bol = 876; pos_cnum = 891}
 |}]
 
-let position = (new class_with_a_method_with_a_positional_parameter)#m ();;
+let position = (new class_with_a_method_with_a_positional_parameter)#m ()
 
-[%%expect{|
+[%%expect
+{|
 val position : lexing_position =
   {pos_fname = ""; pos_lnum = 1; pos_bol = 1015; pos_cnum = 1030}
 |}]
 
+class class_with_positional_parameter ~(call_pos : [%call_pos]) () =
+  object
+    method call_pos = call_pos
+  end
 
-class class_with_positional_parameter ~(call_pos : [%call_pos]) () = object 
-  method call_pos = call_pos
-end
-
-[%%expect{|
+[%%expect
+{|
 class class_with_positional_parameter :
   call_pos:[%call_pos] ->
   unit -> object method call_pos : lexing_position end
 |}]
 
 let o = new class_with_positional_parameter ()
+
 let position = o#call_pos
 
-[%%expect{|
+[%%expect
+{|
 val o : class_with_positional_parameter = <obj>
 val position : lexing_position =
   {pos_fname = ""; pos_lnum = 1; pos_bol = 1458; pos_cnum = 1466}
 |}]
 
-
 (* Different kinds of shadowed parameters (both a class parameter is shadowed and a
    method parameter is shadowed) *)
 
-class c ~(call_pos : [%call_pos]) () = object(self)
-  method from_class_param = call_pos
+class c ~(call_pos : [%call_pos]) () =
+  object (self)
+    method from_class_param = call_pos
 
-  method m ~(call_pos : [%call_pos]) () = call_pos, self#from_class_param
-end
-[%%expect{|
+    method m ~(call_pos : [%call_pos]) () = call_pos, self#from_class_param
+  end
+
+[%%expect
+{|
 class c :
   call_pos:[%call_pos] ->
   unit ->
@@ -87,10 +99,12 @@ class c :
   end
 |}]
 
-let c = (new c ())
-let from_method_param, from_class_param = c#m()
+let c = new c ()
 
-[%%expect{|
+let from_method_param, from_class_param = c#m ()
+
+[%%expect
+{|
 val c : c = <obj>
 val from_method_param : lexing_position =
   {pos_fname = ""; pos_lnum = 2; pos_bol = 2216; pos_cnum = 2258}
@@ -98,16 +112,20 @@ val from_class_param : lexing_position =
   {pos_fname = ""; pos_lnum = 1; pos_bol = 2197; pos_cnum = 2206}
 |}]
 
-class parent ~(call_pos : [%call_pos]) () = object
-  method pos = call_pos
-end
+class parent ~(call_pos : [%call_pos]) () =
+  object
+    method pos = call_pos
+  end
 
-let o = object 
-  inherit parent ()
-end
+let o =
+  object
+    inherit parent ()
+  end
+
 let position = o#pos
 
-[%%expect{|
+[%%expect
+{|
 class parent :
   call_pos:[%call_pos] -> unit -> object method pos : lexing_position end
 val o : parent = <obj>
@@ -115,24 +133,30 @@ val position : lexing_position =
   {pos_fname = ""; pos_lnum = 6; pos_bol = 2611; pos_cnum = 2621}
 |}]
 
-let o ~(call_pos : [%call_pos]) () = object 
-  inherit parent ~call_pos ()
-end
+let o ~(call_pos : [%call_pos]) () =
+  object
+    inherit parent ~call_pos ()
+  end
+
 let position = (o ())#pos
 
-[%%expect{|
+[%%expect
+{|
 val o : call_pos:[%call_pos] -> unit -> parent = <fun>
 val position : lexing_position =
   {pos_fname = ""; pos_lnum = 4; pos_bol = 2964; pos_cnum = 2980}
 |}]
 
 (* Applying an call_pos argument without a label. *)
-let o ~(call_pos : [%call_pos]) () = object 
-  inherit parent call_pos ()
-end
+let o ~(call_pos : [%call_pos]) () =
+  object
+    inherit parent call_pos ()
+  end
+
 let position = (o ())#pos
 
-[%%expect{|
+[%%expect
+{|
 Line 2, characters 10-16:
 2 |   inherit parent call_pos ()
               ^^^^^^
@@ -143,18 +167,21 @@ val position : lexing_position =
   {pos_fname = ""; pos_lnum = 4; pos_bol = 3293; pos_cnum = 3309}
 |}]
 
-
 (* Same behavior as optional parameters. *)
-class parent ?(i = 1) () = object
-  method i = i
-end
+class parent ?(i = 1) () =
+  object
+    method i = i
+  end
 
-let o = object 
-  inherit parent ()
-end
+let o =
+  object
+    inherit parent ()
+  end
+
 let position = o#i
 
-[%%expect{|
+[%%expect
+{|
 class parent : ?i:int -> unit -> object method i : int end
 val o : parent = <obj>
 val position : int = 1
@@ -162,22 +189,26 @@ val position : int = 1
 
 (* Partially applying a class *)
 class c ~(a : [%call_pos]) ~(b : [%call_pos]) () =
-  object 
+  object
     method a = a
+
     method b = b
   end
 
-[%%expect{|
+[%%expect
+{|
 class c :
   a:[%call_pos] ->
   b:[%call_pos] ->
   unit -> object method a : lexing_position method b : lexing_position end
 |}]
 
-let pos_a : lexing_position = {Lexing.dummy_pos with pos_fname = "a"};;
+let pos_a : lexing_position = { Lexing.dummy_pos with pos_fname = "a" }
+
 let partially_applied_class = new c ~a:pos_a
 
-[%%expect{|
+[%%expect
+{|
 val pos_a : lexing_position =
   {pos_fname = "a"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1}
 val partially_applied_class : b:[%call_pos] -> unit -> c = <fun>
@@ -185,13 +216,14 @@ val partially_applied_class : b:[%call_pos] -> unit -> c = <fun>
 
 let fully_applied_class = partially_applied_class ()
 
-[%%expect{|
+[%%expect {|
 val fully_applied_class : c = <obj>
 |}]
 
 let a, b = fully_applied_class#a, fully_applied_class#b
 
-[%%expect{|
+[%%expect
+{|
 val a : lexing_position =
   {pos_fname = "a"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1}
 val b : lexing_position =
@@ -199,13 +231,19 @@ val b : lexing_position =
 |}]
 
 class c :
-  x:[%call_pos] -> y:lexing_position -> unit -> object
-    method xy : lexing_position * lexing_position
-  end = fun ~(x : [%call_pos]) ~y () -> object
-    method xy = x, y
-  end
+  x:[%call_pos]
+  -> y:lexing_position
+  -> unit
+  -> object
+       method xy : lexing_position * lexing_position
+     end =
+  fun ~(x : [%call_pos]) ~y () ->
+    object
+      method xy = x, y
+    end
 
-[%%expect{|
+[%%expect
+{|
 class c :
   x:[%call_pos] ->
   y:lexing_position ->
@@ -214,7 +252,8 @@ class c :
 
 let x, y = (new c ~y:pos_a ())#xy
 
-[%%expect{|
+[%%expect
+{|
 val x : lexing_position =
   {pos_fname = ""; pos_lnum = 1; pos_bol = 5199; pos_cnum = 5211}
 val y : lexing_position =
@@ -222,5 +261,5 @@ val y : lexing_position =
 |}]
 
 (* TEST
- expect;
+   expect;
 *)

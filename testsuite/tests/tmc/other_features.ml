@@ -1,5 +1,5 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module Non_recursive_let_bad = struct
@@ -11,10 +11,12 @@ module Non_recursive_let_bad = struct
     match l with
     | N v -> N (f v)
     | C (a, b) ->
-        let map' l = map f l in
-        C (map' a, (map' [@tailcall]) b)
+      let map' l = map f l in
+      C (map' a, (map' [@tailcall]) b)
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 6-11, characters 30-40:
  6 | ..............................f l =
  7 |     match l with
@@ -42,7 +44,6 @@ module Non_recursive_let_bad :
   end
 |}]
 
-
 module Non_recursive_let_good = struct
   type 'a t =
     | N of 'a
@@ -52,10 +53,12 @@ module Non_recursive_let_good = struct
     match l with
     | N v -> N (f v)
     | C (a, b) ->
-        let[@tail_mod_cons] map' l = map f l in
-        C (map' a, (map' [@tailcall]) b)
+      let[@tail_mod_cons] map' l = map f l in
+      C (map' a, (map' [@tailcall]) b)
 end
-[%%expect {|
+
+[%%expect
+{|
 module Non_recursive_let_good :
   sig
     type 'a t = N of 'a | C of 'a t * 'a t

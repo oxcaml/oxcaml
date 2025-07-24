@@ -22,16 +22,15 @@
 type cfg_item_info =
   | Cfg of Cfg_with_layout.t
   | Data of Cmm.data_item list
-  | Cfg_before_regalloc of {
-    cfg_with_layout_and_relocatable_regs : Cfg_with_layout.t * (Reg.t list);
-    cmm_label: Label.t;
-    reg_stamp: int;
-  }
+  | Cfg_before_regalloc of
+      { cfg_with_layout_and_relocatable_regs : Cfg_with_layout.t * Reg.t list;
+        cmm_label : Label.t;
+        reg_stamp : int
+      }
 
 type cfg_unit_info =
-  {
-    mutable unit : Compilation_unit.t;
-    mutable items : cfg_item_info list;
+  { mutable unit : Compilation_unit.t;
+    mutable items : cfg_item_info list
   }
 
 (* Marshal and unmarshal a compilation unit in Cfg format.
@@ -39,4 +38,5 @@ type cfg_unit_info =
    that currently consists of Cmm.label_counter.
 *)
 val save : string -> cfg_unit_info -> unit
+
 val restore : string -> cfg_unit_info * Digest.t

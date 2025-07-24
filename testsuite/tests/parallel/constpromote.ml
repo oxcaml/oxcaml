@@ -1,9 +1,9 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
 *)
 
 (* when run with the bytecode debug runtime, this test
@@ -11,8 +11,7 @@
    remained unpromoted *)
 
 let rec burn l =
-  if List.hd l > 14 then ()
-  else burn (l @ l |> List.map (fun x -> x + 1))
+  if List.hd l > 14 then () else burn (l @ l |> List.map (fun x -> x + 1))
 
 let () =
   ignore (Domain.spawn (fun () -> burn [13]));

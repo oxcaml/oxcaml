@@ -1,21 +1,24 @@
 (* TEST
- modules = "offset.ml pr6726.ml pr7427.ml pr4008.ml";
+   modules = "offset.ml pr6726.ml pr7427.ml pr4008.ml";
 *)
 
 (* PR#6435 *)
 
 module F (M : sig
-           type t
-           module Set : Set.S with type elt = t
-         end) =
+  type t
+
+  module Set : Set.S with type elt = t
+end) =
 struct
- let test set = Printf.printf "%d\n" (M.Set.cardinal set)
+  let test set = Printf.printf "%d\n" (M.Set.cardinal set)
 end
 
 module M = F (Offset)
 
 let () = M.test (Offset.M.Set.singleton "42")
+
 let v = Pr6726.Test.v
+
 let v = Pr4008.v
 
 (* PR#7427 *)

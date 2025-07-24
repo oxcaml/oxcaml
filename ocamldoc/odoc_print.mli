@@ -25,10 +25,11 @@ val string_of_type_expr : Types.type_expr -> string
    @param code if [complete = false] and the type contains something else
    than identificators and functors, then the given code is used.
 *)
-val string_of_module_type : ?code: string -> ?complete: bool -> Types.module_type -> string
+val string_of_module_type :
+  ?code:string -> ?complete:bool -> Types.module_type -> string
 
 (** This function returns a string representing a [Types.class_type].
    @param complete indicates if we must print complete signatures
    or just [object end]. Default is [false].
 *)
-val string_of_class_type : ?complete: bool -> Types.class_type -> string
+val string_of_class_type : ?complete:bool -> Types.class_type -> string

@@ -61,15 +61,17 @@
 (** The core types of a diffing implementation *)
 module type Defs = sig
   type left
+
   type right
-  type eq
+
   (** Detailed equality trace *)
+  type eq
 
-  type diff
   (** Detailed difference trace *)
+  type diff
 
-  type state
   (** environment of a partial patch *)
+  type state
 end
 
 (** The kind of changes which is used to share printing and styling
@@ -79,69 +81,69 @@ type change_kind =
   | Insertion
   | Modification
   | Preservation
-val prefix: Format.formatter -> (int * change_kind) -> unit
-val style: change_kind -> Misc.Style.style list
 
+val prefix : Format.formatter -> int * change_kind -> unit
 
-type ('left,'right,'eq,'diff) change =
+val style : change_kind -> Misc.Style.style list
+
+type ('left, 'right, 'eq, 'diff) change =
   | Delete of 'left
   | Insert of 'right
-  | Keep of 'left * 'right *' eq
+  | Keep of 'left * 'right * 'eq
   | Change of 'left * 'right * 'diff
 
-val classify: _ change -> change_kind
+val classify : _ change -> change_kind
 
 (** [Define(Defs)] creates the diffing types from the types
     defined in [Defs] and the functors that need to be instantatied
     with the diffing algorithm parameters
 *)
-module Define(D:Defs): sig
+module Define (D : Defs) : sig
   open D
 
   (** The type of potential changes on a list. *)
-  type nonrec change = (left,right,eq,diff) change
-  type patch = change list
+  type nonrec change = (left, right, eq, diff) change
+
   (** A patch is an ordered list of changes. *)
+  type patch = change list
 
   module type Parameters = sig
     type update_result
 
-    val weight: change -> int
     (** [weight ch] returns the weight of the change [ch].
         Used to find the smallest patch. *)
+    val weight : change -> int
 
-    val test: state -> left -> right -> (eq, diff) result
     (**
        [test st xl xr] tests if the elements [xl] and [xr] are
         co  mpatible ([Ok]) or not ([Error]).
     *)
+    val test : state -> left -> right -> (eq, diff) result
 
-    val update: change -> state -> update_result
     (**  [update ch st] returns the new state after applying a change.
          The [update_result] type also contains expansions in the variadic
          case.
      *)
+    val update : change -> state -> update_result
   end
 
   module type S = sig
-    val diff: state -> left array -> right array -> patch
     (** [diff state l r] computes the optimal patch between [l] and [r],
         using the initial state [state].
     *)
+    val diff : state -> left array -> right array -> patch
   end
 
-
-  module Simple: (Parameters with type update_result := state) -> S
+  module Simple (_ : Parameters with type update_result := state) : S
 
   (** {1 Variadic diffing}
 
       Variadic diffing allows to expand the lists being diffed during diffing.
       in one specific direction.
   *)
-  module Left_variadic:
-    (Parameters with type update_result := state * left array) -> S
+  module Left_variadic
+      (_ : Parameters with type update_result := state * left array) : S
 
-  module Right_variadic:
-    (Parameters with type update_result := state * right array) -> S
-
+  module Right_variadic
+      (_ : Parameters with type update_result := state * right array) : S
 end

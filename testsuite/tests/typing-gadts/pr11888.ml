@@ -1,16 +1,18 @@
 (* TEST
- expect;
+   expect;
 *)
 
 type z
+
 type 'a s
+
 type _ nat =
   | Nz : z -> z nat
   | Nss : 'd nat -> 'd s s nat
   | Ns : 'a nat -> 'a s nat
-;;
 
-[%%expect{|
+[%%expect
+{|
 type z
 type 'a s
 Lines 3-6, characters 0-27:
@@ -21,16 +23,20 @@ Lines 3-6, characters 0-27:
 Error: In the GADT constructor
          "Nss : 'd nat -> 'd s s nat"
        the type variable "'d" cannot be deduced from the type parameters.
-|}];;
+|}]
 
 type z
-type 'a s
-type _ nat = ..
-type _ nat += Nz : z -> z nat
-type _ nat += Nss : 'd nat -> 'd s s nat
-;;
 
-[%%expect{|
+type 'a s
+
+type _ nat = ..
+
+type _ nat += Nz : z -> z nat
+
+type _ nat += Nss : 'd nat -> 'd s s nat
+
+[%%expect
+{|
 type z
 type 'a s
 type _ nat = ..
@@ -41,13 +47,16 @@ Line 5, characters 0-40:
 Error: In the extension constructor
          type _ nat += Nss : 'd nat -> 'd s s nat
        the type variable "'d" cannot be deduced from the type parameters.
-|}];;
+|}]
 
 type 'any any = int
-type _ t = ..
-type 'b t += A: 'b -> 'b any t
 
-[%%expect{|
+type _ t = ..
+
+type 'b t += A : 'b -> 'b any t
+
+[%%expect
+{|
 type 'any any = int
 type _ t = ..
 Line 3, characters 0-30:

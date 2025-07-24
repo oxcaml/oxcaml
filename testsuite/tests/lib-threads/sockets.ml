@@ -1,13 +1,13 @@
 (* TEST
- include systhreads;
- hassysthreads;
- not-macos;
- libunix;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   hassysthreads;
+   not-macos;
+   libunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 open Printf
@@ -23,28 +23,27 @@ let serve_connection s =
 
 let server sock =
   while true do
-    let (s, _) = Unix.accept sock in
-    ignore(Thread.create serve_connection s)
+    let s, _ = Unix.accept sock in
+    ignore (Thread.create serve_connection s)
   done
 
 let mutex = Mutex.create ()
+
 let lines = ref []
 
 let client (addr, msg) =
-  let sock =
-    Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
+  let sock = Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
   Unix.connect sock addr;
   let buf = Bytes.make 1024 ' ' in
-  ignore(Unix.write_substring sock msg 0 (String.length msg));
+  ignore (Unix.write_substring sock msg 0 (String.length msg));
   let n = Unix.read sock buf 0 (Bytes.length buf) in
   Mutex.lock mutex;
-  lines := (Bytes.sub buf 0 n) :: !lines;
+  lines := Bytes.sub buf 0 n :: !lines;
   Mutex.unlock mutex
 
 let () =
-  let addr = Unix.ADDR_INET(Unix.inet_addr_loopback, 0) in
-  let sock =
-    Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
+  let addr = Unix.ADDR_INET (Unix.inet_addr_loopback, 0) in
+  let sock = Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
   Unix.setsockopt sock Unix.SO_REUSEADDR true;
   Unix.bind sock addr;
   let addr = Unix.getsockname sock in

@@ -57,10 +57,11 @@
 module Uid : sig
   type t = private
     | Compilation_unit of string
-    | Item of {
-        comp_unit: string;
-        id: int;
-        from: Unit_info.intf_or_impl }
+    | Item of
+        { comp_unit : string;
+          id : int;
+          from : Unit_info.intf_or_impl
+        }
     | Internal
     | Predef of string
     | Unboxed_version of t
@@ -68,10 +69,15 @@ module Uid : sig
   val reinit : unit -> unit
 
   val mk : current_unit:Unit_info.t option -> t
+
   val of_compilation_unit_id : Compilation_unit.t -> t
+
   val of_compilation_unit_name : Compilation_unit.Name.t -> t
+
   val of_predef_id : Ident.t -> t
+
   val internal_not_actually_unique : t
+
   val unboxed_version : t -> t
 
   val for_actual_declaration : t -> bool
@@ -104,20 +110,31 @@ end
   labels. *)
 module Item : sig
   type t = string * Sig_component_kind.t
+
   val name : t -> string
+
   val kind : t -> Sig_component_kind.t
 
   val make : string -> Sig_component_kind.t -> t
 
   val value : Ident.t -> t
+
   val type_ : Ident.t -> t
+
   val constr : Ident.t -> t
+
   val label : Ident.t -> t
+
   val unboxed_label : Ident.t -> t
+
   val module_ : Ident.t -> t
+
   val module_type : Ident.t -> t
+
   val extension_constructor : Ident.t -> t
+
   val class_ : Ident.t -> t
+
   val class_type : Ident.t -> t
 
   val print : Format.formatter -> t -> unit
@@ -128,7 +145,14 @@ module Item : sig
 end
 
 type var = Ident.t
-type t = private { hash: int; uid: Uid.t option; desc: desc; approximated: bool }
+
+type t = private
+  { hash : int;
+    uid : Uid.t option;
+    desc : desc;
+    approximated : bool
+  }
+
 and desc =
   | Var of var
   | Abs of var * t
@@ -149,18 +173,29 @@ val equal : t -> t -> bool
 (* Smart constructors *)
 
 val for_unnamed_functor_param : var
+
 val fresh_var : ?name:string -> Uid.t -> var * t
 
 val var : Uid.t -> Ident.t -> t
+
 val abs : ?uid:Uid.t -> var -> t -> t
+
 val app : ?uid:Uid.t -> t -> arg:t -> t
+
 val str : ?uid:Uid.t -> t Item.Map.t -> t
+
 val alias : ?uid:Uid.t -> t -> t
+
 val error : ?uid:Uid.t -> string -> t
+
 val proj : ?uid:Uid.t -> t -> Item.t -> t
+
 val leaf : Uid.t -> t
+
 val leaf' : Uid.t option -> t
+
 val no_fuel_left : ?uid:Uid.t -> t -> t
+
 val comp_unit : ?uid:Uid.t -> string -> t
 
 val set_approximated : approximated:bool -> t -> t
@@ -169,10 +204,12 @@ val decompose_abs : t -> (var * t) option
 
 (* CR lmaurer: Should really take a [Compilation_unit.t] *)
 val for_persistent_unit : string -> t
+
 val leaf_for_unpack : t
 
 module Map : sig
   type shape = t
+
   type nonrec t = t Item.Map.t
 
   val empty : t
@@ -180,33 +217,43 @@ module Map : sig
   val add : t -> Item.t -> shape -> t
 
   val add_value : t -> Ident.t -> Uid.t -> t
+
   val add_value_proj : t -> Ident.t -> shape -> t
 
   val add_type : t -> Ident.t -> shape -> t
+
   val add_type_proj : t -> Ident.t -> shape -> t
 
   val add_constr : t -> Ident.t -> shape -> t
+
   val add_constr_proj : t -> Ident.t -> shape -> t
 
   val add_label : t -> Ident.t -> Uid.t -> t
+
   val add_label_proj : t -> Ident.t -> shape -> t
 
   val add_unboxed_label : t -> Ident.t -> Uid.t -> t
+
   val add_unboxed_label_proj : t -> Ident.t -> shape -> t
 
   val add_module : t -> Ident.t -> shape -> t
+
   val add_module_proj : t -> Ident.t -> shape -> t
 
   val add_module_type : t -> Ident.t -> Uid.t -> t
+
   val add_module_type_proj : t -> Ident.t -> shape -> t
 
   val add_extcons : t -> Ident.t -> shape -> t
+
   val add_extcons_proj : t -> Ident.t -> shape -> t
 
   val add_class : t -> Ident.t -> Uid.t -> t
+
   val add_class_proj : t -> Ident.t -> shape -> t
 
   val add_class_type : t -> Ident.t -> Uid.t -> t
+
   val add_class_type_proj : t -> Ident.t -> shape -> t
 end
 
@@ -218,6 +265,8 @@ val dummy_mod : t
     associated with a given path. *)
 val of_path :
   find_shape:(Sig_component_kind.t -> Ident.t -> t) ->
-  namespace:Sig_component_kind.t -> Path.t -> t
+  namespace:Sig_component_kind.t ->
+  Path.t ->
+  t
 
 val set_uid_if_none : t -> Uid.t -> t

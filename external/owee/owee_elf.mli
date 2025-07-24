@@ -2,44 +2,44 @@ open Owee_buf
 
 (** Minimalist ELF 64 decoder *)
 
-type identification = {
-  elf_class      : u8;
-  elf_data       : u8;
-  elf_version    : u8;
-  elf_osabi      : u8;
-  elf_abiversion : u8;
-}
+type identification =
+  { elf_class : u8;
+    elf_data : u8;
+    elf_version : u8;
+    elf_osabi : u8;
+    elf_abiversion : u8
+  }
 
-type header = {
-  e_ident     : identification;
-  e_type      : u16;
-  e_machine   : u16;
-  e_version   : u32;
-  e_entry     : u64;
-  e_phoff     : u64;
-  e_shoff     : u64;
-  e_flags     : u32;
-  e_ehsize    : u16;
-  e_phentsize : u16;
-  e_phnum     : u16;
-  e_shentsize : u16;
-  e_shnum     : u16;
-  e_shstrndx  : u16;
-}
+type header =
+  { e_ident : identification;
+    e_type : u16;
+    e_machine : u16;
+    e_version : u32;
+    e_entry : u64;
+    e_phoff : u64;
+    e_shoff : u64;
+    e_flags : u32;
+    e_ehsize : u16;
+    e_phentsize : u16;
+    e_phnum : u16;
+    e_shentsize : u16;
+    e_shnum : u16;
+    e_shstrndx : u16
+  }
 
-type section = {
-  sh_name      : u32;
-  sh_type      : u32;
-  sh_flags     : u64;
-  sh_addr      : u64;
-  sh_offset    : u64;
-  sh_size      : u64;
-  sh_link      : u32;
-  sh_info      : u32;
-  sh_addralign : u64;
-  sh_entsize   : u64;
-  sh_name_str  : string;
-}
+type section =
+  { sh_name : u32;
+    sh_type : u32;
+    sh_flags : u64;
+    sh_addr : u64;
+    sh_offset : u64;
+    sh_size : u64;
+    sh_link : u32;
+    sh_info : u32;
+    sh_addralign : u64;
+    sh_entsize : u64;
+    sh_name_str : string
+  }
 
 (** From a buffer pointing to an ELF image, [read_elf] decodes the header and
     section table. *)
@@ -56,21 +56,17 @@ val section_body : Owee_buf.t -> section -> Owee_buf.t
 val find_section : section array -> string -> section option
 
 (** From a buffer pointing to an ELF image, find the body of a section given its name. *)
-val find_section_body
-   : Owee_buf.t
-  -> section array
-  -> section_name:string
-  -> Owee_buf.t option
+val find_section_body :
+  Owee_buf.t -> section array -> section_name:string -> Owee_buf.t option
 
-val debug_line_pointers
-  : Owee_buf.t
-  -> section array
-  -> Owee_debug_line.pointers_to_other_sections
+val debug_line_pointers :
+  Owee_buf.t -> section array -> Owee_debug_line.pointers_to_other_sections
 
 module String_table : sig
   type t
 
   (* CR-someday mshinwell: [index] should probably be [Int32.t] *)
+
   (** Extract a string from the string table at the given index. *)
   val get_string : t -> index:int -> string option
 end
@@ -116,25 +112,23 @@ module Symbol_table : sig
     val value : t -> Int64.t
 
     val size_in_bytes : t -> Int64.t
+
     val type_attribute : t -> type_attribute
+
     val binding_attribute : t -> binding_attribute
+
     val visibility : t -> visibility
+
     val section_header_table_index : t -> int
   end
 
   (** The symbols in the table whose value and size determine that they
       cover [address]. *)
-  val symbols_enclosing_address
-     : t
-    -> address:Int64.t
-    -> Symbol.t list
+  val symbols_enclosing_address : t -> address:Int64.t -> Symbol.t list
 
   (** As for [symbols_enclosing_address], but only returns function
       symbols. *)
-  val functions_enclosing_address
-     : t
-    -> address:Int64.t
-    -> Symbol.t list
+  val functions_enclosing_address : t -> address:Int64.t -> Symbol.t list
 
   (** [iter t ~f] calls f on each symbol found in [t]. *)
   val iter : t -> f:(Symbol.t -> unit) -> unit

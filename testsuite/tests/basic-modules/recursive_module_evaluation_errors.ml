@@ -1,13 +1,43 @@
 (* TEST
- expect;
+   expect;
 *)
 
-module rec A: sig val x: int end = struct let x = B.x end
-and B:sig val x: int end = struct let x = E.y end
-and C:sig val x: int end = struct let x = B.x end
-and D:sig val x: int end = struct let x = C.x end
-and E:sig val x: int val y:int end = struct let x = D.x let y = 0 end
-[%%expect {|
+module rec A : sig
+  val x : int
+end = struct
+  let x = B.x
+end
+
+and B : sig
+  val x : int
+end = struct
+  let x = E.y
+end
+
+and C : sig
+  val x : int
+end = struct
+  let x = B.x
+end
+
+and D : sig
+  val x : int
+end = struct
+  let x = C.x
+end
+
+and E : sig
+  val x : int
+
+  val y : int
+end = struct
+  let x = D.x
+
+  let y = 0
+end
+
+[%%expect
+{|
 Line 2, characters 27-49:
 2 | and B:sig val x: int end = struct let x = E.y end
                                ^^^^^^^^^^^^^^^^^^^^^^
@@ -33,9 +63,21 @@ Line 3, characters 10-20:
 |}]
 
 type t = ..
-module rec A: sig type t += A end = struct type t += A = B.A end
-and B:sig type t += A end = struct type t += A = A.A end
-[%%expect {|
+
+module rec A : sig
+  type t += A
+end = struct
+  type t += A = B.A
+end
+
+and B : sig
+  type t += A
+end = struct
+  type t += A = A.A
+end
+
+[%%expect
+{|
 type t = ..
 Line 2, characters 36-64:
 2 | module rec A: sig type t += A end = struct type t += A = B.A end
@@ -53,16 +95,24 @@ Line 3, characters 20-21:
   Module "B" defines an unsafe extension constructor, "A" .
 |}]
 
+module rec A : sig
+  module F : functor (X : sig end) -> sig end
 
-module rec A: sig
-  module F: functor(X:sig end) -> sig end
-  val f: unit -> unit
+  val f : unit -> unit
 end = struct
-  module F(X:sig end) = struct end
+  module F (X : sig end) = struct end
+
   let f () = B.value
 end
-and B: sig val value: unit end = struct let value = A.f () end
-[%%expect {|
+
+and B : sig
+  val value : unit
+end = struct
+  let value = A.f ()
+end
+
+[%%expect
+{|
 Lines 4-7, characters 6-3:
 4 | ......struct
 5 |   module F(X:sig end) = struct end
@@ -81,18 +131,31 @@ Line 8, characters 11-26:
   Module "B" defines an unsafe value, "value" .
 |}]
 
+module F (X : sig
+  module type t
 
-module F(X: sig module type t module M: t end) = struct
-  module rec A: sig
-    module M: X.t
-    val f: unit -> unit
+  module M : t
+end) =
+struct
+  module rec A : sig
+    module M : X.t
+
+    val f : unit -> unit
   end = struct
     module M = X.M
+
     let f () = B.value
   end
-  and B: sig val value: unit end = struct let value  = A.f () end
+
+  and B : sig
+    val value : unit
+  end = struct
+    let value = A.f ()
+  end
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 5-8, characters 8-5:
 5 | ........struct
 6 |     module M = X.M
@@ -111,9 +174,18 @@ Line 9, characters 13-28:
   Module "B" defines an unsafe value, "value" .
 |}]
 
+module rec M : sig
+  val f : unit -> int
+end = struct
+  let f () = N.x
+end
 
-module rec M: sig val f: unit -> int end = struct let f () = N.x end
-and N:sig val x: int end = struct let x = M.f () end;;
+and N : sig
+  val x : int
+end = struct
+  let x = M.f ()
+end
+
 [%%expect {|
 Exception: Undefined_recursive_module ("", 1, 43).
 |}]

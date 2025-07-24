@@ -12,12 +12,19 @@ type _ t += F : string t
 let handle comp =
   Gc.compact ();
   try_with comp ()
-    { effc = fun (type a) (e : a t) ->
-      Gc.compact ();
-      match e with
-      | F -> Some (fun (k : (a,_) continuation) ->
-        Gc.compact (); continue k "Hello, world!")
-      | _ -> None }
+    { effc =
+        (fun (type a) (e : a t) ->
+          Gc.compact ();
+          match e with
+          | F ->
+            Some
+              (fun (k : (a, _) continuation) ->
+                Gc.compact ();
+                continue k "Hello, world!")
+          | _ -> None)
+    }
 
-let () = handle (fun () ->
-  Gc.compact (); print_endline (perform F ^ (" " ^ perform F)))
+let () =
+  handle (fun () ->
+      Gc.compact ();
+      print_endline (perform F ^ " " ^ perform F))

@@ -15,7 +15,6 @@
 (**************************************************************************)
 
 open Misc
-
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 
 module Consistbl : module type of struct
@@ -23,7 +22,8 @@ module Consistbl : module type of struct
 end
 
 type error =
-  | Illegal_renaming of Compilation_unit.Name.t * Compilation_unit.Name.t * filepath
+  | Illegal_renaming of
+      Compilation_unit.Name.t * Compilation_unit.Name.t * filepath
   | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
   | Need_recursive_types of Compilation_unit.Name.t
   | Inconsistent_package_declaration_between_imports of
@@ -34,37 +34,37 @@ type error =
   | Not_compiled_as_parameter of Global_module.Name.t
   | Imported_module_has_unset_parameter of
       { imported : Global_module.Name.t;
-        parameter : Global_module.Parameter_name.t;
+        parameter : Global_module.Parameter_name.t
       }
   | Imported_module_has_no_such_parameter of
       { imported : Compilation_unit.Name.t;
         valid_parameters : Global_module.Parameter_name.t list;
         parameter : Global_module.Parameter_name.t;
-        value : Global_module.Name.t;
+        value : Global_module.Name.t
       }
   | Not_compiled_as_argument of
       { param : Global_module.Parameter_name.t;
         value : Global_module.Name.t;
-        filename : filepath;
+        filename : filepath
       }
   | Argument_type_mismatch of
       { value : Global_module.Name.t;
         filename : filepath;
         expected : Global_module.Parameter_name.t;
-        actual : Global_module.Parameter_name.t;
+        actual : Global_module.Parameter_name.t
       }
   | Unbound_module_as_argument_value of
-      { instance : Global_module.Name.t; value : Global_module.Name.t; }
-
-
+      { instance : Global_module.Name.t;
+        value : Global_module.Name.t
+      }
 
 exception Error of error
 
-val report_error: Format.formatter -> error -> unit
+val report_error : Format.formatter -> error -> unit
 
 module Persistent_signature : sig
   type t =
-    { filename : string; (** Name of the file containing the signature. *)
+    { filename : string;  (** Name of the file containing the signature. *)
       cmi : Cmi_format.cmi_infos_lazy;
       visibility : Load_path.visibility
     }
@@ -85,6 +85,7 @@ type 'a t
 val empty : unit -> 'a t
 
 val clear : 'a t -> unit
+
 val clear_missing : 'a t -> unit
 
 val fold : 'a t -> (Global_module.Name.t -> 'a -> 'b -> 'b) -> 'b -> 'b
@@ -95,23 +96,34 @@ type address =
   | Adot of address * int
 
 type 'a sig_reader =
-  Subst.Lazy.signature
-  -> Global_module.Name.t
-  -> Shape.Uid.t
-  -> shape:Shape.t
-  -> address:address
-  -> flags:Cmi_format.pers_flags list
-  -> 'a
+  Subst.Lazy.signature ->
+  Global_module.Name.t ->
+  Shape.Uid.t ->
+  shape:Shape.t ->
+  address:address ->
+  flags:Cmi_format.pers_flags list ->
+  'a
 
-val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
-  -> Subst.Lazy.signature
-val find : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> Global_module.Name.t -> allow_excess_args:bool -> 'a
+val read :
+  'a t -> Global_module.Name.t -> Unit_info.Artifact.t -> Subst.Lazy.signature
+
+val find :
+  allow_hidden:bool ->
+  'a t ->
+  'a sig_reader ->
+  Global_module.Name.t ->
+  allow_excess_args:bool ->
+  'a
 
 val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
 
-val check : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> loc:Location.t -> Global_module.Name.t -> unit
+val check :
+  allow_hidden:bool ->
+  'a t ->
+  'a sig_reader ->
+  loc:Location.t ->
+  Global_module.Name.t ->
+  unit
 
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
@@ -137,37 +149,40 @@ val register_import_as_opaque : 'a t -> Compilation_unit.Name.t -> unit
 
 (* [implemented_parameter penv md] returns the argument to [-as-argument-for]
    that [md] was compiled with. *)
-val implemented_parameter : 'a t
-  -> Global_module.Name.t -> Global_module.Parameter_name.t option
+val implemented_parameter :
+  'a t -> Global_module.Name.t -> Global_module.Parameter_name.t option
 
-val global_of_global_name : 'a t
-  -> check:bool
-  -> Global_module.Name.t
-  -> allow_excess_args:bool
-  -> Global_module.t
+val global_of_global_name :
+  'a t ->
+  check:bool ->
+  Global_module.Name.t ->
+  allow_excess_args:bool ->
+  Global_module.t
 
 (* [normalize_global_name penv g] returns [g] with any excess arguments removed,
    loading any .cmi files necessary to do so. *)
 val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 
-val make_cmi : 'a t
-  -> Compilation_unit.Name.t
-  -> Cmi_format.kind
-  -> Subst.Lazy.signature
-  -> alerts
-  -> Cmi_format.cmi_infos_lazy
+val make_cmi :
+  'a t ->
+  Compilation_unit.Name.t ->
+  Cmi_format.kind ->
+  Subst.Lazy.signature ->
+  alerts ->
+  Cmi_format.cmi_infos_lazy
 
 val save_cmi : 'a t -> Persistent_signature.t -> unit
 
 val can_load_cmis : 'a t -> can_load_cmis
+
 val set_can_load_cmis : 'a t -> can_load_cmis -> unit
+
 val without_cmis : 'a t -> ('b -> 'c) -> 'b -> 'c
 (* [without_cmis penv f arg] applies [f] to [arg], but does not
     allow [penv] to openi cmis during its execution *)
 
 (* may raise Consistbl.Inconsistency *)
-val import_crcs : 'a t -> source:filepath ->
-  Import_info.Intf.t array -> unit
+val import_crcs : 'a t -> source:filepath -> Import_info.Intf.t array -> unit
 
 (* Return the set of compilation units imported, with their CRC *)
 val imports : 'a t -> Import_info.Intf.t list
@@ -199,7 +214,7 @@ val is_imported_parameter : 'a t -> Global_module.Name.t -> bool
 val parameters : 'a t -> Global_module.Parameter_name.t list
 
 (* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: 'a t -> Compilation_unit.Name.t -> Digest.t
+val crc_of_unit : 'a t -> Compilation_unit.Name.t -> Digest.t
 
 (* Forward declaration to break mutual recursion with Typecore. *)
-val add_delayed_check_forward: ((unit -> unit) -> unit) ref
+val add_delayed_check_forward : ((unit -> unit) -> unit) ref

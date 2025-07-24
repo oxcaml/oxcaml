@@ -19,19 +19,18 @@ open Ocamltest_stdlib
 open Environments
 
 let wrap sl = " " ^ String.concat " " sl ^ " "
+
 let append var sl = Append (var, wrap sl)
+
 let add var s = Add (var, s)
 
 let principal =
-[
-  append Ocaml_variables.flags ["-principal"];
-  add Ocaml_variables.compiler_directory_suffix ".principal";
-  add Ocaml_variables.compiler_reference_suffix ".principal";
-]
+  [ append Ocaml_variables.flags ["-principal"];
+    add Ocaml_variables.compiler_directory_suffix ".principal";
+    add Ocaml_variables.compiler_reference_suffix ".principal" ]
 
 let latex =
-  [
-    add Ocaml_variables.ocamldoc_backend "latex";
+  [ add Ocaml_variables.ocamldoc_backend "latex";
     append Ocaml_variables.ocamldoc_flags ["-latex-type-prefix=TYP"];
     append Ocaml_variables.ocamldoc_flags ["-latex-module-prefix="];
     append Ocaml_variables.ocamldoc_flags ["-latex-value-prefix="];
@@ -39,90 +38,72 @@ let latex =
     append Ocaml_variables.ocamldoc_flags ["-latextitle=1,subsection*"];
     append Ocaml_variables.ocamldoc_flags ["-latextitle=2,subsubsection*"];
     append Ocaml_variables.ocamldoc_flags ["-latextitle=6,subsection*"];
-    append Ocaml_variables.ocamldoc_flags ["-latextitle=7,subsubsection*"];
-  ]
-
+    append Ocaml_variables.ocamldoc_flags ["-latextitle=7,subsubsection*"] ]
 
 let html =
-  [
-    add Ocaml_variables.ocamldoc_backend "html";
-    append Ocaml_variables.ocamldoc_flags ["-colorize-code"];
-  ]
+  [ add Ocaml_variables.ocamldoc_backend "html";
+    append Ocaml_variables.ocamldoc_flags ["-colorize-code"] ]
 
-let man =
-  [
-    add Ocaml_variables.ocamldoc_backend "man";
-  ]
+let man = [add Ocaml_variables.ocamldoc_backend "man"]
 
 let make_library_modifier library directories =
-[
-  append Ocaml_variables.directories directories;
-  append Ocaml_variables.libraries [library];
-  append Ocaml_variables.caml_ld_library_path directories;
-]
+  [ append Ocaml_variables.directories directories;
+    append Ocaml_variables.libraries [library];
+    append Ocaml_variables.caml_ld_library_path directories ]
 
 let make_module_modifier unit_name directory =
-[
-  append Ocaml_variables.directories [directory];
-  append Ocaml_variables.binary_modules [unit_name];
-]
+  [ append Ocaml_variables.directories [directory];
+    append Ocaml_variables.binary_modules [unit_name] ]
 
 let compiler_subdir subdir =
   (* CR mshinwell: upstream this change *)
   Filename.make_path (Ocaml_directories.srcdir :: subdir)
 
-let config =
-[
-  append Ocaml_variables.directories [compiler_subdir ["utils"]];
-]
+let config = [append Ocaml_variables.directories [compiler_subdir ["utils"]]]
 
-let testing = make_library_modifier
-  "testing" [compiler_subdir ["testsuite"; "lib"]]
+let testing =
+  make_library_modifier "testing" [compiler_subdir ["testsuite"; "lib"]]
 
-let tool_ocaml_lib = make_module_modifier
-  "lib" (compiler_subdir ["testsuite"; "lib"])
+let tool_ocaml_lib =
+  make_module_modifier "lib" (compiler_subdir ["testsuite"; "lib"])
 
-let unix = make_library_modifier
-  "unix" [compiler_subdir ["otherlibs"; "unix"]]
+let unix = make_library_modifier "unix" [compiler_subdir ["otherlibs"; "unix"]]
 
 let dynlink =
   make_library_modifier "dynlink"
-    [compiler_subdir ["otherlibs"; "dynlink"];
-     compiler_subdir ["otherlibs"; "dynlink"; "native"]]
+    [ compiler_subdir ["otherlibs"; "dynlink"];
+      compiler_subdir ["otherlibs"; "dynlink"; "native"] ]
 
-let str = make_library_modifier
-  "str" [compiler_subdir ["otherlibs"; "str"]]
+let str = make_library_modifier "str" [compiler_subdir ["otherlibs"; "str"]]
 
 let systhreads =
-  unix @
-  (make_library_modifier
-    "threads" [compiler_subdir ["otherlibs"; Ocamltest_config.systhreads_path]])
+  unix
+  @ make_library_modifier "threads"
+      [compiler_subdir ["otherlibs"; Ocamltest_config.systhreads_path]]
 
 let runtime_events =
-  make_library_modifier
-    "runtime_events" [compiler_subdir ["otherlibs"; "runtime_events"]]
+  make_library_modifier "runtime_events"
+    [compiler_subdir ["otherlibs"; "runtime_events"]]
 
 let compilerlibs_subdirs =
-[
-  "asmcomp";
-  "bytecomp";
-  "compilerlibs";
-  "driver";
-  "file_formats";
-  "lambda";
-  "middle_end";
-  "parsing";
-  "toplevel";
-  "typing";
-  "utils";
-]
+  [ "asmcomp";
+    "bytecomp";
+    "compilerlibs";
+    "driver";
+    "file_formats";
+    "lambda";
+    "middle_end";
+    "parsing";
+    "toplevel";
+    "typing";
+    "utils" ]
 
 let add_compiler_subdir subdir =
   append Ocaml_variables.directories [compiler_subdir [subdir]]
 
 let compilerlibs_archive archive =
-  append Ocaml_variables.libraries [archive] ::
-  List.map add_compiler_subdir compilerlibs_subdirs
+  append Ocaml_variables.libraries [archive]
+  :: List.map add_compiler_subdir compilerlibs_subdirs
 
 let runtime_suffix = if Config.runtime5 then "" else "4"
 
@@ -140,21 +121,17 @@ let init () =
   register_modifiers "str" str;
   List.iter
     (fun name -> register_modifiers name (extension_universe_lib name))
-    [
-      "stdlib_upstream_compatible";
+    [ "stdlib_upstream_compatible";
       "stdlib_stable";
       "stdlib_beta";
-      "stdlib_alpha";
-    ];
+      "stdlib_alpha" ];
   List.iter
     (fun archive -> register_modifiers archive (compilerlibs_archive archive))
-    [
-      "ocamlcommon";
+    [ "ocamlcommon";
       "ocamlbytecomp";
       "ocamlmiddleend";
       "ocamloptcomp";
-      "ocamltoplevel";
-    ];
+      "ocamltoplevel" ];
   register_modifiers "runtime_events" runtime_events;
   register_modifiers "systhreads" systhreads;
   register_modifiers "latex" latex;

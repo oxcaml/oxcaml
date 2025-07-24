@@ -1,10 +1,15 @@
 (* TEST
- expect;
+   expect;
 *)
 
-type ab = [ `A | `B ];;
-let f (x : [`A]) = match x with #ab -> 1;;
-[%%expect{|
+type ab =
+  [ `A
+  | `B ]
+
+let f (x : [`A]) = match x with #ab -> 1
+
+[%%expect
+{|
 type ab = [ `A | `B ]
 Line 2, characters 32-35:
 2 | let f (x : [`A]) = match x with #ab -> 1;;
@@ -12,58 +17,90 @@ Line 2, characters 32-35:
 Error: This pattern matches values of type "[? `A | `B ]"
        but a pattern was expected which matches values of type "[ `A ]"
        The second variant type does not allow tag(s) "`B"
-|}];;
-let f x = ignore (match x with #ab -> 1); ignore (x : [`A]);;
-[%%expect{|
+|}]
+
+let f x =
+  ignore (match x with #ab -> 1);
+  ignore (x : [`A])
+
+[%%expect
+{|
 Line 1, characters 31-34:
 1 | let f x = ignore (match x with #ab -> 1); ignore (x : [`A]);;
                                    ^^^
 Error: This pattern matches values of type "[? `B ]"
        but a pattern was expected which matches values of type "[ `A ]"
        The second variant type does not allow tag(s) "`B"
-|}];;
-let f x = ignore (match x with `A|`B -> 1); ignore (x : [`A]);;
-[%%expect{|
+|}]
+
+let f x =
+  ignore (match x with `A | `B -> 1);
+  ignore (x : [`A])
+
+[%%expect
+{|
 Line 1, characters 34-36:
 1 | let f x = ignore (match x with `A|`B -> 1); ignore (x : [`A]);;
                                       ^^
 Error: This pattern matches values of type "[? `B ]"
        but a pattern was expected which matches values of type "[ `A ]"
        The second variant type does not allow tag(s) "`B"
-|}];;
+|}]
 
-let f (x : [< `A | `B]) = match x with `A | `B | `C -> 0;; (* warn *)
-[%%expect{|
+let f (x : [< `A | `B]) = match x with `A | `B | `C -> 0
+
+(* warn *)
+[%%expect
+{|
 Line 1, characters 49-51:
 1 | let f (x : [< `A | `B]) = match x with `A | `B | `C -> 0;; (* warn *)
                                                      ^^
 Warning 12 [redundant-subpat]: this sub-pattern is unused.
 
 val f : [< `A | `B ] -> int = <fun>
-|}];;
-let f (x : [`A | `B]) = match x with `A | `B | `C -> 0;; (* fail *)
-[%%expect{|
+|}]
+
+let f (x : [`A | `B]) = match x with `A | `B | `C -> 0
+
+(* fail *)
+[%%expect
+{|
 Line 1, characters 47-49:
 1 | let f (x : [`A | `B]) = match x with `A | `B | `C -> 0;; (* fail *)
                                                    ^^
 Error: This pattern matches values of type "[? `C ]"
        but a pattern was expected which matches values of type "[ `A | `B ]"
        The second variant type does not allow tag(s) "`C"
-|}];;
+|}]
 
 (* imported from in poly.ml *)
-type t = A | B;;
-function `A,_ -> 1 | _,A -> 2 | _,B -> 3;;
-function `A,_ -> 1 | _,(A|B) -> 2;;
+type t =
+  | A
+  | B
+;;
+
+function `A, _ -> 1 | _, A -> 2 | _, B -> 3;;
+
+function `A, _ -> 1 | _, (A | B) -> 2;;
+
 function Some `A, _ -> 1 | Some _, A -> 2 | None, A -> 3 | _, B -> 4;;
-function Some `A, A -> 1 | Some `A, B -> 1
-       | Some _, A -> 2  | None, A -> 3 | _, B -> 4;;
+
+function
+| Some `A, A -> 1 | Some `A, B -> 1 | Some _, A -> 2 | None, A -> 3 | _, B -> 4
+;;
+
 function A, `A -> 1 | A, `B -> 2 | B, _ -> 3;;
+
 function `A, A -> 1 | `B, A -> 2 | _, B -> 3;;
-function (`A|`B), _ -> 0 | _,(`A|`B) -> 1;;
-function `B,1 -> 1 | _,1 -> 2;;
-function 1,`B -> 1 | 1,_ -> 2;;
-[%%expect {|
+
+function (`A | `B), _ -> 0 | _, (`A | `B) -> 1;;
+
+function `B, 1 -> 1 | _, 1 -> 2;;
+
+function 1, `B -> 1 | 1, _ -> 2
+
+[%%expect
+{|
 type t = A | B
 - : [> `A ] * t -> int = <fun>
 - : [> `A ] * t -> int = <fun>
@@ -105,24 +142,29 @@ Line 11, characters 21-24:
 Warning 11 [redundant-case]: this match case is unused.
 
 - : int * [< `B ] -> int = <fun>
-|}];;
+|}]
 
 (* PR#6787 *)
-let revapply x f = f x;;
+let revapply x f = f x
 
 let f x (g : [< `Foo]) =
   let y = `Bar x, g in
-  revapply y (fun ((`Bar i), _) -> i);;
+  revapply y (fun (`Bar i, _) -> i)
+
 (* f : 'a -> [< `Foo ] -> 'a *)
-[%%expect{|
+[%%expect
+{|
 val revapply : 'a -> ('a -> 'b) -> 'b = <fun>
 val f : 'a -> [< `Foo ] -> 'a = <fun>
-|}];;
+|}]
 
 (* PR#6124 *)
-let f : ([`A | `B ] as 'a) -> [> 'a] -> unit = fun x (y : [> 'a]) -> ();;
-let f (x : [`A | `B] as 'a) (y : [> 'a]) = ();;
-[%%expect{|
+let f : ([`A | `B] as 'a) -> [> 'a] -> unit = fun x (y : [> 'a]) -> ()
+
+let f (x : [`A | `B] as 'a) (y : [> 'a]) = ()
+
+[%%expect
+{|
 Line 1, characters 61-63:
 1 | let f : ([`A | `B ] as 'a) -> [> 'a] -> unit = fun x (y : [> 'a]) -> ();;
                                                                  ^^
@@ -131,18 +173,21 @@ Hint: Did you mean "`a"?
 |}]
 
 (* CR reisenberg: This test is disabled. It only barely works in `main`
-   anyway, as evidenced by https://github.com/ocaml/ocaml/issues/13369
-(* PR#5927 *)
-type 'a foo = 'a constraint 'a = [< `Tag of & int];;
-[%%expect{|
-type 'a foo = 'a constraint 'a = [< `Tag of & int ]
-|}]
+      anyway, as evidenced by https://github.com/ocaml/ocaml/issues/13369
+   (* PR#5927 *)
+   type 'a foo = 'a constraint 'a = [< `Tag of & int];;
+   [%%expect{|
+   type 'a foo = 'a constraint 'a = [< `Tag of & int ]
+   |}]
 *)
 
 (* PR#7704 *)
-type t = private [> `A of string ];;
-function (`A x : t) -> x;;
-[%%expect{|
+type t = private [> `A of string];;
+
+function (`A x : t) -> x
+
+[%%expect
+{|
 type t = private [> `A of string ]
 Line 2, characters 0-24:
 2 | function (`A x : t) -> x;;
@@ -154,8 +199,10 @@ Here is an example of a case that is not matched:
 - : t -> string = <fun>
 |}]
 
-let f = function `AnyOtherTag, _ -> 1 | _, (`AnyOtherTag|`AnyOtherTag') -> 2;;
-[%%expect{|
+let f = function `AnyOtherTag, _ -> 1 | _, (`AnyOtherTag | `AnyOtherTag') -> 2
+
+[%%expect
+{|
 Line 1, characters 8-76:
 1 | let f = function `AnyOtherTag, _ -> 1 | _, (`AnyOtherTag|`AnyOtherTag') -> 2;;
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -166,8 +213,10 @@ Here is an example of a case that is not matched:
 val f : [> `AnyOtherTag ] * [> `AnyOtherTag | `AnyOtherTag' ] -> int = <fun>
 |}]
 
-let x:(([`A] as 'a)* ([`B] as 'a)) = [`A]
-[%%expect {|
+let x : ([`A] as 'a) * ([`B] as 'a) = [`A]
+
+[%%expect
+{|
 Line 1, characters 31-32:
 1 | let x:(([`A] as 'a)* ([`B] as 'a)) = [`A]
                                    ^
@@ -177,8 +226,11 @@ Error: This alias is bound to type "[ `B ]" but is used as an instance of type
 |}]
 
 type t = private [< `A]
-let f: t -> [ `A ] = fun x -> x
-[%%expect {|
+
+let f : t -> [`A] = fun x -> x
+
+[%%expect
+{|
 type t = private [< `A ]
 Line 2, characters 30-31:
 2 | let f: t -> [ `A ] = fun x -> x
@@ -188,13 +240,16 @@ Error: This expression has type "t" but an expression was expected of type
        The first variant type is private, it may not allow the tag(s) "`A"
 |}]
 
-
 (** Check that the non-regularity error message is robust to permutation *)
 
-type ('a,'b,'c,'d,'e) a = [ `A of ('d,'a,'e,'c,'b) b ]
-and  ('a,'b,'c,'d,'e) b = [ `B of ('c,'d,'e,'a,'b) c ]
-and  ('a,'b,'c,'d,'e) c = [ `C of ('a,'b,'c,'d,'e) a ]
-[%%expect {|
+type ('a, 'b, 'c, 'd, 'e) a = [`A of ('d, 'a, 'e, 'c, 'b) b]
+
+and ('a, 'b, 'c, 'd, 'e) b = [`B of ('c, 'd, 'e, 'a, 'b) c]
+
+and ('a, 'b, 'c, 'd, 'e) c = [`C of ('a, 'b, 'c, 'd, 'e) a]
+
+[%%expect
+{|
 Line 3, characters 0-54:
 3 | type ('a,'b,'c,'d,'e) a = [ `A of ('d,'a,'e,'c,'b) b ]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -214,11 +269,13 @@ Error: This recursive type is not regular.
 
 (* PR 10762 *)
 type a = int
-type t = [ `A of a ]
-let inspect: [< t ] -> unit = function
-  | `A 0 -> ()
-  | `A _ -> ()
-[%%expect {|
+
+type t = [`A of a]
+
+let inspect : [< t] -> unit = function `A 0 -> () | `A _ -> ()
+
+[%%expect
+{|
 type a = int
 type t = [ `A of a ]
 val inspect : [< `A of a & int ] -> unit = <fun>
@@ -226,12 +283,17 @@ val inspect : [< `A of a & int ] -> unit = <fun>
 
 (** Error messages with weakly polymorphic row variables *)
 let x = !(ref (function `X -> () | _ -> ()))
+
 [%%expect {|
 val x : ([> `X ] as '_weak1) -> unit = <fun>
 |}]
 
-let x = let rec x = `X (`Y (fun y -> x = y)) in !(ref x)
-[%%expect {|
+let x =
+  let rec x = `X (`Y (fun y -> x = y)) in
+  !(ref x)
+
+[%%expect
+{|
 val x : [> `X of [> `Y of '_weak2 -> bool ] as '_weak3 ] as '_weak2 =
   `X (`Y <fun>)
 |}]
@@ -240,8 +302,10 @@ val x : [> `X of [> `Y of '_weak2 -> bool ] as '_weak3 ] as '_weak2 =
 
 (** Arity mismatch *)
 
-let f (x:[`X of int]) = (x:[`X])
-[%%expect{|
+let f (x : [`X of int]) : [`X] = x
+
+[%%expect
+{|
 Line 5, characters 25-26:
 5 | let f (x:[`X of int]) = (x:[`X])
                              ^
@@ -250,9 +314,10 @@ Error: This expression has type "[ `X of int ]"
        Types for tag "`X" are incompatible
 |}]
 
+let f (x : [`X of int]) : [< `X of  & int] = x
 
-let f (x:[`X of int]) = (x:[<`X of & int])
-[%%expect{|
+[%%expect
+{|
 Line 1, characters 25-26:
 1 | let f (x:[`X of int]) = (x:[<`X of & int])
                              ^
@@ -263,8 +328,10 @@ Error: This expression has type "[ `X of int ]"
 
 (** Inconsistent type *)
 
-let f (x:[<`X of & int & float]) = (x:[`X])
-[%%expect{|
+let f (x : [< `X of  & int & float]) : [`X] = x
+
+[%%expect
+{|
 Line 3, characters 36-37:
 3 | let f (x:[<`X of & int & float]) = (x:[`X])
                                         ^
@@ -273,13 +340,18 @@ Error: This expression has type "[< `X of & int & float ]"
        Types for tag "`X" are incompatible
 |}]
 
-
 (** Missing tag correctly attributed *)
-type rt = [ `A | `B of string | `R of rt ]
+type rt =
+  [ `A
+  | `B of string
+  | `R of rt ]
+
 let rec f = function `A -> 0 | `B s -> int_of_string s | `R x -> f x
 
-let g (x:[`A | `R of rt]) = f x
-[%%expect{|
+let g (x : [`A | `R of rt]) = f x
+
+[%%expect
+{|
 type rt = [ `A | `B of string | `R of rt ]
 val f : ([< `A | `B of string | `R of 'a ] as 'a) -> int = <fun>
 Line 4, characters 30-31:

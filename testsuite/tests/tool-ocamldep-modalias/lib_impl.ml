@@ -3,6 +3,7 @@ module Packed = struct
   module B = LibB
   module C = LibC
 end
+
 include Packed
 
-let imp x = x+1
+let imp x = x + 1

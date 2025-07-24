@@ -1,16 +1,13 @@
 (* TEST
- expect;
+   expect;
 *)
 
-type foo1 =
-  | Foo : ('a * 'b * 'c * 'd * 'e * 'f) -> foo1
+type foo1 = Foo : ('a * 'b * 'c * 'd * 'e * 'f) -> foo1
 
-let bar1 x =
-  match x with
-  | Foo a -> a + 1
-  | _ -> 0
-;;
-[%%expect {|
+let bar1 x = match x with Foo a -> a + 1 | _ -> 0
+
+[%%expect
+{|
 type foo1 = Foo : ('a * 'b * 'c * 'd * 'e * 'f) -> foo1
 Line 6, characters 13-14:
 6 |   | Foo a -> a + 1
@@ -33,10 +30,12 @@ type foo2 =
 let bar2 x =
   match x with
   | Foo1 a1, Foo2 a2, Foo3 a3, Foo4 a4, Foo5 a5, Foo6 a6, Foo7 a7 ->
-      let x = (a1, a2, a3, a4, a5, a6, a7) in x + 1
+    let x = a1, a2, a3, a4, a5, a6, a7 in
+    x + 1
   | _ -> 0
-;;
-[%%expect {|
+
+[%%expect
+{|
 type foo2 =
     Foo1 : 'a -> foo2
   | Foo2 : 'a -> foo2
@@ -71,10 +70,12 @@ type foo3 =
 let bar2 x =
   match x with
   | Foo1 a1, Foo2 a2, Foo3 a3, Foo4 a4, Foo5 a5, Foo6 a6, Foo7 a7 ->
-      let x = (a1, a2, a3, a4, a5, a6, a7) in x + 1
+    let x = a1, a2, a3, a4, a5, a6, a7 in
+    x + 1
   | _ -> 0
-;;
-[%%expect {|
+
+[%%expect
+{|
 type foo3 =
     Foo1 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3
   | Foo2 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3

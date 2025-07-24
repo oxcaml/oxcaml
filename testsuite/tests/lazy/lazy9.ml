@@ -4,11 +4,10 @@
    let-rec size computation to raise a fatal error. *)
 
 (* *)
-type t =
-  | C of t Lazy.t Lazy.t
+type t = C of t Lazy.t Lazy.t
 
 let rec x =
-  let y = (lazy (C x)) in
+  let y = lazy (C x) in
   lazy y
 
 (* *)
@@ -21,17 +20,13 @@ let todo () : float =
 
 (* *)
 let () =
-  begin match Lazy.force (Lazy.force x) with
-    | C _ -> ()
-  end;
-  begin match todo () with
-    | f ->
-      (* trying to get the actual value of the float will cause a segfault *)
-      let f' = f +. 1. in
-      print_float f';
-      print_newline ()
-    | exception CamlinternalLazy.Undefined ->
-      (* this is what should happen if `todo` is compiled correctly *)
-      ()
-  end;
-
+  (match Lazy.force (Lazy.force x) with C _ -> ());
+  match todo () with
+  | f ->
+    (* trying to get the actual value of the float will cause a segfault *)
+    let f' = f +. 1. in
+    print_float f';
+    print_newline ()
+  | exception CamlinternalLazy.Undefined ->
+    (* this is what should happen if `todo` is compiled correctly *)
+    ()

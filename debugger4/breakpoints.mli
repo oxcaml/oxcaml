@@ -25,6 +25,7 @@ val breakpoints_count : unit -> int
 
 (* Breakpoint number -> code_event. *)
 type breakpoint_id = int
+
 val breakpoints : (breakpoint_id * Events.code_event) list ref
 
 (* Is there a breakpoint at `pc' ? *)

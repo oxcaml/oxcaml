@@ -1,11 +1,12 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* Typing for recursive modules checks scope escape *)
 module type S = sig
   type t
-end;;
+end
+;;
 
 let rec (module M : S) =
   (module struct
@@ -13,8 +14,10 @@ let rec (module M : S) =
   end : S
     with type t = M.t)
 in
-();;
-[%%expect{|
+()
+
+[%%expect
+{|
 module type S = sig type t end
 Lines 6-9, characters 2-22:
 6 | ..(module struct
@@ -23,7 +26,8 @@ Lines 6-9, characters 2-22:
 9 |     with type t = M.t)
 Error: This expression has type "(module S with type t = M.t)"
        but an expression was expected of type "(module S)"
-|}];;
+|}]
+;;
 
 let rec k =
   let (module K : S with type t = A.t) = k in
@@ -38,8 +42,10 @@ and (module A : S) =
     let x = ()
   end)
 in
-();;
-[%%expect{|
+()
+
+[%%expect
+{|
 Lines 2-6, characters 2-22:
 2 | ..let (module K : S with type t = A.t) = k in
 3 |   (module struct
@@ -49,7 +55,7 @@ Lines 2-6, characters 2-22:
 Error: This expression has type "(module S with type t = A.t)"
        but an expression was expected of type "'a"
        The type constructor "A.t" would escape its scope
-|}];;
+|}]
 
 (* The locally abstract type lets us check the module's type
    without scope escape. *)
@@ -57,31 +63,35 @@ let f (type a) () =
   let rec (module M : S with type t = a) =
     (module struct
       type t = M.t
-    end : S with type t = M.t)
+    end : S
+      with type t = M.t)
   in
   ()
-;;
-[%%expect{|
+
+[%%expect {|
 val f : unit -> unit = <fun>
-|}];;
+|}]
 
 let f (type a) () =
   let rec (module M : S with type t = a) =
     (module struct
       type t = M.t
-    end : S with type t = a)
+    end : S
+      with type t = a)
   in
-  ();;
-[%%expect{|
+  ()
+
+[%%expect {|
 val f : unit -> unit = <fun>
-|}];;
+|}]
 
 (* Reject scope escape via unification *)
 
 module type S = sig
   type t
+
   val x : t
-end;;
+end
 
 let f () =
   let (module M : S) =
@@ -93,12 +103,13 @@ let f () =
   in
   let unify x = if true then M.x else x in
   unify ()
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type S = sig type t val x : t end
 Line 15, characters 8-10:
 15 |   unify ()
              ^^
 Error: This expression has type "unit" but an expression was expected of type
          "M.t"
-|}];;
+|}]

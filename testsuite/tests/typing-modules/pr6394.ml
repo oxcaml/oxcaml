@@ -1,15 +1,21 @@
 (* TEST
- expect;
+   expect;
 *)
 
-[@@@ ocaml.warning "+4"]
+[@@@ocaml.warning "+4"]
+
 module rec X : sig
   type t = int * bool
 end = struct
-  type t = A | B
+  type t =
+    | A
+    | B
+
   let f = function A | B -> 0
-end;;
-[%%expect{|
+end
+
+[%%expect
+{|
 Lines 4-7, characters 6-3:
 4 | ......struct
 5 |   type t = A | B
@@ -25,4 +31,4 @@ Error: Signature mismatch:
        is not included in
          type t = int * bool
        The type "X.t" is not equal to the type "int * bool"
-|}];;
+|}]

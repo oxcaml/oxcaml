@@ -17,15 +17,23 @@
 (* Miscellaneous parameters *)
 
 val program_name : string ref
+
 val socket_name : string ref
+
 val arguments : string ref
+
 val default_load_path : string list ref
+
 val breakpoint : bool ref
+
 val prompt : bool ref
+
 val time : bool ref
+
 val version : bool ref
 
 val add_path : string -> unit
+
 val add_path_for : string -> string -> unit
 
 (* Used by emacs ? *)

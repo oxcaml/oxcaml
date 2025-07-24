@@ -1,13 +1,14 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
-if (14 lsr 2) <> 3 then raise Not_found;;
+
+if 14 lsr 2 <> 3 then raise Not_found
 
 (**
        0 CONSTINT 42

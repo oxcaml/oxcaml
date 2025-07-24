@@ -15,5 +15,7 @@ module type Initial (* 7 *) = sig
 end
 
 module FMT (* 11 *) (X (* 10 *) : sig
-  module type MT (* 9 *) = sig val x (* 8 *) : int end
+  module type MT (* 9 *) = sig
+    val x (* 8 *) : int
+  end
 end) : sig end

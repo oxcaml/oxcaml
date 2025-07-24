@@ -1,12 +1,36 @@
-val foo1: ('a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> unit)
-          -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> unit
+val foo1 :
+  ('a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> unit) ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  unit
 
-val foo2: ('a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> unit)
-          -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> unit
+val foo2 :
+  ('a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> 'a -> unit) ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  'a ->
+  unit
 
-val bar:
+val bar :
   int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> unit
-val baz:
+
+val baz :
   int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> unit
-val bob:
+
+val bob :
   int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> unit

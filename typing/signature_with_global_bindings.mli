@@ -12,10 +12,10 @@
 
     Note that globals without parameters are understood to be bound but aren't
     represented explicitly. *)
-type t = private {
-  sign : Subst.Lazy.signature;
-  bound_globals : Global_module.With_precision.t array;
-}
+type t = private
+  { sign : Subst.Lazy.signature;
+    bound_globals : Global_module.With_precision.t array
+  }
 
 val read_from_cmi : Cmi_format.cmi_infos_lazy -> t
 

@@ -17,13 +17,14 @@
 
 (** The result of reducing a shape and looking for its uid *)
 type result =
-  | Resolved of Shape.Uid.t (** Shape reduction succeeded and a uid was found *)
-  | Resolved_alias of Shape.Uid.t * result (** Reduction led to an alias *)
-  | Unresolved of Shape.t (** Result still contains [Comp_unit] terms *)
+  | Resolved of Shape.Uid.t
+      (** Shape reduction succeeded and a uid was found *)
+  | Resolved_alias of Shape.Uid.t * result  (** Reduction led to an alias *)
+  | Unresolved of Shape.t  (** Result still contains [Comp_unit] terms *)
   | Approximated of Shape.Uid.t option
-    (** Reduction failed: it can arrive with first-class modules for example *)
+      (** Reduction failed: it can arrive with first-class modules for example *)
   | Internal_error_missing_uid
-    (** Reduction succeeded but no uid was found, this should never happen *)
+      (** Reduction succeeded but no uid was found, this should never happen *)
 
 val print_result : Format.formatter -> result -> unit
 
@@ -41,11 +42,11 @@ val print_result : Format.formatter -> result -> unit
     Such an instance should only be used to perform reduction inside a unique
     compilation unit to prevent conflicting entries in these memoization tables.
 *)
-module Make(_ : sig
-    val fuel : int
+module Make (_ : sig
+  val fuel : int
 
-    val read_unit_shape : unit_name:string -> Shape.t option
-  end) : sig
+  val read_unit_shape : unit_name:string -> Shape.t option
+end) : sig
   val reduce : Env.t -> Shape.t -> Shape.t
 
   (** Perform weak reduction and return the head's uid if any. If reduction was

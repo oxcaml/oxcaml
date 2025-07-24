@@ -27,8 +27,7 @@ val action_name : Variables.t
 
 val update : t -> code -> t
 
-val make : name:string -> description:string ->
-  does_something:bool -> code -> t
+val make : name:string -> description:string -> does_something:bool -> code -> t
 
 val compare : t -> t -> int
 
@@ -39,7 +38,9 @@ val get_registered_actions : unit -> t list
 val lookup : string -> t option
 
 val set_hook : string -> code -> unit
+
 val clear_hook : string -> unit
+
 val clear_all_hooks : unit -> unit
 
 val run : out_channel -> Environments.t -> t -> Result.t * Environments.t

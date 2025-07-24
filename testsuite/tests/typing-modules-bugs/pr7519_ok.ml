@@ -1,25 +1,33 @@
 (* TEST
- flags = " -w -a ";
- setup-ocamlc.byte-build-env;
- ocamlc.byte;
- check-ocamlc.byte-output;
+   flags = " -w -a ";
+   setup-ocamlc.byte-build-env;
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)
 
-module Gen_spec = struct type 't extra = unit end
+module Gen_spec = struct
+  type 't extra = unit
+end
 
 module type S = sig
-  module Spec : sig type 't extra = unit end
+  module Spec : sig
+    type 't extra = unit
+  end
 
   type t
+
   val make : unit -> t Spec.extra
-end (* S *)
+end
+(* S *)
 
 module Make () : S with module Spec := Gen_spec = struct
   type t = int
+
   let make () = ()
-end (* Make *)
+end
+(* Make *)
 
 let () =
   let module M = Make () in
   M.make ()
-  (* (M.make () : unit) *)
+(* (M.make () : unit) *)

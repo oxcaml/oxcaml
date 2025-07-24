@@ -1,8 +1,8 @@
 (* TEST
- setup-ocamlc.byte-build-env;
- flags = "-dlambda -dno-unique-ids";
- ocamlc.byte;
- check-ocamlc.byte-output;
+   setup-ocamlc.byte-build-env;
+   flags = "-dlambda -dno-unique-ids";
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)
 
 module type S = sig
@@ -11,16 +11,21 @@ end
 
 module O (X : S) = struct
   let cow x = X.foo x
+
   let sheep x = 1 + cow x
-end [@@inline always]
+end
+[@@inline always]
 
 module F (X : S) (Y : S) = struct
   let cow x = Y.foo (X.foo x)
+
   let sheep x = 1 + cow x
-end [@@inline always]
+end
+[@@inline always]
 
 module type S1 = sig
   val bar : int -> int
+
   val foo : int -> int
 end
 
@@ -30,19 +35,30 @@ end
 
 module F1 (X : S) (Y : S) : T = struct
   let cow x = Y.foo (X.foo x)
-  let sheep x = 1 + cow x
-end [@@inline always]
 
-module F2 : S1 -> S1 -> T = functor (X : S) -> functor (Y : S) -> struct
-  let cow x = Y.foo (X.foo x)
   let sheep x = 1 + cow x
-end [@@inline always]
+end
+[@@inline always]
+
+module F2 : functor (_ : S1) (_ : S1) -> T =
+functor
+  (X : S)
+  (Y : S)
+  ->
+  struct
+    let cow x = Y.foo (X.foo x)
+
+    let sheep x = 1 + cow x
+  end
+[@@inline always]
 
 module M : sig
   module F (X : S1) (Y : S1) : T
 end = struct
   module F (X : S) (Y : S) = struct
     let cow x = Y.foo (X.foo x)
+
     let sheep x = 1 + cow x
-  end [@@inline always]
+  end
+  [@@inline always]
 end
