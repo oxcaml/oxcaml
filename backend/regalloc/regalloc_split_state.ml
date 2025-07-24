@@ -135,18 +135,9 @@ end = struct
               acc)
           loop definitions_at_beginning
       in
+      (* Add destructions before the loop. *)
       let all_loop_predecessors : Label.Set.t =
         (Cfg.get_block_exn cfg header).predecessors
-      in
-      let all_loop_successors : Label.Set.t =
-        Label.Set.diff
-          (Label.Set.fold
-             (fun l acc ->
-               Label.Set.union acc
-                 (Cfg.successor_labels ~normal:true ~exn:true
-                    (Cfg.get_block_exn cfg l)))
-             loop Label.Set.empty)
-          loop
       in
       let destructions_at_end : destructions_at_end =
         Label.Set.fold
@@ -160,6 +151,17 @@ end = struct
                   Some (Destruction_on_all_paths, Reg.Set.union regs to_move))
               acc)
           all_loop_predecessors destructions_at_end
+      in
+      (* Add definitions after the loop. *)
+      let all_loop_successors : Label.Set.t =
+        Label.Set.diff
+          (Label.Set.fold
+             (fun l acc ->
+               Label.Set.union acc
+                 (Cfg.successor_labels ~normal:true ~exn:true
+                    (Cfg.get_block_exn cfg l)))
+             loop Label.Set.empty)
+          loop
       in
       let definitions_at_beginning : definitions_at_beginning =
         Label.Set.fold
