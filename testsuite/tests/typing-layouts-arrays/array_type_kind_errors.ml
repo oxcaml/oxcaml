@@ -4,39 +4,39 @@
  expect;
 *)
 
-type ('a : any_non_null) t
+type ('a : any mod separable) t
 
-external unsafe_get : ('a : any_non_null). 'a t -> int -> 'a
+external unsafe_get : ('a : any mod separable). 'a t -> int -> 'a
   = "%array_unsafe_get"
 [@@layout_poly]
-external unsafe_set : ('a : any_non_null). 'a t -> int -> 'a -> unit
+external unsafe_set : ('a : any mod separable). 'a t -> int -> 'a -> unit
   = "%array_unsafe_set"
 [@@layout_poly]
-external safe_get : ('a : any_non_null). 'a t -> int -> 'a
+external safe_get : ('a : any mod separable). 'a t -> int -> 'a
   = "%array_safe_get"
 [@@layout_poly]
-external safe_set : ('a : any_non_null). 'a t -> int -> 'a -> unit
+external safe_set : ('a : any mod separable). 'a t -> int -> 'a -> unit
   = "%array_safe_set"
 [@@layout_poly]
-external length : ('a : any_non_null). 'a t -> int
+external length : ('a : any mod separable). 'a t -> int
   = "%array_length"
 [@@layout_poly]
-external size_in_bytes : ('a : any_non_null). 'a t -> int
+external size_in_bytes : ('a : any mod separable). 'a t -> int
   = "%array_element_size_in_bytes"
 [@@layout_poly]
 [%%expect{|
-type ('a : any_non_null) t
-external unsafe_get : ('a : any_non_null). 'a t -> int -> 'a
+type ('a : any mod separable) t
+external unsafe_get : ('a : any mod separable). 'a t -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
-external unsafe_set : ('a : any_non_null). 'a t -> int -> 'a -> unit
+external unsafe_set : ('a : any mod separable). 'a t -> int -> 'a -> unit
   = "%array_unsafe_set" [@@layout_poly]
-external safe_get : ('a : any_non_null). 'a t -> int -> 'a
+external safe_get : ('a : any mod separable). 'a t -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
-external safe_set : ('a : any_non_null). 'a t -> int -> 'a -> unit
+external safe_set : ('a : any mod separable). 'a t -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
-external length : ('a : any_non_null). 'a t -> int = "%array_length"
+external length : ('a : any mod separable). 'a t -> int = "%array_length"
   [@@layout_poly]
-external size_in_bytes : ('a : any_non_null). 'a t -> int
+external size_in_bytes : ('a : any mod separable). 'a t -> int
   = "%array_element_size_in_bytes" [@@layout_poly]
 |}]
 

@@ -22,11 +22,11 @@ let custom_block_padding =
 (* We only compile for 64 bits. *)
 let bytes_per_word = 8
 
-external[@layout_poly] size_in_bytes : ('a : any_non_null). 'a array -> int
+external[@layout_poly] size_in_bytes : ('a : any mod separable). 'a array -> int
   = "%array_element_size_in_bytes"
 
 external[@layout_poly] makearray_dynamic :
-  ('a : any_non_null). int -> 'a -> 'a array = "%makearray_dynamic"
+  ('a : any mod separable). int -> 'a -> 'a array = "%makearray_dynamic"
 
 let array_sizes_to_check = [0; 1; 2; 25]
 
