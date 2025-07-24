@@ -2741,7 +2741,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         (Binary (Int_arith (Tagged_immediate, Mul), field, word_size_const))
     in
     [ Binary
-        ( Read_offset (K.With_subkind.any_value, Asttypes.Mutable),
+        ( Read_offset (K.With_subkind.naked_nativeint, Asttypes.Mutable),
           block,
           byte_offset ) ]
   | Psetrawfield, [[block]; [field]; [new_value]] ->
@@ -2759,7 +2759,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     [ Ternary
         ( Write_offset
-            (K.With_subkind.any_value, Alloc_mode.For_assignments.heap),
+            (K.With_subkind.naked_nativeint, Alloc_mode.For_assignments.heap),
           block,
           byte_offset,
           new_value ) ]

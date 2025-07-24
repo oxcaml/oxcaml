@@ -2593,7 +2593,7 @@ let primitive_result_layout (p : primitive) =
   | Patomic_lor_field
   | Patomic_lxor_field
   | Ppoll -> layout_unit
-  | Prawfield -> layout_any_value
+  | Prawfield -> layout_unboxed_nativeint
   | Psetrawfield -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
