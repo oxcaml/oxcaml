@@ -1343,24 +1343,19 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
                   arg, Jkind.Sort.value
                 else
-                  (match Btype.classify_optionality l with
-                  | Optional_arg mpath ->
-                      Typecore.type_option_some val_env mpath sarg ty ty0,
-                      (* CR generic-optional: Change the sort when options can
-                         hold non-values. *)
+                  let mpath = Btype.get_optional_module_path_exn l in
+                  (* CR generic-optional: Change the sort when options can
+                     hold non-values. *)
+                  Typecore.type_option_some val_env mpath sarg ty ty0,
                       Jkind.Sort.value
-                  | Required_or_position_arg -> assert false)
               )
             in
             let eliminate_optional_arg lbl =
-              match Btype.classify_optionality lbl with
-              | Optional_arg mpath ->
-                  Arg
-                    (Typecore.type_option_none val_env mpath ty0 Location.none,
-                      (* CR layouts v5: Change the sort when options can hold
-                          non-values. *)
-                      Jkind.Sort.value)
-              | Required_or_position_arg -> assert false
+              let mpath = Btype.get_optional_module_path_exn lbl in
+              Arg (Typecore.type_option_none val_env mpath ty0 Location.none,
+                (* CR generic-optional: Change the sort when options can hold
+                   non-values. *)
+                Jkind.Sort.value)
             in
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in

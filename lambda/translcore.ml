@@ -1656,9 +1656,14 @@ and transl_curried_function ~scopes loc repr params body
           match fp_kind with
           | Tparam_pat pat ->
               pat.pat_env, pat.pat_type, Translattribute.transl_param_attributes pat
-          | Tparam_optional_default (pat, expr, _) ->
-              expr.exp_env, Predef.type_option expr.exp_type, Translattribute.transl_param_attributes pat
+          | Tparam_optional_default (pat, expr, _, mpath) ->
+              expr.exp_env,
+              (match mpath with
+              | Stdlib_option -> Predef.type_option expr.exp_type
+              | Stdlib_or_null -> Predef.type_or_null expr.exp_type),
+              Translattribute.transl_param_attributes pat
         in
+        (* CR generic-optional: This also needs to change fp_sort *)
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout = layout arg_env fp_loc fp_sort arg_type in
         let arg_mode = transl_alloc_mode_l fp_mode in
@@ -1678,13 +1683,14 @@ and transl_curried_function ~scopes loc repr params body
                 fp_partial
                 ~arg_sort:fp_sort ~arg_layout
                 ~return_layout
-          | Tparam_optional_default (pat, default_arg, default_arg_sort) ->
+          | Tparam_optional_default
+              (pat, default_arg, default_arg_sort, mpath) ->
               let default_arg_sort = Jkind.Sort.default_for_transl_and_get default_arg_sort in
               let default_arg =
                 event_before ~scopes default_arg
                   (transl_exp ~scopes default_arg_sort default_arg)
               in
-              Matching.for_optional_arg_default ~return_layout
+              Matching.for_optional_arg_default ~mpath ~return_layout
                 ~scopes fp_loc pat body ~default_arg ~default_arg_sort
                 ~param:fp_param
         in

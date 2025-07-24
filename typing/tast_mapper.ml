@@ -353,10 +353,10 @@ let function_param sub
   let fp_kind =
     match fp_kind with
     | Tparam_pat pat -> Tparam_pat (sub.pat sub pat)
-    | Tparam_optional_default (pat, expr, sort) ->
+    | Tparam_optional_default (pat, expr, sort, mpath) ->
       let pat = sub.pat sub pat in
       let expr = sub.expr sub expr in
-      Tparam_optional_default (pat, expr, sort)
+      Tparam_optional_default (pat, expr, sort, mpath)
   in
   let fp_newtypes =
     List.map

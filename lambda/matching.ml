@@ -4484,7 +4484,7 @@ let for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list parti
     (do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list
        partial)
 
-let for_optional_arg_default
+let for_optional_arg_default ~(mpath : Btype.optional_module_path)
     ~scopes loc pat ~param ~default_arg ~default_arg_sort ~return_layout body
   : lambda
   =
@@ -4496,22 +4496,32 @@ let for_optional_arg_default
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
   let supplied_or_default =
-    transl_match_on_option
-      default_arg_layout
-      (Lvar param)
-      Loc_unknown
-      ~if_none:default_arg
-      ~if_some:
-        (Lprim
-           (* CR ncik-roberts: Check whether we need something better here. *)
-           (* CR uniqueness: Currently it is not possible for users to refer
-              to the [Some] allocation underlying the optional argument. This
-              makes it impossible to overwrite and safe to use [Reads_agree]
-              here. It would be slightly safer to use [Reads_vary] here, but
-              that could degrade performance of programs not using uniqueness *)
-           (Pfield (0, Pointer, Reads_agree),
-            [ Lvar param ],
-            Loc_unknown))
+    match mpath with
+    | Stdlib_or_null ->
+        transl_match_on_or_null
+          default_arg_layout
+          (Lvar param)
+          Loc_unknown
+          ~if_null:default_arg
+          ~if_this:(Lvar param)
+    | Stdlib_option ->
+        transl_match_on_option
+          default_arg_layout
+          (Lvar param)
+          Loc_unknown
+          ~if_none:default_arg
+          ~if_some:
+            (Lprim
+              (* CR ncik-roberts: Check whether we need something better here.*)
+              (* CR uniqueness: Currently it is not possible for users to refer
+                  to the [Some] allocation underlying the optional argument.
+                  This makes it impossible to overwrite and safe to use
+                  [Reads_agree] here. It would be slightly safer to use
+                  [Reads_vary] here, but that could degrade performance of
+                  programs not using uniqueness *)
+              (Pfield (0, Pointer, Reads_agree),
+                [ Lvar param ],
+                Loc_unknown))
   in
   for_let ~scopes ~arg_sort:default_arg_sort ~return_layout
     loc supplied_or_default Immutable pat body
