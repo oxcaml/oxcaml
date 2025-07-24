@@ -197,6 +197,8 @@
   datarepr
   global_module
   cmi_format
+  vicuna_traverse_typed_tree
+  vicuna_value_shapes
   persistent_env
   env
   errortrace
@@ -212,6 +214,7 @@
   mtype
   envaux
   includecore
+  type_shape
   tast_iterator
   tast_mapper
   signature_group
@@ -526,6 +529,7 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  llvmize
   ;; backend/regalloc
   regalloc_gi
   regalloc_gi_state
@@ -570,6 +574,7 @@
   dwarf_reg_locations
   dwarf_state
   dwarf_variables_and_parameters
+  dwarf_type
   ;; driver/
   opterrors
   optcompile

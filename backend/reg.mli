@@ -93,6 +93,7 @@ val is_reg : t -> bool
 val is_stack :  t -> bool
 val is_unknown : t -> bool
 val is_preassigned : t -> bool
+val is_domainstate : t -> bool
 
 module Set: Set.S with type elt = t
 module Map: Map.S with type key = t

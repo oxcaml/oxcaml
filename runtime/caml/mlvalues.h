@@ -69,12 +69,17 @@ typedef opcode_t * code_t;
 
 #include "domain_state.h"
 
-/* The null pointer value. */
+/* Or_null constructors. */
+
 #define Val_null ((value) 0)
+#define Val_this(v) (v)
+#define This_val(v) (v)
+#define Is_null(v) ((v) == Val_null)
+#define Is_this(v) ((v) != Val_null)
 
 /* Longs vs blocks. */
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(HAS_BMI)
 // Specialize the implementation of Is_block and Is_long on x86-64.
 //
 // Is_block(x) returns 1 if the least significant bit of x is 0, and x != 0.

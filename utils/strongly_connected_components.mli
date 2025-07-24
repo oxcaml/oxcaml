@@ -77,6 +77,10 @@ module type S = sig
     | Has_loop of Id.t list
     | No_loop of Id.t
 
+  val stable_connected_components_sorted_from_roots_to_leaf
+    : (Id.t * Id.Set.t) list
+    -> component array
+
   val connected_components_sorted_from_roots_to_leaf
      : directed_graph
     -> component array

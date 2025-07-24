@@ -61,7 +61,7 @@ Line 1, characters 0-40:
 Error: The kind of type "int ref option" is mutable_data
          because it's a boxed variant type.
        But the kind of type "int ref option" must be a subkind of
-         immutable_data
+           immutable_data
          because of the definition of t at line 1, characters 0-40.
 |}]
 
@@ -97,7 +97,7 @@ Error: This type "(unit -> unit) option" should be an instance of type
        The kind of (unit -> unit) option is value mod immutable non_float
          because it's a boxed variant type.
        But the kind of (unit -> unit) option must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 |}, Principal{|
 Line 1, characters 14-35:
@@ -108,7 +108,7 @@ Error: This type "(unit -> unit) option" should be an instance of type
        The kind of (unit -> unit) option is immutable_data with unit -> unit
          because it's a boxed variant type.
        But the kind of (unit -> unit) option must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 |}]
 
@@ -315,7 +315,7 @@ Error: This type "(unit -> unit) list" should be an instance of type
        The kind of (unit -> unit) list is value mod immutable non_float
          because it's a boxed variant type.
        But the kind of (unit -> unit) list must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 |}, Principal{|
 Line 1, characters 14-33:
@@ -326,7 +326,7 @@ Error: This type "(unit -> unit) list" should be an instance of type
        The kind of (unit -> unit) list is immutable_data with unit -> unit
          because it's a boxed variant type.
        But the kind of (unit -> unit) list must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 |}]
 
@@ -490,7 +490,7 @@ Line 1, characters 0-40:
 Error: The kind of type "int ref iarray" is mutable_data
          because it is the primitive value type iarray.
        But the kind of type "int ref iarray" must be a subkind of
-         immutable_data
+           immutable_data
          because of the definition of t at line 1, characters 0-40.
 |}]
 
@@ -526,7 +526,7 @@ Error: This type "(unit -> unit) iarray" should be an instance of type
        The kind of (unit -> unit) iarray is value mod immutable non_float
          because it is the primitive value type iarray.
        But the kind of (unit -> unit) iarray must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 |}, Principal{|
 Line 1, characters 14-35:
@@ -537,7 +537,7 @@ Error: This type "(unit -> unit) iarray" should be an instance of type
        The kind of (unit -> unit) iarray is immutable_data with unit -> unit
          because it is the primitive value type iarray.
        But the kind of (unit -> unit) iarray must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 |}]
 

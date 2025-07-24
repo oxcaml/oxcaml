@@ -130,7 +130,9 @@ let fresh_exn_cont env { Fexpr.txt = name; loc = _ } =
 
 let fresh_var env { Fexpr.txt = name; loc = _ } =
   let v = Variable.create name ~user_visible:() in
-  v, { env with variables = VM.add name v env.variables }
+  let v_duid = Flambda_debug_uid.none in
+  (* CR sspies: In the future, try to improve the debug UID propagation here. *)
+  v, v_duid, { env with variables = VM.add name v env.variables }
 
 let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   match DM.find_opt env.code_ids name with
@@ -251,6 +253,12 @@ let targetint_31_63 (i : Fexpr.targetint) : Targetint_31_63.t =
 let vec128 bits : Vector_types.Vec128.Bit_pattern.t =
   Vector_types.Vec128.Bit_pattern.of_bits bits
 
+let vec256 bits : Vector_types.Vec256.Bit_pattern.t =
+  Vector_types.Vec256.Bit_pattern.of_bits bits
+
+let vec512 bits : Vector_types.Vec512.Bit_pattern.t =
+  Vector_types.Vec512.Bit_pattern.of_bits bits
+
 let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
@@ -270,6 +278,8 @@ let rec subkind :
   | Boxed_int64 -> Boxed_int64
   | Boxed_nativeint -> Boxed_nativeint
   | Boxed_vec128 -> Boxed_vec128
+  | Boxed_vec256 -> Boxed_vec256
+  | Boxed_vec512 -> Boxed_vec512
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } ->
     let consts =
@@ -317,6 +327,8 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_int64 i -> Reg_width_const.naked_int64 i
   | Naked_nativeint i -> Reg_width_const.naked_nativeint (i |> targetint)
   | Naked_vec128 bits -> Reg_width_const.naked_vec128 (bits |> vec128)
+  | Naked_vec256 bits -> Reg_width_const.naked_vec256 (bits |> vec256)
+  | Naked_vec512 bits -> Reg_width_const.naked_vec512 (bits |> vec512)
 
 let rec rec_info env (ri : Fexpr.rec_info) : Rec_info_expr.t =
   let module US = Rec_info_expr.Unrolling_state in
@@ -480,10 +492,9 @@ let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
   | Naked_floats -> Naked_floats
   | Values -> Values
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Unboxed_product _ ->
+  | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128/unboxed \
-       product arrays not yet implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 let array_set_kind :
     'a -> Fexpr.array_set_kind -> Flambda_primitive.Array_set_kind.t =
@@ -492,10 +503,9 @@ let array_set_kind :
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s ->
+  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128 arrays not \
-       yet implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 let ternop env (ternop : Fexpr.ternop) : Flambda_primitive.ternary_primitive =
   match ternop with
@@ -559,7 +569,7 @@ let set_of_closures env fun_decls value_slots alloc =
     |> Function_slot.Lmap.of_list
     |> Function_slot.Lmap.map
          (fun code_id : Function_declarations.code_id_in_function_declaration ->
-           Code_id code_id)
+           Code_id { code_id; only_full_applications = false })
     |> Function_declarations.create
   in
   let value_slots = Option.value value_slots ~default:[] in
@@ -626,8 +636,8 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     in
     let bound_vars, env =
       let convert_binding env (var, _) : Bound_var.t * env =
-        let var, env = fresh_var env var in
-        let var = Bound_var.create var Name_mode.normal in
+        let var, var_duid, env = fresh_var env var in
+        let var = Bound_var.create var var_duid Name_mode.normal in
         var, env
       in
       map_accum_left convert_binding env vars_and_closure_bindings
@@ -652,9 +662,9 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     Misc.fatal_errorf "'with' clause only allowed when defining closures"
   | Let { bindings = [{ var; defining_expr = d }]; body; value_slots = None } ->
     let named = defining_expr env d in
-    let id, env = fresh_var env var in
+    let id, id_duid, env = fresh_var env var in
     let body = expr env body in
-    let var = Bound_var.create id Name_mode.normal in
+    let var = Bound_var.create id id_duid Name_mode.normal in
     let bound = Bound_pattern.singleton var in
     Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
     |> Flambda.Expr.create_let
@@ -685,9 +695,11 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
       let env, parameters =
         List.fold_right
           (fun ({ param; kind } : Fexpr.kinded_parameter) (env, args) ->
-            let var, env = fresh_var env param in
+            let var, var_duid, env = fresh_var env param in
             let param =
-              Bound_parameter.create var (value_kind_with_subkind_opt kind)
+              Bound_parameter.create var
+                (value_kind_with_subkind_opt kind)
+                var_duid
             in
             env, param :: args)
           params (env, [])
@@ -830,6 +842,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           static_const (SC.boxed_nativeint (or_variable targetint env i))
         | Boxed_vec128 i ->
           static_const (SC.boxed_vec128 (or_variable vec128 env i))
+        | Boxed_vec256 i ->
+          static_const (SC.boxed_vec256 (or_variable vec256 env i))
+        | Boxed_vec512 i ->
+          static_const (SC.boxed_vec512 (or_variable vec512 env i))
         | Immutable_float_block elements ->
           static_const
             (SC.immutable_float_block
@@ -905,17 +921,22 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
           let params, env =
             map_accum_left
               (fun env ({ param; kind } : Fexpr.kinded_parameter) ->
-                let var, env = fresh_var env param in
+                let var, var_duid, env = fresh_var env param in
                 let param =
-                  Bound_parameter.create var (value_kind_with_subkind_opt kind)
+                  Bound_parameter.create var
+                    (value_kind_with_subkind_opt kind)
+                    var_duid
                 in
                 param, env)
               env params
           in
-          let my_closure, env = fresh_var env closure_var in
-          let my_region, env = fresh_var env region_var in
-          let my_ghost_region, env = fresh_var env ghost_region_var in
-          let my_depth, env = fresh_var env depth_var in
+          let my_closure, _my_closure_duid, env = fresh_var env closure_var in
+          let my_region, _my_region_duid, env = fresh_var env region_var in
+          let my_ghost_region, _my_ghost_region, env =
+            fresh_var env ghost_region_var
+          in
+          let my_depth, _my_depth, env = fresh_var env depth_var in
+          (* CR sspies: In the future, consider propagating these debug UIDs. *)
           let return_continuation, env =
             fresh_cont env ret_cont ~sort:Return
               ~arity:(Flambda_arity.cardinal_unarized result_arity)

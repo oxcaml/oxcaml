@@ -96,11 +96,7 @@ let mem64_rip typ ?(ofs = 0) s = Mem64_RIP (typ, s, ofs)
 module I = struct
   let add x y = emit (ADD (x, y))
 
-  let addsd x y = emit (ADDSD (x, y))
-
   let and_ x y = emit (AND (x, y))
-
-  let andpd x y = emit (ANDPD (x, y))
 
   let bsf x y = emit (BSF (x, y))
 
@@ -118,27 +114,9 @@ module I = struct
 
   let cmp x y = emit (CMP (x, y))
 
-  let cmpsd cond x y = emit (CMPSD (cond, x, y))
-
-  let comisd x y = emit (COMISD (x, y))
-
   let cqo () = emit CQO
 
-  let cvtsi2ss x y = emit (CVTSI2SS (x, y))
-
-  let cvtsd2ss x y = emit (CVTSD2SS (x, y))
-
-  let cvtsi2sd x y = emit (CVTSI2SD (x, y))
-
-  let cvtss2sd x y = emit (CVTSS2SD (x, y))
-
-  let cvttss2si x y = emit (CVTTSS2SI (x, y))
-
-  let cvttsd2si x y = emit (CVTTSD2SI (x, y))
-
   let dec x = emit (DEC x)
-
-  let divsd x y = emit (DIVSD (x, y))
 
   let hlt () = emit HLT
 
@@ -190,25 +168,11 @@ module I = struct
 
   let mov x y = emit (MOV (x, y))
 
-  let movapd x y = emit (MOVAPD (x, y))
-
-  let movupd x y = emit (MOVUPD (x, y))
-
-  let movd x y = emit (MOVD (x, y))
-
-  let movq x y = emit (MOVQ (x, y))
-
-  let movsd x y = emit (MOVSD (x, y))
-
-  let movss x y = emit (MOVSS (x, y))
-
   let movsx x y = emit (MOVSX (x, y))
 
   let movsxd x y = emit (MOVSXD (x, y))
 
   let movzx x y = emit (MOVZX (x, y))
-
-  let mulsd x y = emit (MULSD (x, y))
 
   let neg x = emit (NEG x)
 
@@ -248,35 +212,11 @@ module I = struct
 
   let sub x y = emit (SUB (x, y))
 
-  let subsd x y = emit (SUBSD (x, y))
-
   let test x y = emit (TEST (x, y))
-
-  let ucomisd x y = emit (UCOMISD (x, y))
 
   let xchg x y = emit (XCHG (x, y))
 
   let xor x y = emit (XOR (x, y))
-
-  let xorpd x y = emit (XORPD (x, y))
-
-  let addss x y = emit (ADDSS (x, y))
-
-  let subss x y = emit (SUBSS (x, y))
-
-  let mulss x y = emit (MULSS (x, y))
-
-  let divss x y = emit (DIVSS (x, y))
-
-  let comiss x y = emit (COMISS (x, y))
-
-  let ucomiss x y = emit (UCOMISS (x, y))
-
-  let xorps x y = emit (XORPS (x, y))
-
-  let andps x y = emit (ANDPS (x, y))
-
-  let cmpss i x y = emit (CMPSS (i, x, y))
 
   let lzcnt x y = emit (LZCNT (x, y))
 

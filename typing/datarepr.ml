@@ -241,7 +241,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Value.Const.id;
     lbl_sort = Jkind.Sort.Const.void;
-    lbl_num = -1; lbl_pos = -1; lbl_all = [||];
+    lbl_pos = -1; lbl_all = [||];
     lbl_repres = repres;
     lbl_private = Public;
     lbl_loc = Location.none;
@@ -251,10 +251,9 @@ let dummy_label (type rep) (record_form : rep record_form)
 
 let label_descrs record_form ty_res lbls repres priv =
   let all_labels = Array.make (List.length lbls) (dummy_label record_form) in
-  let rec describe_labels num pos = function
+  let rec describe_labels pos = function
       [] -> []
     | l :: rest ->
-        let is_void = Jkind.Sort.Const.(equal void l.ld_sort) in
         let lbl =
           { lbl_name = Ident.name l.ld_id;
             lbl_res = ty_res;
@@ -262,8 +261,7 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_mut = l.ld_mutable;
             lbl_modalities = l.ld_modalities;
             lbl_sort = l.ld_sort;
-            lbl_pos = if is_void then lbl_pos_void else pos;
-            lbl_num = num;
+            lbl_pos = pos;
             lbl_all = all_labels;
             lbl_repres = repres;
             lbl_private = priv;
@@ -271,10 +269,9 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_attributes = l.ld_attributes;
             lbl_uid = l.ld_uid;
           } in
-        all_labels.(num) <- lbl;
-        let pos = if is_void then pos else pos+1 in
-        (l.ld_id, lbl) :: describe_labels (num+1) pos rest in
-  describe_labels 0 0 lbls
+        all_labels.(pos) <- lbl;
+        (l.ld_id, lbl) :: describe_labels (pos+1) rest in
+  describe_labels 0 lbls
 
 exception Constr_not_found
 
@@ -282,17 +279,17 @@ let find_constr ~constant tag cstrs =
   try
     List.find
       (function
-        | (({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_),_) ->
+        | ({cstr_tag=Ordinary {runtime_tag=tag'}; cstr_constant},_) ->
           tag' = tag && cstr_constant = constant
-        | (({cstr_tag=Null; cstr_constant}, _),_) ->
+        | ({cstr_tag=Null; cstr_constant}, _) ->
           tag = -1 && cstr_constant = constant
-        | (({cstr_tag=Extension _},_),_) -> false)
+        | ({cstr_tag=Extension _},_) -> false)
       cstrs
   with
   | Not_found -> raise Constr_not_found
 
 let find_constr_by_tag ~constant tag cstrlist =
-  fst (fst (find_constr ~constant tag cstrlist))
+  fst (find_constr ~constant tag cstrlist)
 
 let constructors_of_type ~current_unit ty_path decl =
   match decl.type_kind with

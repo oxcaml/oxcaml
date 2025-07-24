@@ -148,7 +148,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   | Lifused (_, exp) | Lregion (exp, _) | Lexclave exp -> comp_expr exp
   | Lprim (primitive, args, loc) -> (
     let simd_is_not_supported () =
-      Misc.fatal_error "SIMD is not supported in bytecode mode."
+      let args = List.map comp_arg args in
+      Blambda.Prim (Ccall "caml_simd_bytecode_not_supported", args)
     in
     let wrong_arity ~expected =
       Misc.fatal_errorf "Blambda_of_lambda: %a takes exactly %d %s"
@@ -184,7 +185,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         Blambda.primitive =
       let suffix =
         match index_kind with
-        | Ptagged_int_index -> ""
+        | Ptagged_int_index | Punboxed_int_index (Unboxed_int16 | Unboxed_int8)
+          ->
+          ""
         | Punboxed_int_index Unboxed_int64 -> "_indexed_by_int64"
         | Punboxed_int_index Unboxed_int32 -> "_indexed_by_int32"
         | Punboxed_int_index Unboxed_nativeint -> "_indexed_by_nativeint"
@@ -195,17 +198,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Popaque _ | Pobj_magic _
     | Pbox_float ((Boxed_float64 | Boxed_float32), _)
     | Punbox_float (Boxed_float64 | Boxed_float32)
-    | Pbox_int _ | Punbox_int _ -> (
+    | Pbox_int _ | Punbox_int _ | Punbox_unit | Ptag_int _ | Puntag_int _ -> (
       match args with
       | [arg] ->
-        (* in bytecode we only deal with boxed+tagged floats and ints *)
+        (* in bytecode we only deal with boxed+tagged floats/ints/units *)
         comp_expr arg
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pignore -> (
       match args with
-      | [arg] ->
-        (* in bytecode we only deal with boxed+tagged floats and ints *)
-        Sequence (comp_arg arg, Const (Const_base (Const_int 0)))
+      | [arg] -> Sequence (comp_arg arg, Const (Const_base (Const_int 0)))
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pnot -> unary Boolnot
     | Psequand -> (
@@ -279,54 +280,64 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
-      let init : Lambda.lambda =
-        match kind with
-        | Pgenarray | Paddrarray | Pintarray | Pfloatarray
-        | Pgcscannableproductarray _ ->
-          Misc.fatal_errorf
-            "Array kind %s should have been ruled out by the frontend for \
-             %%makearray_dynamic_uninit"
-            (Printlambda.array_kind kind)
-        | Punboxedfloatarray Unboxed_float32 ->
-          Lconst (Const_base (Const_float32 "0.0"))
-        | Punboxedfloatarray Unboxed_float64 ->
-          Lconst (Const_base (Const_float "0.0"))
-        | Punboxedintarray Unboxed_int32 -> Lconst (Const_base (Const_int32 0l))
-        | Punboxedintarray Unboxed_int64 -> Lconst (Const_base (Const_int64 0L))
-        | Punboxedintarray Unboxed_nativeint ->
-          Lconst (Const_base (Const_nativeint 0n))
-        | Punboxedvectorarray _ -> simd_is_not_supported ()
-        | Pgcignorableproductarray ignorables ->
-          let rec convert_ignorable
-              (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
-            match ign with
-            | Pint_ignorable -> Lconst (Const_base (Const_int 0))
-            | Punboxedfloat_ignorable Unboxed_float32 ->
-              Lconst (Const_base (Const_float32 "0.0"))
-            | Punboxedfloat_ignorable Unboxed_float64 ->
-              Lconst (Const_base (Const_float "0.0"))
-            | Punboxedint_ignorable Unboxed_int32 ->
-              Lconst (Const_base (Const_int32 0l))
-            | Punboxedint_ignorable Unboxed_int64 ->
-              Lconst (Const_base (Const_int64 0L))
-            | Punboxedint_ignorable Unboxed_nativeint ->
-              Lconst (Const_base (Const_nativeint 0n))
-            | Pproduct_ignorable ignorables ->
-              let fields = List.map convert_ignorable ignorables in
-              Lprim
-                (Pmakeblock (0, Immutable, None, Lambda.alloc_heap), fields, loc)
-          in
-          convert_ignorable (Pproduct_ignorable ignorables)
-      in
-      match args with
-      | [len] ->
-        comp_expr
-          (Lprim
-             ( Pmakearray_dynamic (kind, locality, With_initializer),
-               [len; init],
-               loc )
-            : Lambda.lambda)
-      | _ -> wrong_arity ~expected:1)
+      try
+        let init : Lambda.lambda =
+          match kind with
+          | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+          | Pgcscannableproductarray _ ->
+            Misc.fatal_errorf
+              "Array kind %s should have been ruled out by the frontend for \
+               %%makearray_dynamic_uninit"
+              (Printlambda.array_kind kind)
+          | Punboxedintarray (Unboxed_int8 | Unboxed_int16) ->
+            Misc.unboxed_small_int_arrays_are_not_implemented ()
+          | Punboxedfloatarray Unboxed_float32 ->
+            Lconst (Const_base (Const_float32 "0.0"))
+          | Punboxedfloatarray Unboxed_float64 ->
+            Lconst (Const_base (Const_float "0.0"))
+          | Punboxedintarray Unboxed_int32 ->
+            Lconst (Const_base (Const_int32 0l))
+          | Punboxedintarray Unboxed_int64 ->
+            Lconst (Const_base (Const_int64 0L))
+          | Punboxedintarray Unboxed_nativeint ->
+            Lconst (Const_base (Const_nativeint 0n))
+          | Punboxedvectorarray _ -> raise Not_found
+          | Pgcignorableproductarray ignorables ->
+            let rec convert_ignorable
+                (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
+              match ign with
+              | Pint_ignorable -> Lconst (Const_base (Const_int 0))
+              | Punboxedint_ignorable (Unboxed_int8 | Unboxed_int16) ->
+                Misc.unboxed_small_int_arrays_are_not_implemented ()
+              | Punboxedfloat_ignorable Unboxed_float32 ->
+                Lconst (Const_base (Const_float32 "0.0"))
+              | Punboxedfloat_ignorable Unboxed_float64 ->
+                Lconst (Const_base (Const_float "0.0"))
+              | Punboxedint_ignorable Unboxed_int32 ->
+                Lconst (Const_base (Const_int32 0l))
+              | Punboxedint_ignorable Unboxed_int64 ->
+                Lconst (Const_base (Const_int64 0L))
+              | Punboxedint_ignorable Unboxed_nativeint ->
+                Lconst (Const_base (Const_nativeint 0n))
+              | Pproduct_ignorable ignorables ->
+                let fields = List.map convert_ignorable ignorables in
+                Lprim
+                  ( Pmakeblock (0, Immutable, None, Lambda.alloc_heap),
+                    fields,
+                    loc )
+            in
+            convert_ignorable (Pproduct_ignorable ignorables)
+        in
+        match args with
+        | [len] ->
+          comp_expr
+            (Lprim
+               ( Pmakearray_dynamic (kind, locality, With_initializer),
+                 [len; init],
+                 loc )
+              : Lambda.lambda)
+        | _ -> wrong_arity ~expected:1
+      with Not_found -> simd_is_not_supported ())
     | Pduparray (kind, mutability) -> (
       match args with
       | [Lprim (Pmakearray (kind', _, m), args, _)] ->
@@ -667,31 +678,33 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parray_of_iarray -> unary (Ccall "caml_array_of_iarray")
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
-    | Patomic_load _ -> unary (Ccall "caml_atomic_load")
-    | Patomic_set _ | Patomic_exchange _ ->
-      binary (Ccall "caml_atomic_exchange")
-    | Patomic_compare_exchange _ ->
-      ternary (Ccall "caml_atomic_compare_exchange")
-    | Patomic_compare_set _ -> ternary (Ccall "caml_atomic_cas")
-    | Patomic_fetch_add -> binary (Ccall "caml_atomic_fetch_add")
-    | Patomic_add -> binary (Ccall "caml_atomic_add")
-    | Patomic_sub -> binary (Ccall "caml_atomic_sub")
-    | Patomic_land -> binary (Ccall "caml_atomic_land")
-    | Patomic_lor -> binary (Ccall "caml_atomic_lor")
-    | Patomic_lxor -> binary (Ccall "caml_atomic_lxor")
+    | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
+    | Patomic_compare_exchange_field _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
+    | Patomic_compare_set_field _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_cas_field")
+    | Patomic_fetch_add_field -> ternary (Ccall "caml_atomic_fetch_add_field")
+    | Patomic_add_field -> ternary (Ccall "caml_atomic_add_field")
+    | Patomic_sub_field -> ternary (Ccall "caml_atomic_sub_field")
+    | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
+    | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
+    | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
+    | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
-    | Pstring_load_128 _ | Pbytes_load_128 _ | Pbytes_set_128 _
-    | Pbigstring_load_128 _ | Pbigstring_set_128 _ | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _ | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _ | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _ | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _ | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _ | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _ | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _ | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _ | Pbox_vector _ | Punbox_vector _ ->
+    | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
+    | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _ | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _ | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()
@@ -725,14 +738,13 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         match locality with
         | Alloc_heap -> binary (Ccall "caml_make_vect")
         | Alloc_local -> binary (Ccall "caml_make_local_vect")))
-    | Parrayblit { src_mutability = _; dst_array_set_kind } ->
-      (match dst_array_set_kind with
+    | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
+      match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
       | Punboxedintarray_set _ | Pfloatarray_set | Punboxedfloatarray_set _
       | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
-        ());
-      n_ary (Ccall "caml_array_blit") ~arity:5
+        n_ary (Ccall "caml_array_blit") ~arity:5)
     | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive

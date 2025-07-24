@@ -305,11 +305,17 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
           (fun _id -> EPA.Extra_arg.Already_in_scope (Simple.var var))
           rewrite_ids
       in
+      let var_duid = Flambda_debug_uid.none in
+      (* CR sspies: Improve the debug UID propagation here in the future.
+         Concretely, extra params can sometimes be generated and not user
+         visible (e.g. create during unboxing), and sometimes can be
+         user-visible, or at least aliases of user-visible variable (e.g. CSE,
+         loop invariants, etc...). See #3967. *)
       let var_kind =
         Flambda_kind.With_subkind.anything (Variable.Map.find var aliases_kind)
       in
       EPA.add
-        ~extra_param:(Bound_parameter.create var var_kind)
+        ~extra_param:(Bound_parameter.create var var_kind var_duid)
         ~extra_args epa ~invalids:Apply_cont_rewrite_id.Set.empty)
     required_extra_args.extra_args_for_aliases EPA.empty
 
@@ -553,16 +559,20 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         Continuation.print cont
   in
   let handler, uacc =
-    Variable.Map.fold
+    Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
+        let var_duid = Flambda_debug_uid.none in
+        (* CR sspies: [var] can be derived/aliased from a user visible variable.
+           If we can, it would be good to propagate debugging UIDs (or derived
+           UIDs) here in the future. For now, we make due without. See #3967 *)
         let bound_pattern =
-          Bound_pattern.singleton (Bound_var.create var Name_mode.normal)
+          Bound_pattern.singleton
+            (Bound_var.create var var_duid Name_mode.normal)
         in
-        let named = Named.create_simple (Simple.var bound_to) in
+        let named = Named.create_simple bound_to in
         let handler, uacc =
           Expr_builder.create_let_binding uacc bound_pattern named
-            ~free_names_of_defining_expr:
-              (Name_occurrences.singleton_variable bound_to Name_mode.normal)
+            ~free_names_of_defining_expr:(Simple.free_names bound_to)
             ~cost_metrics_of_defining_expr:Cost_metrics.zero ~body:handler
         in
         handler, uacc)
@@ -592,9 +602,9 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
   let new_phantom_param_bindings_outermost_first =
     List.map
       (fun param ->
-        let var = BP.var param in
+        let param_var, param_uid = BP.var_and_uid param in
         let kind = K.With_subkind.kind (BP.kind param) in
-        let var = Bound_var.create var Name_mode.phantom in
+        let var = Bound_var.create param_var param_uid Name_mode.phantom in
         let let_bound = Bound_pattern.singleton var in
         let prim = Flambda_primitive.(Nullary (Optimised_out kind)) in
         let named = Named.create_prim prim Debuginfo.none in
@@ -1446,9 +1456,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
     (* CR-someday ncourant: this makes the order in which continuations are
        processed dependant on things like the name of the compilation unit
        (because it affects the order on [Continuation.t], and thus the element
-       returned by [min_elt_opt]). However, recursive continuations are
-       specified using a [Continuation.Map.t], whose order already depends on
-       the name of the compilation unit. *)
+       returned by [min_elt_opt]). *)
     match Continuation.Set.min_elt_opt reachable_handlers_to_simplify with
     | None ->
       (* all remaining_handlers are unreachable *)

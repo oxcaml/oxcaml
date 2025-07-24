@@ -11,7 +11,7 @@ type t_float64 : float64
 type t_float64_mod_e : float64 mod everything
 [%%expect{|
 type t_value
-type t_value_mod_e : immediate_or_null mod non_null separable
+type t_value_mod_e : value_or_null mod everything mod non_null separable
 type t_float64 : float64
 type t_float64_mod_e : float64 mod everything
 |}]
@@ -107,7 +107,7 @@ Line 1, characters 0-42:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod aliased
+           float64 mod aliased
          because of the definition of bad at line 1, characters 0-42.
 |}]
 
@@ -141,7 +141,7 @@ Line 1, characters 0-43:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod portable
+           float64 mod portable
          because of the definition of bad at line 1, characters 0-43.
 |}]
 
@@ -175,7 +175,7 @@ Line 1, characters 0-44:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod contended
+           float64 mod contended
          because of the definition of bad at line 1, characters 0-44.
 |}]
 
@@ -209,7 +209,7 @@ Line 1, characters 0-45:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod unyielding
+           float64 mod unyielding
          because of the definition of bad at line 1, characters 0-45.
 |}]
 
@@ -243,7 +243,7 @@ Line 1, characters 0-44:
 Error: The kind of type "t_float64" is float64
          because of the definition of t_float64 at line 3, characters 0-24.
        But the kind of type "t_float64" must be a subkind of
-         float64 mod external_
+           float64 mod external_
          because of the definition of bad at line 1, characters 0-44.
 |}]
 
@@ -257,11 +257,11 @@ type t : value_or_null mod everything
 type bad : value = t
 
 [%%expect{|
-type t : immediate_or_null
+type t : value_or_null mod everything
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immediate_or_null
+Error: The kind of type "t" is value_or_null mod everything
          because of the definition of t at line 1, characters 0-37.
        But the kind of type "t" must be a subkind of value
          because of the definition of bad at line 2, characters 0-20.
@@ -295,15 +295,15 @@ type t : immediate & immediate
 type t : value & float64 mod everything
 [%%expect{|
 type t
-  : immediate_or_null mod non_null separable
+  : value_or_null mod everything mod non_null separable
     & float64 mod global aliased many stateless immutable external_
 |}]
 
 type t : value & (immediate & bits64) & float32 mod everything
 [%%expect{|
 type t
-  : immediate_or_null mod non_null separable
-    & (immediate_or_null mod non_null separable
+  : value_or_null mod everything mod non_null separable
+    & (value_or_null mod everything mod non_null separable
       & bits64 mod global aliased many stateless immutable external_)
     & float32 mod global aliased many stateless immutable external_
 |}]

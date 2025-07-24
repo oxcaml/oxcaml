@@ -124,6 +124,11 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   let vars_and_fields =
     List.init tuple_size (fun field ->
         ( Variable.create "tuple_field",
+          Flambda_debug_uid.none,
+          (* This internally created variable does not get a
+             [Flambda_debug_uid.t]. *)
+          (* CR sspies: Consider introducing a phantom let for it in the future
+             to improve the debug information. *)
           Simplify_common.project_tuple ~dbg ~size:tuple_size ~field tuple_arg ))
   in
   (* Construct the arities for the tuple and any over application arguments *)
@@ -142,7 +147,7 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   (* Change the application to operate on the fields of the tuple *)
   let apply =
     Apply.with_args apply
-      (List.map (fun (v, _) -> Simple.var v) vars_and_fields
+      (List.map (fun (v, _, _) -> Simple.var v) vars_and_fields
       @ over_application_args)
       ~args_arity
   in
@@ -163,8 +168,8 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
      optimizations *)
   let expr =
     List.fold_right
-      (fun (v, defining_expr) body ->
-        let var_bind = Bound_var.create v Name_mode.normal in
+      (fun (v, v_duid, defining_expr) body ->
+        let var_bind = Bound_var.create v v_duid Name_mode.normal in
         Let.create
           (Bound_pattern.singleton var_bind)
           defining_expr ~body ~free_names_of_body:Unknown
@@ -318,8 +323,9 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
               let denv =
                 List.fold_left2
                   (fun denv kind result ->
+                    let result_var, result_uid = BP.var_and_uid result in
                     DE.add_variable denv
-                      (VB.create (BP.var result) NM.in_types)
+                      (VB.create result_var result_uid NM.in_types)
                       (T.unknown_with_subkind kind))
                   denv result_arity results
               in
@@ -422,6 +428,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       (Flambda_arity.unarize param_arity)
   in
   let wrapper_var = Variable.create "partial_app" in
+  let wrapper_var_duid = Flambda_debug_uid.none in
   let compilation_unit = Compilation_unit.get_current_exn () in
   let wrapper_function_slot =
     Function_slot.create compilation_unit ~name:"partial_app_closure"
@@ -456,7 +463,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   let expr, dacc =
     match new_closure_alloc_mode_and_first_complex_local_param with
     | Bottom ->
-      Expr.create_invalid (Partial_application_mode_mismatch apply), dacc
+      ( Expr.create_invalid
+          (Partial_application_mode_mismatch (apply, callee's_code_metadata)),
+        dacc )
     | Ok (new_closure_alloc_mode, first_complex_local_param) ->
       (match closure_alloc_mode_from_type with
       | Heap_or_local -> ()
@@ -476,7 +485,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           List.map
             (fun kind ->
               let param = Variable.create "param" in
-              Bound_parameter.create param kind)
+              let param_duid = Flambda_debug_uid.none in
+              Bound_parameter.create param kind param_duid)
             (Flambda_arity.unarize remaining_param_arity)
           |> Bound_parameters.create
         in
@@ -602,7 +612,12 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               match applied_value with
               | Const _ | Symbol _ -> expr, cost_metrics, free_names
               | In_closure { var; value_slot; value = _ } ->
-                let arg = VB.create var Name_mode.normal in
+                let arg =
+                  VB.create var Flambda_debug_uid.none
+                    (* CR sspies: In the future, try improving the debugging UID
+                       propagation here if possible. *)
+                    Name_mode.normal
+                in
                 let prim =
                   P.Unary
                     ( Project_value_slot
@@ -682,7 +697,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let function_decls =
           Function_declarations.create
             (Function_slot.Lmap.singleton wrapper_function_slot
-               (Code_id code_id
+               (Code_id { code_id; only_full_applications = false }
                  : Function_declarations.code_id_in_function_declaration))
         in
         let value_slots =
@@ -711,7 +726,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         Apply_cont.create apply_continuation ~args:[Simple.var wrapper_var] ~dbg
       in
       let expr =
-        let wrapper_var = VB.create wrapper_var Name_mode.normal in
+        let wrapper_var =
+          VB.create wrapper_var wrapper_var_duid Name_mode.normal
+        in
         let bound_vars = [wrapper_var] in
         let bound = Bound_pattern.set_of_closures bound_vars in
         let body =
@@ -784,6 +801,28 @@ let replace_apply_by_invalid dacc ~down_to_up reason =
       let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
       EB.rebuild_invalid uacc reason ~after_rebuild)
 
+let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
+    ~(args_arity : [`Complex] Flambda_arity.t) =
+  (* This checks the shortest of the two arities against the prefix of the same
+     size of the other. *)
+  let rec has_mismatch params args =
+    match params, args with
+    | [], _ | _, [] -> false
+    | param :: params, arg :: args ->
+      let c = List.compare_lengths param arg in
+      if c = 0
+      then
+        List.exists2
+          (fun param_component arg_component ->
+            not (K.equal (KS.kind param_component) (KS.kind arg_component)))
+          param arg
+        || has_mismatch params args
+      else true
+  in
+  let params = Flambda_arity.unarize_per_parameter params_arity in
+  let args = Flambda_arity.unarize_per_parameter args_arity in
+  has_mismatch params args
+
 let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_id_from_call_kind
     ~callee's_function_slot ~result_arity ~result_types ~recursive
@@ -829,10 +868,24 @@ let simplify_direct_function_call ~simplify_expr dacc apply
 
        - Indirect calls adopt the calling convention consisting of a single
        tuple argument, irrespective of what [Code.params_arity] says. *)
+    let args_arity = Apply.args_arity apply in
     if must_be_detupled
     then
       simplify_direct_tuple_application ~simplify_expr dacc apply
         ~apply_alloc_mode ~callee's_code_id ~callee's_code_metadata ~down_to_up
+    else if arity_mismatch ~params_arity ~args_arity
+    then
+      if Flambda_features.kind_checks ()
+      then
+        Misc.fatal_errorf
+          "Mismatched arities for arguments to direct OCaml function call@ \
+           (expected %a, found %a):@ %a"
+          Flambda_arity.print params_arity Flambda_arity.print args_arity
+          Apply.print apply
+      else
+        replace_apply_by_invalid dacc ~down_to_up
+          (Direct_application_parameter_kind_mismatch
+             { params_arity; args_arity; apply })
     else
       let args_arity = Apply.args_arity apply in
       let provided_num_args = Flambda_arity.num_params args_arity in
@@ -871,7 +924,8 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       else if provided_num_args > num_params
       then (
         (* See comment above. *)
-        if not (Flambda_arity.is_one_param_of_kind_value result_arity)
+        if Flambda_features.kind_checks ()
+           && not (Flambda_arity.is_one_param_of_kind_value result_arity)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for overapplied OCaml function:@ \
@@ -883,9 +937,10 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       else if provided_num_args > 0 && provided_num_args < num_params
       then (
         (* See comment above. *)
-        if not
-             (Flambda_arity.is_one_param_of_kind_value
-                result_arity_of_application)
+        if Flambda_features.kind_checks ()
+           && not
+                (Flambda_arity.is_one_param_of_kind_value
+                   result_arity_of_application)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for partially-applied OCaml \

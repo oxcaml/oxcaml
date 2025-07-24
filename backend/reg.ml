@@ -127,6 +127,11 @@ let is_reg t =
   | Reg _ -> true
   | Stack _ | Unknown -> false
 
+let is_domainstate t =
+  match t.loc with
+  | Stack (Domainstate _) -> true
+  | Stack (Incoming _ | Outgoing _ | Local _) | Reg _ | Unknown -> false
+
 let clear_relocatable_regs () =
   (* When clear_relocatable_regs is called for the first time, the current
      stamp reflects all hardware pseudo-registers that have been allocated by Proc,

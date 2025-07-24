@@ -460,9 +460,9 @@ let f_scannable_literal arr : #(bool option * string * int) =
   | [: #(x, y, z) :] -> #(z, y, x)
   | _ -> assert false
 [%%expect{|
-Line 3, characters 4-9:
-3 |   | [: :] -> #(None, "hi", 42)
-        ^^^^^
+Line 2, characters 8-11:
+2 |   match arr with
+            ^^^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
@@ -472,9 +472,9 @@ let f_ignorable_literal arr : #(#(int64# * float#) * int32# * int) =
   | [: #(x, y, #(z, q)) :] -> #(#(q, z), y, x)
   | _ -> assert false
 [%%expect{|
-Line 3, characters 4-9:
-3 |   | [: :] -> #(#(#42L, #3.14), #10l, 43)
-        ^^^^^
+Line 2, characters 8-11:
+2 |   match arr with
+            ^^^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 

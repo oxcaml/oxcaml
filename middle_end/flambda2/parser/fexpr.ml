@@ -59,6 +59,8 @@ type const =
   | Naked_int32 of int32
   | Naked_int64 of int64
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
+  | Naked_vec256 of Vector_types.Vec256.Bit_pattern.bits
+  | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
   | Naked_nativeint of targetint
 
 type field_of_block =
@@ -95,6 +97,8 @@ type static_data =
   | Boxed_int64 of int64 or_variable
   | Boxed_nativeint of targetint or_variable
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.bits or_variable
+  | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.bits or_variable
+  | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.bits or_variable
   | Immutable_float_block of float or_variable list
   | Immutable_float_array of float or_variable list
   | Immutable_value_array of field_of_block list
@@ -112,6 +116,8 @@ type subkind =
   | Boxed_int64
   | Boxed_nativeint
   | Boxed_vec128
+  | Boxed_vec256
+  | Boxed_vec512
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
@@ -185,6 +191,8 @@ type array_kind = Flambda_primitive.Array_kind.t =
   | Naked_int64s
   | Naked_nativeints
   | Naked_vec128s
+  | Naked_vec256s
+  | Naked_vec512s
   | Unboxed_product of array_kind list
 
 type box_kind = Flambda_kind.Boxable_number.t =
@@ -194,6 +202,8 @@ type box_kind = Flambda_kind.Boxable_number.t =
   | Naked_int64
   | Naked_nativeint
   | Naked_vec128
+  | Naked_vec256
+  | Naked_vec512
 
 type generic_array_specialisation =
   | No_specialisation
@@ -216,6 +226,8 @@ type block_access_kind =
 type standard_int = Flambda_kind.Standard_int.t =
   | Tagged_immediate
   | Naked_immediate
+  | Naked_int8
+  | Naked_int16
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
@@ -225,6 +237,8 @@ type standard_int_or_float = Flambda_kind.Standard_int_or_float.t =
   | Naked_immediate
   | Naked_float32
   | Naked_float
+  | Naked_int8
+  | Naked_int16
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
@@ -342,6 +356,8 @@ type string_accessor_width = Flambda_primitive.string_accessor_width =
   | Single
   | Sixty_four
   | One_twenty_eight of { aligned : bool }
+  | Two_fifty_six of { aligned : bool }
+  | Five_twelve of { aligned : bool }
 
 type array_load_kind = Flambda_primitive.Array_load_kind.t =
   | Immediates
@@ -352,6 +368,8 @@ type array_load_kind = Flambda_primitive.Array_load_kind.t =
   | Naked_int64s
   | Naked_nativeints
   | Naked_vec128s
+  | Naked_vec256s
+  | Naked_vec512s
 
 type array_set_kind =
   | Immediates
@@ -362,6 +380,8 @@ type array_set_kind =
   | Naked_int64s
   | Naked_nativeints
   | Naked_vec128s
+  | Naked_vec256s
+  | Naked_vec512s
 
 type string_like_value = Flambda_primitive.string_like_value =
   | String

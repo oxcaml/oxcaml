@@ -820,6 +820,10 @@ let mem_symbol t symbol = For_names.mem t.names (Name.symbol symbol)
 
 let mem_code_id t code_id = For_code_ids.mem t.code_ids code_id
 
+let mem_continuation t cont =
+  For_continuations.mem t.continuations cont
+  || For_continuations.mem t.continuations_in_trap_actions cont
+
 let value_slot_is_used_or_imported t value_slot =
   Value_slot.is_imported value_slot
   || For_value_slots.mem t.value_slots_in_projections value_slot
@@ -946,6 +950,8 @@ let downgrade_occurrences_at_strictly_greater_name_mode
 let with_only_variables { names; _ } =
   let names = For_names.filter names ~f:Name.is_var in
   { empty with names }
+
+let with_only_names { names; _ } = { empty with names }
 
 let with_only_names_and_code_ids_promoting_newer_version_of
     { names; code_ids; newer_version_of_code_ids; _ } =

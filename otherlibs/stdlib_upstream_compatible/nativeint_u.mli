@@ -16,6 +16,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+@@ portable
+
 open! Stdlib
 
 (** Unboxed processor-native integers.  This file primarily duplicates

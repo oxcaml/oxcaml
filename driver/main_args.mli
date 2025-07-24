@@ -54,6 +54,8 @@ module type Common_options = sig
   val _no_strict_formats : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
+  val _dump_debug_uids : unit -> unit
+  val _dump_debug_uid_tables : unit -> unit
   val _verbose_types : unit -> unit
   val _no_verbose_types : unit -> unit
   val _version : unit -> unit

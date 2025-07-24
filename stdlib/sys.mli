@@ -451,7 +451,8 @@ val runtime_warnings_enabled: unit -> bool
 
 (** {1 Optimization} *)
 
-external[@layout_poly] opaque_identity : ('a : any). 'a -> 'a = "%opaque"
+external[@layout_poly] opaque_identity :
+  ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
 (** For the purposes of optimization, [opaque_identity] behaves like an
     unknown (and thus possibly side-effecting) function.
 

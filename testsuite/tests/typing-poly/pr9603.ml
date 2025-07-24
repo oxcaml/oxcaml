@@ -28,9 +28,11 @@ Line 2, characters 4-53:
 2 |   < m : 'left 'right. <left:'left; right:'right> pair >
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "'left 'right. < left : 'left; right : 'right > pair" is any
+       The layout of "'left 'right. < left : 'left; right : 'right > pair" is
+           any
          because the .cmi file for pair is missing.
-       But the layout of "'left 'right. < left : 'left; right : 'right > pair" must be a sublayout of value
+       But the layout of "'left 'right. < left : 'left; right : 'right > pair" must be a sublayout of
+         value
          because it's the type of an object field.
        No .cmi file found containing pair.
 |}]

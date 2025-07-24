@@ -16,6 +16,7 @@
 
 module Typing_env = struct
   include Typing_env
+  open Meet_env
 
   let add_equation t name ty =
     add_equation t name ty ~meet_type:(Meet.meet_type ())

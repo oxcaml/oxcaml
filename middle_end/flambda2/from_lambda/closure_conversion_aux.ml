@@ -21,7 +21,8 @@ module IR = struct
 
   type exn_continuation =
     { exn_handler : Continuation.t;
-      extra_args : (simple * Flambda_kind.With_subkind.t) list
+      extra_args :
+        (simple * Flambda_debug_uid.t * Flambda_kind.With_subkind.t) list
     }
 
   type trap_action =
@@ -243,7 +244,7 @@ module Env = struct
   let add_vars_like t ids =
     let vars =
       List.map
-        (fun (id, (user_visible : IR.user_visible), kind) ->
+        (fun (id, _uid, (user_visible : IR.user_visible), kind) ->
           let user_visible =
             match user_visible with
             | Not_user_visible -> None
@@ -252,7 +253,7 @@ module Env = struct
           Variable.create_with_same_name_as_ident ?user_visible id, kind)
         ids
     in
-    add_vars t (List.map (fun (id, _, _) -> id) ids) vars, List.map fst vars
+    add_vars t (List.map (fun (id, _, _, _) -> id) ids) vars, List.map fst vars
 
   let find_var t id =
     try Ident.Map.find id t.variables
@@ -500,14 +501,15 @@ module Acc = struct
             (tag, shape, fields, Alloc_mode.For_types.unknown ())
         else Value_unknown
       | Set_of_closures _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
-      | Boxed_int64 _ | Boxed_vec128 _ | Boxed_nativeint _
-      | Immutable_float_block _
+      | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+      | Boxed_nativeint _ | Immutable_float_block _
       (* For immutable float blocks, we can statically allocate them in classic
          mode, but they are not currently provided with approximations. *)
       | Immutable_float_array _ | Immutable_float32_array _
       | Immutable_value_array _ | Empty_array _ | Immutable_int32_array _
       | Immutable_int64_array _ | Immutable_nativeint_array _
-      | Immutable_vec128_array _ | Mutable_string _ | Immutable_string _ ->
+      | Immutable_vec128_array _ | Immutable_vec256_array _
+      | Immutable_vec512_array _ | Mutable_string _ | Immutable_string _ ->
         Value_unknown
     in
     let symbol_approximations =
@@ -744,6 +746,7 @@ module Function_decls = struct
   module Function_decl = struct
     type param =
       { name : Ident.t;
+        debug_uid : Flambda_debug_uid.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
         mode : Lambda.locality_mode
@@ -761,6 +764,7 @@ module Function_decls = struct
 
     type t =
       { let_rec_ident : Ident.t;
+        let_rec_uid : Flambda_debug_uid.t;
         function_slot : Function_slot.t;
         kind : Lambda.function_kind;
         params : param list;
@@ -782,9 +786,9 @@ module Function_decls = struct
         result_mode : Lambda.locality_mode
       }
 
-    let create ~let_rec_ident ~function_slot ~kind ~params ~params_arity
-        ~removed_params ~return ~calling_convention ~return_continuation
-        ~exn_continuation ~my_region ~my_ghost_region ~body
+    let create ~let_rec_ident ~let_rec_uid ~function_slot ~kind ~params
+        ~params_arity ~removed_params ~return ~calling_convention
+        ~return_continuation ~exn_continuation ~my_region ~my_ghost_region ~body
         ~(attr : Lambda.function_attribute) ~loc ~free_idents_of_body recursive
         ~closure_alloc_mode ~first_complex_local_param ~result_mode =
       let let_rec_ident =
@@ -805,6 +809,7 @@ module Function_decls = struct
           (Format.pp_print_option Ident.print)
           my_ghost_region);
       { let_rec_ident;
+        let_rec_uid;
         function_slot;
         kind;
         params;
@@ -827,6 +832,8 @@ module Function_decls = struct
       }
 
     let let_rec_ident t = t.let_rec_ident
+
+    let let_rec_debug_uid t = t.let_rec_uid
 
     let function_slot t = t.function_slot
 

@@ -14,15 +14,31 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Translate Lambda code to Cmm using Flambda 2. *)
-
-(** This function is not currently re-entrant. *)
+(** Translate Lambda code to Cmm using Flambda 2.
+    This function is not currently re-entrant. *)
 val lambda_to_cmm :
   ppf_dump:Format.formatter ->
   prefixname:string ->
   keep_symbol_tables:bool ->
   Lambda.program ->
   Cmm.phrase list
+
+type flambda_result =
+  { flambda : Flambda_unit.t;
+    all_code : Exported_code.t;
+    offsets : Exported_offsets.t;
+    reachable_names : Flambda2_nominal.Name_occurrences.t
+  }
+
+(** Translate Lambda code into (potentially Simplified) Flambda 2.
+    This function is not currently re-entrant. *)
+val lambda_to_flambda :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  Lambda.program ->
+  flambda_result
+
+val reset_symbol_tables : unit -> unit
 
 val get_module_info :
   Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option

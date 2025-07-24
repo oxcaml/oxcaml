@@ -131,10 +131,14 @@ let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   | Naked_immediate -> "imm"
   | Naked_float32 -> "float32"
   | Naked_float -> "float"
+  | Naked_int8 -> "int8"
+  | Naked_int16 -> "int16"
   | Naked_int32 -> "int32"
   | Naked_int64 -> "int64"
   | Naked_nativeint -> "nativeint"
   | Naked_vec128 -> "vec128"
+  | Naked_vec256 -> "vec256"
+  | Naked_vec512 -> "vec512"
 
 let rec subkind ppf (k : subkind) =
   let str s = Format.pp_print_string ppf s in
@@ -147,6 +151,8 @@ let rec subkind ppf (k : subkind) =
   | Boxed_int64 -> str "int64 boxed"
   | Boxed_nativeint -> str "nativeint boxed"
   | Boxed_vec128 -> str "vec128 boxed"
+  | Boxed_vec256 -> str "vec256 boxed"
+  | Boxed_vec512 -> str "vec512 boxed"
   | Variant { consts; non_consts } -> variant_subkind ppf consts non_consts
   | Tagged_immediate -> str "imm tagged"
   | Float_array -> str "float array"
@@ -199,6 +205,8 @@ let standard_int ~space ppf (i : standard_int) =
     match i with
     | Tagged_immediate -> None
     | Naked_immediate -> Some "imm"
+    | Naked_int8 -> Some "int8"
+    | Naked_int16 -> Some "int16"
     | Naked_int32 -> Some "int32"
     | Naked_int64 -> Some "int64"
     | Naked_nativeint -> Some "nativeint"
@@ -212,6 +220,8 @@ let convertible_type ppf (t : standard_int_or_float) =
     | Naked_immediate -> "imm"
     | Naked_float32 -> "float32"
     | Naked_float -> "float"
+    | Naked_int8 -> "int8"
+    | Naked_int16 -> "int16"
     | Naked_int32 -> "int32"
     | Naked_int64 -> "int64"
     | Naked_nativeint -> "nativeint"
@@ -262,8 +272,15 @@ let const ppf (c : Fexpr.const) =
   | Naked_int32 i -> Format.fprintf ppf "%lil" i
   | Naked_int64 i -> Format.fprintf ppf "%LiL" i
   | Naked_nativeint i -> Format.fprintf ppf "%Lin" i
-  | Naked_vec128 { high; low } ->
-    Format.fprintf ppf "vec128[%016Lx:%016Lx]" high low
+  | Naked_vec128 { word0; word1 } ->
+    Format.fprintf ppf "vec128[%016Lx:%016Lx]" word0 word1
+  | Naked_vec256 { word0; word1; word2; word3 } ->
+    Format.fprintf ppf "vec256[%016Lx:%016Lx:%016Lx:%016Lx]" word0 word1 word2
+      word3
+  | Naked_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    Format.fprintf ppf
+      "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
+      word1 word2 word3 word4 word5 word6 word7
 
 let rec simple ppf : simple -> unit = function
   | Symbol s -> symbol ppf s
@@ -295,6 +312,8 @@ let array_kind ~space ppf (ak : array_kind) =
     | Naked_int64s -> Some "int64"
     | Naked_nativeints -> Some "nativeint"
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | Unboxed_product _ -> Some "unboxed_product"
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -308,6 +327,8 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
     | Naked_int64s -> Some "int64"
     | Naked_nativeints -> Some "nativeint"
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | Unboxed_products -> Some "unboxed_product"
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -355,14 +376,24 @@ let static_data ppf : static_data -> unit = function
   | Boxed_int32 (Const i) -> Format.fprintf ppf "%lil" i
   | Boxed_int64 (Const i) -> Format.fprintf ppf "%LiL" i
   | Boxed_nativeint (Const i) -> Format.fprintf ppf "%Lin" i
-  | Boxed_vec128 (Const { high; low }) ->
-    Format.fprintf ppf "vec128[%016Lx:%016Lx]" high low
+  | Boxed_vec128 (Const { word0; word1 }) ->
+    Format.fprintf ppf "vec128[%016Lx:%016Lx]" word0 word1
+  | Boxed_vec256 (Const { word0; word1; word2; word3 }) ->
+    Format.fprintf ppf "vec256[%016Lx:%016Lx:%016Lx:%016Lx]" word0 word1 word2
+      word3
+  | Boxed_vec512
+      (Const { word0; word1; word2; word3; word4; word5; word6; word7 }) ->
+    Format.fprintf ppf
+      "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
+      word1 word2 word3 word4 word5 word6 word7
   | Boxed_float (Var v) -> boxed_variable ppf v ~kind:"float"
   | Boxed_float32 (Var v) -> boxed_variable ppf v ~kind:"float32"
   | Boxed_int32 (Var v) -> boxed_variable ppf v ~kind:"int32"
   | Boxed_int64 (Var v) -> boxed_variable ppf v ~kind:"int64"
   | Boxed_nativeint (Var v) -> boxed_variable ppf v ~kind:"nativeint"
   | Boxed_vec128 (Var v) -> boxed_variable ppf v ~kind:"vec128"
+  | Boxed_vec256 (Var v) -> boxed_variable ppf v ~kind:"vec256"
+  | Boxed_vec512 (Var v) -> boxed_variable ppf v ~kind:"vec512"
   | Immutable_float_block elements ->
     Format.fprintf ppf "Float_block (%a)"
       (pp_comma_list float_or_variable)
@@ -497,12 +528,18 @@ let string_accessor_width ppf saw =
     | Single -> "f32"
     | Sixty_four -> "64"
     | One_twenty_eight { aligned = false } -> "128u"
-    | One_twenty_eight { aligned = true } -> "128a")
+    | One_twenty_eight { aligned = true } -> "128a"
+    | Two_fifty_six { aligned = false } -> "256u"
+    | Two_fifty_six { aligned = true } -> "256a"
+    | Five_twelve { aligned = false } -> "512u"
+    | Five_twelve { aligned = true } -> "512a")
 
 let array_load_kind ~space ppf (load_kind : array_load_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] load_kind with
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | _ -> None
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -511,6 +548,8 @@ let array_set_kind ~space ppf (set_kind : array_set_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] set_kind with
     | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
     | _ -> None
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -571,6 +610,8 @@ let unop ppf u =
     | Naked_int64 -> print verb_not_imm "int64"
     | Naked_nativeint -> print verb_not_imm "nativeint"
     | Naked_vec128 -> print verb_not_imm "vec128"
+    | Naked_vec256 -> print verb_not_imm "vec256"
+    | Naked_vec512 -> print verb_not_imm "vec512"
   in
   match (u : unop) with
   | Block_load { kind; mut; field } ->
@@ -618,7 +659,7 @@ let ternop ppf t a1 a2 a3 =
       match set_kind with
       | Values ia -> ia
       | Immediates | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s ->
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
         Initialization (* Will be ignored anyway *)
     in
     Format.fprintf ppf "@[<2>%%array_set%a%a@ %a.(%a) %a %a@]"

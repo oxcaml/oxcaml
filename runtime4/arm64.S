@@ -164,10 +164,10 @@ L(caml_call_gc):
         mov     TMP, sp
         str     TMP, Caml_state(bottom_of_stack)
     /* Set up stack space, saving return address and frame pointer */
-    /* (2 regs RA/GP, 24 allocatable int regs)*8 + (24 caller-save float regs)*16 */
-	sub	sp, sp, #592
-	CFI_ADJUST(592)
-	CFI_OFFSET(29, 0)
+    /* (2 regs RA/GP, 24 allocatable int regs)*8 + (32 caller-save float regs)*16 */
+        sub     sp, sp, #720
+        CFI_ADJUST(720)
+        CFI_OFFSET(29, 0)
         CFI_OFFSET(30, -8)
         stp     x29, x30, [sp]
         add     x29, sp, #0
@@ -191,14 +191,18 @@ L(caml_call_gc):
         stp     q2, q3, [sp, 240]
         stp     q4, q5, [sp, 272]
         stp     q6, q7, [sp, 304]
-        stp     q16, q17, [sp, 336]
-        stp     q18, q19, [sp, 368]
-        stp     q20, q21, [sp, 400]
-        stp     q22, q23, [sp, 432]
-        stp     q24, q25, [sp, 464]
-        stp     q26, q27, [sp, 496]
-        stp     q28, q29, [sp, 528]
-        stp     q30, q31, [sp, 560]
+        stp     q8, q9, [sp, 336]
+        stp     q10, q11, [sp, 368]
+        stp     q12, q13, [sp, 400]
+        stp     q14, q15, [sp, 432]
+        stp     q16, q17, [sp, 464]
+        stp     q18, q19, [sp, 496]
+        stp     q20, q21, [sp, 528]
+        stp     q22, q23, [sp, 560]
+        stp     q24, q25, [sp, 592]
+        stp     q26, q27, [sp, 624]
+        stp     q28, q29, [sp, 656]
+        stp     q30, q31, [sp, 688]
     /* Store pointer to saved integer registers in Caml_state->gc_regs */
         add     TMP, sp, #16
         str     TMP, Caml_state(gc_regs)
@@ -225,19 +229,23 @@ L(caml_call_gc):
         ldp     q2, q3, [sp, 240]
         ldp     q4, q5, [sp, 272]
         ldp     q6, q7, [sp, 304]
-        ldp     q16, q17, [sp, 336]
-        ldp     q18, q19, [sp, 368]
-        ldp     q20, q21, [sp, 400]
-        ldp     q22, q23, [sp, 432]
-        ldp     q24, q25, [sp, 464]
-        ldp     q26, q27, [sp, 496]
-        ldp     q28, q29, [sp, 528]
-        ldp     q30, q31, [sp, 560]
+        ldp     q8, q9, [sp, 336]
+        ldp     q10, q11, [sp, 368]
+        ldp     q12, q13, [sp, 400]
+        ldp     q14, q15, [sp, 432]
+        ldp     q16, q17, [sp, 464]
+        ldp     q18, q19, [sp, 496]
+        ldp     q20, q21, [sp, 528]
+        ldp     q22, q23, [sp, 560]
+        ldp     q24, q25, [sp, 592]
+        ldp     q26, q27, [sp, 624]
+        ldp     q28, q29, [sp, 656]
+        ldp     q30, q31, [sp, 688]
     /* Reload new allocation pointer */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
     /* Free stack space and return to caller */
         ldp     x29, x30, [sp]
-	add     sp, sp, #592
+        add     sp, sp, #720
         ret
         CFI_ENDPROC
         END_FUNCTION(caml_call_gc)
@@ -287,12 +295,12 @@ L(caml_call_local_realloc):
         CFI_STARTPROC
     /* Set up stack space, saving return address and frame pointer */
     /* Store return address and frame pointer */
-    /* (2 RA/GP, 24 allocatable int regs)*8 + (24 caller-saved float regs)*16 */
-        sub	sp, sp, #592
-	CFI_ADJUST(592)
-	CFI_OFFSET(29,0)
+    /* (2 RA/GP, 24 allocatable int regs)*8 + (32 caller-saved float regs)*16 */
+        sub     sp, sp, #720
+        CFI_ADJUST(720)
+        CFI_OFFSET(29,0)
         CFI_OFFSET(30,-8)
-	stp     x29, x30, [sp]
+        stp     x29, x30, [sp]
         add     x29, sp, #0
 
     /* Save allocatable integer registers on the stack, using order in proc.ml */
@@ -314,14 +322,18 @@ L(caml_call_local_realloc):
         stp     q2, q3, [sp, 240]
         stp     q4, q5, [sp, 272]
         stp     q6, q7, [sp, 304]
-        stp     q16, q17, [sp, 336]
-        stp     q18, q19, [sp, 368]
-        stp     q20, q21, [sp, 400]
-        stp     q22, q23, [sp, 432]
-        stp     q24, q25, [sp, 464]
-        stp     q26, q27, [sp, 496]
-        stp     q28, q29, [sp, 528]
-        stp     q30, q31, [sp, 560]
+        stp     q8, q9, [sp, 336]
+        stp     q10, q11, [sp, 368]
+        stp     q12, q13, [sp, 400]
+        stp     q14, q15, [sp, 432]
+        stp     q16, q17, [sp, 464]
+        stp     q18, q19, [sp, 496]
+        stp     q20, q21, [sp, 528]
+        stp     q22, q23, [sp, 560]
+        stp     q24, q25, [sp, 592]
+        stp     q26, q27, [sp, 624]
+        stp     q28, q29, [sp, 656]
+        stp     q30, q31, [sp, 688]
 
     /* Store pointer to saved integer registers in Caml_state->gc_regs */
         add     TMP, sp, #16
@@ -350,21 +362,25 @@ L(caml_call_local_realloc):
         ldp     q2, q3, [sp, 240]
         ldp     q4, q5, [sp, 272]
         ldp     q6, q7, [sp, 304]
-        ldp     q16, q17, [sp, 336]
-        ldp     q18, q19, [sp, 368]
-        ldp     q20, q21, [sp, 400]
-        ldp     q22, q23, [sp, 432]
-        ldp     q24, q25, [sp, 464]
-        ldp     q26, q27, [sp, 496]
-        ldp     q28, q29, [sp, 528]
-        ldp     q30, q31, [sp, 560]
+        ldp     q8, q9, [sp, 336]
+        ldp     q10, q11, [sp, 368]
+        ldp     q12, q13, [sp, 400]
+        ldp     q14, q15, [sp, 432]
+        ldp     q16, q17, [sp, 464]
+        ldp     q18, q19, [sp, 496]
+        ldp     q20, q21, [sp, 528]
+        ldp     q22, q23, [sp, 560]
+        ldp     q24, q25, [sp, 592]
+        ldp     q26, q27, [sp, 624]
+        ldp     q28, q29, [sp, 656]
+        ldp     q30, q31, [sp, 688]
 
     /* Reload new allocation pointer */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
 
     /* Free stack space and return to caller */
         ldp     x29, x30, [sp]
-	add	sp, sp, #592
+        add     sp, sp, #720
         ret
         CFI_ENDPROC
         END_FUNCTION(caml_call_local_realloc)
@@ -595,7 +611,7 @@ FUNCTION(caml_callback2_asm)
         mov     TMP2, x1
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         mov     x2, TMP2         /* x2 = closure environment */
-        ADDRGLOBAL(TMP2, caml_apply2)
+        ADDRGLOBAL(TMP2, caml_apply2L)
         b       L(jump_to_caml)
         CFI_ENDPROC
         END_FUNCTION(caml_callback2_asm)
@@ -609,7 +625,7 @@ FUNCTION(caml_callback3_asm)
         mov     x3, x1          /* x3 = closure environment */
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         ldr     x2, [x2, 16]    /* x2 = third arg */
-        ADDRGLOBAL(TMP2, caml_apply3)
+        ADDRGLOBAL(TMP2, caml_apply3L)
         b       L(jump_to_caml)
         CFI_ENDPROC
         END_FUNCTION(caml_callback3_asm)

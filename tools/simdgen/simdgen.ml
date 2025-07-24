@@ -72,10 +72,9 @@ let parse in_ =
   csv []
 
 let rec parse_args mnemonic acc encs args imm res =
-  let set_imm () =
-    if !imm then failwith mnemonic;
-    imm := true;
-    None
+  let set_imm i =
+    if !imm <> Imm_none then failwith mnemonic;
+    imm := i
   in
   let set_res loc enc =
     (* MULX has two results *)
@@ -92,7 +91,9 @@ let rec parse_args mnemonic acc encs args imm res =
       | "<RCX>" -> Some (Pin RCX)
       | "<RDX>" -> Some (Pin RDX)
       | "<XMM0>" -> Some (Pin XMM0)
-      | "imm8" -> set_imm ()
+      | "imm8" ->
+        set_imm Imm_spec;
+        None
       | "r8/m8" | "r/m8" -> Some (Temp [| R8; M8 |])
       | "r16/m16" | "r/m16" -> Some (Temp [| R16; M16 |])
       | "r32/m32" | "r/m32" -> Some (Temp [| R32; M32 |])
@@ -112,6 +113,7 @@ let rec parse_args mnemonic acc encs args imm res =
       | "m32" -> Some (Temp [| M32 |])
       | "m64" -> Some (Temp [| M64 |])
       | "m128" -> Some (Temp [| M128 |])
+      | "m256" -> Some (Temp [| M256 |])
       | "mm" | "mm0" | "mm1" | "mm2" | "mm3" -> Some (Temp [| MM |])
       | "mm0/m8" | "mm1/m8" | "mm2/m8" | "mm3/m8" -> Some (Temp [| MM; M8 |])
       | "mm0/m16" | "mm1/m16" | "mm2/m16" | "mm3/m16" ->
@@ -134,10 +136,10 @@ let rec parse_args mnemonic acc encs args imm res =
         Some (Temp [| XMM; M128 |])
       (* Load/store operations are not handled *)
       | "mem" | "vm32x" | "vm64x" | "vm32y" | "vm64y" -> raise Unsupported
-      (* CR-soon mslater: AVX / AVX2 *)
-      | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" | "ymm0/m256"
-      | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" | "m256" ->
-        raise Unsupported
+      | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" ->
+        Some (Temp [| YMM |])
+      | "ymm0/m256" | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" ->
+        Some (Temp [| YMM; M256 |])
       | arg -> fail mnemonic arg
     in
     let enc, rw = first_word enc in
@@ -147,9 +149,12 @@ let rec parse_args mnemonic acc encs args imm res =
       | "ModRM:r/m" -> RM_rm
       | "VEX.vvvv" -> Vex_v
       | "NA" | "<XMM0>" | "<RAX>" | "<RCX>" | "<RDX>" | "implicit" -> Implicit
-      | enc when String.starts_with (String.lowercase_ascii enc) ~prefix:"imm"
-        ->
-        Implicit
+      | "Imm8" | "imm8" | "imm8[3:0]" | "imm8[7:4]" ->
+        if Option.is_some loc
+        then (
+          set_imm Imm_reg;
+          Immediate)
+        else Implicit
       | enc -> fail mnemonic enc
     in
     match loc with
@@ -163,7 +168,7 @@ let rec parse_args mnemonic acc encs args imm res =
   | _ -> failwith mnemonic
 
 let parse_args mnemonic enc args =
-  let imm = ref false in
+  let imm = ref Imm_none in
   let res = ref First_arg in
   let args = parse_args mnemonic [] enc args imm res in
   Array.of_list args, !imm, !res
@@ -271,13 +276,15 @@ let mangle_loc (loc : loc) =
     | R32 | M32 -> Some 32
     | R64 | M64 -> Some 64
     | M128 -> Some 128
-    | MM | XMM -> None
+    | M256 -> Some 256
+    | MM | XMM | YMM -> None
   in
   let short : temp -> string = function
     | R8 | R16 | R32 | R64 -> "r"
-    | M8 | M16 | M32 | M64 | M128 -> "m"
+    | M8 | M16 | M32 | M64 | M128 | M256 -> "m"
     | MM -> "M"
     | XMM -> "X"
+    | YMM -> "Y"
   in
   match loc with
   | Pin RAX -> "rax"
@@ -309,7 +316,19 @@ let binding instr =
     instr.mnemonic ^ "_" ^ res ^ args
   else instr.mnemonic
 
-let print_one instr =
+let print_one bind instr =
+  let print_ext : ext -> string = function
+    | SSE -> "SSE"
+    | SSE2 -> "SSE2"
+    | SSE3 -> "SSE3"
+    | SSSE3 -> "SSSE3"
+    | SSE4_1 -> "SSE4_1"
+    | SSE4_2 -> "SSE4_2"
+    | PCLMULQDQ -> "PCLMULQDQ"
+    | BMI2 -> "BMI2"
+    | AVX -> "AVX"
+    | AVX2 -> "AVX2"
+  in
   let print_temp : temp -> string = function
     | R8 -> "R8"
     | R16 -> "R16"
@@ -320,8 +339,10 @@ let print_one instr =
     | M32 -> "M32"
     | M64 -> "M64"
     | M128 -> "M128"
+    | M256 -> "M256"
     | MM -> "MM"
     | XMM -> "XMM"
+    | YMM -> "YMM"
   in
   let print_loc : loc -> string = function
     | Pin RAX -> "Pin RAX"
@@ -339,6 +360,12 @@ let print_one instr =
     | RM_rm -> "RM_rm"
     | Vex_v -> "Vex_v"
     | Implicit -> "Implicit"
+    | Immediate -> "Immediate"
+  in
+  let print_imm = function
+    | Imm_none -> "Imm_none"
+    | Imm_reg -> "Imm_reg"
+    | Imm_spec -> "Imm_spec"
   in
   let print_res : res -> string = function
     | First_arg -> "First_arg"
@@ -386,8 +413,10 @@ let print_one instr =
     sprintf "{ prefix = %s; rm_reg = %s; opcode = %d }" (print_prefix p)
       (print_rm_reg r) opcode
   in
-  let binding = binding instr in
-  let constructor = String.capitalize_ascii binding in
+  let constructor = String.capitalize_ascii bind in
+  let ext =
+    Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
+  in
   let args =
     Array.map
       (fun (arg : arg) ->
@@ -397,40 +426,46 @@ let print_one instr =
     |> Array.to_list |> String.concat ";"
   in
   let res = print_res instr.res in
+  let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
   printf
     {|
 let %s = {
     id = %s
+  ; ext = [|%s|]
   ; args = [|%s|]
   ; res = %s
-  ; imm = %b
+  ; imm = %s
   ; mnemonic = "%s"
   ; enc = %s
 }|}
-    binding constructor args res instr.imm instr.mnemonic enc
+    bind constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
+  let module Map = Map.Make (String) in
+  let all =
+    Hashtbl.to_seq_keys all_instructions
+    |> Seq.map (fun instr -> binding instr, instr)
+    |> Map.of_seq
+  in
   print_endline "type id = ";
-  let constructors = Hashtbl.create 1024 in
-  Hashtbl.iter
-    (fun instr () ->
-      let ctr = String.capitalize_ascii (binding instr) in
-      match Hashtbl.find_opt constructors ctr with
-      | Some () -> ()
-      | None ->
-        Hashtbl.add constructors ctr ();
-        printf "  | %s\n" ctr)
-    all_instructions;
+  Map.iter (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind)) all;
   print_endline "\ntype nonrec instr = id instr";
-  Hashtbl.iter (fun instr () -> print_one instr) all_instructions
+  Map.iter (fun bind instr -> print_one bind instr) all
 
-let relevant_ext = function
-  (* CR-soon mslater: AVX / AVX2 *)
-  | "SSE" | "SSE2" | "SSE3" | "SSSE3" | "SSE4_1" | "SSE4_2" | "PCLMULQDQ"
-  | "BMI2" ->
-    true
-  | _ -> false
+let parse_ext = function
+  | "SSE" -> Some [| SSE |]
+  | "SSE2" -> Some [| SSE2 |]
+  | "SSE3" -> Some [| SSE3 |]
+  | "SSSE3" -> Some [| SSSE3 |]
+  | "SSE4_1" -> Some [| SSE4_1 |]
+  | "SSE4_2" -> Some [| SSE4_2 |]
+  | "PCLMULQDQ" -> Some [| PCLMULQDQ |]
+  | "PCLMULQDQ AVX" -> Some [| PCLMULQDQ; AVX |]
+  | "BMI2" -> Some [| BMI2 |]
+  | "AVX" -> Some [| AVX |]
+  | "AVX2" -> Some [| AVX2 |]
+  | _ -> None
 
 let amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
@@ -439,16 +474,16 @@ let amd64 () =
     |> List.filter_map (function
          | mnemonic :: enc :: ext :: encs -> (
            try
-             match relevant_ext ext with
-             | true ->
+             match parse_ext ext with
+             | Some ext ->
                let mnemonic, args = first_word mnemonic in
                let mnemonic = String.lowercase_ascii mnemonic in
                let args, imm, res =
                  String.split_on_char ',' args |> parse_args mnemonic encs
                in
                let enc = parse_enc mnemonic enc in
-               Some { id = Dummy; args; res; imm; mnemonic; enc }
-             | false -> None
+               Some { id = Dummy; ext; args; res; imm; mnemonic; enc }
+             | None -> None
            with Unsupported -> None)
          | _ -> None)
   in

@@ -44,10 +44,14 @@ module Const_data = struct
     | Tagged_immediate of Targetint_31_63.t
     | Naked_float32 of Numeric_types.Float32_by_bit_pattern.t
     | Naked_float of Numeric_types.Float_by_bit_pattern.t
+    | Naked_int8 of Numeric_types.Int8.t
+    | Naked_int16 of Numeric_types.Int16.t
     | Naked_int32 of Int32.t
     | Naked_int64 of Int64.t
     | Naked_nativeint of Targetint_32_64.t
     | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
+    | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
+    | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
     | Null
 
   let flags = const_flags
@@ -77,6 +81,18 @@ module Const_data = struct
           Flambda_colours.naked_number
           Numeric_types.Float_by_bit_pattern.print f
           Flambda_colours.pop
+      | Naked_int8 n ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Int8.print
+          n
+          Flambda_colours.pop
+      | Naked_int16 n ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Int16.print
+          n
+          Flambda_colours.pop
       | Naked_int32 n ->
         Format.fprintf ppf "%t#%ldl%t"
           Flambda_colours.naked_number
@@ -97,6 +113,16 @@ module Const_data = struct
           Flambda_colours.naked_number
           Vector_types.Vec128.Bit_pattern.print v
           Flambda_colours.pop
+      | Naked_vec256 (v) ->
+        Format.fprintf ppf "%t#vec256[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Vec256.Bit_pattern.print v
+          Flambda_colours.pop
+      | Naked_vec512 (v) ->
+        Format.fprintf ppf "%t#vec512[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Vec512.Bit_pattern.print v
+          Flambda_colours.pop
       | Null ->
         Format.fprintf ppf "%t#null%t"
           Flambda_colours.naked_number
@@ -111,11 +137,17 @@ module Const_data = struct
         Numeric_types.Float32_by_bit_pattern.compare f1 f2
       | Naked_float f1, Naked_float f2 ->
         Numeric_types.Float_by_bit_pattern.compare f1 f2
+      | Naked_int8 n1, Naked_int8 n2 -> Numeric_types.Int8.compare n1 n2
+      | Naked_int16 n1, Naked_int16 n2 -> Numeric_types.Int16.compare n1 n2
       | Naked_int32 n1, Naked_int32 n2 -> Int32.compare n1 n2
       | Naked_int64 n1, Naked_int64 n2 -> Int64.compare n1 n2
       | Naked_nativeint n1, Naked_nativeint n2 -> Targetint_32_64.compare n1 n2
       | Naked_vec128 v1, Naked_vec128 v2 ->
         Vector_types.Vec128.Bit_pattern.compare v1 v2
+      | Naked_vec256 v1, Naked_vec256 v2 ->
+        Vector_types.Vec256.Bit_pattern.compare v1 v2
+      | Naked_vec512 v1, Naked_vec512 v2 ->
+        Vector_types.Vec512.Bit_pattern.compare v1 v2
       | Null, Null -> 0
       | Naked_immediate _, _ -> -1
       | _, Naked_immediate _ -> 1
@@ -125,14 +157,22 @@ module Const_data = struct
       | _, Naked_float _ -> 1
       | Naked_float32 _, _ -> -1
       | _, Naked_float32 _ -> 1
+      | Naked_int8 _, _ -> -1
+      | _, Naked_int8 _ -> 1
+      | Naked_int16 _, _ -> -1
+      | _, Naked_int16 _ -> 1
       | Naked_int32 _, _ -> -1
       | _, Naked_int32 _ -> 1
       | Naked_int64 _, _ -> -1
       | _, Naked_int64 _ -> 1
+      | Naked_nativeint _, _ -> -1
+      | _, Naked_nativeint _ -> 1
       | Naked_vec128 _, _ -> -1
       | _, Naked_vec128 _ -> 1
-      | Null, _ -> -1
-      | _, Null -> 1
+      | Naked_vec256 _, _ -> -1
+      | _, Naked_vec256 _ -> 1
+      | Naked_vec512 _, _ -> -1
+      | _, Naked_vec512 _ -> 1
 
     let equal t1 t2 =
       if t1 == t2
@@ -146,14 +186,21 @@ module Const_data = struct
           Numeric_types.Float32_by_bit_pattern.equal f1 f2
         | Naked_float f1, Naked_float f2 ->
           Numeric_types.Float_by_bit_pattern.equal f1 f2
+        | Naked_int8 n1, Naked_int8 n2 -> Numeric_types.Int8.equal n1 n2
+        | Naked_int16 n1, Naked_int16 n2 -> Numeric_types.Int16.equal n1 n2
         | Naked_int32 n1, Naked_int32 n2 -> Int32.equal n1 n2
         | Naked_int64 n1, Naked_int64 n2 -> Int64.equal n1 n2
         | Naked_nativeint n1, Naked_nativeint n2 -> Targetint_32_64.equal n1 n2
         | Naked_vec128 v1, Naked_vec128 v2 ->
           Vector_types.Vec128.Bit_pattern.equal v1 v2
+        | Naked_vec256 v1, Naked_vec256 v2 ->
+          Vector_types.Vec256.Bit_pattern.equal v1 v2
+        | Naked_vec512 v1, Naked_vec512 v2 ->
+          Vector_types.Vec512.Bit_pattern.equal v1 v2
         | Null, Null -> true
         | ( ( Naked_immediate _ | Tagged_immediate _ | Naked_float _
-            | Naked_float32 _ | Naked_vec128 _ | Naked_int32 _ | Naked_int64 _
+            | Naked_float32 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+            | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
             | Naked_nativeint _ | Null ),
             _ ) ->
           false
@@ -164,10 +211,14 @@ module Const_data = struct
       | Tagged_immediate n -> Targetint_31_63.hash n
       | Naked_float32 n -> Numeric_types.Float32_by_bit_pattern.hash n
       | Naked_float n -> Numeric_types.Float_by_bit_pattern.hash n
+      | Naked_int8 n -> Numeric_types.Int8.hash n
+      | Naked_int16 n -> Numeric_types.Int16.hash n
       | Naked_int32 n -> Hashtbl.hash n
       | Naked_int64 n -> Hashtbl.hash n
       | Naked_nativeint n -> Targetint_32_64.hash n
       | Naked_vec128 v -> Vector_types.Vec128.Bit_pattern.hash v
+      | Naked_vec256 v -> Vector_types.Vec256.Bit_pattern.hash v
+      | Naked_vec512 v -> Vector_types.Vec512.Bit_pattern.hash v
       | Null -> Hashtbl.hash 0
   end)
 end
@@ -295,6 +346,10 @@ module Const = struct
 
   let naked_float f = create (Naked_float f)
 
+  let naked_int8 i = create (Naked_int8 i)
+
+  let naked_int16 i = create (Naked_int16 i)
+
   let naked_int32 i = create (Naked_int32 i)
 
   let naked_int64 i = create (Naked_int64 i)
@@ -302,6 +357,10 @@ module Const = struct
   let naked_nativeint i = create (Naked_nativeint i)
 
   let naked_vec128 i = create (Naked_vec128 i)
+
+  let naked_vec256 i = create (Naked_vec256 i)
+
+  let naked_vec512 i = create (Naked_vec512 i)
 
   let const_true = tagged_immediate Targetint_31_63.bool_true
 
@@ -428,6 +487,7 @@ module Variable = struct
 
   module Set = Tree.Set
   module Map = Tree.Map
+  module Lmap = Lmap.Make (T)
 
   let export t = find_data t
 
@@ -514,14 +574,18 @@ module Name = struct
 
   let var v = v
 
+  let var_set s = s
+
+  let var_map m = m
+
   let symbol s = s
 
   let[@inline always] pattern_match t ~var ~symbol =
     let flags = Id.flags t in
     if flags = var_flags
-    then var t
+    then (var [@inlined hint]) t
     else if flags = symbol_flags
-    then symbol t
+    then (symbol [@inlined hint]) t
     else assert false
 
   module T0 = struct
@@ -801,12 +865,12 @@ module Code_id_or_symbol = struct
 
   let create_symbol symbol = symbol
 
-  let pattern_match t ~code_id ~symbol =
+  let[@inline always] pattern_match t ~code_id ~symbol =
     let flags = Table_by_int_id.Id.flags t in
     if flags = Code_id_data.flags
-    then code_id t
+    then (code_id [@inlined hint]) t
     else if flags = Symbol_data.flags
-    then symbol t
+    then (symbol [@inlined hint]) t
     else
       Misc.fatal_errorf "Code_id_or_symbol 0x%x with wrong flags 0x%x" t flags
 
@@ -870,14 +934,14 @@ module Code_id_or_name = struct
 
   let symbol symbol = symbol
 
-  let pattern_match t ~code_id ~var ~symbol =
+  let[@inline always] pattern_match t ~code_id ~var ~symbol =
     let flags = Table_by_int_id.Id.flags t in
     if flags = Code_id_data.flags
-    then code_id t
+    then (code_id [@inlined hint]) t
     else if flags = Symbol_data.flags
-    then symbol t
+    then (symbol [@inlined hint]) t
     else if flags = Variable_data.flags
-    then var t
+    then (var [@inlined hint]) t
     else
       Misc.fatal_errorf "Code_id_or_symbol 0x%x with wrong flags 0x%x" t flags
 

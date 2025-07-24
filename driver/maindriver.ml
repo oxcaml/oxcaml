@@ -70,7 +70,7 @@ let main argv ppf =
           (String.concat "|"
              (P.available_pass_names ~filter:(fun _ -> true) ~native:false))
       | Some (P.Middle_end | P.Linearization | P.Simplify_cfg | P.Emit
-             | P.Selection | P.Register_allocation) ->
+             | P.Selection | P.Register_allocation | P.Llvmize) ->
         assert false (* native only *)
     end;
     if !make_archive then begin

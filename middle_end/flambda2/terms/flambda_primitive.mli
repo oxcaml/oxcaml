@@ -63,6 +63,8 @@ module Array_kind : sig
     | Naked_int64s
     | Naked_nativeints
     | Naked_vec128s
+    | Naked_vec256s
+    | Naked_vec512s
     | Unboxed_product of t list
         (** Accesses to arrays of unboxed products are unarized on the way into
             Flambda 2.  The float array optimization never applies for these
@@ -111,6 +113,8 @@ module Array_load_kind : sig
     | Naked_int64s
     | Naked_nativeints
     | Naked_vec128s
+    | Naked_vec256s
+    | Naked_vec512s
 
   val print : Format.formatter -> t -> unit
 
@@ -131,6 +135,8 @@ module Array_set_kind : sig
     | Naked_int64s
     | Naked_nativeints
     | Naked_vec128s
+    | Naked_vec256s
+    | Naked_vec512s
 
   val print : Format.formatter -> t -> unit
 
@@ -165,6 +171,8 @@ module Duplicate_array_kind : sig
     | Naked_int64s of { length : Targetint_31_63.t option }
     | Naked_nativeints of { length : Targetint_31_63.t option }
     | Naked_vec128s of { length : Targetint_31_63.t option }
+    | Naked_vec256s of { length : Targetint_31_63.t option }
+    | Naked_vec512s of { length : Targetint_31_63.t option }
 
   val print : Format.formatter -> t -> unit
 
@@ -287,6 +295,8 @@ type string_accessor_width =
   | Single
   | Sixty_four
   | One_twenty_eight of { aligned : bool }
+  | Two_fifty_six of { aligned : bool }
+  | Five_twelve of { aligned : bool }
 
 val kind_of_string_accessor_width : string_accessor_width -> Flambda_kind.t
 
@@ -313,6 +323,8 @@ type signed_or_unsigned =
 
 (** Primitives taking exactly zero arguments. *)
 type nullary_primitive =
+  (* CR mshinwell: try to remove [Invalid]; we probably shouldn't have two
+     mechanisms for propagating this. *)
   | Invalid of Flambda_kind.t
       (** Used when rebuilding a primitive that turns out to be invalid. This is
           easier to use than turning a whole let-binding into Invalid (which
@@ -332,6 +344,9 @@ type nullary_primitive =
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and
           GC slices, so should not be moved or optimised away. *)
+  | Cpu_relax
+      (** Arch-specific pause. If poll insertion is disabled, also acts
+          as a polling point. *)
 
 (** Untagged binary integer arithmetic operations.
 
@@ -445,9 +460,6 @@ type unary_primitive =
           ocamlopt-generated code. Tag reads that are allowed to be lazy tags
           (by the type system) should always go through caml_obj_tag, which is
           opaque to the compiler. *)
-  | Atomic_load of Block_access_field_kind.t
-  (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
-     deleting [Atomic_load] *)
   | Peek of Flambda_kind.Standard_int_or_float.t
   | Make_lazy of Lazy_block_tag.t
 
@@ -482,15 +494,6 @@ type binary_float_arith_op =
   | Mul
   | Div
 
-(** Binary atomic arithmetic operations on integers. *)
-type binary_int_atomic_op =
-  | Fetch_add
-  | Add
-  | Sub
-  | And
-  | Or
-  | Xor
-
 (** Primitives taking exactly two arguments. *)
 type binary_primitive =
   | Block_set of
@@ -515,10 +518,19 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_set of Block_access_field_kind.t
-  | Atomic_exchange of Block_access_field_kind.t
-  | Atomic_int_arith of binary_int_atomic_op
+  | Atomic_load_field of Block_access_field_kind.t
+  (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
+     deleting [Atomic_load_field] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
+
+(** Atomic arithmetic operations on integers. *)
+type int_atomic_op =
+  | Fetch_add
+  | Add
+  | Sub
+  | And
+  | Or
+  | Xor
 
 (** Primitives taking exactly three arguments. *)
 type ternary_primitive =
@@ -527,8 +539,14 @@ type ternary_primitive =
           for more details on the unarization. *)
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
-  | Atomic_compare_and_set of Block_access_field_kind.t
-  | Atomic_compare_exchange of
+  | Atomic_field_int_arith of int_atomic_op
+  | Atomic_set_field of Block_access_field_kind.t
+  | Atomic_exchange_field of Block_access_field_kind.t
+
+(** Primitives taking exactly four arguments. *)
+type quaternary_primitive =
+  | Atomic_compare_and_set_field of Block_access_field_kind.t
+  | Atomic_compare_exchange_field of
       { atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
         args_kind : Block_access_field_kind.t
@@ -558,6 +576,8 @@ type t =
   | Unary of unary_primitive * Simple.t
   | Binary of binary_primitive * Simple.t * Simple.t
   | Ternary of ternary_primitive * Simple.t * Simple.t * Simple.t
+  | Quaternary of
+      quaternary_primitive * Simple.t * Simple.t * Simple.t * Simple.t
   | Variadic of variadic_primitive * Simple.t list
 
 type primitive_application = t
@@ -578,6 +598,7 @@ module Without_args : sig
     | Unary of unary_primitive
     | Binary of binary_primitive
     | Ternary of ternary_primitive
+    | Quaternary of quaternary_primitive
     | Variadic of variadic_primitive
 
   val print : Format.formatter -> t -> unit
@@ -596,6 +617,10 @@ val args_kind_of_binary_primitive :
 
 val args_kind_of_ternary_primitive :
   ternary_primitive -> Flambda_kind.t * Flambda_kind.t * Flambda_kind.t
+
+val args_kind_of_quaternary_primitive :
+  quaternary_primitive ->
+  Flambda_kind.t * Flambda_kind.t * Flambda_kind.t * Flambda_kind.t
 
 type arg_kinds =
   | Variadic_mixed of Flambda_kind.Mixed_block_shape.t
@@ -620,6 +645,8 @@ val result_kind_of_binary_primitive : binary_primitive -> result_kind
 
 val result_kind_of_ternary_primitive : ternary_primitive -> result_kind
 
+val result_kind_of_quaternary_primitive : quaternary_primitive -> result_kind
+
 val result_kind_of_variadic_primitive : variadic_primitive -> result_kind
 
 (** Describe the kind of the result of the given primitive. *)
@@ -633,6 +660,9 @@ val result_kind_of_unary_primitive' : unary_primitive -> Flambda_kind.t
 val result_kind_of_binary_primitive' : binary_primitive -> Flambda_kind.t
 
 val result_kind_of_ternary_primitive' : ternary_primitive -> Flambda_kind.t
+
+val result_kind_of_quaternary_primitive' :
+  quaternary_primitive -> Flambda_kind.t
 
 val result_kind_of_variadic_primitive' : variadic_primitive -> Flambda_kind.t
 
@@ -691,8 +721,16 @@ val equal_binary_primitive : binary_primitive -> binary_primitive -> bool
 
 val equal_ternary_primitive : ternary_primitive -> ternary_primitive -> bool
 
+val equal_quaternary_primitive :
+  quaternary_primitive -> quaternary_primitive -> bool
+
 val equal_variadic_primitive : variadic_primitive -> variadic_primitive -> bool
 
+val compare_primitive_application :
+  compare_simple:(Simple.t -> Simple.t -> int) -> t -> t -> int
+
 val is_begin_or_end_region : t -> bool
+
+val is_begin_region : t -> bool
 
 val is_end_region : t -> Variable.t option

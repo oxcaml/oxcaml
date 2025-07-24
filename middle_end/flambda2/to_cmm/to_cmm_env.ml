@@ -68,6 +68,15 @@ type 'env trans_prim =
         P.ternary_primitive,
         Cmm.expression -> Cmm.expression -> Cmm.expression -> prim_res )
       prim_helper;
+    quaternary :
+      ( 'env,
+        P.quaternary_primitive,
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        Cmm.expression ->
+        prim_res )
+      prim_helper;
     variadic :
       ('env, P.variadic_primitive, Cmm.expression list -> prim_res) prim_helper
   }
@@ -155,7 +164,11 @@ type t =
     (* All bindings currently in env. *)
     inline_once_aliases : Variable.t Variable.Map.t;
     (* Maps for `Must_inline_once` variable that end up aliased. *)
-    stages : stage list (* Stages of let-bindings, most recent at the head. *)
+    stages : stage list;
+    (* Stages of let-bindings, most recent at the head. *)
+    symbol_inits : Cmm.expression list Backend_var.Map.t
+        (* Symbol initialization expressions, indexed by the variable used as
+           value for the symbol field initialization. *)
   }
 
 type translation_result =
@@ -251,7 +264,8 @@ let create offsets functions_info ~trans_prim ~return_continuation
     vars_extra = Variable.Map.empty;
     vars = Variable.Map.empty;
     conts;
-    exn_handlers = Continuation.Set.singleton exn_continuation
+    exn_handlers = Continuation.Set.singleton exn_continuation;
+    symbol_inits = Backend_var.Map.empty
   }
 
 let enter_function_body env ~return_continuation ~return_continuation_arity
@@ -293,7 +307,7 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable v =
+let gen_variable ~debug_uid v =
   let user_visible = Variable.user_visible v in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
@@ -307,7 +321,7 @@ let gen_variable v =
          be reworked soon *)
       Some
         (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v)
+           ~location:Debuginfo.none ~original_ident:v ~debug_uid)
   in
   Backend_var.With_provenance.create ?provenance v
 
@@ -317,12 +331,12 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env v =
+let create_bound_parameter env (v, debug_uid) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
-  let v' = gen_variable v in
+  let v' = gen_variable v ~debug_uid in
   let env = add_bound_param env v v' in
   env, v'
 
@@ -341,6 +355,14 @@ let resolve_alias env var =
   match Variable.Map.find var env.inline_once_aliases with
   | exception Not_found -> var
   | v -> v
+
+let add_symbol_init env var expr =
+  let symbol_inits =
+    Backend_var.Map.update var
+      (function None -> Some [expr] | Some l -> Some (expr :: l))
+      env.symbol_inits
+  in
+  { env with symbol_inits }
 
 (* Continuations *)
 
@@ -406,7 +428,8 @@ let splittable_primitive dbg prim args = Splittable_prim { dbg; prim; args }
 let is_cmm_simple cmm =
   match (cmm : Cmm.expression) with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_symbol _ | Cvar _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
+  | Cvar _ ->
     true
   | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
   | Cswitch _ | Ccatch _ | Cexit _ ->
@@ -414,7 +437,7 @@ let is_cmm_simple cmm =
 
 (* Helper function to create bindings *)
 
-let create_binding_aux (type a) effs var ~(inline : a inline)
+let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     (bound_expr : a bound_expr) =
   let order =
     let incr =
@@ -425,7 +448,9 @@ let create_binding_aux (type a) effs var ~(inline : a inline)
     next_order := !next_order + incr;
     !next_order
   in
-  let cmm_var = gen_variable var in
+  let cmm_var =
+    gen_variable ~debug_uid:(Bound_var.debug_uid var) (Bound_var.var var)
+  in
   let binding = Binding { order; inline; effs; cmm_var; bound_expr } in
   binding
 
@@ -510,9 +535,11 @@ let rebuild_prim ~dbg ~env ~res prim args =
     | Binary binary, [x; y] -> env.trans_prim.binary env res dbg binary x y
     | Ternary ternary, [x; y; z] ->
       env.trans_prim.ternary env res dbg ternary x y z
+    | Quaternary quaternary, [x; y; z; w] ->
+      env.trans_prim.quaternary env res dbg quaternary x y z w
     | Variadic variadic, args ->
       env.trans_prim.variadic env res dbg variadic args
-    | (Nullary _ | Unary _ | Binary _ | Ternary _), _ ->
+    | (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _), _ ->
       Misc.fatal_errorf
         "Mismatched arity when splitting a binding in to_cmm_env:@\n%a@\n%a"
         Flambda_primitive.Without_args.print prim
@@ -662,13 +689,13 @@ let bind_variable_with_decision (type a) ?extra env res var ~inline
     ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr:effs
     =
   let binding = create_binding ~inline effs var defining_expr in
-  add_binding_to_env ?extra env res var binding
+  add_binding_to_env ?extra env res (Bound_var.var var) binding
 
 let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
     ~num_normal_occurrences_of_bound_vars
     ~effects_and_coeffects_of_defining_expr =
   let inline =
-    To_cmm_effects.classify_let_binding var
+    To_cmm_effects.classify_let_binding (Bound_var.var var)
       ~effects_and_coeffects_of_defining_expr
       ~num_normal_occurrences_of_bound_vars
   in
@@ -853,6 +880,7 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
 let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
   let num_occurrences_of_var : Num_occurrences.t =
+    let var = Bound_var.var var in
     match Variable.Map.find var num_normal_occurrences_of_bound_vars with
     | exception Not_found ->
       Misc.fatal_errorf
@@ -866,7 +894,7 @@ let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
     | Zero ->
       let env = remove_binding env alias_of in
       env, res
-    | One -> make_alias env res var alias_of
+    | One -> make_alias env res (Bound_var.var var) alias_of
     | More_than_one ->
       let env = remove_binding env alias_of in
       split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of b)
@@ -905,27 +933,48 @@ let can_be_removed effs =
 let flush_delayed_lets ~mode env res =
   (* Generate a wrapper function to introduce the delayed let-bindings. *)
   let wrap_flush order_map e free_vars =
-    M.fold
-      (fun _ (Binding b) (acc, acc_free_vars) ->
-        match b.bound_expr with
-        | Splittable_prim _ ->
-          Misc.fatal_errorf
-            "Complex bindings should have been split prior to being flushed."
-        | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
-          let v = Backend_var.With_provenance.var b.cmm_var in
-          if (not (Backend_var.Set.mem v acc_free_vars))
-             && can_be_removed b.effs
-          then acc, acc_free_vars
-          else
-            let expr =
-              Cmm_helpers.letin b.cmm_var ~defining_expr:cmm_expr ~body:acc
+    let expr, free_vars, symbol_inits =
+      M.fold
+        (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
+          match b.bound_expr with
+          | Splittable_prim _ ->
+            Misc.fatal_errorf
+              "Complex bindings should have been split prior to being flushed."
+          | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
+            let v = Backend_var.With_provenance.var b.cmm_var in
+            let inits, symbol_inits =
+              match Backend_var.Map.find v symbol_inits with
+              | exception Not_found -> [], symbol_inits
+              | l -> l, Backend_var.Map.remove v symbol_inits
             in
-            let free_vars =
-              Backend_var.Set.union free_vars
-                (Backend_var.Set.remove v acc_free_vars)
-            in
-            expr, free_vars)
-      order_map (e, free_vars)
+            if can_be_removed b.effs
+               && Misc.Stdlib.List.is_empty inits
+               && not (Backend_var.Set.mem v acc_free_vars)
+            then acc, acc_free_vars, symbol_inits
+            else
+              let body =
+                List.fold_left
+                  (fun acc init -> Cmm_helpers.sequence init acc)
+                  acc inits
+              in
+              let expr =
+                Cmm_helpers.letin b.cmm_var ~defining_expr:cmm_expr ~body
+              in
+              let free_vars =
+                Backend_var.Set.union free_vars
+                  (Backend_var.Set.remove v acc_free_vars)
+              in
+              expr, free_vars, symbol_inits)
+        order_map
+        (e, free_vars, env.symbol_inits)
+    in
+    Backend_var.Map.fold
+      (fun v inits (acc, acc_free_vars) ->
+        ( List.fold_left
+            (fun acc init -> Cmm_helpers.sequence init acc)
+            acc inits,
+          Backend_var.Set.add v acc_free_vars ))
+      symbol_inits (expr, free_vars)
   in
   (* CR-someday mshinwell: work out a criterion for allowing substitutions into
      loops. CR gbury: this is now done by creating a binding with the inline
@@ -1007,4 +1056,10 @@ let flush_delayed_lets ~mode env res =
       env.bindings
   in
   let flush e = wrap_flush !bindings_to_flush e in
-  flush, { env with stages = []; bindings = bindings_to_keep }, !res
+  ( flush,
+    { env with
+      stages = [];
+      bindings = bindings_to_keep;
+      symbol_inits = Backend_var.Map.empty
+    },
+    !res )

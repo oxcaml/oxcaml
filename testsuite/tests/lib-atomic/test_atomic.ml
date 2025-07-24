@@ -1,5 +1,10 @@
 (* TEST
  flags = "-alert -unsafe_multidomain";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 let r = Atomic.make 1

@@ -777,9 +777,24 @@ val cross_left_alloc :
   Mode.Alloc.l ->
   Mode.Alloc.l
 
-(** Currently [exn] crosses portability and contention. To make that safe,
-usages of constructors are constrained according to the mode crossing of
-constructor arguments. *)
-val check_constructor_crossing : Env.t ->
-  tag -> res:type_expr -> constructor_argument list ->
-  Env.held_locks -> unit
+(** Zap a modality to floor if the [modes] extension is enabled at a level more
+    immature than the given one. Zap to id otherwise. *)
+val zap_modalities_to_floor_if_modes_enabled_at :
+  Language_extension.maturity ->
+  Mode.Modality.Value.t ->
+  Mode.Modality.Value.Const.t
+
+(** The mode crossing of the memory block of a structure. *)
+val mode_crossing_structure_memaddr : Mode.Crossing.t
+
+(** The mode crossing of a functor. *)
+val mode_crossing_functor : Mode.Crossing.t
+
+(** The mode crossing of any module. *)
+val mode_crossing_module : Mode.Crossing.t
+
+(** Zap a modality to floor if maturity allows, zap to id otherwise. *)
+val zap_modalities_to_floor_if_at_least :
+  Language_extension.maturity ->
+  Mode.Modality.Value.t ->
+  Mode.Modality.Value.Const.t

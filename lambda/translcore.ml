@@ -37,6 +37,7 @@ type error =
   | Void_sort of type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Unboxed_product_in_let_mutable
 
 exception Error of Location.t * error
 
@@ -59,7 +60,8 @@ let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
 let check_record_field_sort loc : Jkind.Sort.Const.t -> _ = function
-  | Base (Value | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word)
+  | Base (Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
+          Vec128 | Vec256 | Vec512 | Word)
   | Product _ -> ()
   | Base Void -> raise (Error (loc, Illegal_void_record_field))
 
@@ -393,6 +395,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let return_layout = layout_exp sort body in
       transl_let ~scopes ~return_layout rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes sort body))
+  | Texp_letmutable(pat_expr, body) ->
+      let return_layout = layout_exp sort body in
+      transl_letmutable ~scopes ~return_layout pat_expr
+        (event_before ~scopes body (transl_exp ~scopes sort body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
@@ -678,7 +684,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let shape =
             Lambda.transl_mixed_product_shape_for_read
               ~get_value_kind:(fun i ->
-                if i <> lbl.lbl_num then Lambda.generic_value
+                if i <> lbl.lbl_pos then Lambda.generic_value
                 else
                   let pointerness, nullable = maybe_pointer e in
                   let raw_kind = match pointerness with
@@ -687,7 +693,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   in
                   Lambda.{ raw_kind; nullable })
               ~get_mode:(fun i ->
-                if i <> lbl.lbl_num then Lambda.alloc_heap
+                if i <> lbl.lbl_pos then Lambda.alloc_heap
                 else
                   match float with
                     | Boxing (mode, _) -> transl_alloc_mode mode
@@ -712,7 +718,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         (* erase singleton unboxed records before lambda *)
         targ
       else
-        Lprim (Punboxed_product_field (lbl.lbl_num, layouts), [targ],
+        Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
   | Texp_setfield(arg, arg_mode, id, lbl, newval) ->
@@ -746,7 +752,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let shape =
             Lambda.transl_mixed_product_shape
               ~get_value_kind:(fun i ->
-                if i <> lbl.lbl_num then Lambda.generic_value
+                if i <> lbl.lbl_pos then Lambda.generic_value
                 else
                   let pointerness, nullable =
                     maybe_pointer newval
@@ -951,11 +957,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let self = transl_value_path loc e.exp_env path_self in
       let var = transl_value_path loc e.exp_env path in
       Lprim(Pfield_computed Reads_vary, [self; var], loc)
+  | Texp_mutvar id -> Lmutvar id.txt
   | Texp_setinstvar(path_self, path, _, expr) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
       let var = transl_value_path loc e.exp_env path in
       transl_setinstvar ~scopes loc self var expr
+  | Texp_setmutvar(id, expr_sort, expr) ->
+      Lassign(id.txt, transl_exp ~scopes
+        (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
   | Texp_override(path_self, modifs) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
@@ -1583,11 +1593,67 @@ and transl_tupled_function
             (transl_tupled_cases ~scopes return_sort pats_expr_list) partial
         in
         let region = region || not (may_allocate_in_region body) in
+        add_type_shapes_of_cases arg_sort cases;
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
+
+(* For the functions [add_type_shape_of_cases], [add_type_shapes_of_params], and
+   [add_type_shapes_of_patterns] to be correct, we must ensure that at the type
+   tree level, a [debug_uid] is never associated with more than one type
+   expression, because the type expressions determine the debug information we
+   emit for the bound variable associated with the debug uid.
+
+   For example, for:
+
+      let f (x: int list) = x
+
+   the functions below will associate the UID of [x] with [int list] as the type
+   expression.
+*)
+
+and add_type_shapes_of_pattern ~env sort pattern =
+  let var_list = Typedtree.pat_bound_idents_full sort pattern in
+  List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+    Type_shape.add_to_type_shapes var_uid type_expr var_sort
+      (Env.find_uid_of_path env))
+  var_list
+
+(** [add_type_shapes_of_cases] iterates through a given list of cases and
+    associates for each case, the debugging UID of the variable with the type
+    expression of the variable and its sort. *)
+and add_type_shapes_of_cases sort cases =
+  let add_case (case : Typedtree.value Typedtree.case) =
+    add_type_shapes_of_pattern ~env:case.c_lhs.pat_env sort case.c_lhs
+  in
+  List.iter add_case cases
+
+(** [add_type_shapes_of_params] iterates through the variables in a function
+    parameter and, for each variable, associates the debugging UID of the
+    variable with the type expression of the variable. *)
+and add_type_shapes_of_params params =
+    let add_param (param : Typedtree.function_param) =
+      let pattern = match param.fp_kind with
+                    | Tparam_pat p -> p
+                    | Tparam_optional_default (p, _, _) -> p
+      in
+      let sort = Jkind.Sort.default_for_transl_and_get param.fp_sort in
+      add_type_shapes_of_pattern ~env:pattern.pat_env sort pattern
+    in
+    List.iter add_param params
+
+(** [add_type_shapes_of_patterns] iterates through the variables in a value
+    binding and, for each variable, associates the debugging UID of the variable
+    with the type expression of the variable. *)
+and add_type_shapes_of_patterns patterns =
+  let add_case (value_binding : Typedtree.value_binding) =
+    let sort = Jkind.Sort.default_for_transl_and_get value_binding.vb_sort in
+    add_type_shapes_of_pattern ~env:value_binding.vb_expr.exp_env sort
+      value_binding.vb_pat
+  in
+  List.iter add_case patterns
 
 and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
@@ -1601,6 +1667,7 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_body _ -> param_curries
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
+  add_type_shapes_of_params params;
   let cases_param, body =
     match body with
     | Tfunction_body body ->
@@ -1621,6 +1688,7 @@ and transl_curried_function ~scopes loc repr params body
               layout_of_sort fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
+        add_type_shapes_of_cases fc_arg_sort fc_cases;
         let attributes =
           match fc_cases with
           | [ { c_lhs }] -> Translattribute.transl_param_attributes c_lhs
@@ -1864,6 +1932,7 @@ and transl_bound_exp ~scopes ~in_structure pat sort expr loc attrs =
 *)
 and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                rec_flag pat_expr_list =
+  add_type_shapes_of_patterns pat_expr_list;
   match rec_flag with
     Nonrecursive ->
       let rec transl = function
@@ -1881,7 +1950,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
           let mk_body = transl rem in
           fun body ->
             Matching.for_let ~scopes ~arg_sort:sort ~return_layout pat.pat_loc
-              lam pat (mk_body body)
+              lam Immutable pat (mk_body body)
       in
       transl pat_expr_list
   | Recursive ->
@@ -1904,6 +1973,15 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         ( id, id_duid, rkind, def ) in
       let lam_bds = List.map2 transl_case pat_expr_list idlist in
       fun body -> Value_rec_compiler.compile_letrec lam_bds body
+
+and transl_letmutable ~scopes ~return_layout
+      {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
+  let arg_sort = Jkind_types.Sort.default_to_value_and_get vb_sort in
+  let lam =
+    transl_bound_exp ~scopes ~in_structure:false pat arg_sort expr vb_loc attr
+  in
+  Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
+    pat body
 
 and transl_setinstvar ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in
@@ -1957,7 +2035,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 let shape =
                   Lambda.transl_mixed_product_shape
                     ~get_value_kind:(fun i ->
-                      if i <> lbl.lbl_num then Lambda.generic_value
+                      if i <> lbl.lbl_pos then Lambda.generic_value
                       else
                         let pointerness, nullable =
                           maybe_pointer expr
@@ -2034,7 +2112,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    let shape =
                      Lambda.transl_mixed_product_shape_for_read
                        ~get_value_kind:(fun i ->
-                         if i <> lbl.lbl_num then Lambda.generic_value
+                         if i <> lbl.lbl_pos then Lambda.generic_value
                          else
                            let pointerness, nullable =
                              maybe_pointer_type env typ
@@ -2498,6 +2576,9 @@ let report_error ppf = function
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \
          products."
+  | Unboxed_product_in_let_mutable ->
+      fprintf ppf
+        "Mutable lets are not yet supported with unboxed products."
 
 let () =
   Location.register_error_of_exn

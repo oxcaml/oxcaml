@@ -25,7 +25,7 @@ exception Error of Location.t * error
 
 module Axis_pair = struct
   type 'm t =
-    | Modal_axis_pair : ('a, _, _) Mode.Alloc.Axis.t * 'a -> modal t
+    | Modal_axis_pair : 'a Mode.Alloc.Axis.t * 'a -> modal t
     | Any_axis_pair : 'a Axis.t * 'a -> maybe_nonmodal t
     | Everything_but_nullability : maybe_nonmodal t
 
@@ -316,8 +316,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
 let transl_mode_annots annots : Alloc.Const.Option.t =
   let step modifiers_so_far annot =
     let { txt =
-            Modal_axis_pair (type a d0 d1)
-              ((axis, mode) : (a, d0, d1) Mode.Alloc.Axis.t * a);
+            Modal_axis_pair (type a) ((axis, mode) : a Mode.Alloc.Axis.t * a);
           loc
         } =
       transl_annot ~annot_type:Mode ~required_mode_maturity:(Some Stable)
@@ -465,7 +464,7 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
    removed. The implications on the monadic axes will stay. Implied modalities
    can be overriden. *)
 (* CR zqian: decouple mutable and comonadic modalities *)
-let mutable_implied_modalities (mut : Types.mutability) =
+let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let comonadic : Modality.t list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
@@ -478,10 +477,12 @@ let mutable_implied_modalities (mut : Types.mutability) =
       Atom (Monadic Contention, Join_with Contention.Const.legacy);
       Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
   in
-  match mut with Immutable -> [] | Mutable _ -> monadic @ comonadic
+  match mut with
+  | Immutable -> []
+  | Mutable _ -> if for_mutable_variable then monadic else monadic @ comonadic
 
-let mutable_implied_modalities (mut : Types.mutability) =
-  let l = mutable_implied_modalities mut in
+let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
+  let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
     (fun t (Modality.Atom (ax, a)) -> Modality.Value.Const.set ax a t)
     Modality.Value.Const.id l
@@ -516,7 +517,7 @@ let implied_modalities (Atom (ax, a) : Modality.t) : Modality.t list =
   | _ -> []
 
 let least_modalities_implying mut (t : Modality.Value.Const.t) =
-  let baseline = mutable_implied_modalities mut in
+  let baseline = mutable_implied_modalities ~for_mutable_variable:false mut in
   let annotated = Modality.Value.Const.(diff baseline t) in
   let implied = List.concat_map implied_modalities annotated in
   let exclude_implied =
@@ -560,7 +561,9 @@ let sort_dedup_modalities ~warn l =
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
 let transl_modalities ~maturity mut modalities =
-  let mut_modalities = mutable_implied_modalities mut in
+  let mut_modalities =
+    mutable_implied_modalities mut ~for_mutable_variable:false
+  in
   let modalities = List.map (transl_modality ~maturity) modalities in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true modalities in
@@ -575,6 +578,9 @@ let transl_modalities ~maturity mut modalities =
         (fun m (Atom (ax, a)) -> Value.Const.set ax a m)
         m (implied_modalities t))
     mut_modalities modalities
+
+let let_mutable_modalities m0 =
+  mutable_implied_modalities (Mutable m0) ~for_mutable_variable:true
 
 let untransl_modalities mut t =
   t

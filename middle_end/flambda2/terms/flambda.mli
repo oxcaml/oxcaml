@@ -109,11 +109,16 @@ module Invalid : sig
     | Apply_cont_of_unreachable_continuation of Continuation.t
     | Defining_expr_of_let of Bound_pattern.t * named
     | Closure_type_was_invalid of Apply_expr.t
+    | Direct_application_parameter_kind_mismatch of
+        { params_arity : [`Complex] Flambda_arity.t;
+          args_arity : [`Complex] Flambda_arity.t;
+          apply : Apply_expr.t
+        }
     | Application_argument_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
     | Application_result_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
-    | Partial_application_mode_mismatch of Apply_expr.t
+    | Partial_application_mode_mismatch of Apply_expr.t * Code_metadata.t
     | Partial_application_mode_mismatch_in_lambda of Debuginfo.t
     | Calling_local_returning_closure_with_normal_apply of Apply_expr.t
     | Zero_switch_arms

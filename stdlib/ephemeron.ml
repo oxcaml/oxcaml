@@ -381,6 +381,10 @@ module GenHashTable = struct
 
   end
 
+  open struct
+    module DLS = Domain.Safe.DLS
+  end
+
   module MakeSeededPortable(H: sig @@ portable
     type t
     type 'a container
@@ -413,8 +417,6 @@ module GenHashTable = struct
       if x >= n then x
       else if x * 2 > Sys.max_array_length then x
       else power_2_above (x * 2) n
-
-    module DLS = Domain.Safe.DLS
 
     let prng_key = DLS.new_key Random.State.make_self_init
 

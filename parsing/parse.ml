@@ -187,6 +187,20 @@ let prepare_error err =
     Location.errorf ~loc
       "Syntax error: expressions that are quotations of types are \
        not currently supported."
+  | Let_mutable_not_allowed_at_structure_level loc ->
+      Location.errorf ~loc
+        "Syntax error: Mutable let bindings are not allowed \
+         at the structure level."
+  | Let_mutable_not_allowed_in_class_definition loc ->
+      Location.errorf ~loc
+        "Syntax error: Mutable let bindings are not allowed \
+         inside class definitions."
+  | Let_mutable_not_allowed_with_function_bindings loc ->
+      Location.errorf ~loc
+        "Syntax error: Mutable let is not allowed with function bindings.\n\
+         @{<hint>Hint@}: If you really want a mutable function variable, \
+         use the de-sugared syntax:\n  %a"
+         Style.inline_code "let mutable f = fun x -> .."
 
 let () =
   Location.register_error_of_exn

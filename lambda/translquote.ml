@@ -12,7 +12,7 @@ let camlinternalQuote =
        Env.open_pers_signature "CamlinternalQuote" (Lazy.force Env.initial)
      with
     | exception Not_found -> fatal_error "Module CamlinternalQuote unavailable."
-    | path, env -> path, env)
+    | path, _, env -> path, env)
 
 let combinator modname field =
   lazy
@@ -2424,6 +2424,8 @@ and quote_expression_desc transl stage e =
     | Texp_object _ -> fatal_error "Cannot quote object construction."
     | Texp_probe _ | Texp_probe_is_enabled _ ->
       fatal_error "Cannot quote probing constructs."
+    | Texp_mutvar _ | Texp_letmutable _ | Texp_setmutvar _ ->
+      fatal_error "Cannot quote constructs related to mutable variables."
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right

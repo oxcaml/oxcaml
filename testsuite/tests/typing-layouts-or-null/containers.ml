@@ -63,8 +63,8 @@ Line 1, characters 21-25:
                          ^^^^
 Error: This expression has type "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a or_null is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of 'a or_null is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
        But the kind of 'a or_null must be a subkind of value
          because it's the type of an array element,
          chosen to have kind value.
@@ -129,8 +129,8 @@ Line 1, characters 28-32:
                                 ^^^^
 Error: This expression has type "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a or_null is immediate_or_null with 'a
-         because it is the primitive immediate_or_null type or_null.
+       The kind of 'a or_null is value_or_null mod everything with 'a
+         because it is the primitive type or_null.
        But the kind of 'a or_null must be a subkind of value
          because it's the type of an array element,
          chosen to have kind value.
@@ -260,7 +260,8 @@ let should_work_option3 = None
 
 [%%expect{|
 val should_work_option1 : float or_null option = Some (This 3.4)
-val should_work_option2 : 'a or_null option = Some Null
+val should_work_option2 :
+  ('a : value_or_null mod non_null). 'a or_null option = Some Null
 val should_work_option3 : 'a option = None
 |}]
 

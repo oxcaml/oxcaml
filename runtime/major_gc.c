@@ -136,9 +136,11 @@ static atomic_uintnat num_domains_to_ephe_sweep;
    a domain finishes processing its first or last finalisers, it decrements the
    appropriate counter.
 
-   Newly created domains increment both the counters. Terminating domain
-   orphans its finalisers and then decrements the counters. See
-   [caml_final_domain_terminate]. */
+   Newly created domains increment both counters. A terminating domain
+   orphans its finalisers and then decrements the counters. The counters
+   also increase when some orphaned finalisers are adopted by a terminating
+   domain that had orphaned its finalisers. See [caml_final_domain_terminate]
+   and [adopt_orphaned_work]. */
 static atomic_uintnat num_domains_to_final_update_first;
 static atomic_uintnat num_domains_to_final_update_last;
 
@@ -519,7 +521,7 @@ void caml_orphan_finalisers (caml_domain_state* domain_state)
 
   /* [caml_orphan_finalisers] is called in a while loop in [domain_terminate].
      We take care to decrement the [num_domains_to_final_update*] counters only
-     if we have not already decremented it for the current cycle. */
+     if we have not already decremented them for the current cycle. */
   if(!f->updated_first) {
     atomic_fetch_add_verify_ge0(&num_domains_to_final_update_first, -1);
     f->updated_first = 1;
@@ -547,7 +549,7 @@ static void adopt_orphaned_work (int expected_status)
   orph_ephe_list_verify_status(expected_status);
 #endif
 
-  if (no_orphaned_work() || caml_domain_is_terminating())
+  if (no_orphaned_work())
     return;
 
   caml_plat_lock_blocking(&orphaned_lock);
@@ -570,10 +572,19 @@ static void adopt_orphaned_work (int expected_status)
   while (f != NULL) {
     myf = domain_state->final_info;
     CAMLassert (caml_gc_phase == Phase_sweep_and_mark_main);
-    /* Since we are in [Phase_sweep_and_mark_main], the current domain has not
-       updated its finalisers. */
-    CAMLassert (!myf->updated_first);
-    CAMLassert (!myf->updated_last);
+
+    /* updated_first/last may be true if the current domain is terminating
+       and has orphaned some finalisers but now has to adopt back (the same
+       or other) finalisers. */
+    if (myf->updated_first){
+      atomic_fetch_add(&num_domains_to_final_update_first, +1);
+      myf->updated_first = 0;
+    }
+    if (myf->updated_last){
+      atomic_fetch_add(&num_domains_to_final_update_last, +1);
+      myf->updated_last = 0;
+    }
+
     if (f->todo_head) {
       /* Adopt the finalising set. */
       if (myf->todo_tail == NULL) {
@@ -1542,8 +1553,9 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
     caml_gc_phase = Phase_sweep_and_mark_main;
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
     /* Adopt orphaned work from domains that were spawned and
-       terminated in the previous cycle. Do this in the barrier,
-       before any domain can terminate on this cycle. */
+       terminated in the previous cycle. */
+    /* There must be no orphaned work remaining when this phase change
+       takes place because orphaned work contains roots. */
     adopt_orphaned_work (caml_global_heap_state.UNMARKED);
   }
 
@@ -1621,10 +1633,14 @@ static bool should_compact_from_stw_single(int compaction_mode)
   struct gc_stats s;
   caml_compute_gc_stats(&s);
 
-  uintnat heap_words = s.heap_stats.pool_words + s.heap_stats.large_words;
+  uintnat heap_words = s.global_stats.chunk_words + s.heap_stats.large_words;
 
-  if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize())
+  if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize()) {
+    CAML_GC_MESSAGE (POLICY,
+                     "Heap is only %"ARCH_INTNAT_PRINTF_FORMAT"u words: "
+                     "compaction off.\n", heap_words);
     return false;
+  }
 
   uintnat live_words = s.heap_stats.pool_live_words + s.heap_stats.large_words;
   uintnat free_words = heap_words - live_words;
@@ -1632,8 +1648,11 @@ static bool should_compact_from_stw_single(int compaction_mode)
 
   bool compacting = current_overhead >= caml_max_percent_free;
   CAML_GC_MESSAGE (POLICY, "Current overhead: %"
+                   ARCH_INTNAT_PRINTF_FORMAT "u/%"
+                   ARCH_INTNAT_PRINTF_FORMAT "u = %"
                    ARCH_INTNAT_PRINTF_FORMAT "u%% %s %"
                    ARCH_INTNAT_PRINTF_FORMAT "u%%: %scompacting.\n",
+                   free_words, live_words,
                    (uintnat) current_overhead,
                    compacting ? ">=" : "<",
                    caml_max_percent_free,
@@ -2014,8 +2033,15 @@ mark_again:
 
   if (mode != Slice_opportunistic && caml_marking_started()) {
     /* Finalisers */
+
+    /* TODO: various improvement work here:
+     * - updating finalisers should be made incremental;
+     * - we should measure and account for the work of it against work meters.
+     * - but until it is made incremental, don't gate it on available work,
+     *   because we have to do it (and therefore advance the phase) in domains
+     *   which don't allocate. */
+
     if (caml_gc_phase == Phase_mark_final &&
-        get_major_slice_markwork(mode) > 0 &&
         caml_final_update_first(domain_state)) {
       /* This domain has updated finalise first values */
       atomic_fetch_add_verify_ge0(&num_domains_to_final_update_first, -1);
@@ -2024,16 +2050,18 @@ mark_again:
         goto mark_again;
     }
 
-    /* TODO measure and account for the work of updating finalisers */
+    /* TODO finaliser improvement work as listed above. */
+
     if (caml_gc_phase == Phase_sweep_ephe &&
-        get_major_slice_markwork(mode) > 0 &&
         caml_final_update_last(domain_state)) {
       /* This domain has updated finalise last values */
       atomic_fetch_add_verify_ge0(&num_domains_to_final_update_last, -1);
       /* Nothing has been marked while updating last */
     }
 
-    adopt_orphaned_work(caml_global_heap_state.MARKED);
+    if (!caml_domain_is_terminating()){
+      adopt_orphaned_work(caml_global_heap_state.MARKED);
+    }
 
     /* Ephemerons */
     if (caml_gc_phase != Phase_sweep_ephe) {

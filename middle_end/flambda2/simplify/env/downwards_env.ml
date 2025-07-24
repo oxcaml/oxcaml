@@ -28,11 +28,33 @@ type get_imported_names = unit -> Name.Set.t
 
 type get_imported_code = unit -> Exported_code.t
 
+module Disable_inlining_reason = struct
+  type t =
+    | Stub
+    | Speculative_inlining
+
+  let print ppf = function
+    | Stub -> Format.fprintf ppf "Stub"
+    | Speculative_inlining -> Format.fprintf ppf "Speculative_inlining"
+end
+
+module Disable_inlining = struct
+  type t =
+    | Disable_inlining of Disable_inlining_reason.t
+    | Do_not_disable_inlining
+
+  let print ppf = function
+    | Disable_inlining reason ->
+      Format.fprintf ppf "@[<hov 1>(Disable_inlining %a)@]"
+        Disable_inlining_reason.print reason
+    | Do_not_disable_inlining -> Format.fprintf ppf "Do_not_disable_inlining"
+end
+
 type t =
   { round : int;
     typing_env : TE.t;
     inlined_debuginfo : Inlined_debuginfo.t;
-    can_inline : bool;
+    disable_inlining : Disable_inlining.t;
     inlining_state : Inlining_state.t;
     propagating_float_consts : bool;
     at_unit_toplevel : bool;
@@ -73,7 +95,7 @@ type t =
   }
 
 let [@ocamlformat "disable"] print ppf { round; typing_env;
-                inlined_debuginfo; can_inline;
+                inlined_debuginfo; disable_inlining;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; cse; comparison_results;
@@ -87,7 +109,7 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
       @[<hov 1>(round@ %d)@]@ \
       @[<hov 1>(typing_env@ %a)@]@ \
       @[<hov 1>(inlined_debuginfo@ %a)@]@ \
-      @[<hov 1>(can_inline@ %b)@]@ \
+      @[<hov 1>(disable_inlining@ %a)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
       @[<hov 1>(propagating_float_consts@ %b)@]@ \
       @[<hov 1>(at_unit_toplevel@ %b)@]@ \
@@ -108,7 +130,7 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
     round
     TE.print typing_env
     Inlined_debuginfo.print inlined_debuginfo
-    can_inline
+    Disable_inlining.print disable_inlining
     Inlining_state.print inlining_state
     propagating_float_consts
     at_unit_toplevel
@@ -149,7 +171,8 @@ let define_variable0 ~extra t var kind =
         let variables_defined_in_current_continuation =
           Lifted_cont_params.new_param ~replay_history
             variables_defined_in_current_continuation
-            (Bound_parameter.create (Bound_var.var var) kind)
+            (Bound_parameter.create (Bound_var.var var) kind
+               (Bound_var.debug_uid var))
         in
         variables_defined_in_current_continuation :: r
   in
@@ -185,7 +208,7 @@ let create ~round ~(resolver : resolver)
     { round;
       typing_env;
       inlined_debuginfo = Inlined_debuginfo.none;
-      can_inline = true;
+      disable_inlining = Do_not_disable_inlining;
       inlining_state = Inlining_state.default ~round;
       propagating_float_consts;
       at_unit_toplevel = true;
@@ -208,11 +231,14 @@ let create ~round ~(resolver : resolver)
       cost_of_lifting_continuations_out_of_current_one = 0
     }
   in
+  let my_region_duid = Flambda_debug_uid.none in
+  let my_ghost_region_duid = Flambda_debug_uid.none in
   define_variable
     (define_variable t
-       (Bound_var.create toplevel_my_region Name_mode.normal)
+       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
        K.region)
-    (Bound_var.create toplevel_my_ghost_region Name_mode.normal)
+    (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
+       Name_mode.normal)
     K.region
 
 let all_code t = t.all_code
@@ -225,7 +251,7 @@ let round t = t.round
 
 let get_continuation_scope t = TE.current_scope t.typing_env
 
-let can_inline t = t.can_inline
+let disable_inlining t = t.disable_inlining
 
 let propagating_float_consts t = t.propagating_float_consts
 
@@ -264,7 +290,7 @@ let enter_set_of_closures
     { round;
       typing_env;
       inlined_debuginfo = _;
-      can_inline;
+      disable_inlining = _;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
@@ -284,11 +310,11 @@ let enter_set_of_closures
       defined_variables_by_scope = _;
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _
-    } =
+    } disable_inlining =
   { round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
-    can_inline;
+    disable_inlining;
     inlining_state;
     propagating_float_consts;
     at_unit_toplevel = false;
@@ -321,7 +347,10 @@ let define_name t name kind =
   Name.pattern_match (Bound_name.name name)
     ~var:(fun [@inline] var ->
       (define_variable [@inlined hint]) t
-        (Bound_var.create var (Bound_name.name_mode name))
+        (Bound_var.create var Flambda_debug_uid.none
+           (* CR sspies: In the future, improve the debug UID propagation
+              here. *)
+           (Bound_name.name_mode name))
         kind)
     ~symbol:(fun [@inline] sym -> (define_symbol [@inlined hint]) t sym kind)
 
@@ -341,7 +370,12 @@ let add_symbol t sym ty =
 let add_name t name ty =
   Name.pattern_match (Bound_name.name name)
     ~var:(fun [@inline] var ->
-      add_variable t (Bound_var.create var (Bound_name.name_mode name)) ty)
+      add_variable t
+        (Bound_var.create var Flambda_debug_uid.none
+           (* CR sspies: In the future, improve the debug UID propagation
+              here. *)
+           (Bound_name.name_mode name))
+        ty)
     ~symbol:(fun [@inline] sym -> add_symbol t sym ty)
 
 let add_equation_on_variable t var ty =
@@ -380,7 +414,8 @@ let add_equation_on_name t name ty =
 let define_parameters ~extra t ~params =
   List.fold_left
     (fun t param ->
-      let var = Bound_var.create (BP.var param) Name_mode.normal in
+      let param_var, param_duid = BP.var_and_uid param in
+      let var = Bound_var.create param_var param_duid Name_mode.normal in
       define_variable0 ~extra t var (K.With_subkind.kind (BP.kind param)))
     t
     (Bound_parameters.to_list params)
@@ -398,7 +433,8 @@ let add_parameters ~extra ?(name_mode = Name_mode.normal) t params ~param_types
       param_types;
   List.fold_left2
     (fun t param param_type ->
-      let var = Bound_var.create (BP.var param) name_mode in
+      let param_var, param_duid = BP.var_and_uid param in
+      let var = Bound_var.create param_var param_duid name_mode in
       add_variable0 ~extra t var param_type)
     t params param_types
 
@@ -511,13 +547,14 @@ let find_comparison_result t var =
 
 let with_cse t cse = { t with cse }
 
-let set_do_not_rebuild_terms_and_disable_inlining t =
+let set_do_not_rebuild_terms_and_disable_inlining t disable_inlining_reason =
   { t with
     are_rebuilding_terms = Are_rebuilding_terms.are_not_rebuilding;
-    can_inline = false
+    disable_inlining = Disable_inlining disable_inlining_reason
   }
 
-let disable_inlining t = { t with can_inline = false }
+let set_disable_inlining t reason =
+  { t with disable_inlining = Disable_inlining reason }
 
 let set_rebuild_terms t =
   { t with are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding }
@@ -672,7 +709,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
      k' after they are lifted out from the handler of k. *)
   { (* denv *)
     inlined_debuginfo = denv.inlined_debuginfo;
-    can_inline = denv.can_inline;
+    disable_inlining = denv.disable_inlining;
     inlining_state = denv.inlining_state;
     all_code = denv.all_code;
     inlining_history_tracker = denv.inlining_history_tracker;

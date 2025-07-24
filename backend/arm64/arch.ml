@@ -91,6 +91,8 @@ let size_int = 8
 let size_float = 8
 
 let size_vec128 = 16
+let size_vec256 = 32
+let size_vec512 = 64
 
 let allow_unaligned_access = true
 
@@ -112,6 +114,19 @@ let offset_addressing addr delta =
 let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
+
+let addressing_displacement_for_llvmize addr =
+  if not !Oxcaml_flags.llvm_backend
+  then
+    Misc.fatal_error
+      "Arch.displacement_addressing_for_llvmize: should only be called with \
+        -llvm-backend"
+  else
+    match addr with
+    | Iindexed d -> d
+    | Ibased _ ->
+      Misc.fatal_error
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
 
 (* Printing operations and addressing modes *)
 
@@ -195,6 +210,33 @@ let print_specific_operation printreg op ppf arg =
         n printreg arg.(0)
   | Isimd op ->
     Simd.print_operation printreg op ppf arg
+
+let specific_operation_name : specific_operation -> string = fun op ->
+  match op with
+  | Ifar_poll -> "far poll"
+  | Ifar_alloc { bytes; dbginfo = _ } ->
+      Printf.sprintf "far alloc of %d bytes" bytes
+  | Ishiftarith (op, shift) ->
+      let op_name = function
+        | Ishiftadd -> "+"
+        | Ishiftsub -> "-" in
+      let shift_mark =
+        if shift >= 0
+        then sprintf "<< %i" shift
+        else sprintf ">> %i" (-shift) in
+      Printf.sprintf "%s %s" (op_name op) shift_mark
+  | Imuladd -> "muladd"
+  | Imulsub -> "mulsub"
+  | Inegmulf -> "negmulf"
+  | Imuladdf -> "muladdf"
+  | Inegmuladdf -> "negmuladdf"
+  | Imulsubf -> "mulsubf"
+  | Inegmulsubf -> "negmulsubf"
+  | Isqrtf -> "sqrtf"
+  | Ibswap _ -> "bswap"
+  | Imove32 -> "move32"
+  | Isignext _ -> "signext"
+  | Isimd _ -> "simd"
 
 let equal_addressing_mode left right =
   match left, right with

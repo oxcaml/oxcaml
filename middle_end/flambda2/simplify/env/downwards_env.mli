@@ -63,8 +63,6 @@ val unit_toplevel_return_continuation : t -> Continuation.t
 
 val unit_toplevel_exn_continuation : t -> Continuation.t
 
-val enter_set_of_closures : t -> t
-
 val increment_continuation_scope : t -> t
 
 val bump_current_level_scope : t -> t
@@ -148,8 +146,6 @@ val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
 val round : t -> int
 
-val can_inline : t -> bool
-
 val set_inlining_state : t -> Inlining_state.t -> t
 
 val get_inlining_state : t -> Inlining_state.t
@@ -167,9 +163,26 @@ val comparison_results : t -> Comparison_result.t Variable.Map.t
 
 val with_cse : t -> Common_subexpression_elimination.t -> t
 
-val set_do_not_rebuild_terms_and_disable_inlining : t -> t
+module Disable_inlining_reason : sig
+  type t =
+    | Stub
+    | Speculative_inlining
+end
 
-val disable_inlining : t -> t
+val set_do_not_rebuild_terms_and_disable_inlining :
+  t -> Disable_inlining_reason.t -> t
+
+val set_disable_inlining : t -> Disable_inlining_reason.t -> t
+
+module Disable_inlining : sig
+  type t =
+    | Disable_inlining of Disable_inlining_reason.t
+    | Do_not_disable_inlining
+end
+
+val disable_inlining : t -> Disable_inlining.t
+
+val enter_set_of_closures : t -> Disable_inlining.t -> t
 
 val set_rebuild_terms : t -> t
 

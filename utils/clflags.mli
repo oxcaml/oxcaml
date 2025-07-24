@@ -235,6 +235,10 @@ val error_style_reader : Misc.Error_style.setting env_reader
 
 val unboxed_types : bool ref
 
+val dump_debug_uids : bool ref         (* -ddebug-uids *)
+
+val dump_debug_uid_tables : bool ref   (* -ddebug-uid-tables *)
+
 val insn_sched : bool ref
 val insn_sched_default : bool
 
@@ -255,7 +259,7 @@ val set_o2 : unit -> unit
 val set_o3 : unit -> unit
 
 module Compiler_ir : sig
-  type t = Linear | Cfg
+  type t = Linear | Cfg | Llvmir
   val all : t list
   val to_string : t -> string
   val extension : t -> string
@@ -265,7 +269,7 @@ end
 module Compiler_pass : sig
   type t = Parsing | Typing | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
-         | Register_allocation
+         | Register_allocation | Llvmize
   val of_string : string -> t option
   val to_string : t -> string
   val is_compilation_pass : t -> bool

@@ -324,8 +324,8 @@ Line 1, characters 0-51:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod external_
-         with 'a
+       But the kind of type "t" must be a subkind of
+           value mod external_ with 'a
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -631,7 +631,7 @@ Error: This expression has type "(unit -> unit) t"
        The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
 |}, Principal{|
 Line 1, characters 24-28:
@@ -642,7 +642,7 @@ Error: This expression has type "(unit -> unit) t"
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
 |}]
 
@@ -656,7 +656,7 @@ Error: This expression has type "(unit -> unit) t"
        The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod external_
+           value mod external_
          because of the definition of cross_external at line 13, characters 58-69.
 |}, Principal{|
 Line 1, characters 24-28:
@@ -667,7 +667,7 @@ Error: This expression has type "(unit -> unit) t"
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod external_
+           value mod external_
          because of the definition of cross_external at line 13, characters 58-69.
 |}]
 
@@ -751,7 +751,7 @@ Error: This type "(unit -> unit) t" should be an instance of type
        The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 18, characters 0-47.
 |}, Principal{|
 Line 1, characters 14-30:
@@ -762,7 +762,7 @@ Error: This type "(unit -> unit) t" should be an instance of type
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 18, characters 0-47.
 |}]
 

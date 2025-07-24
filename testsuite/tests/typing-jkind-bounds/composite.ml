@@ -527,14 +527,15 @@ Line 1, characters 0-149:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "int list list list list list list list list list list
                         list list list list list list list list list list
-                        list list list list" is immutable_data
-         with int list list list list list list list list list list list list list list
-list list list list list list
+                        list list list list" is
+           immutable_data
+             with int list list list list list list list list list list list list list list
+                  list list list list list list
          because it's a boxed variant type.
        But the kind of type "int list list list list list list list list list
                             list list list list list list list list list list
                             list list list list list" must be a subkind of
-         immutable_data
+           immutable_data
          because of the definition of t at line 1, characters 0-149.
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
@@ -646,8 +647,8 @@ type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
 Line 1, characters 0-71:
 1 | type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data
-         with 'a t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2
+Error: The kind of type "t" is
+           immutable_data with 'a t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
