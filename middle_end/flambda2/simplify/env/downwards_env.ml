@@ -235,7 +235,7 @@ let create ~round ~(resolver : resolver)
         Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.can_specialize;
+      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
       cost_of_lifting_continuations_out_of_current_one = 0;
@@ -339,7 +339,7 @@ let enter_set_of_closures
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
-    specialization_cost = Specialization_cost.can_specialize;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
@@ -668,7 +668,8 @@ let enter_continuation_handler lifted_params t =
   { t with
     lifted;
     defined_variables_by_scope = lifted_params :: t.defined_variables_by_scope;
-    cost_of_lifting_continuations_out_of_current_one = 0
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    specialization_cost = Specialization_cost.can_specialize
   }
 
 let variables_defined_in_current_continuation t =
