@@ -240,6 +240,8 @@ module type S = sig
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
+      | Crossing_left : ('l * disallowed) morph
+      | Crossing_right : (disallowed * 'r) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
           (** A composition of morphism hints. The *)
       constraint 'd = _ * _

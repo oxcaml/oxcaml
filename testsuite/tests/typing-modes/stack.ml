@@ -207,7 +207,7 @@ Line 1, characters 11-24:
 1 | let f () = stack_ (3, 5)
                ^^^^^^^^^^^^^
 Error: This value is "local" because it is a stack expression.
-       However, it is expected to be local to the parent region.
+       However, it is expected to be local to the parent region because it is a function return value without an exclave annotation.
 |}]
 
 let f () = exclave_ stack_ (3, 5)
@@ -345,7 +345,8 @@ let mk () =
 Line 3, characters 2-5:
 3 |   r.x
       ^^^
-Error: This value is "local" but expected to be local to the parent region.
+Error: This value is "local"
+       but expected to be local to the parent region because it is a function return value without an exclave annotation.
 |}]
 
 (* Testing primitives *)

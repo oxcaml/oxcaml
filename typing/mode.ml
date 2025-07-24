@@ -1609,6 +1609,8 @@ module Hint = struct
     | Is_closed_by : closure_details -> (disallowed * 'r) morph
     | Captured_by_partial_application : (disallowed * 'r) morph
     | Adj_captured_by_partial_application : ('l * disallowed) morph
+    | Crossing_left : ('l * disallowed) morph
+    | Crossing_right : (disallowed * 'r) morph
     | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
@@ -1622,6 +1624,8 @@ module Hint = struct
     | Is_closed_by _ -> true
     | Captured_by_partial_application -> true
     | Adj_captured_by_partial_application -> true
+    | Crossing_left -> false
+    | Crossing_right -> false
     | Compose (x, y) -> is_rigid x || is_rigid y
 
   let morph_none = None
@@ -1635,6 +1639,7 @@ module Hint = struct
     | Skip -> Skip
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
+    | Crossing_right -> Crossing_left
     | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
 
   let rec right_adjoint :
@@ -1644,6 +1649,7 @@ module Hint = struct
     | Skip -> Skip
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
+    | Crossing_left -> Crossing_right
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
   let rec maybe_compose :
@@ -1685,6 +1691,7 @@ module Hint = struct
        | Close_over x -> Close_over x
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
+       | Crossing_left -> Crossing_left
        | Compose (x, y) -> Compose (allow_left x, allow_left y)
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
@@ -1695,6 +1702,7 @@ module Hint = struct
        | Skip -> Skip
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
+       | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (allow_right x, allow_right y)
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
@@ -1708,6 +1716,8 @@ module Hint = struct
        | Captured_by_partial_application -> Captured_by_partial_application
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
+       | Crossing_left -> Crossing_left
+       | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
@@ -1721,6 +1731,8 @@ module Hint = struct
        | Captured_by_partial_application -> Captured_by_partial_application
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
+       | Crossing_left -> Crossing_left
+       | Crossing_right -> Crossing_right
        | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
   end)
 end
@@ -1853,6 +1865,8 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
     | Adj_captured_by_partial_application ->
       Print_then_continue
         (dprintf "has a partial application capturing a value")
+    | Crossing_left | Crossing_right ->
+      Print_then_continue (dprintf "crosses with something")
     | Compose (hint1, hint2) -> (
       match print_morph_hint hint1 with
       | Skip -> print_morph_hint hint2
@@ -4151,13 +4165,16 @@ module Crossing = struct
     let modality m t = Modality.concat ~then_:t m
 
     let apply_left : t -> _ -> _ = function
-      | Join_const c -> fun m -> Mode.subtract c (Mode.join_const c m)
+      | Join_const c ->
+        fun m ->
+          Mode.apply_hint Crossing_right
+            (Mode.subtract ~hint:Skip c (Mode.join_const ~hint:Skip c m))
 
     let apply_right : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
           (* The right adjoint of join is a restriction of identity *)
-          Mode.join_const c m
+          Mode.join_const ~hint:Crossing_left c m
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
@@ -4183,10 +4200,13 @@ module Crossing = struct
       | Meet_const c ->
         fun m ->
           (* The left adjoint of meet is a restriction of identity *)
-          Mode.meet_const c m
+          Mode.meet_const ~hint:Crossing_left c m
 
     let apply_right : t -> _ -> _ = function
-      | Meet_const c -> fun m -> Mode.imply c (Mode.meet_const c m)
+      | Meet_const c ->
+        fun m ->
+          Mode.apply_hint Crossing_right
+            (Mode.imply ~hint:Skip c (Mode.meet_const ~hint:Skip c m))
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1
