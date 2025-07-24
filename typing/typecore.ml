@@ -1739,10 +1739,16 @@ let rec build_as_type_and_mode (env : Env.t) p ~mode =
 
 and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
   | [] -> build_as_type_aux env p ~mode
-  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack |
+  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack None |
       Tpat_inspected_type _), _, _) :: rest ->
       build_as_type_and_mode_extra env p rest ~mode
   | (Tpat_constraint ({ctyp_type = ty; _}, _), _, _) :: rest ->
+      build_as_type_extra_inner env p ty rest ~mode
+  | (Tpat_unpack (Some ptyp), _, _) :: rest ->
+      build_as_type_extra_inner env p
+        (newgenty (Tpackage ptyp.tpt_type)) rest ~mode
+
+and build_as_type_extra_inner env p ty rest ~mode =
       (* If the type constraint is ground, then this is the best type
          we can return, so just return an instance (cf. #12313) *)
       if closed_type_expr ty then instance ty, mode else
@@ -3352,14 +3358,30 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_unpack name ->
+  | Ppat_unpack (name, optyp) ->
+      let optyp, wrap, expected_ty =
+        match optyp with
+        | Some ptyp ->
+          let sty = Ast_helper.Typ.package ~loc ptyp in
+          let cty, ty, expected_ty =
+            solve_Ppat_constraint tps loc !!penv Alloc.Const.legacy
+              sty expected_ty
+          in
+          let optyp = match cty.ctyp_desc with
+            | Ttyp_package pack -> Some pack
+            | _ -> assert false (* Should not happen *)
+          in
+          let wrap p = { p with pat_type = ty } in
+          optyp, wrap, expected_ty
+        | None -> None, (fun pat -> pat), expected_ty
+      in
       let t = instance expected_ty in
-      begin match name.txt with
+      wrap begin match name.txt with
       | None ->
           rvp {
             pat_desc = Tpat_any;
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, name.loc, sp.ppat_attributes];
+            pat_extra = [Tpat_unpack optyp, name.loc, sp.ppat_attributes];
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -3378,7 +3400,7 @@ and type_pat_aux
             pat_desc = Tpat_var { id; name = v; uid; sort;
                                   mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
+            pat_extra = [Tpat_unpack optyp, loc, sp.ppat_attributes];
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;

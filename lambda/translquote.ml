@@ -2621,7 +2621,10 @@ let quote_nonopt loc (lbl : string option) =
   | Some s -> Label.Nonoptional.labelled loc s |> Label.Nonoptional.wrap
 
 let is_module pat =
-  List.mem Tpat_unpack (List.map (fun (extra, _, _) -> extra) pat.pat_extra)
+  List.exists
+    (fun (extra, _, _) ->
+      match extra with Tpat_unpack _ -> true | _ -> false)
+    pat.pat_extra
 
 let rec with_new_idents_pat pat =
   match pat.pat_desc with
@@ -2862,6 +2865,7 @@ let type_for_annotation ~env ~loc typ =
                   (fun (parts, ty) ->
                     mkloc (Longident.unflatten parts |> Option.get) loc, go ty)
                   pack_cstrs;
+              tpt_type = { pack_path; pack_cstrs };
               tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
         | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
@@ -2898,7 +2902,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
       (quote_core_type ~scopes ty)
       (quote_modes loc ms)
     |> Pat.wrap
-  | Tpat_unpack -> pat_lam (* handled elsewhere *)
+  | Tpat_unpack _ -> pat_lam (* handled elsewhere *)
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
       Location.print_loc (to_location loc)

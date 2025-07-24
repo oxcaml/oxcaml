@@ -348,11 +348,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let attrs = sub.attributes sub pat.pat_attributes in
   let desc =
   match pat with
-      { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
-        Ppat_unpack { txt = None; loc  }
-    | { pat_extra=[Tpat_unpack, _, _attrs];
+      { pat_extra=[Tpat_unpack pty, loc, _attrs]; pat_desc = Tpat_any; _ } ->
+        Ppat_unpack({ txt = None; loc  }, Option.map (sub.package_type sub) pty)
+    | { pat_extra=[Tpat_unpack pty, _, _attrs];
         pat_desc = Tpat_var { name; _ }; _ } ->
-        Ppat_unpack { name with txt = Some name.txt }
+        Ppat_unpack ({ name with txt = Some name.txt },
+          Option.map (sub.package_type sub) pty)
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
@@ -368,7 +369,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
-              Ppat_unpack { name with txt = Some name.txt}
+              Ppat_unpack ({ name with txt = Some name.txt}, None)
           | _ ->
               Ppat_var name
         end

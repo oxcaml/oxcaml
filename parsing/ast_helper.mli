@@ -149,7 +149,8 @@ module Pat:
                      -> mode with_loc list -> pattern
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
-    val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
+    val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> package_type option
+                -> pattern
     val open_: ?loc:loc -> ?attrs:attrs  -> lid -> pattern -> pattern
     val exception_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val effect_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern -> pattern

@@ -108,6 +108,21 @@ foo
 - : unit = ()
 |}];;
 
+run {|
+  let module MS = struct module type S = sig end end in
+  (fun _ -> ())
+    (fun (module M1 : MS.S) ((module M2) : (module MS.S)) ->
+      (module M1 : MS.S), ((module M2) : (module MS.S)))
+|};;
+
+[%%expect{|
+let module MS = struct module type S  = sig  end end in
+  (fun _ -> ())
+    (fun (module M1 : MS.S) ((module M2)  : (module MS.S)) ->
+       (((module M1) : (module MS.S)), ((module M2) : (module MS.S))))
+- : unit = ()
+|}];;
+
 run {| let foo : ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|

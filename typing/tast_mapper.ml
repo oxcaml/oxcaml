@@ -332,7 +332,7 @@ let[@warning "+9"] jkind_declaration sub
    jkind_loc}
 
 let pat_extra sub = function
-  | Tpat_unpack as d -> d
+  | Tpat_unpack pty -> Tpat_unpack (Option.map (sub.package_type sub) pty)
   | Tpat_type (path,lid) -> Tpat_type (path, map_loc_lid sub lid)
   | Tpat_open (path,lid,env) ->
       Tpat_open (path, map_loc_lid sub lid, sub.env sub env)

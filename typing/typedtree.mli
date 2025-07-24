@@ -193,11 +193,11 @@ and pat_extra =
                            branches of [tconst].
          *)
   | Tpat_open of Path.t * Longident.t loc * Env.t
-  | Tpat_unpack
-        (** (module P)     { pat_desc  = Tpat_var "P"
-                           ; pat_extra = (Tpat_unpack, _, _) :: ... }
+  | Tpat_unpack of package_type option
+        (** (module P : ?S)     { pat_desc  = Tpat_var "P"
+                           ; pat_extra = (Tpat_unpack ?S, _, _) :: ... }
             (module _)     { pat_desc  = Tpat_any
-            ; pat_extra = (Tpat_unpack, _, _) :: ... }
+            ; pat_extra = (Tpat_unpack None, _, _) :: ... }
          *)
   | Tpat_inspected_type of [ `pat ] type_inspection
         (** Inserted when type inspection was necessary to resolve types
@@ -1228,6 +1228,7 @@ and core_type_desc =
 and package_type = {
   tpt_path : Path.t;
   tpt_cstrs : (Longident.t loc * core_type) list;
+  tpt_type : Types.package;
   tpt_txt : Longident.t loc;
 }
 

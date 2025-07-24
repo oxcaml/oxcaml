@@ -345,8 +345,9 @@ and pattern i ppf x =
   | Ppat_type (li) ->
       line i ppf "Ppat_type\n";
       longident_loc i ppf li
-  | Ppat_unpack s ->
+  | Ppat_unpack (s, ptyp) ->
       line i ppf "Ppat_unpack %a\n" fmt_str_opt_loc s;
+      option i package_type ppf ptyp;
   | Ppat_exception p ->
       line i ppf "Ppat_exception\n";
       pattern i ppf p

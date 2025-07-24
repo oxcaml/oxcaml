@@ -278,7 +278,7 @@ let pat_extra sub (e, loc, attrs) =
   sub.attributes sub attrs;
   match e with
   | Tpat_type (_, lid) -> iter_loc_lid sub lid
-  | Tpat_unpack -> ()
+  | Tpat_unpack pty -> Option.iter (sub.package_type sub) pty
   | Tpat_open (_, lid, env) -> iter_loc_lid sub lid; sub.env sub env
   | Tpat_constraint (ct, ma) -> sub.typ sub ct; sub.modes sub ma
   | Tpat_inspected_type (Label_disambiguation _) -> ()

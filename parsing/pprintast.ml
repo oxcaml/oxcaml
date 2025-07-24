@@ -826,10 +826,12 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
           punct
           (list (pattern1 ctxt) ~sep:";") l
           punct
-    | Ppat_unpack { txt = None } ->
-        pp f "(module@ _)@ "
-    | Ppat_unpack { txt = Some s } ->
+    | Ppat_unpack ({ txt; }, None) ->
+        let s = Option.value txt ~default:"_" in
         pp f "(module@ %s)@ " s
+    | Ppat_unpack ({ txt; }, Some ptyp) ->
+        let s = Option.value txt ~default:"_" in
+        pp f "@[<2>(module@ %s :@ %a)@]" s (package_type ctxt) ptyp
     | Ppat_type li ->
         pp f "#%a" (with_loc type_longident) li
     | Ppat_record (l, closed) ->

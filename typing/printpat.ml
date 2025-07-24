@@ -57,8 +57,10 @@ let bool ppf = function
 
 let pretty_extra ppf (cstr, _loc, _attrs) pretty_rest rest =
   match cstr with
-  | Tpat_unpack ->
+  | Tpat_unpack None ->
      fprintf ppf "@[(module %a)@]" pretty_rest rest
+  | Tpat_unpack (Some _) ->
+     fprintf ppf "@[(module %a : _)@]" pretty_rest rest
   | Tpat_constraint _ ->
      fprintf ppf "@[(%a : _)@]" pretty_rest rest
   | Tpat_type _ ->

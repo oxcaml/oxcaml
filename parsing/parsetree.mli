@@ -369,13 +369,12 @@ and pattern_desc =
          *)
   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
-  | Ppat_unpack of string option loc
-      (** [Ppat_unpack(s)] represents:
-            - [(module P)] when [s] is [Some "P"]
-            - [(module _)] when [s] is [None]
-
-           Note: [(module P : S)] is represented as
-           [Ppat_constraint(Ppat_unpack(Some "P"), Ptyp_package S)]
+  | Ppat_unpack of string option loc * package_type option
+      (** [Ppat_unpack(s, ptyp)] represents:
+            - [(module P : S)] when [s] is [Some "P"] and [ptyp] is [Some "S"]
+            - [(module _ : S)] when [s] is [None] and [ptyp] is [Some "S"]
+            - [(module P)] when [s] is [Some "P"] and [ptyp] is [None]
+            - [(module _)] when [s] is [None] and [ptyp] is [None]
          *)
   | Ppat_exception of pattern  (** Pattern [exception P] *)
   | Ppat_effect of pattern * pattern (* Pattern [effect P P] *)

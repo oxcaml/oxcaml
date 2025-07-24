@@ -1162,11 +1162,8 @@ Ptop_def
               [
                 <case>
                   pattern (//toplevel//[4,28+17]..[4,28+31])
-                    Ppat_constraint
-                    pattern (//toplevel//[4,28+25]..[4,28+26])
-                      Ppat_unpack "M" (//toplevel//[4,28+25]..[4,28+26])
-                    core_type (//toplevel//[4,28+29]..[4,28+30])
-                      Ptyp_package
+                    Ppat_unpack "M" (//toplevel//[4,28+25]..[4,28+26])
+                    Some
                         package_type "S" (//toplevel//[4,28+29]..[4,28+30])
                         []
                   expression (//toplevel//[4,28+35]..[4,28+37])

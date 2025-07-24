@@ -1207,13 +1207,16 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package ptyp ->
       let path, ptys = transl_package env ~policy ~row_context ptyp in
-      let ty = newty (Tpackage {
-          pack_path = path;
-          pack_cstrs = List.map (fun (s, cty) ->
-                         (Longident.flatten s.txt, cty.ctyp_type)) ptys})
+      let pack = {
+        pack_path = path;
+        pack_cstrs = List.map (fun (s, cty) ->
+                       (Longident.flatten s.txt, cty.ctyp_type)) ptys
+      } in
+      let ty = newty (Tpackage pack)
       in
       ctyp (Ttyp_package {
             tpt_path = path;
+            tpt_type = pack;
             tpt_cstrs = ptys;
             tpt_txt = ptyp.ppt_path;
            }) ty

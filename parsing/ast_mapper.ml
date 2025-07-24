@@ -723,7 +723,8 @@ module P = struct
         constraint_ ~loc ~attrs (sub.pat sub p) (Option.map (sub.typ sub) t) (sub.modes sub m)
     | Ppat_type s -> type_ ~loc ~attrs (map_loc_lid sub s)
     | Ppat_lazy p -> lazy_ ~loc ~attrs (sub.pat sub p)
-    | Ppat_unpack s -> unpack ~loc ~attrs (map_loc sub s)
+    | Ppat_unpack (s, ptyp) ->
+        unpack ~loc ~attrs (map_loc sub s) (map_opt (sub.package_type sub) ptyp)
     | Ppat_open (lid,p) ->
         open_ ~loc ~attrs (map_loc_lid sub lid) (sub.pat sub p)
     | Ppat_exception p -> exception_ ~loc ~attrs (sub.pat sub p)

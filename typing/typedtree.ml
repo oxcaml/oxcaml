@@ -172,7 +172,7 @@ and pat_extra =
   | Tpat_constraint of core_type * Mode.Alloc.Const.t modes
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
-  | Tpat_unpack
+  | Tpat_unpack of package_type option
   | Tpat_inspected_type of [ `pat ] type_inspection
 
 and 'k pattern_desc =
@@ -839,6 +839,7 @@ and core_type_desc =
 and package_type = {
   tpt_path : Path.t;
   tpt_cstrs : (Longident.t loc * core_type) list;
+  tpt_type : package;
   tpt_txt : Longident.t loc;
 }
 
