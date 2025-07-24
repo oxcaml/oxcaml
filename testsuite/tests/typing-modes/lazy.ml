@@ -15,8 +15,8 @@ let foo () =
 Line 2, characters 37-38:
 2 |     lazy (let x @ local = "hello" in x)
                                          ^
-Error: This value is "local"
-       but expected to be "global" because it is the result of a lazy expression.
+Error: This value is "local" but expected to be "global"
+       because it is the result of a lazy expression.
 |}]
 
 let foo (local_ x) =
@@ -26,8 +26,8 @@ Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
 Error: The value "x" is local to the parent region but expected to be "global"
-       because it is used inside a lazy expression
-       which is "global" because lazy expressions are always global.
+       because it is used inside a lazy expression which is "global"
+       because lazy expressions are always global.
 |}]
 
 (* For simplicity, we also require them to be [unyielding]. *)
@@ -38,8 +38,8 @@ Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
 Error: The value "x" is "yielding" but expected to be "unyielding"
-       because it is used inside a lazy expression
-       which is "unyielding" because lazy expressions are always unyielding.
+       because it is used inside a lazy expression which is "unyielding"
+       because lazy expressions are always unyielding.
 |}]
 
 (* lazy expression is constructed as global *)
@@ -113,8 +113,8 @@ let foo (x @ contended) =
 Line 3, characters 6-12:
 3 |     | lazy _ -> ()
           ^^^^^^
-Error: This value is "contended"
-       but expected to be "uncontended" because it is a lazy expression that is forced.
+Error: This value is "contended" but expected to be "uncontended"
+       because it is a lazy expression that is forced.
 |}]
 
 (* stdlib's [Lazy.force] is a special case of lazy pattern *)

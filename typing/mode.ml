@@ -1784,7 +1784,7 @@ type print_hint_res =
   is text for the specific constant hint and returns [HintPrinted]. *)
 let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
   let open Format in
-  let wrap_print_hint t = fprintf ppf " because %t" t in
+  let wrap_print_hint t = fprintf ppf "@ because %t" t in
   function
   | None -> NothingPrinted
   | Result_of_lazy ->
@@ -1884,7 +1884,7 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
         | Skip -> Print_then_continue pp1
         | Stop -> Stop
         | Print_then_continue pp2 ->
-          Print_then_continue (dprintf "%t@ which %t" pp1 pp2)
+          Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)
         | Debug_print_then_continue pp2 ->
           Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)))
 

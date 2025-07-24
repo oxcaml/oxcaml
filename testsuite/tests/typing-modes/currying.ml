@@ -15,8 +15,8 @@ let apply1 x = g x
 Line 1, characters 15-18:
 1 | let apply1 x = g x
                    ^^^
-Error: This value is "local"
-       but expected to be local to the parent region because it is a function return value without an exclave annotation.
+Error: This value is "local" but expected to be local to the parent region
+       because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -41,7 +41,8 @@ Line 1, characters 23-32:
 Error: This value is "local" because it crosses with something which is "local"
        because it crosses with something
        which is "local".
-       However, it is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is expected to be local to the parent region
+       because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -90,8 +91,8 @@ Line 1, characters 64-79:
 1 | let app1 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42) ()
                                                                     ^^^^^^^^^^^^^^^
 Error: This value is "local" but expected to be "global"
-       because it is captured by a partial application
-       which is "global" because it is a function return value without an exclave annotation.
+       because it is captured by a partial application which is "global"
+       because it is a function return value without an exclave annotation.
 |}]
 let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
@@ -99,8 +100,8 @@ Line 1, characters 64-79:
 1 | let app2 (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(local_ ref 42)
                                                                     ^^^^^^^^^^^^^^^
 Error: This value is "local" but expected to be "global"
-       because it is captured by a partial application
-       which is "global" because it is a function return value without an exclave annotation.
+       because it is captured by a partial application which is "global"
+       because it is a function return value without an exclave annotation.
 |}]
 let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
@@ -108,16 +109,16 @@ Line 1, characters 56-71:
 1 | let app3 (f : a:int -> b:local_ int ref -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
 Error: This value is "local" but expected to be "global"
-       because it is captured by a partial application
-       which is "global" because it is a function return value without an exclave annotation.
+       because it is captured by a partial application which is "global"
+       because it is a function return value without an exclave annotation.
 |}]
 let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
 [%%expect{|
 Line 1, characters 56-71:
 1 | let app4 (f : b:local_ int ref -> a:int -> unit) = f ~b:(local_ ref 42)
                                                             ^^^^^^^^^^^^^^^
-Error: This value is "local"
-       but expected to be local to the parent region because it is an argument in a tail call.
+Error: This value is "local" but expected to be local to the parent region
+       because it is an argument in a tail call.
 |}]
 let app42 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(local_ ref 1) 2 ~c:4
@@ -142,8 +143,8 @@ let app43 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
 Line 2, characters 7-21:
 2 |   f ~a:(local_ ref 1) 2
            ^^^^^^^^^^^^^^
-Error: This value is "local"
-       but expected to be local to the parent region because it is an argument in a tail call.
+Error: This value is "local" but expected to be local to the parent region
+       because it is an argument in a tail call.
 |}]
 let app5 (f : b:local_ int ref -> a:int -> unit) = f ~a:42
 [%%expect{|
@@ -177,8 +178,8 @@ let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
 Line 1, characters 52-65:
 1 | let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
                                                         ^^^^^^^^^^^^^
-Error: This value is "local"
-       but expected to be local to the parent region because it is a function return value without an exclave annotation.
+Error: This value is "local" but expected to be local to the parent region
+       because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -232,8 +233,8 @@ let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
 Line 1, characters 50-59:
 1 | let rapp3 (f : a:int -> unit -> local_ int ref) = f ~a:1 ()
                                                       ^^^^^^^^^
-Error: This value is "local"
-       but expected to be local to the parent region because it is a function return value without an exclave annotation.
+Error: This value is "local" but expected to be local to the parent region
+       because it is a function return value without an exclave annotation.
 |}]
 
 let bug1 () =
@@ -247,8 +248,8 @@ let bug1 () =
 Line 7, characters 2-5:
 7 |   res
       ^^^
-Error: This value is "local"
-       but expected to be local to the parent region because it is a function return value without an exclave annotation.
+Error: This value is "local" but expected to be local to the parent region
+       because it is a function return value without an exclave annotation.
 |}]
 let bug2 () =
   let foo : a:local_ string -> (b:local_ string -> (c:int -> unit)) =
@@ -361,7 +362,8 @@ Line 3, characters 25-31:
                              ^^^^^^
 Error: This value is "local" because it crosses with something
        which is "local".
-       However, it is expected to be local to the parent region because it is a function return value without an exclave annotation.
+       However, it is expected to be local to the parent region
+       because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument may make the value non-local
 |}]
