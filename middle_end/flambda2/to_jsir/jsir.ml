@@ -55,6 +55,8 @@ module Var : sig
 
   val of_idx : int -> t
 
+  val last : unit -> t
+
   val fresh : unit -> t
 
   val fresh_n : string -> t
@@ -218,6 +220,8 @@ end = struct
       (match Name.get x with None -> "" | Some nm -> "{" ^ nm ^ "}")
 
   let set_name i nm = Name.set i nm
+
+  let last () = !last_var
 
   let fresh () =
     incr last_var;
