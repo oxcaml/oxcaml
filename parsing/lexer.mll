@@ -782,40 +782,38 @@ rule token = parse
   | "[@@@" { LBRACKETATATAT }
   | "[%"   { LBRACKETPERCENT }
   | "[%%"  { LBRACKETPERCENTPERCENT }
-  | "!"    { BANG }
-  | "!="   { INFIXOP0 "!=" }
-  | "+"    { PLUS }
-  | "+."   { PLUSDOT }
-  | "+="   { PLUSEQ }
-  | "-"    { MINUS }
-  | "-."   { MINUSDOT }
+  | "!"  { BANG }
+  | "!=" { INFIXOP0 "!=" }
+  | "+"  { PLUS }
+  | "+." { PLUSDOT }
+  | "+=" { PLUSEQ }
+  | "-"  { MINUS }
+  | "-." { MINUSDOT }
 
   | "!" symbolchar_or_hash + as op
-           { PREFIXOP op }
+            { PREFIXOP op }
   | ['~' '?'] symbolchar_or_hash + as op
-           { PREFIXOP op }
-  | ['=' '|' '&' '<' '>'] symbolchar * as op
-           { INFIXOP0 op }
-  | '$' symbolchar + as op
-           { INFIXOP0 op }
-  | "@"    { AT }
-  | "@@"   { ATAT }
+            { PREFIXOP op }
+  | ['=' '<' '>' '|' '&' '$'] symbolchar * as op
+            { INFIXOP0 op }
+  | "@" { AT }
+  | "@@" { ATAT }
   | ['@' '^'] symbolchar * as op
-           { INFIXOP1 op }
+            { INFIXOP1 op }
   | ['+' '-'] symbolchar * as op
-           { INFIXOP2 op }
+            { INFIXOP2 op }
   | "**" symbolchar * as op
-           { INFIXOP4 op }
-  | '%'    { PERCENT }
+            { INFIXOP4 op }
+  | '%'     { PERCENT }
   | ['*' '/' '%'] symbolchar * as op
-           { INFIXOP3 op }
+            { INFIXOP3 op }
   | '#' symbolchar_or_hash + as op
-           { HASHOP op }
+            { HASHOP op }
   | "let" kwdopchar dotsymbolchar * as op
-           { LETOP op }
+            { LETOP op }
   | "and" kwdopchar dotsymbolchar * as op
-           { ANDOP op }
-  | eof    { EOF }
+            { ANDOP op }
+  | eof { EOF }
   | (_ as illegal_char)
       { error lexbuf (Illegal_character illegal_char) }
 

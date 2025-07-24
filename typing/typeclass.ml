@@ -1555,7 +1555,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
 (* Approximate the type of the constructor to allow recursive use *)
 (* of optional parameters                                         *)
 
-let var_option = Predef.type_option (Btype.newgenvar Predef.option_argument_jkind)
+let var_option =
+  Predef.type_option (Btype.newgenvar Predef.option_argument_jkind)
 
 let rec approx_declaration cl =
   match cl.pcl_desc with
@@ -1891,11 +1892,11 @@ let final_decl env define_class
 
   List.iter Ctype.generalize clty.cty_params;
   Ctype.generalize_class_type clty.cty_type;
-  Option.iter Ctype.generalize clty.cty_new;
+  Option.iter  Ctype.generalize clty.cty_new;
   List.iter Ctype.generalize obj_abbr.type_params;
-  Option.iter Ctype.generalize obj_abbr.type_manifest;
+  Option.iter  Ctype.generalize obj_abbr.type_manifest;
   List.iter Ctype.generalize cl_abbr.type_params;
-  Option.iter Ctype.generalize cl_abbr.type_manifest;
+  Option.iter  Ctype.generalize cl_abbr.type_manifest;
 
   Ctype.nongen_vars_in_class_declaration clty
   |> Option.iter (fun vars ->

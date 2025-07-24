@@ -12,8 +12,10 @@ Error: "##" is not a valid value identifier.
 
 let f x = !#x
 [%%expect {|
-Uncaught exception: Failure("Cannot unqoute outside of a quotation context.")
-
+Line 1, characters 10-12:
+1 | let f x = !#x
+              ^^
+Error: "!#" is not a valid value identifier.
 |}]
 
 let f x = ?#x
