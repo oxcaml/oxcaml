@@ -1655,7 +1655,32 @@ module Hint = struct
     | Crossing_left -> Crossing_right
     | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
 
-  let compose x y = Compose (x, y)
+  let rec maybe_compose :
+      type l r. (l * r) morph -> (l * r) morph -> (l * r) morph option =
+   fun x y ->
+    (* This function tries to be "smart" when composing hints, by making
+       optimizations without changing the semantics.  We return [Some z]
+       when we could simplify the composition [x . y], or return [None]
+       when no simplification was possible. *)
+    match x, y with
+    | None, _y -> Some None
+    | _x, None -> Some None
+    | Skip, y -> Some y
+    | x, Skip -> Some x
+    | Compose (x0, x1), y -> (
+      match maybe_compose x1 y with
+      | Some z -> Some (compose x0 z)
+      (* the check needed to prevent infinite loop *)
+      | None -> None)
+    | x, Compose (y0, y1) -> (
+      match maybe_compose x y0 with
+      | Some z -> Some (compose z y1)
+      | None -> None)
+    | _, _ -> None
+   [@@ocaml.warning "-4"]
+
+  and compose : type l r. (l * r) morph -> (l * r) morph -> (l * r) morph =
+   fun x y -> match maybe_compose x y with Some z -> z | None -> Compose (x, y)
 
   module Allow_disallow = Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd morph constraint 'd = 'l * 'r
