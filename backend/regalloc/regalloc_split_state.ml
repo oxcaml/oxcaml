@@ -115,25 +115,26 @@ end = struct
       if debug
       then
         Reg.Set.iter (fun reg -> log "%a can be moved" Printreg.reg reg) to_move;
-      let destructions_at_end : destructions_at_end =
+      let (destructions_at_end, definitions_at_beginning)
+            : destructions_at_end * definitions_at_beginning =
         Label.Set.fold
-          (fun label acc ->
-            Label.Map.update label
-              (function
-                | None -> None
-                | Some (kind, regs) -> Some (kind, Reg.Set.diff regs to_move))
-              acc)
-          loop destructions_at_end
-      in
-      let definitions_at_beginning : definitions_at_beginning =
-        (* CR xclerc for xclerc: merge with fold above. *)
-        Label.Set.fold
-          (fun label acc ->
-            Label.Map.update label
-              (function
-                | None -> None | Some regs -> Some (Reg.Set.diff regs to_move))
-              acc)
-          loop definitions_at_beginning
+          (fun label (destructions_at_end, definitions_at_beginning) ->
+            let destructions_at_end =
+              Label.Map.update label
+                (function
+                  | None -> None
+                  | Some (kind, regs) -> Some (kind, Reg.Set.diff regs to_move))
+                destructions_at_end
+            in
+            let definitions_at_beginning =
+              Label.Map.update label
+                (function
+                  | None -> None | Some regs -> Some (Reg.Set.diff regs to_move))
+                definitions_at_beginning
+            in
+            destructions_at_end, definitions_at_beginning)
+          loop
+          (destructions_at_end, definitions_at_beginning)
       in
       (* Add destructions before the loop. *)
       let all_loop_predecessors : Label.Set.t =
