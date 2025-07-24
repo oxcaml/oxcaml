@@ -1368,6 +1368,8 @@ val bar : unit -> (module F) = <fun>
 let (bar @ portable) () =
   let k = (module M : Class) in
   k
+(* CR pdsouza: this test case should also say that the class is nonportable because
+               classes are always nonportable. Fixing this will take some work, though *)
 [%%expect{|
 Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
