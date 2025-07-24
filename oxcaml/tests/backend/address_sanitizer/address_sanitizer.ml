@@ -25,7 +25,7 @@ let run_test func_name ~test ~validate =
          (Printexc.to_string exn))
 ;;
 
-external alloc
+external alloc_gen
   :  len:(int[@untagged])
   -> tag:(int[@untagged])
   -> 'a
@@ -34,15 +34,18 @@ external alloc
 
 external free : 'a -> unit = "ocaml_address_sanitizer_test_free" [@@noalloc]
 
-let[@inline always] alloc ~len ~tag =
-  let t : Obj.t = alloc ~len ~tag in
+let[@inline always] alloc_gen ~len ~tag =
+  let t : Obj.t = alloc_gen ~len ~tag in
   assert (Obj.size t = len);
   assert (Obj.tag t = tag);
   Obj.obj t
 ;;
 
-let[@inline always] alloc_floatarray len = alloc ~len ~tag:Obj.double_array_tag
-let[@inline always] alloc len = alloc ~len ~tag:Obj.abstract_tag
+let[@inline always] alloc_floatarray len = alloc_gen ~len ~tag:Obj.double_array_tag
+let[@inline always] alloc_abstract len = alloc_gen ~len ~tag:Obj.abstract_tag
+let[@inline always] alloc_array len = alloc_gen ~len ~tag:0
+let alloc_value_record = alloc_array
+
 let use_after_free_regex = Str.regexp_string "AddressSanitizer: heap-use-after-free"
 
 let out_of_bounds_access_regex =
@@ -84,7 +87,7 @@ module Test_use_after_free = struct
 
   let field_get_immediate () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- 0;
       free t;
       let _ = Sys.opaque_identity t.x in
@@ -95,7 +98,7 @@ module Test_use_after_free = struct
 
   let field_set_immediate () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- 0;
       free t;
       t.x <- 1;
@@ -112,7 +115,7 @@ module Test_use_after_free = struct
 
   let field_get_value () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_array 1 in
       t.x <- [||];
       free t;
       let _ = Sys.opaque_identity t.x in
@@ -123,7 +126,7 @@ module Test_use_after_free = struct
 
   let field_set_value () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_value_record 1 in
       t.x <- [||];
       free t;
       t.x <- Sys.opaque_identity [| 1 |];
@@ -136,7 +139,7 @@ module Test_use_after_free = struct
 
   let field_get_i64 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0L;
       free t;
       let _ = Sys.opaque_identity t.x in
@@ -147,7 +150,7 @@ module Test_use_after_free = struct
 
   let field_set_i64 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0L;
       free t;
       t.x <- #1L;
@@ -161,7 +164,7 @@ module Test_use_after_free = struct
 
   let field_get_i32 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0l;
       free t;
       let _ = Sys.opaque_identity t.x in
@@ -172,7 +175,7 @@ module Test_use_after_free = struct
 
   let field_set_i32 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0l;
       free t;
       t.x <- #1l;
@@ -189,7 +192,7 @@ module Test_use_after_free = struct
 
   let field_get_float () =
     let test () =
-      let t = alloc 2 in
+      let t = alloc_value_record 2 in
       t.x <- 0.;
       t.y <- 0;
       let _ = Sys.opaque_identity t.y in
@@ -204,7 +207,7 @@ module Test_use_after_free = struct
 
   let field_get_f64 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0.;
       free t;
       let _ = Sys.opaque_identity t.x in
@@ -215,7 +218,7 @@ module Test_use_after_free = struct
 
   let field_set_f64 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0.;
       free t;
       t.x <- #1.;
@@ -229,7 +232,7 @@ module Test_use_after_free = struct
 
   let field_get_f32 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0.s;
       free t;
       let _ = Sys.opaque_identity t.x in
@@ -240,7 +243,7 @@ module Test_use_after_free = struct
 
   let field_set_f32 () =
     let test () =
-      let t = alloc 1 in
+      let t = alloc_abstract 1 in
       t.x <- #0.s;
       free t;
       t.x <- #1.s;
@@ -291,7 +294,7 @@ module Test_use_after_free = struct
 
   let prefetch_read_record () =
     let test () =
-      let t : t8 = alloc 2 in
+      let t : t8 = alloc_abstract 2 in
       t.x <- t.x;
       t.y <- t.y;
       free t;
@@ -304,7 +307,7 @@ module Test_use_after_free = struct
 
   let prefetch_write_record () =
     let test () =
-      let t : t8 = alloc 2 in
+      let t : t8 = alloc_abstract 2 in
       t.x <- t.x;
       t.y <- t.y;
       free t;
@@ -317,7 +320,7 @@ module Test_use_after_free = struct
 
   let cldemote_record () =
     let test () =
-      let t : t8 = alloc 2 in
+      let t : t8 = alloc_abstract 2 in
       t.x <- t.x;
       t.y <- t.y;
       free t;
@@ -330,20 +333,20 @@ module Test_use_after_free = struct
 
   let valid_accesses_are_unaffected () =
     let test () =
-      let t0 : t0 = alloc 1 in
+      let t0 : t0 = alloc_abstract 1 in
       t0.x <- 0;
-      let t1 : t1 = alloc 1 in
+      let t1 : t1 = alloc_value_record 1 in
       t1.x <- [||];
-      let t2 : t2 = alloc 1 in
+      let t2 : t2 = alloc_abstract 1 in
       t2.x <- #0L;
-      let t3 : t3 = alloc 1 in
+      let t3 : t3 = alloc_abstract 1 in
       t3.x <- #0l;
-      let t4 : t4 = alloc 2 in
+      let t4 : t4 = alloc_value_record 2 in
       t4.x <- 0.0;
       t4.y <- 0;
-      let t5 : t5 = alloc 1 in
+      let t5 : t5 = alloc_abstract 1 in
       t5.x <- #0.0;
-      let t6 : t6 = alloc 1 in
+      let t6 : t6 = alloc_abstract 1 in
       t6.x <- #0.0s;
       let t7 : t7 = alloc_floatarray 1 in
       t7.x <- 0.0;
@@ -366,7 +369,7 @@ module Test_use_after_free = struct
       ()
     in
     run_test __FUNCTION__ ~test ~validate:(fun test_output ->
-      assert (String.equal test_output ""))
+      if test_output <> "" then failwith ("Failed: " ^ test_output))
   ;;
 end
 
@@ -374,7 +377,7 @@ module Test_out_of_bounds_accesses = struct
   let read_int_array () =
     let test () =
       let len = 8 in
-      let t : int array = alloc len in
+      let t : int array = alloc_array len in
       let x = Array.unsafe_get t len in
       let _ = Sys.opaque_identity x in
       ()
@@ -385,7 +388,7 @@ module Test_out_of_bounds_accesses = struct
   let write_int_array () =
     let test () =
       let len = 8 in
-      let t : int array = alloc len in
+      let t : int array = alloc_array len in
       let () = Array.unsafe_set t len 0 in
       let _ = Sys.opaque_identity t in
       ()
@@ -396,7 +399,7 @@ module Test_out_of_bounds_accesses = struct
   let read_obj_array () =
     let test () =
       let len = 8 in
-      let t : Obj.t array = alloc len in
+      let t : Obj.t array = alloc_array len in
       let x = Array.unsafe_get t len in
       let _ = Sys.opaque_identity x in
       ()
@@ -407,7 +410,7 @@ module Test_out_of_bounds_accesses = struct
   let write_obj_array () =
     let test () =
       let len = 8 in
-      let t : Obj.t array = alloc len in
+      let t : Obj.t array = alloc_array len in
       let () = Array.unsafe_set t len (Obj.repr None) in
       let _ = Sys.opaque_identity t in
       ()

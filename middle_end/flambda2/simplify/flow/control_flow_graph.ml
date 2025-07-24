@@ -59,13 +59,11 @@ let create ~dummy_toplevel_cont { T.Acc.map; _ } =
             acc
         in
         let acc =
-          Continuation.Map.merge
-            (fun _callee acc args ->
-              match acc, args with
-              | None, None -> assert false
-              | Some set, None -> Some set
-              | None, Some _ -> Some (Continuation.Set.singleton caller)
-              | Some set, Some _ -> Some (Continuation.Set.add caller set))
+          Continuation.Map.update_many
+            (fun _callee acc_opt _args ->
+              match acc_opt with
+              | None -> Some (Continuation.Set.singleton caller)
+              | Some set -> Some (Continuation.Set.add caller set))
             acc elt.apply_cont_args
         in
         acc)

@@ -42,6 +42,8 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
 
 let compile_from_raw_lambda i raw_lambda ~unix ~pipeline ~as_arg_for =
   raw_lambda
+  |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+        (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
   |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
   |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
   |> Profile.(record generate)

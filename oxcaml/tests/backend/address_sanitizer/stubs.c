@@ -14,9 +14,11 @@
 
 CAMLprim value ocaml_address_sanitizer_test_alloc(size_t len, int64_t tag) {
   assert(len > 0);
-  assert(tag >= No_scan_tag);
   header_t *block = malloc((len * sizeof(value)) + sizeof(header_t));
   *block = Caml_out_of_heap_header(/*wosize=*/len, /*tag=*/tag);
+  if (tag < No_scan_tag) {
+    for (size_t i = 0; i < len; i++) Op_hp(block)[i] = Val_unit;
+  }
   return Val_hp(block);
 }
 

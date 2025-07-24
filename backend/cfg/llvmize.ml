@@ -139,7 +139,7 @@ type t =
            function) *)
     mutable data : Cmm.data_item list;
         (* Collects data items as they come and processes them at the end *)
-    mutable defined_function_symbols : String.Set.t;
+    mutable defined_symbols : String.Set.t;
         (* Keeps track of all function symbols defined so far *)
     mutable referenced_symbols : String.Set.t
         (* Keeps track of all global symbols referenced so far *)
@@ -163,7 +163,7 @@ let create ~llvmir_filename ~ppf_dump =
     ppf_dump;
     current_fun_info = create_fun_info ();
     data = [];
-    defined_function_symbols = String.Set.empty;
+    defined_symbols = String.Set.empty;
     referenced_symbols = String.Set.empty
   }
 
@@ -313,11 +313,11 @@ module F = struct
   let ins_store t ~src ~dst typ =
     ins t "store %a %a, ptr %a" Llvm_typ.pp_t typ pp_ident src pp_ident dst
 
-  let ins_load_reg t ident (reg : Reg.t) =
+  let ins_load_from_reg t ident (reg : Reg.t) =
     ins_load t ~src:(get_ident_for_reg t reg) ~dst:ident
       (Llvm_typ.of_machtyp_component reg.typ)
 
-  let ins_store_reg t ident (reg : Reg.t) =
+  let ins_store_into_reg t ident (reg : Reg.t) =
     ins_store t ~src:ident ~dst:(get_ident_for_reg t reg)
       (Llvm_typ.of_machtyp_component reg.typ)
 
@@ -332,14 +332,14 @@ module F = struct
 
   (* [dbg] is used to print the [Reg.t] the allocated identifier corresponds to
      in the preamble *)
-  let ins_alloca ?dbg t (reg : Reg.t) =
-    let pp_my_dbg ppf () =
-      match dbg with
+  let ins_alloca ?regname t (reg : Reg.t) =
+    let pp_regname ppf () =
+      match regname with
       | None -> ()
-      | Some dbg -> pp_dbg_comment ~newline:false ppf dbg Debuginfo.none
+      | Some regname -> pp_dbg_comment ~newline:false ppf regname Debuginfo.none
     in
     ins t "%a = alloca %a %a" (pp_reg_ident t) reg pp_machtyp_component reg.typ
-      pp_my_dbg ()
+      pp_regname ()
 
   let ins_branch_cond t cond ifso ifnot =
     ins t "br i1 %a, %a, %a" pp_ident cond (pp_label t) ifso (pp_label t) ifnot
@@ -359,7 +359,7 @@ module F = struct
   let ins_binop_imm t op arg imm res typ =
     ins t "%a = %s %a %a, %s" pp_ident res op Llvm_typ.pp_t typ pp_ident arg imm
 
-  let ins_monop t op arg res typ =
+  let ins_unary_op t op arg res typ =
     ins t "%a = %s %a %a" pp_ident res op Llvm_typ.pp_t typ pp_ident arg
 
   let ins_icmp t cond arg1 arg2 res typ =
@@ -376,7 +376,7 @@ module F = struct
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
-    ins_load_reg t temp reg;
+    ins_load_from_reg t temp reg;
     temp
 
   let load_addr t (addr : Arch.addressing_mode) (i : 'a Cfg.instruction) n =
@@ -547,10 +547,16 @@ module F = struct
       | Ilsl -> do_binop "shl"
       | Ilsr -> do_binop "lshr"
       | Iasr -> do_binop "ashr"
-      | Icomp comp -> int_comp t comp i ~imm
+      | Icomp comp ->
+        let bool_res = int_comp t comp i ~imm in
+        (* convert i1 -> i64 *)
+        let int_res = fresh_ident t in
+        ins_conv t "zext" ~src:bool_res ~dst:int_res ~src_typ:Llvm_typ.bool
+          ~dst_typ:typ;
+        int_res
       | Iclz _ | Ictz _ | Ipopcnt -> not_implemented_basic i
     in
-    ins_store_reg t res i.res.(0)
+    ins_store_into_reg t res i.res.(0)
 
   let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
       (op : Operation.float_operation) =
@@ -573,7 +579,7 @@ module F = struct
       | Inegf ->
         let arg = load_reg_to_temp t i.arg.(0) in
         let res = fresh_ident t in
-        ins_monop t "fneg" arg res typ;
+        ins_unary_op t "fneg" arg res typ;
         res
       | Iabsf ->
         let arg = load_reg_to_temp t i.arg.(0) in
@@ -591,13 +597,13 @@ module F = struct
           ~dst_typ:(Llvm_typ.of_machtyp_component i.res.(0).typ);
         int_res
     in
-    ins_store_reg t res i.res.(0)
+    ins_store_into_reg t res i.res.(0)
 
   let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     match op with
     | Move | Opaque ->
       let temp = load_reg_to_temp t i.arg.(0) in
-      ins_store_reg t temp i.res.(0)
+      ins_store_into_reg t temp i.res.(0)
     | Const_int n -> ins_store_nativeint t n i.res.(0)
     | Const_symbol { sym_name; sym_global = _ } ->
       t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
@@ -608,14 +614,14 @@ module F = struct
       let basic typ =
         let temp = fresh_ident t in
         ins_load t ~src ~dst:temp typ;
-        ins_store_reg t temp i.res.(0)
+        ins_store_into_reg t temp i.res.(0)
       in
       let extend op typ =
         let temp = fresh_ident t in
         let temp2 = fresh_ident t in
         ins_load t ~src ~dst:temp typ;
         ins_conv t op ~src:temp ~dst:temp2 ~src_typ:typ ~dst_typ:Llvm_typ.i64;
-        ins_store_reg t temp2 i.res.(0)
+        ins_store_into_reg t temp2 i.res.(0)
       in
       match memory_chunk with
       | Word_int | Word_val -> basic Llvm_typ.i64
@@ -636,14 +642,14 @@ module F = struct
       let dst = load_addr t addr i 1 in
       let basic typ =
         let temp = fresh_ident t in
-        ins_load_reg t temp i.arg.(0);
+        ins_load_from_reg t temp i.arg.(0);
         ins_store t ~src:temp ~dst typ
       in
       let trunc_int dst_typ =
         let reg_typ = i.arg.(0).typ |> Llvm_typ.of_machtyp_component in
         let temp = fresh_ident t in
         let truncated = fresh_ident t in
-        ins_load_reg t temp i.arg.(0);
+        ins_load_from_reg t temp i.arg.(0);
         ins_conv t "trunc" ~src:temp ~dst:truncated ~src_typ:reg_typ ~dst_typ;
         ins_store t ~src:truncated ~dst dst_typ
       in
@@ -774,12 +780,12 @@ let alloca_regs t cfg old_arg_idents =
   let body_regs = collect_body_regs cfg in
   let temp_regs = Reg.Set.diff body_regs arg_regs in
   let alloca (reg : Reg.t) =
-    F.ins_alloca ~dbg:(Format.asprintf "%a" Printreg.reg reg) t reg
+    F.ins_alloca ~regname:(Format.asprintf "%a" Printreg.reg reg) t reg
   in
   Reg.Set.iter alloca arg_regs;
   Reg.Set.iter alloca temp_regs;
   List.iter
-    (fun (reg, old_ident) -> F.ins_store_reg t old_ident reg)
+    (fun (reg, old_ident) -> F.ins_store_into_reg t old_ident reg)
     old_arg_idents
 
 let cfg (cl : CL.t) =
@@ -804,8 +810,7 @@ let cfg (cl : CL.t) =
       } =
     cfg
   in
-  t.defined_function_symbols
-    <- String.Set.add fun_name t.defined_function_symbols;
+  t.defined_symbols <- String.Set.add fun_name t.defined_symbols;
   (* Make fresh idents for argument regs since these will be different from
      idents assigned to them later on *)
   let fun_args_with_idents =
@@ -839,33 +844,20 @@ let data ds =
 
 (* Define menitoned but not declared data items as extern *)
 let emit_data_extern t =
-  let defined_function_symbols =
-    List.filter_map
-      (fun (d : Cmm.data_item) ->
-        match d with
-        | Cdefine_symbol { sym_name; sym_global = _ } -> Some sym_name
-        | Cint _ | Csymbol_address _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _
-        | Cdouble _ | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _
-        | Cstring _ | Cskip _ | Calign _ ->
-          None)
-      t.data
-    |> String.Set.of_list
-    |> String.Set.union t.defined_function_symbols
-  in
-  let referenced_symbols =
-    List.filter_map
-      (fun (d : Cmm.data_item) ->
-        match d with
-        | Csymbol_address { sym_name; _ } -> Some sym_name
-        | Cdefine_symbol _ | Cint _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _
-        | Cdouble _ | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _
-        | Cstring _ | Cskip _ | Calign _ ->
-          None)
-      t.data
-    |> String.Set.of_list
-    |> String.Set.union t.referenced_symbols
-  in
-  String.Set.diff referenced_symbols defined_function_symbols
+  List.iter
+    (fun (d : Cmm.data_item) ->
+      match d with
+      | Cdefine_symbol { sym_name; sym_global = _ } ->
+        (* [t.defined_symbols] now tracks all defined symbols *)
+        t.defined_symbols <- String.Set.add sym_name t.defined_symbols
+      | Csymbol_address { sym_name; sym_global = _ } ->
+        t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
+      | Cint _ | Cint8 _ | Cint16 _ | Cint32 _ | Csingle _ | Cdouble _
+      | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_offset _ | Cstring _
+      | Cskip _ | Calign _ ->
+        ())
+    t.data;
+  String.Set.diff t.referenced_symbols t.defined_symbols
   |> String.Set.iter (fun sym -> F.data_decl_extern t sym)
 
 (* CR yusumez: We do this cumbersome list wrangling since we receive data

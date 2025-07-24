@@ -41,6 +41,9 @@ type upstream_compat_warning =
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
       on an external declaration with float# is missing. *)
+  | Immediate_void_variant
+      (* example: [type t = A of void] is immediate, but
+         not after erasure, which boxes void, so it can't be erased. *)
 
 type name_out_of_scope_warning =
   | Name of string
@@ -1244,6 +1247,11 @@ let message = function
       "[@unboxed] attribute must be added to external declaration \n\
        argument type with layout %s for upstream compatibility."
       layout
+  | Incompatible_with_upstream Immediate_void_variant ->
+      "This variant is immediate \n\
+       because all its constructors have all-void arguments, but after \n\
+       erasure for upstream compatibility, void is no longer zero-width, \n\
+       so it won't be immediate."
   | Unerasable_position_argument -> "this position argument cannot be erased."
   | Unnecessarily_partial_tuple_pattern ->
       "This tuple pattern\n\

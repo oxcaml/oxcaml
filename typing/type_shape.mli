@@ -238,3 +238,9 @@ val add_to_type_shapes :
 val find_in_type_decls : Uid.t -> Type_decl_shape.tds option
 
 val type_name : _ Type_shape.ts -> string
+
+val print_table_all_type_decls : Format.formatter -> unit
+
+val print_table_all_type_shapes : Format.formatter -> unit
+
+val print_debug_uid_tables : Format.formatter -> unit
