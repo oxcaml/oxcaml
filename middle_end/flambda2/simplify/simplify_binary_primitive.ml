@@ -1052,6 +1052,15 @@ let simplify_poke dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_
     ~result_var =
   SPR.create_unit dacc ~result_var ~original_term
 
+let simplify_read_offset kind dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_ 
+    ~arg2:_ ~arg2_ty:_ ~result_var =
+  (* Read_offset performs a raw read at a byte offset from a block.
+     We don't try to optimize this primitive as it's used for low-level
+     access patterns. *)
+  SPR.create_unknown dacc ~result_var
+    (K.With_subkind.kind kind)
+    ~original_term
+
 let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
     ~arg1 ~arg1_ty ~arg2 ~arg2_ty dbg ~result_var =
   let original_term = Named.create_prim original_prim dbg in
@@ -1106,11 +1115,7 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       simplify_bigarray_get_alignment align ~original_prim
     | Atomic_load_field _ -> simplify_atomic_load_field ~original_prim
     | Poke _ -> simplify_poke
-    | Read_offset _ ->
-      (* Just use the default simplification for now *)
-      fun dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_
-          ~result_var:_ ->
-       Simplify_primitive_result.create original_term ~try_reify:false dacc
+    | Read_offset (kind, _mutability) -> simplify_read_offset kind
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var
 
