@@ -1847,20 +1847,38 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
 (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
 terminated with an [Empty] or [Const] axhint *)
 let rec print_axhint_chain :
-    type a. a -> a C.obj -> a axhint -> Format.formatter -> print_hint_res =
- fun (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
+    type a.
+    [`Actual | `Expected] ->
+    a ->
+    a C.obj ->
+    a axhint ->
+    Format.formatter ->
+    print_hint_res =
+ fun side (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
   let open Format in
   let print_mode : type x. x C.obj -> x -> _ =
+   (* This is a wrapping around the standard [C.print],
+      to make the error messages more readable for the user *)
    fun x_obj x ->
-    match x_obj, x with
-    | Regionality, Regional ->
+    let mode_printer = Misc.Style.as_inline_code (C.print x_obj) in
+    let default_printer () = mode_printer ppf x in
+    match side, x_obj, x with
+    | _, Regionality, Regional ->
       (* In the special case that we are talking about the regional mode,
          we print a more user-friendly message, as below, instead of referring
-         directly to the regional mode *)
+         directly to the regional mode, as the user doesn't need to know about it *)
       fprintf ppf "local to the parent region"
+    | `Expected, Contention_op, Shared ->
+      (* When printing the "shared" mode on the "expected" side (noting that expected
+         modes only appear on the right side of inequalities (on the "greater" side)),
+         we print that it was expected to be either shared or uncontended, to help
+         the user. We don't do anything similar when printing on the "actual" side
+         as this is confusing to put in an error message. *)
+      fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
+        C.Contention.Uncontended
     | _ ->
       (* Otherwise, we just use the default mode constant printer *)
-      Misc.Style.as_inline_code (C.print x_obj) ppf x
+      default_printer ()
    [@@ocaml.warning "-4"]
   in
   match hint with
@@ -1871,12 +1889,12 @@ let rec print_axhint_chain :
            && not (Hint.is_rigid morph_hint) ->
       (* When the [a] and [b] modes are equal, and the hint is non-rigid,
          we can definitely skip printing this line. *)
-      print_axhint_chain b b_obj b_hint ppf
+      print_axhint_chain side b b_obj b_hint ppf
     | Some Refl | None -> (
       match print_morph_hint morph_hint with
       | Skip ->
         (* This is another case where we skip a line without printing the mode first *)
-        print_axhint_chain b b_obj b_hint ppf
+        print_axhint_chain side b b_obj b_hint ppf
       | Stop ->
         print_mode a_obj a;
         NothingPrinted
@@ -1887,7 +1905,7 @@ let rec print_axhint_chain :
       | PrintThenContinue pp ->
         print_mode a_obj a;
         fprintf ppf "@ because it %t@ which is " pp;
-        ignore (print_axhint_chain b b_obj b_hint ppf);
+        ignore (print_axhint_chain side b b_obj b_hint ppf);
         HintPrinted))
   | Const const_hint ->
     print_mode a_obj a;
@@ -1910,10 +1928,10 @@ let report_axerror :
   (match target with
   | None -> fprintf ppf "This value is "
   | Some name -> fprintf ppf "%t is " name);
-  (match print_axhint_chain err.left left_obj err.left_hint ppf with
+  (match print_axhint_chain `Actual err.left left_obj err.left_hint ppf with
   | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
   | NothingPrinted -> fprintf ppf "@ but expected to be ");
-  ignore (print_axhint_chain err.right right_obj err.right_hint ppf);
+  ignore (print_axhint_chain `Expected err.right right_obj err.right_hint ppf);
   fprintf ppf "."
 
 (** Description of an input axis responsible for an output axis of a morphism *)
