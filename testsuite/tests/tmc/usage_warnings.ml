@@ -66,9 +66,9 @@ let[@tail_mod_cons] rec flatten = function
 
 [%%expect
 {|
-Line 10, characters 9-30:
-10 |       in append_flatten xs xss
-              ^^^^^^^^^^^^^^^^^^^^^
+Line 11, characters 4-25:
+11 |     append_flatten xs xss
+         ^^^^^^^^^^^^^^^^^^^^^
 Warning 72 [tmc-breaks-tailcall]: This call
 is in tail-modulo-cons position in a TMC function,
 but the function called is not itself specialized for TMC,
@@ -77,17 +77,17 @@ Please either mark the called function with the [@tail_mod_cons]
 attribute, or mark this call with the [@tailcall false] attribute
 to make its non-tailness explicit.
 
-Lines 1-10, characters 34-30:
+Lines 1-11, characters 34-25:
  1 | ..................................function
  2 |   | [] -> []
  3 |   | xs :: xss ->
- 4 |       let rec append_flatten xs xss =
- 5 |         match xs with
- 6 |         | [] -> flatten xss
- 7 |         | x :: xs ->
- 8 |             (* incorrect: this call to append_flatten is not transformed *)
- 9 |             x :: append_flatten xs xss
-10 |       in append_flatten xs xss
+ 4 |     let rec append_flatten xs xss =
+ 5 |       match xs with
+...
+ 8 |         (* incorrect: this call to append_flatten is not transformed *)
+ 9 |         x :: append_flatten xs xss
+10 |     in
+11 |     append_flatten xs xss
 Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
 but is never applied in TMC position.
 
@@ -114,9 +114,9 @@ let rec flatten = function
 
 [%%expect
 {|
-Line 13, characters 12-23:
-13 |             flatten xss
-                 ^^^^^^^^^^^
+Line 13, characters 8-19:
+13 |         flatten xss
+             ^^^^^^^^^^^
 Warning 72 [tmc-breaks-tailcall]: This call
 is in tail-modulo-cons position in a TMC function,
 but the function called is not itself specialized for TMC,
@@ -165,11 +165,11 @@ end
 
 [%%expect
 {|
-Lines 20-23, characters 10-27:
-20 | ..........list_id
-21 |             (* no [@tailcall false]: this should warn that
-22 |                the call becomes non-tailcall in the TMC version. *)
-23 |             (filter_1 f xs)
+Lines 18-21, characters 8-25:
+18 | ........list_id
+19 |           (* no [@tailcall false]: this should warn that
+20 |              the call becomes non-tailcall in the TMC version. *)
+21 |           (filter_1 f xs)
 Warning 72 [tmc-breaks-tailcall]: This call
 is in tail-modulo-cons position in a TMC function,
 but the function called is not itself specialized for TMC,
@@ -254,9 +254,9 @@ end
 
 [%%expect
 {|
-Line 16, characters 13-56:
-16 |         then (graft[@tailcall]) (* this should warn *) n
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 15, characters 11-55:
+15 |       then (graft [@tailcall]) (* this should warn *) n
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 72 [tmc-breaks-tailcall]: This call
 is in tail-modulo-cons position in a TMC function,
 but the function called is not itself specialized for TMC,
@@ -265,19 +265,19 @@ Please either mark the called function with the [@tail_mod_cons]
 attribute, or mark this call with the [@tailcall false] attribute
 to make its non-tailness explicit.
 
-Line 17, characters 17-67:
-17 |         else Tau ((graft[@tailcall]) (* this should also warn *) n)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 16, characters 15-66:
+16 |       else Tau ((graft [@tailcall]) (* this should also warn *) n)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 51 [wrong-tailcall-expectation]: expected tailcall
 
-Line 16, characters 13-56:
-16 |         then (graft[@tailcall]) (* this should warn *) n
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 15, characters 11-55:
+15 |       then (graft [@tailcall]) (* this should warn *) n
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 51 [wrong-tailcall-expectation]: expected tailcall
 
-Line 17, characters 17-67:
-17 |         else Tau ((graft[@tailcall]) (* this should also warn *) n)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 16, characters 15-66:
+16 |       else Tau ((graft [@tailcall]) (* this should also warn *) n)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 51 [wrong-tailcall-expectation]: expected tailcall
 
 module All_annotations_flipped :

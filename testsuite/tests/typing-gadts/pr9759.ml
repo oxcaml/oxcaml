@@ -27,8 +27,8 @@ let rec foo : type k. k general -> k general =
 
 [%%expect
 {|
-Line 9, characters 4-9:
-9 |   | indir ->
+Line 7, characters 4-9:
+7 |   | indir -> { g with indir }
         ^^^^^
 Warning 11 [redundant-case]: this match case is unused.
 

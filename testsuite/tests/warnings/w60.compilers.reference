@@ -1,9 +1,9 @@
-File "w60.ml", line 40, characters 13-14:
-40 |   let module M = struct end in
+File "w60.ml", line 39, characters 13-14:
+39 |   let module M = struct end in
                   ^
 Warning 60 [unused-module]: unused module M.
 
-File "w60.ml", line 47, characters 4-22:
-47 |     module M : sig end
+File "w60.ml", line 46, characters 4-22:
+46 |     module M : sig end
          ^^^^^^^^^^^^^^^^^^
 Warning 60 [unused-module]: unused module M.

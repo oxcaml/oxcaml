@@ -28,9 +28,9 @@ type ('env, 'a) typ =
     Tint : ('env, int) typ
   | Tbool : ('env, bool) typ
   | Tvar : ('env, 'a) var -> ('env, 'a) typ
-Line 15, characters 5-6:
-15 |    | _ -> .   (* error *)
-          ^
+Line 16, characters 4-5:
+16 |   | _ -> . (* error *)
+         ^
 Error: This match case could not be refuted.
        Here is an example of a value that would reach it: "(Tint, Tvar Zero)"
 |}]

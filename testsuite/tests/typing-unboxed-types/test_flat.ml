@@ -11,8 +11,8 @@ type t16 = A : 'a abs -> t16 [@@ocaml.unboxed]
 [%%expect
 {|
 type 'a abs
-Line 2, characters 0-46:
-2 | type t16 = A : 'a abs -> t16 [@@ocaml.unboxed];;
+Line 3, characters 0-46:
+3 | type t16 = A : 'a abs -> t16 [@@ocaml.unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -26,7 +26,7 @@ type t18 = A : _ list abs -> t18 [@@ocaml.unboxed]
 [%%expect
 {|
 Line 1, characters 0-50:
-1 | type t18 = A : _ list abs -> t18 [@@ocaml.unboxed];;
+1 | type t18 = A : _ list abs -> t18 [@@ocaml.unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -43,8 +43,8 @@ type t = T : 'a s -> t [@@unboxed]
 [%%expect
 {|
 type 'a s = S : 'a -> 'a s [@@unboxed]
-Line 2, characters 0-34:
-2 | type t = T : 'a s -> t [@@unboxed];;
+Line 3, characters 0-34:
+3 | type t = T : 'a s -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -60,8 +60,8 @@ type t = T : 'a s -> t [@@unboxed]
 [%%expect
 {|
 type 'a s = S : 'a -> 'a option s [@@unboxed]
-Line 2, characters 0-34:
-2 | type t = T : 'a s -> t [@@unboxed];;
+Line 3, characters 0-34:
+3 | type t = T : 'a s -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -92,7 +92,7 @@ type t = T : (unit -> _) M.r -> t [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-45:
-1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
+1 | type t = T : (unit -> _) M.r -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -113,7 +113,7 @@ type t = T : 'a s -> t [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-34:
-1 | type t = T : 'a s -> t [@@unboxed];;
+1 | type t = T : 'a s -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -151,7 +151,7 @@ type t = T : (unit -> _) N.r -> t [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-45:
-1 | type t = T : (unit -> _) N.r -> t [@@unboxed];;
+1 | type t = T : (unit -> _) N.r -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -186,8 +186,8 @@ type t = T : 'a s -> t [@@unboxed]
 [%%expect
 {|
 type 'a s = S : 'a -> 'a s [@@unboxed]
-Line 2, characters 0-34:
-2 | type t = T : 'a s -> t [@@unboxed];;
+Line 3, characters 0-34:
+3 | type t = T : 'a s -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -203,8 +203,8 @@ type t = T : 'a s -> t [@@unboxed]
 [%%expect
 {|
 type 'a s = S : 'a -> 'a option s [@@unboxed]
-Line 2, characters 0-34:
-2 | type t = T : 'a s -> t [@@unboxed];;
+Line 3, characters 0-34:
+3 | type t = T : 'a s -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -235,7 +235,7 @@ type t = T : (unit -> _) M.r -> t [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-45:
-1 | type t = T : (unit -> _) M.r -> t [@@unboxed];;
+1 | type t = T : (unit -> _) M.r -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -255,7 +255,7 @@ type t = T : 'a s -> t [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-34:
-1 | type t = T : 'a s -> t [@@unboxed];;
+1 | type t = T : 'a s -> t [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -309,7 +309,7 @@ type valid1 = Any : ('a, int) almost_eq -> valid1 [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-61:
-1 | type valid1 = Any : ('a, int) almost_eq -> valid1 [@@unboxed];;
+1 | type valid1 = Any : ('a, int) almost_eq -> valid1 [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -329,7 +329,7 @@ type danger = Any : ('a, 'a) almost_eq -> danger [@@unboxed]
 [%%expect
 {|
 Line 1, characters 0-60:
-1 | type danger = Any : ('a, 'a) almost_eq -> danger [@@unboxed];;
+1 | type danger = Any : ('a, 'a) almost_eq -> danger [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be unboxed because
        it might contain both float and non-float values,
@@ -369,8 +369,8 @@ type cycle = cycle id
 [%%expect
 {|
 type 'a id = Id of 'a [@@unboxed]
-Line 2, characters 0-21:
-2 | type cycle = cycle id
+Line 3, characters 0-21:
+3 | type cycle = cycle id
     ^^^^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "cycle" is cyclic:
          "cycle" = "cycle id",

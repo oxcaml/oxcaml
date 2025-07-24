@@ -159,9 +159,9 @@ let and_unbound =
 
 [%%expect
 {|
-Line 4, characters 4-8:
-4 |     and+ y = 2 in
-        ^^^^
+Line 3, characters 15-19:
+3 |     let+ x = 1 and+ y = 2 in
+                   ^^^^
 Error: Unbound value "(and+)"
 |}]
 
@@ -211,7 +211,7 @@ let ill_typed_2 =
 [%%expect
 {|
 Line 3, characters 13-14:
-3 |     let+ x = 1
+3 |     let+ x = 1 and+ y = 2 in
                  ^
 Error: This expression has type "int" but an expression was expected of type
          "float"
@@ -259,9 +259,9 @@ let ill_typed_4 =
 
 [%%expect
 {|
-Line 4, characters 4-8:
-4 |     and+ y = 2 in
-        ^^^^
+Line 3, characters 15-19:
+3 |     let+ x = 1 and+ y = 2 in
+                   ^^^^
 Error: The operator "and+" has type "bool -> bool"
        but it was expected to have type "bool -> 'a -> 'b"
        Type "bool" is not compatible with type "'a -> 'b"
@@ -289,10 +289,9 @@ let ill_typed_5 =
 
 [%%expect
 {|
-Lines 3-5, characters 9-14:
-3 | .........x = 1
-4 |     and+ y = 2
-5 |     and+ z = 3...
+Line 3, characters 9-36:
+3 |     let+ x = 1 and+ y = 2 and+ z = 3 in
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: These bindings have type "(int * int) * int"
        but bindings were expected of type "bool"
 |}]
@@ -319,9 +318,9 @@ let ill_typed_6 =
 
 [%%expect
 {|
-Lines 3-4, characters 9-14:
-3 | .........x = 1
-4 |     and+ y = 2
+Line 3, characters 9-25:
+3 |     let+ x = 1 and+ y = 2 and+ z = 3 in
+             ^^^^^^^^^^^^^^^^
 Error: These bindings have type "int * int" but bindings were expected of type
          "int"
 |}]
@@ -349,7 +348,7 @@ let ill_typed_7 =
 [%%expect
 {|
 Line 3, characters 4-8:
-3 |     let+ x = 1
+3 |     let+ x = 1 and+ y = 2 in
         ^^^^
 Error: The operator "let+" has type "(int -> 'a) -> int -> 'a"
        but it was expected to have type "(int -> 'a) -> ('b * 'c -> 'd) -> 'e"
@@ -525,9 +524,9 @@ let indexed_monad4 =
 
 [%%expect
 {|
-Lines 6-7, characters 4-29:
+Lines 6-7, characters 4-27:
 6 | ....let* second = read in
-7 |       return (first ^ second)
+7 |     return (first ^ second).
 Error: This expression has type
          "(Indexed_monad.opened, Indexed_monad.opened, string) Indexed_monad.t"
        but an expression was expected of type
@@ -637,12 +636,10 @@ let and_not_principal =
 [%%expect
 {|
 val and_not_principal : A.t -> A.t -> unit = <fun>
-|},
-  Principal
-    {|
-Line 5, characters 11-12:
-5 |       and+ A = y in
-               ^
+|}, Principal{|
+Line 4, characters 24-25:
+4 |       let+ A.A = x and+ A = y in
+                            ^
 Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
 
 val and_not_principal : A.t -> A.t -> unit = <fun>
@@ -665,7 +662,7 @@ let let_not_propagated : A.t =
 [%%expect
 {|
 Line 4, characters 4-5:
-4 |     A
+4 |     A)
         ^
 Error: Unbound constructor "A"
 |}]
@@ -765,18 +762,16 @@ let bad_location =
 [%%expect
 {|
 val bad_location : 'a GADT_ordering.is_point -> 'a -> int = <fun>
-|},
-  Principal
-    {|
+|}, Principal{|
 Line 4, characters 11-19:
-4 |       let+ Is_point = is_point
+4 |       let+ Is_point = is_point and+ { x; y } = a in
                ^^^^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering GADT_ordering.point and a as equal.
 But the knowledge of these types is not principal.
 
-Line 5, characters 11-19:
-5 |       and+ { x; y } = a in
-               ^^^^^^^^
+Line 4, characters 36-44:
+4 |       let+ Is_point = is_point and+ { x; y } = a in
+                                        ^^^^^^^^
 Error: This pattern matches values of type "GADT_ordering.point"
        but a pattern was expected which matches values of type
          "a" = "GADT_ordering.point"

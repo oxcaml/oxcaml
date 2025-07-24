@@ -25,8 +25,8 @@ type 'a local_visit_action
 type ('a, 'result, 'visit_action) context =
     Local : ('a, 'a * insert, 'a local_visit_action) context
   | Global : ('a, 'a, 'a visit_action) context
-Line 15, characters 4-9:
-15 |   | Local -> fun _ -> raise Exit
+Line 13, characters 4-9:
+13 |   | Local -> fun _ -> raise Exit
          ^^^^^
 Error: This pattern matches values of type
          "($0, $0 * insert, $0 local_visit_action) context"
@@ -42,8 +42,8 @@ let vexpr (type visit_action) :
 
 [%%expect
 {|
-Line 4, characters 4-9:
-4 |   | Local -> fun _ -> raise Exit
+Line 3, characters 4-9:
+3 |   | Local -> fun _ -> raise Exit
         ^^^^^
 Error: This pattern matches values of type
          "($'a, $'a * insert, $'a local_visit_action) context"

@@ -33,9 +33,9 @@ let y =
 
 [%%expect
 {|
-Line 2, characters 8-41:
-2 |   match (M.bar :> [ `Bar of M.t | `Foo ]) with
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 8-39:
+2 |   match (M.bar :> [`Bar of M.t | `Foo]) with
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "M.t" is not a subtype of "[ `Bar of M.t | `Foo ]"
        Type "M.t" = "[ `Bar of M.t | `Foo ]" is not a subtype of "M.t"
 |}]
@@ -69,12 +69,10 @@ module N = F ()
 
 [%%expect
 {|
-module N :
-  sig
-    type s = private [ `Bar of 'a | `Foo ] as 'a
-    val from : M.t -> s
-    val to_ : s -> M.t
-  end
+Line 1, characters 11-15:
+1 | module N = F ()
+               ^^^^
+Error: The functor was expected to be applicative at this position
 |}]
 
 let y =
@@ -84,9 +82,8 @@ let y =
 
 [%%expect
 {|
-Line 2, characters 8-48:
-2 |   match (N.from M.bar :> [ `Bar of N.s | `Foo ]) with
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "N.s" is not a subtype of "[ `Bar of N.s | `Foo ]"
-       Type "N.s" = "[ `Bar of N.s | `Foo ]" is not a subtype of "N.s"
+Line 2, characters 34-37:
+2 |   match (N.from M.bar :> [`Bar of N.s | `Foo]) with
+                                      ^^^
+Error: Unbound module "N"
 |}]

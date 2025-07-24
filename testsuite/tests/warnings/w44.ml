@@ -17,9 +17,9 @@ let g f =
 
 [%%expect
 {|
-Line 1, characters 16-17:
-1 | let g f = f (); M.(f ());;
-                    ^
+Line 3, characters 2-3:
+3 |   M.(f ())
+      ^
 Warning 44 [open-shadow-identifier]: this open statement shadows the value identifier f (which is later used)
 
 val g : (unit -> 'a) -> int = <fun>
@@ -56,9 +56,9 @@ class c =
 
 [%%expect
 {|
-Line 3, characters 10-11:
-3 |   val y = x + 1
-              ^
+Line 5, characters 12-13:
+5 |     val y = x + 1
+                ^
 Error: The instance variable "x"
        cannot be accessed from the definition of another instance variable
 |}]

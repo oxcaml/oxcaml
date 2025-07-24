@@ -31,7 +31,7 @@ let f = function Sigma (M, A) -> ()
 [%%expect
 {|
 Line 1, characters 8-35:
-1 | let f = function Sigma (M, A) -> ();;
+1 | let f = function Sigma (M, A) -> ()
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
@@ -57,18 +57,16 @@ let f (type a) t (x : a) =
 [%%expect
 {|
 val f : 'a t -> 'a -> int = <fun>
-|},
-  Principal
-    {|
-Line 4, characters 4-10:
-4 |   | IntLit, n -> n+1
-        ^^^^^^
+|}, Principal{|
+Line 3, characters 18-24:
+3 |   match t, x with IntLit, n -> n + 1 | BoolLit, b -> 1
+                      ^^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering int and a as equal.
 But the knowledge of these types is not principal.
 
-Line 5, characters 4-11:
-5 |   | BoolLit, b -> 1
-        ^^^^^^^
+Line 3, characters 39-46:
+3 |   match t, x with IntLit, n -> n + 1 | BoolLit, b -> 1
+                                           ^^^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering bool and a as equal.
 But the knowledge of these types is not principal.
 
@@ -82,12 +80,10 @@ let f (type a) t (x : a) =
 [%%expect
 {|
 val f : 'a t -> 'a -> int = <fun>
-|},
-  Principal
-    {|
-Line 4, characters 4-10:
-4 |   | IntLit, n -> n+1
-        ^^^^^^
+|}, Principal{|
+Line 3, characters 18-24:
+3 |   match t, x with IntLit, n -> n + 1 | _, _ -> 1
+                      ^^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering int and a as equal.
 But the knowledge of these types is not principal.
 
@@ -100,9 +96,9 @@ let f (type a) t (x : a) =
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit, b -> 1
-        ^^^^^^^
+Line 2, characters 40-47:
+2 |   (match t, x with IntLit, n -> n + 1 | BoolLit, b -> 1);
+                                            ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -114,9 +110,9 @@ let f (type a) t (x : a) =
 
 [%%expect
 {|
-Line 3, characters 17-18:
-3 |   | IntLit, n -> n+1
-                     ^
+Line 2, characters 32-33:
+2 |   (match t, x with IntLit, n -> n + 1 | _, _ -> 1);
+                                    ^
 Error: This expression has type "a" but an expression was expected of type "int"
 |}]
 
@@ -160,12 +156,10 @@ let f1 t1 = match t1 with AB -> true | MAB -> false
 [%%expect
 {|
 val f1 : unit ab M.t -> bool = <fun>
-|},
-  Principal
-    {|
-Line 4, characters 4-7:
-4 |   | MAB -> false;;
-        ^^^
+|}, Principal{|
+Line 1, characters 39-42:
+1 | let f1 t1 = match t1 with AB -> true | MAB -> false
+                                           ^^^
 Warning 18 [not-principal]: typing this pattern requires considering unit M.mab and unit ab as equal.
 But the knowledge of these types is not principal.
 
@@ -179,18 +173,16 @@ let f2 (type x) t1 =
 [%%expect
 {|
 val f2 : 'x M.t -> bool = <fun>
-|},
-  Principal
-    {|
-Line 4, characters 4-6:
-4 |   | AB -> true
-        ^^
+|}, Principal{|
+Line 3, characters 16-18:
+3 |   match t1 with AB -> true | MAB -> false
+                    ^^
 Warning 18 [not-principal]: typing this pattern requires considering unit ab and x as equal.
 But the knowledge of these types is not principal.
 
-Line 5, characters 4-7:
-5 |   | MAB -> false;;
-        ^^^
+Line 3, characters 29-32:
+3 |   match t1 with AB -> true | MAB -> false
+                                 ^^^
 Warning 18 [not-principal]: typing this pattern requires considering unit M.mab and x as equal.
 But the knowledge of these types is not principal.
 
@@ -205,12 +197,10 @@ let f3 t1 =
 [%%expect
 {|
 val f3 : unit ab M.t -> bool = <fun>
-|},
-  Principal
-    {|
-Line 5, characters 4-7:
-5 |   | MAB -> false;;
-        ^^^
+|}, Principal{|
+Line 3, characters 29-32:
+3 |   match t1 with AB -> true | MAB -> false
+                                 ^^^
 Warning 18 [not-principal]: typing this pattern requires considering unit M.mab and unit ab as equal.
 But the knowledge of these types is not principal.
 
@@ -241,12 +231,10 @@ let g2 (type x) (e : (x, _ option) eq) (x : x) : int option =
 [%%expect
 {|
 val g2 : ('x, int option) eq -> 'x -> int option = <fun>
-|},
-  Principal
-    {|
-Line 3, characters 7-11:
-3 |    let Refl = e in x;;
-           ^^^^
+|}, Principal{|
+Line 3, characters 6-10:
+3 |   let Refl = e in
+          ^^^^
 Warning 18 [not-principal]: typing this pattern requires considering x and int option as equal.
 But the knowledge of these types is not principal.
 
@@ -279,12 +267,10 @@ let () = match [] with [{ a = 3; _ }; { b = F; _ }] -> () | _ -> ()
 
 [%%expect
 {|
-|},
-  Principal
-    {|
-Line 3, characters 27-28:
-3 |   | [ { a = 3; _ } ; { b = F; _ }] -> ()
-                               ^
+|}, Principal{|
+Line 1, characters 44-45:
+1 | let () = match [] with [{ a = 3; _ }; { b = F; _ }] -> () | _ -> ()
+                                                ^
 Warning 18 [not-principal]: typing this pattern requires considering Foo.t and int as equal.
 But the knowledge of these types is not principal.
 |}]
@@ -293,9 +279,9 @@ let () = match [] with [{ b = F; _ }; { a = 3; _ }] -> () | _ -> ()
 
 [%%expect
 {|
-Line 3, characters 27-28:
-3 |   | [ { b = F; _ } ; { a = 3; _ }] -> ()
-                               ^
+Line 1, characters 44-45:
+1 | let () = match [] with [{ b = F; _ }; { a = 3; _ }] -> () | _ -> ()
+                                                ^
 Error: This pattern matches values of type "int"
        but a pattern was expected which matches values of type "Foo.t"
 |}]
@@ -317,12 +303,10 @@ let () = match [] with [{ a = 3; _ }; { b = Refl3; _ }] -> () | _ -> ()
 
 [%%expect
 {|
-|},
-  Principal
-    {|
-Line 3, characters 26-31:
-3 |   | [ { a = 3; _ }; { b = Refl3 ; _ }] -> ()
-                              ^^^^^
+|}, Principal{|
+Line 1, characters 44-49:
+1 | let () = match [] with [{ a = 3; _ }; { b = Refl3; _ }] -> () | _ -> ()
+                                                ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering int and Foo.t as equal.
 But the knowledge of these types is not principal.
 |}]
@@ -331,12 +315,10 @@ let () = match [] with [{ b = Refl3; _ }; { a = 3; _ }] -> () | _ -> ()
 
 [%%expect
 {|
-|},
-  Principal
-    {|
-Line 3, characters 12-17:
-3 |   | [ { b = Refl3 ; _ }; { a = 3; _ } ] -> ()
-                ^^^^^
+|}, Principal{|
+Line 1, characters 30-35:
+1 | let () = match [] with [{ b = Refl3; _ }; { a = 3; _ }] -> () | _ -> ()
+                                  ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering int and Foo.t as equal.
 But the knowledge of these types is not principal.
 |}]
@@ -356,12 +338,10 @@ let () = match [] with [{ a = 3; _ }; { b = Refl3; _ }] -> () | _ -> ()
 
 [%%expect
 {|
-|},
-  Principal
-    {|
-Line 3, characters 26-31:
-3 |   | [ { a = 3; _ }; { b = Refl3 ; _ }] -> ()
-                              ^^^^^
+|}, Principal{|
+Line 1, characters 44-49:
+1 | let () = match [] with [{ a = 3; _ }; { b = Refl3; _ }] -> () | _ -> ()
+                                                ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering int and Foo.t as equal.
 But the knowledge of these types is not principal.
 |}]
@@ -370,12 +350,10 @@ let () = match [] with [{ b = Refl3; _ }; { a = 3; _ }] -> () | _ -> ()
 
 [%%expect
 {|
-|},
-  Principal
-    {|
-Line 3, characters 12-17:
-3 |   | [ { b = Refl3 ; _ }; { a = 3; _ } ] -> ()
-                ^^^^^
+|}, Principal{|
+Line 1, characters 30-35:
+1 | let () = match [] with [{ b = Refl3; _ }; { a = 3; _ }] -> () | _ -> ()
+                                  ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering int and Foo.t as equal.
 But the knowledge of these types is not principal.
 |}]
@@ -415,12 +393,10 @@ let foo x = match x with { x; eq = Refl3 } -> x
 [%%expect
 {|
 val foo : M.t foo -> M.t = <fun>
-|},
-  Principal
-    {|
-Line 3, characters 18-23:
-3 |   | { x = x; eq = Refl3 } -> x
-                      ^^^^^
+|}, Principal{|
+Line 1, characters 35-40:
+1 | let foo x = match x with { x; eq = Refl3 } -> x
+                                       ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering M.t and N.t as equal.
 But the knowledge of these types is not principal.
 
@@ -432,12 +408,10 @@ let foo x = match x with { x : int; eq = Refl3 } -> x
 [%%expect
 {|
 val foo : int foo -> int = <fun>
-|},
-  Principal
-    {|
-Line 3, characters 26-31:
-3 |   | { x = (x : int); eq = Refl3 } -> x
-                              ^^^^^
+|}, Principal{|
+Line 1, characters 41-46:
+1 | let foo x = match x with { x : int; eq = Refl3 } -> x
+                                             ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering M.t and N.t as equal.
 But the knowledge of these types is not principal.
 
@@ -448,25 +422,23 @@ let foo x = match x with { x : N.t; eq = Refl3 } -> x
 
 [%%expect
 {|
-Line 3, characters 4-33:
-3 |   | { x = (x : N.t); eq = Refl3 } -> x
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 25-48:
+1 | let foo x = match x with { x : N.t; eq = Refl3 } -> x
+                             ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "N.t foo"
        but a pattern was expected which matches values of type "'a"
        This instance of "M.t" is ambiguous:
        it would escape the scope of its equation
-|},
-  Principal
-    {|
-Line 3, characters 26-31:
-3 |   | { x = (x : N.t); eq = Refl3 } -> x
-                              ^^^^^
+|}, Principal{|
+Line 1, characters 41-46:
+1 | let foo x = match x with { x : N.t; eq = Refl3 } -> x
+                                             ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering M.t and N.t as equal.
 But the knowledge of these types is not principal.
 
-Line 3, characters 4-33:
-3 |   | { x = (x : N.t); eq = Refl3 } -> x
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 25-48:
+1 | let foo x = match x with { x : N.t; eq = Refl3 } -> x
+                             ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "N.t foo"
        but a pattern was expected which matches values of type "'a"
        This instance of "M.t" is ambiguous:
@@ -478,12 +450,10 @@ let foo x = match x with { x : string; eq = Refl3 } -> x
 [%%expect
 {|
 val foo : string foo -> string = <fun>
-|},
-  Principal
-    {|
-Line 3, characters 29-34:
-3 |   | { x = (x : string); eq = Refl3 } -> x
-                                 ^^^^^
+|}, Principal{|
+Line 1, characters 44-49:
+1 | let foo x = match x with { x : string; eq = Refl3 } -> x
+                                                ^^^^^
 Warning 18 [not-principal]: typing this pattern requires considering M.t and N.t as equal.
 But the knowledge of these types is not principal.
 

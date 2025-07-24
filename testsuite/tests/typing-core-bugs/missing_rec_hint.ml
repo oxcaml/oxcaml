@@ -8,9 +8,9 @@ let facto n =
 
 [%%expect
 {|
-Line 2, characters 28-33:
-2 |    if n = 0 then 1 else n * facto (n-1)
-                                ^^^^^
+Line 3, characters 27-32:
+3 |   if n = 0 then 1 else n * facto (n - 1)
+                               ^^^^^
 Error: Unbound value "facto"
 Hint: If this is a recursive definition,
 you should add the "rec" keyword on line 1
@@ -40,7 +40,7 @@ and h x = if x < 0 then x else g (x - 1)
 [%%expect
 {|
 Line 1, characters 31-32:
-1 | let f x = if x < 0 then x else h (x-1)
+1 | let f x = if x < 0 then x else h (x - 1)
                                    ^
 Error: Unbound value "h"
 Hint: If this is a recursive definition,

@@ -38,8 +38,8 @@ let g = f ?y:None ?x:None ~a:()
 [%%expect
 {|
 val f : ?x:'a -> a:'b -> ?y:'c -> z:'d -> unit -> unit = <fun>
-Line 2, characters 13-17:
-2 | let g = f ?y:None ?x:None ~a:()
+Line 3, characters 13-17:
+3 | let g = f ?y:None ?x:None ~a:()
                  ^^^^
 Error: The function applied to this argument has type
          ?x:'a -> a:'b -> ?y:'c -> z:'d -> unit -> unit
@@ -53,9 +53,9 @@ let f (g : ?x:_ -> _) =
 
 [%%expect
 {|
-Line 1, characters 28-32:
-1 | let f (g: ?x:_ -> _) = g ~y:None ?x:None; g ?x:None ()
-                                ^^^^
+Line 2, characters 7-11:
+2 |   g ~y:None ?x:None;
+           ^^^^
 Error: The function applied to this argument has type ?x:'a -> 'b
 This argument cannot be applied with label "~y"
   Since OCaml 4.11, optional arguments do not commute when -nolabels is given
@@ -78,7 +78,7 @@ f 3 ~c:2 ~a:1 ~b:0 ~x:4 5
 [%%expect
 {|
 Line 1, characters 7-8:
-1 | f 3 ~c:2 ~a:1 ~b:0 ~x:4 5;;
+1 | f 3 ~c:2 ~a:1 ~b:0 ~x:4 5
            ^
 Error: The function applied to this argument has type
          ?a:int -> ?b:int -> ?c:int -> x:int -> int -> int
@@ -95,7 +95,7 @@ f 3 ~a:1 ~b:2 5 ~c:0 ~x:4
 [%%expect
 {|
 Line 1, characters 14-15:
-1 | f 3 ~a:1 ~b:2 5 ~c:0 ~x:4;;
+1 | f 3 ~a:1 ~b:2 5 ~c:0 ~x:4
                   ^
 Error: The function applied to this argument has type
          ?c:int -> x:int -> int -> int
@@ -109,7 +109,7 @@ f 3 ~a:1 ~c:2 5 ~b:0 ~x:4
 [%%expect
 {|
 Line 1, characters 12-13:
-1 | f 3 ~a:1 ~c:2 5 ~b:0 ~x:4;;
+1 | f 3 ~a:1 ~c:2 5 ~b:0 ~x:4
                 ^
 Error: The function applied to this argument has type
          ?b:int -> ?c:int -> x:int -> int -> int
@@ -123,7 +123,7 @@ f 3 ~b:1 ~c:2 5 ~a:0 ~x:4
 [%%expect
 {|
 Line 1, characters 7-8:
-1 | f 3 ~b:1 ~c:2 5 ~a:0 ~x:4;;
+1 | f 3 ~b:1 ~c:2 5 ~a:0 ~x:4
            ^
 Error: The function applied to this argument has type
          ?a:int -> ?b:int -> ?c:int -> x:int -> int -> int
@@ -145,7 +145,7 @@ f ~y:3
 [%%expect
 {|
 Line 1, characters 5-6:
-1 | f ~y:3;;
+1 | f ~y:3
          ^
 Error: The function applied to this argument has type
          ?x:'a -> ?y:'b -> unit -> unit

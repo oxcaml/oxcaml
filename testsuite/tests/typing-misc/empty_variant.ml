@@ -61,9 +61,9 @@ let f () =
 type nothing = |
 type ('a, 'b, 'c) t = A of 'a | B of 'b | C of 'c
 module Runner : sig val ac : f:((unit, 'a, unit) t -> unit) -> unit end
-Lines 16-17, characters 8-18:
-16 | ........match abc with
-17 |         | A _ -> 1
+Line 18, characters 18-41:
+18 |       let value = match abc with A _ -> 1 in
+                       ^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 C ()
@@ -84,9 +84,9 @@ let g (x : nothing t) = match x with A -> ()
 {|
 type nothing = |
 type 'b t = A | B of 'b | C
-Line 3, characters 22-42:
-3 | let g (x:nothing t) = match x with A -> ()
-                          ^^^^^^^^^^^^^^^^^^^^
+Line 8, characters 24-44:
+8 | let g (x : nothing t) = match x with A -> ()
+                            ^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 C

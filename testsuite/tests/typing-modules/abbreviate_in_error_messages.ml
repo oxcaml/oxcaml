@@ -52,9 +52,9 @@ end
 
 [%%expect
 {|
-Line 24, characters 37-41:
-24 |   module G(F:F)(X:functor() -> S1) = F(X)
-                                          ^^^^
+Line 46, characters 44-49:
+46 |   module G (F : F) (X : functor () -> S1) = F (X)
+                                                 ^^^^^
 Error: Modules do not match: functor () -> S1 is not included in
        sig
          module M1 :
@@ -108,9 +108,9 @@ end
 
 [%%expect
 {|
-Line 19, characters 52-56:
-19 |   module F(F : F)(X : sig module M : sig end end) = F(X)
-                                                         ^^^^
+Line 24, characters 4-9:
+24 |     F (X)
+         ^^^^^
 Error: Modules do not match: sig module M : sig end end is not included in
        S
      In module "M":

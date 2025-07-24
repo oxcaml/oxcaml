@@ -29,8 +29,8 @@ type aux =
     Aux :
       [ `Succ of [< [< [< [ `Zero ] pre_nat ] pre_nat ] pre_nat ] ] nat ->
       aux
-Line 14, characters 4-5:
-14 |   | _ -> .  (* error *)
+Line 18, characters 4-5:
+18 |   | _ -> . (* error *)
          ^
 Error: This match case could not be refuted.
        Here is an example of a value that would reach it:

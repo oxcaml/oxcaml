@@ -98,8 +98,8 @@ end
 
 [%%expect
 {|
-Line 2, characters 11-25:
-2 |   type t = X.F(Parsing).t
+Line 7, characters 11-25:
+7 |   type t = X.F(Parsing).t
                ^^^^^^^^^^^^^^
 Error: The module "X.F" is of abstract type "S", it cannot be applied
 |}]

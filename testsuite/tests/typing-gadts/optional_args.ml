@@ -37,8 +37,8 @@ let go (type a) (Refl : (unit, a) refl) = apply (fun ?x:_ () : a -> ())
 [%%expect
 {|
 val apply : (?x:unit -> unit -> 'a) -> 'a = <fun>
-Line 2, characters 42-71:
-2 | let go (type a) (Refl : (unit, a) refl) = apply (fun ?x:_ () : a -> ())
+Line 3, characters 42-71:
+3 | let go (type a) (Refl : (unit, a) refl) = apply (fun ?x:_ () : a -> ())
                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "a" = "unit"
        but an expression was expected of type "'a"
@@ -63,13 +63,13 @@ let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())
 [%%expect
 {|
 val apply : (unit -> ?x:unit -> 'a) -> 'a = <fun>
-Line 2, characters 59-60:
-2 | let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())
+Line 3, characters 59-60:
+3 | let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())
                                                                ^
 Warning 16 [unerasable-optional-argument]: this optional argument cannot be erased.
 
-Line 2, characters 42-71:
-2 | let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())
+Line 3, characters 42-71:
+3 | let go (type a) (Refl : (unit, a) refl) = apply (fun () ?x:_ : a -> ())
                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "a" = "unit"
        but an expression was expected of type "'a"

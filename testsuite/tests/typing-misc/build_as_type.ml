@@ -73,10 +73,11 @@ let f = function
 
 [%%expect
 {|
-Lines 5-7, characters 4-7:
-5 | ....begin match x with
-6 |     | `A -> ()
-7 |     end
+Lines 2-5, characters 21-26:
+2 | .....................(
+3 |     (* This should be flagged as non-exhaustive: because of the constraint [x]
+4 |        is of type [t]. *)
+5 |     match x with `A -> ())
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 `B
@@ -98,9 +99,9 @@ let f = function
 
 [%%expect
 {|
-Line 6, characters 6-8:
-6 |     | `C -> ()
-          ^^
+Line 2, characters 58-60:
+2 |   | (`A : t) as x -> ( match x with `A -> () | `B -> () | `C -> ())
+                                                              ^^
 Error: This pattern matches values of type "[? `C ]"
        but a pattern was expected which matches values of type "t"
        The second variant type does not allow tag(s) "`C"
@@ -123,10 +124,11 @@ let f = function
 
 [%%expect
 {|
-Lines 5-7, characters 4-7:
-5 | ....begin match x with
-6 |     | `A -> ()
-7 |     end
+Lines 2-5, characters 27-26:
+2 | ...........................(
+3 |     (* This should be flagged as non-exhaustive: because of the constraint [x]
+4 |        is of type [t]. *)
+5 |     match x with `A -> ())
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 `B
@@ -143,10 +145,11 @@ let f = function
 
 [%%expect
 {|
-Lines 5-7, characters 4-7:
-5 | ....begin match x with
-6 |     | `A -> ()
-7 |     end
+Lines 2-5, characters 27-26:
+2 | ...........................(
+3 |     (* This should be flagged as non-exhaustive: because of the constraint [x]
+4 |        is of type [t]. *)
+5 |     match x with `A -> ())
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 `B

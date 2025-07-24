@@ -30,9 +30,9 @@ let f : [`L of (s, t) eql | `R of silly] -> 'a = function
 
 [%%expect
 {|
-Line 2, characters 2-30:
-2 |   function `R {silly} -> silly
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-2, characters 49-25:
+1 | .................................................function
+2 |   | `R { silly } -> silly
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 `L Refl

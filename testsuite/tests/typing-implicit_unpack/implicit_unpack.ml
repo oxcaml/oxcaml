@@ -71,7 +71,7 @@ let f (module M : S with type t = 'a) = M.x
 [%%expect
 {|
 Line 1, characters 14-15:
-1 | let f (module M : S with type t = 'a) = M.x;; (* Error *)
+1 | let f (module M : S with type t = 'a) = M.x
                   ^
 Error: The type of this packed module contains variables:
        "(module S with type t = 'a)"
@@ -116,9 +116,9 @@ let f { s = (module M) } = M.x
 (* Error *)
 [%%expect
 {|
-Line 1, characters 9-19:
-1 | let f {s=(module M)} = M.x;; (* Error *)
-             ^^^^^^^^^^
+Line 1, characters 12-22:
+1 | let f { s = (module M) } = M.x
+                ^^^^^^^^^^
 Error: The type of this packed module contains variables:
        "(module S with type t = 'a)"
 |}]
@@ -166,9 +166,10 @@ let m =
 (* Error *)
 [%%expect
 {|
-Line 1, characters 8-37:
-1 | let m = (module struct let x = 3 end);; (* Error *)
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-6:
+2 | ..(module struct
+3 |     let x = 3
+4 |   end)
 Error: The signature for this packaged module couldn't be inferred.
 |}]
 
@@ -211,7 +212,7 @@ let (module M) = m
 [%%expect
 {|
 Line 1, characters 4-14:
-1 | let (module M) = m;; (* Error: only allowed in [let .. in] *)
+1 | let (module M) = m
         ^^^^^^^^^^
 Error: Modules are not allowed in this pattern.
 |}]
@@ -223,9 +224,9 @@ class c =
 (* Error again *)
 [%%expect
 {|
-Line 1, characters 14-24:
-1 | class c = let (module M) = m in object end;; (* Error again *)
-                  ^^^^^^^^^^
+Line 2, characters 6-16:
+2 |   let (module M) = m in
+          ^^^^^^^^^^
 Error: Modules are not allowed in this pattern.
 |}]
 
@@ -620,9 +621,12 @@ let x =
 [%%expect
 {|
 module type S = sig type t end
-Line 4, characters 10-51:
-4 |   (module struct type elt = A type t = elt list end : S with type t = _ list)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 6-10, characters 10-5:
+ 6 | ..........struct
+ 7 |     type elt = A
+ 8 |
+ 9 |     type t = elt list
+10 |   end....
 Error: The type "t" in this module cannot be exported.
        Its type contains local dependencies: "elt list"
 |}]
@@ -649,9 +653,10 @@ let x : 'a s =
 
 [%%expect
 {|
-Line 1, characters 23-44:
-1 | let x : 'a s = (module struct type t = A end);;
-                           ^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 10-5:
+2 | ..........struct
+3 |     type t = A
+4 |   end.
 Error: The type "t" in this module cannot be exported.
        Its type contains local dependencies: "t"
 |}]
@@ -661,7 +666,7 @@ let x : 'a s = (module struct end)
 [%%expect
 {|
 Line 1, characters 23-33:
-1 | let x : 'a s = (module struct end);;
+1 | let x : 'a s = (module struct end)
                            ^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match: sig end is not included in S

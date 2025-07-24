@@ -7,7 +7,7 @@ let x = [%src_pos]
 [%%expect
 {|
 val x : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 24; pos_cnum = 32}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 27; pos_cnum = 35}
 |}]
 
 let f ~(call_pos : [%call_pos]) () = call_pos
@@ -21,7 +21,7 @@ let _ = f ~call_pos:x ()
 [%%expect
 {|
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 1; pos_bol = 24; pos_cnum = 32}
+{pos_fname = ""; pos_lnum = 1; pos_bol = 27; pos_cnum = 35}
 |}]
 
 let _ = "Increment line count"
@@ -32,7 +32,11 @@ let _ = f ~call_pos:[%src_pos] ()
 {|
 - : string = "Increment line count"
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 2; pos_bol = 438; pos_cnum = 458}
+{pos_fname = ""; pos_lnum = 3; pos_bol = 440; pos_cnum = 460}
+|}, Principal{|
+- : string = "Increment line count"
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 3; pos_bol = 642; pos_cnum = 662}
 |}]
 
 (* passing an argment explicitly as call_pos *)
@@ -61,7 +65,10 @@ let _ =
 [%%expect
 {|
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 4; pos_bol = 1164; pos_cnum = 1186}
+{pos_fname = ""; pos_lnum = 6; pos_bol = 1152; pos_cnum = 1162}
+|}, Principal{|
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 6; pos_bol = 1490; pos_cnum = 1500}
 |}]
 
 (* call_pos type annotations not permitted anywhere other than labelled arg
@@ -70,9 +77,9 @@ let error1 x : [%call_pos] = x
 
 [%%expect
 {|
-Line 1, characters 22-30:
-1 | let error1 x = (x : [%call_pos])
-                          ^^^^^^^^
+Line 1, characters 17-25:
+1 | let error1 x : [%call_pos] = x
+                     ^^^^^^^^
 Error: [%call_pos] can only exist as the type of a labelled argument
 |}]
 

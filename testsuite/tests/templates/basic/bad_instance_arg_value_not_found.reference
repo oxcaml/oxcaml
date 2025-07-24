@@ -1,4 +1,4 @@
-File "bad_instance_arg_value_not_found.ml", line 2, characters 2-61:
-2 |   Monoid_utils(Monoid)(Banana) [@jane.non_erasable.instances]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "bad_instance_arg_value_not_found.ml", lines 1-2, characters 29-30:
+1 | .............................(Monoid_utils (Monoid)) (Banana)
+2 | [@jane.non_erasable.instances]
 Error: Unbound module "Banana" in instance "Monoid_utils[Monoid:Banana]"

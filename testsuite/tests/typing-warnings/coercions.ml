@@ -79,12 +79,10 @@ end
 [%%expect
 {|
 module Test1 : sig type t = private int val f : t -> int end
-|},
-  Principal
-    {|
-Line 3, characters 49-59:
-3 |   let f x = let y = if true then x else (x:t) in (y :> int)
-                                                     ^^^^^^^^^^
+|}, Principal{|
+Line 6, characters 4-14:
+6 |     (y :> int)
+        ^^^^^^^^^^
 Warning 18 [not-principal]: this ground coercion is not principal.
 
 module Test1 : sig type t = private int val f : t -> int end

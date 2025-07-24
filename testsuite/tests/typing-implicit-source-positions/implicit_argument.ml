@@ -37,8 +37,8 @@ let _ = g ()
 [%%expect
 {|
 - : lexing_position * lexing_position =
-({pos_fname = ""; pos_lnum = 1; pos_bol = 560; pos_cnum = 568},
- {pos_fname = ""; pos_lnum = 1; pos_bol = 560; pos_cnum = 568})
+({pos_fname = ""; pos_lnum = 1; pos_bol = 559; pos_cnum = 567},
+ {pos_fname = ""; pos_lnum = 1; pos_bol = 559; pos_cnum = 567})
 |}]
 
 let h ~(a : [%call_pos]) ~(b : [%call_pos]) () :
@@ -65,7 +65,11 @@ let y = x ()
 [%%expect
 {|
 val y : lexing_position * lexing_position =
-  ({pos_fname = ""; pos_lnum = 1; pos_bol = 1135; pos_cnum = 1143},
+  ({pos_fname = ""; pos_lnum = 1; pos_bol = 1145; pos_cnum = 1153},
+   {pos_fname = "b"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1})
+|}, Principal{|
+val y : lexing_position * lexing_position =
+  ({pos_fname = ""; pos_lnum = 1; pos_bol = 1329; pos_cnum = 1337},
    {pos_fname = "b"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1})
 |}]
 
@@ -88,7 +92,10 @@ let _ = k ()
 [%%expect
 {|
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 1; pos_bol = 1343; pos_cnum = 1352}
+{pos_fname = ""; pos_lnum = 1; pos_bol = 1353; pos_cnum = 1362}
+|}, Principal{|
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 1; pos_bol = 1729; pos_cnum = 1738}
 |}]
 
 let m ~(call_pos : [%call_pos]) = ()
@@ -96,7 +103,7 @@ let m ~(call_pos : [%call_pos]) = ()
 [%%expect
 {|
 Line 1, characters 8-16:
-1 | let m ~(call_pos:[%call_pos]) = ()
+1 | let m ~(call_pos : [%call_pos]) = ()
             ^^^^^^^^
 Warning 188 [unerasable-position-argument]: this position argument cannot be erased.
 

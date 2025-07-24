@@ -58,11 +58,11 @@ match px with
 
 [%%expect
 {|
-Lines 1-4, characters 0-24:
+Lines 1-4, characters 0-30:
 1 | match px with
-2 | | {pv=[]} -> "OK"
-3 | | {pv=5::_} -> "int"
-4 | | {pv=true::_} -> "bool"
+2 | | { pv = [] } -> "OK"
+3 | | { pv = 5 :: _ } -> "int"
+4 | | { pv = true :: _ } -> "bool"
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 {pv=false::_}
@@ -78,11 +78,11 @@ match px with
 
 [%%expect
 {|
-Lines 1-4, characters 0-20:
+Lines 1-4, characters 0-26:
 1 | match px with
-2 | | {pv=[]} -> "OK"
-3 | | {pv=true::_} -> "bool"
-4 | | {pv=5::_} -> "int"
+2 | | { pv = [] } -> "OK"
+3 | | { pv = true :: _ } -> "bool"
+4 | | { pv = 5 :: _ } -> "int"
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 {pv=0::_}
@@ -380,12 +380,10 @@ class ['a] ostream1 :
     method hd : 'a
     method tl : 'b
   end
-|},
-  Principal
-    {|
-Line 8, characters 4-16:
-8 |     self#tl#fold ~f ~init:(f self#hd init)
-        ^^^^^^^^^^^^
+|}, Principal{|
+Line 13, characters 27-39:
+13 |     method fold ~f ~init = self#tl#fold ~f ~init:(f self#hd init)
+                                ^^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
 class ['a] ostream1 :
@@ -579,9 +577,9 @@ val cp : color_point = <obj>
 val c : circle = <obj>
 val d : float = 11.
 val f : < m : 'a. 'a -> 'a > -> < m : 'b. 'b -> 'b > = <fun>
-Line 9, characters 41-42:
-9 | let f (x : < m : 'a. 'a -> 'a list >) = (x : < m : 'b. 'b -> 'c >)
-                                             ^
+Line 13, characters 63-64:
+13 | let f (x : < m : 'a. 'a -> 'a list >) : < m : 'b. 'b -> 'c > = x
+                                                                    ^
 Error: This expression has type "< m : 'b. 'b -> 'b list >"
        but an expression was expected of type "< m : 'b. 'b -> 'c >"
        The method "m" has type "'b. 'b -> 'b list",
@@ -643,9 +641,9 @@ class ['a] id1 =
 
 [%%expect
 {|
-Line 3, characters 12-17:
-3 |   method id x = x
-                ^^^^^
+Line 5, characters 14-19:
+5 |     method id x = x
+                  ^^^^^
 Error: This method has type "'a -> 'a" which is less general than "'b. 'b -> 'a"
 |}]
 
@@ -658,9 +656,9 @@ class id2 (x : 'a) =
 
 [%%expect
 {|
-Line 3, characters 12-17:
-3 |   method id x = x
-                ^^^^^
+Line 5, characters 14-19:
+5 |     method id x = x
+                  ^^^^^
 Error: This method has type "'a -> 'a" which is less general than "'b. 'b -> 'a"
 |}]
 
@@ -675,9 +673,9 @@ class id3 x =
 
 [%%expect
 {|
-Line 4, characters 12-17:
-4 |   method id _ = x
-                ^^^^^
+Line 7, characters 14-19:
+7 |     method id _ = x
+                  ^^^^^
 Error: This method has type "'b -> 'b" which is less general than "'a. 'a -> 'a"
 |}]
 
@@ -697,11 +695,13 @@ class id4 () =
 
 [%%expect
 {|
-Lines 4-7, characters 12-17:
-4 | ............x =
-5 |     match r with
-6 |       None -> r <- Some x; x
-7 |     | Some y -> y
+Lines 7-12, characters 14-19:
+ 7 | ..............x =
+ 8 |       match r with
+ 9 |       | None ->
+10 |         r <- Some x;
+11 |         x
+12 |       | Some y -> y
 Error: This method has type "'b -> 'b" which is less general than "'a. 'a -> 'a"
 |}]
 
@@ -765,9 +765,9 @@ type 'a foo = 'a foo list
 {|
 class id2 : object method id : 'a -> 'a method mono : int -> int end
 val app : int * bool = (1, true)
-Line 9, characters 0-25:
-9 | type 'a foo = 'a foo list
-    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 12, characters 0-25:
+12 | type 'a foo = 'a foo list
+     ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "foo" is cyclic:
          "'a foo" = "'a foo list",
          "'a foo list" contains "'a foo"
@@ -1053,9 +1053,9 @@ bad2.bad2 <- Some (ref None)
 [%%expect
 {|
 type bad = { bad : 'a. 'a option ref; }
-Line 2, characters 17-25:
-2 | let bad = {bad = ref None};;
-                     ^^^^^^^^
+Line 3, characters 18-26:
+3 | let bad = { bad = ref None }
+                      ^^^^^^^^
 Error: This field value has type "'b option ref" which is less general than
          "'a. 'a option ref"
 |}]
@@ -1130,9 +1130,9 @@ and virtual int_list =
 
 [%%expect
 {|
-Line 4, characters 30-51:
-4 | object method virtual visit : 'a.('a visitor -> 'a) end;;
-                                  ^^^^^^^^^^^^^^^^^^^^^
+Line 8, characters 27-47:
+8 |     method virtual visit : 'a. 'a visitor -> 'a
+                               ^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable "'a" cannot be generalized:
        it escapes its scope.
 |}]
@@ -1169,7 +1169,7 @@ and u = t
 [%%expect
 {|
 Line 1, characters 0-10:
-1 | type t = u and u = t;;
+1 | type t = u
     ^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "t" = "u",
@@ -1197,9 +1197,9 @@ and ('a, 'b) u = ('a, 'b) t
 
 [%%expect
 {|
-Line 1, characters 50-59:
-1 | type ('a,'b) t constraint 'a = 'b and ('a,'b) u = ('a,'b) t;;
-                                                      ^^^^^^^^^
+Line 3, characters 17-27:
+3 | and ('a, 'b) u = ('a, 'b) t
+                     ^^^^^^^^^^
 Error: Constraints are not satisfied in this type.
        Type "('a, 'b) t" should be an instance of "('c, 'c) t"
 |}]
@@ -1228,9 +1228,9 @@ and 'a v = 'a u t constraint 'a = int
 [%%expect
 {|
 type 'a t constraint 'a = int
-Line 2, characters 26-32:
-2 | type 'a u = 'a and 'a v = 'a u t;;
-                              ^^^^^^
+Line 5, characters 11-17:
+5 | and 'a v = 'a u t
+               ^^^^^^
 Error: Constraints are not satisfied in this type.
        Type "'a u t" should be an instance of "int t"
 |}]
@@ -1252,9 +1252,9 @@ and 'a v = 'a u t constraint 'a = int
 {|
 type g = int
 type 'a t = unit constraint 'a = g
-Line 3, characters 26-32:
-3 | type 'a u = 'a and 'a v = 'a u t;;
-                              ^^^^^^
+Line 7, characters 11-17:
+7 | and 'a v = 'a u t
+               ^^^^^^
 Error: Constraints are not satisfied in this type.
        Type "'a u t" should be an instance of "g t"
 |}]
@@ -1266,9 +1266,9 @@ and 'a u = (float, string) t
 
 [%%expect
 {|
-Line 3, characters 13-29:
-3 |   and 'a u = (float,string) t;;
-                 ^^^^^^^^^^^^^^^^
+Line 3, characters 11-28:
+3 | and 'a u = (float, string) t
+               ^^^^^^^^^^^^^^^^^
 Error: Constraints are not satisfied in this type.
        Type "(float, string) t" should be an instance of "(int, int) t"
        Type "float" is not compatible with type "int"
@@ -1282,7 +1282,7 @@ and 'a v = 'a list u
 [%%expect
 {|
 Line 1, characters 0-24:
-1 | type 'a u = < m : 'a v > and 'a v = 'a list u;;
+1 | type 'a u = < m : 'a v >
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "u" is defined as
@@ -1334,9 +1334,9 @@ and ('a2, 'b2) ty2 = 'b2 -> unit
 
 [%%expect
 {|
-Lines 1-2, characters 0-51:
+Lines 1-2, characters 0-53:
 1 | type ('a1, 'b1) ty1 = 'a1 -> unit
-2 |   constraint 'a1 = [> `V1 of ('a1, 'b1) ty2 as 'b1]
+2 |   constraint 'a1 = [> `V1 of (('a1, 'b1) ty2 as 'b1)]
 Error: The definition of "ty1" contains a cycle:
          "([> `V1 of 'a ] as 'b, 'a) ty2 as 'a" contains "'a"
 |}]
@@ -1476,16 +1476,19 @@ let o =
 class c : object method m : int end
 val f : unit -> c = <fun>
 val f : unit -> c = <fun>
-Line 4, characters 11-60:
-4 | let f () = object method private n = 1 method m = {<>}#n end;;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 19-23, characters 2-5:
+19 | ..object
+20 |     method private n = 1
+21 |
+22 |     method m = {<>}#n
+23 |   end
 Warning 15 [implicit-public-methods]: the following private methods were made public implicitly:
  n.
 
 val f : unit -> < m : int; n : int > = <fun>
-Line 5, characters 27-39:
-5 | let f () = object (self:c) method n = 1 method m = 2 end;;
-                               ^^^^^^^^^^^^
+Line 27, characters 4-16:
+27 |     method n = 1
+         ^^^^^^^^^^^^
 Error: This object is expected to have type : "c"
        This type does not have a method "n".
 |}]
@@ -1508,9 +1511,9 @@ let f (x : foo') : bar' = x
 
 [%%expect
 {|
-Line 2, characters 3-4:
-2 |   (x : <m : 'a. 'a * (<m:'b. 'a * <m:'c. 'c * 'bar> > as 'bar) >);;
-       ^
+Line 3, characters 2-3:
+3 |   x
+      ^
 Error: This expression has type "< m : 'a. 'a * < m : 'a * 'b > > as 'b"
        but an expression was expected of type
          "< m : 'a. 'a * (< m : 'a * < m : 'c. 'c * 'd > > as 'd) >"
@@ -1543,9 +1546,9 @@ let f x =
 
 [%%expect
 {|
-Line 2, characters 3-4:
-2 |   (x : <m : 'b. 'b * ('b * <m : 'c. 'c * ('c * 'bar)>)> as 'bar);;
-       ^
+Line 3, characters 2-3:
+3 |   x
+      ^
 Error: This expression has type
          "< m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) >"
        but an expression was expected of type
@@ -1569,9 +1572,10 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-64:
-3 | = struct let f (x : <m : 'a. 'a * ('a * 'foo)> as 'foo) = () end;;
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (x : < m : 'a. 'a * ('a * 'foo) > as 'foo) = ()
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit end
@@ -1676,9 +1680,9 @@ type v = private [> t ]
 - : t -> v = <fun>
 type u = private [< t ]
 - : u -> v = <fun>
-Line 6, characters 9-21:
-6 | fun x -> (x : v :> u);;
-             ^^^^^^^^^^^^
+Line 13, characters 9-21:
+13 | fun x -> (x : v :> u)
+              ^^^^^^^^^^^^
 Error: Type "v" = "[> `A | `B ]" is not a subtype of "u" = "[< `A | `B ]"
 |}]
 
@@ -1711,9 +1715,10 @@ let f6 x =
 
 [%%expect
 {|
-Lines 2-3, characters 2-47:
-2 | ..(x : <m:'a. (<p:int;..> as 'a) -> int>
-3 |     :> <m:'b. (<p:int;q:int;..> as 'b) -> int>)..
+Lines 2-4, characters 2-61:
+2 | ..(x
+3 |     : < m : 'a. (< p : int ; .. > as 'a) -> int >
+4 |     :> < m : 'b. (< p : int ; q : int ; .. > as 'b) -> int >)
 Error: Type "< m : 'a. (< p : int; .. > as 'a) -> int >" is not a subtype of
          "< m : 'b. (< p : int; q : int; .. > as 'b) -> int >"
        Type "< p : int; q : int; .. >" is not a subtype of "< p : int; .. >"
@@ -1743,27 +1748,25 @@ val f : < m : 'a. 'a -> 'a > * 'b -> < m : 'a. 'a -> 'a > = <fun>
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
 val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > array = <fun>
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
-|},
-  Principal
-    {|
+|}, Principal{|
 val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > = <fun>
-Line 2, characters 9-16:
-2 | fun x -> (f x)#m;; (* Warning 18 *)
+Line 3, characters 9-16:
+3 | fun x -> (f x)#m
              ^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
 val f : < m : 'a. 'a -> 'a > * 'b -> < m : 'a. 'a -> 'a > = <fun>
-Line 4, characters 9-20:
-4 | fun x -> (f (x,x))#m;; (* Warning 18 *)
-             ^^^^^^^^^^^
+Line 8, characters 9-21:
+8 | fun x -> (f (x, x))#m
+             ^^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
 val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > array = <fun>
-Line 6, characters 9-20:
-6 | fun x -> (f x).(0)#m;; (* Warning 18 *)
-             ^^^^^^^^^^^
+Line 13, characters 9-20:
+13 | fun x -> (f x).(0)#m
+              ^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
 - : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
@@ -1810,21 +1813,19 @@ val just : 'a option -> 'a = <fun>
 val f : c -> 'a -> 'a = <fun>
 val g : c -> 'a -> 'a = <fun>
 val h : < id : 'a; .. > -> 'a = <fun>
-|},
-  Principal
-    {|
+|}, Principal{|
 class c : object method id : 'a -> 'a end
 type u = c option
 val just : 'a option -> 'a = <fun>
-Line 4, characters 42-62:
-4 | let f x = let l = [Some x; (None : u)] in (just(List.hd l))#id;;
-                                              ^^^^^^^^^^^^^^^^^^^^
+Line 12, characters 2-23:
+12 |   (just (List.hd l))#id
+       ^^^^^^^^^^^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
 val f : c -> 'a -> 'a = <fun>
-Line 7, characters 36-47:
-7 |   let x = List.hd [Some x; none] in (just x)#id;;
-                                        ^^^^^^^^^^^
+Line 22, characters 2-13:
+22 |   (just x)#id
+       ^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
 val g : c -> 'a -> 'a = <fun>
@@ -1893,9 +1894,9 @@ type 'a t = Leaf of 'a | Node of ('a * 'a) t
 val depth : 'a t -> int = <fun>
 val depth : 'a t -> int = <fun>
 val d : ('a * 'a) t -> int = <fun>
-Line 9, characters 2-46:
-9 |   function Leaf x -> x | Node x -> 1 + depth x;; (* fails *)
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 16, characters 32-76:
+16 | let rec depth : 'a. 'a t -> _ = function Leaf x -> x | Node x -> 1 + depth x
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This definition has type "int t -> int" which is less general than
          "'a. 'a t -> int"
 |}]
@@ -1915,9 +1916,9 @@ let zero = { f = `Int 0 }
 type t = { f : 'a. [> `B of 'a | `Int of int ] as 'a; }
 val zero : t = {f = `Int 0}
 type t = { f : 'a. [< `Int of int ] as 'a; }
-Line 4, characters 16-22:
-4 | let zero = {f = `Int 0} ;; (* fails *)
-                    ^^^^^^
+Line 7, characters 17-23:
+7 | let zero = { f = `Int 0 }
+                     ^^^^^^
 Error: This expression has type "[> `Int of int ]"
        but an expression was expected of type "[< `Int of int ]"
        The second variant type is bound to the universal type variable "'a",
@@ -1990,9 +1991,9 @@ let f ?x y = y in
 {|
 type t = { f : 'a. 'a -> unit; }
 - : t = {f = <fun>}
-Line 3, characters 19-20:
-3 | let f ?x y = y in {f};; (* fail *)
-                       ^
+Line 8, characters 2-3:
+8 | { f }
+      ^
 Error: This field value has type "unit -> unit" which is less general than
          "'a. 'a -> unit"
 |}]
@@ -2045,7 +2046,7 @@ type 'x t = < f : 'y. 'y t >
 [%%expect
 {|
 Line 1, characters 0-28:
-1 | type 'x t = < f : 'y. 'y t >;;
+1 | type 'x t = < f : 'y. 'y t >
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
@@ -2103,9 +2104,10 @@ let (n : < m : 'a. [< `Foo of int] -> 'a >) =
 
 [%%expect
 {|
-Line 2, characters 2-72:
-2 |   object method m : 'x. [< `Foo of 'x] -> 'x = fun x -> assert false end;;
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method m : 'x. [< `Foo of 'x] -> 'x = fun x -> assert false
+4 |   end
 Error: This expression has type "< m : 'b 'x. ([< `Foo of 'x ] as 'b) -> 'x >"
        but an expression was expected of type
          "< m : 'a. [< `Foo of int ] -> 'a >"
@@ -2121,9 +2123,10 @@ let (n : 'b -> < m : 'a. ([< `Foo of int] as 'b) -> 'a >) =
 
 [%%expect
 {|
-Line 2, characters 2-72:
-2 |   object method m : 'x. [< `Foo of 'x] -> 'x = fun x -> assert false end;;
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 3-5, characters 2-5:
+3 | ..object
+4 |     method m : 'x. [< `Foo of 'x] -> 'x = fun x -> assert false
+5 |   end
 Error: This expression has type "< m : 'b 'x. ([< `Foo of 'x ] as 'b) -> 'x >"
        but an expression was expected of type
          "< m : 'a. [< `Foo of int ] -> 'a >"
@@ -2149,9 +2152,9 @@ let f (n : < m : 'a 'r. ([< `Foo of 'a & int | `Bar] as 'r) >) :
 
 [%%expect
 {|
-Line 2, characters 3-4:
-2 |   (n : < m : 'b 'r. [< `Foo of int & 'b | `Bar] as 'r >)
-       ^
+Line 3, characters 2-3:
+3 |   n
+      ^
 Error: This expression has type
          "< m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c >"
        but an expression was expected of type
@@ -2181,8 +2184,8 @@ let f b (x : 'x) =
 
 [%%expect
 {|
-Line 3, characters 19-22:
-3 |   if b then x else M.A;;
+Line 5, characters 19-22:
+5 |   if b then x else M.A
                        ^^^
 Error: This expression has type "M.t" but an expression was expected of type "'x"
        The type constructor "M.t" would escape its scope
@@ -2293,9 +2296,9 @@ and g = < a : t >
 
 [%%expect
 {|
-Line 1, characters 10-11:
-1 | type t = <g>
-              ^
+Line 1, characters 11-12:
+1 | type t = < g >
+               ^
 Error: The type constructor "g" is not yet completely defined
 |}]
 
@@ -2306,9 +2309,9 @@ type g = < t >
 [%%expect
 {|
 type t = int
-Line 2, characters 10-11:
-2 | type g = <t>
-              ^
+Line 3, characters 11-12:
+3 | type g = < t >
+               ^
 Error: The type "int" is not an object type
 |}]
 
@@ -2369,9 +2372,9 @@ type gg = < a : int -> float ; a : int >
 
 [%%expect
 {|
-Line 1, characters 27-30:
-1 | type gg = <a:int->float; a:int>
-                               ^^^
+Line 1, characters 35-38:
+1 | type gg = < a : int -> float ; a : int >
+                                       ^^^
 Error: Method "a" has type "int", which should be "int -> float"
 |}]
 
@@ -2382,9 +2385,9 @@ type g = < b : float ; t >
 [%%expect
 {|
 type t = < a : int; b : string >
-Line 2, characters 19-20:
-2 | type g = <b:float; t;>
-                       ^
+Line 3, characters 23-24:
+3 | type g = < b : float ; t >
+                           ^
 Error: Method "b" has type "string", which should be "float"
 |}]
 
@@ -2460,9 +2463,12 @@ class ['a] r =
 
 [%%expect
 {|
-Line 1, characters 0-63:
-1 | class ['a] r = let r : 'a = ref [] in object method get = r end;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-5, characters 0-5:
+1 | class ['a] r =
+2 |   let r : 'a = ref [] in
+3 |   object
+4 |     method get = r
+5 |   end
 Error: The type of this class,
        "class ['a] r :
          object constraint 'a = '_weak2 list ref method get : 'a end",
@@ -2524,9 +2530,9 @@ let rec foo : 'a. 'a -> 'd = fun x -> x
 
 [%%expect
 {|
-Line 1, characters 30-40:
-1 | let rec foo : 'a . 'a -> 'd = fun x -> x
-                                  ^^^^^^^^^^
+Line 1, characters 29-39:
+1 | let rec foo : 'a. 'a -> 'd = fun x -> x
+                                 ^^^^^^^^^^
 Error: This definition has type "'b -> 'b" which is less general than
          "'a. 'a -> 'c"
 |}]
@@ -2551,10 +2557,10 @@ let x : 'a c =
 
 [%%expect
 {|
-Lines 1-3, characters 15-3:
-1 | ...............object
-2 |   method x : 'b . 'b s list = [S]
-3 | end
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method x : 'b. 'b s list = [S]
+4 |   end
 Error: This expression has type "< x : 'b. 'b s list >"
        but an expression was expected of type "'a c"
        The method "x" has type "'b. 'b s list", but the expected method type was
@@ -2576,9 +2582,9 @@ let f (x : u) : v = x
 
 [%%expect
 {|
-Line 1, characters 17-18:
-1 | let f (x : u) = (x : v)
-                     ^
+Line 1, characters 20-21:
+1 | let f (x : u) : v = x
+                        ^
 Error: This expression has type "u" but an expression was expected of type "v"
        The method "m" has type "'a s list * < m : 'b > as 'b",
        but the expected method type was "'a. 'a s list * < m : 'a. 'c > as 'c"
@@ -2598,10 +2604,10 @@ let x : 'a c =
 
 [%%expect
 {|
-Lines 1-3, characters 15-3:
-1 | ...............object
-2 |   method x : 'b . 'b s list = []
-3 | end
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method x : 'b. 'b s list = []
+4 |   end
 Error: This expression has type "< x : 'b. 'b s list >"
        but an expression was expected of type "'a c"
        The method "x" has type "'b. 'b s list", but the expected method type was
@@ -2617,9 +2623,9 @@ let f x =
 
 [%%expect
 {|
-Line 2, characters 6-44:
-2 |   let ref : type a . a option ref = ref None in
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 6-43:
+2 |   let ref : type a. a option ref = ref None in
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This definition has type "'a option ref" which is less general than
          "'a0. 'a0 option ref"
 |}]
@@ -2631,8 +2637,8 @@ let x = { foo = ref None }
 [%%expect
 {|
 type pr = { foo : 'a. 'a option ref; }
-Line 2, characters 16-24:
-2 | let x = { foo = ref None }
+Line 3, characters 16-24:
+3 | let x = { foo = ref None }
                     ^^^^^^^^
 Error: This field value has type "'b option ref" which is less general than
          "'a. 'a option ref"
@@ -2678,9 +2684,9 @@ let fail : 'a. 'a -> [> `X of 'a] -> 'a =
 
 [%%expect
 {|
-Line 3, characters 4-6:
-3 |   | `Y -> x
-        ^^
+Line 2, characters 25-27:
+2 |  fun x y -> match y with `Y -> x | `X x -> x
+                             ^^
 Error: This pattern matches values of type "[? `Y ]"
        but a pattern was expected which matches values of type "[> `X of 'a ]"
        The second variant type is bound to the universal type variable "'b",
@@ -2713,9 +2719,10 @@ let explicitly_quantified_row : 'a 'r. (< x : 'a ; .. > as 'r) -> 'a =
 
 [%%expect
 {|
-Line 1, characters 65-85:
-1 | let explicitly_quantified_row: 'a 'r. (<x:'a; ..> as 'r) -> 'a = fun o -> o#y (); o#x
-                                                                     ^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 1-5:
+2 | .fun o ->
+3 |   o#y ();
+4 |   o#x
 Error: This definition has type "'b. < x : 'b; y : unit -> 'c; .. > -> 'b"
        which is less general than "'a 'd. (< x : 'a; .. > as 'd) -> 'a"
 |}]
@@ -2729,10 +2736,12 @@ class type ['a] c =
 
 [%%expect
 {|
-Lines 1-3, characters 0-3:
-1 | class type ['a] c = object
-2 |   method m: 'b. <n:'irr. ('irr -> unit) * (<x: 'a; y: 'b; .. > -> 'a) >
-3 | end
+Lines 1-5, characters 0-5:
+1 | class type ['a] c =
+2 |   object
+3 |     method m :
+4 |       'b. < n : 'irr. ('irr -> unit) * (< x : 'a ; y : 'b ; .. > -> 'a) >
+5 |   end
 Error: Some type variables are unbound in this type:
          class type ['a] c =
            object
@@ -2786,9 +2795,9 @@ let fail : 'a. 'a -> [> `X of 'a] -> 'a =
 
 [%%expect
 {|
-Line 3, characters 4-6:
-3 |   | `Y -> x
-        ^^
+Line 2, characters 25-27:
+2 |  fun x y -> match y with `Y -> x | `X x -> x
+                             ^^
 Error: This pattern matches values of type "[? `Y ]"
        but a pattern was expected which matches values of type "[> `X of 'a ]"
        The second variant type is bound to the universal type variable "'b",
@@ -2821,9 +2830,10 @@ let explicitly_quantified_row : 'a 'r. (< x : 'a ; .. > as 'r) -> 'a =
 
 [%%expect
 {|
-Line 1, characters 65-85:
-1 | let explicitly_quantified_row: 'a 'r. (<x:'a; ..> as 'r) -> 'a = fun o -> o#y (); o#x
-                                                                     ^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 1-5:
+2 | .fun o ->
+3 |   o#y ();
+4 |   o#x
 Error: This definition has type "'b. < x : 'b; y : unit -> 'c; .. > -> 'b"
        which is less general than "'a 'd. (< x : 'a; .. > as 'd) -> 'a"
 |}]
@@ -2837,10 +2847,12 @@ class type ['a] c =
 
 [%%expect
 {|
-Lines 1-3, characters 0-3:
-1 | class type ['a] c = object
-2 |   method m: 'b. <n:'irr. ('irr -> unit) * (<x: 'a; y: 'b; .. > -> 'a) >
-3 | end
+Lines 1-5, characters 0-5:
+1 | class type ['a] c =
+2 |   object
+3 |     method m :
+4 |       'b. < n : 'irr. ('irr -> unit) * (< x : 'a ; y : 'b ; .. > -> 'a) >
+5 |   end
 Error: Some type variables are unbound in this type:
          class type ['a] c =
            object
@@ -2894,9 +2906,9 @@ let fail : 'a. 'a -> [> `X of 'a] -> 'a =
 
 [%%expect
 {|
-Line 3, characters 4-6:
-3 |   | `Y -> x
-        ^^
+Line 2, characters 25-27:
+2 |  fun x y -> match y with `Y -> x | `X x -> x
+                             ^^
 Error: This pattern matches values of type "[? `Y ]"
        but a pattern was expected which matches values of type "[> `X of 'a ]"
        The second variant type is bound to the universal type variable "'b",
@@ -2929,9 +2941,10 @@ let explicitly_quantified_row : 'a 'r. (< x : 'a ; .. > as 'r) -> 'a =
 
 [%%expect
 {|
-Line 1, characters 65-85:
-1 | let explicitly_quantified_row: 'a 'r. (<x:'a; ..> as 'r) -> 'a = fun o -> o#y (); o#x
-                                                                     ^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 1-5:
+2 | .fun o ->
+3 |   o#y ();
+4 |   o#x
 Error: This definition has type "'b. < x : 'b; y : unit -> 'c; .. > -> 'b"
        which is less general than "'a 'd. (< x : 'a; .. > as 'd) -> 'a"
 |}]
@@ -2945,10 +2958,12 @@ class type ['a] c =
 
 [%%expect
 {|
-Lines 1-3, characters 0-3:
-1 | class type ['a] c = object
-2 |   method m: 'b. <n:'irr. ('irr -> unit) * (<x: 'a; y: 'b; .. > -> 'a) >
-3 | end
+Lines 1-5, characters 0-5:
+1 | class type ['a] c =
+2 |   object
+3 |     method m :
+4 |       'b. < n : 'irr. ('irr -> unit) * (< x : 'a ; y : 'b ; .. > -> 'a) >
+5 |   end
 Error: Some type variables are unbound in this type:
          class type ['a] c =
            object

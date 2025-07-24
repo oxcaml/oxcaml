@@ -12,8 +12,8 @@ let _ = g 3
 [%%expect
 {|
 val g : (unit -> 'a) -> 'a = <fun>
-Line 2, characters 10-11:
-2 | let _ = g 3;;       (* missing `fun () ->' *)
+Line 3, characters 10-11:
+3 | let _ = g 3
               ^
 Error: This expression has type "int" but an expression was expected of type
          "unit -> 'a"
@@ -30,9 +30,9 @@ let _ =
    about print_newline not being of type unit *)
 [%%expect
 {|
-Line 3, characters 3-16:
-3 |    print_newline;    (* missing unit argument *)
-       ^^^^^^^^^^^^^
+Line 3, characters 2-15:
+3 |   print_newline;
+      ^^^^^^^^^^^^^
 Error: This expression has type "unit -> unit"
        but an expression was expected of type "unit"
        because it is in the left-hand side of a sequence
@@ -46,8 +46,8 @@ print_int x
 
 [%%expect
 {|
-Line 2, characters 10-11:
-2 | print_int x;;
+Line 3, characters 10-11:
+3 | print_int x
               ^
 Error: This expression has type "unit -> int"
        but an expression was expected of type "int"
@@ -61,7 +61,7 @@ let g f =
 [%%expect
 {|
 Line 3, characters 6-7:
-3 |   f = 3;;
+3 |   f = 3
           ^
 Error: This expression has type "int" but an expression was expected of type
          "unit -> 'a"
@@ -75,7 +75,7 @@ let g f =
 [%%expect
 {|
 Line 3, characters 6-7:
-3 |   3 = f;;
+3 |   3 = f
           ^
 Error: This expression has type "unit -> 'a"
        but an expression was expected of type "int"

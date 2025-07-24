@@ -371,7 +371,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('b, 'a) bar = A of 'a
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('b, 'a) bar = A of 'a end
@@ -604,8 +604,8 @@ type 'a poly_and_contravariant += A | X of 'a
 [%%expect
 {|
 type -'b poly_and_contravariant = .. constraint 'b = < x : 'a. 'a -> 'a; .. >
-Line 2, characters 0-45:
-2 | type 'a poly_and_contravariant += A | X of 'a
+Line 3, characters 0-45:
+3 | type 'a poly_and_contravariant += A | X of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the extension constructor
          type 'a poly_and_contravariant += X of 'a

@@ -30,9 +30,9 @@ let foo :
    should change back to a better error message. *)
 [%%expect
 {|
-Line 2, characters 4-53:
-2 |   < m : 'left 'right. <left:'left; right:'right> pair >
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 6-62:
+2 |     < m : 'left 'right. < left : 'left ; right : 'right > pair > ->
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
        The layout of "'left 'right. < left : 'left; right : 'right > pair" is
            any

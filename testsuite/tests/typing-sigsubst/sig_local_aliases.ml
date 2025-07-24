@@ -95,9 +95,9 @@ end
 
 [%%expect
 {|
-Line 2, characters 22-23:
-2 |   type t := [ `Foo of t | `Nil ]
-                          ^
+Line 3, characters 14-15:
+3 |     [ `Foo of t
+                  ^
 Error: Unbound type constructor "t"
 |}]
 
@@ -119,8 +119,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 11-12:
-3 |   and u := t * int
+Line 4, characters 11-12:
+4 |   and u := t * int
                ^
 Error: Unbound type constructor "t"
 |}]

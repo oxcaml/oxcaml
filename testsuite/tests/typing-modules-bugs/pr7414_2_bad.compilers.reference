@@ -1,6 +1,6 @@
-File "pr7414_2_bad.ml", line 46, characters 22-35:
-46 |   let module Ignore = Force(Choose) in
-                           ^^^^^^^^^^^^^
+File "pr7414_2_bad.ml", line 49, characters 22-36:
+49 |   let module Ignore = Force (Choose) in
+                           ^^^^^^^^^^^^^^
 Error: Modules do not match:
        functor () -> sig module Choice : T val r : '_weak1 list ref ref end
      is not included in functor () -> S
@@ -15,5 +15,5 @@ Error: Modules do not match:
      The type "'_weak1 list ref ref" is not compatible with the type
        "Choice.t list ref ref"
      The type constructor "Choice.t" would escape its scope
-     File "pr7414_2_bad.ml", line 29, characters 2-31: Expected declaration
-     File "pr7414_2_bad.ml", line 40, characters 8-9: Actual declaration
+     File "pr7414_2_bad.ml", line 32, characters 2-31: Expected declaration
+     File "pr7414_2_bad.ml", line 43, characters 8-9: Actual declaration

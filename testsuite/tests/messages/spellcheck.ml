@@ -104,9 +104,9 @@ let _ =
 [%%expect
 {|
 class foobar : object  end
-Line 2, characters 23-29:
-2 | let _ = object inherit foobaz end
-                           ^^^^^^
+Line 5, characters 12-18:
+5 |     inherit foobaz
+                ^^^^^^
 Error: Unbound class "foobaz"
 Hint: Did you mean "foobar"?
 |}]
@@ -118,8 +118,8 @@ module Foo : Foobaz = struct end
 [%%expect
 {|
 module type Foobar = sig end
-Line 2, characters 13-19:
-2 | module Foo : Foobaz = struct end
+Line 3, characters 13-19:
+3 | module Foo : Foobaz = struct end
                  ^^^^^^
 Error: Unbound module type "Foobaz"
 Hint: Did you mean "Foobar"?
@@ -132,9 +132,9 @@ let (_ : #foobaz) = object end
 [%%expect
 {|
 class type foobar = object  end
-Line 2, characters 9-15:
-2 | let _ : #foobaz = object end
-             ^^^^^^
+Line 3, characters 10-16:
+3 | let (_ : #foobaz) = object end
+              ^^^^^^
 Error: Unbound class type "foobaz"
 Hint: Did you mean "foobar"?
 |}]
@@ -149,8 +149,8 @@ let _ =
 
 [%%expect
 {|
-Line 5, characters 22-33:
-5 |     method update n = foobaz <- n
+Line 6, characters 22-33:
+6 |     method update n = foobaz <- n
                           ^^^^^^^^^^^
 Error: The value "foobaz" is not an instance variable or mutable variable
 Hint: Did you mean "foobar"?
@@ -162,9 +162,9 @@ let _ = function foobar | foobaz -> ()
 
 [%%expect
 {|
-Line 1, characters 17-34:
-1 | let _ = function (foobar | foobaz) -> ()
-                     ^^^^^^^^^^^^^^^^^
+Line 1, characters 17-32:
+1 | let _ = function foobar | foobaz -> ()
+                     ^^^^^^^^^^^^^^^
 Error: Variable "foobar" must occur on both sides of this "|" pattern
 Hint: Did you mean "foobaz"?
 |}]
@@ -176,9 +176,9 @@ let _ = fun { foobaz } -> ()
 [%%expect
 {|
 type foo = { foobar : int; }
-Line 2, characters 13-19:
-2 | let _ = fun {foobaz} -> ()
-                 ^^^^^^
+Line 3, characters 14-20:
+3 | let _ = fun { foobaz } -> ()
+                  ^^^^^^
 Error: Unbound record field "foobaz"
 Hint: Did you mean "foobar"?
 |}]
@@ -212,8 +212,8 @@ let _ = Foobaz 42
 [%%expect
 {|
 type bar = Foobar of int
-Line 2, characters 8-14:
-2 | let _ = Foobaz 42
+Line 3, characters 8-14:
+3 | let _ = Foobaz 42
             ^^^^^^
 Error: Unbound constructor "Foobaz"
 Hint: Did you mean "Foobar"?
@@ -226,8 +226,8 @@ let _ = K { foobaz = 42 }
 [%%expect
 {|
 type baz = K of { foobar : int; }
-Line 2, characters 12-18:
-2 | let _ = K { foobaz = 42 }
+Line 3, characters 12-18:
+3 | let _ = K { foobaz = 42 }
                 ^^^^^^
 Error: The field "foobaz" is not part of the record argument for the "baz.K" constructor
 Hint: Did you mean "foobar"?
@@ -242,9 +242,9 @@ let _ =
 
 [%%expect
 {|
-Line 3, characters 17-21:
-3 |   method other = self#foobaz
-                     ^^^^
+Line 5, characters 19-23:
+5 |     method other = self#foobaz
+                       ^^^^
 Error: This expression has no method "foobaz"
 Hint: Did you mean "foobar"?
 |}]
@@ -258,9 +258,9 @@ let _ =
 
 [%%expect
 {|
-Line 3, characters 18-35:
-3 |   method myself = {< foobaz = 42 >}
-                      ^^^^^^^^^^^^^^^^^
+Line 5, characters 20-35:
+5 |     method myself = {<foobaz = 42>}
+                        ^^^^^^^^^^^^^^^
 Error: Unbound instance variable "foobaz"
 Hint: Did you mean "foobar"?
 |}]

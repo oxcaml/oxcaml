@@ -1,2 +1,9 @@
-Hello, world!- : unit = ()
+Line 16, characters 0-1:
+16 | #load "largeFile.cmo";;
+     ^
+Error: Syntax error
+
+
+Line 3, characters 0-0:
+Error: Syntax error
 

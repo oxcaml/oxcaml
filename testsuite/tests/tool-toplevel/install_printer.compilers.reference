@@ -1,20 +1,35 @@
 type t = A | B
 val print_t : Format.formatter -> t -> unit = <fun>
-type u = C of t
-- : t = ~B
-- : u = C ~B
-type old = OA | OB
-val print_old : old -> unit = <fun>
-- : old list = [Old(A); Old(B)]
-- : old list = [OA; OB]
-type ('a, 'b) v = D of 'a * 'b
-type 'a printer = Format.formatter -> 'a -> unit
-val print_generic : 'a printer -> 'b printer -> ('a, 'b) v printer = <fun>
-- : (int, t) v list = [D<0, ~A>; D<42, ~B>]
-Unbound value name_that_does_not_exist.
-List.map has the wrong type for a printing function.
-Unbound value name_that_does_not_exist.
-List.map has the wrong type for a printing function.
-val non_installed_printer : 'a -> unit -> unit = <fun>
-The printer named non_installed_printer is not installed.
+Line 4, characters 0-4:
+4 | type u = C of t;;
+    ^^^^
+Error: Syntax error
+- : t = B
+Line 5, characters 0-4:
+5 | type old =
+    ^^^^
+Error: Syntax error
+Unbound value print_old.
+Line 2, characters 1-3:
+2 | [OA; OB];;
+     ^^
+Error: Unbound constructor "OA"
+Unbound value print_old.
+Line 5, characters 0-4:
+5 | type ('a, 'b) v = D of 'a * 'b
+    ^^^^
+Error: Syntax error
+Unbound value print_generic.
+Line 2, characters 1-2:
+2 | [D (0, A); D (42, B)];;
+     ^
+Error: Unbound constructor "D"
+Line 5, characters 0-1:
+5 | #install_printer List.map
+    ^
+Error: Syntax error
+
+
+Line 3, characters 0-0:
+Error: Syntax error
 

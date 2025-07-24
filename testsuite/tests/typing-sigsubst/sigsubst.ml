@@ -31,16 +31,16 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-36:
-3 |   include Comparable with type t = t
+Line 4, characters 2-36:
+4 |   include Comparable with type t = t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Illegal shadowing of included type "t/2" by "t/1".
 Line 2, characters 2-19:
 2 |   include Printable
       ^^^^^^^^^^^^^^^^^
   Type "t/2" came from this include.
-Line 3, characters 2-23:
-3 |   val print : t -> unit
+Line 4, characters 2-23:
+4 |   val print : t -> unit
       ^^^^^^^^^^^^^^^^^^^^^
   The value "print" has no valid type if "t/2" is shadowed.
 |}]
@@ -240,12 +240,15 @@ with type 'a t2 := 'a t * bool
 [%%expect
 {|
 type 'a t constraint 'a = 'b list
-Lines 2-6, characters 16-34:
-2 | ................sig
-3 |   type 'a t2 constraint 'a = 'b list
-4 |   type 'a mylist = 'a list
-5 |   val x : int mylist t2
-6 | end with type 'a t2 := 'a t * bool
+Lines 3-10, characters 16-30:
+ 3 | ................sig
+ 4 |   type 'a t2 constraint 'a = 'b list
+ 5 |
+ 6 |   type 'a mylist = 'a list
+ 7 |
+ 8 |   val x : int mylist t2
+ 9 | end
+10 | with type 'a t2 := 'a t * bool
 Error: Destructive substitutions are not supported for constrained
        types (other than when replacing a type constructor with
        a type constructor with the same arguments).
@@ -311,8 +314,8 @@ end
 [%%expect
 {|
 type (_, _) eq = Refl : ('a, 'a) eq
-Line 11, characters 18-58:
-11 |   module type T = S with type N.t = M.t with module N := N;;
+Line 14, characters 18-58:
+14 |   module type T = S with type N.t = M.t with module N := N
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "N"
        does not match its original definition in the constrained signature:
@@ -403,11 +406,15 @@ with type M.t := float
 
 [%%expect
 {|
-Lines 1-4, characters 16-26:
+Lines 1-8, characters 16-22:
 1 | ................sig
-2 |   module M : sig type t end
-3 |   module A = M
-4 | end with type M.t := float
+2 |   module M : sig
+3 |     type t
+4 |   end
+5 |
+6 |   module A = M
+7 | end
+8 | with type M.t := float
 Error: This "with" constraint on "M.t" changes "M", which is aliased
        in the constrained signature (as "A").
 |}]
@@ -495,11 +502,17 @@ with type M2.t := int
 [%%expect
 {|
 module Id : functor (X : sig type t end) -> sig type t = X.t end
-Lines 2-5, characters 17-25:
-2 | .................sig
-3 |   module rec M : sig type t = A of Id(M2).t end
-4 |   and M2 : sig type t end
-5 | end with type M2.t := int
+Lines 8-17, characters 17-21:
+ 8 | .................sig
+ 9 |   module rec M : sig
+10 |     type t = A of Id(M2).t
+11 |   end
+12 |
+13 |   and M2 : sig
+14 |     type t
+15 |   end
+16 | end
+17 | with type M2.t := int
 Error: This "with" constraint on "M2.t" makes the applicative functor
        type "Id(M2).t" ill-typed in the constrained signature:
        Modules do not match: sig end is not included in sig type t end
@@ -552,17 +565,17 @@ with module M.N := A
 
 [%%expect
 {|
-Lines 1-10, characters 16-24:
+Lines 1-12, characters 16-20:
  1 | ................sig
  2 |   module M : sig
  3 |     module N : sig
  4 |       module P : sig
  5 |         type t
- 6 |       end
- 7 |     end
- 8 |   end
- 9 |   module Alias = M
-10 | end with module M.N := A
+...
+ 9 |
+10 |   module Alias = M
+11 | end
+12 | with module M.N := A
 Error: This "with" constraint on "M.N" changes "M", which is aliased
        in the constrained signature (as "Alias").
 |}]

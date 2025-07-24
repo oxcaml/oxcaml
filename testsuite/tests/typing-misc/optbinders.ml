@@ -48,9 +48,9 @@ end
 
 [%%expect
 {|
-Line 1, characters 41-60:
-1 | module type Bad_constraint = sig val c : 'a . 'a constrained end
-                                             ^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-28:
+2 |   val c : 'a. 'a constrained
+              ^^^^^^^^^^^^^^^^^^
 Error: The universal type variable "'a" cannot be generalized: it is bound to
        "int".
 |}]
@@ -67,9 +67,9 @@ end
 [%%expect
 {|
 module type Row = sig val poly : [> `Foo of int ] * 'b end
-Line 2, characters 36-60:
-2 | module type NotRow = sig val poly : 'a 'b . (int as 'a) * 'b end
-                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+Line 6, characters 13-36:
+6 |   val poly : 'a 'b. (int as 'a) * 'b
+                 ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable "'a" cannot be generalized: it is bound to
        "int".
 |}]
@@ -133,8 +133,8 @@ type 'a t =
 
 [%%expect
 {|
-Line 4, characters 15-17:
-4 |   | Bad : 'b . 'a -> 'a t
-                   ^^
+Line 4, characters 14-16:
+4 |   | Bad : 'b. 'a -> 'a t
+                  ^^
 Error: The type variable "'a" is unbound in this type declaration.
 |}]

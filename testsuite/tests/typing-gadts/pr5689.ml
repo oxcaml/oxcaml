@@ -108,9 +108,9 @@ let inlineseq_from_astseq seq =
 [%%expect
 {|
 type _ linkp2 = Kind : 'a linkp -> ([< inkind ] as 'a) linkp2
-Line 7, characters 35-43:
-7 |     | (Kind _, Ast_Text txt)    -> Text txt
-                                       ^^^^^^^^
+Line 7, characters 30-38:
+7 |     | Kind _, Ast_Text txt -> Text txt
+                                  ^^^^^^^^
 Error: This expression has type "[< inkind > `Nonlink ] inline_t"
        but an expression was expected of type "a inline_t"
        Type "[< inkind > `Nonlink ]" = "[< `Link | `Nonlink > `Nonlink ]"

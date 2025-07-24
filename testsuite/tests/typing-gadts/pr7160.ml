@@ -21,9 +21,11 @@ type _ t =
   | String : string -> string t
   | Same : 'l t -> 'l t
 val f : int t -> int = <fun>
-Lines 4-5, characters 0-77:
-4 | type 'a tt = 'a t =
-5 |   Int : int -> int tt | String : string -> string tt | Same : 'l1 t -> 'l2 tt..
+Lines 8-11, characters 0-26:
+ 8 | type 'a tt = 'a t =
+ 9 |   | Int : int -> int tt
+10 |   | String : string -> string tt
+11 |   | Same : 'l1 t -> 'l2 tt
 Error: This variant or record definition does not match that of type "'a t"
        Constructors do not match:
          "Same : 'l t -> 'l t"

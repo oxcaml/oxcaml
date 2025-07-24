@@ -15,9 +15,9 @@ let ret_e1 (type a b) (b : bool) (wit : (a, b) eq) (x : a) (y : b) =
 
 [%%expect
 {|
-Line 3, characters 29-30:
-3 |   | Refl -> if b then x else y
-                                 ^
+Line 2, characters 42-43:
+2 |   match wit with Refl -> if b then x else y | _ -> x
+                                              ^
 Error: This expression has type "b" = "a" but an expression was expected of type
          "a"
        This instance of "a" is ambiguous:
@@ -29,9 +29,9 @@ let ret_e2 (type a b) (b : bool) (wit : (a, b) eq) (x : a) (y : b) =
 
 [%%expect
 {|
-Line 3, characters 29-30:
-3 |   | Refl -> if b then x else y
-                                 ^
+Line 2, characters 42-43:
+2 |   match wit with Refl -> if b then x else y | _ -> y
+                                              ^
 Error: This expression has type "b" = "a" but an expression was expected of type
          "a"
        This instance of "a" is ambiguous:
@@ -43,9 +43,9 @@ let ret_ei1 (type a) (b : bool) (wit : (a, int) eq) (x : a) =
 
 [%%expect
 {|
-Line 3, characters 29-30:
-3 |   | Refl -> if b then x else 0
-                                 ^
+Line 2, characters 42-43:
+2 |   match wit with Refl -> if b then x else 0 | _ -> x
+                                              ^
 Error: This expression has type "int" but an expression was expected of type
          "a" = "int"
        This instance of "int" is ambiguous:
@@ -57,9 +57,9 @@ let ret_ei2 (type a) (b : bool) (wit : (a, int) eq) (x : a) =
 
 [%%expect
 {|
-Line 3, characters 29-30:
-3 |   | Refl -> if b then x else 0
-                                 ^
+Line 2, characters 42-43:
+2 |   match wit with Refl -> if b then x else 0 | _ -> x
+                                              ^
 Error: This expression has type "int" but an expression was expected of type
          "a" = "int"
        This instance of "int" is ambiguous:
@@ -71,9 +71,9 @@ let ret_f (type a b) (wit : (a, b) eq) (x : a) (y : b) =
 
 [%%expect
 {|
-Line 3, characters 16-17:
-3 |   | Refl -> [x; y]
-                    ^
+Line 2, characters 29-30:
+2 |   match wit with Refl -> [x; y] | _ -> [x]
+                                 ^
 Error: This expression has type "b" = "a" but an expression was expected of type
          "a"
        This instance of "a" is ambiguous:
@@ -85,9 +85,9 @@ let ret_g1 (type a b) (wit : (a, b) eq) (x : a) (y : b) =
 
 [%%expect
 {|
-Line 3, characters 16-17:
-3 |   | Refl -> [x; y]
-                    ^
+Line 2, characters 29-30:
+2 |   match wit with Refl -> [x; y] | _ -> [y]
+                                 ^
 Error: This expression has type "b" = "a" but an expression was expected of type
          "a"
        This instance of "a" is ambiguous:
@@ -106,9 +106,9 @@ let f (type a b) (x : (a, b) eq) =
 
 [%%expect
 {|
-Line 3, characters 4-29:
-3 |   | Refl, [(_ : a) | (_ : b)] -> []
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 19-46:
+2 |   match x, [] with Refl, [((_ : a) | (_ : b))] -> [] | _, [(_ : a)] -> []
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "(a, b) eq * a list"
        This instance of "a" is ambiguous:
        it would escape the scope of its equation
@@ -119,9 +119,9 @@ let g1 (type a b) (x : (a, b) eq) =
 
 [%%expect
 {|
-Line 3, characters 4-29:
-3 |   | Refl, [(_ : a) | (_ : b)] -> []
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 19-46:
+2 |   match x, [] with Refl, [((_ : a) | (_ : b))] -> [] | _, [(_ : b)] -> []
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "(a, b) eq * a list"
        This instance of "a" is ambiguous:
        it would escape the scope of its equation
@@ -132,9 +132,9 @@ let g2 (type a b) (x : (a, b) eq) =
 
 [%%expect
 {|
-Line 3, characters 4-29:
-3 |   | Refl, [(_ : b) | (_ : a)] -> []
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 19-46:
+2 |   match x, [] with Refl, [((_ : b) | (_ : a))] -> [] | _, [(_ : a)] -> []
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "(a, b) eq * b list"
        This instance of "b" is ambiguous:
        it would escape the scope of its equation
@@ -145,9 +145,9 @@ let h1 (type a b) (x : (a, b) eq) =
 
 [%%expect
 {|
-Line 4, characters 4-29:
-4 |   | Refl, [(_ : a) | (_ : b)] -> []
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 40-67:
+2 |   match x, [] with _, [(_ : a)] -> [] | Refl, [((_ : a) | (_ : b))] -> []
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "(a, b) eq * a list"
        This instance of "a" is ambiguous:
        it would escape the scope of its equation
@@ -158,9 +158,9 @@ let h2 (type a b) (x : (a, b) eq) =
 
 [%%expect
 {|
-Line 4, characters 4-29:
-4 |   | Refl, [(_ : a) | (_ : b)] -> []
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 40-67:
+2 |   match x, [] with _, [(_ : b)] -> [] | Refl, [((_ : a) | (_ : b))] -> []
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "(a, b) eq * a list"
        This instance of "a" is ambiguous:
        it would escape the scope of its equation
@@ -171,9 +171,9 @@ let h3 (type a b) (x : (a, b) eq) =
 
 [%%expect
 {|
-Line 4, characters 4-29:
-4 |   | Refl, [(_ : b) | (_ : a)] -> []
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 40-67:
+2 |   match x, [] with _, [(_ : a)] -> [] | Refl, [((_ : b) | (_ : a))] -> []
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "(a, b) eq * b list"
        This instance of "b" is ambiguous:
        it would escape the scope of its equation
@@ -218,8 +218,8 @@ module type S = module type of M
 [%%expect
 {|
 module M : sig val r : '_weak1 list ref end
-Line 12, characters 25-26:
-12 |     let module O : N.S = M in
+Line 14, characters 25-26:
+14 |     let module O : N.S = M in
                               ^
 Error: Signature mismatch:
        Modules do not match:
@@ -256,8 +256,8 @@ module type S = module type of M
 [%%expect
 {|
 module M : sig val r : '_weak2 list ref end
-Line 12, characters 25-26:
-12 |     let module O : N.S = M in
+Line 14, characters 25-26:
+14 |     let module O : N.S = M in
                               ^
 Error: Signature mismatch:
        Modules do not match:

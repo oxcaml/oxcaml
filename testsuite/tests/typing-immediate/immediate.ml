@@ -214,9 +214,11 @@ end
 
 [%%expect
 {|
-Line 2, characters 2-41:
-2 |   type t = Foo of int | Bar [@@immediate]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-5, characters 2-15:
+2 | ..type t =
+3 |     | Foo of int
+4 |     | Bar
+5 |   [@@immediate]
 Error: The kind of type "t" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immediate
@@ -248,13 +250,13 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-26:
-3 |   type s = t [@@immediate]
+Line 4, characters 2-26:
+4 |   type s = t [@@immediate]
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t" is value
          because of the definition of t at line 2, characters 2-8.
        But the kind of type "t" must be a subkind of immediate
-         because of the definition of s at line 3, characters 2-26.
+         because of the definition of s at line 4, characters 2-26.
 |}]
 
 (* Can't ascribe to an immediate type signature with a non-immediate type *)
@@ -266,10 +268,10 @@ end
 
 [%%expect
 {|
-Lines 1-3, characters 42-3:
-1 | ..........................................struct
-2 |   type t = string
-3 | end..
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = string
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = string end
@@ -282,7 +284,7 @@ Error: Signature mismatch:
        The kind of the first is immutable_data
          because it is the primitive type string.
        But the kind of the first must be a subkind of immediate
-         because of the definition of t at line 1, characters 15-35.
+         because of the definition of t at line 2, characters 2-22.
 |}]
 
 (* Same as above but with explicit signature *)
@@ -292,9 +294,10 @@ end
 
 [%%expect
 {|
-Line 1, characters 23-49:
-1 | module M_invalid : S = struct type t = string end;;
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-3, characters 23-3:
+1 | .......................struct
+2 |   type t = string
+3 | end
 Error: Signature mismatch:
        Modules do not match: sig type t = string end is not included in S
        Type declarations do not match:
@@ -304,7 +307,7 @@ Error: Signature mismatch:
        The kind of the first is immutable_data
          because it is the primitive type string.
        But the kind of the first must be a subkind of immediate
-         because of the definition of t at line 1, characters 20-40.
+         because of the definition of t at line 2, characters 2-22.
 |}]
 
 module FM_invalid = F (struct
@@ -313,9 +316,10 @@ end)
 
 [%%expect
 {|
-Line 1, characters 20-50:
-1 | module FM_invalid = F (struct type t = string end);;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-3, characters 20-4:
+1 | ....................F (struct
+2 |   type t = string
+3 | end)
 Error: Modules do not match: sig type t = string end is not included in
        S
      Type declarations do not match:
@@ -325,7 +329,7 @@ Error: Modules do not match: sig type t = string end is not included in
      The kind of the first is immutable_data
        because it is the primitive type string.
      But the kind of the first must be a subkind of immediate
-       because of the definition of t at line 1, characters 20-40.
+       because of the definition of t at line 2, characters 2-22.
 |}]
 
 (* Can't use a non-immediate type even if mutually recursive *)

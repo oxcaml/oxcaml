@@ -23,8 +23,8 @@ type 'a s = 'a t = T : i t
 [%%expect
 {|
 type 'a t = T : i t
-Line 2, characters 23-26:
-2 | type 'a s = 'a t = T : i t
+Line 3, characters 23-26:
+3 | type 'a s = 'a t = T : i t
                            ^^^
 Error: Constraints are not satisfied in this type.
        Type "i t" should be an instance of "'a s"

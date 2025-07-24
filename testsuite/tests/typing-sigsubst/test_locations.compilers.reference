@@ -17,7 +17,7 @@ Error: Signature mismatch:
        The type "String.t" = "string" is not equal to the type "unit"
        File "test_loc_type_eq.ml", line 1, characters 31-46:
          Expected declaration
-       File "test_functor.ml", line 8, characters 45-61: Actual declaration
+       File "test_functor.ml", line 11, characters 14-30: Actual declaration
 File "test_loc_modtype_type_eq.ml", line 3, characters 15-42:
 3 | module M : S = Test_functor.Apply (String)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -37,7 +37,7 @@ Error: Signature mismatch:
        The type "String.t" = "string" is not equal to the type "unit"
        File "test_loc_modtype_type_eq.ml", line 1, characters 36-51:
          Expected declaration
-       File "test_functor.ml", line 8, characters 45-61: Actual declaration
+       File "test_functor.ml", line 11, characters 14-30: Actual declaration
 File "test_loc_type_subst.ml", line 1, characters 50-77:
 1 | module M : Test_functor.S with type elt := unit = Test_functor.Apply (String)
                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -58,7 +58,7 @@ Error: Signature mismatch:
        Type "elt" = "string" is not compatible with type "unit"
        File "test_loc_type_subst.ml", line 1, characters 11-47:
          Expected declaration
-       File "test_functor.ml", line 5, characters 2-23: Actual declaration
+       File "test_functor.ml", line 6, characters 2-23: Actual declaration
 File "test_loc_modtype_type_subst.ml", line 3, characters 15-42:
 3 | module M : S = Test_functor.Apply (String)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -79,4 +79,4 @@ Error: Signature mismatch:
        Type "elt" = "string" is not compatible with type "unit"
        File "test_loc_modtype_type_subst.ml", line 1, characters 16-52:
          Expected declaration
-       File "test_functor.ml", line 5, characters 2-23: Actual declaration
+       File "test_functor.ml", line 6, characters 2-23: Actual declaration

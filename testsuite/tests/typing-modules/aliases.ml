@@ -91,21 +91,10 @@ module F :
       val hash : t -> int @@ portable
       external unsafe_chr : int -> char @@ portable = "%identity"
     end
-module C4 :
-  sig
-    external code : char -> int @@ portable = "%identity"
-    val chr : int -> char @@ portable
-    val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
-    type t = char
-    val compare : t -> t -> int @@ portable
-    val equal : t -> t -> bool @@ portable
-    val seeded_hash : int -> t -> int @@ portable
-    val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
-  end
-- : char = 'B'
+Line 3, characters 12-16:
+3 | module C4 = F ();;
+                ^^^^
+Error: The functor was expected to be applicative at this position
 |}]
 
 module G (X : sig end) = struct
@@ -118,7 +107,10 @@ module M = G ()
 [%%expect
 {|
 module G : functor (X : sig end) -> sig module M : sig end end
-module M : sig module M : sig end end
+Line 6, characters 11-15:
+6 | module M = G ()
+               ^^^^
+Error: The functor was expected to be applicative at this position
 |}]
 
 module M' = struct
@@ -229,8 +221,10 @@ module F :
   functor (X : sig end) ->
     sig module N : sig val x : int end module N' = N end
 module G : functor (X : sig end) -> sig module N' : sig val x : int end end
-module M5 : sig module N' : sig val x : int end end
-- : int = 1
+Line 16, characters 12-16:
+16 | module M5 = G ();;
+                 ^^^^
+Error: The functor was expected to be applicative at this position
 |}]
 
 module M = struct
@@ -837,8 +831,8 @@ module type S =
     type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(I).t) eq
   end
 module Int2 : sig type t = int val compare : 'a -> 'a -> int end
-Line 15, characters 10-30:
-15 |   include S with module I := I
+Line 32, characters 10-30:
+32 |   include S with module I := I
                ^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "I"
        does not match its original definition in the constrained signature:
@@ -1206,10 +1200,12 @@ end
 [%%expect
 {|
 module X : sig module N : sig end end
-Lines 4-6, characters 6-3:
-4 | ......struct
-5 |   module type S = module type of struct include X end
-6 | end..
+Lines 9-13, characters 6-3:
+ 9 | ......struct
+10 |   module type S = module type of struct
+11 |     include X
+12 |   end
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type S = sig module N = X.N @@ stateless end end

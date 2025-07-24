@@ -7,10 +7,10 @@
   (let
     (A =
        (apply (field_imm 0 (global CamlinternalMod!))
-         [0: "anonymous.ml" 25 6] [0: [0]])
+         [0: "anonymous.ml" 12 2] [0: [0]])
      B =
        (apply (field_imm 0 (global CamlinternalMod!))
-         [0: "anonymous.ml" 35 6] [0: [0]]))
+         [0: "anonymous.ml" 26 6] [0: [0]]))
     (seq
       (ignore
         (let

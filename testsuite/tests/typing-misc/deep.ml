@@ -12,7 +12,7 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let x = false , "not an int"
+4 |   let x = false, "not an int"
 5 | end
 Error: Signature mismatch:
        Modules do not match:
@@ -64,7 +64,7 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f : ('c list * 'd option  -> int) = assert false
+4 |   let f : 'c list * 'd option -> int = assert false
 5 | end
 Error: Signature mismatch:
        Modules do not match:

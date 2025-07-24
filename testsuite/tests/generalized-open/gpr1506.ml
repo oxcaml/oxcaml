@@ -93,11 +93,16 @@ end
 
 [%%expect
 {|
-Line 3, characters 7-20:
-3 |   open M(struct end)
-           ^^^^^^^^^^^^^
-Error: This module is not a structure; it has type
-       "functor (X : sig end) -> sig end"
+Line 4, characters 7-11:
+4 |   open M ()
+           ^^^^
+Error: This application of the functor "M" is ill-typed.
+       These arguments:
+         ()
+       do not match these parameters:
+         functor (F : sig end) (X : sig end) -> ...
+       1. An argument appears to be missing with module type sig end
+       2. The functor was expected to be applicative at this position
 |}]
 
 open struct
@@ -138,13 +143,14 @@ end
 
 [%%expect
 {|
-Line 1, characters 15-41:
-1 | include struct open struct type t = T end let x = T end
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-5:
+2 | ..open struct
+3 |     type t = T
+4 |   end
 Error: The type "t" introduced by this open appears in the signature.
-Line 1, characters 46-47:
-1 | include struct open struct type t = T end let x = T end
-                                                  ^
+Line 6, characters 6-7:
+6 |   let x = T
+          ^
   The value "x" has no valid type if "t" is hidden.
 |}]
 
@@ -162,14 +168,15 @@ end
 
 [%%expect
 {|
-Lines 3-6, characters 4-7:
+Lines 3-7, characters 4-7:
 3 | ....open struct
 4 |       type t = T
-5 |       let x = T
-6 |     end
+5 |
+6 |       let x = T
+7 |     end
 Error: The type "t" introduced by this open appears in the signature.
-Line 7, characters 8-9:
-7 |     let y = x
+Line 9, characters 8-9:
+9 |     let y = x
             ^
   The value "y" has no valid type if "t" is hidden.
 |}]
@@ -193,8 +200,8 @@ Lines 3-5, characters 4-7:
 4 |       type t = T
 5 |     end
 Error: The type "t" introduced by this open appears in the signature.
-Line 6, characters 8-9:
-6 |     let y = T
+Line 7, characters 8-9:
+7 |     let y = T
             ^
   The value "y" has no valid type if "t" is hidden.
 |}]
@@ -485,9 +492,9 @@ let x =
 
 [%%expect
 {|
-Line 1, characters 42-43:
-1 | let x = let open struct type t = T end in T
-                                              ^
+Line 5, characters 2-3:
+5 |   T
+      ^
 Error: This expression has type "t" but an expression was expected of type "'a"
        The type constructor "t" would escape its scope
 |}]
@@ -529,9 +536,9 @@ let f () =
 
 [%%expect
 {|
-Line 1, characters 27-53:
-1 | let f () = let open functor(X: sig end) -> struct end in ();;
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 19-46:
+2 |   let open functor (X : sig end) -> struct end in
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This module is not a structure; it has type
        "functor (X : sig end) -> sig end"
 |}]

@@ -50,8 +50,8 @@ end =
 
 [%%expect
 {|
-Line 5, characters 10-14:
-5 |       let None = None
+Line 6, characters 10-14:
+6 |       let None = None
               ^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:

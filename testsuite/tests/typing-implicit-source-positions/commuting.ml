@@ -94,7 +94,7 @@ let _ = k ~a:Lexing.dummy_pos ~a:0 ()
 [%%expect
 {|
 Line 1, characters 13-29:
-1 | let _ = k ~a:Lexing.dummy_pos ~a:0 ();;
+1 | let _ = k ~a:Lexing.dummy_pos ~a:0 ()
                  ^^^^^^^^^^^^^^^^
 Error: This expression has type "Lexing.position" = "lexing_position"
        but an expression was expected of type "int"
@@ -114,9 +114,9 @@ let m : a:[%call_pos] -> b:[%call_pos] -> unit -> unit =
 
 [%%expect
 {|
-Line 1, characters 57-103:
-1 | let m : a:[%call_pos] -> b:[%call_pos] -> unit -> unit = fun ~(b:[%call_pos]) ~(a:[%call_pos]) () -> ()
-                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 1-51:
+2 |  fun ~(b : [%call_pos]) ~(a : [%call_pos]) () -> ()
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This function should have type
          "a:[%call_pos] -> b:[%call_pos] -> unit -> unit"
        but its first argument is "~(b:[%call_pos])" instead of "~(a:[%call_pos])"
@@ -160,9 +160,9 @@ class m : a:[%call_pos] -> b:[%call_pos] -> unit -> object end =
 
 [%%expect
 {|
-Line 2, characters 6-56:
-2 |   fun ~(b:[%call_pos]) ~(a:[%call_pos]) () -> object end
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 6-60:
+2 |   fun ~(b : [%call_pos]) ~(a : [%call_pos]) () -> object end
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The class type b:[%call_pos] -> a:[%call_pos] -> unit -> object  end
        is not matched by the class type
          a:[%call_pos] -> b:[%call_pos] -> unit -> object  end
@@ -183,10 +183,11 @@ class c :
 
 [%%expect
 {|
-Lines 4-6, characters 12-5:
-4 | ............~(a : [%call_pos]) ~b () -> object
-5 |     method x = a, b
-6 |   end
+Lines 8-11, characters 6-7:
+ 8 | ......~(a : [%call_pos]) ~b () ->
+ 9 |     object
+10 |       method x = a, b
+11 |     end
 Error: The class type
          a:[%call_pos] -> b:'b -> unit -> object method x : 'a * 'b end
        is not matched by the class type

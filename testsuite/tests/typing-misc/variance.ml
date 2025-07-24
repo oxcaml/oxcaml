@@ -63,8 +63,8 @@ type +'a error_np = 'a n p
 type -'a n
 type +'a p
 type !'a i
-Line 5, characters 0-26:
-5 | type +'a error_np = 'a n p;;
+Line 7, characters 0-26:
+7 | type +'a error_np = 'a n p
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
@@ -76,7 +76,7 @@ type +'a error_pn = 'a p n
 [%%expect
 {|
 Line 1, characters 0-26:
-1 | type +'a error_pn = 'a p n;;
+1 | type +'a error_pn = 'a p n
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
@@ -88,7 +88,7 @@ type -'a error_pp = 'a p p
 [%%expect
 {|
 Line 1, characters 0-26:
-1 | type -'a error_pp = 'a p p;;
+1 | type -'a error_pp = 'a p p
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
@@ -100,7 +100,7 @@ type -'a error_nn = 'a n n
 [%%expect
 {|
 Line 1, characters 0-26:
-1 | type -'a error_nn = 'a n n;;
+1 | type -'a error_nn = 'a n n
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
@@ -149,9 +149,9 @@ end)
 
 [%%expect
 {|
-Line 6, characters 2-23:
-6 |   type +'a t = 'a i M.t
-      ^^^^^^^^^^^^^^^^^^^^^
+Line 10, characters 2-23:
+10 |   type +'a t = 'a i M.t
+       ^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be covariant,
        but it is invariant.

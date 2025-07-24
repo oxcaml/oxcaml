@@ -44,9 +44,9 @@ let f z =
 
 [%%expect
 {|
-Line 1, characters 22-32:
-1 | let f z = let rec x = [| y; z |] and y = z in x;;
-                          ^^^^^^^^^^
+Line 2, characters 14-24:
+2 |   let rec x = [| y; z |] and y = z in
+                  ^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -60,8 +60,8 @@ let f (z : float) =
 
 [%%expect
 {|
-Line 1, characters 31-41:
-1 | let f (z: float) = let rec x = [| y; z |] and y = z in x;;
-                                   ^^^^^^^^^^
+Line 2, characters 14-24:
+2 |   let rec x = [| y; z |] and y = z in
+                  ^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]

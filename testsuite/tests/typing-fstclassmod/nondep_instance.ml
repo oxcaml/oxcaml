@@ -54,9 +54,9 @@ end
 
 [%%expect
 {|
-Line 3, characters 21-22:
-3 |     Linear_map.scale s x
-                         ^
+Line 2, characters 76-77:
+2 |   let f (type s) (s : (module Scalar with type t = s)) x = Linear_map.scale s x
+                                                                                ^
 Error: This expression has type "(module Scalar with type t = s)"
        but an expression was expected of type
          "(module Vector_space with type scalar = 'a and type t = 'b)"

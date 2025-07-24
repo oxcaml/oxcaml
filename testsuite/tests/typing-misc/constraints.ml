@@ -8,15 +8,13 @@ type 'a t = [`A of 'a t t] as 'a
 [%%expect
 {|
 Line 1, characters 0-32:
-1 | type 'a t = [`A of 'a t t] as 'a;; (* fails *)
+1 | type 'a t = [`A of 'a t t] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "('a t as 'b) t as 'a" contains "'b"
-|},
-  Principal
-    {|
+|}, Principal{|
 Line 1, characters 0-32:
-1 | type 'a t = [`A of 'a t t] as 'a;; (* fails *)
+1 | type 'a t = [`A of 'a t t] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
@@ -32,7 +30,7 @@ type 'a t = [`A of 'a t t]
 [%%expect
 {|
 Line 1, characters 0-26:
-1 | type 'a t = [`A of 'a t t];; (* fails *)
+1 | type 'a t = [`A of 'a t t]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
@@ -48,7 +46,7 @@ type 'a t = [`A of 'a t t] constraint 'a = 'a t
 [%%expect
 {|
 Line 1, characters 0-47:
-1 | type 'a t = [`A of 'a t t] constraint 'a = 'a t;; (* fails since 4.04 *)
+1 | type 'a t = [`A of 'a t t] constraint 'a = 'a t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The definition of "t" contains a cycle:
          "'a t as 'a" contains "'a"
@@ -60,7 +58,7 @@ type 'a t = [`A of 'a t] constraint 'a = 'a t
 [%%expect
 {|
 Line 1, characters 0-45:
-1 | type 'a t = [`A of 'a t] constraint 'a = 'a t;; (* fails since 4.04 *)
+1 | type 'a t = [`A of 'a t] constraint 'a = 'a t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The definition of "t" contains a cycle:
          "'a t as 'a" contains "'a"
@@ -85,9 +83,9 @@ and u = t
 (* fails *)
 [%%expect
 {|
-Line 1, characters 42-51:
-1 | type 'a v = [`A of u v] constraint 'a = t and t = u and u = t;; (* fails *)
-                                              ^^^^^^^^^
+Line 3, characters 0-9:
+3 | and t = u
+    ^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "t" = "u",
          "u" = "t"
@@ -123,8 +121,8 @@ end
 (* fails *)
 [%%expect
 {|
-Line 3, characters 2-44:
-3 |   and 'o abs constraint 'o = 'o is_an_object
+Line 4, characters 2-44:
+4 |   and 'o abs constraint 'o = 'o is_an_object
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The definition of "abs" contains a cycle:
          "'a is_an_object as 'a" contains "'a"
@@ -140,8 +138,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 7-9:
-3 |   and ('k,'l) abs = 'l constraint 'k = 'l is_an_object
+Line 4, characters 7-9:
+4 |   and ('k, 'l) abs = 'l constraint 'k = 'l is_an_object
            ^^
 Error: Constraints are not satisfied in this type.
        Type "'l is_an_object" should be an instance of "< .. > is_an_object"
@@ -167,15 +165,13 @@ module PR6505a :
       constraint 'b = < .. >
     val y : (<  > is_an_object, <  > is_an_object) abs
   end
-Line 6, characters 8-17:
-6 | let _ = PR6505a.y#bang;; (* fails *)
+Line 9, characters 8-17:
+9 | let _ = PR6505a.y#bang
             ^^^^^^^^^
 Error: This expression has type
          "(<  > PR6505a.is_an_object, <  > PR6505a.is_an_object) PR6505a.abs"
        It has no method "bang"
-|},
-  Principal
-    {|
+|}, Principal{|
 module PR6505a :
   sig
     type 'o is_an_object = 'o constraint 'o = < .. >
@@ -183,8 +179,8 @@ module PR6505a :
       constraint 'b = < .. >
     val y : (<  >, <  >) abs
   end
-Line 6, characters 8-17:
-6 | let _ = PR6505a.y#bang;; (* fails *)
+Line 9, characters 8-17:
+9 | let _ = PR6505a.y#bang
             ^^^^^^^^^
 Error: This expression has type "(<  >, <  >) PR6505a.abs"
        It has no method "bang"
@@ -210,14 +206,14 @@ module PR6505b :
       constraint 'o = [>  ]
     val x : (([> `Foo of int ] as 'a) is_an_object, 'a is_an_object) abs
   end
-Line 6, characters 23-57:
-6 | let () = print_endline (match PR6505b.x with `Bar s -> s);; (* fails *)
+Line 9, characters 23-57:
+9 | let () = print_endline (match PR6505b.x with `Bar s -> s)
                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 `Foo _
 
-Exception: Match_failure ("", 6, 23).
+Exception: Match_failure ("", 9, 23).
 |}]
 
 (* #9866, #9873 *)
@@ -226,9 +222,9 @@ type 'a t = 'b constraint 'a = 'b t
 
 [%%expect
 {|
-Line 1, characters 0-36:
-1 | type 'a t = 'b  constraint 'a = 'b t;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-35:
+1 | type 'a t = 'b constraint 'a = 'b t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
          type "'b t t"
@@ -242,7 +238,7 @@ type 'a t = 'b constraint 'a = ('b * 'b) t
 [%%expect
 {|
 Line 1, characters 0-42:
-1 | type 'a t = 'b constraint 'a = ('b * 'b) t;;
+1 | type 'a t = 'b constraint 'a = ('b * 'b) t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
@@ -263,7 +259,7 @@ type 'a t = 'a * 'b constraint 'a = 'b t
 [%%expect
 {|
 Line 1, characters 0-40:
-1 | type 'a t = 'a * 'b constraint 'a = 'b t;;
+1 | type 'a t = 'a * 'b constraint 'a = 'b t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "'a t t" = "'a t * 'a",
@@ -274,9 +270,9 @@ type 'a t = < a : 'a ; b : 'b > constraint 'a = 'b t
 
 [%%expect
 {|
-Line 1, characters 0-49:
-1 | type 'a t = <a : 'a; b : 'b> constraint 'a = 'b t;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-52:
+1 | type 'a t = < a : 'a ; b : 'b > constraint 'a = 'b t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
          type "'b t t"
@@ -289,9 +285,9 @@ type 'a t = < a : 'a ; b : 'b > constraint < a : 'a ; .. > = 'b t
 
 [%%expect
 {|
-Line 1, characters 0-59:
-1 | type 'a t = <a : 'a; b : 'b> constraint <a : 'a; ..> = 'b t;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-65:
+1 | type 'a t = < a : 'a ; b : 'b > constraint < a : 'a ; .. > = 'b t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: A type variable is unbound in this type declaration.
        In method "b: 'b" the variable "'b" is unbound
 |}]
@@ -303,9 +299,9 @@ end =
 
 [%%expect
 {|
-Line 1, characters 19-54:
-1 | module rec M : sig type 'a t = 'b constraint 'a = 'b t end = M;;
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 2-37:
+2 |   type 'a t = 'b constraint 'a = 'b t
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
          type "'b t t"
@@ -321,9 +317,9 @@ end =
 
 [%%expect
 {|
-Line 1, characters 19-61:
-1 | module rec M : sig type 'a t = 'b constraint 'a = ('b * 'b) t end = M;;
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 2-44:
+2 |   type 'a t = 'b constraint 'a = ('b * 'b) t
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "t" is defined as
          type "('b * 'b) t t"
@@ -356,9 +352,9 @@ type 'a t = T constraint 'a = int constraint 'a = float
 
 [%%expect
 {|
-Line 3, characters 13-23:
-3 |   constraint 'a = float
-                 ^^^^^^^^^^
+Line 1, characters 45-55:
+1 | type 'a t = T constraint 'a = int constraint 'a = float
+                                                 ^^^^^^^^^^
 Error: The type constraints are not consistent.
        Type "int" is not compatible with type "float"
 |}]
@@ -369,9 +365,9 @@ type ('a, 'b) t =
 
 [%%expect
 {|
-Line 4, characters 13-20:
-4 |   constraint 'a = 'b
-                 ^^^^^^^
+Line 3, characters 71-78:
+3 |   constraint 'a = int -> float constraint 'b = bool -> char constraint 'a = 'b
+                                                                           ^^^^^^^
 Error: The type constraints are not consistent.
        Type "int -> float" is not compatible with type "bool -> char"
        Type "int" is not compatible with type "bool"
@@ -388,9 +384,9 @@ class type ['a, 'b] a =
 
 [%%expect
 {|
-Line 4, characters 2-31:
-4 |   constraint 'b = float * float
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 7, characters 4-33:
+7 |     constraint 'b = float * float
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The class constraints are not consistent.
        Type "int * int" is not compatible with type "float * float"
        Type "int" is not compatible with type "float"
@@ -450,8 +446,8 @@ type u = < x : u > t
 [%%expect
 {|
 type 'a t = 'b constraint 'a = < x : 'b >
-Line 2, characters 0-20:
-2 | type u = < x : u > t
+Line 3, characters 0-20:
+3 | type u = < x : u > t
     ^^^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "u" is cyclic:
          "u" = "< x : u > t",

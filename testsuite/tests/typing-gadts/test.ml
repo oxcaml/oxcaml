@@ -98,17 +98,17 @@ end
 
 [%%expect
 {|
-Lines 11-12, characters 6-19:
-11 | ......function
-12 |         | C2 x -> x
+Line 8, characters 40-58:
+8 |   let unexhaustive : type s. s u -> s = function C2 x -> x
+                                            ^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 C1 _
 
-Lines 24-26, characters 6-30:
-24 | ......function
-25 |         | Foo _ , Foo _ -> true
-26 |         | Bar _, Bar _ -> true
+Lines 24-26, characters 46-26:
+24 | ..............................................function
+25 |     | Foo _, Foo _ -> true
+26 |     | Bar _, Bar _ -> true
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 (Foo _, Bar _)
@@ -168,15 +168,15 @@ end
 [%%expect
 {|
 Line 2, characters 10-18:
-2 |   class c (Some x) = object method x : int = x end
+2 |   class c (Some x) =
               ^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 None
 
-Line 4, characters 10-18:
-4 |   class d (Just x) = object method x : int = x end
-              ^^^^^^^^
+Line 11, characters 10-18:
+11 |   class d (Just x) =
+               ^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Nothing
@@ -213,8 +213,8 @@ end
 
 [%%expect
 {|
-Line 4, characters 43-44:
-4 |   let g : int t -> int = function I -> 1 | _ -> 2 (* warn *)
+Line 8, characters 43-44:
+8 |   let g : int t -> int = function I -> 1 | _ -> 2 (* warn *)
                                                ^
 Warning 56 [unreachable-case]: this match case is unreachable.
 Consider replacing it with a refutation case '<pat> -> .'
@@ -292,9 +292,9 @@ end
 
 [%%expect
 {|
-Lines 8-9, characters 4-33:
-8 | ....match x with
-9 |     | String s -> print_endline s.................
+Line 8, characters 4-44:
+8 |     match x with String s -> print_endline s (* warn : Any *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Any
@@ -319,9 +319,9 @@ end
 
 [%%expect
 {|
-Line 5, characters 21-22:
-5 |     let eval (D x) = x
-                         ^
+Line 6, characters 19-20:
+6 |   let eval (D x) = x
+                       ^
 Error: This expression has type "$a t" but an expression was expected of type
          "'a"
        The type constructor "$a" would escape its scope
@@ -396,12 +396,10 @@ module Propagation :
     type _ t = IntLit : int -> int t | BoolLit : bool -> bool t
     val check : 's t -> 's
   end
-|},
-  Principal
-    {|
-Line 13, characters 19-20:
-13 |     | BoolLit b -> b
-                        ^
+|}, Principal{|
+Line 10, characters 60-61:
+10 |     let r = match x with IntLit n -> (n : s) | BoolLit b -> b in
+                                                                 ^
 Error: This expression has type "bool" but an expression was expected of type
          "s" = "bool"
        This instance of "bool" is ambiguous:
@@ -418,8 +416,8 @@ end
 
 [%%expect
 {|
-Line 5, characters 28-29:
-5 |   let f = function A -> 1 | B -> 2
+Line 6, characters 28-29:
+6 |   let f = function A -> 1 | B -> 2
                                 ^
 Error: This variant pattern is expected to have type "a"
        There is no constructor "B" within type "a"
@@ -433,9 +431,9 @@ end
 
 [%%expect
 {|
-Line 5, characters 6-9:
-5 |       Foo -> 5
-          ^^^
+Line 4, characters 32-35:
+4 |   let f : int -> int = function Foo -> 5
+                                    ^^^
 Error: This pattern matches values of type "'a t"
        but a pattern was expected which matches values of type "int"
 |}]
@@ -471,9 +469,9 @@ let test : type a. a t -> _ = function Int -> ky (1 : a) 1 (* fails *)
 
 [%%expect
 {|
-Line 2, characters 18-30:
-2 |   function Int -> ky (1 : a) 1  (* fails *)
-                      ^^^^^^^^^^^^
+Line 1, characters 46-58:
+1 | let test : type a. a t -> _ = function Int -> ky (1 : a) 1 (* fails *)
+                                                  ^^^^^^^^^^^^
 Error: This expression has type "a" = "int"
        but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
@@ -487,8 +485,8 @@ let test : type a. a t -> a =
 
 [%%expect
 {|
-Line 2, characters 30-42:
-2 |   let r = match x with Int -> ky (1 : a) 1  (* fails *)
+Line 3, characters 30-42:
+3 |   let r = match x with Int -> ky (1 : a) 1 (* fails *) in
                                   ^^^^^^^^^^^^
 Error: This expression has type "a" = "int"
        but an expression was expected of type "'a"
@@ -503,8 +501,8 @@ let test : type a. a t -> a =
 
 [%%expect
 {|
-Line 2, characters 30-42:
-2 |   let r = match x with Int -> ky 1 (1 : a)  (* fails *)
+Line 3, characters 30-42:
+3 |   let r = match x with Int -> ky 1 (1 : a) (* fails *) in
                                   ^^^^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
@@ -594,9 +592,9 @@ let test2 : type a. a t -> a option =
 (* fails because u : (int | a) option ref *)
 [%%expect
 {|
-Line 4, characters 46-48:
-4 |   begin match x with Int -> u := Some 1; r := !u end;
-                                                  ^^
+Line 8, characters 9-11:
+8 |     r := !u);
+             ^^
 Error: This expression has type "int option"
        but an expression was expected of type "a option"
        Type "int" is not compatible with type "a" = "int"
@@ -649,9 +647,9 @@ let we_y1x (type a) (x : a) (v : a t) =
 [%%expect
 {|
 val either : 'a -> 'a -> 'a = <fun>
-Line 3, characters 44-45:
-3 |   match v with Int -> let y = either 1 x in y
-                                                ^
+Line 7, characters 4-5:
+7 |     y
+        ^
 Error: This expression has type "int" but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
@@ -779,9 +777,9 @@ let f : type a b. (a, b) eq -> (< m : a ; .. > as 'c) -> (< m : b ; .. > as 'c)
 [%%expect
 {|
 type (_, _) eq = Eq : ('a, 'a) eq
-Line 3, characters 18-72:
-3 | let f : type a b. (a,b) eq -> (<m : a; ..> as 'c) -> (<m : b; ..> as 'c) =
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 18-79:
+3 | let f : type a b. (a, b) eq -> (< m : a ; .. > as 'c) -> (< m : b ; .. > as 'c)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable "'b" cannot be generalized:
        it is already bound to another variable.
 |}]
@@ -791,9 +789,9 @@ let f : type a b. (a, b) eq -> < m : a ; .. > -> < m : b ; .. > = fun Eq o -> o
 (* fail *)
 [%%expect
 {|
-Line 2, characters 14-15:
-2 |   fun Eq o -> o
-                  ^
+Line 1, characters 78-79:
+1 | let f : type a b. (a, b) eq -> < m : a ; .. > -> < m : b ; .. > = fun Eq o -> o
+                                                                                  ^
 Error: This expression has type "< m : a; .. >"
        but an expression was expected of type "< m : b; .. >"
        Type "a" is not compatible with type "b" = "a"
@@ -808,7 +806,7 @@ let f (type a b) (eq : (a, b) eq) (o : < m : a ; .. >) : < m : b ; .. > =
 [%%expect
 {|
 Line 2, characters 22-23:
-2 |   match eq with Eq -> o ;; (* should fail *)
+2 |   match eq with Eq -> o
                           ^
 Error: This expression has type "< m : a; .. >"
        but an expression was expected of type "< m : b; .. >"
@@ -857,12 +855,10 @@ let f : type a b. (a, b) eq -> < m : a ; .. > -> < m : b > =
 [%%expect
 {|
 val f : ('a, 'b) eq -> < m : 'a > -> < m : 'b > = <fun>
-|},
-  Principal
-    {|
-Line 4, characters 44-45:
-4 |     let r : < m : b > = match eq with Eq -> o in (* fail with principal *)
-                                                ^
+|}, Principal{|
+Line 4, characters 42-43:
+4 |   let r : < m : b > = match eq with Eq -> o in
+                                              ^
 Error: This expression has type "< m : a >"
        but an expression was expected of type "< m : b >"
        Type "a" is not compatible with type "b" = "a"
@@ -879,9 +875,9 @@ let f : type a b. (a, b) eq -> < m : a ; .. > -> < m : b > =
 
 [%%expect
 {|
-Line 3, characters 44-45:
-3 |     let r : < m : b > = match eq with Eq -> o in (* fail *)
-                                                ^
+Line 3, characters 42-43:
+3 |   let r : < m : b > = match eq with Eq -> o in
+                                              ^
 Error: This expression has type "< m : a; .. >"
        but an expression was expected of type "< m : b >"
        Type "a" is not compatible with type "b" = "a"
@@ -894,9 +890,9 @@ let f : type a b. (a, b) eq -> [> `A of a] -> [> `A of b] = fun Eq o -> o
 (* fail *)
 [%%expect
 {|
-Line 2, characters 14-15:
-2 |   fun Eq o -> o ;; (* fail *)
-                  ^
+Line 1, characters 72-73:
+1 | let f : type a b. (a, b) eq -> [> `A of a] -> [> `A of b] = fun Eq o -> o
+                                                                            ^
 Error: This expression has type "[> `A of a ]"
        but an expression was expected of type "[> `A of b ]"
        Type "a" is not compatible with type "b" = "a"
@@ -911,7 +907,7 @@ let f (type a b) (eq : (a, b) eq) (v : [> `A of a]) : [> `A of b] =
 [%%expect
 {|
 Line 2, characters 22-23:
-2 |   match eq with Eq -> v ;; (* should fail *)
+2 |   match eq with Eq -> v
                           ^
 Error: This expression has type "[> `A of a ]"
        but an expression was expected of type "[> `A of b ]"
@@ -926,9 +922,9 @@ let f : type a b. (a, b) eq -> [< `A of a | `B] -> [< `A of b | `B] =
 (* fail *)
 [%%expect
 {|
-Lines 1-2, characters 4-15:
-1 | ....f : type a b. (a,b) eq -> [< `A of a | `B] -> [< `A of b | `B] =
-2 |   fun Eq o -> o..............
+Lines 1-2, characters 4-14:
+1 | ....f : type a b. (a, b) eq -> [< `A of a | `B] -> [< `A of b | `B] =
+2 |  fun Eq o -> o
 Error: This definition has type
          "'c 'd. ('d, 'd) eq -> ([< `A of 'd | `B ] as 'c) -> 'c"
        which is less general than
@@ -962,24 +958,23 @@ let f : type a b. (a, b) eq -> [> `A of a | `B] -> [`A of b | `B] =
 
 [%%expect
 {|
-Lines 1-5, characters 4-5:
-1 | ....f : type a b. (a,b) eq -> [> `A of a | `B] -> [`A of b | `B] =
-2 |   fun eq o ->
-3 |     ignore (o : [< `A of a | `B]);
-4 |     let r : [`A of b | `B] = match eq with Eq -> o in (* fail with principal *)
-5 |     r..
+Lines 1-6, characters 4-3:
+1 | ....f : type a b. (a, b) eq -> [> `A of a | `B] -> [`A of b | `B] =
+2 |  fun eq o ->
+3 |   ignore (o : [< `A of a | `B]);
+4 |   let r : [`A of b | `B] = match eq with Eq -> o in
+5 |   (* fail with principal *)
+6 |   r
 Error: This expression has type
          "('a, 'b) eq -> [ `A of 'a | `B ] -> [ `A of 'b | `B ]"
        but an expression was expected of type
          "('a, 'b) eq -> [> `A of 'a | `B ] -> [ `A of 'b | `B ]"
        The second variant type is bound to the universal type variable "'c",
        it cannot be closed
-|},
-  Principal
-    {|
-Line 4, characters 49-50:
-4 |     let r : [`A of b | `B] = match eq with Eq -> o in (* fail with principal *)
-                                                     ^
+|}, Principal{|
+Line 4, characters 47-48:
+4 |   let r : [`A of b | `B] = match eq with Eq -> o in
+                                                   ^
 Error: This expression has type "[ `A of a | `B ]"
        but an expression was expected of type "[ `A of b | `B ]"
        Type "a" is not compatible with type "b" = "a"
@@ -996,9 +991,9 @@ let f : type a b. (a, b) eq -> [> `A of a | `B] -> [`A of b | `B] =
 
 [%%expect
 {|
-Line 3, characters 49-50:
-3 |     let r : [`A of b | `B] = match eq with Eq -> o in (* fail *)
-                                                     ^
+Line 3, characters 47-48:
+3 |   let r : [`A of b | `B] = match eq with Eq -> o in
+                                                   ^
 Error: This expression has type "[> `A of a | `B ]"
        but an expression was expected of type "[ `A of b | `B ]"
        Type "a" is not compatible with type "b" = "a"
@@ -1061,14 +1056,14 @@ let f : type a. a ty -> a t -> int =
 (* warn *)
 [%%expect
 {|
-Lines 2-8, characters 2-16:
-2 | ..match x, y with
-3 |   | _, A z -> z
-4 |   | _, B z -> if z then 1 else 2
-5 |   | _, C z -> truncate z
-6 |   | TE TC, D [|1.0|] -> 14
-7 |   | TA, D 0 -> -1
-8 |   | TA, D z -> z
+Lines 3-9, characters 2-16:
+3 | ..match x, y with
+4 |   | _, A z -> z
+5 |   | _, B z -> if z then 1 else 2
+6 |   | _, C z -> truncate z
+7 |   | TE TC, D [| 1.0 |] -> 14
+8 |   | TA, D 0 -> -1
+9 |   | TA, D z -> z
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 (TE TC, D [| 0. |])
@@ -1089,9 +1084,9 @@ let f : type a. a ty -> a t -> int =
 (* fail *)
 [%%expect
 {|
-Line 6, characters 6-13:
-6 |   | D [|1.0|], TE TC -> 14
-          ^^^^^^^
+Line 7, characters 6-15:
+7 |   | D [| 1.0 |], TE TC -> 14
+          ^^^^^^^^^
 Error: This pattern matches values of type "'a array"
        but a pattern was expected which matches values of type "a"
 |}]
@@ -1115,9 +1110,9 @@ let f : type a. a ty -> a t -> int =
 [%%expect
 {|
 type ('a, 'b) pair = { right : 'a; left : 'b; }
-Line 8, characters 25-32:
-8 |   | {left=TE TC; right=D [|1.0|]} -> 14
-                             ^^^^^^^
+Line 12, characters 30-39:
+12 |   | { left = TE TC; right = D [| 1.0 |] } -> 14
+                                   ^^^^^^^^^
 Error: This pattern matches values of type "'a array"
        but a pattern was expected which matches values of type "a"
 |}]
@@ -1141,14 +1136,14 @@ let f : type a. a ty -> a t -> int =
 [%%expect
 {|
 type ('a, 'b) pair = { left : 'a; right : 'b; }
-Lines 4-10, characters 2-29:
- 4 | ..match {left=x; right=y} with
- 5 |   | {left=_; right=A z} -> z
- 6 |   | {left=_; right=B z} -> if z then 1 else 2
- 7 |   | {left=_; right=C z} -> truncate z
- 8 |   | {left=TE TC; right=D [|1.0|]} -> 14
- 9 |   | {left=TA; right=D 0} -> -1
-10 |   | {left=TA; right=D z} -> z
+Lines 8-14, characters 2-35:
+ 8 | ..match { left = x; right = y } with
+ 9 |   | { left = _; right = A z } -> z
+10 |   | { left = _; right = B z } -> if z then 1 else 2
+11 |   | { left = _; right = C z } -> truncate z
+12 |   | { left = TE TC; right = D [| 1.0 |] } -> 14
+13 |   | { left = TA; right = D 0 } -> -1
+14 |   | { left = TA; right = D z } -> z
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 {left=TE TC; right=D [| 0. |]}
@@ -1174,9 +1169,9 @@ let f : type a b. (a M.t, b M.t) eq -> (a, b) eq = function
 [%%expect
 {|
 module M : sig type 'a t val eq : ('a t, 'b t) eq end
-Line 6, characters 17-19:
-6 |   function Eq -> Eq (* fail *)
-                     ^^
+Line 12, characters 10-12:
+12 |   | Eq -> Eq (* fail *)
+               ^^
 Error: This expression has type "(a, a) eq"
        but an expression was expected of type "(a, b) eq"
        Type "a" is not compatible with type "b"
@@ -1227,9 +1222,9 @@ let g (type t) (x : t) (e : t int_foo) (e' : t int_bar) =
 {|
 type _ int_foo = IF_constr : < foo : int; .. > int_foo
 type _ int_bar = IB_constr : < bar : int; .. > int_bar
-Line 10, characters 3-4:
-10 |   (x:<foo:int>)
-        ^
+Line 7, characters 3-4:
+7 |   (x : < foo : int >)
+       ^
 Error: This expression has type "t" = "< foo : int; .. >"
        but an expression was expected of type "< foo : int >"
        Type "$0" = "< bar : int; .. >" is not compatible with type "<  >"
@@ -1243,7 +1238,7 @@ let g (type t) (x : t) (e : t int_foo) (e' : t int_bar) =
 [%%expect
 {|
 Line 3, characters 3-4:
-3 |   (x:<foo:int;bar:int>)
+3 |   (x : < foo : int ; bar : int >)
        ^
 Error: This expression has type "t" = "< foo : int; .. >"
        but an expression was expected of type "< bar : int; foo : int >"
@@ -1257,18 +1252,16 @@ let g (type t) (x : t) (e : t int_foo) (e' : t int_bar) =
 
 [%%expect
 {|
-Line 3, characters 2-26:
-3 |   (x:<foo:int;bar:int;..>)
-      ^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 2-38:
+3 |   (x : < foo : int ; bar : int ; .. >)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "< bar : int; foo : int; .. >"
        but an expression was expected of type "'a"
        The type constructor "$1" would escape its scope
-|},
-  Principal
-    {|
-Line 3, characters 2-26:
-3 |   (x:<foo:int;bar:int;..>)
-      ^^^^^^^^^^^^^^^^^^^^^^^^
+|}, Principal{|
+Line 3, characters 2-38:
+3 |   (x : < foo : int ; bar : int ; .. >)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "< bar : int; foo : int; .. >"
        but an expression was expected of type "'a"
        This instance of "$1" is ambiguous:
@@ -1380,8 +1373,8 @@ let f : type a b. (a, b) eq -> (a, int) eq -> a -> b -> _ =
 (* ok *)
 [%%expect
 {|
-Line 5, characters 24-25:
-5 |     if true then a else b
+Line 6, characters 24-25:
+6 |     if true then a else b
                             ^
 Error: This expression has type "b" = "int"
        but an expression was expected of type "a" = "int"
@@ -1401,8 +1394,8 @@ let f : type a b. (a, b) eq -> (b, int) eq -> a -> b -> _ =
 (* ok *)
 [%%expect
 {|
-Line 5, characters 24-25:
-5 |     if true then a else b
+Line 6, characters 24-25:
+6 |     if true then a else b
                             ^
 Error: This expression has type "b" = "int"
        but an expression was expected of type "a" = "int"
@@ -1418,8 +1411,8 @@ let f (type a b c) (b : bool) (w1 : (a, b) eq) (w2 : (a, int) eq) (x : a)
 
 [%%expect
 {|
-Line 4, characters 19-20:
-4 |   if b then x else y
+Line 5, characters 19-20:
+5 |   if b then x else y
                        ^
 Error: This expression has type "b" = "int"
        but an expression was expected of type "a" = "int"
@@ -1435,8 +1428,8 @@ let f (type a b c) (b : bool) (w1 : (a, b) eq) (w2 : (a, int) eq) (x : a)
 
 [%%expect
 {|
-Line 4, characters 19-20:
-4 |   if b then y else x
+Line 5, characters 19-20:
+5 |   if b then y else x
                        ^
 Error: This expression has type "a" = "int"
        but an expression was expected of type "b" = "int"
@@ -1458,8 +1451,8 @@ let f (x : M.t) (y : (M.t, int -> int) eq) =
 {|
 module M : sig type t end
 type (_, _) eq = Refl : ('a, 'a) eq
-Line 7, characters 22-36:
-7 |   if true then x else fun x -> x + 1
+Line 9, characters 22-36:
+9 |   if true then x else fun x -> x + 1
                           ^^^^^^^^^^^^^^
 Error: This expression has type "'a -> 'b"
        but an expression was expected of type "M.t" = "int -> int"
@@ -1482,8 +1475,8 @@ let f (x : M.t) (y : (M.t, int -> int) eq) =
 {|
 module M : sig type t end
 type (_, _) eq = Refl : ('a, 'a) eq
-Line 7, characters 35-36:
-7 |   if true then fun x -> x + 1 else x
+Line 9, characters 35-36:
+9 |   if true then fun x -> x + 1 else x
                                        ^
 Error: This expression has type "M.t" = "int -> int"
        but an expression was expected of type "int -> int"
@@ -1506,9 +1499,9 @@ let f w (x : M.t) (y : (M.t, < m : int >) eq) =
 {|
 module M : sig type t end
 type (_, _) eq = Refl : ('a, 'a) eq
-Line 8, characters 2-3:
-8 |   z#m
-      ^
+Line 10, characters 2-3:
+10 |   z#m
+       ^
 Error: This expression has type "M.t" but an expression was expected of type
          "< m : 'a; .. >"
        This instance of "< m : int >" is ambiguous:
@@ -1531,9 +1524,9 @@ let f w (x : M.t) (y : (M.t, < m : int >) eq) =
 {|
 module M : sig type t end
 type (_, _) eq = Refl : ('a, 'a) eq
-Line 8, characters 2-3:
-8 |   z#m
-      ^
+Line 10, characters 2-3:
+10 |   z#m
+       ^
 Error: This expression has type "M.t" but an expression was expected of type
          "< m : 'a; .. >"
        This instance of "< m : int >" is ambiguous:
@@ -1562,9 +1555,9 @@ module M :
     type t =
         C : (< m : int; .. > as 'a) * ('a, < b : bool; m : int >) eq -> t
   end
-Line 9, characters 4-5:
-9 |     z#b
-        ^
+Line 11, characters 4-5:
+11 |     z#b
+         ^
 Error: This expression has type "$a" = "< b : bool >"
        but an expression was expected of type "< b : 'a; .. >"
        This instance of "< b : bool >" is ambiguous:
@@ -1595,9 +1588,9 @@ module M :
     type t =
         C : (< m : int; .. > as 'a) * ('a, < b : bool; m : int >) eq -> t
   end
-Line 9, characters 4-5:
-9 |     z#b
-        ^
+Line 11, characters 4-5:
+11 |     z#b
+         ^
 Error: This expression has type "$a" = "< b : bool >"
        but an expression was expected of type "< b : 'a; .. >"
        This instance of "< b : bool >" is ambiguous:

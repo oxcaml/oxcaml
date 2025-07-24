@@ -1,4 +1,4 @@
-File "deprecated_mutable.ml", line 13, characters 11-12:
-13 | let () = y.x <- 42
-                ^
+File "deprecated_mutable.ml", line 9, characters 11-12:
+9 | let () = y.x <- 42
+               ^
 Alert deprecated: mutating field x

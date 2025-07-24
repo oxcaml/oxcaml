@@ -1,6 +1,10 @@
-File "pr4824a_bad.ml", line 10, characters 2-45:
-10 |   struct class c x = object val x = x end end
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "pr4824a_bad.ml", lines 11-16, characters 6-3:
+11 | ......struct
+12 |   class c x =
+13 |     object
+14 |       val x = x
+15 |     end
+16 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class c : 'a -> object val x : 'a end end

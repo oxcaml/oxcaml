@@ -29,9 +29,9 @@ let ambiguous_typical_example = function
 
 [%%expect
 {|
-Line 2, characters 4-29:
-2 |   | ((Val x, _) | (_, Val x)) when x < 0 -> ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 4-25:
+2 |   | (Val x, _ | _, Val x) when x < 0 -> ()
+        ^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variable x appears in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -43,7 +43,7 @@ val ambiguous_typical_example : expr * expr -> unit = <fun>
 let fails = ambiguous_typical_example (Val 2, Val (-1))
 
 [%%expect {|
-Exception: Assert_failure ("", 6, 6).
+Exception: Assert_failure ("", 6, 4).
 |}]
 
 let not_ambiguous__no_orpat = function
@@ -232,9 +232,10 @@ let ambiguous__first_orpat = function
 
 [%%expect
 {|
-Lines 2-3, characters 4-58:
-2 | ....`A ((`B (Some x, _) | `B (_, Some x)),
-3 |         (`C (Some y, Some _, _) | `C (Some y, _, Some _))).................
+Lines 2-4, characters 4-59:
+2 | ....`A
+3 |       ( (`B (Some x, _) | `B (_, Some x)),
+4 |         (`C (Some y, Some _, _) | `C (Some y, _, Some _)) )
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variable x appears in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -257,9 +258,10 @@ let ambiguous__second_orpat = function
 
 [%%expect
 {|
-Lines 2-3, characters 4-42:
-2 | ....`A ((`B (Some x, Some _, _) | `B (Some x, _, Some _)),
-3 |         (`C (Some y, _) | `C (_, Some y))).................
+Lines 2-4, characters 4-43:
+2 | ....`A
+3 |       ( (`B (Some x, Some _, _) | `B (Some x, _, Some _)),
+4 |         (`C (Some y, _) | `C (_, Some y)) )
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variable y appears in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -364,9 +366,9 @@ let ambiguous__amoi a =
 
 [%%expect
 {|
-Lines 2-3, characters 2-17:
-2 | ..X (Z x,Y (y,0))
-3 | | X (Z y,Y (x,_))
+Line 3, characters 4-43:
+3 |   | (X (Z x, Y (y, 0)) | X (Z y, Y (x, _))) when x + y > 0 -> 0
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variables x, y appear in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -390,9 +392,9 @@ let ambiguous__module_variable x b =
 
 [%%expect
 {|
-Lines 2-3, characters 4-24:
-2 | ....(module M:S),_,(1,_)
-3 |   | _,(module M:S),(_,1)...................
+Line 3, characters 4-59:
+3 |   | ((module M : S), _, (1, _) | _, (module M : S), (_, 1)) when M.b && b -> 1
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variable M appears in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -409,9 +411,9 @@ let not_ambiguous__module_variable x b =
 
 [%%expect
 {|
-Line 2, characters 12-13:
-2 |   | (module M:S),_,(1,_)
-                ^
+Line 3, characters 13-14:
+3 |   | ((module M : S), _, (1, _) | _, (module M : S), (_, 1)) when b -> 1
+                 ^
 Warning 60 [unused-module]: unused module M.
 
 val not_ambiguous__module_variable :
@@ -436,22 +438,24 @@ let ambiguous_xy_but_not_ambiguous_z g = function
 
 [%%expect
 {|
-Line 2, characters 4-5:
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-        ^
+Line 2, characters 5-6:
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+         ^
 Warning 41 [ambiguous-name]: A belongs to several types: t2 t
 The first one was selected. Please disambiguate if this is wrong.
 
-Lines 1-3, characters 41-10:
+Lines 1-5, characters 41-10:
 1 | .........................................function
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-3 |   | _ -> 2
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+3 |     when g x (y + z) ->
+4 |     1
+5 |   | _ -> 2
 Warning 4 [fragile-match]: this pattern-matching is fragile.
 It will remain exhaustive when constructors are added to type t2.
 
-Line 2, characters 4-56:
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 4-69:
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variables x, y appear in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -459,37 +463,37 @@ Only the first match will be used to evaluate the guard expression.
 
 val ambiguous_xy_but_not_ambiguous_z : (int -> int -> bool) -> t2 -> int =
   <fun>
-|},
-  Principal
-    {|
-Line 2, characters 4-5:
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-        ^
+|}, Principal{|
+Line 2, characters 5-6:
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+         ^
 Warning 41 [ambiguous-name]: A belongs to several types: t2 t
 The first one was selected. Please disambiguate if this is wrong.
 
-Line 2, characters 24-25:
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-                            ^
+Line 2, characters 30-31:
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+                                  ^
 Warning 41 [ambiguous-name]: A belongs to several types: t2 t
 The first one was selected. Please disambiguate if this is wrong.
 
-Line 2, characters 42-43:
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-                                              ^
+Line 2, characters 53-54:
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+                                                         ^
 Warning 41 [ambiguous-name]: B belongs to several types: t2 t
 The first one was selected. Please disambiguate if this is wrong.
 
-Lines 1-3, characters 41-10:
+Lines 1-5, characters 41-10:
 1 | .........................................function
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-3 |   | _ -> 2
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+3 |     when g x (y + z) ->
+4 |     1
+5 |   | _ -> 2
 Warning 4 [fragile-match]: this pattern-matching is fragile.
 It will remain exhaustive when constructors are added to type t2.
 
-Line 2, characters 4-56:
-2 |   | A (x as z,(0 as y))|A (0 as y as z,x)|B (x,(y as z)) when g x (y+z) -> 1
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 4-69:
+2 |   | (A ((x as z), (0 as y)) | A ((0 as y as z), x) | B (x, (y as z)))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variables x, y appear in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -551,9 +555,9 @@ let guarded_ambiguity = function
 
 [%%expect
 {|
-Line 3, characters 4-29:
-3 |   | ((Val y, _) | (_, Val y)) when y < 0 -> ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 4-25:
+3 |   | (Val y, _ | _, Val y) when y < 0 -> ()
+        ^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variable y appears in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.
@@ -588,9 +592,9 @@ let cmp (pred : a -> bool) (x : a alg) (y : a alg) =
 
 [%%expect
 {|
-Line 4, characters 4-29:
-4 |   | ((Val x, _) | (_, Val x)) when pred x -> ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 4-25:
+4 |   | (Val x, _ | _, Val x) when pred x -> ()
+        ^^^^^^^^^^^^^^^^^^^^^
 Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables under guard;
 variable x appears in different places in different or-pattern alternatives.
 Only the first match will be used to evaluate the guard expression.

@@ -9,7 +9,7 @@ and b = 3
 [%%expect
 {|
 Line 1, characters 12-18:
-1 | let rec a = lazy b and b = 3;;
+1 | let rec a = lazy b
                 ^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]

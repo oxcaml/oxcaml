@@ -185,9 +185,9 @@ module M_S : S = M
 
 [%%expect
 {|
-Line 1, characters 14-15:
-1 | module M_S = (M : S)
-                  ^
+Line 1, characters 17-18:
+1 | module M_S : S = M
+                     ^
 Error: Signature mismatch:
        Modules do not match: sig type foo = M.foo end is not included in S
        Type declarations do not match:
@@ -253,9 +253,9 @@ module M_S : S = M
 
 [%%expect
 {|
-Line 1, characters 14-15:
-1 | module M_S = (M : S)
-                  ^
+Line 1, characters 17-18:
+1 | module M_S : S = M
+                     ^
 Error: Signature mismatch:
        Modules do not match:
          sig type foo = M.foo = private .. end
@@ -295,9 +295,9 @@ module M_S : S = M
 
 [%%expect
 {|
-Line 1, characters 14-15:
-1 | module M_S = (M : S)
-                  ^
+Line 1, characters 17-18:
+1 | module M_S : S = M
+                     ^
 Error: Signature mismatch:
        Modules do not match:
          sig type 'a foo = 'a M.foo = .. type 'a bar = 'a foo = .. end
@@ -327,8 +327,8 @@ let _ = raise Foobar
 [%%expect
 {|
 type exn += private Foobar
-Line 2, characters 14-20:
-2 | let _ = raise Foobar
+Line 3, characters 14-20:
+3 | let _ = raise Foobar
                   ^^^^^^
 Error: Cannot use private constructor "Foobar" to create values of type "exn"
 |}]
@@ -345,8 +345,8 @@ let f = function Foo -> ()
 {|
 type foo = ..
 type foo += Foo
-Line 3, characters 8-26:
-3 | let f = function Foo -> ()
+Line 5, characters 8-26:
+5 | let f = function Foo -> ()
             ^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
@@ -363,11 +363,9 @@ let f = function [Foo] -> 1 | _ :: _ :: _ -> 3 | [] -> 2
 
 [%%expect
 {|
-Lines 1-4, characters 8-11:
-1 | ........function
-2 |   | [Foo] -> 1
-3 |   | _::_::_ -> 3
-4 |   | [] -> 2
+Line 1, characters 8-56:
+1 | let f = function [Foo] -> 1 | _ :: _ :: _ -> 3 | [] -> 2
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 *extension*::[]
@@ -393,7 +391,7 @@ let f = function IPair (i, j) -> Format.sprintf "(%d, %d)" i j
 [%%expect
 {|
 Line 1, characters 8-62:
-1 | let f = function IPair (i, j) -> Format.sprintf "(%d, %d)" i j ;;
+1 | let f = function IPair (i, j) -> Format.sprintf "(%d, %d)" i j
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:

@@ -15,7 +15,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('a, 'b) t = 'a * 'a
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('a, 'b) t = 'a * 'a end
@@ -40,7 +40,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('a, 'b) t = 'a * 'b
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('a, 'b) t = 'a * 'b end
@@ -67,10 +67,10 @@ end
 [%%expect
 {|
 type 'a x
-Lines 4-6, characters 6-3:
-4 | ......struct
-5 |   type ('b,'c,'a) t = ('b * 'c * 'a * 'c * 'a) x
-6 | end
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   type ('b, 'c, 'a) t = ('b * 'c * 'a * 'c * 'a) x
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('b, 'c, 'a) t = ('b * 'c * 'a * 'c * 'a) x end
@@ -95,8 +95,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <m : 'a. 'a * ('a * 'foo)> as 'foo
-5 | end..
+4 |   type t = < m : 'a. 'a * ('a * 'foo) > as 'foo
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < m : 'a. 'a * ('a * 'b) > as 'b end
@@ -129,8 +129,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <m : int>
-5 | end..
+4 |   type t = < m : int >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < m : int > end
@@ -155,7 +155,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = s
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = s end
@@ -177,11 +177,10 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of (int*int)*float
-7 | end..
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Foo of (int * int) * float
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of (int * int) * float end
@@ -208,8 +207,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = (int * float * int)
-5 | end..
+4 |   type t = int * float * int
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = int * float * int end
@@ -232,8 +231,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <n : int; f : float>
-5 | end..
+4 |   type t = < n : int ; f : float >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < f : float; n : int > end
@@ -258,8 +257,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <n : int>
-5 | end..
+4 |   type t = < n : int >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < n : int > end
@@ -283,8 +282,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <n : int; m : int>
-5 | end..
+4 |   type t = < n : int ; m : int >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < m : int; n : int > end
@@ -308,11 +307,10 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of [`Bar of string]
-7 | end..
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Foo of [`Bar of string]
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of [ `Bar of string ] end
@@ -342,7 +340,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private [`C]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [ `C ] end
@@ -367,7 +365,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private [`C of int]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [ `C of int ] end
@@ -406,7 +404,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private [`A of int]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [ `A of int ] end
@@ -431,7 +429,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private [> `A of int]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [> `A of int ] end
@@ -455,8 +453,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type 'a t =  [> `A of int] as 'a
-5 | end..
+4 |   type 'a t = [> `A of int] as 'a
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type 'a t = 'a constraint 'a = [> `A of int ] end
@@ -482,8 +480,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type 'a t =  [> `A of int | `C of float] as 'a
-5 | end..
+4 |   type 'a t = [> `A of int | `C of float] as 'a
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type 'a t = 'a constraint 'a = [> `A of int | `C of float ] end
@@ -523,8 +521,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = private [< `C of int&float]
-5 | end..
+4 |   type t = private [< `C of int & float]
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `C of int & float ] end
@@ -571,9 +569,9 @@ module type S = sig module Choice : T val r : Choice.t list ref ref end
 module Force : functor (X : functor () -> S) -> sig end
 module Choose :
   functor () -> sig module Choice : T val r : '_weak1 list ref ref end
-Line 17, characters 16-29:
-17 | module Ignore = Force(Choose)
-                     ^^^^^^^^^^^^^
+Line 23, characters 16-30:
+23 | module Ignore = Force (Choose)
+                     ^^^^^^^^^^^^^^
 Error: Modules do not match:
        functor () -> sig module Choice : T val r : '_weak1 list ref ref end
      is not included in functor () -> S
@@ -604,11 +602,12 @@ end
 
 [%%expect
 {|
-Lines 5-8, characters 8-5:
-5 | ........struct
-6 |     module type s
-7 |     let f (module X:s) = ()
-8 |   end
+Lines 6-10, characters 8-5:
+ 6 | ........struct
+ 7 |     module type s
+ 8 |
+ 9 |     let f (module X : s) = ()
+10 |   end
 Error: Signature mismatch:
        Modules do not match:
          sig module type s val f : (module s) -> unit end
@@ -621,7 +620,7 @@ Error: Signature mismatch:
        The type "(module s/1) -> unit" is not compatible with the type
          "(module s/2) -> unit"
        Type "(module s/1)" is not compatible with type "(module s/2)"
-       Line 6, characters 4-17:
+       Line 7, characters 4-17:
          Definition of module type "s/1"
        Line 2, characters 2-15:
          Definition of module type "s/2"
@@ -637,8 +636,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : <m : 'a. ('a * 'foo)> as 'foo) = ()
-5 | end..
+4 |   let f (x : < m : 'a. 'a * 'foo > as 'foo) = ()
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : (< m : 'a. 'a * 'b > as 'b) -> unit end
@@ -669,8 +668,8 @@ end
 type s = private < m : int; .. >
 Lines 5-7, characters 6-3:
 5 | ......struct
-6 |   let f (x : <m : int>) = x
-7 | end..
+6 |   let f (x : < m : int >) = x
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : < m : int > -> < m : int > end
@@ -697,7 +696,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f : 'b -> int = fun _ -> 0
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : 'b -> int end
@@ -722,7 +721,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let x = ref []
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val x : '_weak2 list ref end
@@ -751,9 +750,9 @@ end =
 {|
 module M : sig val r : '_weak3 list ref end
 type t
-Line 3, characters 40-41:
-3 | module N : sig val r : t list ref end = M;;
-                                            ^
+Line 10, characters 2-3:
+10 |   M
+       ^
 Error: Signature mismatch:
        Modules do not match:
          sig val r : '_weak3 list ref end
@@ -804,8 +803,8 @@ let foo p (e : (T.t, T.s) eq) (x : T.t) (y : T.s) =
 type (_, _) eq = Refl : ('a, 'a) eq
 module T : sig type t type s val eq : (t, s) eq end
 module M : sig val r : '_weak4 list ref end
-Line 22, characters 25-26:
-22 |     let module O : N.S = M in
+Line 30, characters 25-26:
+30 |     let module O : N.S = M in
                               ^
 Error: Signature mismatch:
        Modules do not match:
@@ -832,7 +831,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : 'a) = x
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : 'a -> 'a end
@@ -856,8 +855,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : (int * int)) = x
-5 | end..
+4 |   let f (x : int * int) = x
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : int * int -> int * int end
@@ -882,8 +881,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : <m : int; f : float>) = x
-5 | end..
+4 |   let f (x : < m : int ; f : float >) = x
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : < f : float; m : int > -> < f : float; m : int > end
@@ -909,8 +908,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : [ `Foo | `Bar]) = ()
-5 | end..
+4 |   let f (x : [`Foo | `Bar]) = ()
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [ `Bar | `Foo ] -> unit end
@@ -936,7 +935,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : [< `Foo]) = ()
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [< `Foo ] -> unit end
@@ -962,7 +961,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : [< `Foo]) = ()
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [< `Foo ] -> unit end
@@ -987,8 +986,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : < m : 'a. [< `Foo] as 'a >) = ()
-5 | end..
+4 |   let f (x : < m : 'a. ([< `Foo] as 'a) >) = ()
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : < m : 'a. [< `Foo ] as 'a > -> unit end
@@ -1015,7 +1014,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : < m : [`Foo] >) = ()
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : < m : [ `Foo ] > -> unit end
@@ -1041,8 +1040,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : [< `C of int&float]) = ()
-5 | end..
+4 |   let f (x : [< `C of int & float]) = ()
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [< `C of int & float ] -> unit end
@@ -1068,7 +1067,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : [`Foo of int]) = ()
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [ `Foo of int ] -> unit end
@@ -1094,7 +1093,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : [`Foo]) = ()
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [ `Foo ] -> unit end
@@ -1130,7 +1129,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f (x : [> `Foo | `Bar]) = ()
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : [> `Bar | `Foo ] -> unit end
@@ -1158,10 +1157,10 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = [`C]
-5 | end..
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   type t = [`C]
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = [ `C ] end
@@ -1184,10 +1183,10 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private [> `A]
-5 | end..
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   type t = private [> `A]
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [> `A ] end
@@ -1210,10 +1209,10 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = [`B]
-5 | end..
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   type t = [`B]
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = [ `B ] end
@@ -1237,7 +1236,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = [`A]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = [ `A ] end
@@ -1260,8 +1259,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |    type t = private [< `A of & int]
-5 | end..
+4 |   type t = private [< `A of  & int]
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `A of & int ] end
@@ -1285,7 +1284,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private [< `A]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `A ] end
@@ -1309,7 +1308,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private [< `A]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `A ] end
@@ -1333,7 +1332,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = [`A of float]
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = [ `A of float ] end
@@ -1358,10 +1357,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private [`A | `B]
-5 | end..
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type t = private
+7 |     [ `A
+8 |     | `B ]
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [ `A | `B ] end
@@ -1388,10 +1389,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private [`A | `B]
-5 | end..
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type t = private
+7 |     [ `A
+8 |     | `B ]
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [ `A | `B ] end
@@ -1416,10 +1419,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private [< `A | `B]
-5 | end..
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type t = private
+7 |     [< `A
+8 |     | `B ]
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `A | `B ] end
@@ -1443,8 +1448,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <b : int>
-5 | end..
+4 |   type t = < b : int >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < b : int > end
@@ -1467,8 +1472,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = <a : int>
-5 | end..
+4 |   type t = < a : int >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = < a : int > end
@@ -1500,10 +1505,10 @@ end
 type w = private float
 type q = private int * w
 type u = private int * q
-Lines 6-8, characters 6-3:
-6 | ......struct
-7 |   type t = private u
-8 | end..
+Lines 10-12, characters 6-3:
+10 | ......struct
+11 |   type t = private u
+12 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private u end
@@ -1534,10 +1539,10 @@ end
 type w = float
 type q = int * w
 type u = private int * q
-Lines 6-8, characters 6-3:
-6 | ......struct
-7 |   type t = private u
-8 | end..
+Lines 9-11, characters 6-3:
+ 9 | ......struct
+10 |   type t = private u
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private u end
@@ -1566,7 +1571,7 @@ type s = private int
 Lines 5-7, characters 6-3:
 5 | ......struct
 6 |   type t = private s
-7 | end..
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private s end
@@ -1590,7 +1595,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = private A
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private A end
@@ -1615,10 +1620,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private A | B
-5 | end..
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type t = private
+7 |     | A
+8 |     | B
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private A | B end
@@ -1647,10 +1654,14 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private A of { x : int; y : bool }
-5 | end..
+Lines 7-13, characters 6-3:
+ 7 | ......struct
+ 8 |   type t = private
+ 9 |     | A of
+10 |         { x : int;
+11 |           y : bool
+12 |         }
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private A of { x : int; y : bool; } end
@@ -1677,10 +1688,13 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private { x : int; y : bool }
-5 | end..
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   type t = private
+ 8 |     { x : int;
+ 9 |       y : bool
+10 |     }
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private { x : int; y : bool; } end
@@ -1703,10 +1717,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
+Lines 3-7, characters 6-3:
 3 | ......struct
-4 |   type t = private A | B
-5 | end..
+4 |   type t = private
+5 |     | A
+6 |     | B
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private A | B end
@@ -1729,10 +1745,10 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private A
-5 | end..
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   type t = private A
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private A end
@@ -1756,10 +1772,13 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
+Lines 3-8, characters 6-3:
 3 | ......struct
-4 |   type t = private { x : int; y : bool }
-5 | end..
+4 |   type t = private
+5 |     { x : int;
+6 |       y : bool
+7 |     }
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private { x : int; y : bool; } end
@@ -1783,10 +1802,10 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private { x : int }
-5 | end..
+Lines 6-8, characters 6-3:
+6 | ......struct
+7 |   type t = private { x : int }
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private { x : int; } end
@@ -1812,10 +1831,13 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private { x : int; y : bool }
-5 | end..
+Lines 5-10, characters 6-3:
+ 5 | ......struct
+ 6 |   type t = private
+ 7 |     { x : int;
+ 8 |       y : bool
+ 9 |     }
+10 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private { x : int; y : bool; } end
@@ -1841,10 +1863,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = private A | B
-5 | end..
+Lines 6-10, characters 6-3:
+ 6 | ......struct
+ 7 |   type t = private
+ 8 |     | A
+ 9 |     | B
+10 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private A | B end
@@ -1867,10 +1891,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
+Lines 3-7, characters 6-3:
 3 | ......struct
-4 |   type t = private [> `A | `B]
-5 | end..
+4 |   type t = private
+5 |     [> `A
+6 |     | `B ]
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [> `A | `B ] end
@@ -1893,10 +1919,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
+Lines 3-7, characters 6-3:
 3 | ......struct
-4 |   type t = private [< `A | `B]
-5 | end..
+4 |   type t = private
+5 |     [< `A
+6 |     | `B ]
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `A | `B ] end
@@ -1919,10 +1947,12 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
+Lines 3-7, characters 6-3:
 3 | ......struct
-4 |   type t = private [< `A | `B > `A]
-5 | end..
+4 |   type t = private
+5 |     [< `A
+6 |     | `B > `A ]
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private [< `A | `B > `A ] end
@@ -1945,8 +1975,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = private < m : int; .. >
-5 | end..
+4 |   type t = private < m : int ; .. >
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = private < m : int; .. > end
@@ -1970,7 +2000,7 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type _ t = A : (<x:'a * 'a> as 'a) -> (<y:'b> as 'b) t
+4 |   type _ t = A : (< x : 'a * 'a > as 'a) -> (< y : 'b > as 'b) t
 5 | end
 Error: Signature mismatch:
        Modules do not match:
@@ -2003,7 +2033,7 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = { a: (<x:'a * 'a> as 'a) }
+4 |   type t = { a : < x : 'a * 'a > as 'a }
 5 | end
 Error: Signature mismatch:
        Modules do not match:
@@ -2035,10 +2065,10 @@ end
 [%%expect
 {|
 type _ ext = ..
-Lines 4-6, characters 6-3:
-4 | ......struct
-5 |   type _ ext  += A : (<x:'a * 'a> as 'a) -> (<y:'b> as 'b) ext
-6 | end
+Lines 5-7, characters 6-3:
+5 | ......struct
+6 |   type _ ext += A : (< x : 'a * 'a > as 'a) -> (< y : 'b > as 'b) ext
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -2084,11 +2114,10 @@ end
 
 [%%expect
 {|
-Lines 7-10, characters 6-3:
- 7 | ......struct
- 8 |   module N = struct
- 9 |   end
-10 | end
+Lines 9-11, characters 6-3:
+ 9 | ......struct
+10 |   module N = struct end
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module N : sig end end

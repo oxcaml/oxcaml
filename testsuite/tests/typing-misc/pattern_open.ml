@@ -233,9 +233,9 @@ let test_separation = function S.(Sep), (S.(Sep, Sep), Sep) -> ()
 
 [%%expect
 {|
-Line 2, characters 27-30:
-2 |   | S.(Sep), (S.(Sep,Sep), Sep) -> ();;
-                               ^^^
+Line 1, characters 55-58:
+1 | let test_separation = function S.(Sep), (S.(Sep, Sep), Sep) -> ()
+                                                           ^^^
 Error: Unbound constructor "Sep"
 |}]
 
@@ -243,9 +243,9 @@ let test_separation_2 = function S.(Ex (a, b)), Ex (c, d) -> ()
 
 [%%expect
 {|
-Line 2, characters 17-19:
-2 |   | S.(Ex(a,b)), Ex(c,d) -> ();;
-                     ^^
+Line 1, characters 48-50:
+1 | let test_separation_2 = function S.(Ex (a, b)), Ex (c, d) -> ()
+                                                    ^^
 Error: Unbound constructor "Ex"
 |}]
 
@@ -253,9 +253,9 @@ let test_separation_3 = function S.(Sep) -> s
 
 [%%expect
 {|
-Line 2, characters 15-16:
-2 |   | S.(Sep) -> s;;
-                   ^
+Line 1, characters 44-45:
+1 | let test_separation_3 = function S.(Sep) -> s
+                                                ^
 Error: Unbound value "s"
 |}]
 

@@ -17,8 +17,8 @@ let f (x : int * int) : t = x
 
 [%%expect
 {|
-Line 1, characters 29-30:
-1 | let f (x : int * int) = (x : t)
-                                 ^
+Line 1, characters 24-25:
+1 | let f (x : int * int) : t = x
+                            ^
 Error: Unbound type constructor "t"
 |}]

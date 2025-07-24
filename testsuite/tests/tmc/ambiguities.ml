@@ -17,21 +17,21 @@ end
 
 [%%expect
 {|
-Line 5, characters 4-34:
-5 |     Node (map f left, map f right)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 28-58:
+4 |     | Node (left, right) -> Node (map f left, map f right)
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: "[@tail_mod_cons]": this constructor application may be TMC-transformed
        in several different ways. Please disambiguate by adding an explicit
        "[@tailcall]" attribute to the call that should be made tail-recursive,
        or a "[@tailcall false]" attribute on calls that should not be
        transformed.
-Line 5, characters 10-20:
-5 |     Node (map f left, map f right)
-              ^^^^^^^^^^
+Line 4, characters 34-44:
+4 |     | Node (left, right) -> Node (map f left, map f right)
+                                      ^^^^^^^^^^
   This call could be annotated.
-Line 5, characters 22-33:
-5 |     Node (map f left, map f right)
-                          ^^^^^^^^^^^
+Line 4, characters 46-57:
+4 |     | Node (left, right) -> Node (map f left, map f right)
+                                                  ^^^^^^^^^^^
   This call could be annotated.
 |}]
 
@@ -161,33 +161,33 @@ end
 
 [%%expect
 {|
-Line 7, characters 10-71:
-7 |           Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 9, characters 6-67:
+9 |       Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: "[@tail_mod_cons]": this constructor application may be TMC-transformed
        in several different ways. Please disambiguate by adding an explicit
        "[@tailcall]" attribute to the call that should be made tail-recursive,
        or a "[@tailcall false]" attribute on calls that should not be
        transformed.
-Line 7, characters 16-24:
-7 |           Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
-                    ^^^^^^^^
+Line 9, characters 12-20:
+9 |       Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
+                ^^^^^^^^
   This call could be annotated.
-Line 7, characters 27-35:
-7 |           Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
-                               ^^^^^^^^
+Line 9, characters 23-31:
+9 |       Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
+                           ^^^^^^^^
   This call could be annotated.
-Line 7, characters 38-46:
-7 |           Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
-                                          ^^^^^^^^
+Line 9, characters 34-42:
+9 |       Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
+                                      ^^^^^^^^
   This call could be annotated.
-Line 7, characters 49-57:
-7 |           Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
-                                                     ^^^^^^^^
+Line 9, characters 45-53:
+9 |       Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
+                                                 ^^^^^^^^
   This call could be annotated.
-Line 7, characters 59-67:
-7 |           Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
-                                                               ^^^^^^^^
+Line 9, characters 55-63:
+9 |       Node (map f t1, (map f t2, (map f t3, (map f t4, map f t5))))
+                                                           ^^^^^^^^
   This call could be annotated.
 |}]
 
@@ -212,35 +212,30 @@ end
 
 [%%expect
 {|
-Lines 13-20, characters 8-9:
-13 | ........Node (
-14 |           (if flip
-15 |            then shift ~flip (- k) left
-16 |            else shift ~flip k left),
-17 |           (if flip
-18 |            then shift ~flip (- k) right
-19 |            else shift ~flip k right)
-20 |         )
+Lines 15-17, characters 6-72:
+15 | ......Node
+16 |         ( (if flip then shift ~flip (-k) left else shift ~flip k left),
+17 |           if flip then shift ~flip (-k) right else shift ~flip k right )
 Error: "[@tail_mod_cons]": this constructor application may be TMC-transformed
        in several different ways. Please disambiguate by adding an explicit
        "[@tailcall]" attribute to the call that should be made tail-recursive,
        or a "[@tailcall false]" attribute on calls that should not be
        transformed.
-Line 15, characters 16-38:
-15 |            then shift ~flip (- k) left
-                     ^^^^^^^^^^^^^^^^^^^^^^
+Line 16, characters 24-45:
+16 |         ( (if flip then shift ~flip (-k) left else shift ~flip k left),
+                             ^^^^^^^^^^^^^^^^^^^^^
   This call could be annotated.
-Line 16, characters 16-34:
-16 |            else shift ~flip k left),
-                     ^^^^^^^^^^^^^^^^^^
+Line 16, characters 51-69:
+16 |         ( (if flip then shift ~flip (-k) left else shift ~flip k left),
+                                                        ^^^^^^^^^^^^^^^^^^
   This call could be annotated.
-Line 18, characters 16-39:
-18 |            then shift ~flip (- k) right
-                     ^^^^^^^^^^^^^^^^^^^^^^^
+Line 17, characters 23-45:
+17 |           if flip then shift ~flip (-k) right else shift ~flip k right )
+                            ^^^^^^^^^^^^^^^^^^^^^^
   This call could be annotated.
-Line 19, characters 16-35:
-19 |            else shift ~flip k right)
-                     ^^^^^^^^^^^^^^^^^^^
+Line 17, characters 51-70:
+17 |           if flip then shift ~flip (-k) right else shift ~flip k right )
+                                                        ^^^^^^^^^^^^^^^^^^^
   This call could be annotated.
 |}]
 
@@ -287,26 +282,25 @@ end
 
 [%%expect
 {|
-Lines 7-14, characters 8-9:
- 7 | ........Node (
- 8 |           (if flip
- 9 |            then (shift[@tailcall]) ~flip (- k) left
-10 |            else shift ~flip k left),
-11 |           (if flip
-12 |            then shift ~flip (- k) right
-13 |            else (shift[@tailcall]) ~flip k right)
-14 |         )
+Lines 9-15, characters 6-50:
+ 9 | ......Node
+10 |         ( (if flip
+11 |           then (shift [@tailcall]) ~flip (-k) left
+12 |           else shift ~flip k left),
+13 |           if flip
+14 |           then shift ~flip (-k) right
+15 |           else (shift [@tailcall]) ~flip k right )
 Error: "[@tail_mod_cons]": this constructor application may be TMC-transformed
        in several different ways. Only one of the arguments may become a TMC
        call, but several arguments contain calls that are explicitly marked
        as tail-recursive. Please fix the conflict by reviewing and fixing the
        conflicting annotations.
-Line 9, characters 16-51:
-9 |            then (shift[@tailcall]) ~flip (- k) left
+Line 11, characters 15-50:
+11 |           then (shift [@tailcall]) ~flip (-k) left
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   This call is explicitly annotated.
-Line 13, characters 16-48:
-13 |            else (shift[@tailcall]) ~flip k right)
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 15, characters 15-48:
+15 |           else (shift [@tailcall]) ~flip k right )
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   This call is explicitly annotated.
 |}]

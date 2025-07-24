@@ -27,9 +27,9 @@ end
 (* should fail *)
 [%%expect
 {|
-Line 7, characters 16-20:
-7 |     fun Refl -> Refl
-                    ^^^^
+Line 8, characters 72-76:
+8 |   let uniq : type a. (a, [`Rec of a] X.t) eq -> (a, t) eq = fun Refl -> Refl
+                                                                            ^^^^
 Error: This expression has type "(a, a) eq"
        but an expression was expected of type "(a, t) eq"
        Type "a" is not compatible with type "t" = "[ `Rec of 'a ] X.t as 'a"
@@ -51,8 +51,8 @@ let magic : type a b. a -> b =
 [%%expect
 {|
 module Id : sig type 'a t = 'b constraint 'a = [ `Rec of 'b ] end
-Line 4, characters 13-16:
-4 | module Bad = Fix(Id)
+Line 5, characters 13-16:
+5 | module Bad = Fix (Id)
                  ^^^
 Error: Unbound module "Fix"
 |}]
@@ -71,9 +71,9 @@ end
 (* should fail *)
 [%%expect
 {|
-Line 4, characters 21-25:
-4 |     fun Refl Refl -> Refl;;
-                         ^^^^
+Line 8, characters 20-24:
+8 |    fun Refl Refl -> Refl
+                        ^^^^
 Error: This expression has type "(a, a) eq"
        but an expression was expected of type "(a, a X.t X.t) eq"
        Type "a" = "b X.t" is not compatible with type "a X.t X.t"

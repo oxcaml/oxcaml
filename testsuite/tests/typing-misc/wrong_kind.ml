@@ -89,9 +89,9 @@ let () = match Constr.get () with A | B | C -> ()
 
 [%%expect
 {|
-Line 3, characters 4-5:
-3 |   | A | B | C -> ();;
-        ^
+Line 1, characters 34-35:
+1 | let () = match Constr.get () with A | B | C -> ()
+                                      ^
 Error: This pattern should not be a constructor, the expected type is
        "'a -> Constr.t"
 |}]
@@ -100,9 +100,9 @@ let () = match Record.get () with { a; _ } -> ()
 
 [%%expect
 {|
-Line 3, characters 4-12:
-3 |   | { a; _ } -> ();;
-        ^^^^^^^^
+Line 1, characters 34-42:
+1 | let () = match Record.get () with { a; _ } -> ()
+                                      ^^^^^^^^
 Error: This pattern should not be a record, the expected type is
        "'a -> Record.t"
 |}]
@@ -111,9 +111,9 @@ let () = match Bool.get () with true -> ()
 
 [%%expect
 {|
-Line 3, characters 4-8:
-3 |   | true -> ();;
-        ^^^^
+Line 1, characters 32-36:
+1 | let () = match Bool.get () with true -> ()
+                                    ^^^^
 Error: This pattern should not be a boolean literal, the expected type is
        "'a -> Bool.t"
 |}]
@@ -122,9 +122,9 @@ let () = match Bool.get () with false -> ()
 
 [%%expect
 {|
-Line 3, characters 4-9:
-3 |   | false -> ();;
-        ^^^^^
+Line 1, characters 32-37:
+1 | let () = match Bool.get () with false -> ()
+                                    ^^^^^
 Error: This pattern should not be a boolean literal, the expected type is
        "'a -> Bool.t"
 |}]
@@ -133,9 +133,9 @@ let () = match List.get () with [] -> ()
 
 [%%expect
 {|
-Line 3, characters 4-6:
-3 |   | [] -> ();;
-        ^^
+Line 1, characters 32-34:
+1 | let () = match List.get () with [] -> ()
+                                    ^^
 Error: This pattern should not be a list literal, the expected type is
        "'a -> 'b List.t"
 |}]
@@ -144,9 +144,9 @@ let () = match List.get () with _ :: _ -> ()
 
 [%%expect
 {|
-Line 3, characters 4-10:
-3 |   | _ :: _ -> ();;
-        ^^^^^^
+Line 1, characters 32-38:
+1 | let () = match List.get () with _ :: _ -> ()
+                                    ^^^^^^
 Error: This pattern should not be a list literal, the expected type is
        "'a -> 'b List.t"
 |}]
@@ -155,9 +155,9 @@ let () = match Unit.get () with () -> ()
 
 [%%expect
 {|
-Line 3, characters 4-6:
-3 |   | () -> ();;
-        ^^
+Line 1, characters 32-34:
+1 | let () = match Unit.get () with () -> ()
+                                    ^^
 Error: This pattern should not be a unit literal, the expected type is
        "'a -> Unit.t"
 |}]
@@ -167,7 +167,7 @@ let () = Constr.put A
 [%%expect
 {|
 Line 1, characters 20-21:
-1 | let () = Constr.put A;;
+1 | let () = Constr.put A
                         ^
 Error: This expression should not be a constructor, the expected type is
        "unit -> Constr.t"
@@ -178,7 +178,7 @@ let () = Record.put { a = 0; b = 0; c = 0 }
 [%%expect
 {|
 Line 1, characters 20-43:
-1 | let () = Record.put { a = 0; b = 0; c = 0 };;
+1 | let () = Record.put { a = 0; b = 0; c = 0 }
                         ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression should not be a record, the expected type is
        "unit -> Record.t"
@@ -189,7 +189,7 @@ let () = Bool.put true
 [%%expect
 {|
 Line 1, characters 18-22:
-1 | let () = Bool.put true;;
+1 | let () = Bool.put true
                       ^^^^
 Error: This expression should not be a boolean literal, the expected type is
        "unit -> Bool.t"
@@ -200,7 +200,7 @@ let () = Bool.put false
 [%%expect
 {|
 Line 1, characters 18-23:
-1 | let () = Bool.put false;;
+1 | let () = Bool.put false
                       ^^^^^
 Error: This expression should not be a boolean literal, the expected type is
        "unit -> Bool.t"
@@ -211,7 +211,7 @@ let () = List.put []
 [%%expect
 {|
 Line 1, characters 18-20:
-1 | let () = List.put [];;
+1 | let () = List.put []
                       ^^
 Error: This expression should not be a list literal, the expected type is
        "unit -> int List.t"
@@ -222,7 +222,7 @@ let () = List.put (1 :: 2)
 [%%expect
 {|
 Line 1, characters 18-26:
-1 | let () = List.put (1 :: 2);;
+1 | let () = List.put (1 :: 2)
                       ^^^^^^^^
 Error: This expression should not be a list literal, the expected type is
        "unit -> int List.t"
@@ -233,7 +233,7 @@ let () = Unit.put ()
 [%%expect
 {|
 Line 1, characters 18-20:
-1 | let () = Unit.put ();;
+1 | let () = Unit.put ()
                       ^^
 Error: This expression should not be a unit literal, the expected type is
        "unit -> Unit.t"
@@ -243,9 +243,9 @@ let () = ignore (Record.get ()).a
 
 [%%expect
 {|
-Line 2, characters 10-25:
-2 |   ignore ((Record.get ()).a);;
-              ^^^^^^^^^^^^^^^
+Line 1, characters 16-31:
+1 | let () = ignore (Record.get ()).a
+                    ^^^^^^^^^^^^^^^
 Error: This expression has type "'a -> Record.t" which is not a record type.
 |}]
 
@@ -253,9 +253,9 @@ let () = (Record.get ()).a <- 5
 
 [%%expect
 {|
-Line 2, characters 2-17:
-2 |   (Record.get ()).a <- 5;;
-      ^^^^^^^^^^^^^^^
+Line 1, characters 9-24:
+1 | let () = (Record.get ()).a <- 5
+             ^^^^^^^^^^^^^^^
 Error: This expression has type "'a -> Record.t" which is not a record type.
 |}]
 
@@ -263,9 +263,9 @@ let () = ignore { (Record.get ()) with a = 5 }
 
 [%%expect
 {|
-Line 2, characters 9-39:
-2 |   ignore { (Record.get ()) with a = 5 };;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 16-46:
+1 | let () = ignore { (Record.get ()) with a = 5 }
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "'a -> Record.t" which is not a record type.
 |}]
 
@@ -273,9 +273,9 @@ let foo x = Record.put { x with a = 5 }
 
 [%%expect
 {|
-Line 2, characters 13-29:
-2 |   Record.put { x with a = 5 };;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 23-39:
+1 | let foo x = Record.put { x with a = 5 }
+                           ^^^^^^^^^^^^^^^^
 Error: This expression should not be a record, the expected type is
        "unit -> Record.t"
 |}]

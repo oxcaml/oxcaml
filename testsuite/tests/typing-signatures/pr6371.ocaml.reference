@@ -1,3 +1,5 @@
-module M : sig type t = int * (< m : 'a > as 'a) end
-module type S = sig module M : sig type t = int * (< m : 'a > as 'a) end end
+
+
+Line 15, characters 0-0:
+Error: Syntax error
 

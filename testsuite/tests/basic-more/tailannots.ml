@@ -18,9 +18,9 @@ let bad_annot_1 () = (nop () [@tail] [@nontail])
 
 [%%expect
 {|
-Line 2, characters 2-8:
-2 |   nop () [@tail] [@nontail]
-      ^^^^^^
+Line 1, characters 21-48:
+1 | let bad_annot_1 () = (nop () [@tail] [@nontail])
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The tail-call annotation on this application is contradictory.
 |}]
 

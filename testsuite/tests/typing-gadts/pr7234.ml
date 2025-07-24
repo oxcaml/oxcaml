@@ -15,8 +15,8 @@ let f (type a) (Neq n : (a, a t) eq) = n
 {|
 type (_, _) eq = Eq : ('a, 'a) eq | Neq : int -> ('a, 'b) eq
 type 'a t
-Line 3, characters 15-36:
-3 | let f (type a) (Neq n : (a, a t) eq) = n;;   (* warn! *)
+Line 7, characters 15-36:
+7 | let f (type a) (Neq n : (a, a t) eq) = n
                    ^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
@@ -34,9 +34,9 @@ end
 
 [%%expect
 {|
-Line 2, characters 16-39:
-2 |  let f (type a) (Neq n : (a, a T.t) eq) = n  (* warn! *)
-                    ^^^^^^^^^^^^^^^^^^^^^^^
+Line 5, characters 17-40:
+5 |   let f (type a) (Neq n : (a, a T.t) eq) = n (* warn! *)
+                     ^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Eq

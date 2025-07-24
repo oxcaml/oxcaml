@@ -14,9 +14,9 @@ let trivial t = match t with IntLit -> () | BoolLit -> ()
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit -> ()
-        ^^^^^^^
+Line 1, characters 44-51:
+1 | let trivial t = match t with IntLit -> () | BoolLit -> ()
+                                                ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -33,9 +33,9 @@ let trivial_merged t = match t with IntLit | BoolLit -> ()
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit -> ()
-        ^^^^^^^
+Line 1, characters 45-52:
+1 | let trivial_merged t = match t with IntLit | BoolLit -> ()
+                                                 ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -61,9 +61,9 @@ let trivial_merged_annotated_under_tuple2 (type a) (tt : a t * a t) =
 
 [%%expect
 {|
-Line 3, characters 22-29:
-3 |   | IntLit, (IntLit | BoolLit) -> ()
-                          ^^^^^^^
+Line 2, characters 34-41:
+2 |   match tt with IntLit, (IntLit | BoolLit) -> () | _ -> ()
+                                      ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "a t"
        Type "bool" is not compatible with type "a" = "int"
@@ -94,9 +94,9 @@ let simple t a =
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit, true -> ()
-        ^^^^^^^
+Line 2, characters 36-43:
+2 |   match t, a with IntLit, 3 -> () | BoolLit, true -> () | _, _ -> ()
+                                        ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -114,9 +114,9 @@ let simple_merged t a =
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit, true -> ()
-        ^^^^^^^
+Line 2, characters 30-37:
+2 |   match t, a with IntLit, 3 | BoolLit, true -> () | _, _ -> ()
+                                  ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -127,9 +127,9 @@ let simple_merged_ambi (type a) (t : a t) a =
 
 [%%expect
 {|
-Line 4, characters 13-17:
-4 |   | BoolLit, true -> ()
-                 ^^^^
+Line 2, characters 45-49:
+2 |   match t, a with IntLit, (3 : a) | BoolLit, true -> () | _, _ -> ()
+                                                 ^^^^
 Error: This pattern matches values of type "bool"
        but a pattern was expected which matches values of type "a" = "bool"
        This instance of "bool" is ambiguous:
@@ -141,9 +141,9 @@ let simple_merged_not_annotated_enough (type a) (t : a t) a =
 
 [%%expect
 {|
-Line 4, characters 13-17:
-4 |   | BoolLit, true -> ()
-                 ^^^^
+Line 2, characters 39-43:
+2 |   match t, a with IntLit, 3 | BoolLit, true -> () | _, _ -> ()
+                                           ^^^^
 Error: This pattern matches values of type "bool"
        but a pattern was expected which matches values of type "int"
 |}]
@@ -170,7 +170,7 @@ let simple_merged_annotated_return (type a) (t : a t) (a : a) =
 [%%expect
 {|
 Line 3, characters 18-19:
-3 |   | IntLit, (3 as x)
+3 |   | IntLit, (3 as x) | BoolLit, (true as x) -> ignore x
                       ^
 Error: This pattern matches values of type "int"
        This instance of "int" is ambiguous:
@@ -311,9 +311,9 @@ let noop t a = match t, a with IntLit, x -> x | BoolLit, x -> x
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit, x -> x
-        ^^^^^^^
+Line 1, characters 48-55:
+1 | let noop t a = match t, a with IntLit, x -> x | BoolLit, x -> x
+                                                    ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -330,9 +330,9 @@ let noop_merged t a = match t, a with IntLit, x | BoolLit, x -> x
 
 [%%expect
 {|
-Line 4, characters 4-11:
-4 |   | BoolLit, x -> x
-        ^^^^^^^
+Line 1, characters 50-57:
+1 | let noop_merged t a = match t, a with IntLit, x | BoolLit, x -> x
+                                                      ^^^^^^^
 Error: This pattern matches values of type "bool t"
        but a pattern was expected which matches values of type "int t"
        Type "bool" is not compatible with type "int"
@@ -359,9 +359,9 @@ let trivial2 t2 = match t2 with Int _ -> () | Bool _ -> ()
 
 [%%expect
 {|
-Line 4, characters 4-10:
-4 |   | Bool _ -> ()
-        ^^^^^^
+Line 1, characters 46-52:
+1 | let trivial2 t2 = match t2 with Int _ -> () | Bool _ -> ()
+                                                  ^^^^^^
 Error: This pattern matches values of type "bool t2"
        but a pattern was expected which matches values of type "int t2"
        Type "bool" is not compatible with type "int"
@@ -378,9 +378,9 @@ let trivial2_merged t2 = match t2 with Int _ | Bool _ -> ()
 
 [%%expect
 {|
-Line 4, characters 4-10:
-4 |   | Bool _ -> ()
-        ^^^^^^
+Line 1, characters 47-53:
+1 | let trivial2_merged t2 = match t2 with Int _ | Bool _ -> ()
+                                                   ^^^^^^
 Error: This pattern matches values of type "bool t2"
        but a pattern was expected which matches values of type "int t2"
        Type "bool" is not compatible with type "int"
@@ -397,9 +397,9 @@ let extract t2 = match t2 with Int _ -> x | Bool _ -> x
 
 [%%expect
 {|
-Line 4, characters 4-10:
-4 |   | Bool _ -> x
-        ^^^^^^
+Line 1, characters 44-50:
+1 | let extract t2 = match t2 with Int _ -> x | Bool _ -> x
+                                                ^^^^^^
 Error: This pattern matches values of type "bool t2"
        but a pattern was expected which matches values of type "int t2"
        Type "bool" is not compatible with type "int"
@@ -416,9 +416,9 @@ let extract_merged t2 = match t2 with Int x | Bool x -> x
 
 [%%expect
 {|
-Line 4, characters 4-10:
-4 |   | Bool x -> x
-        ^^^^^^
+Line 1, characters 46-52:
+1 | let extract_merged t2 = match t2 with Int x | Bool x -> x
+                                                  ^^^^^^
 Error: This pattern matches values of type "bool t2"
        but a pattern was expected which matches values of type "int t2"
        Type "bool" is not compatible with type "int"
@@ -429,9 +429,9 @@ let extract_merged_annotated (type a) (t2 : a t2) : a =
 
 [%%expect
 {|
-Lines 3-4, characters 4-10:
-3 | ....Int x
-4 |   | Bool x.....
+Line 2, characters 16-30:
+2 |   match t2 with Int x | Bool x -> x
+                    ^^^^^^^^^^^^^^
 Error: The variable "x" on the left-hand side of this or-pattern has type "
        int" but on the right-hand side it has type "bool"
 |}]
@@ -448,9 +448,9 @@ let extract_merged_too_lightly_annotated (type a) (t2 : a t2) : a =
 
 [%%expect
 {|
-Lines 3-4, characters 4-10:
-3 | ....Int (x : a)
-4 |   | Bool x.....
+Line 2, characters 16-36:
+2 |   match t2 with Int (x : a) | Bool x -> x
+                    ^^^^^^^^^^^^^^^^^^^^
 Error: The variable "x" on the left-hand side of this or-pattern has type "
        a" but on the right-hand side it has type "bool"
 |}]
@@ -475,9 +475,9 @@ let rambiguity (type a) (t2 : a t2) =
 
 [%%expect
 {|
-Lines 3-4, characters 4-23:
-3 | ....Int (_ as x)
-4 |   | Bool ((_ : a) as x).....
+Line 2, characters 16-50:
+2 |   match t2 with Int (_ as x) | Bool ((_ : a) as x) -> x
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The variable "x" on the left-hand side of this or-pattern has type "
        int" but on the right-hand side it has type "a"
 |}]
@@ -511,9 +511,9 @@ let return_a (type a) (x : a t3) : a = match x with A | B -> 3
 
 [%%expect
 {|
-Line 3, characters 13-14:
-3 |   | A | B -> 3 (* fails because the equation [a = int] doesn't escape any of
-                 ^
+Line 1, characters 61-62:
+1 | let return_a (type a) (x : a t3) : a = match x with A | B -> 3
+                                                                 ^
 Error: This expression has type "int" but an expression was expected of type "a"
 |}]
 
@@ -595,8 +595,8 @@ let f_amb (type a) (t : a t) (a : bool ref) (b : a ref) =
 [%%expect
 {|
 Lines 3-4, characters 4-42:
-3 | ....IntLit,  ({ contents = true } as x), _
-4 |   | BoolLit,  _, ({ contents = true} as x)............
+3 | ....IntLit, ({ contents = true } as x), _
+4 |   | BoolLit, _, ({ contents = true } as x)...
 Error: The variable "x" on the left-hand side of this or-pattern has type
          "bool ref"
        but on the right-hand side it has type "a ref"
@@ -624,9 +624,9 @@ let foo : type a. a t -> a t = function (A | B) as t -> t
 [%%expect
 {|
 type _ t = A : [ `A ] t | B : [ `B ] t
-Line 6, characters 16-17:
-6 |   function (A | B) as t -> t
-                    ^
+Line 5, characters 45-46:
+5 | let foo : type a. a t -> a t = function (A | B) as t -> t
+                                                 ^
 Error: This pattern matches values of type "[ `B ] t"
        but a pattern was expected which matches values of type "[ `A ] t"
        These two variant types have no intersection
@@ -652,9 +652,9 @@ let f = function A x | B x -> ignore x
 
 [%%expect
 {|
-Line 2, characters 6-7:
-2 |   | A x
-          ^
+Line 1, characters 19-20:
+1 | let f = function A x | B x -> ignore x
+                       ^
 Error: This pattern matches values of type "$a"
        The type constructor "$a" would escape its scope
        Hint: "$a" is an existential type bound by the constructor "A".

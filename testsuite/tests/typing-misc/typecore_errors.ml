@@ -51,9 +51,9 @@ let f = function A (x : _) -> 0
 [%%expect
 {|
 type t = A of { x : int; }
-Line 2, characters 20-25:
-2 | let f = function (A (x:_)) -> 0
-                        ^^^^^
+Line 3, characters 19-26:
+3 | let f = function A (x : _) -> 0
+                       ^^^^^^^
 Error: This form is not allowed as the type of the inlined record could escape.
 |}]
 
@@ -62,9 +62,9 @@ let f = function Some (exception Not_found) -> 0
 
 [%%expect
 {|
-Line 1, characters 21-42:
-1 | let f = function Some(exception Not_found) -> 0
-                         ^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 22-43:
+1 | let f = function Some (exception Not_found) -> 0
+                          ^^^^^^^^^^^^^^^^^^^^^
 Error: Exception patterns are not allowed in this position.
 |}]
 
@@ -85,9 +85,9 @@ let rec f x : _ -> _ -> _ = (), ()
 
 [%%expect
 {|
-Line 3, characters 16-22:
-3 | let rec f x = ( (), () : _ -> _ -> _ )
-                    ^^^^^^
+Line 3, characters 28-34:
+3 | let rec f x : _ -> _ -> _ = (), ()
+                                ^^^^^^
 Error: This expression has type "'a * 'b"
        but an expression was expected of type "'c -> 'd -> 'e"
 |}]
@@ -96,9 +96,9 @@ let rec g x = ((), () : _ -> _ :> _)
 
 [%%expect
 {|
-Line 1, characters 16-24:
-1 | let rec g x = ( ((), ()) : _ -> _ :> _ )
-                    ^^^^^^^^
+Line 1, characters 15-21:
+1 | let rec g x = ((), () : _ -> _ :> _)
+                   ^^^^^^
 Error: This expression has type "'a * 'b"
        but an expression was expected of type "'c -> 'd"
 |}]
@@ -110,7 +110,7 @@ let f x = match x with exception Not_found -> ()
 [%%expect
 {|
 Line 3, characters 10-48:
-3 | let f x = match x with exception Not_found -> ();;
+3 | let f x = match x with exception Not_found -> ()
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: None of the patterns in this "match" expression match values.
 |}]
@@ -123,9 +123,9 @@ let r = { x = 1; x = 1 }
 [%%expect
 {|
 type r = { x : int; }
-Line 2, characters 8-21:
-2 | let r = { x= 1; x= 1}
-            ^^^^^^^^^^^^^
+Line 3, characters 8-24:
+3 | let r = { x = 1; x = 1 }
+            ^^^^^^^^^^^^^^^^
 Error: The record field label x is defined several times
 |}]
 
@@ -149,9 +149,9 @@ let () =
 
 [%%expect
 {|
-Line 3, characters 13-19:
-3 | let () = for Some i = 3 to 4 do () done;
-                 ^^^^^^
+Line 4, characters 6-12:
+4 |   for Some i = 3 to 4 do
+          ^^^^^^
 Error: Invalid for-loop index: only variables and "_" are allowed.
 |}]
 
@@ -174,9 +174,9 @@ class c =
 [%%expect
 {|
 class virtual v : object method virtual m : int end
-Line 7, characters 18-23:
-7 |   method x: int = super#m
-                      ^^^^^
+Line 14, characters 21-26:
+14 |     method x : int = super#m
+                          ^^^^^
 Error: This expression has no method "m"
 |}]
 
@@ -202,9 +202,9 @@ let x =
 
 [%%expect
 {|
-Line 1, characters 36-40:
-1 | let x = object val x = 1 method m = x<-0 end
-                                        ^^^^
+Line 5, characters 15-21:
+5 |     method m = x <- 0
+                   ^^^^^^
 Error: The instance variable "x" is not mutable
 |}]
 
@@ -216,9 +216,9 @@ let x =
 
 [%%expect
 {|
-Line 1, characters 32-40:
-1 | let x = object(self) method m = self <-0 end
-                                    ^^^^^^^^
+Line 3, characters 15-24:
+3 |     method m = self <- 0
+                   ^^^^^^^^^
 Error: The value "self" is not an instance variable or mutable variable
 |}]
 
@@ -233,9 +233,9 @@ class c =
 
 [%%expect
 {|
-Line 3, characters 41-55:
-3 | class c = object val x = 0 method m: c = {< x=0; x=1 >} end
-                                             ^^^^^^^^^^^^^^
+Line 7, characters 19-35:
+7 |     method m : c = {<x = 0; x = 1>}
+                       ^^^^^^^^^^^^^^^^
 Error: The instance variable "x" is overridden several times
 |}]
 
@@ -245,9 +245,9 @@ let f x = {<y = x>}
 
 [%%expect
 {|
-Line 3, characters 10-21:
-3 | let f x = {< y = x >}
-              ^^^^^^^^^^^
+Line 3, characters 10-19:
+3 | let f x = {<y = x>}
+              ^^^^^^^^^
 Error: This object duplication occurs outside a method definition
 |}]
 
@@ -262,9 +262,9 @@ class c =
 
 [%%expect
 {|
-Line 3, characters 41-50:
-3 | class c = object val x = 0 method m: c = {< y=1 >} end
-                                             ^^^^^^^^^
+Line 7, characters 19-28:
+7 |     method m : c = {<y = 1>}
+                       ^^^^^^^^^
 Error: Unbound instance variable "y"
 |}]
 
@@ -279,8 +279,8 @@ let x = f (module struct end)
 {|
 module type empty = sig end
 val f : int -> unit = <fun>
-Line 3, characters 10-29:
-3 | let x = f (module struct end)
+Line 5, characters 10-29:
+5 | let x = f (module struct end)
               ^^^^^^^^^^^^^^^^^^^
 Error: This expression is packed module, but the expected type is "int"
 |}]
@@ -293,8 +293,8 @@ let x = [%extension_constructor A]
 [%%expect
 {|
 type t = A
-Line 2, characters 32-33:
-2 | let x = [%extension_constructor A]
+Line 3, characters 32-33:
+3 | let x = [%extension_constructor A]
                                     ^
 Error: This constructor is not an extension constructor.
 |}]
@@ -329,8 +329,8 @@ let y = f ~y:1
 [%%expect
 {|
 val f : x:int -> int = <fun>
-Line 4, characters 13-14:
-4 | let y = f ~y:1
+Line 5, characters 13-14:
+5 | let y = f ~y:1
                  ^
 Error: The function applied to this argument has type x:int -> int
 This argument cannot be applied with label "~y"
@@ -342,9 +342,9 @@ let g f =
 
 [%%expect
 {|
-Line 1, characters 23-24:
-1 | let g f = f ~x:0 ~y:0; f ~y:0 ~x:0
-                           ^
+Line 3, characters 2-3:
+3 |   f ~y:0 ~x:0
+      ^
 Error: This function is applied to arguments
        in an order different from other calls.
        This is only allowed when the real type is known.
@@ -358,8 +358,8 @@ let x = A 1
 [%%expect
 {|
 type t = A of { x : int; }
-Line 2, characters 8-11:
-2 | let x = A 1
+Line 3, characters 8-11:
+3 | let x = A 1
             ^^^
 Error: This constructor expects an inlined record argument.
 |}]
@@ -372,9 +372,9 @@ let rec (A x) = A (A ())
 [%%expect
 {|
 type 'a t = A of 'a
-Line 2, characters 8-11:
-2 | let rec A x = A (A ())
-            ^^^
+Line 3, characters 8-13:
+3 | let rec (A x) = A (A ())
+            ^^^^^
 Error: Only variables are allowed as left-hand side of "let rec"
 |}]
 
@@ -384,9 +384,9 @@ let quadratic (x, x) = x * x
 
 [%%expect
 {|
-Line 3, characters 17-18:
-3 | let quadratic (x,x) = x * x
-                     ^
+Line 3, characters 18-19:
+3 | let quadratic (x, x) = x * x
+                      ^
 Error: Variable "x" is bound several times in this matching
 |}]
 
@@ -401,9 +401,9 @@ let f (A x | B x) = 0
 [%%expect
 {|
 type t = A of int | B of float | C
-Line 2, characters 6-15:
-2 | let f (A x|B x) = 0
-          ^^^^^^^^^
+Line 6, characters 6-17:
+6 | let f (A x | B x) = 0
+          ^^^^^^^^^^^
 Error: The variable "x" on the left-hand side of this or-pattern has type "
        int" but on the right-hand side it has type "float"
 |}]
@@ -414,9 +414,9 @@ let f (A x | C) = 0
 
 [%%expect
 {|
-Line 3, characters 6-13:
-3 | let f (A x|C) = 0
-          ^^^^^^^
+Line 3, characters 6-15:
+3 | let f (A x | C) = 0
+          ^^^^^^^^^
 Error: Variable "x" must occur on both sides of this "|" pattern
 |}]
 
@@ -424,9 +424,9 @@ let f (A x | B y) = 0
 
 [%%expect
 {|
-Line 1, characters 6-15:
-1 | let f (A x|B y) = 0
-          ^^^^^^^^^
+Line 1, characters 6-17:
+1 | let f (A x | B y) = 0
+          ^^^^^^^^^^^
 Error: Variable "x" must occur on both sides of this "|" pattern
 |}]
 
@@ -438,8 +438,8 @@ let f = function #t -> ()
 [%%expect
 {|
 type t = []
-Line 2, characters 18-19:
-2 | let f = function #t -> ()
+Line 3, characters 18-19:
+3 | let f = function #t -> ()
                       ^
 Error: The type "t" is not a variant type
 |}]
@@ -448,9 +448,9 @@ let f { x; x = y; x = z } = x
 
 [%%expect
 {|
-Line 1, characters 6-17:
-1 | let f {x;x=y;x=z} = x
-          ^^^^^^^^^^^
+Line 1, characters 6-25:
+1 | let f { x; x = y; x = z } = x
+          ^^^^^^^^^^^^^^^^^^^
 Error: The record field label x is defined several times
 |}]
 
@@ -461,7 +461,7 @@ let x = ([`B] :> [`A])
 [%%expect
 {|
 Line 3, characters 9-13:
-3 | let x = ([`B]:>[`A])
+3 | let x = ([`B] :> [`A])
              ^^^^
 Error: This expression cannot be coerced to type ""[ `A ]""; it has type
          "[> `B ] list"
@@ -477,9 +477,9 @@ let o =
 
 [%%expect
 {|
-Line 3, characters 26-39:
-3 | let o = object method m = instance <- 0 end
-                              ^^^^^^^^^^^^^
+Line 5, characters 15-28:
+5 |     method m = instance <- 0
+                   ^^^^^^^^^^^^^
 Error: Unbound instance variable or mutable variable "instance"
 |}]
 
@@ -488,9 +488,9 @@ let x = function `azdwbie -> () | `c7diagq -> ()
 
 [%%expect
 {|
-Line 3, characters 4-12:
-3 |   | `c7diagq -> ()
-        ^^^^^^^^
+Line 1, characters 34-42:
+1 | let x = function `azdwbie -> () | `c7diagq -> ()
+                                      ^^^^^^^^
 Error: Variant tags "`azdwbie" and "`c7diagq" have the same hash value.
        Change one of them.
 |}]
@@ -499,9 +499,9 @@ let x = `azdwbie = `c7diagq
 
 [%%expect
 {|
-Line 1, characters 20-28:
-1 | let x =  `azdwbie = `c7diagq
-                        ^^^^^^^^
+Line 1, characters 19-27:
+1 | let x = `azdwbie = `c7diagq
+                       ^^^^^^^^
 Error: Variant tags "`azdwbie" and "`c7diagq" have the same hash value.
        Change one of them.
 |}]
@@ -515,9 +515,9 @@ let x = function X -> () | Y -> ()
 [%%expect
 {|
 type 'a x = X : [> `azdwbie ] x | Y : [> `c7diagq ] x
-Line 7, characters 4-5:
-7 |   | Y  -> ()
-        ^
+Line 5, characters 27-28:
+5 | let x = function X -> () | Y -> ()
+                               ^
 Error: Variant tags "`azdwbie" and "`c7diagq" have the same hash value.
        Change one of them.
 |}]
@@ -532,9 +532,9 @@ let f = function { x; y } -> x
 {|
 type t = { x : unit; }
 type s = { y : unit; }
-Line 3, characters 21-22:
-3 | let f = function {x; y} -> x
-                         ^
+Line 5, characters 22-23:
+5 | let f = function { x; y } -> x
+                          ^
 Error: The record field "y" belongs to the type "s"
        but is mixed here with fields of type "t"
 |}]

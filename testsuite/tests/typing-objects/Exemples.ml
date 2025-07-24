@@ -130,12 +130,15 @@ class ref x_init =
 
 [%%expect
 {|
-Lines 1-5, characters 0-3:
-1 | class ref x_init = object
-2 |   val mutable x = x_init
-3 |   method get = x
-4 |   method set y = x <- y
-5 | end..
+Lines 1-8, characters 0-5:
+1 | class ref x_init =
+2 |   object
+3 |     val mutable x = x_init
+4 |
+5 |     method get = x
+6 |
+7 |     method set y = x <- y
+8 |   end
 Error: Some type variables are unbound in this type:
          class ref :
            'a ->
@@ -278,7 +281,7 @@ let c'' = new color_circle p
 [%%expect
 {|
 Line 1, characters 27-28:
-1 | let c'' = new color_circle p;;
+1 | let c'' = new color_circle p
                                ^
 Error: This expression has type "point" but an expression was expected of type
          "#color_point"
@@ -302,7 +305,7 @@ val c'' : color_point color_circle = <obj>
 [%%expect
 {|
 Line 1, characters 0-21:
-1 | (c'' :> point circle);;
+1 | (c'' :> point circle)
     ^^^^^^^^^^^^^^^^^^^^^
 Error: Type
          "color_point color_circle" =
@@ -322,7 +325,7 @@ fun x -> (x : color_point color_circle :> point circle)
 [%%expect
 {|
 Line 1, characters 9-55:
-1 | fun x -> (x : color_point color_circle :> point circle);;
+1 | fun x -> (x : color_point color_circle :> point circle)
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type
          "color_point color_circle" =
@@ -382,9 +385,9 @@ class printable_color_point y c =
 
 [%%expect
 {|
-Line 3, characters 2-36:
-3 |   inherit printable_point y as super
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 5, characters 4-38:
+5 |     inherit printable_point y as super
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 13 [instance-variable-override]: the following instance variables are overridden by the class printable_point :
   x
 
@@ -703,7 +706,7 @@ l#add (c2 :> int_comparable)
 [%%expect
 {|
 Line 1, characters 6-28:
-1 | l#add (c2 :> int_comparable);;
+1 | l#add (c2 :> int_comparable)
           ^^^^^^^^^^^^^^^^^^^^^^
 Error: Type
          "int_comparable2" =
@@ -762,7 +765,7 @@ l#add (c3 :> int_comparable)
 [%%expect
 {|
 Line 1, characters 25-27:
-1 | (new sorted_list ())#add c3;;
+1 | (new sorted_list ())#add c3
                              ^^
 Error: This expression has type
          "int_comparable3" =
@@ -793,9 +796,12 @@ let pr l =
 
 [%%expect
 {|
-Line 2, characters 2-69:
-2 |   List.map (fun c -> Format.print_int c#x; Format.print_string " ") l;
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-6, characters 2-5:
+2 | ..List.map
+3 |     (fun c ->
+4 |       Format.print_int c#x;
+5 |       Format.print_string " ")
+6 |     l.
 Warning 10 [non-unit-statement]: this expression should have type unit.
 
 val pr : < x : int; .. > list -> unit = <fun>

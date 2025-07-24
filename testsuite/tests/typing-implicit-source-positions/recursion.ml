@@ -44,9 +44,9 @@ let rec g ~(call_pos : [%call_pos]) i =
 
 [%%expect
 {|
-Line 3, characters 19-20:
-3 |   else g ~call_pos:y (i - 1)
-                       ^
+Line 2, characters 35-36:
+2 |   if i < 0 then 0 else g ~call_pos:y (i - 1)
+                                       ^
 Error: This expression has type "t" but an expression was expected of type
          "lexing_position"
 |}]

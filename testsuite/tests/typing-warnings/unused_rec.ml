@@ -9,7 +9,7 @@ let rec f () = 3
 [%%expect
 {|
 Line 3, characters 8-9:
-3 | let rec f () = 3;;
+3 | let rec f () = 3
             ^
 Warning 39 [unused-rec-flag]: unused rec flag.
 
@@ -27,7 +27,7 @@ let[@warning "+39"] rec h () = 3
 [%%expect
 {|
 Line 1, characters 24-25:
-1 | let[@warning "+39"] rec h () = 3;;
+1 | let[@warning "+39"] rec h () = 3
                             ^
 Warning 39 [unused-rec-flag]: unused rec flag.
 
@@ -53,7 +53,7 @@ let[@warning "+39"] rec h () = 3
 [%%expect
 {|
 Line 1, characters 24-25:
-1 | let[@warning "+39"] rec h () = 3;;
+1 | let[@warning "+39"] rec h () = 3
                             ^
 Warning 39 [unused-rec-flag]: unused rec flag.
 

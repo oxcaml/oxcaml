@@ -1,6 +1,9 @@
-File "t02bad.ml", line 10, characters 0-61:
-10 | module rec A : sig type t = B.t end = struct type t = B.t end
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "t02bad.ml", lines 6-10, characters 0-3:
+ 6 | module rec A : sig
+ 7 |   type t = B.t
+ 8 | end = struct
+ 9 |   type t = B.t
+10 | end
 Error: The definition of "A.t" contains a cycle:
          "B.t" = "A.t",
          "A.t" = "B.t",

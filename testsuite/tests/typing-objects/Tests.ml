@@ -27,7 +27,7 @@ and ['a] d () =
 
 [%%expect
 {|
-class ['a] c : unit -> object constraint 'a = int method f : int c end
+class ['a] c : unit -> object constraint 'a = int method f : 'a c end
 and ['a] d : unit -> object constraint 'a = int method f : 'a c end
 |}]
 
@@ -47,10 +47,11 @@ and d () =
 
 [%%expect
 {|
-Lines 3-5, characters 4-3:
-3 | ....and d () = object
-4 |   inherit ['a] c ()
-5 | end..
+Lines 6-9, characters 0-5:
+6 | and d () =
+7 |   object
+8 |     inherit ['a] c ()
+9 |   end
 Error: Some type variables are unbound in this type:
          class d : unit -> object method f : 'a -> unit end
        The method "f" has type "'a -> unit" where "'a" is unbound
@@ -151,10 +152,10 @@ class x () =
 
 [%%expect
 {|
-Lines 1-3, characters 13-3:
-1 | .............object
-2 |   method virtual f : int
-3 | end..
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method virtual f : int
+4 |   end
 Error: This non-virtual class has virtual methods.
        The following methods are virtual : "f"
 |}]
@@ -173,9 +174,9 @@ and virtual d x =
 
 [%%expect
 {|
-Line 1, characters 49-57:
-1 | class virtual c ((x : 'a): < f : int >) = object (_ : 'a) end
-                                                     ^^^^^^^^
+Line 1, characters 50-58:
+1 | class virtual c ((x : 'a) : < f : int >) = object (_ : 'a) end
+                                                      ^^^^^^^^
 Error: This pattern cannot match self: it only matches values of type
        "< f : int >"
 |}]
@@ -190,11 +191,13 @@ class ['a] c () =
 
 [%%expect
 {|
-Lines 1-4, characters 0-3:
-1 | class ['a] c () = object
-2 |   constraint 'a = int
-3 |   method f x = (x : bool c)
-4 | end..
+Lines 1-6, characters 0-5:
+1 | class ['a] c () =
+2 |   object
+3 |     constraint 'a = int
+4 |
+5 |     method f x : bool c = x
+6 |   end
 Error: The abbreviation "c" is used with parameter(s) "bool "
        which are incompatible with constraint(s) "int "
 |}]
@@ -250,10 +253,11 @@ class ['a] c () =
 
 [%%expect
 {|
-Lines 1-3, characters 0-3:
-1 | class ['a] c () = object
-2 |   method f = (x : 'a)
-3 | end..
+Lines 1-4, characters 0-5:
+1 | class ['a] c () =
+2 |   object
+3 |     method f : 'a = x
+4 |   end
 Error: The type of this class,
        "class ['a] c :
          unit -> object constraint 'a = '_weak1 list ref method f : 'a end",
@@ -268,9 +272,9 @@ and 'a d = < f : int c >
 
 [%%expect
 {|
-Line 1, characters 0-32:
-1 | type 'a c = <f : 'a c; g : 'a d>
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-35:
+1 | type 'a c = < f : 'a c ; g : 'a d >
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This recursive type is not regular.
        The type constructor "c" is defined as
          type "'a c"
@@ -307,8 +311,8 @@ and 'a t = 'a t u
 
 [%%expect
 {|
-Line 2, characters 0-17:
-2 | and 'a t = 'a t u;;
+Line 3, characters 0-17:
+3 | and 'a t = 'a t u
     ^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "'a t u" contains "'a t",
@@ -323,8 +327,8 @@ and 'a t = 'a t u
 
 [%%expect
 {|
-Line 2, characters 0-17:
-2 | and 'a t = 'a t u;;
+Line 3, characters 0-17:
+3 | and 'a t = 'a t u
     ^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "'a t" = "'a t u",
@@ -342,7 +346,7 @@ type t = t u * t u
 [%%expect
 {|
 Line 1, characters 0-18:
-1 | type t = t u * t u;;
+1 | type t = t u * t u
     ^^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "t" = "t u * t u",
@@ -607,9 +611,9 @@ class c () =
 
 [%%expect
 {|
-Line 1, characters 30-34:
-1 | class c () = object val x = - true val y = -. () end;;
-                                  ^^^^
+Line 3, characters 13-17:
+3 |     val x = -true
+                 ^^^^
 Error: This expression has type "bool" but an expression was expected of type
          "int"
 |}]
@@ -745,26 +749,26 @@ class e () =
 
 [%%expect
 {|
-Line 3, characters 2-13:
-3 |   inherit c 5
-      ^^^^^^^^^^^
+Line 5, characters 4-15:
+5 |     inherit c 5
+        ^^^^^^^^^^^
 Warning 13 [instance-variable-override]: the following instance variables are overridden by the class c :
   x
 
-Line 4, characters 6-7:
-4 |   val y = 3
-          ^
+Line 7, characters 8-9:
+7 |     val y = 3
+            ^
 Warning 13 [instance-variable-override]: the instance variable y is overridden.
 
-Line 6, characters 2-13:
-6 |   inherit d 7
-      ^^^^^^^^^^^
+Line 11, characters 4-15:
+11 |     inherit d 7
+         ^^^^^^^^^^^
 Warning 13 [instance-variable-override]: the following instance variables are overridden by the class d :
   t z
 
-Line 7, characters 6-7:
-7 |   val u = 3
-          ^
+Line 13, characters 8-9:
+13 |     val u = 3
+             ^
 Warning 13 [instance-variable-override]: the instance variable u is overridden.
 
 class e :
@@ -960,11 +964,13 @@ class virtual ['a] matrix ((sz, init) : int * 'a) =
 
 [%%expect
 {|
-Lines 1-4, characters 0-3:
-1 | class virtual ['a] matrix (sz, init : int * 'a) = object
-2 |   val m = Array.make_matrix sz sz init
-3 |   method add (mtx : 'a matrix) = (mtx#m.(0).(0) : 'a)
-4 | end..
+Lines 1-6, characters 0-5:
+1 | class virtual ['a] matrix ((sz, init) : int * 'a) =
+2 |   object
+3 |     val m = Array.make_matrix sz sz init
+4 |
+5 |     method add (mtx : 'a matrix) : 'a = mtx#m.(0).(0)
+6 |   end
 Error: The abbreviation "'a matrix" expands to type "< add : 'a matrix -> 'a >"
        but is used with type "< m : 'a array array; .. >"
 |}]
@@ -1036,10 +1042,10 @@ end
 
 [%%expect
 {|
-Lines 1-3, characters 12-3:
-1 | ............struct
-2 |   let f (x : #c) = x
-3 | end......
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (x : #c) = x
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig val f : (#c as 'a) -> 'a end
@@ -1063,9 +1069,9 @@ end
 
 [%%expect
 {|
-Line 1, characters 37-38:
-1 | module M = struct type t = int class t () = object end end;;
-                                         ^
+Line 4, characters 8-9:
+4 |   class t () = object end
+            ^
 Error: Multiple definition of the type name "t".
        Names must be unique in a given structure or signature.
 |}]
@@ -1082,7 +1088,7 @@ fun x -> (x : int -> bool :> 'a -> 'a)
 [%%expect
 {|
 Line 1, characters 9-38:
-1 | fun x -> (x : int -> bool :> 'a -> 'a);;
+1 | fun x -> (x : int -> bool :> 'a -> 'a)
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "int -> bool" is not a subtype of "int -> int"
        Type "bool" is not a subtype of "int"
@@ -1094,7 +1100,7 @@ fun x -> (x : int -> bool :> int -> int)
 [%%expect
 {|
 Line 1, characters 9-40:
-1 | fun x -> (x : int -> bool :> int -> int);;
+1 | fun x -> (x : int -> bool :> int -> int)
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "int -> bool" is not a subtype of "int -> int"
        Type "bool" is not a subtype of "int"
@@ -1146,7 +1152,7 @@ fun (x : 'a t as 'a) -> ()
 [%%expect
 {|
 Line 1, characters 18-19:
-1 | fun (x : 'a t as 'a) -> ();;
+1 | fun (x : 'a t as 'a) -> ()
                       ^
 Error: This alias is bound to type "'a t" but is used as an instance of type "'a"
        The type variable "'a" occurs inside "'a t"
@@ -1159,9 +1165,9 @@ fun (x : 'a t) ->
 
 [%%expect
 {|
-Line 1, characters 19-20:
-1 | fun (x : 'a t) -> (x : 'a); ();;
-                       ^
+Line 2, characters 3-4:
+2 |   (x : 'a);
+       ^
 Error: This expression has type "'a t" but an expression was expected of type
          "'a"
        The type variable "'a" occurs inside "'a t"
@@ -1173,7 +1179,7 @@ fun ((x : 'a) | (x : 'a t)) -> ()
 [%%expect
 {|
 Line 1, characters 10-12:
-1 | fun ((x : 'a) | (x : 'a t)) -> ();;
+1 | fun ((x : 'a) | (x : 'a t)) -> ()
               ^^
 Error: This type "'a t" should be an instance of type "'a"
        The type variable "'a" occurs inside "'a t"
@@ -1185,7 +1191,7 @@ fun ((x : 'a) | (x : 'a t)) -> ()
 [%%expect
 {|
 Line 1, characters 10-12:
-1 | fun ((x : 'a) | (x : 'a t)) -> ();;
+1 | fun ((x : 'a) | (x : 'a t)) -> ()
               ^^
 Error: This type "'a t" should be an instance of type "'a"
        The type variable "'a" occurs inside "'a t"
@@ -1197,7 +1203,7 @@ fun ((x : 'a) | (x : 'a t)) -> ()
 [%%expect
 {|
 Line 1, characters 10-12:
-1 | fun ((x : 'a) | (x : 'a t)) -> ();;
+1 | fun ((x : 'a) | (x : 'a t)) -> ()
               ^^
 Error: This type "'a t" should be an instance of type "'a"
        The type variable "'a" occurs inside "'a t"
@@ -1221,9 +1227,9 @@ fun (x : 'a t) ->
 
 [%%expect
 {|
-Line 1, characters 18-26:
-1 | fun (x : 'a t) -> (x : 'a); ();;
-                      ^^^^^^^^
+Line 2, characters 2-10:
+2 |   (x : 'a);
+      ^^^^^^^^
 Warning 10 [non-unit-statement]: this expression should have type unit.
 
 - : ('a t as 'a) t -> unit = <fun>
@@ -1235,7 +1241,7 @@ fun ((x : 'a) | (x : 'a t)) -> ()
 [%%expect
 {|
 Line 1, characters 17-18:
-1 | fun ((x : 'a) | (x : 'a t)) -> ();;
+1 | fun ((x : 'a) | (x : 'a t)) -> ()
                      ^
 Warning 12 [redundant-subpat]: this sub-pattern is unused.
 
@@ -1326,9 +1332,9 @@ and b =
 
 [%%expect
 {|
-Line 1, characters 10-37:
-1 | class a = let _ = new b in object end
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-3, characters 2-12:
+2 | ..let _ = new b in
+3 |   object end
 Error: This kind of recursive class expression is not allowed
 |}]
 
@@ -1338,9 +1344,9 @@ class a =
 
 [%%expect
 {|
-Line 1, characters 10-37:
-1 | class a = let _ = new a in object end;;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-3, characters 2-12:
+2 | ..let _ = new a in
+3 |   object end
 Error: This kind of recursive class expression is not allowed
 |}]
 
@@ -1371,9 +1377,10 @@ class a =
 
 [%%expect
 {|
-Line 1, characters 10-54:
-1 | class a = let x() = new a in let y = x() in object end;;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-12:
+2 | ..let x () = new a in
+3 |   let y = x () in
+4 |   object end
 Error: This kind of recursive class expression is not allowed
 |}]
 
@@ -1386,9 +1393,10 @@ and b =
 
 [%%expect
 {|
-Line 2, characters 8-52:
-2 | and b = let x() = new a in let y = x() in object end;;
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 4-6, characters 2-12:
+4 | ..let x () = new a in
+5 |   let y = x () in
+6 |   object end
 Error: This kind of recursive class expression is not allowed
 |}]
 
@@ -1401,9 +1409,9 @@ class a =
 
 [%%expect
 {|
-Line 1, characters 35-36:
-1 | class a = object val x = 3 val y = x + 2 end;;
-                                       ^
+Line 5, characters 12-13:
+5 |     val y = x + 2
+                ^
 Error: The instance variable "x"
        cannot be accessed from the definition of another instance variable
 |}]
@@ -1417,9 +1425,9 @@ class a =
 
 [%%expect
 {|
-Line 1, characters 32-36:
-1 | class a = object (self) val x = self#m method m = 3 end;;
-                                    ^^^^
+Line 3, characters 12-16:
+3 |     val x = self#m
+                ^^^^
 Error: The self variable "self"
        cannot be accessed from the definition of an instance variable
 |}]
@@ -1439,9 +1447,9 @@ class b =
 [%%expect
 {|
 class a : object method m : int end
-Line 2, characters 44-49:
-2 | class b = object inherit a as super val x = super#m end;;
-                                                ^^^^^
+Line 10, characters 12-17:
+10 |     val x = super#m
+                 ^^^^^
 Error: The ancestor variable "super"
        cannot be accessed from the definition of an instance variable
 |}]
@@ -1477,9 +1485,10 @@ class c =
 
 [%%expect
 {|
-Line 2, characters 13-58:
-2 |   method o = object(_ : 'self) method o = assert false end
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 4-6, characters 6-9:
+4 | ......object (_ : 'self)
+5 |         method o = assert false
+6 |       end
 Error: Cannot close type of object literal: "< o : '_weak4; .. > as '_weak3"
        it has been unified with the self type of a class that is not yet
        completely defined.
@@ -1497,9 +1506,9 @@ class c =
 
 [%%expect
 {|
-Line 4, characters 17-23:
-4 |       method n = self#m
-                     ^^^^^^
+Line 7, characters 19-25:
+7 |         method n = self#m
+                       ^^^^^^
 Warning 17 [undeclared-virtual-method]: the virtual method m is not declared.
 
 class c : object method m : int method n : int end
@@ -1538,8 +1547,8 @@ let o =
 [%%expect
 {|
 class ['a] c : object ('a) constraint 'a = < .. > end
-Line 4, characters 14-25:
-4 |     inherit [ < m : int > ] c
+Line 7, characters 14-25:
+7 |     inherit [ < m : int > ] c
                   ^^^^^^^^^^^
 Error: The type parameter "< m : int >"
        does not meet its constraint: it should be "< .. >"
@@ -1563,9 +1572,12 @@ class c : ['a] d =
 [%%expect
 {|
 class type ['a] d = object method a : 'a method b : 'a end
-Line 2, characters 19-73:
-2 | class c : ['a] d = object (self) method a = 1 method b = assert false end;;
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 9-13, characters 2-5:
+ 9 | ..object (self)
+10 |     method a = 1
+11 |
+12 |     method b = assert false
+13 |   end
 Error: The class type object method a : int method b : 'a end
        is not matched by the class type ['_a] d
        The class type object method a : int method b : 'a end
@@ -1585,9 +1597,9 @@ class c : [ < a : int ; .. > ] ct =
 [%%expect
 {|
 class type ['a] ct = object ('a) constraint 'a = < .. > end
-Line 2, characters 10-31:
-2 | class c : [ < a : int; ..> ] ct = object method a = 3 end;;
-              ^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 10-33:
+3 | class c : [ < a : int ; .. > ] ct =
+              ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This non-virtual class has undeclared virtual methods.
        The following methods were not declared : "a"
 |}]
@@ -1611,10 +1623,10 @@ class c :
 
 [%%expect
 {|
-Lines 3-5, characters 8-3:
-3 | ........object (self)
-4 |   method m = self
-5 | end..
+Lines 5-7, characters 2-5:
+5 | ..object (self)
+6 |     method m = self
+7 |   end
 Error: The class type object ('a) method m : < m : 'a; .. > as 'a end
        is not matched by the class type
          object method m : < m : 'a > as 'a end
@@ -1635,8 +1647,8 @@ class c :
 {|
 Lines 5-7, characters 2-5:
 5 | ..object
-6 |     method foo : 'a. (< foo : int; .. > as 'a) -> 'a -> unit = assert false
-7 |   end..
+6 |     method foo : 'a. (< foo : int ; .. > as 'a) -> 'a -> unit = assert false
+7 |   end
 Error: The class type
          object method foo : (< foo : int; .. > as 'a) -> 'a -> unit end
        is not matched by the class type
@@ -1687,9 +1699,10 @@ class c :
 
 [%%expect
 {|
-Line 2, characters 4-52:
-2 |     object (_ : 'self) method m (_ : 'self) = () end;;
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 5-7, characters 2-5:
+5 | ..object (_ : 'self)
+6 |     method m (_ : 'self) = ()
+7 |   end
 Error: The class type
          object ('a) method m : (< m : 'a -> unit; .. > as 'a) -> unit end
        is not matched by the class type
@@ -1710,9 +1723,9 @@ class c =
 [%%expect
 {|
 val is_empty : <  > -> unit = <fun>
-Line 2, characters 54-58:
-2 | class c = object (self) method private foo = is_empty self end;;
-                                                          ^^^^
+Line 5, characters 34-38:
+5 |     method private foo = is_empty self
+                                      ^^^^
 Error: This expression has type "< .. >" but an expression was expected of type
          "<  >"
        Self type cannot be unified with a closed object type
@@ -1731,9 +1744,12 @@ class c =
 [%%expect
 {|
 val has_foo : < foo : 'a; .. > -> unit = <fun>
-Line 3, characters 10-75:
-3 | class c = object (self) method private foo = 5 initializer has_foo self end;;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 4-8, characters 2-5:
+4 | ..object (self)
+5 |     method private foo = 5
+6 |
+7 |     initializer has_foo self
+8 |   end
 Warning 15 [implicit-public-methods]: the following private methods were made public implicitly:
  foo.
 
@@ -1772,9 +1788,10 @@ class c =
 
 [%%expect
 {|
-Line 1, characters 10-45:
-1 | class c = object method virtual foo : int end;;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method virtual foo : int
+4 |   end
 Error: This non-virtual class has virtual methods.
        The following methods are virtual : "foo"
 |}]
@@ -1786,9 +1803,10 @@ class type ct =
 
 [%%expect
 {|
-Line 1, characters 16-51:
-1 | class type ct = object method virtual foo : int end;;
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method virtual foo : int
+4 |   end
 Error: This non-virtual class type has virtual methods.
        The following methods are virtual : "foo"
 |}]
@@ -1800,9 +1818,10 @@ let o =
 
 [%%expect
 {|
-Line 1, characters 8-43:
-1 | let o = object method virtual foo : int end;;
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method virtual foo : int
+4 |   end
 Error: This object has virtual methods.
        The following methods are virtual : "foo"
 |}]
@@ -1814,9 +1833,9 @@ class c =
 
 [%%expect
 {|
-Line 1, characters 35-39:
-1 | class c = object(self) initializer self#foo end;;
-                                       ^^^^
+Line 3, characters 16-20:
+3 |     initializer self#foo
+                    ^^^^
 Error: This expression has no method "foo"
 |}]
 
@@ -1827,9 +1846,9 @@ let o =
 
 [%%expect
 {|
-Line 1, characters 33-37:
-1 | let o = object(self) initializer self#foo end;;
-                                     ^^^^
+Line 3, characters 16-20:
+3 |     initializer self#foo
+                    ^^^^
 Error: This expression has no method "foo"
 |}]
 
@@ -1843,9 +1862,10 @@ class c =
 [%%expect
 {|
 val has_foo : < foo : int; .. > -> unit = <fun>
-Line 2, characters 10-51:
-2 | class c = object(self) initializer has_foo self end;;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 4-6, characters 2-5:
+4 | ..object (self)
+5 |     initializer has_foo self
+6 |   end
 Error: This non-virtual class has undeclared virtual methods.
        The following methods were not declared : "foo"
 |}]
@@ -1857,9 +1877,9 @@ let o =
 
 [%%expect
 {|
-Line 1, characters 41-45:
-1 | let o = object(self) initializer has_foo self end;;
-                                             ^^^^
+Line 3, characters 24-28:
+3 |     initializer has_foo self
+                            ^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "< foo : int; .. >"
        The first object type has no method "foo"
@@ -1869,9 +1889,9 @@ class c = object (_ : < foo : int ; .. >) end
 
 [%%expect
 {|
-Line 1, characters 10-42:
-1 | class c = object(_ : < foo : int; ..>) end;;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 10-45:
+1 | class c = object (_ : < foo : int ; .. >) end
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This non-virtual class has undeclared virtual methods.
        The following methods were not declared : "foo"
 |}]
@@ -1880,9 +1900,9 @@ class type ct = object (< foo : int ; .. >) end
 
 [%%expect
 {|
-Line 1, characters 16-44:
-1 | class type ct = object(< foo : int; ..>) end;;
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 16-47:
+1 | class type ct = object (< foo : int ; .. >) end
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This non-virtual class type has undeclared virtual methods.
        The following methods were not declared : "foo"
 |}]
@@ -1891,9 +1911,9 @@ let o = object (_ : < foo : int ; .. >) end
 
 [%%expect
 {|
-Line 1, characters 8-40:
-1 | let o = object(_ : < foo : int; ..>) end;;
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 8-43:
+1 | let o = object (_ : < foo : int ; .. >) end
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This object has undeclared virtual methods.
        The following methods were not declared : "foo"
 |}]
@@ -1978,8 +1998,8 @@ let () = (new c)#test
 [%%expect
 {|
 class c : object method private test : unit end
-Line 6, characters 9-16:
-6 | let () = (new c)#test
+Line 8, characters 9-16:
+8 | let () = (new c)#test
              ^^^^^^^
 Error: This expression has type "c"
        It has no method "test"
@@ -2016,8 +2036,8 @@ let () = (new c)#test
 {|
 class virtual d : object method private virtual test : unit end
 class c : object method private test : unit end
-Line 10, characters 9-16:
-10 | let () = (new c)#test
+Line 13, characters 9-16:
+13 | let () = (new c)#test
               ^^^^^^^
 Error: This expression has type "c"
        It has no method "test"
@@ -2063,10 +2083,10 @@ class c :
 
 [%%expect
 {|
-Lines 1-3, characters 10-3:
-1 | ..........object
-2 |     method virtual m : int
-3 | end.........
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method virtual m : int
+4 |   end..
 Error: This non-virtual class type has virtual methods.
        The following methods are virtual : "m"
 |}]
@@ -2096,8 +2116,8 @@ class c : cv =
 [%%expect
 {|
 class virtual cv : object method virtual m : int end
-Line 5, characters 10-12:
-5 | class c : cv = object
+Line 6, characters 10-12:
+6 | class c : cv =
               ^^
 Error: This non-virtual class type has virtual methods.
        The following methods are virtual : "m"
@@ -2140,8 +2160,8 @@ class d = ['a] c
 [%%expect
 {|
 class ['a] c : object method m : (< f : 'b; x : 'a > as 'b) -> unit end
-Line 2, characters 0-16:
-2 | class d = ['a] c
+Line 6, characters 0-16:
+6 | class d = ['a] c
     ^^^^^^^^^^^^^^^^
 Error: Some type variables are unbound in this type: class d : ['a] c
        The method "m" has type "(< f : 'b; x : 'a > as 'b) -> unit" where "'a"

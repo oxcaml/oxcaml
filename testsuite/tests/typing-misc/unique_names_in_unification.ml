@@ -15,12 +15,12 @@ end
 {|
 type t = A
 val x : t = A
-Line 5, characters 27-28:
-5 |   let f: t -> t = fun B -> x
-                               ^
+Line 8, characters 28-29:
+8 |   let f : t -> t = fun B -> x
+                                ^
 Error: This expression has type "t/2" but an expression was expected of type
          "t/1"
-       Line 4, characters 2-12:
+       Line 6, characters 2-12:
          Definition of type "t/1"
        Line 1, characters 0-10:
          Definition of type "t/2"
@@ -44,14 +44,14 @@ end
 {|
 module M : sig type t = B end
 val y : M.t = M.B
-Line 7, characters 34-35:
-7 |   let f : M.t -> M.t = fun M.C -> y
-                                      ^
+Line 12, characters 34-35:
+12 |   let f : M.t -> M.t = fun M.C -> y
+                                       ^
 Error: This expression has type "M/2.t" but an expression was expected of type
          "M/1.t"
-       Lines 4-6, characters 2-5:
+       Lines 8-10, characters 2-5:
          Definition of module "M/1"
-       Line 1, characters 0-32:
+       Lines 1-3, characters 0-3:
          Definition of module "M/2"
 |}]
 
@@ -62,9 +62,9 @@ let f : t -> t = fun D -> x
 [%%expect
 {|
 type t = D
-Line 2, characters 25-26:
-2 | let f: t -> t = fun D -> x;;
-                             ^
+Line 3, characters 26-27:
+3 | let f : t -> t = fun D -> x
+                              ^
 Error: This expression has type "t/2" but an expression was expected of type
          "t/1"
        Line 1, characters 0-10:
@@ -99,13 +99,13 @@ let x : ttt =
 [%%expect
 {|
 type nonrec ttt = X of ttt
-Line 2, characters 32-33:
-2 | let x: ttt = let rec y = A y in y;;
-                                    ^
+Line 5, characters 2-3:
+5 |   y
+      ^
 Error: This expression has type "ttt/2" but an expression was expected of type
          "ttt/1"
        Line 1, characters 0-26:
          Definition of type "ttt/1"
-       Line 2, characters 0-30:
+       Lines 3-5, characters 0-12:
          Definition of type "ttt/2"
 |}]

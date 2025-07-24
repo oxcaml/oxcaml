@@ -18,7 +18,7 @@ let position = object_with_a_method_with_a_positional_parameter#m ()
 [%%expect
 {|
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 281; pos_cnum = 296}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 290; pos_cnum = 305}
 |}]
 
 class class_with_a_method_with_a_positional_parameter =
@@ -43,7 +43,10 @@ let position = o#m ()
 [%%expect
 {|
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 876; pos_cnum = 891}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 889; pos_cnum = 904}
+|}, Principal{|
+val position : lexing_position =
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 1002; pos_cnum = 1017}
 |}]
 
 let position = (new class_with_a_method_with_a_positional_parameter)#m ()
@@ -51,7 +54,10 @@ let position = (new class_with_a_method_with_a_positional_parameter)#m ()
 [%%expect
 {|
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 1015; pos_cnum = 1030}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 1027; pos_cnum = 1042}
+|}, Principal{|
+val position : lexing_position =
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 1253; pos_cnum = 1268}
 |}]
 
 class class_with_positional_parameter ~(call_pos : [%call_pos]) () =
@@ -74,7 +80,11 @@ let position = o#call_pos
 {|
 val o : class_with_positional_parameter = <obj>
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 1458; pos_cnum = 1466}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 1474; pos_cnum = 1482}
+|}, Principal{|
+val o : class_with_positional_parameter = <obj>
+val position : lexing_position =
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 1815; pos_cnum = 1823}
 |}]
 
 (* Different kinds of shadowed parameters (both a class parameter is shadowed and a
@@ -107,9 +117,15 @@ let from_method_param, from_class_param = c#m ()
 {|
 val c : c = <obj>
 val from_method_param : lexing_position =
-  {pos_fname = ""; pos_lnum = 2; pos_bol = 2216; pos_cnum = 2258}
+  {pos_fname = ""; pos_lnum = 3; pos_bol = 2243; pos_cnum = 2285}
 val from_class_param : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 2197; pos_cnum = 2206}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 2225; pos_cnum = 2233}
+|}, Principal{|
+val c : c = <obj>
+val from_method_param : lexing_position =
+  {pos_fname = ""; pos_lnum = 3; pos_bol = 2747; pos_cnum = 2789}
+val from_class_param : lexing_position =
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 2729; pos_cnum = 2737}
 |}]
 
 class parent ~(call_pos : [%call_pos]) () =
@@ -130,7 +146,13 @@ class parent :
   call_pos:[%call_pos] -> unit -> object method pos : lexing_position end
 val o : parent = <obj>
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 6; pos_bol = 2611; pos_cnum = 2621}
+  {pos_fname = ""; pos_lnum = 8; pos_bol = 2647; pos_cnum = 2659}
+|}, Principal{|
+class parent :
+  call_pos:[%call_pos] -> unit -> object method pos : lexing_position end
+val o : parent = <obj>
+val position : lexing_position =
+  {pos_fname = ""; pos_lnum = 8; pos_bol = 3400; pos_cnum = 3412}
 |}]
 
 let o ~(call_pos : [%call_pos]) () =
@@ -144,7 +166,11 @@ let position = (o ())#pos
 {|
 val o : call_pos:[%call_pos] -> unit -> parent = <fun>
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 4; pos_bol = 2964; pos_cnum = 2980}
+  {pos_fname = ""; pos_lnum = 6; pos_bol = 3012; pos_cnum = 3028}
+|}, Principal{|
+val o : call_pos:[%call_pos] -> unit -> parent = <fun>
+val position : lexing_position =
+  {pos_fname = ""; pos_lnum = 6; pos_bol = 3992; pos_cnum = 4008}
 |}]
 
 (* Applying an call_pos argument without a label. *)
@@ -157,14 +183,23 @@ let position = (o ())#pos
 
 [%%expect
 {|
-Line 2, characters 10-16:
-2 |   inherit parent call_pos ()
-              ^^^^^^
+Line 3, characters 12-18:
+3 |     inherit parent call_pos ()
+                ^^^^^^
 Warning 6 [labels-omitted]: label call_pos was omitted in the application of this function.
 
 val o : call_pos:[%call_pos] -> unit -> parent = <fun>
 val position : lexing_position =
-  {pos_fname = ""; pos_lnum = 4; pos_bol = 3293; pos_cnum = 3309}
+  {pos_fname = ""; pos_lnum = 6; pos_bol = 3348; pos_cnum = 3364}
+|}, Principal{|
+Line 3, characters 12-18:
+3 |     inherit parent call_pos ()
+                ^^^^^^
+Warning 6 [labels-omitted]: label call_pos was omitted in the application of this function.
+
+val o : call_pos:[%call_pos] -> unit -> parent = <fun>
+val position : lexing_position =
+  {pos_fname = ""; pos_lnum = 6; pos_bol = 4498; pos_cnum = 4514}
 |}]
 
 (* Same behavior as optional parameters. *)
@@ -227,7 +262,12 @@ let a, b = fully_applied_class#a, fully_applied_class#b
 val a : lexing_position =
   {pos_fname = "a"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1}
 val b : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 4512; pos_cnum = 4538}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 4583; pos_cnum = 4609}
+|}, Principal{|
+val a : lexing_position =
+  {pos_fname = "a"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1}
+val b : lexing_position =
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 6080; pos_cnum = 6106}
 |}]
 
 class c :
@@ -255,7 +295,12 @@ let x, y = (new c ~y:pos_a ())#xy
 [%%expect
 {|
 val x : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 5199; pos_cnum = 5211}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 5295; pos_cnum = 5307}
+val y : lexing_position =
+  {pos_fname = "a"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1}
+|}, Principal{|
+val x : lexing_position =
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 6988; pos_cnum = 7000}
 val y : lexing_position =
   {pos_fname = "a"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1}
 |}]

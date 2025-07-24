@@ -87,8 +87,8 @@ let x1 = f4 Function_b.f_opt
 [%%expect
 {|
 val f4 : Function_b.take_t -> unit = <fun>
-Line 2, characters 12-28:
-2 | let x1 = f4 Function_b.f_opt
+Line 3, characters 12-28:
+3 | let x1 = f4 Function_b.f_opt
                 ^^^^^^^^^^^^^^^^
 Error: Function arguments and returns must be representable.
        The layout of Function_a.t is any
@@ -106,8 +106,8 @@ let x2 = f5 Function_b.f_opt_2
 [%%expect
 {|
 val f5 : Function_b.return_t -> unit = <fun>
-Line 2, characters 12-30:
-2 | let x2 = f5 Function_b.f_opt_2
+Line 3, characters 12-30:
+3 | let x2 = f5 Function_b.f_opt_2
                 ^^^^^^^^^^^^^^^^^^
 Error: Function arguments and returns must be representable.
        The layout of Function_a.t is any

@@ -23,9 +23,9 @@ and y = 2.0
 {|
 type t = { mutable f : float; }
 val g : t = {f = 0.}
-Line 3, characters 12-26:
-3 | let rec x = (g.f <- y; ()) and y = 2.0;;
-                ^^^^^^^^^^^^^^
+Lines 6-7, characters 2-4:
+6 | ..g.f <- y;
+7 |   ()
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -47,8 +47,8 @@ let _ = print_float (new c)#m
 
 [%%expect
 {|
-Line 4, characters 16-28:
-4 |     let rec x = (f <- y; ()) and y = 2.0 in f
-                    ^^^^^^^^^^^^
+Lines 7-8, characters 8-10:
+7 | ........f <- y;
+8 |         ()
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]

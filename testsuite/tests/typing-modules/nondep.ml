@@ -20,9 +20,10 @@ end)
 
 [%%expect
 {|
-Line 1, characters 11-35:
-1 | module M = F(struct type t = T end);;
-               ^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-3, characters 11-4:
+1 | ...........F (struct
+2 |   type t = T
+3 | end)
 Error: This functor has type
        "functor (X : sig type t end) -> sig val f : X.t -> unit end"
        The parameter cannot be eliminated in the result type.

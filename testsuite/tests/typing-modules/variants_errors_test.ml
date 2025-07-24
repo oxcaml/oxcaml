@@ -10,11 +10,10 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of float * int
-7 | end..
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Foo of float * int
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of float * int end
@@ -39,11 +38,10 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of float
-7 | end..
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Foo of float
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of float end
@@ -76,11 +74,14 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of {x : float; y : int}
-7 | end..
+Lines 7-13, characters 6-3:
+ 7 | ......struct
+ 8 |   type t =
+ 9 |     | Foo of
+10 |         { x : float;
+11 |           y : int
+12 |         }
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of { x : float; y : int; } end
@@ -113,11 +114,10 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of float
-7 | end..
+Lines 7-9, characters 6-3:
+7 | ......struct
+8 |   type t = Foo of float
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of float end
@@ -142,11 +142,10 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type 'a t =
-6 |     | Foo of 'a
-7 | end..
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = Foo of 'a
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type 'a t = Foo of 'a end
@@ -174,7 +173,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('a, 'b) t = A of 'b
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('a, 'b) t = A of 'b end
@@ -204,7 +203,7 @@ end
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('b, 'a) t = A of 'a
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('b, 'a) t = A of 'a end

@@ -23,11 +23,9 @@ let test () =
 [%%expect
 {|
 val test : unit -> [> `A_t of A.t | `Onoes ] = <fun>
-|},
-  Principal
-    {|
+|}, Principal{|
 Line 5, characters 49-50:
-5 |   | B -> if Random.bool () then `Onoes else `A_t B;;
+5 |   | B -> if Random.bool () then `Onoes else `A_t B
                                                      ^
 Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
 
@@ -43,11 +41,9 @@ let test () =
 [%%expect
 {|
 val test : unit -> [> `A_t of A.t | `Onoes ] = <fun>
-|},
-  Principal
-    {|
+|}, Principal{|
 Line 5, characters 49-50:
-5 |   | B -> if Random.bool () then `Onoes else `A_t B;;
+5 |   | B -> if Random.bool () then `Onoes else `A_t B
                                                      ^
 Warning 18 [not-principal]: this type-based constructor disambiguation is not principal.
 

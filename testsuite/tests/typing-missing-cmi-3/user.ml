@@ -84,8 +84,8 @@ let foo x = (x : Middle.pack1 :> (module T1))
 [%%expect
 {|
 module type T1 = sig type t = int end
-Line 2, characters 12-45:
-2 | let foo x = (x : Middle.pack1 :> (module T1))
+Line 5, characters 12-45:
+5 | let foo x = (x : Middle.pack1 :> (module T1))
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "Middle.pack1" = "(module Original.T with type t = int)"
        is not a subtype of "(module T1)"
@@ -102,8 +102,8 @@ let foo x = (x : Middle.pack2 :> (module T2))
 [%%expect
 {|
 module type T2 = sig module M : sig type t = int end end
-Line 2, characters 12-45:
-2 | let foo x = (x : Middle.pack2 :> (module T2))
+Line 7, characters 12-45:
+7 | let foo x = (x : Middle.pack2 :> (module T2))
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "Middle.pack2" = "(module Middle.T with type M.t = int)"
        is not a subtype of "(module T2)"

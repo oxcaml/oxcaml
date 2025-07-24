@@ -28,9 +28,9 @@ end =
 
 [%%expect
 {|
-Line 2, characters 44-49:
-2 | and Bar : sig class type c = object inherit Foo.c end end = Bar
-                                                ^^^^^
+Line 12, characters 14-19:
+12 |       inherit Foo.c
+                   ^^^^^
 Error: This class type is recursive. This use of the class type "Foo.c"
        from the recursive module "Foo" within the definition of
        the class type "c" in the recursive module "Bar"
@@ -49,9 +49,9 @@ end =
 
 [%%expect
 {|
-Line 1, characters 51-56:
-1 | module rec Foo : sig class type c = object inherit Foo.c end end = Foo;;
-                                                       ^^^^^
+Line 4, characters 14-19:
+4 |       inherit Foo.c
+                  ^^^^^
 Error: This class type is recursive. This use of the class type "Foo.c"
        from the recursive module "Foo" within the definition of
        the class type "c" in the recursive module "Foo"
@@ -86,9 +86,9 @@ let baz (x : Baz.c) = x#x
 
 [%%expect
 {|
-Line 2, characters 29-34:
-2 | and Bar : sig class type c = Foo.c end = Bar
-                                 ^^^^^
+Line 10, characters 17-22:
+10 |   class type c = Foo.c
+                      ^^^^^
 Error: This class type is recursive. This use of the class type "Foo.c"
        from the recursive module "Foo" within the definition of
        the class type "c" in the recursive module "Bar"

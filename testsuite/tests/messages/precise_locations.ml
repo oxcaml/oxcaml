@@ -19,9 +19,9 @@ function (x : #bar) -> ()
 (* we expect the location on "bar" instead of "#bar" *)
 [%%expect
 {|
-Line 2, characters 1-4:
-2 | #bar) -> ();;
-     ^^^
+Line 1, characters 15-18:
+1 | function (x : #bar) -> ()
+                   ^^^
 Error: Unbound class type "bar"
 |}]
 ;;
@@ -31,9 +31,9 @@ function #bar -> ()
 (* we expect the location on "bar" instead of "#bar" *)
 [%%expect
 {|
-Line 2, characters 1-4:
-2 | #bar -> ()
-     ^^^
+Line 1, characters 10-13:
+1 | function #bar -> ()
+              ^^^
 Error: Unbound type constructor "bar"
 |}]
 ;;
@@ -44,7 +44,7 @@ new bar
 [%%expect
 {|
 Line 1, characters 4-7:
-1 | new bar;;
+1 | new bar
         ^^^
 Error: Unbound class "bar"
 |}]
@@ -61,9 +61,9 @@ let x = Foo ()
 [%%expect
 {|
 type t = Foo of unit | Bar
-Line 6, characters 0-3:
-6 | Foo ();;
-    ^^^
+Line 8, characters 8-11:
+8 | let x = Foo ()
+            ^^^
 Error (alert deprecated): Foo
 |}]
 ;;
@@ -72,9 +72,9 @@ function Foo _ -> () | Bar -> ()
 
 [%%expect
 {|
-Line 2, characters 0-3:
-2 | Foo _ -> () | Bar -> ();;
-    ^^^
+Line 1, characters 9-12:
+1 | function Foo _ -> () | Bar -> ()
+             ^^^
 Error (alert deprecated): Foo
 |}]
 
@@ -84,7 +84,7 @@ open Foo
 [%%expect
 {|
 Line 1, characters 5-8:
-1 | open Foo;;
+1 | open Foo
          ^^^
 Error: Unbound module "Foo"
 |}]
@@ -101,9 +101,9 @@ end
    on "open List" as whole rather than "List" *)
 [%%expect
 {|
-Line 2, characters 0-9:
-2 | open List
-    ^^^^^^^^^
+Line 2, characters 2-11:
+2 |   open List
+      ^^^^^^^^^
 Error (warning 33 [unused-open]): unused open List.
 |}]
 
@@ -113,7 +113,7 @@ type unknown += Foo
 [%%expect
 {|
 Line 1, characters 5-12:
-1 | type unknown += Foo;;
+1 | type unknown += Foo
          ^^^^^^^
 Error: Unbound type constructor "unknown"
 |}]
@@ -126,8 +126,8 @@ type t += Foo = Foobar
 [%%expect
 {|
 type t = ..
-Line 3, characters 6-12:
-3 | Foo = Foobar;;
-          ^^^^^^
+Line 3, characters 16-22:
+3 | type t += Foo = Foobar
+                    ^^^^^^
 Error: Unbound constructor "Foobar"
 |}]

@@ -10,9 +10,9 @@ type t =
 
 [%%expect
 {|
-Line 1, characters 11-18:
-1 | type t = [ 'A_name | `Hi ];;
-               ^^^^^^^
+Line 2, characters 4-11:
+2 |   [ 'A_name
+        ^^^^^^^
 Error: The type "'A_name" does not expand to a polymorphic variant type
 Hint: Did you mean "`A_name"?
 |}]
@@ -86,8 +86,8 @@ let x = X zeros
 {|
 type 'a t = private X of 'a
 val zeros : < next : int * 'a > as 'a = <obj>
-Line 3, characters 8-15:
-3 | let x = X zeros;;
+Line 8, characters 8-15:
+8 | let x = X zeros
             ^^^^^^^
 Error: Cannot create values of the private type "(< next : int * 'a > as 'a) t"
 |}]
@@ -103,9 +103,9 @@ let f (x : t) (type a) (y : a) (witness : (a, t) eq) =
 {|
 type ('a, 'b) eq = Refl : ('a, 'a) eq
 type t = < m : int * 'a > as 'a
-Line 4, characters 32-33:
-4 |   | Refl -> if true then x else y
-                                    ^
+Line 6, characters 49-50:
+6 |   match witness with Refl -> if true then x else y
+                                                     ^
 Error: This expression has type "a" but an expression was expected of type "t"
        This instance of "< m : int * 'a > as 'a" is ambiguous:
        it would escape the scope of its equation
@@ -121,8 +121,8 @@ let f (x : t1) : t2 = x
 {|
 type t1 = < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) >
 type t2 = < m : 'a. 'a * ('a * 'b) > as 'b
-Line 3, characters 22-23:
-3 | let f (x : t1) : t2 = x;;
+Line 5, characters 22-23:
+5 | let f (x : t1) : t2 = x
                           ^
 Error: This expression has type "t1" but an expression was expected of type "t2"
        The method "m" has type "'c. 'c * ('a * < m : 'c. 'b >) as 'b",
@@ -143,8 +143,8 @@ and bar () =
 
 [%%expect
 {|
-Line 4, characters 26-27:
-4 |   x |> List.fold_left max 0 x
+Line 5, characters 26-27:
+5 |   x |> List.fold_left max 0 x
                               ^
 Error: This expression has type "int" but an expression was expected of type
          "'a -> 'b"

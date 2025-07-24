@@ -1,6 +1,6 @@
-File "pr6870_bad.ml", line 10, characters 49-50:
-10 | module Fix (T : T) = struct type r = ('r T.t as 'r) end
-                                                      ^
+File "pr6870_bad.ml", line 10, characters 22-23:
+10 |   type r = 'r T.t as 'r
+                           ^
 Error: This alias is bound to type "'a T.t" but is used as an instance of type
          "'a"
        The type variable "'a" occurs inside "'a T.t"

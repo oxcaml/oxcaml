@@ -9,14 +9,14 @@ let rec x =
 
 [%%expect
 {|
-Line 1, characters 12-19:
-1 | let rec x = [| x |]; 1.;;
-                ^^^^^^^
+Line 2, characters 2-9:
+2 |   [| x |];
+      ^^^^^^^
 Warning 10 [non-unit-statement]: this expression should have type unit.
 
-Line 1, characters 12-23:
-1 | let rec x = [| x |]; 1.;;
-                ^^^^^^^^^^^
+Lines 2-3, characters 2-4:
+2 | ..[| x |];
+3 |   1.
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -28,8 +28,8 @@ and y = 1.
 
 [%%expect
 {|
-Line 1, characters 12-32:
-1 | let rec x = let u = [|y|] in 10. and y = 1.;;
-                ^^^^^^^^^^^^^^^^^^^^
+Lines 2-3, characters 2-5:
+2 | ..let u = [| y |] in
+3 |   10.
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]

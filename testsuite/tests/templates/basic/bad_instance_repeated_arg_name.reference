@@ -1,4 +1,4 @@
-File "bad_instance_repeated_arg_name.ml", line 2, characters 2-87:
-2 |   Monoid_utils(Monoid)(List_monoid)(Monoid)(List_monoid) [@jane.non_erasable.instances]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "bad_instance_repeated_arg_name.ml", lines 2-3, characters 2-30:
+2 | ..(Monoid_utils (Monoid) (List_monoid) (Monoid)) (List_monoid)
+3 | [@jane.non_erasable.instances]
 Error: This instance has multiple arguments with the name "Monoid".

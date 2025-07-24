@@ -15,8 +15,8 @@ end
 (* fail *)
 [%%expect
 {|
-Line 3, characters 2-29:
-3 |   type _ t = T : 'a -> 'a s t
+Line 7, characters 2-29:
+7 |   type _ t = T : 'a -> 'a s t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "T : 'a -> 'a s t"
@@ -58,9 +58,15 @@ end
 (* fail *)
 [%%expect
 {|
-Lines 2-3, characters 2-67:
-2 | ..class ['a] c x =
-3 |     object constraint 'a = 'b T.t val x' : 'b = x method x = x' end
+Lines 5-12, characters 2-7:
+ 5 | ..class ['a] c x =
+ 6 |     object
+ 7 |       constraint 'a = 'b T.t
+ 8 |
+ 9 |       val x' : 'b = x
+10 |
+11 |       method x = x'
+12 |     end
 Error: In the definition
          "type 'a c = < x : 'b > constraint 'a = 'b T.t"
        the type variable "'b" cannot be deduced from the type parameters.
@@ -78,9 +84,9 @@ let magic (x : int) : bool =
 (* fail *)
 [%%expect
 {|
-Line 1, characters 0-49:
-1 | type 'x t = A of 'a constraint 'x = [< `X of 'a ] ;; (* fail *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-48:
+1 | type 'x t = A of 'a constraint 'x = [< `X of 'a]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type 'b t = A of 'a constraint 'b = [< `X of 'a ]"
        the type variable "'a" cannot be deduced from the type parameters.
@@ -91,9 +97,9 @@ type 'a t = A : 'a -> [< `X of 'a] t
 (* fail *)
 [%%expect
 {|
-Line 1, characters 0-37:
-1 | type 'a t = A : 'a -> [< `X of 'a ] t;; (* fail *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-36:
+1 | type 'a t = A : 'a -> [< `X of 'a] t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "A : 'a -> [< `X of 'a ] t"
        the type variable "'a" cannot be deduced from the type parameters.
@@ -114,8 +120,8 @@ type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t
 type (_, _) eq = Eq : ('a, 'a) eq
 val eq : 'a = <poly>
 val eq : (('a, 'b) Ephemeron.K1.t, ('c, 'd) Ephemeron.K1.t) eq = Eq
-Line 4, characters 0-46:
-4 | type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t;; (* fail *)
+Line 7, characters 0-46:
+7 | type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "T : 'a -> ('a, 'b) Ephemeron.K1.t t"
@@ -138,8 +144,8 @@ end
 (* fail *)
 [%%expect
 {|
-Line 3, characters 2-29:
-3 |   type _ t = T : 'a -> 'a s t
+Line 4, characters 2-29:
+4 |   type _ t = T : 'a -> 'a s t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "T : 'a -> 'a s t"
@@ -152,7 +158,7 @@ module rec M : (S with type 'a s = unit) = M
 [%%expect
 {|
 Line 1, characters 16-17:
-1 | module rec M : (S with type 'a s = unit) = M;;
+1 | module rec M : (S with type 'a s = unit) = M
                     ^
 Error: Unbound module type "S"
 |}]
@@ -179,8 +185,8 @@ type +'a t = 'b constraint 'a = 'b q
 [%%expect
 {|
 type 'a q = Q
-Line 2, characters 0-36:
-2 | type +'a t = 'b constraint 'a = 'b q;;
+Line 3, characters 0-36:
+3 | type +'a t = 'b constraint 'a = 'b q
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type +'a t = 'b constraint 'a = 'b q"
@@ -207,7 +213,7 @@ type -'a s = 'b constraint 'a = 'b t
 [%%expect
 {|
 Line 1, characters 0-36:
-1 | type -'a s = 'b constraint 'a = 'b t;; (* fail *)
+1 | type -'a s = 'b constraint 'a = 'b t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type -'a s = 'b constraint 'a = 'b t"
@@ -243,7 +249,7 @@ type +'a s = 'b constraint 'a = 'b t q
 [%%expect
 {|
 Line 1, characters 0-38:
-1 | type +'a s = 'b constraint 'a = 'b t q;; (* fail *)
+1 | type +'a s = 'b constraint 'a = 'b t q
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type +'a s = 'b constraint 'a = 'b t q"
@@ -275,8 +281,8 @@ type _ g = G : 'a -> 'a t g
 [%%expect
 {|
 type +'a t = unit constraint 'a = 'b list
-Line 2, characters 0-27:
-2 | type _ g = G : 'a -> 'a t g;; (* fail *)
+Line 3, characters 0-27:
+3 | type _ g = G : 'a -> 'a t g
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "G : 'a list -> 'a list t g"

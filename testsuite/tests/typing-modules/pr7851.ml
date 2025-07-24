@@ -35,9 +35,9 @@ module rec M1 : (S with type x = int and type y = bool) = M1
 
 [%%expect
 {|
-Line 1, characters 0-58:
-1 | module rec M1 : S with type x = int and type y = bool = M1;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-60:
+1 | module rec M1 : (S with type x = int and type y = bool) = M1
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This variant or record definition does not match that of type "M1.t"
        Constructors do not match:
          "E of M1.x"
@@ -109,9 +109,9 @@ cast eq 3
 
 [%%expect
 {|
-Line 1, characters 0-58:
-1 | module rec M1 : S with type x = int and type y = bool = M1;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-60:
+1 | module rec M1 : (S with type x = int and type y = bool) = M1
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This variant or record definition does not match that of type "M1.t"
        Constructors do not match:
          "E of (M1.x, M1.x) eq"

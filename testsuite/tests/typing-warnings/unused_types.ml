@@ -9,8 +9,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-19:
-3 |   type unused = int
+Line 2, characters 2-19:
+2 |   type unused = int
       ^^^^^^^^^^^^^^^^^
 Warning 34 [unused-type-declaration]: unused type unused.
 
@@ -39,13 +39,13 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-27:
-3 |   type unused = A of unused
+Line 2, characters 2-27:
+2 |   type unused = A of unused
       ^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 34 [unused-type-declaration]: unused type unused.
 
-Line 3, characters 16-27:
-3 |   type unused = A of unused
+Line 2, characters 16-27:
+2 |   type unused = A of unused
                     ^^^^^^^^^^^
 Warning 37 [unused-constructor]: unused constructor A.
 
@@ -94,8 +94,8 @@ end
 
 [%%expect
 {|
-Line 5, characters 11-12:
-5 |   type t = T
+Line 6, characters 11-12:
+6 |   type t = T
                ^
 Warning 37 [unused-constructor]: constructor T is never used to build values.
 (However, this constructor appears in patterns.)
@@ -197,8 +197,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-26:
-3 |   exception Nobody_uses_me
+Line 2, characters 2-26:
+2 |   exception Nobody_uses_me
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 38 [unused-extension]: unused exception Nobody_uses_me
 
@@ -215,8 +215,8 @@ end
 
 [%%expect
 {|
-Line 5, characters 12-26:
-5 |   type t += Nobody_uses_me
+Line 6, characters 12-26:
+6 |   type t += Nobody_uses_me
                 ^^^^^^^^^^^^^^
 Warning 38 [unused-extension]: unused extension constructor Nobody_uses_me
 
@@ -233,8 +233,8 @@ end
 
 [%%expect
 {|
-Line 5, characters 59-75:
-5 |   type t += Dont_warn_on_me [@warning "-unused-extension"] | Nobody_uses_me
+Line 6, characters 59-75:
+6 |   type t += Dont_warn_on_me [@warning "-unused-extension"] | Nobody_uses_me
                                                                ^^^^^^^^^^^^^^^^
 Warning 38 [unused-extension]: unused extension constructor Nobody_uses_me
 
@@ -274,8 +274,8 @@ end
 
 [%%expect
 {|
-Line 6, characters 12-27:
-6 |   type t += Noone_builds_me
+Line 8, characters 12-27:
+8 |   type t += Noone_builds_me
                 ^^^^^^^^^^^^^^^
 Warning 38 [unused-extension]: extension constructor Noone_builds_me is never used to build values.
 (However, this constructor appears in patterns.)
@@ -314,8 +314,8 @@ end
 
 [%%expect
 {|
-Line 6, characters 12-23:
-6 |   type t += Private_ext
+Line 8, characters 12-23:
+8 |   type t += Private_ext
                 ^^^^^^^^^^^
 Warning 38 [unused-extension]: extension constructor Private_ext is never used to build values.
 It is exported or rebound as a private extension.
@@ -351,8 +351,8 @@ end
 
 [%%expect
 {|
-Line 5, characters 20-31:
-5 |   type t += private Private_ext
+Line 6, characters 20-31:
+6 |   type t += private Private_ext
                         ^^^^^^^^^^^
 Warning 38 [unused-extension]: unused extension constructor Private_ext
 
@@ -399,8 +399,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 11-12:
-3 |   type t = A [@@warning "-34"]
+Line 2, characters 11-12:
+2 |   type t = A [@@warning "-34"]
                ^
 Warning 37 [unused-constructor]: unused constructor A.
 
@@ -413,8 +413,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-30:
-3 |   type t = A [@@warning "-37"]
+Line 2, characters 2-30:
+2 |   type t = A [@@warning "-37"]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 34 [unused-type-declaration]: unused type t.
 
@@ -429,14 +429,15 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-33:
-3 |   type t = A [@warning "-37"] | B
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-4, characters 2-7:
+2 | ..type t =
+3 |     | A [@warning "-37"]
+4 |     | B
 Warning 34 [unused-type-declaration]: unused type t.
 
-Line 3, characters 30-33:
-3 |   type t = A [@warning "-37"] | B
-                                  ^^^
+Line 4, characters 4-7:
+4 |     | B
+        ^^^
 Warning 37 [unused-constructor]: unused constructor B.
 
 module Unused_constructor_disable_one_warning : sig end
@@ -455,14 +456,14 @@ end
 
 [%%expect
 {|
-Line 2, characters 13-21:
-2 |   type t = { a : int; b : int }
-                 ^^^^^^^^
+Line 3, characters 6-14:
+3 |     { a : int;
+          ^^^^^^^^
 Warning 69 [unused-field]: unused record field a.
 
-Line 2, characters 22-29:
-2 |   type t = { a : int; b : int }
-                          ^^^^^^^
+Line 4, characters 6-13:
+4 |       b : int
+          ^^^^^^^
 Warning 69 [unused-field]: unused record field b.
 
 module Unused_record : sig end
@@ -505,9 +506,9 @@ end
 
 [%%expect
 {|
-Line 2, characters 22-30:
-2 |   type t = { a : int; b : int; c : int }
-                          ^^^^^^^^
+Line 4, characters 6-14:
+4 |       b : int;
+          ^^^^^^^^
 Warning 69 [unused-field]: record field b is never read.
 (However, this field is used to build or mutate values.)
 
@@ -529,9 +530,9 @@ end
 
 [%%expect
 {|
-Line 2, characters 22-37:
-2 |   type t = { a : int; mutable b : int }
-                          ^^^^^^^^^^^^^^^
+Line 4, characters 6-21:
+4 |       mutable b : int
+          ^^^^^^^^^^^^^^^
 Warning 69 [unused-field]: mutable record field b is never mutated.
 
 module Unused_mutable_field : sig end
@@ -581,9 +582,9 @@ end
 
 [%%expect
 {|
-Line 4, characters 22-37:
-4 |   type t = { a : int; mutable b : int }
-                          ^^^^^^^^^^^^^^^
+Line 9, characters 6-21:
+9 |       mutable b : int
+          ^^^^^^^^^^^^^^^
 Warning 69 [unused-field]: mutable record field b is never mutated.
 
 module Unused_mutable_field_exported_private :
@@ -600,9 +601,12 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-56:
-3 |   type t = { a: int; b:int } [@@warning "-unused-field"]
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-6, characters 2-29:
+2 | ..type t =
+3 |     { a : int;
+4 |       b : int
+5 |     }
+6 |   [@@warning "-unused-field"]
 Warning 34 [unused-type-declaration]: unused type t.
 
 module Unused_field_disable_warning : sig end
@@ -617,14 +621,16 @@ end
 
 [%%expect
 {|
-Line 3, characters 2-55:
-3 |   type t = { a: int [@warning "-unused-field"]; b:int }
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 2-5, characters 2-5:
+2 | ..type t =
+3 |     { a : int; [@warning "-unused-field"]
+4 |       b : int
+5 |     }
 Warning 34 [unused-type-declaration]: unused type t.
 
-Line 3, characters 48-53:
-3 |   type t = { a: int [@warning "-unused-field"]; b:int }
-                                                    ^^^^^
+Line 4, characters 6-13:
+4 |       b : int
+          ^^^^^^^
 Warning 69 [unused-field]: unused record field b.
 
 module Unused_field_disable_one_warning : sig end
@@ -648,9 +654,9 @@ let u (type unused) = ()
 
 [%%expect
 {|
-Line 1, characters 18-24:
-1 | let u = fun (type unused) -> ()
-                      ^^^^^^
+Line 1, characters 12-18:
+1 | let u (type unused) = ()
+                ^^^^^^
 Warning 34 [unused-type-declaration]: unused type unused.
 
 val u : unit = ()
@@ -672,9 +678,9 @@ let f (type unused) x = x
 
 [%%expect
 {|
-Line 1, characters 18-24:
-1 | let f = fun (type unused) x -> x
-                      ^^^^^^
+Line 1, characters 12-18:
+1 | let f (type unused) x = x
+                ^^^^^^
 Warning 34 [unused-type-declaration]: unused type unused.
 
 val f : 'a -> 'a = <fun>
@@ -696,9 +702,9 @@ let f (type used unused) (x : used) = x
 
 [%%expect
 {|
-Line 1, characters 23-29:
-1 | let f = fun (type used unused) (x : used) -> x
-                           ^^^^^^
+Line 1, characters 17-23:
+1 | let f (type used unused) (x : used) = x
+                     ^^^^^^
 Warning 34 [unused-type-declaration]: unused type unused.
 
 val f : 'used -> 'used = <fun>

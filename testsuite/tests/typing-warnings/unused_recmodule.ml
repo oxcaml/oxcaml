@@ -26,8 +26,8 @@ end
 
 [%%expect
 {|
-Line 14, characters 4-10:
-14 |     type t
+Line 15, characters 4-10:
+15 |     type t
          ^^^^^^
 Warning 34 [unused-type-declaration]: unused type t.
 

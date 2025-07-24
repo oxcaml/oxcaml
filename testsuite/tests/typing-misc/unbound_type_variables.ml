@@ -16,9 +16,9 @@ type record = { contents : 'a }
 
 [%%expect
 {|
-Line 1, characters 26-28:
-1 | type record = { contents: 'a }
-                              ^^
+Line 1, characters 27-29:
+1 | type record = { contents : 'a }
+                               ^^
 Error: The type variable "'a" is unbound in this type declaration.
 |}]
 
@@ -61,8 +61,8 @@ type extensible += Extension of 'a
 [%%expect
 {|
 type extensible = ..
-Line 2, characters 32-34:
-2 | type extensible += Extension of 'a
+Line 3, characters 32-34:
+3 | type extensible += Extension of 'a
                                     ^^
 Error: The type variable "'a" is unbound in this type declaration.
 |}]

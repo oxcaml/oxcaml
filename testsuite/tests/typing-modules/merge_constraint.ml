@@ -24,9 +24,9 @@ end
 
 [%%expect
 {|
-Line 15, characters 18-19:
-15 |     with type u = t
-                       ^
+Line 15, characters 42-43:
+15 |   module type Check1 = Sig1 with type u = t
+                                               ^
 Error: Unbound type constructor "t"
 |}]
 
@@ -355,8 +355,8 @@ module type T = S with type M.t = s
 {|
 module type S = sig module rec M : sig type t = Foo of M.r type r = t end end
 type s = Foo of s
-Line 10, characters 23-35:
-10 | module type T = S with type M.t = s
+Line 11, characters 23-35:
+11 | module type T = S with type M.t = s
                             ^^^^^^^^^^^^
 Error: This variant or record definition does not match that of type "s"
        Constructors do not match:
@@ -384,8 +384,8 @@ module type T = S with type M.t = s
 module type S =
   sig module rec M : sig type t = private [ `Foo of M.r ] type r = t end end
 type s = [ `Foo of s ]
-Line 10, characters 16-35:
-10 | module type T = S with type M.t = s
+Line 11, characters 16-35:
+11 | module type T = S with type M.t = s
                      ^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M.t"
        does not match its original definition in the constrained signature:
@@ -426,8 +426,8 @@ module type S =
       end
   end
 module X : sig type t = [ `Foo of t ] end
-Line 10, characters 16-37:
-10 | module type T = S with module M.N = X
+Line 15, characters 16-37:
+15 | module type T = S with module M.N = X
                      ^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M.N"
        does not match its original definition in the constrained signature:
@@ -473,8 +473,8 @@ module type S =
       sig module N : sig type t = M.r type s end type r = N.s end
   end
 module X : sig type t type s = t end
-Line 10, characters 16-37:
-10 | module type T = S with module M.N = X
+Line 19, characters 16-37:
+19 | module type T = S with module M.N = X
                      ^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "M.N"
        does not match its original definition in the constrained signature:
@@ -545,8 +545,8 @@ end
 
 [%%expect
 {|
-Line 6, characters 32-34:
-6 |   module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
+Line 8, characters 32-34:
+8 |   module type S2 = S with type ('a, 'b) t = ('a, 'b) t2
                                     ^^
 Error: The type constraints are not consistent.
        Type "'a * 'b * 'c" is not compatible with type "'l * 'r"
@@ -564,8 +564,8 @@ end
 
 [%%expect
 {|
-Line 6, characters 19-49:
-6 |   module type S2 = S with type ('a, _) t := 'a t2
+Line 8, characters 19-49:
+8 |   module type S2 = S with type ('a, _) t := 'a t2
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Destructive substitutions are not supported for constrained
        types (other than when replacing a type constructor with
@@ -604,8 +604,8 @@ end
 
 [%%expect
 {|
-Line 6, characters 32-34:
-6 |   module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
+Line 8, characters 32-34:
+8 |   module type S2 = S with type ('a, 'b) t := ('a, 'b) t2
                                     ^^
 Error: The type constraints are not consistent.
        Type "'a * 'b * 'c" is not compatible with type "'l * 'r"
@@ -737,9 +737,9 @@ end
 
 [%%expect
 {|
-Line 9, characters 39-41:
-9 |                  end) with module X2 = X0
-                                           ^^
+Line 12, characters 19-21:
+12 |   with module X2 = X0)
+                        ^^
 Error: The signature constrained by "with" has no component named "X2"
 |}]
 
@@ -763,9 +763,9 @@ end
 
 [%%expect
 {|
-Line 9, characters 42-44:
-9 |                  end) with module X1.X2 = X0
-                                              ^^
+Line 14, characters 22-24:
+14 |   with module X1.X2 = X0)
+                           ^^
 Error: The signature constrained by "with" has no component named "X1.X2"
 |}]
 
@@ -784,10 +784,13 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 17-41:
-3 | .................(sig
-4 |                    module X1 : sig type t end
-5 |                  end) with module X1 = X0
+Lines 4-9, characters 18-21:
+4 | ..................sig
+5 |     module X1 : sig
+6 |       type t
+7 |     end
+8 |   end
+9 |   with module X1 = X0.
 Error: In this "with" constraint, the new definition of "X1"
        does not match its original definition in the constrained signature:
        Modules do not match: sig end is not included in sig type t end
@@ -839,9 +842,9 @@ end
 
 [%%expect
 {|
-Line 6, characters 27-39:
-6 |                  end) with type v = int
-                               ^^^^^^^^^^^^
+Line 8, characters 7-19:
+8 |   with type v = int)
+           ^^^^^^^^^^^^
 Error: The signature constrained by "with" has no component named "v"
 |}]
 
@@ -859,9 +862,9 @@ end
 
 [%%expect
 {|
-Line 6, characters 27-40:
-6 |                  end) with type v := int
-                               ^^^^^^^^^^^^^
+Line 8, characters 7-20:
+8 |   with type v := int)
+           ^^^^^^^^^^^^^
 Error: The signature constrained by "with" has no component named "v"
 |}]
 
@@ -876,10 +879,11 @@ end
 
 [%%expect
 {|
-Lines 2-4, characters 17-39:
-2 | .................(sig
-3 |                    type 'a t
-4 |                  end) with type t = int
+Lines 2-5, characters 18-19:
+2 | ..................sig
+3 |     type 'a t
+4 |   end
+5 |   with type t = int.
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
@@ -941,10 +945,11 @@ with type v = int
 
 [%%expect
 {|
-Lines 5-7, characters 42-23:
+Lines 5-8, characters 42-17:
 5 | ..........................................sig
-6 |     class v : object end
-7 |   end with type v = int
+6 |   class v : object end
+7 | end
+8 | with type v = int
 Error: The signature constrained by "with" has no component named "v"
 |}]
 
@@ -959,8 +964,8 @@ end
 
 [%%expect
 {|
-Line 3, characters 33-45:
-3 |                         end with type v = int
-                                     ^^^^^^^^^^^^
+Line 5, characters 7-19:
+5 |   with type v = int)
+           ^^^^^^^^^^^^
 Error: The signature constrained by "with" has no component named "v"
 |}]

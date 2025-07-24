@@ -22,7 +22,7 @@ let f (type a b) (y : (a, b) j t) : a -> b =
 [%%expect
 {|
 Line 2, characters 6-7:
-2 |   let A = y in fun x -> x;;
+2 |   let A = y in
           ^
 Error: This pattern matches values of type "i t"
        but a pattern was expected which matches values of type "(a, b) j t"
@@ -70,9 +70,9 @@ let g (y : M.j t option) =
 [%%expect
 {|
 module M : sig type 'a d type j = < m : 'c. 'c -> 'c d > end
-Line 6, characters 2-20:
-6 |   let None = y in () ;;
-      ^^^^^^^^^^^^^^^^^^
+Lines 8-9, characters 2-4:
+8 | ..let None = y in
+9 |   ()
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Some A
@@ -106,9 +106,9 @@ module M :
     type j = < m : 'c. 'c -> e >
   end
 type _ t = A : M.i t
-Line 9, characters 2-20:
-9 |   let None = y in () ;;
-      ^^^^^^^^^^^^^^^^^^
+Lines 14-15, characters 2-4:
+14 | ..let None = y in
+15 |   ()
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Some A
@@ -140,9 +140,9 @@ module M :
     type 'a j = < m : 'c. 'c -> 'a >
   end
 type _ t = A : M.i t
-Line 9, characters 2-20:
-9 |   let None = y in () ;;
-      ^^^^^^^^^^^^^^^^^^
+Lines 13-14, characters 2-4:
+13 | ..let None = y in
+14 |   ()
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Some A
@@ -220,9 +220,9 @@ module M :
     type j = C of < m : 'c. 'c -> 'c a >
   end
 type _ t = A : M.i t
-Line 7, characters 33-34:
-7 | let f (y : M.j t) = match y with _ -> .;;
-                                     ^
+Line 11, characters 33-34:
+11 | let f (y : M.j t) = match y with _ -> .
+                                      ^
 Error: This match case could not be refuted.
        Here is an example of a value that would reach it: "A"
 |}]

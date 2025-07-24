@@ -10,8 +10,8 @@ f ?x:0
 [%%expect
 {|
 val f : x:int -> int = <fun>
-Line 2, characters 5-6:
-2 | f ?x:0;;
+Line 3, characters 5-6:
+3 | f ?x:0
          ^
 Warning 43 [nonoptional-label]: the label x is not optional.
 
@@ -42,7 +42,7 @@ foo (fun ?opt () -> ())
 [%%expect
 {|
 Line 1, characters 4-23:
-1 | foo (fun ?opt () -> ()) ;; (* fails *)
+1 | foo (fun ?opt () -> ())
         ^^^^^^^^^^^^^^^^^^^
 Error: This function should have type "unit -> unit"
        but its first argument is labeled "?opt" instead of being unlabeled
@@ -91,9 +91,9 @@ let f g =
 
 [%%expect
 {|
-Line 1, characters 37-38:
-1 | let f g = ignore (g ?x:(Some 2) ()); g ~x:3 () ;;
-                                         ^
+Line 3, characters 2-3:
+3 |   g ~x:3 ()
+      ^
 Error: This function is applied to arguments
        in an order different from other calls.
        This is only allowed when the real type is known.
@@ -105,9 +105,9 @@ let f g =
 
 [%%expect
 {|
-Line 1, characters 38-39:
-1 | let f g = let _ = g ?x:(Some 2) () in g ~x:3 () ;;
-                                          ^
+Line 3, characters 2-3:
+3 |   g ~x:3 ()
+      ^
 Error: This function is applied to arguments
        in an order different from other calls.
        This is only allowed when the real type is known.
@@ -121,12 +121,10 @@ let f g =
 [%%expect
 {|
 val f : (?x:int -> unit -> int) -> int = <fun>
-|},
-  Principal
-    {|
-Line 1, characters 51-52:
-1 | let f g = ignore (g : ?x:int -> unit -> int); g ~x:3 () ;;
-                                                       ^
+|}, Principal{|
+Line 3, characters 7-8:
+3 |   g ~x:3 ()
+           ^
 Warning 18 [not-principal]: using an optional argument here is not principal.
 
 val f : (?x:int -> unit -> int) -> int = <fun>
@@ -139,12 +137,10 @@ let f g =
 [%%expect
 {|
 val f : (?x:int -> unit -> int) -> int = <fun>
-|},
-  Principal
-    {|
-Line 1, characters 46-47:
-1 | let f g = ignore (g : ?x:int -> unit -> int); g ();;
-                                                  ^
+|}, Principal{|
+Line 3, characters 2-3:
+3 |   g ()
+      ^
 Warning 19 [non-principal-labels]: eliminated omittable argument without principality.
 
 val f : (?x:int -> unit -> int) -> int = <fun>
@@ -157,12 +153,10 @@ let f g =
 [%%expect
 {|
 val f : (x:int -> unit -> int) -> x:int -> int = <fun>
-|},
-  Principal
-    {|
-Line 1, characters 45-46:
-1 | let f g = ignore (g : x:int -> unit -> int); g ();;
-                                                 ^
+|}, Principal{|
+Line 3, characters 2-3:
+3 |   g ()
+      ^
 Warning 19 [non-principal-labels]: commuted an argument without principality.
 
 val f : (x:int -> unit -> int) -> x:int -> int = <fun>

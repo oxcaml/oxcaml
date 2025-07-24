@@ -19,11 +19,11 @@ in
 [%%expect
 {|
 module type S = sig type t end
-Lines 6-9, characters 2-22:
-6 | ..(module struct
-7 |     type t = M.t
-8 |   end : S
-9 |     with type t = M.t)
+Lines 7-10, characters 2-22:
+ 7 | ..(module struct
+ 8 |     type t = M.t
+ 9 |   end : S
+10 |     with type t = M.t)
 Error: This expression has type "(module S with type t = M.t)"
        but an expression was expected of type "(module S)"
 |}]
@@ -107,8 +107,8 @@ let f () =
 [%%expect
 {|
 module type S = sig type t val x : t end
-Line 15, characters 8-10:
-15 |   unify ()
+Line 16, characters 8-10:
+16 |   unify ()
              ^^
 Error: This expression has type "unit" but an expression was expected of type
          "M.t"

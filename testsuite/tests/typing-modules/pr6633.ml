@@ -10,8 +10,8 @@ module Foo = functor (E : Equal) -> struct end
 [%%expect
 {|
 module Equal : sig end
-Line 2, characters 26-31:
-2 | module Foo = functor (E : Equal) -> struct end;;
+Line 3, characters 26-31:
+3 | module Foo = functor (E : Equal) -> struct end
                               ^^^^^
 Error: Unbound module type "Equal"
 Hint: There is a module named "Equal", but modules are not module types
@@ -27,8 +27,8 @@ module Foo = functor (E : EqualF) -> struct end
 [%%expect
 {|
 module type Equals = sig end
-Line 2, characters 26-32:
-2 | module Foo = functor (E : EqualF) -> struct end;;
+Line 3, characters 26-32:
+3 | module Foo = functor (E : EqualF) -> struct end
                               ^^^^^^
 Error: Unbound module type "EqualF"
 Hint: Did you mean "Equals"?
@@ -46,8 +46,8 @@ module Foo = functor (E : EqualF) -> struct end
 {|
 module type Equal = sig end
 module EqualF : sig end
-Line 3, characters 26-32:
-3 | module Foo = functor (E : EqualF) -> struct end;;
+Line 5, characters 26-32:
+5 | module Foo = functor (E : EqualF) -> struct end
                               ^^^^^^
 Error: Unbound module type "EqualF"
 Hint: There is a module named "EqualF", but modules are not module types
@@ -65,9 +65,9 @@ let f (x : S.t) = ()
 [%%expect
 {|
 module type S = sig type t val show : t -> string end
-Line 2, characters 10-13:
-2 | let f (x: S.t ) = ();;
-              ^^^
+Line 7, characters 11-14:
+7 | let f (x : S.t) = ()
+               ^^^
 Error: Unbound module "S"
 Hint: There is a module type named "S", but module types are not modules
 |}]
@@ -86,9 +86,9 @@ class c =
 [%%expect
 {|
 class type ct = object method m : int end
-Line 2, characters 25-27:
-2 | class c = object inherit ct end
-                             ^^
+Line 8, characters 12-14:
+8 |     inherit ct
+                ^^
 Error: Unbound class "ct"
 Hint: There is a class type named "ct", but classes are not class types
 |}]

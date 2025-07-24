@@ -41,12 +41,17 @@ end
 {|
 module A : sig type a and b and c and d end
 module type S = sig module B = A end
-Lines 9-13, characters 15-3:
- 9 | ...............struct
-10 |   module B = struct
-11 |     type a and b and c and d and e and f and g and h
-12 |   end
-13 | end
+Lines 15-33, characters 15-3:
+15 | ...............struct
+16 |   module B = struct
+17 |     type a
+18 |
+19 |     and b
+...
+30 |
+31 |     and h
+32 |   end
+33 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -97,14 +102,17 @@ end
 
 [%%expect
 {|
-Lines 1-7, characters 15-3:
-1 | ...............struct
-2 |   module B = struct
-3 |     type a and b and c and d and e and f and g and h
-4 |     and a_type_with_extremely_long_long_long_long_long_long_long_long_name
-5 |     and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
-6 |   end
-7 | end
+Lines 1-23, characters 15-3:
+ 1 | ...............struct
+ 2 |   module B = struct
+ 3 |     type a
+ 4 |
+ 5 |     and b
+...
+20 |
+21 |     and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
+22 |   end
+23 | end
 Error: Signature mismatch:
        ...
        In module "B":
@@ -169,14 +177,17 @@ end
 {|
 module A : sig type a and b and c and d end
 module type S = sig module type B = sig module C = A end end
-Lines 11-17, characters 15-3:
-11 | ...............struct
-12 |   module type B = sig
-13 |     module C: sig
-14 |       type a and b and c and d and e and f and g and h
-15 |     end
-16 |   end
-17 | end
+Lines 17-37, characters 15-3:
+17 | ...............struct
+18 |   module type B = sig
+19 |     module C : sig
+20 |       type a
+21 |
+...
+34 |       and h
+35 |     end
+36 |   end
+37 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -248,16 +259,17 @@ end
 
 [%%expect
 {|
-Lines 1-9, characters 15-3:
-1 | ...............struct
-2 |   module type B = sig
-3 |     module C: sig
-4 |       type a and b and c and d and e and f and g and h
-5 |       and a_type_with_extremely_long_long_long_long_long_long_long_long_name
-6 |       and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
-7 |     end
-8 |   end
-9 | end
+Lines 1-25, characters 15-3:
+ 1 | ...............struct
+ 2 |   module type B = sig
+ 3 |     module C : sig
+ 4 |       type a
+ 5 |
+...
+22 |       and a_type_with_extremely_long_long_long_long_long_long_long_long_name0
+23 |     end
+24 |   end
+25 | end
 Error: Signature mismatch:
        ...
        ...

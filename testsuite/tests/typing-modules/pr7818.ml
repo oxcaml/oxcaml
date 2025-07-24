@@ -135,11 +135,11 @@ end
 
 [%%expect
 {|
-Lines 2-5, characters 57-3:
-2 | .........................................................struct
-3 |   module Id = T'.T.Id
-4 |   module Id2 = Id
-5 | end..
+Lines 6-9, characters 32-3:
+6 | ................................struct
+7 |   module Id = T'.T.Id
+8 |   module Id2 = Id
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module Id : sig end module Id2 = Id end
@@ -191,9 +191,9 @@ M.Id.x
 [%%expect
 {|
 module M : sig module Id : sig end module Id2 = Id end
-Line 3, characters 0-6:
-3 | M.Id.x;;
-    ^^^^^^
+Line 12, characters 0-6:
+12 | M.Id.x
+     ^^^^^^
 Error: Unbound value "M.Id.x"
 |}]
 
@@ -395,9 +395,9 @@ module type S' =
   end
 module Asc : sig type t = int val compare : int -> int -> int end
 module Desc : sig type t = int val compare : int -> int -> int end
-Line 15, characters 0-69:
-15 | module rec M1 : S' with module Term0 := Asc and module T := Desc = M1;;
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 35, characters 0-71:
+35 | module rec M1 : (S' with module Term0 := Asc and module T := Desc) = M1
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This variant or record definition does not match that of type "M.t"
        Constructors do not match:
          "E of (MkT(M.T).t, MkT(M.T).t) eq"

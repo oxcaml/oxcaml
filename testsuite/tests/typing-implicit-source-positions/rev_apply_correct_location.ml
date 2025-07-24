@@ -45,7 +45,7 @@ let first_here = fst (snd obj#here)#here
 {|
 val obj : unit c c = <obj>
 val second_here : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 710; pos_cnum = 736}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 731; pos_cnum = 756}
 val first_here : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 710; pos_cnum = 727}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 731; pos_cnum = 747}
 |}]

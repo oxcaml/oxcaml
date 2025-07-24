@@ -17,9 +17,9 @@ end =
 
 [%%expect
 {|
-Line 3, characters 6-18:
-3 | end = Cmi_test_lib
-          ^^^^^^^^^^^^
+Line 4, characters 2-14:
+4 |   Cmi_test_lib
+      ^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -46,9 +46,9 @@ end =
 
 [%%expect
 {|
-Line 3, characters 6-41:
-3 | end = Cmi_test_lib.M_constrained_variable
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 2-37:
+4 |   Cmi_test_lib.M_constrained_variable
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
          sig val f : int -> int @@ portable [@@zero_alloc] end
@@ -78,9 +78,9 @@ end =
 
 [%%expect
 {|
-Line 3, characters 6-32:
-3 | end = Cmi_test_lib.M_no_variable
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 2-28:
+4 |   Cmi_test_lib.M_no_variable
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
          sig val f : int -> int end
@@ -92,5 +92,5 @@ Error: Signature mismatch:
          val f : int -> int [@@zero_alloc]
        The former provides a weaker "zero_alloc" guarantee than the latter.
        Hint: Add a "zero_alloc" attribute to the implementation.
-       File "cmi_test_lib.ml", line 13, characters 2-20: Actual declaration
+       File "cmi_test_lib.ml", line 16, characters 2-20: Actual declaration
 |}]

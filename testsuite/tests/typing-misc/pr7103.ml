@@ -26,7 +26,7 @@ let _ = fun (x : a t) -> f x
 [%%expect
 {|
 Line 1, characters 27-28:
-1 | let _ = fun (x : a t) -> f x;;
+1 | let _ = fun (x : a t) -> f x
                                ^
 Error: This expression has type "a t" but an expression was expected of type
          "< .. > t"
@@ -38,7 +38,7 @@ let _ = fun (x : a t) -> g x
 [%%expect
 {|
 Line 1, characters 27-28:
-1 | let _ = fun (x : a t) -> g x;;
+1 | let _ = fun (x : a t) -> g x
                                ^
 Error: This expression has type "a t" but an expression was expected of type
          "[< `b ] t"
@@ -50,7 +50,7 @@ let _ = fun (x : a t) -> h x
 [%%expect
 {|
 Line 1, characters 27-28:
-1 | let _ = fun (x : a t) -> h x;;
+1 | let _ = fun (x : a t) -> h x
                                ^
 Error: This expression has type "a t" but an expression was expected of type
          "[> `b ] t"

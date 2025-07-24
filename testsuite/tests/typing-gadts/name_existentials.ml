@@ -35,9 +35,9 @@ let ko1 = function Dyn (type a) ((w, x) : _) -> ()
 
 [%%expect
 {|
-Line 1, characters 40-41:
-1 | let ko1 = function Dyn (type a) (w, x : _) -> ()
-                                            ^
+Line 1, characters 42-43:
+1 | let ko1 = function Dyn (type a) ((w, x) : _) -> ()
+                                              ^
 Error: This type does not bind all existentials in the constructor:
          "type a. 'a ty * 'a"
 |}]
@@ -46,9 +46,9 @@ let ko2 = function Dyn (type a b) ((a, x) : a ty * b) -> ignore (x : b)
 
 [%%expect
 {|
-Line 1, characters 42-50:
-1 | let ko2 = function Dyn (type a b) (a, x : a ty * b) -> ignore (x : b)
-                                              ^^^^^^^^
+Line 1, characters 44-52:
+1 | let ko2 = function Dyn (type a b) ((a, x) : a ty * b) -> ignore (x : b)
+                                                ^^^^^^^^
 Error: This pattern matches values of type "a ty * b"
        but a pattern was expected which matches values of type "a ty * a"
        Type "b" is not compatible with type "a"
@@ -68,9 +68,9 @@ let f = function C (type a) ((x, f) : a * (a -> a list)) -> ignore (x : a)
 
 [%%expect
 {|
-Line 1, characters 36-53:
-1 | let f = function C (type a) (x, f : a * (a -> a list)) -> ignore (x : a)
-                                        ^^^^^^^^^^^^^^^^^
+Line 1, characters 38-55:
+1 | let f = function C (type a) ((x, f) : a * (a -> a list)) -> ignore (x : a)
+                                          ^^^^^^^^^^^^^^^^^
 Error: This type does not bind all existentials in the constructor:
          "type a. a * (a -> a list)"
 |}]
@@ -116,9 +116,9 @@ let () = match None with None (type a) (_ : a * int) -> () | Some _ -> ()
 
 [%%expect
 {|
-Line 4, characters 4-31:
-4 |   | None (type a) (_ : a * int) -> ()
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 3, characters 25-52:
+3 | let () = match None with None (type a) (_ : a * int) -> () | Some _ -> ()
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The constructor "None" expects 0 argument(s),
        but is applied here to 1 argument(s)
 |}]

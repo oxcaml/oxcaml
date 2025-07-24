@@ -31,7 +31,7 @@ x "hello"
 [%%expect
 {|
 val x : string -> nothing = <fun>
-Exception: Assert_failure ("", 1, 50).
+Exception: Assert_failure ("", 1, 48).
 |}]
 ;;
 
@@ -41,7 +41,7 @@ print_endline (ok ())
 [%%expect
 {|
 Line 1, characters 14-21:
-1 | print_endline (ok ());;
+1 | print_endline (ok ())
                   ^^^^^^^
 Error: This expression has type "'a -> 'b"
        but an expression was expected of type "string"
@@ -55,9 +55,9 @@ let bad : type a. ?opt:(a, int -> int) eq -> unit -> a =
 
 [%%expect
 {|
-Line 2, characters 2-67:
-2 |   fun ?opt:((Eq : (a, int -> int) eq) = assert false) () x -> x + 1;;
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 1-64:
+2 |  fun ?opt:(Eq : (a, int -> int) eq = assert false) () x -> x + 1
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The syntactic arity of the function doesn't match the type constraint:
        This function has 3 syntactic arguments, but its type is constrained to
          "?opt:(a, int -> int) eq -> unit -> a".
@@ -85,13 +85,21 @@ let workaround2 (type a) ?opt:(Eq : (a, int -> int) eq = assert false) () : a =
 
 [%%expect
 {|
-val workaround2 : ?opt:('a, int -> int) eq -> unit -> 'a = <fun>
+val workaround2 :
+  ('a : any) ('b : any). ?opt:('a -> 'b, int -> int) eq -> unit -> 'a -> 'b =
+  <fun>
 |}]
 
 let (x : nothing) = workaround2 ()
 
 [%%expect {|
-Exception: Assert_failure ("", 1, 59).
+Line 1, characters 20-34:
+1 | let (x : nothing) = workaround2 ()
+                        ^^^^^^^^^^^^^^
+Error: This expression has type "'a -> 'b"
+       but an expression was expected of type "nothing"
+  Hint: This function application is partial,
+  maybe some arguments are missing.
 |}]
 
 (* The corresponding check for partial matches on GADTs *)
@@ -105,7 +113,7 @@ let ok (type a) (Eq : (a, int -> int) eq_or_not) : a = function x -> x + 1
 {|
 type (_, _) eq_or_not = Eq : ('a, 'a) eq_or_not | Neq : ('a, 'b) eq_or_not
 Line 5, characters 16-48:
-5 | let ok (type a) (Eq : (a, int -> int) eq_or_not) : a =
+5 | let ok (type a) (Eq : (a, int -> int) eq_or_not) : a = function x -> x + 1
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
@@ -120,16 +128,16 @@ let bad : type a. (a, int -> int) eq_or_not -> a =
 
 [%%expect
 {|
-Line 2, characters 6-38:
-2 |   fun (Eq : (a, int -> int) eq_or_not) x -> x + 1;;
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 5-37:
+2 |  fun (Eq : (a, int -> int) eq_or_not) x -> x + 1
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 Neq
 
-Line 2, characters 2-49:
-2 |   fun (Eq : (a, int -> int) eq_or_not) x -> x + 1;;
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 1-48:
+2 |  fun (Eq : (a, int -> int) eq_or_not) x -> x + 1
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The syntactic arity of the function doesn't match the type constraint:
        This function has 2 syntactic arguments, but its type is constrained to
          "(a, int -> int) eq_or_not -> a".
@@ -152,9 +160,9 @@ let bad : type a. (a, int -> int) eq lazy_t -> a = fun (lazy Eq) x -> x + 1
 
 [%%expect
 {|
-Line 2, characters 2-26:
-2 |   fun (lazy Eq) x -> x + 1
-      ^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 51-75:
+1 | let bad : type a. (a, int -> int) eq lazy_t -> a = fun (lazy Eq) x -> x + 1
+                                                       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The syntactic arity of the function doesn't match the type constraint:
        This function has 2 syntactic arguments, but its type is constrained to
          "(a, int -> int) eq lazy_t -> a".
@@ -170,9 +178,9 @@ let spurious : type a. (a, int -> int) eq -> a = fun Eq x -> x
 
 [%%expect
 {|
-Line 2, characters 2-15:
-2 |   fun Eq x -> x
-      ^^^^^^^^^^^^^
+Line 1, characters 49-62:
+1 | let spurious : type a. (a, int -> int) eq -> a = fun Eq x -> x
+                                                     ^^^^^^^^^^^^^
 Error: The syntactic arity of the function doesn't match the type constraint:
        This function has 2 syntactic arguments, but its type is constrained to
          "(a, int -> int) eq -> a".

@@ -11,8 +11,8 @@ let f (g : 'a list -> 'a t -> 'a) s = g s s
 [%%expect
 {|
 type 'a t = 'a
-Line 2, characters 42-43:
-2 | let f (g : 'a list -> 'a t -> 'a) s = g s s;;
+Line 3, characters 42-43:
+3 | let f (g : 'a list -> 'a t -> 'a) s = g s s
                                               ^
 Error: This expression has type "'a list"
        but an expression was expected of type "'a t" = "'a"
@@ -24,7 +24,7 @@ let f (g : 'a * 'b -> 'a t -> 'a) s = g s s
 [%%expect
 {|
 Line 1, characters 42-43:
-1 | let f (g : 'a * 'b -> 'a t -> 'a) s = g s s;;
+1 | let f (g : 'a * 'b -> 'a t -> 'a) s = g s s
                                               ^
 Error: This expression has type "'a * 'b"
        but an expression was expected of type "'a t" = "'a"
@@ -75,8 +75,8 @@ let wrong_to_seq (xt : 'a t) : 'a Seq.t =
 [%%expect
 {|
 type 'a t = T of 'a
-Line 4, characters 2-22:
-4 |   Seq.cons Seq.empty x
+Line 5, characters 2-22:
+5 |   Seq.cons Seq.empty x
       ^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
        but an expression was expected of type
@@ -93,7 +93,7 @@ let strange x = Seq.[cons x empty; cons empty x]
 [%%expect
 {|
 Line 1, characters 35-47:
-1 | let strange x = Seq.[cons x empty; cons empty x];;
+1 | let strange x = Seq.[cons x empty; cons empty x]
                                        ^^^^^^^^^^^^
 Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
        but an expression was expected of type
@@ -102,11 +102,9 @@ Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
          "unit -> 'a Seq.t Seq.node"
        Type "'a" is not compatible with type "'a Seq.t" = "unit -> 'a Seq.node"
        The type variable "'a" occurs inside "'a Seq.t"
-|},
-  Principal
-    {|
+|}, Principal{|
 Line 1, characters 35-47:
-1 | let strange x = Seq.[cons x empty; cons empty x];;
+1 | let strange x = Seq.[cons x empty; cons empty x]
                                        ^^^^^^^^^^^^
 Error: This expression has type "'a Seq.t Seq.t" = "unit -> 'a Seq.t Seq.node"
        but an expression was expected of type

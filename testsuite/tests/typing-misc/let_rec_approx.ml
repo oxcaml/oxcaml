@@ -15,8 +15,8 @@ and g (x : M.t) = f ()
 [%%expect
 {|
 module M : sig type t = A | B end
-Line 2, characters 17-18:
-2 | let rec f () = g A
+Line 7, characters 17-18:
+7 | let rec f () = g A
                      ^
 Error: Unbound constructor "A"
 |}]
@@ -27,8 +27,8 @@ and g (x : string) = f ()
 
 [%%expect
 {|
-Line 2, characters 6-18:
-2 | and g (x : string) = f ()
+Line 3, characters 6-18:
+3 | and g (x : string) = f ()
           ^^^^^^^^^^^^
 Error: This pattern matches values of type "string"
        but a pattern was expected which matches values of type "int"

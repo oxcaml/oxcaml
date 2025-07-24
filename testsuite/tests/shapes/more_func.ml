@@ -130,15 +130,8 @@ module O = N.M
                              });
  }
 module F : functor (X : sig end) -> sig module M : sig end end
-{
- "N"[module] -> {<.22>
-                 "M"[module] -> {<.19>};
-                 };
- }
-module N : sig module M : sig end end
-{
- "O"[module] -> Alias(<.23>
-                      {<.19>});
- }
-module O = N.M
+Line 5, characters 11-15:
+5 | module N = F ()
+               ^^^^
+Error: The functor was expected to be applicative at this position
 |}]

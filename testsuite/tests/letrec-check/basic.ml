@@ -41,9 +41,9 @@ let rec x =
 
 [%%expect
 {|
-Line 1, characters 12-27:
-1 | let rec x = let y = () in x;;
-                ^^^^^^^^^^^^^^^
+Lines 2-3, characters 2-3:
+2 | ..let y = () in
+3 |   x
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -114,7 +114,7 @@ let rec x = ignore x
 [%%expect
 {|
 Line 1, characters 12-20:
-1 | let rec x = ignore x;;
+1 | let rec x = ignore x
                 ^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -126,7 +126,7 @@ and y _ = ()
 [%%expect
 {|
 Line 1, characters 12-15:
-1 | let rec x = y 0 and y _ = ();;
+1 | let rec x = y 0
                 ^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -136,7 +136,7 @@ let rec b = if b then true else false
 [%%expect
 {|
 Line 1, characters 12-37:
-1 | let rec b = if b then true else false;;
+1 | let rec b = if b then true else false
                 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -157,7 +157,7 @@ let rec x = { x with contents = 3 } [@ocaml.warning "-23"]
 [%%expect
 {|
 Line 1, characters 12-35:
-1 | let rec x = { x with contents = 3 }  [@ocaml.warning "-23"];;
+1 | let rec x = { x with contents = 3 } [@ocaml.warning "-23"]
                 ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -169,7 +169,7 @@ let rec c = { c with Complex.re = 1.0 }
 [%%expect
 {|
 Line 1, characters 12-39:
-1 | let rec c = { c with Complex.re = 1.0 };;
+1 | let rec c = { c with Complex.re = 1.0 }
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -220,8 +220,8 @@ let rec x = r := x
 [%%expect
 {|
 val r : unit ref = {contents = ()}
-Line 2, characters 12-18:
-2 | let rec x = r := x;;
+Line 3, characters 12-18:
+3 | let rec x = r := x
                 ^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -238,10 +238,11 @@ and y =
 
 [%%expect
 {|
-Lines 2-4, characters 2-6:
+Lines 2-5, characters 2-6:
 2 | ..for i = 0 to 1 do
-3 |     let z = y in ignore z
-4 |   done
+3 |     let z = y in
+4 |     ignore z
+5 |   done
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -289,10 +290,11 @@ and y =
 
 [%%expect
 {|
-Lines 2-4, characters 2-6:
+Lines 2-5, characters 2-6:
 2 | ..while false do
-3 |     let y = x in ignore y
-4 |   done
+3 |     let y = x in
+4 |     ignore y
+5 |   done
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -322,10 +324,11 @@ and y = false
 
 [%%expect
 {|
-Lines 2-4, characters 2-6:
+Lines 2-5, characters 2-6:
 2 | ..while y do
-3 |     let y = x in ignore y
-4 |   done
+3 |     let y = x in
+4 |     ignore y
+5 |   done
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -336,7 +339,7 @@ and y = { contents = 3 }
 [%%expect
 {|
 Line 1, characters 12-22:
-1 | let rec x = y.contents and y = { contents = 3 };;
+1 | let rec x = y.contents
                 ^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -348,7 +351,7 @@ and y = true
 [%%expect
 {|
 Line 1, characters 12-20:
-1 | let rec x = assert y and y = true;;
+1 | let rec x = assert y
                 ^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -388,8 +391,8 @@ let _ =
 
 [%%expect
 {|
-Line 6, characters 14-26:
-6 |   let rec x = Stdlib.ref y
+Line 5, characters 14-26:
+5 |   let rec x = Stdlib.ref y and y () = ignore x in
                   ^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -403,9 +406,9 @@ let foo p x =
 
 [%%expect
 {|
-Line 3, characters 4-52:
-3 |     if p then (fun y -> x + g y) else (fun y -> g y)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 14-58:
+2 |   let rec f = if p then fun y -> x + g y else fun y -> g y
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -421,10 +424,13 @@ and y = match x with z -> "y", z
 
 [%%expect
 {|
-Lines 2-4, characters 2-30:
-2 | ..match let _ = y in raise Not_found with
-3 |     _ -> "x"
-4 |   | exception Not_found -> "z"
+Lines 2-7, characters 2-30:
+2 | ..match
+3 |     let _ = y in
+4 |     raise Not_found
+5 |   with
+6 |   | _ -> "x"
+7 |   | exception Not_found -> "z"
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -447,10 +453,9 @@ let rec wrong =
 
 [%%expect
 {|
-Lines 10-12, characters 2-25:
-10 | ..let rec x = ref y
-11 |   and y = ref wrong
-12 |   in ref ("foo" ^ ! ! !x)..
+Lines 10-11, characters 2-24:
+10 | ..let rec x = ref y and y = ref wrong in
+11 |   ref ("foo" ^ !(!(!x)))
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 

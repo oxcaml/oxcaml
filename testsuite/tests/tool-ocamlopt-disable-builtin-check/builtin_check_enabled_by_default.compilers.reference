@@ -1,4 +1,4 @@
-File "builtin_check_enabled_by_default.ml", line 12, characters 19-24:
-12 | let () = print_int (p 1); print_newline ();
-                        ^^^^^
+File "builtin_check_enabled_by_default.ml", line 14, characters 12-17:
+14 |   print_int (p 1);
+                 ^^^^^
 Error: External annotated with [@@builtin] is not recognized: "test_stubs_identity"

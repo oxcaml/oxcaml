@@ -15,8 +15,8 @@ let x : M.t = S
 {|
 module M : sig type t = T end
 type t = M.t
-Line 5, characters 14-15:
-5 | let x : M.t = S
+Line 7, characters 14-15:
+7 | let x : M.t = S
                   ^
 Error: This variant expression is expected to have type "t"
        There is no constructor "S" within type "t"
@@ -37,9 +37,9 @@ let () = (new M.c)#bar
 {|
 module M : sig class c : object method foo : int end end
 type c = M.c
-Line 7, characters 9-18:
-7 | let () = (new M.c)#bar
-             ^^^^^^^^^
+Line 10, characters 9-18:
+10 | let () = (new M.c)#bar
+              ^^^^^^^^^
 Error: This expression has type "c"
        It has no method "bar"
 |}]
@@ -58,9 +58,9 @@ let f = function Pair (Char, x) -> x + 1
 {|
 type _ ty = Char : char ty
 type pair = Pair : 'a ty * 'a -> pair
-Line 9, characters 22-23:
-9 |   | Pair (Char, x) -> x + 1
-                          ^
+Line 9, characters 35-36:
+9 | let f = function Pair (Char, x) -> x + 1
+                                       ^
 Error: This expression has type "$a" but an expression was expected of type "int"
        Hint: "$a" is an existential type bound by the constructor "Pair".
 |}]
@@ -77,9 +77,9 @@ let f = function Pair (Char, x) -> if true then x else 'd'
 {|
 type _ ty = Char : char ty
 type pair = Pair : 'a ty * 'a -> pair
-Line 7, characters 35-36:
-7 |   | Pair (Char, x) -> if true then x else 'd'
-                                       ^
+Line 7, characters 48-49:
+7 | let f = function Pair (Char, x) -> if true then x else 'd'
+                                                    ^
 Error: This expression has type "$a" but an expression was expected of type "'a"
        This instance of "$a" is ambiguous:
        it would escape the scope of its equation
@@ -130,8 +130,8 @@ and 'a t = 'a t u
 
 [%%expect
 {|
-Line 2, characters 0-17:
-2 | and 'a t = 'a t u;;
+Line 3, characters 0-17:
+3 | and 'a t = 'a t u
     ^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "'a t u" contains "'a t",
@@ -155,9 +155,12 @@ end
 
 [%%expect
 {|
-Line 1, characters 0-75:
-1 | module rec A : sig type t = B.t -> int end = struct type t = B.t -> int end
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-5, characters 0-3:
+1 | module rec A : sig
+2 |   type t = B.t -> int
+3 | end = struct
+4 |   type t = B.t -> int
+5 | end
 Error: The definition of "A.t" contains a cycle:
          "A.t -> int" contains "A.t",
          "A.t" = "A.t",
@@ -210,8 +213,8 @@ and 'a t = 'a t u
 
 [%%expect
 {|
-Line 2, characters 0-17:
-2 | and 'a t = 'a t u;;
+Line 3, characters 0-17:
+3 | and 'a t = 'a t u
     ^^^^^^^^^^^^^^^^^
 Error: The type abbreviation "t" is cyclic:
          "'a t u" contains "'a t",
@@ -235,9 +238,12 @@ end
 
 [%%expect
 {|
-Line 1, characters 0-75:
-1 | module rec A : sig type t = B.t -> int end = struct type t = B.t -> int end
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-5, characters 0-3:
+1 | module rec A : sig
+2 |   type t = B.t -> int
+3 | end = struct
+4 |   type t = B.t -> int
+5 | end
 Error: The definition of "A.t" contains a cycle:
          "A.t -> int" contains "A.t",
          "A.t" = "A.t",

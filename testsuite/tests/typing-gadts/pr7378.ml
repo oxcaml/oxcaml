@@ -17,9 +17,9 @@ end
 (* should fail *)
 [%%expect
 {|
-Lines 2-3, characters 2-37:
-2 | ..type t = X.t =
-3 |     | A : 'a * 'b * ('b -> unit) -> t
+Line 2, characters 2-48:
+2 |   type t = X.t = A : 'a * 'b * ('b -> unit) -> t
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This variant or record definition does not match that of type "X.t"
        Constructors do not match:
          "A : 'a * 'b * ('a -> unit) -> X.t"

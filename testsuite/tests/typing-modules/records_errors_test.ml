@@ -16,11 +16,13 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t = {f0 : unit * unit * unit * float* unit * unit * unit;
-6 |             f1 : unit * unit * unit * string * unit * unit * unit}
-7 | end..
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   type t =
+ 8 |     { f0 : unit * unit * unit * float * unit * unit * unit;
+ 9 |       f1 : unit * unit * unit * string * unit * unit * unit
+10 |     }
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -76,11 +78,13 @@ end
 
 [%%expect
 {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t = {f0 : unit * unit * unit * float* unit * unit * unit;
-6 |             f1 : unit * unit * unit * string * unit * unit * unit}
-7 | end..
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   type t =
+ 8 |     { f0 : unit * unit * unit * float * unit * unit * unit;
+ 9 |       f1 : unit * unit * unit * string * unit * unit * unit
+10 |     }
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -130,8 +134,8 @@ end
 {|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   type t = {f1 : unit}
-5 | end..
+4 |   type t = { f1 : unit }
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = { f1 : unit; } end
@@ -155,10 +159,10 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = {f0 : unit}
-5 | end..
+Lines 6-8, characters 6-3:
+6 | ......struct
+7 |   type t = { f0 : unit }
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = { f0 : unit; } end
@@ -192,10 +196,16 @@ end
 
 [%%expect
 {|
-Lines 5-7, characters 6-3:
-5 | ......struct
-6 |   type t = {a : unit; b : unit; beta : unit; c : unit; d: unit}
-7 | end
+Lines 10-18, characters 6-3:
+10 | ......struct
+11 |   type t =
+12 |     { a : unit;
+13 |       b : unit;
+14 |       beta : unit;
+15 |       c : unit;
+16 |       d : unit
+17 |     }
+18 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -227,10 +237,14 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = {a : unit; c : unit; d : unit}
-5 | end
+Lines 8-14, characters 6-3:
+ 8 | ......struct
+ 9 |   type t =
+10 |     { a : unit;
+11 |       c : unit;
+12 |       d : unit
+13 |     }
+14 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = { a : unit; c : unit; d : unit; } end
@@ -270,14 +284,14 @@ end
 {|
 Lines 11-22, characters 6-3:
 11 | ......struct
-12 |   type t = {
-13 |     a : unit;
-14 |     b : unit;
-15 |     beta: int;
+12 |   type t =
+13 |     { a : unit;
+14 |       b : unit;
+15 |       beta : int;
 ...
-19 |     g : unit;
-20 |     phi : unit;
-21 |   }
+19 |       g : unit;
+20 |       phi : unit
+21 |     }
 22 | end
 Error: Signature mismatch:
        Modules do not match:
@@ -353,10 +367,16 @@ end
 
 [%%expect
 {|
-Lines 5-7, characters 6-3:
-5 | ......struct
-6 |   type t = { alpha:int; b:int; c:int; d:int; e:int }
-7 | end
+Lines 11-19, characters 6-3:
+11 | ......struct
+12 |   type t =
+13 |     { alpha : int;
+14 |       b : int;
+15 |       c : int;
+16 |       d : int;
+17 |       e : int
+18 |     }
+19 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -394,10 +414,17 @@ end
 
 [%%expect
 {|
-Lines 4-6, characters 0-3:
-4 | struct
-5 |   type t = { b:int; c:int; d:int; e:int; a:int; f:int }
-6 | end
+Lines 10-19, characters 6-3:
+10 | ......struct
+11 |   type t =
+12 |     { b : int;
+13 |       c : int;
+14 |       d : int;
+15 |       e : int;
+16 |       a : int;
+17 |       f : int
+18 |     }
+19 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -450,10 +477,16 @@ end
 
 [%%expect
 {|
-Lines 8-10, characters 6-3:
- 8 | ......struct
- 9 |   type t = A: { a:'a; b:'b; x:'x } -> t
-10 | end
+Lines 13-21, characters 6-3:
+13 | ......struct
+14 |   type t =
+15 |     | A :
+16 |         { a : 'a;
+17 |           b : 'b;
+18 |           x : 'x
+19 |         }
+20 |         -> t
+21 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = A : { a : 'a; b : 'b; x : 'x; } -> t end
@@ -496,10 +529,17 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = A: { y:'a; a:'a; b:'b; x:'b} -> t
-5 | end
+Lines 10-19, characters 6-3:
+10 | ......struct
+11 |   type t =
+12 |     | A :
+13 |         { y : 'a;
+14 |           a : 'a;
+15 |           b : 'b;
+16 |           x : 'b
+17 |         }
+18 |         -> t
+19 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = A : { y : 'a; a : 'a; b : 'b; x : 'b; } -> t end
@@ -539,10 +579,17 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = A: { y:'b; a:'a; b:'b; x:'a} -> t
-5 | end
+Lines 10-19, characters 6-3:
+10 | ......struct
+11 |   type t =
+12 |     | A :
+13 |         { y : 'b;
+14 |           a : 'a;
+15 |           b : 'b;
+16 |           x : 'a
+17 |         }
+18 |         -> t
+19 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = A : { y : 'b; a : 'a; b : 'b; x : 'a; } -> t end
@@ -579,10 +626,16 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = A: { x:'a; a:'a; b:'b} -> t
-5 | end
+Lines 9-17, characters 6-3:
+ 9 | ......struct
+10 |   type t =
+11 |     | A :
+12 |         { x : 'a;
+13 |           a : 'a;
+14 |           b : 'b
+15 |         }
+16 |         -> t
+17 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = A : { x : 'a; a : 'a; b : 'b; } -> t end
@@ -620,10 +673,16 @@ end
 
 [%%expect
 {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = A: { x:'b; a:'a; b:'b} -> t
-5 | end
+Lines 9-17, characters 6-3:
+ 9 | ......struct
+10 |   type t =
+11 |     | A :
+12 |         { x : 'b;
+13 |           a : 'a;
+14 |           b : 'b
+15 |         }
+16 |         -> t
+17 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = A : { x : 'b; a : 'a; b : 'b; } -> t end

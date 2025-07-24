@@ -93,9 +93,10 @@ module type c123 =
     type d
   end
 module type expected = sig module type x = s end
-Line 8, characters 21-51:
-8 | module A: expected = struct module type x = c12 end
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 55-57, characters 22-3:
+55 | ......................struct
+56 |   module type x = c12
+57 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = c12 end
@@ -118,9 +119,10 @@ end
 
 [%%expect
 {|
-Line 1, characters 21-52:
-1 | module B: expected = struct module type x = c123 end
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 1-3, characters 22-3:
+1 | ......................struct
+2 |   module type x = c123
+3 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = c123 end
@@ -165,16 +167,17 @@ end
 
 [%%expect
 {|
-Lines 9-17, characters 6-3:
- 9 | ......struct
-10 |   module type x = sig
-11 |     val a:int
-12 |     val b:int
-13 |     val e:int
-14 |     val d:int
-15 |     val c:int
-16 |   end
-17 | end
+Lines 13-25, characters 6-3:
+13 | ......struct
+14 |   module type x = sig
+15 |     val a : int
+16 |
+17 |     val b : int
+...
+22 |
+23 |     val c : int
+24 |   end
+25 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -239,13 +242,14 @@ end
 
 [%%expect
 {|
-Lines 6-11, characters 6-3:
- 6 | ......struct
- 7 |   module type x= sig
- 8 |     val x:int
- 9 |     class x:ct
-10 |   end
-11 | end
+Lines 7-13, characters 6-3:
+ 7 | ......struct
+ 8 |   module type x = sig
+ 9 |     val x : int
+10 |
+11 |     class x : ct
+12 |   end
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = sig val x : int class x : ct end end
@@ -282,15 +286,16 @@ end
 
 [%%expect
 {|
-Lines 8-15, characters 6-3:
- 8 | ......struct
- 9 |   module type a = sig
-10 |     module type b = sig
-11 |       val y:int
-12 |       val x:int
-13 |     end
-14 |   end
-15 | end
+Lines 9-17, characters 6-3:
+ 9 | ......struct
+10 |   module type a = sig
+11 |     module type b = sig
+12 |       val y : int
+13 |
+14 |       val x : int
+15 |     end
+16 |   end
+17 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -344,13 +349,14 @@ end
 [%%expect
 {|
 class type ct = object  end
-Lines 7-12, characters 6-3:
- 7 | ......struct
- 8 |   module type x = sig
- 9 |     class b: ct
-10 |     class a: ct
-11 |   end
-12 | end
+Lines 9-15, characters 6-3:
+ 9 | ......struct
+10 |   module type x = sig
+11 |     class b : ct
+12 |
+13 |     class a : ct
+14 |   end
+15 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = sig class b : ct class a : ct end end
@@ -383,13 +389,14 @@ end
 
 [%%expect
 {|
-Lines 6-11, characters 6-3:
- 6 | ......struct
- 7 |   module type x = sig
- 8 |     type exn+=B
- 9 |     type exn+=A
-10 |   end
-11 | end
+Lines 7-13, characters 6-3:
+ 7 | ......struct
+ 8 |   module type x = sig
+ 9 |     type exn += B
+10 |
+11 |     type exn += A
+12 |   end
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = sig type exn += B type exn += A end end
@@ -435,9 +442,10 @@ end
 module type w = sig module One : s module Two : s end
 module type w21 = sig module Two : s module One : s end
 module type wOne21 = sig module One : c12 module Two : s end
-Line 16, characters 38-68:
-16 | module C: sig module type x = w end = struct module type x = w21 end
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 21-23, characters 6-3:
+21 | ......struct
+22 |   module type x = w21
+23 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = w21 end
@@ -462,9 +470,10 @@ end
 
 [%%expect
 {|
-Line 1, characters 38-71:
-1 | module D: sig module type x = w end = struct module type x = wOne21 end
-                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   module type x = wOne21
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = wOne21 end
@@ -489,10 +498,10 @@ end
 
 [%%expect
 {|
-Lines 2-4, characters 0-3:
-2 | struct
-3 |   module type x = functor(X:c12) -> s
-4 | end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   module type x = functor (X : c12) -> s
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = functor (X : c12) -> s end
@@ -517,10 +526,10 @@ end
 
 [%%expect
 {|
-Lines 2-4, characters 0-3:
-2 | struct
-3 |   module type x = functor(X:s) -> c12
-4 | end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   module type x = functor (X : s) -> c12
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig module type x = functor (X : s) -> c12 end
@@ -591,17 +600,17 @@ end
 
 [%%expect
 {|
-Lines 22-43, characters 4-3:
-22 | ....struct
-23 |   module type x = sig
-24 |     module A: sig
-25 |       module B: sig
-26 |         module C: functor(X:sig end)(Y:sig end)
+Lines 26-51, characters 6-3:
+26 | ......struct
+27 |   module type x = sig
+28 |     module A : sig
+29 |       module B : sig
+30 |         module C : functor
 ...
-40 |       end
-41 |     end
-42 |   end
-43 | end
+48 |       end
+49 |     end
+50 |   end
+51 | end
 Error: Signature mismatch:
        Modules do not match:
          sig

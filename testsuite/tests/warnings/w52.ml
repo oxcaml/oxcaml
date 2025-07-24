@@ -8,7 +8,7 @@ let () = try () with Invalid_argument "Any" -> ()
 [%%expect
 {|
 Line 1, characters 38-43:
-1 | let () = try () with Invalid_argument "Any" -> ();;
+1 | let () = try () with Invalid_argument "Any" -> ()
                                           ^^^^^
 Warning 52 [fragile-literal-pattern]: Code should not depend on the actual values of
 this constructor's arguments. They are only for information
@@ -19,9 +19,9 @@ let () = try () with Match_failure ("Any", _, _) -> ()
 
 [%%expect
 {|
-Line 1, characters 35-46:
-1 | let () = try () with Match_failure ("Any",_,_) -> ();;
-                                       ^^^^^^^^^^^
+Line 1, characters 35-48:
+1 | let () = try () with Match_failure ("Any", _, _) -> ()
+                                       ^^^^^^^^^^^^^
 Warning 52 [fragile-literal-pattern]: Code should not depend on the actual values of
 this constructor's arguments. They are only for information
 and may change in future versions. (see manual section 13.5.3)
@@ -31,9 +31,9 @@ let () = try () with Match_failure (_, 0, _) -> ()
 
 [%%expect
 {|
-Line 1, characters 35-42:
-1 | let () = try () with Match_failure (_,0,_) -> ();;
-                                       ^^^^^^^
+Line 1, characters 35-44:
+1 | let () = try () with Match_failure (_, 0, _) -> ()
+                                       ^^^^^^^^^
 Warning 52 [fragile-literal-pattern]: Code should not depend on the actual values of
 this constructor's arguments. They are only for information
 and may change in future versions. (see manual section 13.5.3)
@@ -60,9 +60,9 @@ let f = function
 
 [%%expect
 {|
-Line 2, characters 7-17:
-2 | | Warn "anything" -> ()
-           ^^^^^^^^^^
+Line 2, characters 9-19:
+2 |   | Warn "anything" -> ()
+             ^^^^^^^^^^
 Warning 52 [fragile-literal-pattern]: Code should not depend on the actual values of
 this constructor's arguments. They are only for information
 and may change in future versions. (see manual section 13.5.3)
@@ -76,9 +76,9 @@ let g = function
 
 [%%expect
 {|
-Line 2, characters 8-10:
-2 | | Warn' 0n -> ()
-            ^^
+Line 2, characters 10-12:
+2 |   | Warn' 0n -> ()
+              ^^
 Warning 52 [fragile-literal-pattern]: Code should not depend on the actual values of
 this constructor's arguments. They are only for information
 and may change in future versions. (see manual section 13.5.3)
@@ -108,9 +108,9 @@ let j = function
 
 [%%expect
 {|
-Line 2, characters 7-34:
-2 | | Deep (_ :: _ :: ("deep",_) :: _) -> ()
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 9-37:
+2 |   | Deep (_ :: _ :: ("deep", _) :: _) -> ()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 52 [fragile-literal-pattern]: Code should not depend on the actual values of
 this constructor's arguments. They are only for information
 and may change in future versions. (see manual section 13.5.3)

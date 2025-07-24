@@ -53,9 +53,9 @@ module type S2 = sig type u type t type w end
 val g2 : (module S2 with type t = int and type u = bool) -> (module S') =
   <fun>
 val h : (module S2 with type t = 'a) -> (module S with type t = 'a) = <fun>
-Line 5, characters 3-4:
-5 |   (x : (module S'));; (* fail *)
-       ^
+Line 13, characters 74-75:
+13 | let f2 (x : (module S2 with type t = 'a and type u = 'b)) : (module S') = x
+                                                                               ^
 Error: This expression has type
          "(module S2 with type t = int and type u = bool)"
        but an expression was expected of type "(module S')"
@@ -76,9 +76,9 @@ let g3 x = (x : (module S3 with type t = 'a and type u = 'b) :> (module S'))
 [%%expect
 {|
 module type S3 = sig type u type t val x : int end
-Line 3, characters 2-67:
-3 |   (x : (module S3 with type t = 'a and type u = 'b) :> (module S'));; (* fail *)
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 9, characters 11-76:
+9 | let g3 x = (x : (module S3 with type t = 'a and type u = 'b) :> (module S'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module S3 with type t = int and type u = bool)"
        is not a subtype of "(module S')"
 |}]

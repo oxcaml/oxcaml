@@ -50,9 +50,9 @@ let f (type x) (t1 : x t) (t2 : x t) (x : x) =
 {|
 Lines 4-8, characters 2-18:
 4 | ..match t1, t2, x with
-5 |   | AB,  AB, A -> 1
+5 |   | AB, AB, A -> 1
 6 |   | MAB, _, A -> 2
-7 |   | _,  AB, B -> 3
+7 |   | _, AB, B -> 3
 8 |   | _, MAB, B -> 4
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
@@ -184,9 +184,9 @@ let f (type x) (t1 : x t) (t2 : x t) (x : x) =
 
 [%%expect
 {|
-Line 7, characters 4-22:
-7 |   | _,  AB,  { a = _ } -> 3
-        ^^^^^^^^^^^^^^^^^^
+Line 7, characters 4-20:
+7 |   | _, AB, { a = _ } -> 3
+        ^^^^^^^^^^^^^^^^
 Warning 11 [redundant-case]: this match case is unused.
 
 val f : 'x M.t -> 'x M.t -> 'x -> int = <fun>
@@ -215,10 +215,10 @@ let f (type x) (a : x a) (a_or_b : x a_or_b) (x : x) =
 {|
 type _ a_or_b = A_or_B : [< `A of string | `B of int ] a_or_b
 type _ a = A : [> `A of string ] a | Not_A : 'a a
-Lines 9-11, characters 2-37:
- 9 | ..match a, a_or_b, x with
-10 |   | Not_A, A_or_B, `B i -> print_int i
-11 |   | _, A_or_B, `A s -> print_string s
+Lines 8-10, characters 2-37:
+ 8 | ..match a, a_or_b, x with
+ 9 |   | Not_A, A_or_B, `B i -> print_int i
+10 |   | _, A_or_B, `A s -> print_string s
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 (A, A_or_B, `B _)
@@ -229,7 +229,7 @@ val f : 'x a -> 'x a_or_b -> 'x -> unit = <fun>
 let segfault = f A A_or_B (`B 0)
 
 [%%expect {|
-Exception: Match_failure ("", 9, 2).
+Exception: Match_failure ("", 8, 2).
 |}]
 
 (* Another example *)
@@ -248,10 +248,10 @@ let f (type x y) (b : (x, y ty) b) (x : x) (y : y) =
 {|
 type (_, _) b = A : ([< `A ], 'a) b | B : ([< `B of 'a ], 'a) b
 type _ ty = String_option : string option ty
-Lines 9-11, characters 2-18:
- 9 | ..match b, x, y with
-10 |   | B, `B String_option, Some s -> print_string s
-11 |   | A, `A, _ -> ()
+Lines 8-10, characters 2-18:
+ 8 | ..match b, x, y with
+ 9 |   | B, `B String_option, Some s -> print_string s
+10 |   | A, `A, _ -> ()
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 (B, `B String_option, None)
@@ -262,7 +262,7 @@ val f : ('x, 'y ty) b -> 'x -> 'y -> unit = <fun>
 let segfault = f B (`B String_option) None
 
 [%%expect {|
-Exception: Match_failure ("", 9, 2).
+Exception: Match_failure ("", 8, 2).
 |}]
 
 (* More polymorphic variants *)
@@ -274,8 +274,8 @@ let f (x : _ a) = match x with `A None -> ()
 [%%expect
 {|
 type 'a a = private [< `A of 'a ]
-Line 2, characters 18-44:
-2 | let f (x : _ a) = match x with `A None -> ();;
+Line 3, characters 18-44:
+3 | let f (x : _ a) = match x with `A None -> ()
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
@@ -289,7 +289,7 @@ let f (x : [> `A] a) = match x with `A `B -> ()
 [%%expect
 {|
 Line 1, characters 23-47:
-1 | let f (x : [> `A] a) = match x with `A `B -> ();;
+1 | let f (x : [> `A] a) = match x with `A `B -> ()
                            ^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:

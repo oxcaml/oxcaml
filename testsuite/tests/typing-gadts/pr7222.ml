@@ -27,9 +27,9 @@ type (_, _) elt =
     Elt_fine : 'nat n -> ('l, 'nat * 'l) elt
   | Elt : 'nat n -> ('l, 'nat -> 'l) elt
 type _ t = Nil : nil t | Cons : ('x, 'fx) elt * 'x t -> 'fx t
-Line 9, characters 11-18:
-9 |   let Cons(Elt dim, _) = sh in ()
-               ^^^^^^^
+Line 15, characters 13-20:
+15 |   let (Cons (Elt dim, _)) = sh in
+                  ^^^^^^^
 Error: This pattern matches values of type "($x, 'a -> $x) elt"
        but a pattern was expected which matches values of type
          "($x, 'a -> $'b -> nil) elt"

@@ -16,9 +16,9 @@ end
 
 [%%expect
 {|
-Lines 7-8, characters 47-21:
-7 | ...............................................match l, r with
-8 |     | A, B -> "f A B"
+Line 10, characters 46-77:
+10 |    fun (l : int S.t ab) (r : float S.t ab) -> match l, r with A, B -> "f A B"
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 (A, A)
@@ -49,9 +49,9 @@ end
 
 [%%expect
 {|
-Lines 10-11, characters 15-21:
-10 | ...............match l, r with
-11 |     | A, B -> "f A B"
+Line 14, characters 14-45:
+14 |    fun l r -> match l, r with A, B -> "f A B"
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 (A, A)

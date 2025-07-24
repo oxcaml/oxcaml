@@ -19,7 +19,7 @@ let _ =
 [%%expect
 {|
 Line 2, characters 2-6:
-2 |   let+ (call_pos, a) = 1 in
+2 |   let+ call_pos, a = 1 in
       ^^^^
 Error: The operator "let+" has type
          "call_pos:[%call_pos] -> 'a -> (lexing_position * 'a -> 'b) -> 'b"
@@ -36,7 +36,7 @@ let _ =
 {|
 val ( let* ) : ?call_pos:int -> 'a -> (int * 'a -> 'b) -> 'b = <fun>
 Line 4, characters 2-6:
-4 |   let* (call_pos, a) = 1 in
+4 |   let* call_pos, a = 1 in
       ^^^^
 Error: The operator "let*" has type
          "?call_pos:int -> 'a -> (int * 'a -> 'b) -> 'b"
@@ -53,7 +53,12 @@ let _ = 1 >>| fun (call_pos, a) -> call_pos
 val ( >>| ) :
   call_pos:[%call_pos] -> 'a -> (lexing_position * 'a -> 'b) -> 'b = <fun>
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 3; pos_bol = 1140; pos_cnum = 1144}
+{pos_fname = ""; pos_lnum = 3; pos_bol = 1130; pos_cnum = 1140}
+|}, Principal{|
+val ( >>| ) :
+  call_pos:[%call_pos] -> 'a -> (lexing_position * 'a -> 'b) -> 'b = <fun>
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 3; pos_bol = 1696; pos_cnum = 1706}
 |}]
 
 (* TEST

@@ -14,7 +14,7 @@ let rec x = f ~x
 [%%expect
 {|
 Line 1, characters 12-16:
-1 | let rec x = f ~x;;
+1 | let rec x = f ~x
                 ^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -32,7 +32,7 @@ let rec x = f ~x ~z:0
 [%%expect
 {|
 Line 1, characters 12-21:
-1 | let rec x = f ~x ~z:0;;
+1 | let rec x = f ~x ~z:0
                 ^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
@@ -59,8 +59,8 @@ let rec f : omitted_g:_ -> omitted_f:_ -> given:_ -> _ =
 val g :
   omitted_g:'a ->
   given:(omitted_f:unit -> 'b) -> omitted_f:'c -> given:'d -> 'b = <fun>
-Line 3, characters 2-37:
-3 |   g ~given:(f ~omitted_g:() ~given:0);;
+Line 4, characters 2-37:
+4 |   g ~given:(f ~omitted_g:() ~given:0)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
