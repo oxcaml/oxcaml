@@ -8,6 +8,12 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_flambda2_invalid.ml)
+ (action (run %{bin:ocamlopt.opt} %{deps} -g -c -zero-alloc-check default -dcse -dzero-alloc -dump-into-file -O3 -warn-error +a)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (deps t5.ml test_assume.ml)
  (action (run %{bin:ocamlopt.opt} %{deps} -g -c -zero-alloc-check default -dcse -dzero-alloc -dump-into-file -O3 -warn-error +a)))
 
@@ -1562,6 +1568,26 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_arch_specific_witness.output.corrected)
+ (deps (:ml test_arch_specific_witness.ml) filter.sh)
+ (action
+   (with-outputs-to test_arch_specific_witness.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_arch_specific_witness.output test_arch_specific_witness.output.corrected)
+ (action (diff test_arch_specific_witness.output test_arch_specific_witness.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets test_sort_witnesses.output.corrected)
  (deps (:ml test_sort_witnesses.ml) filter.sh)
  (action
@@ -1577,5 +1603,5 @@
 (rule
  (alias   runtest)
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
- (deps test_arch_specific_witness.output test_arch_specific_witness.output.corrected)
- (action (diff test_arch_specific_witness.output test_arch_specific_witness.output.corrected)))
+ (deps test_sort_witnesses.output test_sort_witnesses.output.corrected)
+ (action (diff test_sort_witnesses.output test_sort_witnesses.output.corrected)))

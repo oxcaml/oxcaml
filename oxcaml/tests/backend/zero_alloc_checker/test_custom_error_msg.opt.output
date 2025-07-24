@@ -21,16 +21,11 @@ File "test_custom_error_msg.ml", line 6, characters 5-15:
 Error: Annotation check for zero_alloc strict failed on function Test_custom_error_msg.bar (camlTest_custom_error_msg.bar_HIDE_STAMP).
 This annotation is for testing custom error messages.
 
-<<<<<<< ours
 File "test_custom_error_msg.ml", line 5, characters 52-69:
-Error: called function may allocate on a path to exceptional return (external call to caml_format_int) (test_custom_error_msg.ml:5,52--69;stdlib.ml:280,2--19)
-=======
-File "test_custom_error_msg.ml", line 8, characters 22-39:
 Error: called function may allocate on a path to exceptional return (external call to caml_format_int)
 inlined from
-stdlib/stdlib.ml:273,2--19[Stdlib.string_of_int][camlStdlib.string_of_int_HIDE_STAMP]
-test_custom_error_msg.ml:8,22--39[Test_custom_error_msg.bar]
->>>>>>> theirs
+stdlib/stdlib.ml:280,2--19[Stdlib.string_of_int][camlStdlib.string_of_int_HIDE_STAMP]
+test_custom_error_msg.ml:5,52--69[Test_custom_error_msg.bar]
 
 File "test_custom_error_msg.ml", line 5, characters 43-70:
 Error: allocation of 24 bytes on a path to exceptional return
@@ -40,16 +35,11 @@ Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.
 This annotation is for testing custom error messages 
 in combination with "opt" payload and newlines.
 
-<<<<<<< ours
 File "test_custom_error_msg.ml", line 11, characters 23-28:
-Error: allocation of 24 bytes (test_custom_error_msg.ml:11,23--28;test_custom_error_msg.ml:1,12--16)
-=======
-File "test_custom_error_msg.ml", line 13, characters 20-25:
 Error: allocation of 24 bytes
 inlined from
-test_custom_error_msg.ml:1,12--17[Test_custom_error_msg.foo][camlTest_custom_error_msg.foo_HIDE_STAMP]
-test_custom_error_msg.ml:13,20--25[Test_custom_error_msg.fast]
->>>>>>> theirs
+test_custom_error_msg.ml:1,12--16[Test_custom_error_msg.foo][camlTest_custom_error_msg.foo_HIDE_STAMP]
+test_custom_error_msg.ml:11,23--28[Test_custom_error_msg.fast]
 
 File "test_custom_error_msg.ml", line 12, characters 5-11:
 Error: called function may allocate (external call to caml_equal)

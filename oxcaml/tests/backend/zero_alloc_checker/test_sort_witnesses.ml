@@ -1,3 +1,5 @@
+[@@@ocaml.flambda_oclassic]
+
 module Float_u = struct
   type t = float#
 
@@ -38,7 +40,7 @@ end = struct
 end
 
 let[@zero_alloc] compute x y =
-  let size (x : S.t) =
+  let[@inline always] size (x : S.t) =
     x
     |> S.to_float_option
     |> UFO.of_option
