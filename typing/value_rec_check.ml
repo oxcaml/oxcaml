@@ -257,7 +257,7 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-    | Texp_alloc _ -> Static
+    | Texp_alloc _
     | Texp_new _
     | Texp_instvar _
     | Texp_object _

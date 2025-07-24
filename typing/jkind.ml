@@ -1559,6 +1559,17 @@ module Const = struct
         name = "word mod everything"
       }
 
+    let kind_of_mallocd =
+      let mod_bounds =
+        kind_of_unboxed_nativeint.jkind.mod_bounds
+        |> Mod_bounds.set_externality External
+        |> Mod_bounds.set_locality Local
+        |> Mod_bounds.set_uniqueness Unique
+      in
+      { jkind = { kind_of_unboxed_nativeint.jkind with mod_bounds };
+        name = "kind of mallocd"
+      }
+
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
     let bits32 =

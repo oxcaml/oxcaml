@@ -310,6 +310,8 @@ module Const : sig
     (** The jkind of unboxed 32-bit native-sized integers with no mode crossing. *)
     val word : t
 
+    val kind_of_mallocd : t
+
     (** The jkind of unboxed 32-bit native-sized integers with mode crossing. *)
     val kind_of_unboxed_nativeint : t
 

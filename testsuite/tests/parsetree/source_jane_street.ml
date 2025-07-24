@@ -1491,26 +1491,26 @@ val triangle_10 : int = 55
 
 let f x y = malloc_ (x,y)
 [%%expect{|
-val f : 'a -> 'b -> ('a * 'b) mallocd = <fun>
+val f : 'a @ external_ -> 'b @ external_ -> ('a * 'b) mallocd = <fun>
 |}]
 
 type 'a t = {x : 'a ; y : 'a}
 let f x y = malloc_ {x;y}
 [%%expect{|
 type 'a t = { x : 'a; y : 'a; }
-val f : 'a -> 'a -> 'a t mallocd = <fun>
+val f : 'a @ external_ -> 'a @ external_ -> 'a t mallocd = <fun>
 |}]
 
 type 'a t = Foo of 'a
 let f x = malloc_ (Foo x)
 [%%expect{|
 type 'a t = Foo of 'a
-val f : 'a -> 'a t mallocd = <fun>
+val f : 'a @ external_ -> 'a t mallocd = <fun>
 |}]
 
 let f x = malloc_ (`Bar x)
 [%%expect{|
-val f : 'a -> [> `Bar of 'a ] mallocd = <fun>
+val f : 'a @ external_ -> [> `Bar of 'a ] mallocd = <fun>
 |}]
 
 let f () = malloc_ (fun x -> x)

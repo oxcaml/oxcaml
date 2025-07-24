@@ -215,7 +215,6 @@ type unsupported_external_allocation =
   | Function
   | Array
 
-
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg

@@ -142,7 +142,6 @@ let print_unsupported_stack_allocation ppf = function
   | List_comprehension -> Format.fprintf ppf "list comprehensions"
   | Array_comprehension -> Format.fprintf ppf "array comprehensions"
 
-
 type unsupported_external_allocation =
   | Lazy
   | Module
@@ -431,17 +430,14 @@ type expected_mode =
     mode : Value.r;
     (** The upper bound, hence r (right) *)
 
-    (* CR-someday jcutler: This really should not be a part of the
-       [expected_mode]. There are a bunch of places where tying the current
-       allocator to the expected mode is a potential source of confusion or even
-       bugs.
-    *)
     allocator : allocator;
     (** Indicates which allocator the expression was allocated with.  If
         [stack_], this will be Allocator_stack. If [malloc_], this will be
         Allocator_malloc. Otherwise Allocator_heap. The only invariant between
         this field and [mode] is that if [allocator = Allocator_malloc],
-        [mode] should have externality at most [external_]. *)
+        [mode] should have externality at most [external_].
+
+        This really should not be a part of the [expected_mode]. *)
 
     tuple_modes : Value.r list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
@@ -514,7 +510,6 @@ let meet_regional mode =
   let mode = Value.disallow_left mode in
   Value.meet_with Areality Regionality.Const.Regional mode
 
-(* CR jcutler: optional bad *)
 let mode_default mode ~allocator =
   { position = RNontail;
     locality_context = None;
@@ -545,9 +540,7 @@ let mode_morph f expected_mode =
 let mode_modality modality expected_mode =
   as_single_mode expected_mode
   |> Modality.Value.Const.apply modality
-  (* CR external-mode: This is another place where the expected mode was getting
-     clobbered in unfortunate ways. *)
-  |> mode_default ~allocator:expected_mode.allocator
+  |> mode_default ~allocator:Allocator_heap
 
 (* used when entering a function;
 mode is the mode of the function region *)
@@ -745,16 +738,7 @@ let register_bytecode_allocation_mode ~loc ~env alloc_mode =
 let register_allocation_mode ~loc ~env alloc_mode allocator =
   match allocator with
   | Allocator_heap | Allocator_stack ->
-    let externality = Alloc.proj_comonadic Externality alloc_mode in
-    let res = Externality.submode Externality.internal externality in
-    (match res with
-    | Ok () -> ()
-    | Error reason ->
-        let error =
-          Submode_failed(Value.Error
-            (Comonadic Externality,reason), Other, None, None, None, None)
-        in
-        raise (Error(loc, env, error)));
+    lower_bound_externality ~loc ~env Mode.Externality.internal alloc_mode;
     let alloc_mode = Alloc.disallow_left alloc_mode in
     allocations := alloc_mode :: !allocations
   | Allocator_malloc ->
@@ -771,13 +755,15 @@ let register_allocation_value_mode ~loc ~env mode allocator =
     of potential subcomponents. *)
 let register_allocation ~loc ~env (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    register_allocation_value_mode ~loc ~env expected_mode.mode
+    register_allocation_value_mode ~loc ~env (as_single_mode expected_mode)
       expected_mode.allocator
   in
   let alloc_mode : alloc_mode =
     { mode = alloc_mode;
       locality_context = expected_mode.locality_context }
   in
+  (* Since malloc_ is shallow, the subcomponents of this allocation should
+     use the default allocator *)
   alloc_mode, mode_default mode ~allocator:Allocator_heap
 
 let register_bytecode_allocation ~loc ~env (expected_mode : expected_mode) =
@@ -5310,9 +5296,11 @@ let split_function_ty
       let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
       fst (register_allocation_value_mode ~loc ~env mode Allocator_heap)
   in
-  if expected_mode.allocator = Allocator_stack then
-    Locality.submode_exn Locality.local
-      (Alloc.proj_comonadic Areality alloc_mode);
+  begin match expected_mode.allocator with
+        | Allocator_stack -> Locality.submode_exn Locality.local
+                              (Alloc.proj_comonadic Areality alloc_mode);
+        | _ -> ()
+  end;
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
@@ -7137,40 +7125,47 @@ and type_expect_
       (* If we do the same thing as Pexp_stack here and typecheck *anything*
          before checking if it's actually malloc-able, we get worse error
          messages. Better to prune based on syntax first, then type errors. *)
-       (match e.pexp_desc with
-       | Pexp_function _ -> unsupported Function
-       | Pexp_comprehension _ -> unsupported Comprehension
-       | Pexp_new _ -> unsupported Object
-       | Pexp_lazy _ -> unsupported Lazy
-       | Pexp_object _ -> unsupported Object
-       | Pexp_pack _ -> unsupported Module
-       | Pexp_array _ -> unsupported Array
-       | Pexp_record _ -> ()
-       | Pexp_tuple _ -> ()
-       | Pexp_construct (_,Some _) -> ()
-       | Pexp_variant (_,Some _) -> ()
-       | _ -> not_alloc ()
-       );
-        let unify_as_mallocd ty_expected =
-          let inner_ty =
-            newvar (Jkind.Builtin.value_or_null ~why:(Type_argument
-              { parent_path = Predef.path_mallocd ; position = 1; arity = 1}))
-          in
-          let to_unify = Predef.type_mallocd inner_ty in
-          with_explanation (fun () ->
-            unify_exp_types loc env to_unify ty_expected);
-          inner_ty
-        in
-      let inner_ty = unify_as_mallocd ty_expected in
+      (match e.pexp_desc with
+      | Pexp_function _ -> unsupported Function
+      | Pexp_comprehension _ -> unsupported Comprehension
+      | Pexp_new _ -> unsupported Object
+      | Pexp_lazy _ -> unsupported Lazy
+      | Pexp_object _ -> unsupported Object
+      | Pexp_pack _ -> unsupported Module
+      | Pexp_array _ -> unsupported Array
+      | Pexp_record _ -> ()
+      | Pexp_tuple _ -> ()
+      | Pexp_construct (_,Some _) -> ()
+      | Pexp_variant (_,Some _) -> ()
+      | Pexp_construct (_,None) -> not_alloc ()
+      | Pexp_variant (_,None) -> not_alloc ()
+      | (Pexp_unreachable|Pexp_hole|Pexp_ident _|Pexp_constant _
+      | Pexp_let (_, _, _, _)|Pexp_apply (_, _)| Pexp_match (_, _)
+      | Pexp_try (_, _) | Pexp_unboxed_tuple _
+      | Pexp_record_unboxed_product (_, _) | Pexp_field (_, _)
+      | Pexp_unboxed_field (_, _) | Pexp_setfield (_, _, _)
+      | Pexp_ifthenelse (_, _, _) | Pexp_sequence (_, _) | Pexp_while (_, _)
+      | Pexp_for (_, _, _, _, _) | Pexp_constraint (_, _, _)
+      | Pexp_coerce (_, _, _)| Pexp_send (_, _) | Pexp_setvar (_, _)
+      | Pexp_override _ | Pexp_letmodule (_, _, _) | Pexp_letexception (_, _)
+      | Pexp_assert _ | Pexp_poly (_, _) | Pexp_newtype (_, _, _)
+      | Pexp_open (_, _)| Pexp_letop _  |Pexp_extension _ | Pexp_stack _
+      | Pexp_malloc _ | Pexp_overwrite (_, _)) -> not_alloc ());
+      let inner_ty =
+        newvar (Jkind.Builtin.value_or_null ~why:(Type_argument
+          { parent_path = Predef.path_mallocd ; position = 1; arity = 1}))
+      in
+      let to_unify = Predef.type_mallocd inner_ty in
+      with_explanation (fun () -> unify_exp_types loc env to_unify ty_expected);
       let expected_mode =
-        mode_coerce (Value.max_with_comonadic Externality Externality.external_)
+        mode_coerce
+          (Value.max_with_comonadic Externality Externality.external_)
           expected_mode
       in
       let exp =
         type_expect env {expected_mode with allocator = Allocator_malloc} e
           {ty = inner_ty; explanation}
       in
-
       let exp_desc = Texp_alloc (exp,Allocator_malloc) in
       re {
         exp_desc = exp_desc;

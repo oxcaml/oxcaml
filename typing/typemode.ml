@@ -390,6 +390,9 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let linearity =
     print_to_string_opt Mode.Linearity.Const.print modes.linearity
   in
+  let externality =
+    print_to_string_opt Mode.Externality.Const.print modes.externality
+  in
   List.filter_map
     (fun x ->
       Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
@@ -400,7 +403,8 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
       contention;
       yielding;
       statefulness;
-      visibility ]
+      visibility;
+      externality ]
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   let axis_pair =

@@ -524,7 +524,7 @@ and expression_desc =
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
   (* CR external-mode: at the moment, this is only ever Allocator_malloc. *)
-  | Texp_alloc of expression * allocator
+  | Texp_alloc of expression * allocator (** malloc_ exp *)
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }
