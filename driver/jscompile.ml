@@ -80,6 +80,10 @@ let emit_jsir i jsir_program =
          - for example [Cmo_format] includes [Compilation_unit] to get the linkage
          name etc. *)
       output_string oc Config.cmj_magic_number;
+      (* We include the highest used variable in the translation, so that Js_of_ocaml
+         can read this number and update its own state accordingly. *)
+      output_binary_int oc
+        (Flambda2_to_jsir.Jsir.Var.idx (Flambda2_to_jsir.Jsir.Var.last ()));
       output_value oc jsir_program)
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =

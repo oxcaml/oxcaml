@@ -50,6 +50,8 @@ module Var : sig
 
   val of_idx : int -> t
 
+  val last : unit -> t
+
   val fresh : unit -> t
 
   val fresh_n : string -> t
