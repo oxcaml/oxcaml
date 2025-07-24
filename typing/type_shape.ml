@@ -454,7 +454,7 @@ let print_table_all_type_decls ppf =
     List.map
       (fun (k, v) ->
         ( Format.asprintf "%a" Uid.print k,
-          Format.asprintf "%a" Type_decl_shape.print v ))
+          Format.asprintf "%a" Shape.print_type_decl_shape v ))
       entries
   in
   let uids, decls = List.split entries in
@@ -467,7 +467,7 @@ let print_table_all_type_shapes ppf =
     List.map
       (fun (k, { type_shape; type_layout }) ->
         ( Format.asprintf "%a" Uid.print k,
-          ( Format.asprintf "%a" Type_shape.print type_shape,
+          ( Format.asprintf "%a" Shape.print_type_shape type_shape,
             Format.asprintf "%a" Layout.format type_layout ) ))
       entries
   in
