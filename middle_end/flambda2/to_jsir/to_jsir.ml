@@ -114,7 +114,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
           ~f:(fun params ~handler:cont_body ->
             let params, env = To_jsir_shared.bound_parameters ~env params in
             let res, addr = To_jsir_result.new_block res ~params in
-            let _env, res = expr ~env ~res handler in
+            let _env, res = expr ~env ~res cont_body in
             let env = To_jsir_env.add_continuation env k addr in
             expr ~env ~res body))
   | Recursive handlers ->
