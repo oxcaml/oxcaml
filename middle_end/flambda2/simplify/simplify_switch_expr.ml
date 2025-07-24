@@ -755,7 +755,7 @@ let simplify_switch0 dacc switch ~down_to_up =
           (* CR gbury: we could try and emit something analog to the inlining
              report, but for other optimizations at one point ? *)
           dacc
-        | Can_specialize spec_cost -> (
+        | Can_specialize spec_cost as spec_cost' -> (
           (* Estimate the cost of lifting: this mainly comes from adding new
              parameters, which increase the work done by the typing env, as well
              as the flow analysis. We then only do the lifting if the cost is
@@ -790,9 +790,7 @@ let simplify_switch0 dacc switch ~down_to_up =
               Option.iter
                 (fun join_info ->
                   Format.eprintf "Scrutinee: %a@." Simple.print scrutinee;
-                  Format.eprintf "%a@."
-                    (Join_info.print Apply_cont_rewrite_id.print)
-                    join_info)
+                  Format.eprintf "%a@." Join_info.print join_info)
                 join_info;
             let join_analysis_result =
               match join_info with
@@ -810,9 +808,10 @@ let simplify_switch0 dacc switch ~down_to_up =
                     match Join_info.known_values_at_uses name join_info with
                     | Unknown -> None
                     | Known { unknown_at_uses; known_at_uses } -> (
-                      match unknown_at_uses with
-                      | [] | [_] ->
-                        Some (join_info, known_at_uses, unknown_at_uses)
+                      match
+                        Apply_cont_rewrite_id.Map.cardinal unknown_at_uses
+                      with
+                      | 0 | 1 -> Some (join_info, known_at_uses, unknown_at_uses)
                       | _ -> None))
                   ~const:(fun _ ->
                     (* in this case, we don't need to specialize to know the
@@ -834,10 +833,10 @@ let simplify_switch0 dacc switch ~down_to_up =
                  from the typing env to know which primitives will have their
                  result determined by the values that are known at call_site
                  (and thus will disappear from the specialized versions). *)
-              let specialized = List.map fst known_at_use in
               let cost_metrics =
                 Specialization_cost.cost_metrics (DE.typing_env denv) spec_cost
-                  ~switch ~join_info ~specialized ~generic:unknown_at_use
+                  ~switch ~join_info ~specialized:known_at_use
+                  ~generic:unknown_at_use
               in
               let final_cost =
                 Cost_metrics.evaluate
@@ -845,6 +844,21 @@ let simplify_switch0 dacc switch ~down_to_up =
                   cost_metrics
               in
               let threshold = Flambda_features.Expert.cont_spec_threshold () in
+              if debug ()
+              then
+                Format.eprintf
+                  "*** Continuation specialization %a@\n\
+                   analysis result: %f / %f@\n\
+                   known: %a @\n\
+                   unknown: %a @\n\
+                   spec cost: %a@\n\
+                   %a@."
+                  Continuation.print continuation final_cost threshold
+                  (Apply_cont_rewrite_id.Map.print Reg_width_const.print)
+                  known_at_use
+                  (Apply_cont_rewrite_id.Map.print Simple.print)
+                  unknown_at_use Specialization_cost.print spec_cost'
+                  Inlining_report.Context.print_cost_metrics cost_metrics;
               if Float.compare threshold 0. < 0
                  || Float.compare final_cost threshold > 0
               then dacc

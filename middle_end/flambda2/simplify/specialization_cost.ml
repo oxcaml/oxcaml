@@ -40,13 +40,13 @@ let [@ocamlformat "disable"] print_prim ppf (bound_var, prim) =
 let [@ocamlformat "disable"] print ppf t =
   match t with
   | Can_specialize { primitives } ->
-    Format.fprintf ppf "@[<hov>(can_specialize@ \
-        @[<hov 1>(primitives@ %a)@]\
+    Format.fprintf ppf "@[<hv>(can_specialize@ \
+        @[<hv 1>(primitives@ %a)@]\
       )@]"
       (Format.pp_print_list print_prim) primitives
   | Cannot_specialize { reason } ->
-    Format.fprintf ppf "@[<hov>(cannot_specialize@ \
-        @[<hov 1>(reason@ %a)@]\
+    Format.fprintf ppf "@[<hv>(cannot_specialize@ \
+        @[<hv 1>(reason@ %a)@]\
       )@]"
     print_reason reason
 
@@ -78,20 +78,24 @@ let add_prim bound_var prim t =
 
 (* Computing cost and benefits *)
 
+let rec repeat n acc ~f = if n <= 0 then acc else repeat (n - 1) (f acc) ~f
+
 let cost_metrics typing_env ~switch ~join_info ~specialized ~generic
     (cost : cost) =
   let machine_width = Typing_env.machine_width typing_env in
   (* If there is exactly 1 "generic" call site, then that call site is the same
      as a specialized one. *)
-  let specialized_call_sites, generic_call_sites =
-    match generic with
-    | [id] -> id :: specialized, []
-    | _ -> specialized, generic
+  let n = Apply_cont_rewrite_id.Map.cardinal specialized in
+  let num_specialized_call_sites, zero_generic_call_sites =
+    match Apply_cont_rewrite_id.Map.cardinal generic with
+    | 0 -> n, true
+    | 1 -> n + 1, true
+    | _ -> n, false
   in
   (* Cost metrics for a generic call site *)
   let metrics =
-    match generic_call_sites with
-    | [] ->
+    if zero_generic_call_sites
+    then
       (* CR gbury: in this case, we actually remove the code size of the
          handler, since it disappears in favor of the specialized calls; we'll
          take into account the size of each specialized handler later, so here
@@ -104,7 +108,7 @@ let cost_metrics typing_env ~switch ~join_info ~specialized ~generic
           (Code_size.switch switch) cost.primitives
       in
       Cost_metrics.from_size (Code_size.( - ) Code_size.zero code_size)
-    | _ :: _ ->
+    else
       (* The regular case, where the generic continuaion handler stays, and the
          code size is not changed (at least for the generic case *)
       Cost_metrics.zero
@@ -112,10 +116,8 @@ let cost_metrics typing_env ~switch ~join_info ~specialized ~generic
   (* Cost metrics for specialized call sites *)
   let metrics =
     (* Each specialized handler eliminates the switch *)
-    List.fold_left
-      (fun metrics _ ->
-        Cost_metrics.notify_removed ~operation:Removed_operations.branch metrics)
-      metrics specialized_call_sites
+    repeat num_specialized_call_sites metrics
+      ~f:(Cost_metrics.notify_removed ~operation:Removed_operations.branch)
   in
   (* For each primitive, and each specialized call site: - notify it removed if
      its value is known - else add the prim to the code size *)
@@ -129,28 +131,27 @@ let cost_metrics typing_env ~switch ~join_info ~specialized ~generic
       let disappears, stays =
         Simple.pattern_match canonical_simple
           ~name:(fun name ~coercion:_ ->
-            match Join_analysis.known_values_at_uses name join_info with
-            | Unknown -> [], specialized_call_sites
+            match Join_info.known_values_at_uses name join_info with
+            | Unknown -> 0, num_specialized_call_sites
             | Known { known_at_uses; unknown_at_uses } ->
-              known_at_uses, unknown_at_uses)
+              ( Apply_cont_rewrite_id.Map.cardinal known_at_uses,
+                Apply_cont_rewrite_id.Map.cardinal unknown_at_uses ))
           ~const:(fun _ ->
             (* if the canonical is a simple already, then specialization does
                not change much *)
-            [], [])
+            0, 0)
       in
       let metrics =
-        List.fold_left
-          (fun acc _ ->
-            Cost_metrics.notify_removed
-              ~operation:(Removed_operations.prim prim)
-              acc)
-          metrics disappears
+        repeat disappears metrics
+          ~f:
+            (Cost_metrics.notify_removed
+               ~operation:(Removed_operations.prim prim))
       in
       let metrics =
-        List.fold_left
-          (fun acc _ ->
-            Cost_metrics.notify_added ~code_size:(Code_size.prim prim) acc)
-          metrics stays
+        repeat stays metrics
+          ~f:
+            (Cost_metrics.notify_added
+               ~code_size:(Code_size.prim ~machine_width prim))
       in
       metrics)
     metrics cost.primitives

@@ -84,7 +84,7 @@ val cost_metrics :
   Typing_env.t ->
   switch:Switch_expr.t ->
   join_info:Apply_cont_rewrite_id.t Flambda2_types.Join_analysis.t ->
-  specialized:Apply_cont_rewrite_id.t list ->
-  generic:Apply_cont_rewrite_id.t list ->
+  specialized:Reg_width_const.t Apply_cont_rewrite_id.Map.t ->
+  generic:Simple.t Apply_cont_rewrite_id.Map.t ->
   cost ->
   Cost_metrics.t
