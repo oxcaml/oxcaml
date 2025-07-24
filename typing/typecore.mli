@@ -320,6 +320,7 @@ type error =
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
+  | Cannot_stack_allocate
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
   | Impossible_function_jkind of

@@ -34,8 +34,7 @@ let f () =
 Line 2, characters 17-41:
 2 |   let g = stack_ ((42, 42) : _ @ global ) in
                      ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is a stack expression.
-       However, it is expected to be "global".
+Error: This allocation cannot be on the stack.
 |}]
 
 let f () =
@@ -56,8 +55,7 @@ let f () =
 Line 2, characters 17-48:
 2 |   let g = stack_ (fun x y -> x : 'a -> 'a -> 'a) in
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is a stack expression.
-       However, it is expected to be "global".
+Error: This allocation cannot be on the stack.
 |}]
 
 let f () =

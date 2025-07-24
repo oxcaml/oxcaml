@@ -272,6 +272,7 @@ type error =
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
+  | Cannot_stack_allocate
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
   | Impossible_function_jkind of
@@ -6971,8 +6972,11 @@ and type_expect_
             Alloc.submode Alloc.(of_const ~hint:Stack_expression { Const.min with areality = Local }) alloc_mode
           with
           | Ok () -> ()
-          | Error failure_reason -> raise (Error (e.pexp_loc, env,
-              Submode_failed_alloc failure_reason))
+          | Error _ -> raise (Error (e.pexp_loc, env,
+              (* CR pdsouza: in the future, we want to print a hint chain
+                 describing why the mode is not stack allocatable, but for
+                 now we are just dropping the submode error hint *)
+              Cannot_stack_allocate ))
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension
@@ -11170,6 +11174,8 @@ let report_error ~loc env =
          automatically if omitted. It cannot be passed with '?'.@]"
       Style.inline_code label
       Style.inline_code "[%call_pos]"
+  | Cannot_stack_allocate ->
+      Location.errorf ~loc "@[This allocation cannot be on the stack.@]"
   | Unsupported_stack_allocation category ->
     Location.errorf ~loc "@[Stack allocating %a is unsupported yet.@]"
       print_unsupported_stack_allocation category
