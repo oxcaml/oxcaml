@@ -124,10 +124,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
-       because it closes over the value "best_bytes" (at Line 3, characters 24-34)
-       which is "nonportable".
-       However, it is expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* Closing over reading mutable field gives nonportable *)
@@ -284,10 +281,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
-       because it closes over the value "r" (at Line 3, characters 25-26)
-       which is "nonportable".
-       However, it is expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable".
 |}]
 
 (* closing over nonportable gives nonportable *)

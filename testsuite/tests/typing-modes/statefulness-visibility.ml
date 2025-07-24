@@ -418,9 +418,7 @@ let foo @ stateless =
 Line 2, characters 25-26:
 2 |     fun () -> Atomic.set a 0
                              ^
-Error: This value is "immutable" because it is used inside a function
-       which is "stateless".
-       However, it is expected to be "read_write".
+Error: This value is "immutable" but expected to be "read_write".
 |}]
 
 (* Closing over a stateful value also gives stateful. *)
@@ -681,9 +679,8 @@ let foo (x : int ref) @ stateless = lazy (x.contents)
 Line 1, characters 42-43:
 1 | let foo (x : int ref) @ stateless = lazy (x.contents)
                                               ^
-Error: This value is "immutable" because it is used inside a lazy expression
-       which is "stateless".
-       However, it is expected to be "read" because it has a mutable field read from.
+Error: This value is "immutable"
+       but expected to be "read" because it has a mutable field read from.
 |}]
 
 let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
@@ -691,9 +688,8 @@ let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
 Line 1, characters 42-43:
 1 | let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
                                               ^
-Error: This value is "immutable" because it is used inside a lazy expression
-       which is "stateless".
-       However, it is expected to be "read_write" because it has a mutable field written to.
+Error: This value is "immutable"
+       but expected to be "read_write" because it has a mutable field written to.
 |}]
 
 (* [lazy_t @ observing] capture values at [read]. *)
@@ -703,9 +699,8 @@ let bat (x : int ref) @ observing = lazy (x.contents <- 4)
 Line 1, characters 42-43:
 1 | let bat (x : int ref) @ observing = lazy (x.contents <- 4)
                                               ^
-Error: This value is "read" because it is used inside a lazy expression
-       which is "observing".
-       However, it is expected to be "read_write" because it has a mutable field written to.
+Error: This value is "read"
+       but expected to be "read_write" because it has a mutable field written to.
 |}]
 
 let bar (x : int ref) @ observing = lazy (x.contents)

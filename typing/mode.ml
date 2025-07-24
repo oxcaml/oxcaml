@@ -1601,8 +1601,6 @@ module Hint = struct
       value_item : lock_item
     }
 
-  (* TODO - still need to actually use the crossing morph hints in the crossing functions *)
-
   type 'd morph =
     | Debug : string -> (_ * _) morph
     | None : (_ * _) morph
@@ -1619,8 +1617,7 @@ module Hint = struct
 
   let rec is_rigid : type l r. (l * r) morph -> bool = function
     | Debug _ -> true
-    | None -> false
-    | Skip -> false
+    | None | Skip -> assert false
     | Close_over _ -> true
     | Is_closed_by _ -> true
     | Captured_by_partial_application -> true
@@ -1817,9 +1814,10 @@ type print_morph_hint =
   | Stop
       (** [Stop] means we don't print anything for this line,
       and stop the trace here *)
-  | PrintThenContinue of (Format.formatter -> unit)
-      (** [PrintThenContinue pp] means we print this line, using [pp] to print the
+  | Print_then_continue of (Format.formatter -> unit)
+      (** [Print_then_continue pp] means we print this line, using [pp] to print the
       morph hint, then continue onto the next hint *)
+  | Debug_print_then_continue of (Format.formatter -> unit)
 
 (** Get a printer for a single morph hint, or a special output if the hint requires
   special behaviour *)
@@ -1829,41 +1827,52 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
     match hint with
     (* | Debug s ->
        let _ = Skip in
-       PrintThenContinue (dprintf "DEBUG[%s]" s) *)
+       Debug_print_then_continue (dprintf "DEBUG[%s]" s) *)
     | Debug _ -> Skip
     (* | None ->
        let _ = Stop in
-       PrintThenContinue (dprintf "[None]") *)
+       Debug_print_then_continue (dprintf "[None]") *)
     | None -> Stop
     (* | Skip ->
        let _ = Skip in
-       PrintThenContinue (dprintf "[Skip]") *)
+       Debug_print_then_continue (dprintf "[Skip]") *)
     | Skip -> Skip
     | Close_over closure ->
       (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
-      PrintThenContinue
+      Print_then_continue
         (dprintf "closes over the %a %a (at %a)" Hint.print_lock_item
            closure.value_item
            (Misc.Style.as_inline_code !print_longident)
            closure.value_lid Location.print_loc closure.value_loc)
     | Is_closed_by closure ->
-      PrintThenContinue
+      Print_then_continue
         (dprintf "is used inside a %a" Hint.print_closure_context
            closure.closure_context)
     | Captured_by_partial_application ->
-      PrintThenContinue (dprintf "is captured by a partial application")
+      Print_then_continue (dprintf "is captured by a partial application")
     | Adj_captured_by_partial_application ->
-      PrintThenContinue (dprintf "has a partial application capturing a value")
+      Print_then_continue
+        (dprintf "has a partial application capturing a value")
     | Compose (hint1, hint2) -> (
       match print_morph_hint hint1 with
       | Skip -> print_morph_hint hint2
       | Stop -> Stop
-      | PrintThenContinue pp1 -> (
+      | Print_then_continue pp1 -> (
         match print_morph_hint hint2 with
-        | Skip -> PrintThenContinue pp1
+        | Skip -> Print_then_continue pp1
         | Stop -> Stop
-        | PrintThenContinue pp2 ->
-          PrintThenContinue (dprintf "%t@ which %t" pp1 pp2)))
+        | Print_then_continue pp2 ->
+          Print_then_continue (dprintf "%t@ which %t" pp1 pp2)
+        | Debug_print_then_continue pp2 ->
+          Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2))
+      | Debug_print_then_continue pp1 -> (
+        match print_morph_hint hint2 with
+        | Skip -> Print_then_continue pp1
+        | Stop -> Stop
+        | Print_then_continue pp2 ->
+          Print_then_continue (dprintf "%t@ which %t" pp1 pp2)
+        | Debug_print_then_continue pp2 ->
+          Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)))
 
 (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
 terminated with an [Empty] or [Const] axhint *)
@@ -1904,26 +1913,29 @@ let rec print_axhint_chain :
   in
   match hint with
   | Morph (morph_hint, b, b_obj, b_hint, _morph) -> (
-    match C.eq_obj a_obj b_obj with
-    | Some Refl
-      when Misc.Le_result.equal ~le:(C.le a_obj) a b
-           && not (Hint.is_rigid morph_hint) ->
-      (* When the [a] and [b] modes are equal, and the hint is non-rigid,
-         we can definitely skip printing this line. *)
+    let temp_thing pp =
+      print_mode a_obj a;
+      fprintf ppf "@ because it %t@ which is " pp;
+      ignore (print_axhint_chain side b b_obj b_hint ppf);
+      HintPrinted
+    in
+    match print_morph_hint morph_hint with
+    | Skip ->
+      (* This is a case where we skip a line without printing the mode first *)
       print_axhint_chain side b b_obj b_hint ppf
-    | Some Refl | None -> (
-      match print_morph_hint morph_hint with
-      | Skip ->
-        (* This is another case where we skip a line without printing the mode first *)
+    | Stop ->
+      print_mode a_obj a;
+      NothingPrinted
+    | Print_then_continue pp -> (
+      match C.eq_obj a_obj b_obj with
+      | Some Refl
+        when Misc.Le_result.equal ~le:(C.le a_obj) a b
+             && not (Hint.is_rigid morph_hint) ->
+        (* When the [a] and [b] modes are equal, and the hint is non-rigid,
+           we can definitely skip printing this line. *)
         print_axhint_chain side b b_obj b_hint ppf
-      | Stop ->
-        print_mode a_obj a;
-        NothingPrinted
-      | PrintThenContinue pp ->
-        print_mode a_obj a;
-        fprintf ppf "@ because it %t@ which is " pp;
-        ignore (print_axhint_chain side b b_obj b_hint ppf);
-        HintPrinted))
+      | Some Refl | None -> temp_thing pp)
+    | Debug_print_then_continue pp -> temp_thing pp)
   | Const const_hint ->
     print_mode a_obj a;
     print_const_hint a_obj a ppf const_hint

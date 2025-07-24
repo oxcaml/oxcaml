@@ -13,8 +13,7 @@ type r = { mutable s : string; }
 Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
-Error: This value is "local"
-       but expected to be "global" because it is a function return value without an exclave annotation.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* you can override those implied modalities *)
@@ -112,8 +111,7 @@ let foo (local_ s') = exclave_ {s'}
 Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
-Error: This value is "local"
-       but expected to be "global" because it is a function return value without an exclave annotation.
+Error: This value is "local" but expected to be "global".
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a

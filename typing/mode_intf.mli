@@ -241,6 +241,7 @@ module type S = sig
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
       | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
+          (** A composition of morphism hints. The *)
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
 
@@ -248,12 +249,6 @@ module type S = sig
        the monadic axis modules, as we can't use [neg] within the substitution due
        to type checker limitations *)
     type 'd neg_morph = 'd neg morph constraint 'd = _ * _
-
-    (** When a morph hint is "rigid", this means that it must be printed in
-    the error message.  Conversely, when it is not rigid, we may choose not
-    to include it, for example when the mode axis we are considering is unchanged
-    by the morphism associated with this hint. *)
-    val is_rigid : _ morph -> bool
   end
 
   (** Hints for the mode solvers. These are axis-specific hints that contain a trace
