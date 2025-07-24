@@ -19,6 +19,10 @@ open Allowance
 open Solver
 open Mode_intf
 
+(* Forward declaration *)
+let print_longident =
+  ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
+
 type nonrec allowed = allowed
 
 type nonrec disallowed = disallowed
@@ -1593,6 +1597,7 @@ module Hint = struct
   type closure_details =
     { closure_context : closure_context;
       value_loc : Location.t;
+      value_lid : Longident.t;
       value_item : lock_item
     }
 
@@ -1824,8 +1829,10 @@ let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
     | Close_over closure ->
       (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
       PrintThenContinue
-        (dprintf "closes over a %a (at %a)" Hint.print_lock_item
-           closure.value_item Location.print_loc closure.value_loc)
+        (dprintf "closes over the %a %a (at %a)" Hint.print_lock_item
+           closure.value_item
+           (Misc.Style.as_inline_code !print_longident)
+           closure.value_lid Location.print_loc closure.value_loc)
     | Is_closed_by closure ->
       PrintThenContinue
         (dprintf "is used inside a %a" Hint.print_closure_context
@@ -1916,7 +1923,7 @@ let rec print_axhint_chain :
 (** Report an axerror, printing error traces for both the left and the right sides *)
 let report_axerror :
     type a.
-    ?target:(Format.formatter -> unit) ->
+    ?target:_ ->
     left_obj:a Lattices_mono.obj ->
     right_obj:a Lattices_mono.obj ->
     a axerror ->
@@ -1926,7 +1933,10 @@ let report_axerror :
   let open Format in
   (match target with
   | None -> fprintf ppf "This value is "
-  | Some name -> fprintf ppf "%t is " name);
+  | Some (target_item, target_lid) ->
+    fprintf ppf "The %a %a is " Hint.print_lock_item target_item
+      (Misc.Style.as_inline_code !print_longident)
+      target_lid);
   (match print_axhint_chain `Actual err.left left_obj err.left_hint ppf with
   | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
   | NothingPrinted -> fprintf ppf "@ but expected to be ");

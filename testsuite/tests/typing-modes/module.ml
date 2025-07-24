@@ -44,9 +44,9 @@ Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
 Error: This value is "nonportable"
-       because it closes over a module (at Line 7, characters 23-24)
+       because it closes over the module "F" (at Line 7, characters 23-24)
        which is "nonportable"
-       because it closes over a value (at Line 15, characters 12-15)
+       because it closes over the value "foo" (at Line 15, characters 12-15)
        which is "nonportable".
        However, it is expected to be "portable".
 |}]

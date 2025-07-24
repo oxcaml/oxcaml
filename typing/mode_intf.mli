@@ -172,12 +172,14 @@ module type Common_product = sig
 
   type 'a axerror
 
+  type lock_item
+
   module Const : Lattice_product with type 'a axis := 'a Axis.t
 
   type error = Error : 'a Axis.t * 'a axerror -> error
 
   val report_error :
-    ?target:(Format.formatter -> unit) -> Format.formatter -> error -> unit
+    ?target:lock_item * Longident.t -> Format.formatter -> error -> unit
 
   include
     Common
@@ -189,6 +191,8 @@ module type Common_product = sig
 end
 
 module type S = sig
+  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+
   module Hint : sig
     type const =
       | None
@@ -222,6 +226,8 @@ module type S = sig
       { (* CR pdsouza: add a field, [closure_loc], here for the location of the closing context *)
         closure_context : closure_context;
         value_loc : Location.t;  (** Location of the value being closed over *)
+        value_lid : Longident.t;
+            (** Identifier for the value being closed over *)
         value_item : lock_item
             (** The item type of the value being closed over *)
       }
@@ -567,6 +573,7 @@ module type S = sig
            and type hint_const := Hint.const
            and type 'a axhint := 'a axhint
            and type 'a axerror := 'a axerror
+           and type lock_item := Hint.lock_item
 
       module Const_op : Lattice with type t = Const.t
     end
@@ -579,6 +586,7 @@ module type S = sig
          and type hint_const := Hint.const
          and type 'a axhint := 'a axhint
          and type 'a axerror := 'a axerror
+         and type lock_item := Hint.lock_item
 
     module Axis : sig
       (** Represents a mode axis in this product whose constant is ['a], and whose
@@ -665,7 +673,7 @@ module type S = sig
     type error = Error : 'a Axis.t * 'a axerror -> error
 
     val report_error :
-      ?target:(Format.formatter -> unit) -> Format.formatter -> error -> unit
+      ?target:Hint.lock_item * Longident.t -> Format.formatter -> error -> unit
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 

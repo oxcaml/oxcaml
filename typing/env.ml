@@ -3308,7 +3308,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
       Mode.Value.Comonadic.submode
         comonadic
         (Mode.Value.Comonadic.apply_hint
-          Mode.Hint.(Is_closed_by ({ closure_context; value_loc = loc; value_item = item }))
+          Mode.Hint.(Is_closed_by ({ closure_context; value_loc = loc; value_lid = lid; value_item = item }))
           comonadic0)
     with
     | Error e ->
@@ -3319,7 +3319,7 @@ let closure_mode ~errors ~env ~loc ~item ~lid
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic ~hint:Mode.Hint.(Is_closed_by ({ closure_context; value_loc = loc; value_item = item })) comonadic0 ]
+        Mode.Value.comonadic_to_monadic ~hint:Mode.Hint.(Is_closed_by ({ closure_context; value_loc = loc; value_lid = lid; value_item = item })) comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 
@@ -4789,11 +4789,7 @@ let report_lookup_error _loc env ppf = function
         print_lock_item_reason (item, lid)
         (string_of_shared_context context)
   | Value_used_in_closure (item, lid, err) ->
-      Mode.Value.Comonadic.report_error ppf
-        ~target:(dprintf "The %a %a"
-          Mode.Hint.print_lock_item item
-          (Style.as_inline_code !print_longident) lid)
-        err
+      Mode.Value.Comonadic.report_error ppf ~target:(item, lid) err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"
