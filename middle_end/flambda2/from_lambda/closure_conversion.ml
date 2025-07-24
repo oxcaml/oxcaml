@@ -3520,8 +3520,11 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
         defining_expr ~body)
     (acc, body) components
 
-let wrap_final_module_block acc env ~program ~prog_return_cont
-    ~module_block_size_in_words ~return_cont ~module_symbol =
+let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
+    ~return_cont ~module_symbol =
+  (* CR jrayman: remove these comments *)
+  (* let a : unit K.Mixed_block_lambda_shape.t = failwith "a" in *)
+  (* let shape = K.Mixed_block_shape.from_mixed_block_shape a in *)
   let module_block_var = Variable.create "module_block" in
   let module_block_tag = Tag.Scannable.zero in
   let load_fields_body acc =
@@ -3549,7 +3552,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        Static_const.block module_block_tag Immutable Value_only field_vars
+        (* CR jrayman: allow for Value_only as well *)
+        Static_const.block module_block_tag Immutable
+          (Mixed_record module_shape) field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of
@@ -3572,11 +3577,16 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         (Bound_pattern.static bound_static)
         named ~body:return
     in
+    (* CR jrayman allow for Values as well *)
     let block_access : P.Block_access_kind.t =
-      Values
+      Mixed
         { tag = Known Tag.Scannable.zero;
-          size = Known (Targetint_31_63.of_int module_block_size_in_words);
-          field_kind = Any_value
+          (* CR jrayman: Is this the right tag? *)
+          size = Unknown;
+          (* CR jrayman: Is this size in words or number of fields? *)
+          field_kind = Value_prefix Any_value;
+          (* CR jrayman: is field_kind correct? *)
+          shape = module_shape
         }
     in
     List.fold_left
@@ -3616,9 +3626,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     ~is_exn_handler:false ~is_cold:false
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
-    ~cmx_loader ~compilation_unit ~module_block_size_in_words ~program
-    ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region : mode close_program_result =
+    ~cmx_loader ~compilation_unit ~module_repr ~program ~prog_return_cont
+    ~exn_continuation ~toplevel_my_region ~toplevel_my_ghost_region :
+    mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -3635,8 +3645,8 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode) ~big_endian
   in
   let acc = Acc.create ~cmx_loader in
   let acc, body =
-    wrap_final_module_block acc env ~program ~prog_return_cont
-      ~module_block_size_in_words ~return_cont ~module_symbol
+    wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
+      ~return_cont ~module_symbol
   in
   let module_block_approximation =
     match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
