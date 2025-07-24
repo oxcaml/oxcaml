@@ -167,23 +167,52 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
   then Definition_says_not_to_inline
   else if doing_speculative_inlining
   then Doing_speculative_inlining
-  else if not (argument_types_useful dacc apply)
-  then Argument_types_not_useful
   else
-    let cost_metrics =
-      speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-        ~function_type
-    in
-    let inlining_args =
-      Apply.inlining_arguments apply
-      |> Inlining_arguments.meet (DE.inlining_arguments denv)
-    in
-    let evaluated_to = Cost_metrics.evaluate ~args:inlining_args cost_metrics in
-    let threshold = Inlining_arguments.threshold inlining_args in
-    let is_under_inline_threshold = Float.compare evaluated_to threshold <= 0 in
-    if is_under_inline_threshold
-    then Speculatively_inline { cost_metrics; evaluated_to; threshold }
-    else Speculatively_not_inline { cost_metrics; evaluated_to; threshold }
+    Profile.record_call_with_counters ~accumulate:true "speculative_inlining"
+      ~counter_f:(fun (decision : Call_site_inlining_decision_type.t) ->
+        let counters = Profile.Counters.create () in
+        match decision with
+        | Argument_types_not_useful ->
+          Profile.Counters.incr "argument_types_not_useful" counters
+        | Speculatively_inline _ ->
+          Profile.Counters.incr "speculatively_inline" counters
+        | Speculatively_not_inline _ ->
+          Profile.Counters.incr "speculatively_not_inline" counters
+        | Missing_code | Definition_says_not_to_inline | In_a_stub
+        | Doing_speculative_inlining | Unrolling_depth_exceeded
+        | Max_inlining_depth_exceeded | Recursion_depth_exceeded
+        | Never_inlined_attribute | Attribute_always
+        | Replay_history_says_must_inline | Begin_unrolling _
+        | Continue_unrolling | Definition_says_inline _ ->
+          (* These can't be returned by the speculative inlining cases below. *)
+          if Flambda_features.check_light_invariants ()
+          then
+            Misc.fatal_error
+              "Unexpected call site inlinine decision for speculative inlining";
+          counters)
+      (fun () : Call_site_inlining_decision_type.t ->
+        if not (argument_types_useful dacc apply)
+        then Argument_types_not_useful
+        else
+          let cost_metrics =
+            speculative_inlining ~apply dacc ~simplify_expr ~return_arity
+              ~function_type
+          in
+          let inlining_args =
+            Apply.inlining_arguments apply
+            |> Inlining_arguments.meet (DE.inlining_arguments denv)
+          in
+          let evaluated_to =
+            Cost_metrics.evaluate ~args:inlining_args cost_metrics
+          in
+          let threshold = Inlining_arguments.threshold inlining_args in
+          let is_under_inline_threshold =
+            Float.compare evaluated_to threshold <= 0
+          in
+          if is_under_inline_threshold
+          then Speculatively_inline { cost_metrics; evaluated_to; threshold }
+          else
+            Speculatively_not_inline { cost_metrics; evaluated_to; threshold })
 
 let get_rec_info dacc ~function_type =
   let rec_info = FT.rec_info function_type in
