@@ -1899,7 +1899,7 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   | Atomic_load_field (Any_value | Immediate) ->
     Arbitrary_effects, Has_coeffects, Strict
   | Poke _ -> Arbitrary_effects, No_coeffects, Strict
-  | Read_offset _ -> Arbitrary_effects, No_coeffects, Strict
+  | Read_offset _ -> No_effects, Has_coeffects, Strict
 
 let binary_classify_for_printing p =
   match p with
