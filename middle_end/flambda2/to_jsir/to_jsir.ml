@@ -103,8 +103,6 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
-  (* We treat continuations as normal functions (i.e. a code block and a
-     corresponding [Closure]. *)
   match e with
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
