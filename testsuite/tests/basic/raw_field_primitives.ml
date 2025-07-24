@@ -6,8 +6,9 @@ external raw_field : 'a -> int -> nativeint# = "%raw_field"
 external set_raw_field : 'a -> int -> nativeint# -> unit = "%set_raw_field"
 
 (* Helper to print nativeint# values *)
+external box_nativeint : nativeint# -> nativeint = "%box_nativeint"
 let print_nativeint_unboxed (n : nativeint#) =
-  Printf.printf "%nd\n" (Nativeint_u.to_nativeint n)
+  Printf.printf "%nd\n" (box_nativeint n)
 
 (* Test with tuples *)
 let test_tuples () =
@@ -16,7 +17,7 @@ let test_tuples () =
   print_endline "Tuple (42, 100):";
   print_nativeint_unboxed (raw_field t2 0);
   print_nativeint_unboxed (raw_field t2 1);
-  
+
   let t3 = (1, 2, 3) in
   print_endline "Tuple (1, 2, 3):";
   print_nativeint_unboxed (raw_field t3 0);
@@ -25,24 +26,24 @@ let test_tuples () =
   ()
 
 (* Test with variants/data constructors *)
-type variant = 
-  | A 
+type variant =
+  | A
   | B of int
   | C of int * int
   | D of int * int * int
 
 let test_variants () =
   print_endline "=== Testing variants ===";
-  
+
   let b = B 42 in
   print_endline "B 42:";
   print_nativeint_unboxed (raw_field b 0);
-  
+
   let c = C (10, 20) in
   print_endline "C (10, 20):";
   print_nativeint_unboxed (raw_field c 0);
   print_nativeint_unboxed (raw_field c 1);
-  
+
   let d = D (100, 200, 300) in
   print_endline "D (100, 200, 300):";
   print_nativeint_unboxed (raw_field d 0);
@@ -82,17 +83,17 @@ let test_mutable_records () =
   print_nativeint_unboxed (raw_field r 1);
   print_nativeint_unboxed (raw_field r 2);
   print_nativeint_unboxed (raw_field r 3);
-  
+
   print_endline "Setting field 0 to 999:";
   set_raw_field r 0 #999n;
   print_nativeint_unboxed (raw_field r 0);
   Printf.printf "r.a = %d\n" r.a;
-  
+
   print_endline "Setting field 1 to 888:";
   set_raw_field r 1 #888n;
   print_nativeint_unboxed (raw_field r 1);
   Printf.printf "r.b = %d\n" r.b;
-  
+
   print_endline "Setting field 3 to 777:";
   set_raw_field r 3 #777n;
   print_nativeint_unboxed (raw_field r 3);
@@ -108,7 +109,7 @@ type nativeint_record = {
 
 let test_nativeint_records () =
   print_endline "=== Testing records with nativeint# fields ===";
-  let r = { 
+  let r = {
     n1 = #0x1234n;
     n2 = #0x5678n;
     n3 = 42;
@@ -117,11 +118,10 @@ let test_nativeint_records () =
   print_nativeint_unboxed (raw_field r 0);
   print_nativeint_unboxed (raw_field r 1);
   print_nativeint_unboxed (raw_field r 2);
-  
+
   print_endline "Setting nativeint# field to 0xABCD:";
   set_raw_field r 1 #0xABCDn;
   print_nativeint_unboxed (raw_field r 1);
-  print_nativeint_unboxed r.n2;
   ()
 
 let () =

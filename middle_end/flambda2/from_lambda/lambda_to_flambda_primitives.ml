@@ -2729,6 +2729,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
   | Prawfield, [[block]; [field]] ->
     (* Convert field number (in words) to byte offset *)
+    (* First untag the field index *)
+    let untagged_field = H.Prim (Unary (Untag_immediate, field)) in
     (* Word size is 8 on 64-bit systems, 4 on 32-bit systems *)
     let word_size = if Targetint_32_64.size = 64 then 8 else 4 in
     let word_size_const =
@@ -2738,7 +2740,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     let byte_offset =
       H.Prim
-        (Binary (Int_arith (Tagged_immediate, Mul), field, word_size_const))
+        (Binary
+           (Int_arith (Naked_immediate, Mul), untagged_field, word_size_const))
     in
     [ Binary
         ( Read_offset (K.With_subkind.naked_nativeint, Asttypes.Mutable),
@@ -2746,6 +2749,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           byte_offset ) ]
   | Psetrawfield, [[block]; [field]; [new_value]] ->
     (* Convert field number (in words) to byte offset *)
+    (* First untag the field index *)
+    let untagged_field = H.Prim (Unary (Untag_immediate, field)) in
     (* Word size is 8 on 64-bit systems, 4 on 32-bit systems *)
     let word_size = if Targetint_32_64.size = 64 then 8 else 4 in
     let word_size_const =
@@ -2755,7 +2760,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     in
     let byte_offset =
       H.Prim
-        (Binary (Int_arith (Tagged_immediate, Mul), field, word_size_const))
+        (Binary
+           (Int_arith (Naked_immediate, Mul), untagged_field, word_size_const))
     in
     [ Ternary
         ( Write_offset
