@@ -110,9 +110,15 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
 (** Convert a [Continuation_handler.t] into a code block containing the body
     of the continuation, and return the address of the new block and
     (function) parameters used in the body. *)
-and continuation_handler ~env ~res handler =
+and continuation_handler ~env ~res ~invariant_params handler =
   Continuation_handler.pattern_match handler
     ~f:(fun params ~handler:cont_body ->
+      let params =
+        match invariant_params with
+        | None -> params
+        | Some invariant_params ->
+          Bound_parameters.append invariant_params params
+      in
       let params, env = To_jsir_shared.bound_parameters ~env params in
       let res, addr = To_jsir_result.new_block res ~params:[] in
       let _env, res = expr ~env ~res cont_body in
@@ -125,7 +131,9 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
     let continuation = Non_recursive_let_cont_handler.handler handler in
-    let addr, params, env, res = continuation_handler ~env ~res continuation in
+    let addr, params, env, res =
+      continuation_handler ~env ~res ~invariant_params:None continuation
+    in
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
         let var = Jsir.Var.fresh () in
         let env = To_jsir_env.add_continuation env k var in
@@ -133,8 +141,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         expr ~env ~res body)
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
-      ~f:(fun ~invariant_params:_ ~body conts ->
-        (* CR selee: what is [invariant_params]? *)
+      ~f:(fun ~invariant_params ~body conts ->
         if Continuation_handlers.contains_exn_handler conts
         then
           Misc.fatal_errorf
@@ -152,7 +159,8 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
           Continuation.Lmap.fold
             (fun k continuation (env, res) ->
               let addr, params, env, res =
-                continuation_handler ~env ~res continuation
+                continuation_handler ~env ~res
+                  ~invariant_params:(Some invariant_params) continuation
               in
               let var =
                 match To_jsir_env.get_continuation_exn env k with
