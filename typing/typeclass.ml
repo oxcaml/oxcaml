@@ -1216,7 +1216,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let param_suffix =
         match l with
         | Optional name -> name
-        | Generic_optional (_, name) -> name
+        | Generic_optional name -> name
         | Nolabel | Labelled _ ->
           Misc.fatal_error "[default] allowed only with optional argument"
       in
@@ -1586,7 +1586,7 @@ let rec approx_declaration cl =
         | Optional _ -> Ctype.instance var_option
         | Generic_optional (path, _) ->
             ctype_instance_of_optional_mpath
-              (Btype.classify_module_path path.txt)
+              (Btype.classify_module_path path)
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)

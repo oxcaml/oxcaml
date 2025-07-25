@@ -9,5 +9,5 @@
 
 (* Interface *)
 module type S = sig
-  val concat : Non_existent.?'sep:string -> string list -> string
+  val concat : (?sep):string non_existent -> string list -> string
 end

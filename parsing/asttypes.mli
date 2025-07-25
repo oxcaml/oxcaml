@@ -53,8 +53,7 @@ type arg_label =
     Nolabel
   | Labelled of string (** [label:T -> ...] *)
   | Optional of string (** [?label:T -> ...] *)
-  | Generic_optional of Longident.t Location.loc * string
-                       (** [Module.Path.?label:T -> ...] *)
+  | Generic_optional of string (** [(?label):T -> ...] *)
 
 type 'a loc = 'a Location.loc = {
   txt : 'a;

@@ -4,17 +4,17 @@ flags = "-extension-universe alpha -dlambda -dno-unique-ids";
  expect;
 *)
 
-let f_option Stdlib.Option.?'(x = 33) () = x
+let f_option (?(x = 33) : int option) () = x
 [%%expect{|
 (let
   (f_option =
      (function {nlocal = 0} *opt*x[(consts (0)) (non_consts ([0: *]))]
        param[int] : int (if *opt*x (field_imm 0 *opt*x) 33)))
   (apply (field_imm 1 (global Toploop!)) "f_option" f_option))
-val f_option : Stdlib.Option.?'x:int -> unit -> int = <fun>
+val f_option : (?x):int option -> unit -> int = <fun>
 |}]
 
-let f_option_no_default Stdlib.Option.?'(x : int option) () = x
+let f_option_no_default (?x : int option) () = x
 [%%expect{|
 (let
   (f_option_no_default =
@@ -22,26 +22,25 @@ let f_option_no_default Stdlib.Option.?'(x : int option) () = x
        [(consts (0)) (non_consts ([0: *]))]x))
   (apply (field_imm 1 (global Toploop!)) "f_option_no_default"
     f_option_no_default))
-val f_option_no_default : Stdlib.Option.?'x:int -> unit -> int option = <fun>
+val f_option_no_default : (?x):int option -> unit -> int option = <fun>
 |}]
 
-let f_or_null Stdlib.Or_null.?'(x = 48) () = x
+let f_or_null (?(x = 48) : int or_null) () = x
 [%%expect{|
 (let
   (f_or_null =
      (function {nlocal = 0} *opt*x param[int] : int
        (if (isnull *opt*x) 48 *opt*x)))
   (apply (field_imm 1 (global Toploop!)) "f_or_null" f_or_null))
-val f_or_null : Stdlib.Or_null.?'x:int -> unit -> int = <fun>
+val f_or_null : (?x):int or_null -> unit -> int = <fun>
 |}]
-let f_or_null_no_default Stdlib.Or_null.?'(x : int or_null) () = x
+let f_or_null_no_default (?x : int or_null) () = x
 
 [%%expect{|
 (let (f_or_null_no_default = (function {nlocal = 0} x param[int] x))
   (apply (field_imm 1 (global Toploop!)) "f_or_null_no_default"
     f_or_null_no_default))
-val f_or_null_no_default : Stdlib.Or_null.?'x:int -> unit -> int or_null =
-  <fun>
+val f_or_null_no_default : (?x):int or_null -> unit -> int or_null = <fun>
 |}]
 
 (* Test calling them *)

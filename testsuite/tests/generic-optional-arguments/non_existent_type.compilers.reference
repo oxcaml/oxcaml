@@ -1,0 +1,4 @@
+File "non_existent_type.ml", line 12, characters 22-41:
+12 |   val concat : (?sep):string non_existent -> string list -> string
+                           ^^^^^^^^^^^^^^^^^^^
+Error: Unknown generic optional argument type

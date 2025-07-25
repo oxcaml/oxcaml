@@ -1489,98 +1489,87 @@ val triangle_10 : int = 55
 (******************************)
 (* generic optional arguments *)
 (*
-The following syntaxes are tested
-
-1. in type declaration [Stdlib.Option.?'lbl:tp -> ...]
-2. function parameter with default argument [Stdlib.Option.?'(lbl: tp = val)]
-3. function declaration without default argument [Stdlib.Option.?'(lbl : tp)]
-3. function declaration without type annotation
-    [Stdlib.Option.?'(lbl)] and [Stdlib.Option.?'(lbl : tp)]
-4. function call with expression [Stdlib.Option.?'lbl:(<expr>)]
-5. function call without expression [Stdlib.Option.?'lbl]
+see: generic-optional-arguments/syntax_comparison.ml for a detailed explanation
 *)
-
-module type S = sig
-  val concat :
-    Stdlib.Option.?'sep:string -> string Stdlib.List.t -> string
-    (* CR generic-optional : signature ascription for generic optional types *)
-  (*= val concat_2 : ?sep:string -> string Stdlib.List.t -> string *)
+module type T = sig
+  val h : (?x): int or_null -> unit -> int
 end
-
-[%%expect{|
-module type S =
-  sig val concat : Stdlib.Option.?'sep:string -> string List.t -> string end
+let or_null_get x = match x with This x -> x | Null -> 12
+[%%expect {|
+module type T = sig val h : (?x):int or_null -> unit -> int end
+val or_null_get : int or_null -> int = <fun>
 |}]
 
-
-(* Implementation *)
-module M : S = struct
-  let rec concat Stdlib.Option.?'(sep : string = " ")
-    (xs : string Stdlib.List.t) =
-      String.concat sep xs
-  (*
-  CR generic-optional : signature ascriptions
-  okay to omit type annotations *)
-  (*= let concat_2 Stdlib.Option.?'(sep=" ") (xs : string Stdlib.List.t) =
-    String.concat sep xs *)
+module M_4 : T = struct
+  let h (?x : int or_null) () = or_null_get x
 end
-
-[%%expect{|
-module M : S @@ portable
+[%%expect {|
+module M_4 : T
 |}]
 
-let default_concat ys = M.concat ys ;;
-default_concat ["x"; "y"; "z"] ;;
-
-[%%expect{|
-val default_concat : string List.t -> string = <fun>
-- : string = "x y z"
+module M_5 : T = struct
+  let h (?(x = 7) : int or_null) () = x
+end
+[%%expect {|
+module M_5 : T @@ stateless
+|}]
+module M_9 : T = struct
+  let h (?x:y : int or_null) () = or_null_get y
+end
+[%%expect {|
+module M_9 : T
+|}]
+module M_9_2 : T = struct
+  let h (?x:(y) : int or_null) () = or_null_get y
+end
+[%%expect {|
+module M_9_2 : T
 |}]
 
-
-let comma_concat zs = M.concat ~sep:"," zs ;;
-comma_concat ["x"; "y"; "z"] ;;
-
-[%%expect{|
-val comma_concat : string List.t -> string = <fun>
-- : string = "x,y,z"
+module M_10 : T = struct
+  let h (?x:(y = 11) : int or_null) () = y
+end
+[%%expect {|
+module M_10 : T @@ stateless
 |}]
 
-let comma_concat_2 zs = M.concat Stdlib.Option.?'sep:(Some ",") zs ;;
-comma_concat_2 ["x"; "y"; "z"] ;;
-
-[%%expect{|
-val comma_concat_2 : string List.t -> string = <fun>
-- : string = "x,y,z"
+module M_12 : T = struct
+  let h (?x:(y : int or_null)) () = or_null_get y
+end
+[%%expect {|
+module M_12 : T
 |}]
 
-let chain_call Stdlib.Option.?'(sep : string option) arg =
-  M.concat Stdlib.Option.?'sep arg ;;
-chain_call ["x"; "y"; "z"] ;;
-
-[%%expect{|
-val chain_call : Stdlib.Option.?'sep:string -> string List.t -> string =
-  <fun>
-- : string = "x y z"
+module M_14 : T = struct
+  let h (?x:(y : int or_null) : int or_null) () = or_null_get y
+end
+[%%expect {|
+module M_14 : T
 |}]
 
-let chain_call Stdlib.Option.?'sep:(sep : string option) arg =
-  M.concat Stdlib.Option.?'sep arg ;;
-chain_call Stdlib.Option.?'sep:(Some ",") ["x"; "y"; "z"] ;;
-
-[%%expect{|
-val chain_call : Stdlib.Option.?'sep:string -> string List.t -> string =
-  <fun>
-- : string = "x,y,z"
+module M_15 : T = struct
+  let h (?x:((y : int) = 1) : int or_null) () = y
+end
+[%%expect {|
+module M_15 : T @@ stateless
 |}]
 
-(* okay to omit type annotations *)
-let chain_call_2 Stdlib.Option.?'(sep) arg =
-  M.concat ?sep arg ;;
-chain_call_2 ?sep:(Some ",") ["x"; "y"; "z"] ;;
+let v = M_4.h ?x:(This 2) ()
+let v = M_5.h ?x:(This 2) ()
+let v = M_9.h ?x:(This 2) ()
+let v = M_9_2.h ?x:(This 2) ()
+let v = M_10.h ?x:(This 2) ()
+let v = M_12.h ?x:(This 2) ()
+let v = M_14.h ?x:(This 2) ()
+let v = M_15.h ?x:(This 2) ()
 
 [%%expect{|
-val chain_call_2 : Stdlib.Option.?'sep:string -> string List.t -> string =
-  <fun>
-- : string = "x,y,z"
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
 |}]

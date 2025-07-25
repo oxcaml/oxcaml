@@ -39,13 +39,6 @@ let rec print_ident ppf =
 
 let out_ident = ref print_ident
 
-let rec out_ident_of_longident = function
-  | Longident.Lident s -> Oide_ident {printed_name = s}
-  | Longident.Ldot (l, s) ->
-      Oide_dot (out_ident_of_longident l, s)
-  | Longident.Lapply (l1, l2) ->
-      Oide_apply (out_ident_of_longident l1, out_ident_of_longident l2)
-
 (* Check a character matches the [identchar_latin1] class from the lexer *)
 let is_ident_char c =
   match c with
@@ -423,9 +416,7 @@ let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   | Labelled l -> fprintf ppf "%a:%a" print_lident l print_type ty
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
-  | Generic_optional (path, l) ->
-      fprintf ppf "%a.?'%a:%a" print_ident
-        (out_ident_of_longident path) print_lident l print_type ty
+  | Generic_optional (l) -> fprintf ppf "(?%a):%a" print_lident l print_type ty
 
 let rec print_out_type_0 ppf =
   function

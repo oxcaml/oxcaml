@@ -271,7 +271,15 @@ type optionality = Optional_arg of optional_module_path
 val is_optional : arg_label -> bool
 val is_optional_parsetree : Parsetree.arg_label -> bool
 val classify_optionality : arg_label -> optionality
-val classify_optionality_parsetree : Parsetree.arg_label -> optionality
+
+(* Given a pattern, return the generic optional constructor name, underlying
+   type and the updated pattern with generic optional replaced with its
+   underlying type.
+   e.g. (x : int or_null) -> ("or_null", int, (x : int)) *)
+val extract_optional_tp_from_pattern_constraint :
+  Parsetree.pattern -> (label * Parsetree.core_type * Parsetree.pattern) option
+val classify_optionality_parsetree :
+  Parsetree.arg_label -> Parsetree.pattern -> optionality
 val get_optional_module_path_exn : arg_label -> optional_module_path
 val is_position : arg_label -> bool
 val is_omittable : arg_label -> bool

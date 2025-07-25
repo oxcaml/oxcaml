@@ -448,9 +448,8 @@ and type_with_label ctxt f (label, c, mode) =
   | Optional s ->
     pp f "?%a:%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
-  | Generic_optional (module_path, s) ->
-    pp f "%a.?'%a:%a" longident_loc module_path
-      ident_of_name s
+  | Generic_optional s ->
+    pp f "(?%a):%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
@@ -866,27 +865,31 @@ and label_exp ctxt f (l,opt,p) =
                 ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
           | None -> pp f "?%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p)
       end
-  | Generic_optional(module_path, rest) -> (
+  | Generic_optional(rest) -> (
       begin match p with
-      | {ppat_desc = Ppat_var {txt;_}; ppat_attributes = []}
-        when txt = rest ->
-          (match opt with
-           | Some o ->
-              pp f "%a.?'(%a=@;%a)"
-                longident_loc module_path
-                ident_of_name rest (expression ctxt) o
-           | None ->
-              pp f "%a.?'%a" longident_loc module_path ident_of_name rest)
-      | _ ->
-          (match opt with
-          | Some o ->
-              pp f "%a.?'%a:(%a=@;%a)@;"
-                longident_loc module_path
-                ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
-          | None ->
-              pp f "%a.?'%a:%a@;"
-                longident_loc module_path
-                ident_of_name rest (simple_pattern1 ctxt) p)
+      | {ppat_desc = Ppat_constraint(p, Some ct, m);_} ->
+          (match p with
+          | {ppat_desc = Ppat_var {txt;_}; ppat_attributes = []}
+            when txt = rest ->
+              (match opt with
+              | Some o ->
+                  pp f "(?(%a=@;%a)@;:@;%a)"
+                    ident_of_name rest (expression ctxt) o
+                    (core_type_with_optional_modes ctxt) (ct, m)
+              | None ->
+                  pp f "(?%a@;:@;%a)" ident_of_name rest
+                    (core_type_with_optional_modes ctxt) (ct, m))
+          | _ ->
+              (match opt with
+              | Some o ->
+                  pp f "(?%a:((%a)=@;%a)@;:@;%a)@;"
+                    ident_of_name rest (pattern2 ctxt) p (expression ctxt) o
+                    (core_type_with_optional_modes ctxt) (ct, m)
+              | None ->
+                  pp f "(?%a:%a@;:@;%a)@;"
+                    ident_of_name rest (simple_pattern1 ctxt) p
+                    (core_type_with_optional_modes ctxt) (ct, m)))
+      | _ -> failwith "Cannot print generic optionals without a type annotation"
       end
   )
   | Labelled l -> match p with
@@ -2229,12 +2232,8 @@ and label_x_expression_param ctxt f (l,e) =
         pp f "?%a" ident_of_name str
       else
         pp f "?%a:%a" ident_of_name str (simple_expr ctxt) e
-  | Generic_optional (module_path, str) ->
-      if Some str = simple_name then
-        pp f "%a.?'%a" longident_loc module_path ident_of_name str
-      else
-        pp f "%a.?'%a:%a"
-          longident_loc module_path ident_of_name str (simple_expr ctxt) e
+  | Generic_optional _ ->
+      failwith "Generic optional not allowed as function call arguments"
   | Labelled lbl ->
       if Some lbl = simple_name then
         pp f "~%a" ident_of_name lbl
