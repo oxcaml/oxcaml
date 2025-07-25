@@ -32,9 +32,9 @@ type continuation =
   | Block of Jsir.Addr.t
 
 let get_continuation_exn t cont =
-  if cont = t.return_continuation
+  if Continuation.equal cont t.return_continuation
   then Return
-  else if cont = t.exn_continuation
+  else if Continuation.equal cont t.exn_continuation
   then Exception
   else Block (Continuation.Map.find cont t.continuations)
 

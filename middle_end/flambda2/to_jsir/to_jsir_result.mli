@@ -28,11 +28,11 @@ val set_last : t -> Jsir.last -> t
 (** Create a new block with the given params, and set it to be current.
 
     The current block before this call will be archived and cannot be modified
-    further. This function raises if [set_branch] has not been set for the
+    further. This function raises if [set_last] has not been set for the
     current block. *)
 val new_block_exn : t -> Jsir.Var.t list -> t
 
 (** Create a [Jsir.program] with the blocks in the result, including the
-    current block. This function raises if [set_branch] has not been set for
+    current block. This function raises if [set_last] has not been set for
     the current block. *)
 val to_program_exn : t -> Jsir.program
