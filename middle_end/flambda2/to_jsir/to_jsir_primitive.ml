@@ -108,6 +108,11 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     primitive_not_supported ()
 
 let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
+  let use_prim ~env ~res prim =
+    let expr : Jsir.expr = Prim (prim, [x; y]) in
+    let var = Jsir.Var.fresh () in
+    var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
+  in
   match f with
   | Block_set { kind; init; field } ->
     ignore (kind, init, field);
@@ -122,17 +127,30 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     ignore (dims, kind, layout);
     primitive_not_supported ()
   | Phys_equal comparison ->
-    let expr : Jsir.expr =
-      match comparison with Eq -> Prim (Eq, [x; y]) | Neq -> Prim (Neq, [x; y])
-    in
-    let jvar = Jsir.Var.fresh () in
-    jvar, env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
+    let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
+    use_prim ~env ~res prim
   | Int_arith (kind, op) ->
-    ignore (kind, op);
-    primitive_not_supported ()
+    (* CR selee: this is almost certainly wrong *)
+    ignore kind;
+    let extern_name =
+      match op with
+      | Add -> "%int_add"
+      | Sub -> "%int_sub"
+      | Mul -> "%int_mul"
+      | Div -> "%int_div"
+      | Mod -> "%int_mod"
+      | And -> "%int_and"
+      | Or -> "%int_or"
+      | Xor -> "%int_xor"
+    in
+    use_prim ~env ~res (Extern extern_name)
   | Int_shift (kind, op) ->
-    ignore (kind, op);
-    primitive_not_supported ()
+    (* CR selee: this is almost certainly wrong *)
+    ignore kind;
+    let extern_name =
+      match op with Lsl -> "%int_lsl" | Lsr -> "%int_lsr" | Asr -> "%int_asr"
+    in
+    use_prim ~env ~res (Extern extern_name)
   | Int_comp (kind, behaviour) ->
     ignore (kind, behaviour);
     primitive_not_supported ()
