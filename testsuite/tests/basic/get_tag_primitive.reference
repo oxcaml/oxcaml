@@ -1,0 +1,94 @@
+Testing the %get_tag primitive
+=====================================
+Testing exceptions:
+Test_exn tag: 248 (expected 248)
+Test_exn_with_arg tag: 0 (exception value with arguments)
+
+Testing tuples:
+Tuple (1,2) tag: 0 (expected 0)
+Tuple (1,2,3) tag: 0 (expected 0)
+Tuple (1,2,3,4) tag: 0 (expected 0)
+
+Testing records:
+Record tag: 0 (expected 0)
+
+Testing arrays:
+Int array tag: 0 (expected 0)
+String array tag: 0 (expected 0)
+
+Testing variants:
+Variant B tag: 0 (expected 0 for first constructor with args)
+Variant C tag: 1 (expected 1 for second constructor with args)
+
+Testing lists:
+Non-empty int list tag: 0 (expected 0)
+Non-empty string list tag: 0 (expected 0)
+
+Testing floats:
+Float 3.14 tag: 253 (expected 253)
+Float 0.0 tag: 253 (expected 253)
+Float infinity tag: 253 (expected 253)
+
+Testing strings:
+String "hello" tag: 252 (expected 252)
+Empty string tag: 252 (expected 252)
+Long string tag: 252 (expected 252)
+
+Testing lazy values:
+Lazy int tag: 246 (expected 246)
+Lazy string tag: 246 (expected 246)
+
+Testing closures:
+Simple closure tag: 247 (expected 247)
+Closure with env tag: 247 (expected 247)
+
+Testing objects:
+Simple object tag: 248 (expected 248)
+Object with methods tag: 248 (expected 248)
+
+Testing custom blocks:
+Int64 tag: 255 (expected 255)
+Int32 tag: 255 (expected 255)
+Nativeint tag: 255 (expected 255)
+
+Testing polymorphic variants:
+Poly variant `Blue tag: 0
+Poly variant `Green tag: 0
+
+Testing references:
+Int ref tag: 0 (expected 0)
+String ref tag: 0 (expected 0)
+
+Testing options:
+Some 42 tag: 0 (expected 0)
+Some "hello" tag: 0 (expected 0)
+
+Testing result types:
+Ok 42 tag: 0 (expected 0)
+Error "failed" tag: 1 (expected 1)
+
+Testing nested structures:
+Some [1;2;3] tag: 0 (expected 0)
+(Some 42, Error "test") tag: 0 (expected 0)
+[| Some 1; Some 2; None |] tag: 0 (expected 0)
+
+Testing mutable records:
+Mutable record tag: 0 (expected 0)
+Mutable record after update tag: 0 (expected 0)
+
+Testing float arrays:
+Float array tag: 254 (expected 254)
+Empty float array tag: 0 (expected 0)
+
+Testing variants with multiple arguments:
+Single 1 tag: 0 (expected 0)
+Double (1,2) tag: 1 (expected 1)
+Triple (1,2,3) tag: 2 (expected 2)
+Quad (1,2,3,4) tag: 3 (expected 3)
+
+Testing GADTs:
+Int 42 tag: 0 (expected 0)
+String "hello" tag: 1 (expected 1)
+Pair (Int 1, String "a") tag: 2 (expected 2)
+
+All tests completed!

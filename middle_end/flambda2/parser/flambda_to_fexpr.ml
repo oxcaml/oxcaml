@@ -571,7 +571,7 @@ let unop env (op : Flambda_primitive.unary_primitive) : Fexpr.unop =
   | Box_number (bk, alloc) ->
     Box_number (bk, alloc_mode_for_allocations env alloc)
   | Tag_immediate -> Tag_immediate
-  | Get_tag -> Get_tag
+  | Get_tag _ -> Get_tag
   | End_region { ghost } -> End_region { ghost }
   | End_try_region { ghost } -> End_try_region { ghost }
   | Int_arith (i, o) -> Int_arith (i, o)

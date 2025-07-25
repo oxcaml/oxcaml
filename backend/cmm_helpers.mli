@@ -223,6 +223,9 @@ val get_header : expression -> Debuginfo.t -> expression
 (** Load a block's tag *)
 val get_tag : expression -> Debuginfo.t -> expression
 
+(** Load a block's tag using atomic acquire load *)
+val get_tag_atomic : expression -> Debuginfo.t -> expression
+
 (** Arrays *)
 
 val wordsize_shift : int
