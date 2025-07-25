@@ -3687,13 +3687,7 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error =
-      | Error :
-          (* For now, we don't use hints here, so using [disallowed * disallowed]
-             is just a placeholder allowance *)
-          'a axis
-          * 'a raw axerror
-          -> error
+    type error = Error : 'a axis * 'a raw axerror -> error
 
     module Const = struct
       type t = Join_const of Mode.Const.t
@@ -3710,16 +3704,9 @@ module Modality = struct
           if Mode.Const.le c0 c1
           then Ok ()
           else
-            let (Error (ax, err)) =
-              Mode.flipped_axis_of_solver_error
-                { left = c0;
-                  left_hint = Const Hint.const_none;
-                  right = c1;
-                  right_hint = Const Hint.const_none
-                }
+            let (Axis_with_proj_pair (ax, left, right)) =
+              Mode.axis_of_error c0 c1
             in
-            let left = err.left in
-            let right = err.right in
             Error
               (Error
                  ( ax,
@@ -3841,10 +3828,7 @@ module Modality = struct
 
     type 'a axis = 'a Mode.Axis.t
 
-    type error =
-      (* For now, we don't use hints here, so using [disallowed * disallowed]
-         is just a placeholder allowance *)
-      | Error : 'a axis * 'a raw axerror -> error
+    type error = Error : 'a axis * 'a raw axerror -> error
 
     module Const = struct
       type t = Meet_const of Mode.Const.t
