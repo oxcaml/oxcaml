@@ -1,7 +1,7 @@
 (** Blocks with the continuation potentially not yet defined.
 
     For efficiency reasons, [body] will be inserted head-first,
-    so the instructions are in reverse. [archive_block] will
+    so the instructions are in reverse. [end_block_exn] will
     therefore reverse this before archiving. *)
 type partial_block =
   { params : Jsir.Var.t list;
@@ -10,14 +10,14 @@ type partial_block =
   }
 
 type t =
-  { archived_blocks : Jsir.block Jsir.Addr.Map.t;
+  { complete_blocks : Jsir.block Jsir.Addr.Map.t;
     current_block : partial_block;
     current_block_addr : Jsir.Addr.t
   }
 
 let create () =
   let current_block = { params = []; body = []; last = None } in
-  { archived_blocks = Jsir.Addr.Map.empty;
+  { complete_blocks = Jsir.Addr.Map.empty;
     current_block;
     current_block_addr = Jsir.Addr.zero
   }
@@ -32,7 +32,7 @@ let set_last t last =
   let current_block = { t.current_block with last = Some last } in
   { t with current_block }
 
-let archive_block_exn ~archived_blocks ~current_block ~current_block_addr =
+let end_block_exn ~complete_blocks ~current_block ~current_block_addr =
   let branch =
     match current_block.last with
     | None ->
@@ -48,23 +48,23 @@ let archive_block_exn ~archived_blocks ~current_block ~current_block_addr =
       branch
     }
   in
-  Jsir.Addr.Map.add current_block_addr current_block archived_blocks
+  Jsir.Addr.Map.add current_block_addr current_block complete_blocks
 
-let new_block_exn { archived_blocks; current_block; current_block_addr } params
+let new_block_exn { complete_blocks; current_block; current_block_addr } params
     =
   (* CR selee: review PC *)
-  let archived_blocks =
-    archive_block_exn ~archived_blocks ~current_block ~current_block_addr
+  let complete_blocks =
+    end_block_exn ~complete_blocks ~current_block ~current_block_addr
   in
   let current_block_addr =
     current_block_addr + List.length current_block.body
   in
   let current_block = { params; body = []; last = None } in
-  { archived_blocks; current_block_addr; current_block }
+  { complete_blocks; current_block_addr; current_block }
 
-let to_program_exn { archived_blocks; current_block; current_block_addr } =
-  let archived_blocks =
-    archive_block_exn ~archived_blocks ~current_block ~current_block_addr
+let to_program_exn { complete_blocks; current_block; current_block_addr } =
+  let complete_blocks =
+    end_block_exn ~complete_blocks ~current_block ~current_block_addr
   in
-  let free_pc = (Jsir.Addr.Map.max_binding archived_blocks |> fst) + 1 in
-  { Jsir.start = Jsir.Addr.zero; blocks = archived_blocks; free_pc }
+  let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
+  { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
