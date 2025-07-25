@@ -105,7 +105,9 @@ let invalid_switch_block t =
   | Some addr -> t, addr
   | None ->
     let t, addr = new_block t ~params:[] in
-    (* CR selee: Probably should have some runtime call here saying things are
-       invalid *)
+    let t =
+      add_instr_exn t
+        (Let (Jsir.Var.fresh (), Prim (Extern "caml_invalid_switch_arm", [])))
+    in
     let t = end_block_with_last_exn t Stop in
     { t with invalid_switch_block = Some addr }, addr
