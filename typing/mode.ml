@@ -1759,237 +1759,244 @@ module Axis = C.Axis
 
 (** Hints for the mode solvers. These are axis-specific hints that contain a trace
 of the values in a single axis from an error. *)
-type 'a axhint =
-  | Morph : 'd Hint.morph * 'b * 'b C.obj * 'b axhint * _ C.morph -> 'a axhint
-  | Const : Hint.const -> 'a axhint
-  | Empty : 'a axhint
+type axhint =
+  | Morph : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
+  | Const : Hint.const -> axhint
+  | Empty : axhint
 [@@ocaml.warning "-62"]
 
-(** Errors for the mode solvers. These are axis-specific processed versions of
+(** Provides errors for the mode solvers. These are axis-specific processed versions of
 the errors returned by the solver, as the solver errors consider axis products.
 The hints in this error type are [axhint] values. *)
 type 'a axerror =
   { left : 'a;
-    left_hint : 'a axhint;
+    left_hint : axhint;
     right : 'a;
-    right_hint : 'a axhint
+    right_hint : axhint
   }
 
-type print_hint_res =
-  | HintPrinted
-  | NothingPrinted
+module Axerror = struct
+  module Printing = struct
+    type print_hint_res =
+      | HintPrinted
+      | NothingPrinted
 
-(** Print out the text for a constant hint. Either prints nothing when there is
+    (** Print out the text for a constant hint. Either prints nothing when there is
   no hint and returns [NothingPrinted] or prints " because {hint}" where {hint}
   is text for the specific constant hint and returns [HintPrinted]. *)
-let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
-  let open Format in
-  let wrap_print_hint t = fprintf ppf "@ because %t" t in
-  function
-  | None -> NothingPrinted
-  | Result_of_lazy ->
-    wrap_print_hint (dprintf "it is the result of a lazy expression");
-    HintPrinted
-  | Lazy_closure ->
-    wrap_print_hint (dprintf "lazy expressions are always %a" (C.print a_obj) a);
-    HintPrinted
-  | Class ->
-    wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a);
-    HintPrinted
-  | Tailcall_function ->
-    wrap_print_hint (dprintf "it is the function in a tail call");
-    HintPrinted
-  | Tailcall_argument ->
-    wrap_print_hint (dprintf "it is an argument in a tail call");
-    HintPrinted
-  | Mutable_read ->
-    wrap_print_hint (dprintf "it has a mutable field read from");
-    HintPrinted
-  | Mutable_write ->
-    wrap_print_hint (dprintf "it has a mutable field written to");
-    HintPrinted
-  | Forced_lazy_expression ->
-    wrap_print_hint (dprintf "it is a lazy expression that is forced");
-    HintPrinted
-  | Is_function_return ->
-    wrap_print_hint
-      (dprintf "it is a function return value without an exclave annotation");
-    HintPrinted
-  | Stack_expression ->
-    wrap_print_hint (dprintf "it is a stack expression");
-    HintPrinted
+    let print_const_hint a_obj a ppf : Hint.const -> print_hint_res =
+      let open Format in
+      let wrap_print_hint t = fprintf ppf "@ because %t" t in
+      function
+      | None -> NothingPrinted
+      | Result_of_lazy ->
+        wrap_print_hint (dprintf "it is the result of a lazy expression");
+        HintPrinted
+      | Lazy_closure ->
+        wrap_print_hint
+          (dprintf "lazy expressions are always %a" (C.print a_obj) a);
+        HintPrinted
+      | Class ->
+        wrap_print_hint (dprintf "classes are always %a" (C.print a_obj) a);
+        HintPrinted
+      | Tailcall_function ->
+        wrap_print_hint (dprintf "it is the function in a tail call");
+        HintPrinted
+      | Tailcall_argument ->
+        wrap_print_hint (dprintf "it is an argument in a tail call");
+        HintPrinted
+      | Mutable_read ->
+        wrap_print_hint (dprintf "it has a mutable field read from");
+        HintPrinted
+      | Mutable_write ->
+        wrap_print_hint (dprintf "it has a mutable field written to");
+        HintPrinted
+      | Forced_lazy_expression ->
+        wrap_print_hint (dprintf "it is a lazy expression that is forced");
+        HintPrinted
+      | Is_function_return ->
+        wrap_print_hint
+          (dprintf "it is a function return value without an exclave annotation");
+        HintPrinted
+      | Stack_expression ->
+        wrap_print_hint (dprintf "it is a stack expression");
+        HintPrinted
 
-type print_morph_hint =
-  | Skip
-      (** [Skip] means we don't print anything for this line,
+    type print_morph_hint =
+      | Skip
+          (** [Skip] means we don't print anything for this line,
       and continue onto the next hint *)
-  | Stop
-      (** [Stop] means we don't print anything for this line,
+      | Stop
+          (** [Stop] means we don't print anything for this line,
       and stop the trace here *)
-  | Print_then_continue of (Format.formatter -> unit)
-      (** [Print_then_continue pp] means we print this line, using [pp] to print the
+      | Print_then_continue of (Format.formatter -> unit)
+          (** [Print_then_continue pp] means we print this line, using [pp] to print the
       morph hint, then continue onto the next hint *)
-  | Debug_print_then_continue of (Format.formatter -> unit)
+      | Debug_print_then_continue of (Format.formatter -> unit)
 
-(** Get a printer for a single morph hint, or a special output if the hint requires
+    (** Get a printer for a single morph hint, or a special output if the hint requires
   special behaviour *)
-let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint =
-  let open Format in
-  fun hint ->
-    match hint with
-    (* | Debug s ->
-       let _ = Skip in
-       Debug_print_then_continue (dprintf "DEBUG[%s]" s) *)
-    | Debug _ -> Skip
-    (* | None ->
-       let _ = Stop in
-       Debug_print_then_continue (dprintf "[None]") *)
-    | None -> Stop
-    (* | Skip ->
-       let _ = Skip in
-       Debug_print_then_continue (dprintf "[Skip]") *)
-    | Skip -> Skip
-    | Close_over closure ->
-      (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
-      Print_then_continue
-        (dprintf "closes over the %a %a (at %a)" Hint.print_lock_item
-           closure.value_item
-           (Misc.Style.as_inline_code !print_longident)
-           closure.value_lid Location.print_loc closure.value_loc)
-    | Is_closed_by closure ->
-      Print_then_continue
-        (dprintf "is used inside a %a" Hint.print_closure_context
-           closure.closure_context)
-    | Captured_by_partial_application ->
-      Print_then_continue (dprintf "is captured by a partial application")
-    | Adj_captured_by_partial_application ->
-      Print_then_continue
-        (dprintf "has a partial application capturing a value")
-    | Crossing_left | Crossing_right ->
-      Print_then_continue (dprintf "crosses with something")
-    | Compose (hint1, hint2) -> (
-      match print_morph_hint hint1 with
-      | Skip -> print_morph_hint hint2
-      | Stop -> Stop
-      | Print_then_continue pp1 -> (
-        match print_morph_hint hint2 with
-        | Skip -> Print_then_continue pp1
-        | Stop -> Stop
-        | Print_then_continue pp2 ->
-          Print_then_continue (dprintf "%t@ which %t" pp1 pp2)
-        | Debug_print_then_continue pp2 ->
-          Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2))
-      | Debug_print_then_continue pp1 -> (
-        match print_morph_hint hint2 with
-        | Skip -> Print_then_continue pp1
-        | Stop -> Stop
-        | Print_then_continue pp2 ->
-          Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)
-        | Debug_print_then_continue pp2 ->
-          Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)))
+    let rec print_morph_hint : type l r. (l * r) Hint.morph -> print_morph_hint
+        =
+      let open Format in
+      fun hint ->
+        match hint with
+        (* | Debug s ->
+           let _ = Skip in
+           Debug_print_then_continue (dprintf "DEBUG[%s]" s) *)
+        | Debug _ -> Skip
+        (* | None ->
+           let _ = Stop in
+           Debug_print_then_continue (dprintf "[None]") *)
+        | None -> Stop
+        (* | Skip ->
+           let _ = Skip in
+           Debug_print_then_continue (dprintf "[Skip]") *)
+        | Skip -> Skip
+        | Close_over closure ->
+          (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
+          Print_then_continue
+            (dprintf "closes over the %a %a (at %a)" Hint.print_lock_item
+               closure.value_item
+               (Misc.Style.as_inline_code !print_longident)
+               closure.value_lid Location.print_loc closure.value_loc)
+        | Is_closed_by closure ->
+          Print_then_continue
+            (dprintf "is used inside a %a" Hint.print_closure_context
+               closure.closure_context)
+        | Captured_by_partial_application ->
+          Print_then_continue (dprintf "is captured by a partial application")
+        | Adj_captured_by_partial_application ->
+          Print_then_continue
+            (dprintf "has a partial application capturing a value")
+        | Crossing_left | Crossing_right ->
+          Print_then_continue (dprintf "crosses with something")
+        | Compose (hint1, hint2) -> (
+          match print_morph_hint hint1 with
+          | Skip -> print_morph_hint hint2
+          | Stop -> Stop
+          | Print_then_continue pp1 -> (
+            match print_morph_hint hint2 with
+            | Skip -> Print_then_continue pp1
+            | Stop -> Stop
+            | Print_then_continue pp2 ->
+              Print_then_continue (dprintf "%t@ which %t" pp1 pp2)
+            | Debug_print_then_continue pp2 ->
+              Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2))
+          | Debug_print_then_continue pp1 -> (
+            match print_morph_hint hint2 with
+            | Skip -> Print_then_continue pp1
+            | Stop -> Stop
+            | Print_then_continue pp2 ->
+              Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)
+            | Debug_print_then_continue pp2 ->
+              Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)))
 
-(** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
+    (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
 terminated with an [Empty] or [Const] axhint *)
-let rec print_axhint_chain :
-    type a.
-    [`Actual | `Expected] ->
-    a ->
-    a C.obj ->
-    a axhint ->
-    Format.formatter ->
-    print_hint_res =
- fun side (a : a) (a_obj : a C.obj) (hint : a axhint) ppf ->
-  let open Format in
-  let print_mode : type x. x C.obj -> x -> _ =
-   (* This is a wrapping around the standard [C.print],
-      to make the error messages more readable for the user *)
-   fun x_obj x ->
-    let mode_printer = Misc.Style.as_inline_code (C.print x_obj) in
-    let default_printer () = mode_printer ppf x in
-    match side, x_obj, x with
-    | _, Regionality, Regional ->
-      (* In the special case that we are talking about the regional mode,
-         we print a more user-friendly message, as below, instead of referring
-         directly to the regional mode, as the user doesn't need to know about it *)
-      fprintf ppf "local to the parent region"
-    | `Expected, Contention_op, Shared ->
-      (* When printing the "shared" mode on the "expected" side (noting that expected
-         modes only appear on the right side of inequalities (on the "greater" side)),
-         we print that it was expected to be either shared or uncontended, to help
-         the user. We don't do anything similar when printing on the "actual" side
-         as this is confusing to put in an error message. *)
-      fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
-        C.Contention.Uncontended
-    | _ ->
-      (* Otherwise, we just use the default mode constant printer *)
-      default_printer ()
-   [@@ocaml.warning "-4"]
-  in
-  match hint with
-  | Morph (morph_hint, b, b_obj, b_hint, _morph) -> (
-    let temp_thing pp =
-      print_mode a_obj a;
-      fprintf ppf "@ because it %t@ which is " pp;
-      ignore (print_axhint_chain side b b_obj b_hint ppf);
-      HintPrinted
-    in
-    match print_morph_hint morph_hint with
-    | Skip ->
-      (* This is a case where we skip a line without printing the mode first *)
-      print_axhint_chain side b b_obj b_hint ppf
-    | Stop ->
-      print_mode a_obj a;
-      NothingPrinted
-    | Print_then_continue pp -> (
-      match C.eq_obj a_obj b_obj with
-      | Some Refl
-        when Misc.Le_result.equal ~le:(C.le a_obj) a b
-             && not (Hint.is_rigid morph_hint) ->
-        (* When the [a] and [b] modes are equal, and the hint is non-rigid,
-           we can definitely skip printing this line. *)
-        print_axhint_chain side b b_obj b_hint ppf
-      | Some Refl | None -> temp_thing pp)
-    | Debug_print_then_continue pp -> temp_thing pp)
-  | Const const_hint ->
-    print_mode a_obj a;
-    print_const_hint a_obj a ppf const_hint
-  | Empty ->
-    print_mode a_obj a;
-    NothingPrinted
+    let rec print_axhint_chain :
+        type a.
+        [`Actual | `Expected] ->
+        a ->
+        a C.obj ->
+        axhint ->
+        Format.formatter ->
+        print_hint_res =
+     fun side (a : a) (a_obj : a C.obj) (hint : axhint) ppf ->
+      let open Format in
+      let print_mode : type x. x C.obj -> x -> _ =
+       (* This is a wrapping around the standard [C.print],
+          to make the error messages more readable for the user *)
+       fun x_obj x ->
+        let mode_printer = Misc.Style.as_inline_code (C.print x_obj) in
+        let default_printer () = mode_printer ppf x in
+        match side, x_obj, x with
+        | _, Regionality, Regional ->
+          (* In the special case that we are talking about the regional mode,
+             we print a more user-friendly message, as below, instead of referring
+             directly to the regional mode, as the user doesn't need to know about it *)
+          fprintf ppf "local to the parent region"
+        | `Expected, Contention_op, Shared ->
+          (* When printing the "shared" mode on the "expected" side (noting that expected
+             modes only appear on the right side of inequalities (on the "greater" side)),
+             we print that it was expected to be either shared or uncontended, to help
+             the user. We don't do anything similar when printing on the "actual" side
+             as this is confusing to put in an error message. *)
+          fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
+            C.Contention.Uncontended
+        | _ ->
+          (* Otherwise, we just use the default mode constant printer *)
+          default_printer ()
+       [@@ocaml.warning "-4"]
+      in
+      match hint with
+      | Morph (morph_hint, b, b_obj, b_hint, _morph) -> (
+        let temp_thing pp =
+          print_mode a_obj a;
+          fprintf ppf "@ because it %t@ which is " pp;
+          ignore (print_axhint_chain side b b_obj b_hint ppf);
+          HintPrinted
+        in
+        match print_morph_hint morph_hint with
+        | Skip ->
+          (* This is a case where we skip a line without printing the mode first *)
+          print_axhint_chain side b b_obj b_hint ppf
+        | Stop ->
+          print_mode a_obj a;
+          NothingPrinted
+        | Print_then_continue pp -> (
+          match C.eq_obj a_obj b_obj with
+          | Some Refl
+            when Misc.Le_result.equal ~le:(C.le a_obj) a b
+                 && not (Hint.is_rigid morph_hint) ->
+            (* When the [a] and [b] modes are equal, and the hint is non-rigid,
+               we can definitely skip printing this line. *)
+            print_axhint_chain side b b_obj b_hint ppf
+          | Some Refl | None -> temp_thing pp)
+        | Debug_print_then_continue pp -> temp_thing pp)
+      | Const const_hint ->
+        print_mode a_obj a;
+        print_const_hint a_obj a ppf const_hint
+      | Empty ->
+        print_mode a_obj a;
+        NothingPrinted
 
-(** Report an axerror, printing error traces for both the left and the right sides *)
-let report_axerror :
-    type a.
-    ?target:_ ->
-    left_obj:a Lattices_mono.obj ->
-    right_obj:a Lattices_mono.obj ->
-    a axerror ->
-    Format.formatter ->
-    unit =
- fun ?target ~left_obj ~right_obj err ppf ->
-  let open Format in
-  (match target with
-  | None -> fprintf ppf "This value is "
-  | Some (target_item, target_lid) ->
-    fprintf ppf "The %a %a is " Hint.print_lock_item target_item
-      (Misc.Style.as_inline_code !print_longident)
-      target_lid);
-  (match print_axhint_chain `Actual err.left left_obj err.left_hint ppf with
-  | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
-  | NothingPrinted -> fprintf ppf "@ but expected to be ");
-  ignore (print_axhint_chain `Expected err.right right_obj err.right_hint ppf);
-  fprintf ppf "."
+    (** Report an axerror, printing error traces for both the left and the right sides *)
+    let report_axerror :
+        type a.
+        ?target:_ ->
+        left_obj:a Lattices_mono.obj ->
+        right_obj:a Lattices_mono.obj ->
+        a axerror ->
+        Format.formatter ->
+        unit =
+     fun ?target ~left_obj ~right_obj err ppf ->
+      let open Format in
+      (match target with
+      | None -> fprintf ppf "This value is "
+      | Some (target_item, target_lid) ->
+        fprintf ppf "The %a %a is " Hint.print_lock_item target_item
+          (Misc.Style.as_inline_code !print_longident)
+          target_lid);
+      (match print_axhint_chain `Actual err.left left_obj err.left_hint ppf with
+      | HintPrinted -> fprintf ppf ".@\nHowever, it is expected to be "
+      | NothingPrinted -> fprintf ppf "@ but expected to be ");
+      ignore
+        (print_axhint_chain `Expected err.right right_obj err.right_hint ppf);
+      fprintf ppf "."
+  end
 
-(** Description of an input axis responsible for an output axis of a morphism *)
-type 'a responsible_axis =
-  | NoneResponsible : 'a responsible_axis
-      (** None of the input axes are responsible for the output axis *)
-  | SourceIsSingle : 'a responsible_axis
-      (** The input of the morphism is a single axis object that is responsible for the output axis *)
-  | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
-      (** The specified axis of the input object is responsible for the output axis *)
+  module From_solver_error = struct
+    (** Description of an input axis responsible for an output axis of a morphism *)
+    type 'a responsible_axis =
+      | NoneResponsible : 'a responsible_axis
+          (** None of the input axes are responsible for the output axis *)
+      | SourceIsSingle : 'a responsible_axis
+          (** The input of the morphism is a single axis object that is responsible for the output axis *)
+      | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
+          (** The specified axis of the input object is responsible for the output axis *)
 
-(** Given a morphism either from a product object to a single axis, or
+    (** Given a morphism either from a product object to a single axis, or
      from a product object to a single axis, this function
      is used to find the axis in the source that is responsible for the
      output axis object.
@@ -2006,246 +2013,253 @@ type 'a responsible_axis =
      NOTE: given the morphisms defined, there should only ever be a single source
      axis responsible for the output axis, otherwise this function wouldn't be properly
      definable. *)
-let rec find_responsible_axis_single :
-    type a b l r. (a, b, l * r) C.morph -> a responsible_axis =
-  (* CR-someday pdsouza: add a parameter to this function for the output, [b], to
-     be able to disambiguate cases of a morphism being responsible or the input
-     being responsible. See notes below. This will take some work to have it
-     threaded through the rest of the code.
-     Really, what we are looking to output is one of three cases:
-     1. The input itself (one or all the axes) is solely responsible for the output. If
-         it isn't this case then we can skip the rest of the chain.
-     2. The morphism itself is solely responsible for the output. Beware, applying
-          [Meet_with c] on some [m] where [m <= c] is a nop, so behaves like [Id],
-          and so it is the input that is responsible here, not the morphism.
-     3. Both the input and the morphism are partly responsible for the output. *)
-  let open Lattices_mono in
-  function
-  | Proj (_a_obj, ax) -> Axis ax
-  | Compose (g, f) -> (
-    match find_responsible_axis_single g with
-    | NoneResponsible -> NoneResponsible
-    | SourceIsSingle -> find_responsible_axis_single f
-    | Axis c_ax -> find_responsible_axis_prod f c_ax)
-  | Id | Meet_with _ | Imply _ -> SourceIsSingle
-  | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
-  | Comonadic_to_monadic _ | Monadic_to_comonadic_max ->
-    assert false
-  | Local_to_regional | Regional_to_local | Locality_as_regionality
-  | Regional_to_global | Global_to_regional ->
-    SourceIsSingle
+    let rec find_responsible_axis_single :
+        type a b l r. (a, b, l * r) C.morph -> a responsible_axis =
+      (* CR-someday pdsouza: add a parameter to this function for the output, [b], to
+         be able to disambiguate cases of a morphism being responsible or the input
+         being responsible. See notes below. This will take some work to have it
+         threaded through the rest of the code.
+         Really, what we are looking to output is one of three cases:
+         1. The input itself (one or all the axes) is solely responsible for the output. If
+             it isn't this case then we can skip the rest of the chain.
+         2. The morphism itself is solely responsible for the output. Beware, applying
+              [Meet_with c] on some [m] where [m <= c] is a nop, so behaves like [Id],
+              and so it is the input that is responsible here, not the morphism.
+         3. Both the input and the morphism are partly responsible for the output. *)
+      let open Lattices_mono in
+      function
+      | Proj (_a_obj, ax) -> Axis ax
+      | Compose (g, f) -> (
+        match find_responsible_axis_single g with
+        | NoneResponsible -> NoneResponsible
+        | SourceIsSingle -> find_responsible_axis_single f
+        | Axis c_ax -> find_responsible_axis_prod f c_ax)
+      | Id | Meet_with _ | Imply _ -> SourceIsSingle
+      | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
+      | Comonadic_to_monadic _ | Monadic_to_comonadic_max ->
+        assert false
+      | Local_to_regional | Regional_to_local | Locality_as_regionality
+      | Regional_to_global | Global_to_regional ->
+        SourceIsSingle
 
-(** This function is similar to [find_responsible_axis_single] but assumes that the
+    (** This function is similar to [find_responsible_axis_single] but assumes that the
 output object of the morphism is a product object. *)
-and find_responsible_axis_prod :
-    type a b b_ax l r.
-    (a, b, l * r) C.morph -> (b, b_ax) Axis.t -> a responsible_axis =
-  (* CR pdsouza: should add a new parameter, something like "b" and/or "b_ax", so
-     that we can return NoneResponsible for certain cases of [Meet_with] and [Imply] *)
-  let open Lattices_mono in
-  (* fun (type a b b_ax l r) (m : (a, b, l * r) morph) (ax : (b, b_ax) Axis.t) -> *)
-  fun m ax ->
-    let handle_monadic_to_comonadic (type x y)
-        (ax : (x comonadic_with, y) Axis.t) =
-      (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
-      match ax with
-      | Areality -> NoneResponsible
-      | Linearity -> Axis Uniqueness
-      | Portability -> Axis Contention
-      | Yielding -> NoneResponsible
-      | Statefulness -> Axis Visibility
-    in
-    match m, ax with
-    | Compose (g, f), ax -> (
-      (* Operates similarly to the equivalent branch in [find_responsible_axis_single] *)
-      match find_responsible_axis_prod g ax with
-      | NoneResponsible -> NoneResponsible
-      | SourceIsSingle -> find_responsible_axis_single f
-      | Axis c_ax -> find_responsible_axis_prod f c_ax)
-    | Id, ax -> Axis ax
-    | Meet_with _, ax -> Axis ax
-    | Imply _, ax -> Axis ax
-    | Map_comonadic _, ax -> (
-      match ax with
-      | Areality -> Axis Areality
-      | Yielding -> Axis Yielding
-      | Linearity -> Axis Linearity
-      | Statefulness -> Axis Statefulness
-      | Portability -> Axis Portability)
-    | Max_with m_ax, ax | Min_with m_ax, ax -> (
-      match Axis.eq m_ax ax with
-      | None -> NoneResponsible
-      | Some Refl -> SourceIsSingle)
-    | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
-    | Monadic_to_comonadic_max, ax ->
-      (* Can't use an "or" pattern here due to GADT matching limitations,
-         so I've just made a separate function for code neatness, then inlined it *)
-      handle_monadic_to_comonadic ax
-    | Comonadic_to_monadic _, ax -> (
-      (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
-      match ax with
-      | Uniqueness -> Axis Linearity
-      | Contention -> Axis Portability
-      | Visibility -> Axis Statefulness)
-    | Proj _, _
-    | Local_to_regional, _
-    | Regional_to_local, _
-    | Locality_as_regionality, _
-    | Regional_to_global, _
-    | Global_to_regional, _ ->
-      .
+    and find_responsible_axis_prod :
+        type a b b_ax l r.
+        (a, b, l * r) C.morph -> (b, b_ax) Axis.t -> a responsible_axis =
+      (* CR pdsouza: should add a new parameter, something like "b" and/or "b_ax", so
+         that we can return NoneResponsible for certain cases of [Meet_with] and [Imply] *)
+      let open Lattices_mono in
+      (* fun (type a b b_ax l r) (m : (a, b, l * r) morph) (ax : (b, b_ax) Axis.t) -> *)
+      fun m ax ->
+        let handle_monadic_to_comonadic (type x y)
+            (ax : (x comonadic_with, y) Axis.t) =
+          (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
+          match ax with
+          | Areality -> NoneResponsible
+          | Linearity -> Axis Uniqueness
+          | Portability -> Axis Contention
+          | Yielding -> NoneResponsible
+          | Statefulness -> Axis Visibility
+        in
+        match m, ax with
+        | Compose (g, f), ax -> (
+          (* Operates similarly to the equivalent branch in [find_responsible_axis_single] *)
+          match find_responsible_axis_prod g ax with
+          | NoneResponsible -> NoneResponsible
+          | SourceIsSingle -> find_responsible_axis_single f
+          | Axis c_ax -> find_responsible_axis_prod f c_ax)
+        | Id, ax -> Axis ax
+        | Meet_with _, ax -> Axis ax
+        | Imply _, ax -> Axis ax
+        | Map_comonadic _, ax -> (
+          match ax with
+          | Areality -> Axis Areality
+          | Yielding -> Axis Yielding
+          | Linearity -> Axis Linearity
+          | Statefulness -> Axis Statefulness
+          | Portability -> Axis Portability)
+        | Max_with m_ax, ax | Min_with m_ax, ax -> (
+          match Axis.eq m_ax ax with
+          | None -> NoneResponsible
+          | Some Refl -> SourceIsSingle)
+        | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
+        | Monadic_to_comonadic_max, ax ->
+          (* Can't use an "or" pattern here due to GADT matching limitations,
+             so I've just made a separate function for code neatness, then inlined it *)
+          handle_monadic_to_comonadic ax
+        | Comonadic_to_monadic _, ax -> (
+          (* See [Lattices_mono.monadic_to_comonadic_min] for why these are as they are *)
+          match ax with
+          | Uniqueness -> Axis Linearity
+          | Contention -> Axis Portability
+          | Visibility -> Axis Statefulness)
+        | Proj _, _
+        | Local_to_regional, _
+        | Regional_to_local, _
+        | Locality_as_regionality, _
+        | Regional_to_global, _
+        | Global_to_regional, _ ->
+          .
 
-(** Container for an adjoint function. We use a special record type instead of inlining
+    (** Container for an adjoint function. We use a special record type instead of inlining
 the type so that we can have universal quantification over the input object types. *)
-type ('l1, 'r1, 'l2, 'r2) shint_to_axhint_side =
-  | LeftAdjoint : (_, allowed, allowed, disallowed) shint_to_axhint_side
-  | RightAdjoint : (allowed, _, disallowed, allowed) shint_to_axhint_side
+    type ('l1, 'r1, 'l2, 'r2) shint_to_axhint_side =
+      | LeftAdjoint : (_, allowed, allowed, disallowed) shint_to_axhint_side
+      | RightAdjoint : (allowed, _, disallowed, allowed) shint_to_axhint_side
 
-let shint_to_axhint_side_fn :
-    type a b l1 l2 r1 r2.
-    (l1, r1, l2, r2) shint_to_axhint_side ->
-    b C.obj ->
-    (a, b, l1 * r1) C.morph ->
-    (b, a, l2 * r2) C.morph = function
-  | LeftAdjoint -> C.left_adjoint
-  | RightAdjoint -> C.right_adjoint
+    let shint_to_axhint_side_fn :
+        type a b l1 l2 r1 r2.
+        (l1, r1, l2, r2) shint_to_axhint_side ->
+        b C.obj ->
+        (a, b, l1 * r1) C.morph ->
+        (b, a, l2 * r2) C.morph = function
+      | LeftAdjoint -> C.left_adjoint
+      | RightAdjoint -> C.right_adjoint
 
-let shint_to_axhint_side_le :
-    type a l1 l2 r1 r2.
-    (l1, r1, l2, r2) shint_to_axhint_side -> a C.obj -> a -> a -> bool =
- fun side a_obj x y ->
-  match side with
-  | LeftAdjoint -> C.le a_obj x y
-  | RightAdjoint -> C.le a_obj y x
+    let shint_to_axhint_side_le :
+        type a l1 l2 r1 r2.
+        (l1, r1, l2, r2) shint_to_axhint_side -> a C.obj -> a -> a -> bool =
+     fun side a_obj x y ->
+      match side with
+      | LeftAdjoint -> C.le a_obj x y
+      | RightAdjoint -> C.le a_obj y x
 
-let rec shint_to_axhint :
-    type r a left1 left2 right1 right2.
-    r Lattices_mono.obj ->
-    r ->
-    (r, left1 * right1) S.hint ->
-    (r, a) Axis.t ->
-    (left1, right1, left2, right2) shint_to_axhint_side ->
-    a * a axhint =
-  let open Lattices_mono in
-  fun r_obj r r_shint ax side ->
-    (* This function is for when we have a solver hint (aka "shint") for a product lattice and
-       wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
-    let a_obj = proj_obj ax r_obj in
-    let a = Axis.proj ax r in
-    match r_shint with
-    | Morph (morph_hint, morph, b_shint) -> (
-      let b_obj = src r_obj morph in
-      let morph_inv = shint_to_axhint_side_fn side r_obj morph in
-      let b = apply b_obj morph_inv r in
-      match find_responsible_axis_prod morph ax with
-      | NoneResponsible -> a, Empty
-      | SourceIsSingle ->
-        (* Note that unlike below, the returned [b] value will be the same as
-           the current [b], so we can discard it. *)
-        let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        a, Morph (morph_hint, b, b_obj, b_hint, morph)
-      | Axis b_ax ->
-        (* Note that [ax_b] is different to [b] as it refers to a single-axis
-           value in [b] *)
-        let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
-        let ax_b_obj = C.proj_obj b_ax b_obj in
-        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
-    | Const r_const_hint -> a, Const r_const_hint
-    | Branch (x, x_hint, y, y_hint) ->
-      let x_axval = Axis.proj ax x in
-      let y_axval = Axis.proj ax y in
-      let chosen, chosen_hint =
-        if shint_to_axhint_side_le side a_obj x_axval y_axval
-        then x, x_hint
-        else if shint_to_axhint_side_le side a_obj y_axval x_axval
-        then y, y_hint
-        else
-          (* As we are dealing with a single axis at a time, it should be totally-ordered, so this case should be impossible *)
-          assert false
-      in
-      shint_to_axhint r_obj chosen chosen_hint ax side
+    let rec shint_to_axhint :
+        type r a left1 left2 right1 right2.
+        r Lattices_mono.obj ->
+        r ->
+        (r, left1 * right1) S.hint ->
+        (r, a) Axis.t ->
+        (left1, right1, left2, right2) shint_to_axhint_side ->
+        a * axhint =
+      let open Lattices_mono in
+      fun r_obj r r_shint ax side ->
+        (* This function is for when we have a solver hint (aka "shint") for a product lattice and
+           wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
+        let a_obj = proj_obj ax r_obj in
+        let a = Axis.proj ax r in
+        match r_shint with
+        | Morph (morph_hint, morph, b_shint) -> (
+          let b_obj = src r_obj morph in
+          let morph_inv = shint_to_axhint_side_fn side r_obj morph in
+          let b = apply b_obj morph_inv r in
+          match find_responsible_axis_prod morph ax with
+          | NoneResponsible -> a, Empty
+          | SourceIsSingle ->
+            (* Note that unlike below, the returned [b] value will be the same as
+               the current [b], so we can discard it. *)
+            let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+            a, Morph (morph_hint, b, b_obj, b_hint, morph)
+          | Axis b_ax ->
+            (* Note that [ax_b] is different to [b] as it refers to a single-axis
+               value in [b] *)
+            let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+            let ax_b_obj = C.proj_obj b_ax b_obj in
+            a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
+        | Const r_const_hint -> a, Const r_const_hint
+        | Branch (x, x_hint, y, y_hint) ->
+          let x_axval = Axis.proj ax x in
+          let y_axval = Axis.proj ax y in
+          let chosen, chosen_hint =
+            if shint_to_axhint_side_le side a_obj x_axval y_axval
+            then x, x_hint
+            else if shint_to_axhint_side_le side a_obj y_axval x_axval
+            then y, y_hint
+            else
+              (* As we are dealing with a single axis at a time, it should be totally-ordered, so this case should be impossible *)
+              assert false
+          in
+          shint_to_axhint r_obj chosen chosen_hint ax side
 
-and single_axis_shint_to_axhint :
-    type a left1 right1 left2 right2.
-    a Lattices_mono.obj ->
-    a ->
-    (a, left1 * right1) S.hint ->
-    (left1, right1, left2, right2) shint_to_axhint_side ->
-    a * a axhint =
-  let open Lattices_mono in
-  fun a_obj a a_shint side ->
-    (* This function is for when we have a solver hint (aka "shint") for a
-       single axis and wish to convert it to a mode "axhint". *)
-    match a_shint with
-    | Morph (morph_hint, morph, b_shint) -> (
-      let b_obj = src a_obj morph in
-      let morph_inv = shint_to_axhint_side_fn side a_obj morph in
-      let b = apply b_obj morph_inv a in
-      match find_responsible_axis_single morph with
-      | NoneResponsible -> a, Empty
-      | SourceIsSingle ->
-        (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-        let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
-        a, Morph (morph_hint, b, b_obj, b_hint, morph)
-      | Axis b_ax ->
-        (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-        let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
-        let ax_b_obj = C.proj_obj b_ax b_obj in
-        a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
-    | Const a_const_hint -> a, Const a_const_hint
-    | Branch (x, x_hint, y, y_hint) ->
-      let chosen, chosen_hint =
-        if shint_to_axhint_side_le side a_obj x y
-        then x, x_hint
-        else if shint_to_axhint_side_le side a_obj y x
-        then y, y_hint
-        else
-          (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
-          assert false
-      in
-      single_axis_shint_to_axhint a_obj chosen chosen_hint side
+    and single_axis_shint_to_axhint :
+        type a left1 right1 left2 right2.
+        a Lattices_mono.obj ->
+        a ->
+        (a, left1 * right1) S.hint ->
+        (left1, right1, left2, right2) shint_to_axhint_side ->
+        a * axhint =
+      let open Lattices_mono in
+      fun a_obj a a_shint side ->
+        (* This function is for when we have a solver hint (aka "shint") for a
+           single axis and wish to convert it to a mode "axhint". *)
+        match a_shint with
+        | Morph (morph_hint, morph, b_shint) -> (
+          let b_obj = src a_obj morph in
+          let morph_inv = shint_to_axhint_side_fn side a_obj morph in
+          let b = apply b_obj morph_inv a in
+          match find_responsible_axis_single morph with
+          | NoneResponsible -> a, Empty
+          | SourceIsSingle ->
+            (* See notes above in [shint_to_axhint] regarding returned [b] value *)
+            let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+            a, Morph (morph_hint, b, b_obj, b_hint, morph)
+          | Axis b_ax ->
+            (* See notes above in [shint_to_axhint] regarding returned [b] value *)
+            let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+            let ax_b_obj = C.proj_obj b_ax b_obj in
+            a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
+        | Const a_const_hint -> a, Const a_const_hint
+        | Branch (x, x_hint, y, y_hint) ->
+          let chosen, chosen_hint =
+            if shint_to_axhint_side_le side a_obj x y
+            then x, x_hint
+            else if shint_to_axhint_side_le side a_obj y x
+            then y, y_hint
+            else
+              (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
+              assert false
+          in
+          single_axis_shint_to_axhint a_obj chosen chosen_hint side
 
-let flip_axerror { left; left_hint; right; right_hint } =
-  { left = right; left_hint = right_hint; right = left; right_hint = left_hint }
+    let flip_axerror { left; left_hint; right; right_hint } =
+      { left = right;
+        left_hint = right_hint;
+        right = left;
+        right_hint = left_hint
+      }
 
-(** Take a solver error for a product object, and an axis to project to, and
+    (** Take a solver error for a product object, and an axis to project to, and
 convert the error to an [axerror] *)
-let solver_error_to_axerror :
-    type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror =
- fun r_obj axis { left; left_hint; right; right_hint } ->
-  let left', left'_hint =
-    shint_to_axhint r_obj left left_hint axis RightAdjoint
-  in
-  let right', right'_hint =
-    shint_to_axhint r_obj right right_hint axis LeftAdjoint
-  in
-  { left = left';
-    left_hint = left'_hint;
-    right = right';
-    right_hint = right'_hint
-  }
+    let solver_error_to_axerror :
+        type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror
+        =
+     fun r_obj axis { left; left_hint; right; right_hint } ->
+      let left', left'_hint =
+        shint_to_axhint r_obj left left_hint axis RightAdjoint
+      in
+      let right', right'_hint =
+        shint_to_axhint r_obj right right_hint axis LeftAdjoint
+      in
+      { left = left';
+        left_hint = left'_hint;
+        right = right';
+        right_hint = right'_hint
+      }
 
-let flipped_solver_error_to_axerror r_obj axis err =
-  solver_error_to_axerror r_obj axis err |> flip_axerror
+    let flipped_solver_error_to_axerror r_obj axis err =
+      solver_error_to_axerror r_obj axis err |> flip_axerror
 
-(** Take a solver error for a single axis object and convert it to an [axerror] *)
-let single_axis_solver_error_to_axerror :
-    type a. a Lattices_mono.obj -> a S.error -> a axerror =
- fun a_obj { left; left_hint; right; right_hint } ->
-  let left', left'_hint =
-    single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
-  in
-  let right', right'_hint =
-    single_axis_shint_to_axhint a_obj right right_hint LeftAdjoint
-  in
-  { left = left';
-    left_hint = left'_hint;
-    right = right';
-    right_hint = right'_hint
-  }
+    (** Take a solver error for a single axis object and convert it to an [axerror] *)
+    let single_axis_solver_error_to_axerror :
+        type a. a Lattices_mono.obj -> a S.error -> a axerror =
+     fun a_obj { left; left_hint; right; right_hint } ->
+      let left', left'_hint =
+        single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
+      in
+      let right', right'_hint =
+        single_axis_shint_to_axhint a_obj right right_hint LeftAdjoint
+      in
+      { left = left';
+        left_hint = left'_hint;
+        right = right';
+        right_hint = right'_hint
+      }
 
-let flipped_single_axis_solver_error_to_axerror r_obj err =
-  single_axis_solver_error_to_axerror r_obj err |> flip_axerror
+    let flipped_single_axis_solver_error_to_axerror r_obj err =
+      single_axis_solver_error_to_axerror r_obj err |> flip_axerror
+  end
+end
 
 type changes = S.changes
 
@@ -2441,7 +2455,8 @@ module Comonadic_axis_gen (Obj : Obj) = struct
 
   type equate_error = equate_step * error
 
-  let solver_error_to_axerror = single_axis_solver_error_to_axerror Obj.obj
+  let solver_error_to_axerror =
+    Axerror.From_solver_error.single_axis_solver_error_to_axerror Obj.obj
 
   let submode_log a b ~log =
     Solver.submode obj a b ~log |> Result.map_error solver_error_to_axerror
@@ -2465,7 +2480,8 @@ module Monadic_axis_gen (Obj : Obj) = struct
   type equate_error = equate_step * error
 
   let flipped_solver_error_to_axerror =
-    flipped_single_axis_solver_error_to_axerror Obj.obj
+    Axerror.From_solver_error.flipped_single_axis_solver_error_to_axerror
+      Obj.obj
 
   let submode_log a b ~log =
     Solver.submode obj b a ~log
@@ -2743,7 +2759,7 @@ module Comonadic_with (Areality : Areality) = struct
   let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ?target ~left_obj ~right_obj err ppf
+    Axerror.Printing.report_axerror ?target ~left_obj ~right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -2838,7 +2854,7 @@ module Comonadic_with (Areality : Areality) = struct
     let left = err.left in
     let right = err.right in
     let (Axis_with_proj_pair (ax, _, _)) = axis_of_error left right in
-    Error (ax, solver_error_to_axerror Obj.obj ax err)
+    Error (ax, Axerror.From_solver_error.solver_error_to_axerror Obj.obj ax err)
 
   (* unlike for a single axis object, the below submoding and equality functions
      report the offending axis *)
@@ -2888,7 +2904,7 @@ module Monadic = struct
   let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ?target ~left_obj ~right_obj err ppf
+    Axerror.Printing.report_axerror ?target ~left_obj ~right_obj err ppf
 
   type equate_error = equate_step * error
 
@@ -2957,12 +2973,19 @@ module Monadic = struct
         then assert false
         else
           Error
-            (Visibility, flipped_solver_error_to_axerror Obj.obj Visibility err)
+            ( Visibility,
+              Axerror.From_solver_error.flipped_solver_error_to_axerror Obj.obj
+                Visibility err )
       else
         Error
-          (Contention, flipped_solver_error_to_axerror Obj.obj Contention err)
+          ( Contention,
+            Axerror.From_solver_error.flipped_solver_error_to_axerror Obj.obj
+              Contention err )
     else
-      Error (Uniqueness, flipped_solver_error_to_axerror Obj.obj Uniqueness err)
+      Error
+        ( Uniqueness,
+          Axerror.From_solver_error.flipped_solver_error_to_axerror Obj.obj
+            Uniqueness err )
 
   (* unlike for a single axis object, the below submoding and equality functions
      report the offending axis *)
@@ -3352,7 +3375,7 @@ module Value_with (Areality : Areality) = struct
   let report_error ?target ppf (Error (ax, err)) =
     let right_obj = proj_obj ax in
     let left_obj = proj_obj ax in
-    report_axerror ?target ~left_obj ~right_obj err ppf
+    Axerror.Printing.report_axerror ?target ~left_obj ~right_obj err ppf
 
   type equate_error = equate_step * error
 

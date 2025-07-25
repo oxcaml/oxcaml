@@ -255,16 +255,16 @@ module type S = sig
 
   (** Hints for the mode solvers. These are axis-specific hints that contain a trace
       of the values in a single axis from an error. *)
-  type 'a axhint
+  type axhint
 
   (** Errors for the mode solvers. These are axis-specific processed versions of
       the errors returned by the solver, as the solver errors consider axis products.
       The hints in this error type are [axhint] values. *)
   type 'a axerror =
     { left : 'a;
-      left_hint : 'a axhint;
+      left_hint : axhint;
       right : 'a;
-      right_hint : 'a axhint
+      right_hint : axhint
     }
 
   type changes
