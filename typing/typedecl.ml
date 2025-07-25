@@ -502,10 +502,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          in
          (if is_atomic
           then
-            (* Forbid non-legacy modalities on atomic fields, as we can't force
-               them to be respected when setting them via eg [%atomic.loc]. The
-               same concept can be expressed with eg the unboxed modality
-               wrapper types in the Modes module *)
+            (* Forbid comonadic modalities on atomic fields, as we can't force
+               them to be respected when setting them via eg [%atomic.loc]. *)
             match
               Mode.Modality.Value.Const.equate modalities
                 (Typemode.atomic_mutable_modalities)
@@ -4794,9 +4792,9 @@ let report_error ppf = function
         Style.inline_code name
   | Modalities_on_atomic_field name ->
     fprintf ppf
-      "@[Non-legacy modalities are not allowed on atomic fields (here, %a).\n\
-       Use one of the modality types from the Modes module in the type of the\n\
-       field instead]"
+      "@[Modalities of future axes are not allowed on atomic fields\n\
+       (here, %a). Use one of the modality types from the Modes module in the\n\
+       type of the field instead]"
       Style.inline_code name
 
 let () =

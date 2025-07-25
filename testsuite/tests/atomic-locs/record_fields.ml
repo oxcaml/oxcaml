@@ -89,20 +89,16 @@ end
 Line 2, characters 13-59:
 2 |   type t = { mutable x : (int -> int) @@ portable [@atomic] }
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Non-legacy modalities are not allowed on atomic fields (here, "x").
-Use one of the modality types from the Modes module in the type of the
-field instead]
+Error: Modalities of future axes are not allowed on atomic fields
+(here, "x"). Use one of the modality types from the Modes module in the
+type of the field instead]
 |}]
 
+(* Legacy modalities are allowed because they're the same thing as writing
+   nothing at all *)
 module Legacy_modalities_allowed : sig
-  type t = {
-    mutable x :
-      (int -> int)
-      (* legacy modalities are allowed because they're the same thing as writing
-         nothing at all *)
-      [@atomic]
-  }
-end= struct
+  type t = { mutable x : (int -> int) [@atomic] }
+end = struct
   type t = { mutable x : (int -> int) @@ aliased [@atomic] }
 end
 [%%expect{|
@@ -111,7 +107,6 @@ end
 module Legacy_modalities_allowed :
   sig type t = { mutable x : int -> int [@atomic]; } end
 |}]
-
 
 (* Inline records are supported, including in extensions. *)
 
