@@ -61,6 +61,16 @@ type u64 = int64
 type s128 = int
 type u128 = int
 
+module U128Map = Map.Make(struct
+    type t = u128
+    let compare = Int.compare
+  end)
+
+module S128Map = Map.Make(struct
+    type t = s128
+    let compare = Int.compare
+  end)
+
 (* All endian and bit-width dependent code starts here *)
 module Read = struct
   let u8 t : u8 =
