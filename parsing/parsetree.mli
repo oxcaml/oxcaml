@@ -515,6 +515,7 @@ and expression_desc =
   | Pexp_extension of extension  (** [[%id]] *)
   | Pexp_unreachable  (** [.] *)
   | Pexp_stack of expression (** stack_ exp *)
+  | Pexp_malloc of expression (** malloc_ exp *)
   | Pexp_comprehension of comprehension_expression
     (** [[? BODY ...CLAUSES... ?]], where:
           - [?] is either [""] (list), [:] (immutable array), or [|] (array).

@@ -40,6 +40,7 @@ and ident_array = ident_create "array"
 and ident_iarray = ident_create "iarray"
 and ident_list = ident_create "list"
 and ident_option = ident_create "option"
+and ident_mallocd = ident_create "mallocd"
 and ident_nativeint = ident_create "nativeint"
 and ident_int8 = ident_create "int8"
 and ident_int16 = ident_create "int16"
@@ -84,6 +85,7 @@ and path_array = Pident ident_array
 and path_iarray = Pident ident_iarray
 and path_list = Pident ident_list
 and path_option = Pident ident_option
+and path_mallocd = Pident ident_mallocd
 and path_nativeint = Pident ident_nativeint
 and path_int8 = Pident ident_int8
 and path_int16 = Pident ident_int16
@@ -155,6 +157,7 @@ and type_array t = newgenty (Tconstr(path_array, [t], ref Mnil))
 and type_iarray t = newgenty (Tconstr(path_iarray, [t], ref Mnil))
 and type_list t = newgenty (Tconstr(path_list, [t], ref Mnil))
 and type_option t = newgenty (Tconstr(path_option, [t], ref Mnil))
+and type_mallocd t = newgenty (Tconstr(path_mallocd, [t], ref Mnil))
 and type_nativeint = newgenty (Tconstr(path_nativeint, [], ref Mnil))
 and type_int32 = newgenty (Tconstr(path_int32, [], ref Mnil))
 and type_int64 = newgenty (Tconstr(path_int64, [], ref Mnil))
@@ -532,6 +535,17 @@ let build_initial_env add_type add_extension empty_env =
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Value.Const.id
            ~type_expr:param)
+  |> add_type1 ident_mallocd
+       ~variance:Variance.covariant
+       ~separability:Separability.Sep
+       ~param_jkind:(Jkind.Builtin.value_or_null
+                      ~why:(Type_argument
+                             {parent_path = path_mallocd;
+                              position = 1; arity = 1}))
+       ~jkind:(fun param ->
+                  Jkind.of_const (Jkind.Const.kind_of_mallocd param)
+                    ~why:(Primitive ident_mallocd)
+                    ~quality:Best ~annotation:None)
   |> add_type_with_jkind ident_lexing_position
        ~kind:(
          let lbl (field, field_type) =

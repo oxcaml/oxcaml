@@ -1485,3 +1485,70 @@ let triangle_10 = let mutable x = 0 in
 [%%expect{|
 val triangle_10 : int = 55
 |}]
+
+(*********)
+(* malloc *)
+
+let f x y = malloc_ (x,y)
+[%%expect{|
+val f : 'a @ external_ -> 'b @ external_ -> ('a * 'b) mallocd = <fun>
+|}]
+
+type 'a t = {x : 'a ; y : 'a}
+let f x y = malloc_ {x;y}
+[%%expect{|
+type 'a t = { x : 'a; y : 'a; }
+val f : 'a @ external_ -> 'a @ external_ -> 'a t mallocd = <fun>
+|}]
+
+type 'a t = Foo of 'a
+let f x = malloc_ (Foo x)
+[%%expect{|
+type 'a t = Foo of 'a
+val f : 'a @ external_ -> 'a t mallocd = <fun>
+|}]
+
+let f x = malloc_ (`Bar x)
+[%%expect{|
+val f : 'a @ external_ -> [> `Bar of 'a ] mallocd = <fun>
+|}]
+
+let f () = malloc_ (fun x -> x)
+[%%expect{|
+Line 1, characters 19-31:
+1 | let f () = malloc_ (fun x -> x)
+                       ^^^^^^^^^^^^
+Error: Externally allocating functions is not supported yet.
+|}]
+
+let f () = malloc_ (object method x () = 42 end)
+[%%expect{|
+Line 1, characters 19-48:
+1 | let f () = malloc_ (object method x () = 42 end)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Externally allocating objects is not supported yet.
+|}]
+
+let f () = malloc_ (lazy 42)
+[%%expect{|
+Line 1, characters 19-28:
+1 | let f () = malloc_ (lazy 42)
+                       ^^^^^^^^^
+Error: Externally allocating lazy expressions is not supported yet.
+|}]
+
+let f () = malloc_ [|42|]
+[%%expect{|
+Line 1, characters 19-25:
+1 | let f () = malloc_ [|42|]
+                       ^^^^^^
+Error: Externally allocating arrays is not supported yet.
+|}]
+
+let f () = malloc_ [:42:]
+[%%expect{|
+Line 1, characters 19-25:
+1 | let f () = malloc_ [:42:]
+                       ^^^^^^
+Error: Externally allocating arrays is not supported yet.
+|}]

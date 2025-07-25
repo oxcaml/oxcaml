@@ -1299,6 +1299,25 @@ module Const = struct
       && Mod_bounds.equal t1.mod_bounds t2.mod_bounds
     | None -> false
 
+  let kind_of_mallocd type_expr =
+    let layout = Layout.Const.of_sort_const (Base Sort.Word) in
+    let mod_bounds =
+      Mod_bounds.min
+      |> Mod_bounds.set_externality External
+      |> Mod_bounds.set_locality Local
+      |> Mod_bounds.set_uniqueness Unique
+    in
+    let modality =
+      Mode.Modality.Value.Const.id
+      |> Mode.Modality.Value.Const.set (Comonadic Externality)
+           (Meet_with Jkind_mod_bounds.Externality.min)
+    in
+    let with_bounds =
+      With_bounds.add_modality ~relevant_for_shallow:`Irrelevant ~type_expr
+        ~modality No_with_bounds
+    in
+    { layout; mod_bounds; with_bounds }
+
   module Builtin = struct
     type nonrec t =
       { jkind : (allowed * allowed) t;

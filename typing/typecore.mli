@@ -207,6 +207,14 @@ type unsupported_stack_allocation =
   | List_comprehension
   | Array_comprehension
 
+type unsupported_external_allocation =
+  | Lazy
+  | Module
+  | Object
+  | Comprehension
+  | Function
+  | Array
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Constructor_labeled_arg
@@ -336,6 +344,7 @@ type error =
   | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
+  | Unsupported_external_allocation of unsupported_external_allocation
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term

@@ -11,12 +11,10 @@ module Float_u = Stdlib_upstream_compatible.Float_u
 type t = float#
 |}]
 
-
 type t : bits64 = int64#
 [%%expect {|
 type t = int64#
 |}]
-
 
 let immediate_is_external () =
   let _x @ external_ = 3 in
@@ -137,6 +135,7 @@ Error: This value is "internal" but expected to be "external64".
    the legacy mode is top, you are allowed to do this. Similarly you can write a
    nonportable thing into a portable record.  You're just prevented from
    creating a portable record with a mutable field not marked as @@ portable.
+   (see tests in [malloc.ml])
  *)
 
 type 'a t = {mutable f : 'a}
@@ -144,23 +143,19 @@ let foo (t : 'a t @ external_) (x : 'a @ internal) =
   t.f <- x
 [%%expect{|
 type 'a t = { mutable f : 'a; }
-val foo : 'a t -> 'a -> unit = <fun>
+val foo : 'a t @ external_ -> 'a -> unit = <fun>
 |}]
-
-(* CR jcutler: In the above type's case, creating an @external_ record of this type
-   should be disallowed. Because there is not currently a way to create external records
-(in this PR), we cannot test this. When malloc is introduced, add a test for this. *)
 
 let foo (t : 'a ref @ external_) (x : 'a @ internal) =
   t := x
 [%%expect{|
-val foo : 'a ref -> 'a -> unit = <fun>
+val foo : 'a ref @ external_ -> 'a -> unit = <fun>
 |}]
 
 let foo (t : 'a array @ external_) (x : 'a @ internal) =
   t.(0) <- x
 [%%expect{|
-val foo : 'a array -> 'a -> unit = <fun>
+val foo : 'a array @ external_ -> 'a -> unit = <fun>
 |}]
 
 type 'a t = {mutable f : 'a @@ external_}
@@ -209,12 +204,12 @@ Error: This value is "internal" but expected to be "external_".
 let f (x : string @ external_) : #(string * string) @ external_ = #(x, x)
 
 [%%expect {|
-val f : string -> #(string * string) = <fun>
+val f : string @ external_ -> #(string * string) @ external_ = <fun>
 |}]
 
 let f (x : int @ internal) : #(int * int) @ external_ = #(x, x)
 [%%expect {|
-val f : int -> #(int * int) = <fun>
+val f : int -> #(int * int) @ external_ = <fun>
 |}]
 
 type t = #{x : int; y : string @@ external_}
@@ -242,7 +237,7 @@ type t = #{x : int; y : string }
 let f (x : int) (y : string @ external_) : t @ external_ = #{x;y}
 [%%expect {|
 type t = #{ x : int; y : string; }
-val f : int -> string -> t = <fun>
+val f : int -> string @ external_ -> t @ external_ = <fun>
 |}]
 
 (* CR jcutler: When we support externally allocating functions, write a test to show that
@@ -264,7 +259,7 @@ Error: This value is "external_" but expected to be "external_".
 
 let add_three (x : int @ byte_external) : int @ byte_external = 3 + x
 [%%expect {|
-val add_three : int -> int = <fun>
+val add_three : int @ external_ -> int @ external_ = <fun>
 |}]
 
 

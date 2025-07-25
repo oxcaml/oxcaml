@@ -108,6 +108,11 @@ type alloc_mode = {
   locality_context : Env.locality_context option;
 }
 
+type allocator =
+  | Allocator_heap
+  | Allocator_stack
+  | Allocator_malloc
+
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   (** Projection requires boxing. [unique_use] describes the usage of the
@@ -518,6 +523,8 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
+  (* CR external-mode: at the moment, this is only ever Allocator_malloc. *)
+  | Texp_alloc of expression * allocator (** malloc_ exp *)
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }

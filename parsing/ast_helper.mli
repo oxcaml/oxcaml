@@ -214,6 +214,7 @@ module Exp:
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> expression
     val unreachable: ?loc:loc -> ?attrs:attrs -> unit -> expression
     val stack : ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val malloc : ?loc:loc -> ?attrs:attrs -> expression -> expression
     val comprehension :
       ?loc:loc -> ?attrs:attrs -> comprehension_expression -> expression
     val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
