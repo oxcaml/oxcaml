@@ -74,3 +74,14 @@ val gdwarf_may_alter_codegen : bool ref
     [restrict_to_upstream_dwarf] is set to [false], although that implies
     this variable being set to [true]). *)
 val dwarf_inlined_frames : bool ref
+
+val default_gdwarf_compression : string
+
+val gdwarf_compression : string ref
+
+(** Get the DWARF compression flag to pass to the C toolchain.
+    Returns a flag of the form "-gz=<compression>".
+    Note: The -gz= option is common between GCC and Clang, unlike
+    --compress-debug-sections.
+    See: https://maskray.me/blog/2022-01-23-compressed-debug-sections *)
+val get_dwarf_c_toolchain_flag : unit -> string
