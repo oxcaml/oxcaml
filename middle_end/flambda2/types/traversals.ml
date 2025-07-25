@@ -1040,11 +1040,12 @@ struct
 
   and rewrite_head_of_kind_naked_immediate
       (head : TG.head_of_kind_naked_immediate) : _ Or_unknown.t =
-    match head with
-    | Naked_immediates _ -> Or_unknown.Known head
-    | Is_int _ | Get_tag _ | Is_null _ ->
-      (* CR bclement: replace with prove. *)
-      Or_unknown.Unknown
+    match TG.Head_of_kind_naked_immediate.descr head with
+    | { naked_immediates; inverse_relations = _ } ->
+      (* CR bclement: keep inverse_relations *)
+      Or_unknown.Known
+        (TG.Head_of_kind_naked_immediate.from_descr_non_empty
+           { naked_immediates; inverse_relations = TG.Relation.Map.empty })
 
   and rewrite_head_of_kind_naked_float32 head : _ Or_unknown.t =
     Or_unknown.Known head
