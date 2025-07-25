@@ -67,24 +67,12 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag) {
   return caml_alloc_with_reserved (wosize, tag, 0);
 }
 
-CAMLexport void* caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
-                                                 reserved_t reserved)
-{
-  mlsize_t scannable_wosize = Scannable_wosize_reserved(reserved, wosize);
-  mlsize_t* res = (mlsize_t*) malloc(1 + wosize);
-  res[0] = tag;
-  res++;
-  if (tag < No_scan_tag){
-    for (int i = 0; i < scannable_wosize; i++) Field(res,i) = Val_unit;
-  }
-  return (void *)(res + 1);
-}
 
-CAMLexport void* caml_alloc_malloc(mlsize_t wosize, tag_t tag) {
+CAMLexport value caml_alloc_malloc(mlsize_t wosize, tag_t tag) {
   return caml_alloc_malloc_with_reserved(wosize,tag,0);
 }
 
-CAMLexport void* caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag,
+CAMLexport value caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag,
                                          mlsize_t scannable_prefix)
 {
   reserved_t reserved =
