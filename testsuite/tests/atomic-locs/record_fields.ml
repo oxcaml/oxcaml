@@ -193,7 +193,7 @@ module Float_records :
     val mk_t : float -> float -> t
     val get : t -> float
   end
-|}];;
+|}]
 
 (* Tests for Warning 214: Atomic float record boxing *)
 
@@ -221,7 +221,7 @@ type all_atomic_floats = {
   mutable y : float [@atomic];
   mutable z : float [@atomic];
 }
-|}];;
+|}]
 
 (* This should trigger warning 214 - mix of atomic and non-atomic float fields *)
 type mixed_atomic_floats = {
@@ -250,7 +250,7 @@ type mixed_atomic_floats = {
   mutable c : float;
   mutable d : float [@atomic];
 }
-|}];;
+|}]
 
 (* This should NOT trigger warning 214 - has non-float fields *)
 type atomic_float_with_int = {
@@ -265,7 +265,7 @@ type atomic_float_with_int = {
   mutable i : int;
   mutable g : float;
 }
-|}];;
+|}]
 
 (* This should NOT trigger warning 214 - no atomic fields *)
 type regular_float_record = {
@@ -280,7 +280,7 @@ type regular_float_record = {
   mutable q : float;
   mutable r : float;
 }
-|}];;
+|}]
 
 (* This should NOT trigger warning 214 - immutable float fields (can't be atomic) *)
 type immutable_float_record = {
@@ -291,7 +291,7 @@ type immutable_float_record = {
 [%%expect{|
 0
 type immutable_float_record = { x : float; y : float; z : float; }
-|}];;
+|}]
 
 (* This should trigger warning 214 - single atomic float field *)
 type single_atomic_float = {
@@ -309,7 +309,7 @@ represented as a flat float array.
 0
 
 type single_atomic_float = { mutable value : float [@atomic]; }
-|}];;
+|}]
 
 (* Test warning suppression with [@@@warning "-214"] *)
 [@@@warning "-214"]
@@ -324,7 +324,7 @@ type suppressed_atomic_float = {
   mutable x : float [@atomic];
   mutable y : float [@atomic];
 }
-|}];;
+|}]
 
 (* Re-enable the warning *)
 [@@@warning "+214"]
@@ -344,4 +344,19 @@ represented as a flat float array.
 0
 
 type not_suppressed_atomic_float = { mutable a : float [@atomic]; }
-|}];;
+|}]
+
+type suppressed_directly = { mutable a : float [@atomic] }
+[@@warning "-214"]
+[%%expect{|
+0
+type suppressed_directly = { mutable a : float [@atomic]; }
+|}]
+
+
+type suppressed_via_mnemonic = { mutable a : float [@atomic] }
+[@@warning "-atomic-float-record-boxed"]
+[%%expect{|
+0
+type suppressed_via_mnemonic = { mutable a : float [@atomic]; }
+|}]

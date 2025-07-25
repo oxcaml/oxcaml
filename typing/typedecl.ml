@@ -1152,7 +1152,7 @@ let record_gets_unboxed_version = function
         (fun (kind : mixed_block_element) ->
           match kind with
           | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word -> false
+          | Vec128 | Vec256 | Vec512 | Word | Void -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
         shape
@@ -1594,7 +1594,7 @@ let update_label_sorts env loc lbls named =
     ) lbls
   in
   let lbls, jkinds = List.split lbls_and_jkinds in
-  if List.for_all (fun l -> Jkind.Sort.Const.(equal void l.ld_sort)) lbls then
+  if List.for_all (fun l -> Jkind.Sort.Const.all_void l.ld_sort) lbls then
     raise (Error (loc, Jkind_empty_record))
   else lbls, false, jkinds
 (* CR layouts v5: return true for a record with all voids *)
@@ -1623,7 +1623,7 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
     let args, jkinds = List.split args_and_jkinds in
     Types.Cstr_tuple args,
     List.for_all
-      (fun { ca_sort } -> Jkind_types.Sort.Const.(equal void ca_sort)) args,
+      (fun { ca_sort } -> Jkind_types.Sort.Const.(all_void ca_sort)) args,
     jkinds
   | Types.Cstr_record lbls ->
     let lbls, all_void, jkinds =
@@ -1680,14 +1680,14 @@ module Element_repr = struct
     | Unboxed_element of unboxed_element
     | Float_element
     | Value_element
-    | Element_without_runtime_component of { loc : Location.t; ty : type_expr }
+    | Void
     (* This type technically permits [Float_element] to appear in an unboxed
        product, but we never generate that and make no attempt to apply the
        float record optimization to records of unboxed products of floats. Kinds
        don't give us enough information to do this reliably, and you could just
        use unboxed floats instead. *)
 
-  let classify env loc ty jkind =
+  let classify env  ty jkind =
     if is_float env ty
     then Float_element
     else
@@ -1710,24 +1710,18 @@ module Element_repr = struct
       | Base Vec128 -> Unboxed_element Vec128
       | Base Vec256 -> Unboxed_element Vec256
       | Base Vec512 -> Unboxed_element Vec512
-      | Base Void -> Element_without_runtime_component { loc; ty }
+      | Base Void -> Void
       | Product l ->
         Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
       in
       sort_to_t sort
 
   and mixed_product_shape loc ts kind =
-    let to_shape_element (t,ty) : mixed_block_element =
+    let to_shape_element (t,_ty) : mixed_block_element =
       let rec of_t : t -> mixed_block_element = function
       | Unboxed_element unboxed -> of_unboxed_element unboxed
       | Float_element | Value_element -> Value
-      | Element_without_runtime_component _ ->
-        (* CR layouts v7: Supporting void with mixed blocks will require
-           updating some assumptions in lambda, e.g. the translation of
-           [value_prefix_len]. *)
-        raise (Error (loc,
-                      Invalid_jkind_in_block (ty, Base Void,
-                                              Mixed_product)))
+      | Void -> Void
       and of_unboxed_element : unboxed_element -> mixed_block_element = function
         | Float64 -> Float64
         | Float32 -> Float32
@@ -1746,7 +1740,7 @@ module Element_repr = struct
     let boxed_elements =
       let rec count_boxed_in_t acc : t -> int = function
         | Unboxed_element u -> count_boxed_in_unboxed_element acc u
-        | Element_without_runtime_component _ -> acc
+        | Void -> acc
         | Float_element | Value_element -> acc + 1
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
@@ -1757,7 +1751,8 @@ module Element_repr = struct
       List.fold_left (fun acc (t,_) -> count_boxed_in_t acc t) 0 ts
     in
     let mixed =
-      List.exists (function (Unboxed_element _, _) -> true | _ -> false) ts
+      List.exists
+        (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
     in
     if not mixed then None else begin
       assert_mixed_product_support loc kind ~value_prefix_len:boxed_elements;
@@ -1774,7 +1769,7 @@ let update_constructor_representation
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            Element_repr.classify env loc arg_type arg_jkind,
+            Element_repr.classify env arg_type arg_jkind,
             arg_type)
             arg_types_and_modes arg_jkinds
         in
@@ -1782,7 +1777,7 @@ let update_constructor_representation
     | Cstr_record fields ->
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
-            Element_repr.classify env loc ld.Types.ld_type arg_jkind,
+            Element_repr.classify env ld.Types.ld_type arg_jkind,
             ld.Types.ld_type)
             fields arg_jkinds
         in
@@ -1823,7 +1818,10 @@ let rec update_decl_jkind env dpath decl =
   in
   let decl = { decl with type_unboxed_version } in
   let open struct
-    (* For tracking what types appear in record blocks. *)
+    (* For tracking what types appear in record blocks. All product layouts
+       count only as a [non_float64_unboxed_field], even if it's a
+       [float64 & float64] or [void & void].
+    *)
     type element_repr_summary =
       {  mutable values : bool; (* includes immediates. *)
          mutable floats: bool;
@@ -1833,6 +1831,8 @@ let rec update_decl_jkind env dpath decl =
          mutable atomic_floats : bool;
          mutable float64s : bool;
          mutable non_float64_unboxed_fields : bool;
+         (* Includes product containing void *)
+         mutable voids : bool;
       }
   end in
 
@@ -1857,13 +1857,14 @@ let rec update_decl_jkind env dpath decl =
       let reprs =
         List.map2
           (fun lbl jkind ->
-             Element_repr.classify env loc lbl.Types.ld_type jkind,
+             Element_repr.classify env lbl.Types.ld_type jkind,
              lbl.Types.ld_type )
           lbls jkinds
       in
       let repr_summary =
         { values = false; floats = false; atomic_floats = false;
           float64s = false; non_float64_unboxed_fields = false;
+          voids = false;
         }
       in
       List.iter2
@@ -1878,33 +1879,29 @@ let rec update_decl_jkind env dpath decl =
            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
                              | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
-           | Value_element ->
-               repr_summary.values <- true;
-               (* Check if this value field is atomic and float *)
-               if Types.is_atomic lbl.Types.ld_mutable
-               && is_float env lbl.Types.ld_type
-               then repr_summary.atomic_floats <- true
-           | Element_without_runtime_component _ -> ())
+           | Value_element -> repr_summary.values <- true
+           | Void ->
+               repr_summary.voids <- true)
         reprs lbls;
       let rep =
+        (* CR layouts: improve the readability of this match *)
         match repr_summary with
-        (* We store mixed float/float64 records as flat if there are no
-            non-float fields.
-        *)
+        (* We store floats flatly in mixed records if all fields are
+           float/float64/void. *)
         | { values = false; floats = true; atomic_floats = false;
-            float64s = true; non_float64_unboxed_fields = false; }
-          [@warning "+9"] ->
+            float64s = true; non_float64_unboxed_fields = false }
+           ->
             let shape =
               List.map
                 (fun ((repr : Element_repr.t), _lbl) ->
                   match repr with
                   | Float_element -> Float_boxed
                   | Unboxed_element Float64 -> Float64
-                  | Element_without_runtime_component { ty; loc } ->
-                      raise (Error (loc,
-                        Invalid_jkind_in_block (ty, Base Void,
-                                                Mixed_product)))
-                  | Unboxed_element _ | Value_element ->
+                  | Void -> Void
+                  | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
+                                    | Vec128 | Vec256 | Vec512 | Word
+                                    | Product _)
+                  | Value_element ->
                       Misc.fatal_error "Expected only floats and float64s")
                 reprs
               |> Array.of_list
@@ -1914,8 +1911,11 @@ let rec update_decl_jkind env dpath decl =
         (* For other mixed blocks, float fields are stored as flat
            only when they're unboxed.
         *)
-        | { values = true; float64s = true; _ }
-        | { non_float64_unboxed_fields = true; _ } ->
+        | { values = true; voids = true }
+        | { floats = true; voids = true }
+        | { float64s = true; voids = true }
+        | { values = true; float64s = true }
+        | { non_float64_unboxed_fields = true } ->
             let shape =
               Element_repr.mixed_product_shape loc reprs Record
             in
@@ -1926,36 +1926,31 @@ let rec update_decl_jkind env dpath decl =
             in
             Record_mixed shape
         (* value-only records are stored as boxed records *)
-        | { values = true; float64s = false;
-            non_float64_unboxed_fields = false; _ }
+        | { values = true; float64s = false; non_float64_unboxed_fields = false;
+            voids = false }
           -> rep
         (* All-nonatomic-float and all-nonatomic-float64 records are stored as
            flat float records.
         *)
         | { values = false; floats = true ; atomic_floats = false;
-            float64s = false; non_float64_unboxed_fields = false } ->
+            float64s = false; non_float64_unboxed_fields = false;
+            voids = false } ->
           Record_float
         | { values = false; floats = false; atomic_floats = false;
-            float64s = true; non_float64_unboxed_fields = false } ->
+            float64s = true; non_float64_unboxed_fields = false;
+            voids = false } ->
           Record_ufloat
         (* Records with atomic float fields cannot use flat representation *)
-        | { atomic_floats = true; _ } ->
+        | { atomic_floats = true; floats; values; _ } ->
+          if floats && not values
+          then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
           rep
         | { values = false; floats = false; atomic_floats = false;
-            float64s = false; non_float64_unboxed_fields = false }
+            float64s = false; non_float64_unboxed_fields = false;
+            voids = _ }
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
-      (* Emit warning if atomic float fields prevented float record
-         optimization *)
-      if repr_summary.atomic_floats then begin
-        (* Check if all fields are floats (atomic or not) *)
-        let all_float_fields =
-          List.for_all (fun lbl -> is_float env lbl.Types.ld_type) lbls
-        in
-        if all_float_fields then
-          Location.prerr_warning loc Warnings.Atomic_float_record_boxed
-      end;
       lbls, rep, jkind
     | _, ( Record_inlined _ | Record_float | Record_ufloat
          | Record_mixed _)
@@ -1966,7 +1961,7 @@ let rec update_decl_jkind env dpath decl =
   in
 
   (* returns updated constructors, updated rep, and updated jkind *)
-  let update_variant_kind cstrs rep =
+  let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
@@ -2024,7 +2019,7 @@ let rec update_decl_jkind env dpath decl =
           (idx+1,cstr::cstrs)
         ) (0,[]) cstrs
       in
-      let jkind = Jkind.for_boxed_variant cstrs in
+      let jkind = Jkind.for_boxed_variant ~loc cstrs in
       List.rev cstrs, rep, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
@@ -2085,9 +2080,11 @@ let rec update_decl_jkind env dpath decl =
       Builtin_attributes.has_or_null_reexport decl.type_attributes ->
       decl
     | Type_variant (cstrs, rep, umc) ->
-      let cstrs, rep, type_jkind = update_variant_kind cstrs rep in
-      (* See Note [Quality of jkinds during inference] for more information about when we
-         mark jkinds as best *)
+      let cstrs, rep, type_jkind =
+        update_variant_kind decl.type_loc cstrs rep
+      in
+      (* See Note [Quality of jkinds during inference] for more information
+         about when we mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
       { decl with type_kind = Type_variant (cstrs, rep, umc); type_jkind }
   in
@@ -2130,19 +2127,24 @@ let update_decls_jkind_reason env decls =
 let update_decls_jkind env decls =
   List.map
     (fun (id, decl) ->
-       let allow_any_crossing =
-         Builtin_attributes.has_unsafe_allow_any_mode_crossing decl.type_attributes
-       in
+       Builtin_attributes.warning_scope decl.type_attributes (fun () ->
+         let allow_any_crossing =
+           Builtin_attributes.has_unsafe_allow_any_mode_crossing
+             decl.type_attributes
+         in
 
-       (* Check that the attribute is valid, if set (unconditionally, for consistency). *)
-       if allow_any_crossing then begin
-         match decl.type_kind with
-         | Type_abstract _ | Type_open ->
-           raise(Error(decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
-         | _ -> ()
-       end;
+         (* Check that the attribute is valid, if set (unconditionally, for
+            consistency). *)
+         if allow_any_crossing then begin
+           match decl.type_kind with
+           | Type_abstract _ | Type_open ->
+             raise(Error(
+               decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+           | _ -> ()
+         end;
 
-       (id, decl, allow_any_crossing, update_decl_jkind env (Pident id) decl))
+         (id, decl, allow_any_crossing,
+          update_decl_jkind env (Pident id) decl)))
     decls
 
 (* See Note [Typechecking unboxed versions of types]. *)

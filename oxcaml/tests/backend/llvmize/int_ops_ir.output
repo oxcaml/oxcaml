@@ -1,0 +1,1236 @@
+source_filename = "int_ops.ml"
+
+@camlInt_ops__data_begin = global i64 0
+define void @camlInt_ops__code_begin() { ret void }
+
+define i64 @camlInt_ops__add_0_23_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L101
+L101:                                                ; preds = %L1
+  %11 = load i64, ptr %2
+  store i64 %11, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %12 = load i64, ptr %4
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  %14 = add i64 %13, 8
+  store i64 %14, ptr %5
+  %15 = load i64, ptr %5
+  %16 = add i64 %15, 0
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load i64, ptr %17
+  store i64 %18, ptr %6
+  store ptr @camlInt_ops_data, ptr %7
+  %19 = load i64, ptr %7
+  %20 = add i64 %19, 0
+  %21 = inttoptr i64 %20 to ptr
+  %22 = load i64, ptr %21
+  store i64 %22, ptr %8
+  %23 = load i64, ptr %8
+  store i64 %23, ptr %9
+  %24 = load i64, ptr %9
+  %25 = load i64, ptr %6
+  %26 = add i64 %24, %25
+  store i64 %26, ptr %9
+  %27 = load i64, ptr %9
+  store i64 %27, ptr %10
+  %28 = load i64, ptr %10
+  %29 = add i64 %28, -1
+  store i64 %29, ptr %10
+  %30 = load i64, ptr %10
+  store i64 %30, ptr %2
+  %31 = load i64, ptr %2
+  ret i64 %31
+}
+
+define i64 @camlInt_ops__sub_1_24_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L109
+L109:                                                ; preds = %L1
+  %11 = load i64, ptr %2
+  store i64 %11, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %12 = load i64, ptr %4
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  %14 = add i64 %13, 8
+  store i64 %14, ptr %5
+  %15 = load i64, ptr %5
+  %16 = add i64 %15, 0
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load i64, ptr %17
+  store i64 %18, ptr %6
+  store ptr @camlInt_ops_data, ptr %7
+  %19 = load i64, ptr %7
+  %20 = add i64 %19, 0
+  %21 = inttoptr i64 %20 to ptr
+  %22 = load i64, ptr %21
+  store i64 %22, ptr %8
+  %23 = load i64, ptr %8
+  store i64 %23, ptr %9
+  %24 = load i64, ptr %9
+  %25 = load i64, ptr %6
+  %26 = sub i64 %24, %25
+  store i64 %26, ptr %9
+  %27 = load i64, ptr %9
+  store i64 %27, ptr %10
+  %28 = load i64, ptr %10
+  %29 = add i64 %28, 1
+  store i64 %29, ptr %10
+  %30 = load i64, ptr %10
+  store i64 %30, ptr %2
+  %31 = load i64, ptr %2
+  ret i64 %31
+}
+
+define i64 @camlInt_ops__mul_2_25_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L117
+L117:                                                ; preds = %L1
+  %13 = load i64, ptr %2
+  store i64 %13, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %14 = load i64, ptr %4
+  store i64 %14, ptr %5
+  %15 = load i64, ptr %5
+  %16 = add i64 %15, 8
+  store i64 %16, ptr %5
+  %17 = load i64, ptr %5
+  %18 = add i64 %17, 0
+  %19 = inttoptr i64 %18 to ptr
+  %20 = load i64, ptr %19
+  store i64 %20, ptr %6
+  %21 = load i64, ptr %6
+  store i64 %21, ptr %7
+  %22 = load i64, ptr %7
+  %23 = ashr i64 %22, 1
+  store i64 %23, ptr %7
+  store ptr @camlInt_ops_data, ptr %8
+  %24 = load i64, ptr %8
+  %25 = add i64 %24, 0
+  %26 = inttoptr i64 %25 to ptr
+  %27 = load i64, ptr %26
+  store i64 %27, ptr %9
+  %28 = load i64, ptr %9
+  store i64 %28, ptr %10
+  %29 = load i64, ptr %10
+  %30 = add i64 %29, -1
+  store i64 %30, ptr %10
+  %31 = load i64, ptr %10
+  store i64 %31, ptr %11
+  %32 = load i64, ptr %11
+  %33 = load i64, ptr %7
+  %34 = mul i64 %32, %33
+  store i64 %34, ptr %11
+  %35 = load i64, ptr %11
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  %37 = add i64 %36, 1
+  store i64 %37, ptr %12
+  %38 = load i64, ptr %12
+  store i64 %38, ptr %2
+  %39 = load i64, ptr %2
+  ret i64 %39
+}
+
+define i64 @camlInt_ops__div_3_26_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  %14 = alloca i64 
+  %15 = alloca i64 
+  %16 = alloca i64 
+  %17 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L127
+L127:                                                ; preds = %L1
+  %18 = load i64, ptr %2
+  store i64 %18, ptr %4
+  store ptr @camlInt_ops_data, ptr %5
+  %19 = load i64, ptr %5
+  store i64 %19, ptr %6
+  %20 = load i64, ptr %6
+  %21 = add i64 %20, 8
+  store i64 %21, ptr %6
+  %22 = load i64, ptr %6
+  %23 = add i64 %22, 0
+  %24 = inttoptr i64 %23 to ptr
+  %25 = load i64, ptr %24
+  store i64 %25, ptr %7
+  %26 = load i64, ptr %7
+  store i64 %26, ptr %8
+  %27 = load i64, ptr %8
+  %28 = icmp slt i64 %27, 1
+  br i1 %28, label %L136, label %29
+29:
+  %30 = load i64, ptr %8
+  %31 = icmp sgt i64 %30, 1
+  br i1 %31, label %L136, label %L131
+L131:                                                ; preds = %L127
+  store i64 1, ptr %9
+  %32 = load i64, ptr %9
+  store i64 %32, ptr %2
+  %33 = load i64, ptr %2
+  ret i64 %33
+L136:                                                ; preds = %L127
+  %34 = load i64, ptr %8
+  %35 = icmp slt i64 %34, 1
+  br i1 %35, label %L138, label %36
+36:
+  %37 = load i64, ptr %8
+  %38 = icmp sgt i64 %37, 1
+  br i1 %38, label %L138, label %L149
+L138:                                                ; preds = %L136
+  %39 = load i64, ptr %8
+  store i64 %39, ptr %10
+  %40 = load i64, ptr %10
+  %41 = ashr i64 %40, 1
+  store i64 %41, ptr %10
+  store ptr @camlInt_ops_data, ptr %11
+  %42 = load i64, ptr %11
+  %43 = add i64 %42, 0
+  %44 = inttoptr i64 %43 to ptr
+  %45 = load i64, ptr %44
+  store i64 %45, ptr %12
+  %46 = load i64, ptr %12
+  store i64 %46, ptr %13
+  %47 = load i64, ptr %13
+  %48 = ashr i64 %47, 1
+  store i64 %48, ptr %13
+  %49 = load i64, ptr %13
+  store i64 %49, ptr %2
+  %50 = load i64, ptr %10
+  store i64 %50, ptr %3
+  %51 = load i64, ptr %2
+  %52 = load i64, ptr %3
+  %53 = sdiv i64 %51, %52
+  store i64 %53, ptr %2
+  %54 = load i64, ptr %2
+  store i64 %54, ptr %14
+  %55 = load i64, ptr %14
+  store i64 %55, ptr %15
+  %56 = load i64, ptr %15
+  %57 = shl i64 %56, 1
+  store i64 %57, ptr %15
+  %58 = load i64, ptr %15
+  store i64 %58, ptr %16
+  %59 = load i64, ptr %16
+  %60 = add i64 %59, 1
+  store i64 %60, ptr %16
+  %61 = load i64, ptr %16
+  store i64 %61, ptr %2
+  %62 = load i64, ptr %2
+  ret i64 %62
+L149:                                                ; preds = %L136
+  store ptr @caml_exn_Division_by_zero, ptr %17
+  %63 = load i64, ptr %17
+  store i64 %63, ptr %2
+  call void @llvm.trap()
+  unreachable
+}
+
+define i64 @camlInt_ops__mod__4_27_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  %14 = alloca i64 
+  %15 = alloca i64 
+  %16 = alloca i64 
+  %17 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L154
+L154:                                                ; preds = %L1
+  %18 = load i64, ptr %2
+  store i64 %18, ptr %5
+  store ptr @camlInt_ops_data, ptr %6
+  %19 = load i64, ptr %6
+  store i64 %19, ptr %7
+  %20 = load i64, ptr %7
+  %21 = add i64 %20, 8
+  store i64 %21, ptr %7
+  %22 = load i64, ptr %7
+  %23 = add i64 %22, 0
+  %24 = inttoptr i64 %23 to ptr
+  %25 = load i64, ptr %24
+  store i64 %25, ptr %8
+  %26 = load i64, ptr %8
+  store i64 %26, ptr %9
+  %27 = load i64, ptr %9
+  %28 = icmp slt i64 %27, 1
+  br i1 %28, label %L161, label %29
+29:
+  %30 = load i64, ptr %9
+  %31 = icmp sgt i64 %30, 1
+  br i1 %31, label %L161, label %L172
+L161:                                                ; preds = %L154
+  %32 = load i64, ptr %9
+  store i64 %32, ptr %10
+  %33 = load i64, ptr %10
+  %34 = ashr i64 %33, 1
+  store i64 %34, ptr %10
+  store ptr @camlInt_ops_data, ptr %11
+  %35 = load i64, ptr %11
+  %36 = add i64 %35, 0
+  %37 = inttoptr i64 %36 to ptr
+  %38 = load i64, ptr %37
+  store i64 %38, ptr %12
+  %39 = load i64, ptr %12
+  store i64 %39, ptr %13
+  %40 = load i64, ptr %13
+  %41 = ashr i64 %40, 1
+  store i64 %41, ptr %13
+  %42 = load i64, ptr %13
+  store i64 %42, ptr %2
+  %43 = load i64, ptr %10
+  store i64 %43, ptr %4
+  %44 = load i64, ptr %2
+  %45 = load i64, ptr %4
+  %46 = srem i64 %44, %45
+  store i64 %46, ptr %3
+  %47 = load i64, ptr %3
+  store i64 %47, ptr %14
+  %48 = load i64, ptr %14
+  store i64 %48, ptr %15
+  %49 = load i64, ptr %15
+  %50 = shl i64 %49, 1
+  store i64 %50, ptr %15
+  %51 = load i64, ptr %15
+  store i64 %51, ptr %16
+  %52 = load i64, ptr %16
+  %53 = add i64 %52, 1
+  store i64 %53, ptr %16
+  %54 = load i64, ptr %16
+  store i64 %54, ptr %2
+  %55 = load i64, ptr %2
+  ret i64 %55
+L172:                                                ; preds = %L154
+  store ptr @caml_exn_Division_by_zero, ptr %17
+  %56 = load i64, ptr %17
+  store i64 %56, ptr %2
+  call void @llvm.trap()
+  unreachable
+}
+
+define i64 @camlInt_ops__land__5_28_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L176
+L176:                                                ; preds = %L1
+  %10 = load i64, ptr %2
+  store i64 %10, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %11 = load i64, ptr %4
+  store i64 %11, ptr %5
+  %12 = load i64, ptr %5
+  %13 = add i64 %12, 8
+  store i64 %13, ptr %5
+  %14 = load i64, ptr %5
+  %15 = add i64 %14, 0
+  %16 = inttoptr i64 %15 to ptr
+  %17 = load i64, ptr %16
+  store i64 %17, ptr %6
+  store ptr @camlInt_ops_data, ptr %7
+  %18 = load i64, ptr %7
+  %19 = add i64 %18, 0
+  %20 = inttoptr i64 %19 to ptr
+  %21 = load i64, ptr %20
+  store i64 %21, ptr %8
+  %22 = load i64, ptr %8
+  store i64 %22, ptr %9
+  %23 = load i64, ptr %9
+  %24 = load i64, ptr %6
+  %25 = and i64 %23, %24
+  store i64 %25, ptr %9
+  %26 = load i64, ptr %9
+  store i64 %26, ptr %2
+  %27 = load i64, ptr %2
+  ret i64 %27
+}
+
+define i64 @camlInt_ops__lor__6_29_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L183
+L183:                                                ; preds = %L1
+  %10 = load i64, ptr %2
+  store i64 %10, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %11 = load i64, ptr %4
+  store i64 %11, ptr %5
+  %12 = load i64, ptr %5
+  %13 = add i64 %12, 8
+  store i64 %13, ptr %5
+  %14 = load i64, ptr %5
+  %15 = add i64 %14, 0
+  %16 = inttoptr i64 %15 to ptr
+  %17 = load i64, ptr %16
+  store i64 %17, ptr %6
+  store ptr @camlInt_ops_data, ptr %7
+  %18 = load i64, ptr %7
+  %19 = add i64 %18, 0
+  %20 = inttoptr i64 %19 to ptr
+  %21 = load i64, ptr %20
+  store i64 %21, ptr %8
+  %22 = load i64, ptr %8
+  store i64 %22, ptr %9
+  %23 = load i64, ptr %9
+  %24 = load i64, ptr %6
+  %25 = or i64 %23, %24
+  store i64 %25, ptr %9
+  %26 = load i64, ptr %9
+  store i64 %26, ptr %2
+  %27 = load i64, ptr %2
+  ret i64 %27
+}
+
+define i64 @camlInt_ops__lxor__7_30_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L190
+L190:                                                ; preds = %L1
+  %11 = load i64, ptr %2
+  store i64 %11, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %12 = load i64, ptr %4
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  %14 = add i64 %13, 8
+  store i64 %14, ptr %5
+  %15 = load i64, ptr %5
+  %16 = add i64 %15, 0
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load i64, ptr %17
+  store i64 %18, ptr %6
+  store ptr @camlInt_ops_data, ptr %7
+  %19 = load i64, ptr %7
+  %20 = add i64 %19, 0
+  %21 = inttoptr i64 %20 to ptr
+  %22 = load i64, ptr %21
+  store i64 %22, ptr %8
+  %23 = load i64, ptr %8
+  store i64 %23, ptr %9
+  %24 = load i64, ptr %9
+  %25 = load i64, ptr %6
+  %26 = xor i64 %24, %25
+  store i64 %26, ptr %9
+  %27 = load i64, ptr %9
+  store i64 %27, ptr %10
+  %28 = load i64, ptr %10
+  %29 = or i64 %28, 1
+  store i64 %29, ptr %10
+  %30 = load i64, ptr %10
+  store i64 %30, ptr %2
+  %31 = load i64, ptr %2
+  ret i64 %31
+}
+
+define i64 @camlInt_ops__lnot__8_31_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L198
+L198:                                                ; preds = %L1
+  %8 = load i64, ptr %2
+  store i64 %8, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %9 = load i64, ptr %4
+  %10 = add i64 %9, 0
+  %11 = inttoptr i64 %10 to ptr
+  %12 = load i64, ptr %11
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = xor i64 %14, -1
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = or i64 %17, 1
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
+}
+
+define i64 @camlInt_ops__lsl__9_32_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L204
+L204:                                                ; preds = %L1
+  %14 = load i64, ptr %2
+  store i64 %14, ptr %4
+  store ptr @camlInt_ops_data, ptr %5
+  %15 = load i64, ptr %5
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  %17 = add i64 %16, 8
+  store i64 %17, ptr %6
+  %18 = load i64, ptr %6
+  %19 = add i64 %18, 0
+  %20 = inttoptr i64 %19 to ptr
+  %21 = load i64, ptr %20
+  store i64 %21, ptr %7
+  %22 = load i64, ptr %7
+  store i64 %22, ptr %8
+  %23 = load i64, ptr %8
+  %24 = ashr i64 %23, 1
+  store i64 %24, ptr %8
+  store ptr @camlInt_ops_data, ptr %9
+  %25 = load i64, ptr %9
+  %26 = add i64 %25, 0
+  %27 = inttoptr i64 %26 to ptr
+  %28 = load i64, ptr %27
+  store i64 %28, ptr %10
+  %29 = load i64, ptr %10
+  store i64 %29, ptr %11
+  %30 = load i64, ptr %11
+  %31 = add i64 %30, -1
+  store i64 %31, ptr %11
+  %32 = load i64, ptr %11
+  store i64 %32, ptr %12
+  %33 = load i64, ptr %8
+  store i64 %33, ptr %3
+  %34 = load i64, ptr %12
+  %35 = load i64, ptr %3
+  %36 = shl i64 %34, %35
+  store i64 %36, ptr %12
+  %37 = load i64, ptr %12
+  store i64 %37, ptr %13
+  %38 = load i64, ptr %13
+  %39 = add i64 %38, 1
+  store i64 %39, ptr %13
+  %40 = load i64, ptr %13
+  store i64 %40, ptr %2
+  %41 = load i64, ptr %2
+  ret i64 %41
+}
+
+define i64 @camlInt_ops__lsr__10_33_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L214
+L214:                                                ; preds = %L1
+  %13 = load i64, ptr %2
+  store i64 %13, ptr %4
+  store ptr @camlInt_ops_data, ptr %5
+  %14 = load i64, ptr %5
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %6
+  %16 = add i64 %15, 8
+  store i64 %16, ptr %6
+  %17 = load i64, ptr %6
+  %18 = add i64 %17, 0
+  %19 = inttoptr i64 %18 to ptr
+  %20 = load i64, ptr %19
+  store i64 %20, ptr %7
+  %21 = load i64, ptr %7
+  store i64 %21, ptr %8
+  %22 = load i64, ptr %8
+  %23 = ashr i64 %22, 1
+  store i64 %23, ptr %8
+  store ptr @camlInt_ops_data, ptr %9
+  %24 = load i64, ptr %9
+  %25 = add i64 %24, 0
+  %26 = inttoptr i64 %25 to ptr
+  %27 = load i64, ptr %26
+  store i64 %27, ptr %10
+  %28 = load i64, ptr %10
+  store i64 %28, ptr %11
+  %29 = load i64, ptr %8
+  store i64 %29, ptr %3
+  %30 = load i64, ptr %11
+  %31 = load i64, ptr %3
+  %32 = lshr i64 %30, %31
+  store i64 %32, ptr %11
+  %33 = load i64, ptr %11
+  store i64 %33, ptr %12
+  %34 = load i64, ptr %12
+  %35 = or i64 %34, 1
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  store i64 %36, ptr %2
+  %37 = load i64, ptr %2
+  ret i64 %37
+}
+
+define i64 @camlInt_ops__asr__11_34_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L223
+L223:                                                ; preds = %L1
+  %13 = load i64, ptr %2
+  store i64 %13, ptr %4
+  store ptr @camlInt_ops_data, ptr %5
+  %14 = load i64, ptr %5
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %6
+  %16 = add i64 %15, 8
+  store i64 %16, ptr %6
+  %17 = load i64, ptr %6
+  %18 = add i64 %17, 0
+  %19 = inttoptr i64 %18 to ptr
+  %20 = load i64, ptr %19
+  store i64 %20, ptr %7
+  %21 = load i64, ptr %7
+  store i64 %21, ptr %8
+  %22 = load i64, ptr %8
+  %23 = ashr i64 %22, 1
+  store i64 %23, ptr %8
+  store ptr @camlInt_ops_data, ptr %9
+  %24 = load i64, ptr %9
+  %25 = add i64 %24, 0
+  %26 = inttoptr i64 %25 to ptr
+  %27 = load i64, ptr %26
+  store i64 %27, ptr %10
+  %28 = load i64, ptr %10
+  store i64 %28, ptr %11
+  %29 = load i64, ptr %8
+  store i64 %29, ptr %3
+  %30 = load i64, ptr %11
+  %31 = load i64, ptr %3
+  %32 = ashr i64 %30, %31
+  store i64 %32, ptr %11
+  %33 = load i64, ptr %11
+  store i64 %33, ptr %12
+  %34 = load i64, ptr %12
+  %35 = or i64 %34, 1
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  store i64 %36, ptr %2
+  %37 = load i64, ptr %2
+  ret i64 %37
+}
+
+define i64 @camlInt_ops__add_imm_12_35_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L232
+L232:                                                ; preds = %L1
+  %7 = load i64, ptr %2
+  store i64 %7, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %8 = load i64, ptr %4
+  %9 = add i64 %8, 0
+  %10 = inttoptr i64 %9 to ptr
+  %11 = load i64, ptr %10
+  store i64 %11, ptr %5
+  %12 = load i64, ptr %5
+  store i64 %12, ptr %6
+  %13 = load i64, ptr %6
+  %14 = add i64 %13, 8
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %6
+  store i64 %15, ptr %2
+  %16 = load i64, ptr %2
+  ret i64 %16
+}
+
+define i64 @camlInt_ops__sub_imm_13_36_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L237
+L237:                                                ; preds = %L1
+  %7 = load i64, ptr %2
+  store i64 %7, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %8 = load i64, ptr %4
+  %9 = add i64 %8, 0
+  %10 = inttoptr i64 %9 to ptr
+  %11 = load i64, ptr %10
+  store i64 %11, ptr %5
+  %12 = load i64, ptr %5
+  store i64 %12, ptr %6
+  %13 = load i64, ptr %6
+  %14 = add i64 %13, -8
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %6
+  store i64 %15, ptr %2
+  %16 = load i64, ptr %2
+  ret i64 %16
+}
+
+define i64 @camlInt_ops__mul_imm_14_37_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L242
+L242:                                                ; preds = %L1
+  %8 = load i64, ptr %2
+  store i64 %8, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %9 = load i64, ptr %4
+  %10 = add i64 %9, 0
+  %11 = inttoptr i64 %10 to ptr
+  %12 = load i64, ptr %11
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = shl i64 %14, 2
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = add i64 %17, -3
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
+}
+
+define i64 @camlInt_ops__div_imm_15_38_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L248
+L248:                                                ; preds = %L1
+  %14 = load i64, ptr %2
+  store i64 %14, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %15 = load i64, ptr %4
+  %16 = add i64 %15, 0
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load i64, ptr %17
+  store i64 %18, ptr %5
+  %19 = load i64, ptr %5
+  store i64 %19, ptr %6
+  %20 = load i64, ptr %6
+  %21 = ashr i64 %20, 1
+  store i64 %21, ptr %6
+  %22 = load i64, ptr %6
+  store i64 %22, ptr %7
+  %23 = load i64, ptr %7
+  store i64 %23, ptr %8
+  %24 = load i64, ptr %8
+  %25 = ashr i64 %24, 1
+  store i64 %25, ptr %8
+  %26 = load i64, ptr %8
+  store i64 %26, ptr %9
+  %27 = load i64, ptr %9
+  %28 = lshr i64 %27, 62
+  store i64 %28, ptr %9
+  %29 = load i64, ptr %7
+  store i64 %29, ptr %10
+  %30 = load i64, ptr %10
+  %31 = load i64, ptr %9
+  %32 = add i64 %30, %31
+  store i64 %32, ptr %10
+  %33 = load i64, ptr %10
+  store i64 %33, ptr %11
+  %34 = load i64, ptr %11
+  %35 = ashr i64 %34, 2
+  store i64 %35, ptr %11
+  %36 = load i64, ptr %11
+  store i64 %36, ptr %12
+  %37 = load i64, ptr %12
+  %38 = shl i64 %37, 1
+  store i64 %38, ptr %12
+  %39 = load i64, ptr %12
+  store i64 %39, ptr %13
+  %40 = load i64, ptr %13
+  %41 = add i64 %40, 1
+  store i64 %41, ptr %13
+  %42 = load i64, ptr %13
+  store i64 %42, ptr %2
+  %43 = load i64, ptr %2
+  ret i64 %43
+}
+
+define i64 @camlInt_ops__mod_imm_16_39_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  %8 = alloca i64 
+  %9 = alloca i64 
+  %10 = alloca i64 
+  %11 = alloca i64 
+  %12 = alloca i64 
+  %13 = alloca i64 
+  %14 = alloca i64 
+  %15 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L259
+L259:                                                ; preds = %L1
+  %16 = load i64, ptr %2
+  store i64 %16, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %17 = load i64, ptr %4
+  %18 = add i64 %17, 0
+  %19 = inttoptr i64 %18 to ptr
+  %20 = load i64, ptr %19
+  store i64 %20, ptr %5
+  %21 = load i64, ptr %5
+  store i64 %21, ptr %6
+  %22 = load i64, ptr %6
+  %23 = ashr i64 %22, 1
+  store i64 %23, ptr %6
+  %24 = load i64, ptr %6
+  store i64 %24, ptr %7
+  store i64 -4, ptr %8
+  %25 = load i64, ptr %7
+  store i64 %25, ptr %9
+  %26 = load i64, ptr %9
+  %27 = ashr i64 %26, 1
+  store i64 %27, ptr %9
+  %28 = load i64, ptr %9
+  store i64 %28, ptr %10
+  %29 = load i64, ptr %10
+  %30 = lshr i64 %29, 62
+  store i64 %30, ptr %10
+  %31 = load i64, ptr %7
+  store i64 %31, ptr %11
+  %32 = load i64, ptr %11
+  %33 = load i64, ptr %10
+  %34 = add i64 %32, %33
+  store i64 %34, ptr %11
+  %35 = load i64, ptr %11
+  store i64 %35, ptr %12
+  %36 = load i64, ptr %12
+  %37 = load i64, ptr %8
+  %38 = and i64 %36, %37
+  store i64 %38, ptr %12
+  %39 = load i64, ptr %7
+  store i64 %39, ptr %13
+  %40 = load i64, ptr %13
+  %41 = load i64, ptr %12
+  %42 = sub i64 %40, %41
+  store i64 %42, ptr %13
+  %43 = load i64, ptr %13
+  store i64 %43, ptr %14
+  %44 = load i64, ptr %14
+  %45 = shl i64 %44, 1
+  store i64 %45, ptr %14
+  %46 = load i64, ptr %14
+  store i64 %46, ptr %15
+  %47 = load i64, ptr %15
+  %48 = add i64 %47, 1
+  store i64 %48, ptr %15
+  %49 = load i64, ptr %15
+  store i64 %49, ptr %2
+  %50 = load i64, ptr %2
+  ret i64 %50
+}
+
+define i64 @camlInt_ops__land_imm_17_40_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L271
+L271:                                                ; preds = %L1
+  %7 = load i64, ptr %2
+  store i64 %7, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %8 = load i64, ptr %4
+  %9 = add i64 %8, 0
+  %10 = inttoptr i64 %9 to ptr
+  %11 = load i64, ptr %10
+  store i64 %11, ptr %5
+  %12 = load i64, ptr %5
+  store i64 %12, ptr %6
+  %13 = load i64, ptr %6
+  %14 = and i64 %13, 9
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %6
+  store i64 %15, ptr %2
+  %16 = load i64, ptr %2
+  ret i64 %16
+}
+
+define i64 @camlInt_ops__lor_imm_18_41_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L276
+L276:                                                ; preds = %L1
+  %7 = load i64, ptr %2
+  store i64 %7, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %8 = load i64, ptr %4
+  %9 = add i64 %8, 0
+  %10 = inttoptr i64 %9 to ptr
+  %11 = load i64, ptr %10
+  store i64 %11, ptr %5
+  %12 = load i64, ptr %5
+  store i64 %12, ptr %6
+  %13 = load i64, ptr %6
+  %14 = or i64 %13, 9
+  store i64 %14, ptr %6
+  %15 = load i64, ptr %6
+  store i64 %15, ptr %2
+  %16 = load i64, ptr %2
+  ret i64 %16
+}
+
+define i64 @camlInt_ops__lxor_imm_19_42_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L281
+L281:                                                ; preds = %L1
+  %8 = load i64, ptr %2
+  store i64 %8, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %9 = load i64, ptr %4
+  %10 = add i64 %9, 0
+  %11 = inttoptr i64 %10 to ptr
+  %12 = load i64, ptr %11
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = xor i64 %14, 9
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = or i64 %17, 1
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
+}
+
+define i64 @camlInt_ops__lsl_imm_20_43_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L287
+L287:                                                ; preds = %L1
+  %8 = load i64, ptr %2
+  store i64 %8, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %9 = load i64, ptr %4
+  %10 = add i64 %9, 0
+  %11 = inttoptr i64 %10 to ptr
+  %12 = load i64, ptr %11
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = shl i64 %14, 4
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = add i64 %17, -15
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
+}
+
+define i64 @camlInt_ops__lsr_imm_21_44_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L293
+L293:                                                ; preds = %L1
+  %8 = load i64, ptr %2
+  store i64 %8, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %9 = load i64, ptr %4
+  %10 = add i64 %9, 0
+  %11 = inttoptr i64 %10 to ptr
+  %12 = load i64, ptr %11
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = lshr i64 %14, 4
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = or i64 %17, 1
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
+}
+
+define i64 @camlInt_ops__asr_imm_22_45_code(i64 %0)  {
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  %6 = alloca i64 
+  %7 = alloca i64 
+  store i64 %0, ptr %2
+  br label %L1
+L1:
+  br label %L299
+L299:                                                ; preds = %L1
+  %8 = load i64, ptr %2
+  store i64 %8, ptr %3
+  store ptr @camlInt_ops_data, ptr %4
+  %9 = load i64, ptr %4
+  %10 = add i64 %9, 0
+  %11 = inttoptr i64 %10 to ptr
+  %12 = load i64, ptr %11
+  store i64 %12, ptr %5
+  %13 = load i64, ptr %5
+  store i64 %13, ptr %6
+  %14 = load i64, ptr %6
+  %15 = ashr i64 %14, 4
+  store i64 %15, ptr %6
+  %16 = load i64, ptr %6
+  store i64 %16, ptr %7
+  %17 = load i64, ptr %7
+  %18 = or i64 %17, 1
+  store i64 %18, ptr %7
+  %19 = load i64, ptr %7
+  store i64 %19, ptr %2
+  %20 = load i64, ptr %2
+  ret i64 %20
+}
+
+define i64 @camlInt_ops__entry()  {
+  %1 = alloca i64 
+  %2 = alloca i64 
+  %3 = alloca i64 
+  %4 = alloca i64 
+  %5 = alloca i64 
+  br label %L1
+L1:
+  br label %L308
+L308:                                                ; preds = %L1
+  store ptr @camlInt_ops, ptr %3
+  %6 = load i64, ptr %3
+  store i64 %6, ptr %4
+  %7 = load i64, ptr %4
+  store i64 %7, ptr %2
+  store i64 1, ptr %5
+  %8 = load i64, ptr %5
+  store i64 %8, ptr %1
+  %9 = load i64, ptr %1
+  ret i64 %9
+}
+
+@camlInt_ops__gc_roots = global { i64, i64 } { i64 0, i64 25344 }
+@camlInt_ops = global { i64, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64 } { i64 9, ptr @camlInt_ops__add_23, ptr @camlInt_ops__sub_24, ptr @camlInt_ops__mul_25, ptr @camlInt_ops__div_26, ptr @camlInt_ops__mod__27, ptr @camlInt_ops__land__28, ptr @camlInt_ops__lor__29, ptr @camlInt_ops__lxor__30, ptr @camlInt_ops__lnot__31, ptr @camlInt_ops__lsl__32, ptr @camlInt_ops__lsr__33, ptr @camlInt_ops__asr__34, ptr @camlInt_ops__add_imm_35, ptr @camlInt_ops__sub_imm_36, ptr @camlInt_ops__mul_imm_37, ptr @camlInt_ops__div_imm_38, ptr @camlInt_ops__mod_imm_39, ptr @camlInt_ops__land_imm_40, ptr @camlInt_ops__lor_imm_41, ptr @camlInt_ops__lxor_imm_42, ptr @camlInt_ops__lsl_imm_43, ptr @camlInt_ops__lsr_imm_44, ptr @camlInt_ops__asr_imm_45, i64 3063 }
+@camlInt_ops__asr_imm_45 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr_imm_22_45_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsr_imm_44 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsr_imm_21_44_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsl_imm_43 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsl_imm_20_43_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lxor_imm_42 = global { ptr, i64, i64 } { ptr @camlInt_ops__lxor_imm_19_42_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lor_imm_41 = global { ptr, i64, i64 } { ptr @camlInt_ops__lor_imm_18_41_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__land_imm_40 = global { ptr, i64, i64 } { ptr @camlInt_ops__land_imm_17_40_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mod_imm_39 = global { ptr, i64, i64 } { ptr @camlInt_ops__mod_imm_16_39_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__div_imm_38 = global { ptr, i64, i64 } { ptr @camlInt_ops__div_imm_15_38_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mul_imm_37 = global { ptr, i64, i64 } { ptr @camlInt_ops__mul_imm_14_37_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__sub_imm_36 = global { ptr, i64, i64 } { ptr @camlInt_ops__sub_imm_13_36_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__add_imm_35 = global { ptr, i64, i64 } { ptr @camlInt_ops__add_imm_12_35_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__asr__34 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr__11_34_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsr__33 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsr__10_33_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsl__32 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsl__9_32_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lnot__31 = global { ptr, i64, i64 } { ptr @camlInt_ops__lnot__8_31_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lxor__30 = global { ptr, i64, i64 } { ptr @camlInt_ops__lxor__7_30_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lor__29 = global { ptr, i64, i64 } { ptr @camlInt_ops__lor__6_29_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__land__28 = global { ptr, i64, i64 } { ptr @camlInt_ops__land__5_28_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mod__27 = global { ptr, i64, i64 } { ptr @camlInt_ops__mod__4_27_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__div_26 = global { ptr, i64, i64 } { ptr @camlInt_ops__div_3_26_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mul_25 = global { ptr, i64, i64 } { ptr @camlInt_ops__mul_2_25_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__sub_24 = global { ptr, i64, i64 } { ptr @camlInt_ops__sub_1_24_code, i64 108086391056891909, i64 3063 }
+@camlInt_ops__add_23 = global { ptr, i64 } { ptr @camlInt_ops__add_0_23_code, i64 108086391056891909 }
+@camlInt_ops_data = external global ptr
+@caml_exn_Division_by_zero = external global ptr
+
+@camlInt_ops__data_end = global i64 0
+define void @camlInt_ops__code_end() { ret void }
+@camlInt_ops__frametable = global i64 0

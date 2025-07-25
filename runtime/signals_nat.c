@@ -151,7 +151,7 @@ void caml_init_nat_signals(void)
 {
   struct sigaction act, oldact;
   SET_SIGACT(act, segv_handler);
-  act.sa_flags |= SA_ONSTACK | SA_NODEFER;
+  act.sa_flags |= SA_ONSTACK;
   sigemptyset(&act.sa_mask);
   sigaction(SIGSEGV, &act, &oldact);
   if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {

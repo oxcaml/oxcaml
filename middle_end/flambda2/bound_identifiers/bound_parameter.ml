@@ -42,11 +42,15 @@ include Container_types.Make (struct
         Flambda_kind.With_subkind.hash kind,
         Flambda_debug_uid.hash uid )
 
-  let [@ocamlformat "disable"] print ppf { param; kind; uid = _ } =
-    (* CR sspies: Add printing for debug uids, guarded by a flag. *)
-    Format.fprintf ppf "@[(%t%a%t @<1>\u{2237} %a)@]"
+  let print_debug_uid ppf duid =
+    if !Clflags.dump_debug_uids
+    then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
+
+  let [@ocamlformat "disable"] print ppf { param; kind; uid } =
+    Format.fprintf ppf "@[(%t%a%a%t @<1>\u{2237} %a)@]"
       Flambda_colours.parameter
       Variable.print param
+      print_debug_uid uid
       Flambda_colours.pop
       Flambda_kind.With_subkind.print kind
 end)

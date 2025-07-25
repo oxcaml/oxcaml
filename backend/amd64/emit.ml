@@ -1474,15 +1474,18 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then movss (arg i 0) (res i 0)
-  | V128_of_v128 -> if distinct then movpd ~unaligned:false (arg i 0) (res i 0)
-  | V256_of_v256 ->
+  | V128_of_vec (Vec128 | Vec256) ->
+    if distinct then movpd ~unaligned:false (argX i 0) (res i 0)
+  | V256_of_vec Vec128 ->
+    if distinct then movpd ~unaligned:false (arg i 0) (resX i 0)
+  | V256_of_vec Vec256 ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct
     then
       if Reg.is_stack i.arg.(0)
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
-  | V512_of_v512 ->
+  | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
   | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)

@@ -210,6 +210,7 @@ val afl_instrument : bool ref
 val afl_inst_ratio : int ref
 val function_sections : bool ref
 val probes : bool ref
+val llvm_backend : bool ref
 
 val all_passes : string list ref
 val dumped_pass : string -> bool
@@ -234,6 +235,10 @@ val error_style : Misc.Error_style.setting option ref
 val error_style_reader : Misc.Error_style.setting env_reader
 
 val unboxed_types : bool ref
+
+val dump_debug_uids : bool ref         (* -ddebug-uids *)
+
+val dump_debug_uid_tables : bool ref   (* -ddebug-uid-tables *)
 
 val insn_sched : bool ref
 val insn_sched_default : bool

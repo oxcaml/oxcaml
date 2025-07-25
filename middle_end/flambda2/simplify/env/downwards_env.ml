@@ -290,7 +290,7 @@ let enter_set_of_closures
     { round;
       typing_env;
       inlined_debuginfo = _;
-      disable_inlining = _;
+      disable_inlining;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
@@ -310,7 +310,10 @@ let enter_set_of_closures
       defined_variables_by_scope = _;
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _
-    } disable_inlining =
+    } ~in_stub =
+  let disable_inlining : Disable_inlining.t =
+    if in_stub then Disable_inlining Stub else disable_inlining
+  in
   { round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
