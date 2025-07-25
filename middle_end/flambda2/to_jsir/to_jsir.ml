@@ -265,7 +265,7 @@ and switch ~env ~res e =
      We assume that the max value isn't too high, and just pad the out-of-domain
      cases to invalid blocks. *)
   assert (min >= 0);
-  let res, positives =
+  let res, arms =
     Array.fold_left_map
       (fun res i ->
         let apply_cont = Targetint_31_63.Map.find_opt i arms in
@@ -286,8 +286,14 @@ and switch ~env ~res e =
       res
       (Array.init (max + 1) Targetint_31_63.of_int)
   in
-  ( env,
-    To_jsir_result.end_block_with_last_exn res (Switch (scrutinee, positives)) )
+  let last : Jsir.last =
+    match Array.length arms with
+    | 2 ->
+      (* Special case: turn it into if/then/else *)
+      Cond (scrutinee, arms.(0), arms.(1))
+    | _ -> Switch (scrutinee, arms)
+  in
+  env, To_jsir_result.end_block_with_last_exn res last
 
 and invalid ~env ~res _msg = env, res
 
