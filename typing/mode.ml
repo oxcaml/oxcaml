@@ -1990,9 +1990,12 @@ terminated with an [Empty] or [Const] axhint *)
     (** Description of an input axis responsible for an output axis of a morphism *)
     type 'a responsible_axis =
       | NoneResponsible : 'a responsible_axis
-          (** None of the input axes are responsible for the output axis *)
+          (** None of the input axes are responsible for the output axis.
+              This should mean that it is the morphism that is responsible
+              for the output axis *)
       | SourceIsSingle : 'a responsible_axis
-          (** The input of the morphism is a single axis object that is responsible for the output axis *)
+          (** The input of the morphism is a single axis object that is responsible
+              for the output axis *)
       | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
           (** The specified axis of the input object is responsible for the output axis *)
 
