@@ -717,7 +717,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       | Heap -> No_coeffects
       | Local _ -> Has_coeffects
       | External ->
-        failwith "Unimplemented" (* CR jcutler: fixme, ask OCamlPRO*)),
+        Misc.fatal_error "Externally allocated functions are not supported"),
       Strict )
   in
   let decl_map =
