@@ -95,12 +95,11 @@ let map_opt f = function None -> None | Some x -> Some (f x)
 
 let map_loc sub {loc; txt} = {loc = sub.location sub loc; txt}
 
-let map_arg_label sub = function
+let map_arg_label _sub = function
 | Nolabel -> Nolabel
 | Labelled s -> Labelled s
 | Optional s -> Optional s
-| Generic_optional (module_path, s) ->
-    Generic_optional (map_loc sub module_path, s)
+| Generic_optional s -> Generic_optional s
 
 module C = struct
   (* Constants *)
