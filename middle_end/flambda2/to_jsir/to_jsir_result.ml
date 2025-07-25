@@ -12,13 +12,15 @@ type partial_block =
 type t =
   { complete_blocks : Jsir.block Jsir.Addr.Map.t;
     current_blocks : partial_block list;
-    next_addr : Jsir.Addr.t
+    next_addr : Jsir.Addr.t;
+    reserved_addrs : Jsir.Addr.Set.t
   }
 
 let create () =
   { complete_blocks = Jsir.Addr.Map.empty;
     current_blocks = [];
-    next_addr = Jsir.Addr.zero
+    next_addr = Jsir.Addr.zero;
+    reserved_addrs = Jsir.Addr.Set.empty
   }
 
 let add_instr_exn t instr =
@@ -34,17 +36,43 @@ let add_instr_exn t instr =
   in
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
-let new_block { complete_blocks; current_blocks; next_addr } ~params =
-  (* CR selee: review PC *)
+let new_block { complete_blocks; current_blocks; next_addr; reserved_addrs }
+    ~params =
   let new_block = { params; body = []; addr = next_addr } in
   ( { complete_blocks;
       current_blocks = new_block :: current_blocks;
-      next_addr = Jsir.Addr.succ next_addr
+      next_addr = Jsir.Addr.succ next_addr;
+      reserved_addrs
     },
     next_addr )
 
-let end_block_with_last_exn { complete_blocks; current_blocks; next_addr } last
+let reserve_address
+    { complete_blocks; current_blocks; next_addr; reserved_addrs } =
+  ( { complete_blocks;
+      current_blocks;
+      next_addr = Jsir.Addr.succ next_addr;
+      reserved_addrs = Jsir.Addr.Set.add next_addr reserved_addrs
+    },
+    next_addr )
+
+let new_block_with_addr_exn
+    { complete_blocks; current_blocks; next_addr; reserved_addrs } ~params ~addr
     =
+  if not (Jsir.Addr.Set.mem addr reserved_addrs)
+  then
+    Misc.fatal_errorf
+      "To_jsir_result.new_block_with_addr_exn: expected provided address %d to \
+       be reserved"
+      addr;
+  let new_block = { params; body = []; addr } in
+  { complete_blocks;
+    current_blocks = new_block :: current_blocks;
+    next_addr;
+    reserved_addrs = Jsir.Addr.Set.remove addr reserved_addrs
+  }
+
+let end_block_with_last_exn
+    { complete_blocks; current_blocks; next_addr; reserved_addrs } last =
   let { params; body; addr }, rest_current_blocks =
     match current_blocks with
     | [] ->
@@ -57,12 +85,22 @@ let end_block_with_last_exn { complete_blocks; current_blocks; next_addr } last
     { params; body = List.rev body; branch = last }
   in
   let complete_blocks = Jsir.Addr.Map.add addr new_block complete_blocks in
-  { complete_blocks; current_blocks = rest_current_blocks; next_addr }
+  { complete_blocks;
+    current_blocks = rest_current_blocks;
+    next_addr;
+    reserved_addrs
+  }
 
-let to_program_exn { complete_blocks; current_blocks; next_addr = _ } =
+let to_program_exn
+    { complete_blocks; current_blocks; next_addr = _; reserved_addrs } =
   if List.length current_blocks <> 0
   then
     Misc.fatal_error
       "To_jsir_result.to_program_exn: expected current_blocks to be empty";
+  if not (Jsir.Addr.Set.is_empty reserved_addrs)
+  then
+    Misc.fatal_error
+      "To_jsir_result.to_program_exn: expected all reserved addresses to be \
+       used";
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
   { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
