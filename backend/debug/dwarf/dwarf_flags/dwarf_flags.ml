@@ -172,3 +172,18 @@ let gdwarf_self_tail_calls = ref default_gdwarf_self_tail_calls
 let gdwarf_may_alter_codegen = ref false
 
 let dwarf_inlined_frames = ref false
+
+let default_gdwarf_compression = "zlib"
+
+let gdwarf_compression = ref default_gdwarf_compression
+
+let get_dwarf_compression_flag () =
+  if !dwarf_inlined_frames || not !restrict_to_upstream_dwarf then
+    Some !gdwarf_compression
+  else
+    None
+
+let get_dwarf_c_toolchain_flag () =
+  match get_dwarf_compression_flag () with
+  | Some compression -> " -gz=" ^ compression
+  | None -> ""

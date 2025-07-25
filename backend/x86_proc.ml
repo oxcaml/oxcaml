@@ -370,9 +370,16 @@ let compile infile outfile =
       (Config.asm ^ Filename.quote outfile ^ " " ^ Filename.quote infile
       ^ if !Clflags.verbose then "" else ">NUL")
   else
+    let dwarf_flag =
+      if !Clflags.native_code && !Clflags.debug then
+        Dwarf_flags.get_dwarf_c_toolchain_flag ()
+      else
+        ""
+    in
     Ccomp.command
       (Config.asm ^ " "
       ^ String.concat " " (Misc.debug_prefix_map_flags ())
+      ^ dwarf_flag
       ^ " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
 let assemble_file infile outfile =
