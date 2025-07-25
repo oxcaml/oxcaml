@@ -1528,7 +1528,6 @@ module Extra_params = struct
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-max-function-complexity" ->
       set_int' Debugging.dwarf_max_function_complexity
-    | "llvm-backend" -> set' Clflags.llvm_backend
     | "llvm-path" -> Oxcaml_flags.llvm_path := Some v; true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
