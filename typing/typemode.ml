@@ -464,7 +464,7 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
    removed. The implications on the monadic axes will stay. Implied modalities
    can be overriden. *)
 (* CR zqian: decouple mutable and comonadic modalities *)
-let mutable_implied_modalities ~include_comonadic (mut : Types.mutability) =
+let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let comonadic : Modality.t list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
@@ -477,12 +477,19 @@ let mutable_implied_modalities ~include_comonadic (mut : Types.mutability) =
       Atom (Monadic Contention, Join_with Contention.Const.legacy);
       Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
   in
-  match mut with
-  | Immutable -> []
-  | Mutable _ -> if include_comonadic then monadic @ comonadic else monadic
+  (* We only need to include comonadic mutable implied modalities for now for
+     backwards-compatibility with legacy code which expects them. Atomic record
+     fields and mutable variables are a features, and so don't have this
+     backwards-compatibility requirement. *)
+  match mut, for_mutable_variable with
+  | Immutable, _ -> []
+  | Mutable { atomic = Nonatomic; _ }, false -> monadic @ comonadic
+  | Mutable { atomic = Atomic; _ }, _ | Mutable { atomic = Nonatomic; _ }, true
+    ->
+    monadic
 
-let mutable_implied_modalities ~include_comonadic (mut : Types.mutability) =
-  let l = mutable_implied_modalities ~include_comonadic mut in
+let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
+  let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
     (fun t (Modality.Atom (ax, a)) -> Modality.Value.Const.set ax a t)
     Modality.Value.Const.id l
@@ -517,11 +524,7 @@ let implied_modalities (Atom (ax, a) : Modality.t) : Modality.t list =
   | _ -> []
 
 let least_modalities_implying mut (t : Modality.Value.Const.t) =
-  let baseline =
-    mutable_implied_modalities
-      ~include_comonadic:(not (Types.is_atomic mut))
-      mut
-  in
+  let baseline = mutable_implied_modalities ~for_mutable_variable:false mut in
   let annotated = Modality.Value.Const.(diff baseline t) in
   let implied = List.concat_map implied_modalities annotated in
   let exclude_implied =
@@ -566,13 +569,7 @@ let sort_dedup_modalities ~warn l =
 
 let transl_modalities ~maturity mut modalities =
   let mut_modalities =
-    mutable_implied_modalities
-      mut
-      (* We only need to include comonadic mutable implied modalities for now
-         for backwards-compatibility with legacy code which expects them. Atomic
-         record fields are a new feature, and so don't have this
-         backwards-compatibility requirement. *)
-      ~include_comonadic:(not (Types.is_atomic mut))
+    mutable_implied_modalities mut ~for_mutable_variable:false
   in
   let modalities = List.map (transl_modality ~maturity) modalities in
   (* axes listed in the order of implication. *)
@@ -592,12 +589,12 @@ let transl_modalities ~maturity mut modalities =
 let let_mutable_modalities m0 =
   mutable_implied_modalities
     (Mutable { mode = m0; atomic = Nonatomic })
-    ~include_comonadic:false
+    ~for_mutable_variable:false
 
 let atomic_mutable_modalities =
   mutable_implied_modalities
     (Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic })
-    ~include_comonadic:false
+    ~for_mutable_variable:false
 
 let untransl_modalities mut t =
   t
