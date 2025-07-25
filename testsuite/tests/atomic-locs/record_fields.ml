@@ -89,9 +89,9 @@ end
 Line 2, characters 13-59:
 2 |   type t = { mutable x : (int -> int) @@ portable [@atomic] }
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modalities of future axes are not allowed on atomic fields
-(here, "x"). Use one of the modality types from the Modes module in the
-type of the field instead]
+Error: Modalities are not allowed on atomic fields (here, "x"). Use one of
+the modality types from the Modes module in the type of the field
+instead
 |}]
 
 (* Legacy modalities are allowed because they're the same thing as writing
