@@ -251,27 +251,6 @@ and apply_cont ~env ~res apply_cont =
   let last, res = apply_cont0 ~env ~res apply_cont in
   env, To_jsir_result.end_block_with_last_exn res last
 
-and create_one_sided_switch_arms ~env ~res ~max arms =
-  Array.fold_left_map
-    (fun res i ->
-      let apply_cont = Targetint_31_63.Map.find_opt i arms in
-      let last, res =
-        match apply_cont with
-        | Some apply_cont -> apply_cont0 ~env ~res apply_cont
-        | None ->
-          let res, addr = To_jsir_result.invalid_switch_block res in
-          (Branch (addr, []) : Jsir.last), res
-      in
-      match last with
-      | Branch cont -> res, cont
-      | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
-        ->
-        let res, addr = To_jsir_result.new_block res ~params:[] in
-        let res = To_jsir_result.end_block_with_last_exn res last in
-        res, (addr, []))
-    res
-    (Array.init (max + 1) Targetint_31_63.of_int)
-
 and switch ~env ~res e =
   let scrutinee, res =
     To_jsir_shared.simple ~env ~res (Switch_expr.scrutinee e)
@@ -280,51 +259,35 @@ and switch ~env ~res e =
   let domain = Targetint_31_63.Map.keys arms in
   let min = Targetint_31_63.Set.min_elt domain |> Targetint_31_63.to_int in
   let max = Targetint_31_63.Set.max_elt domain |> Targetint_31_63.to_int in
-  (* Flambda2 allows the domain to be arbitrary subsets of targetint, whereas
-     JSIR requires [0..n].
+  (* Flambda2 allows the domain to be arbitrary non-negative subsets of
+     targetint, whereas JSIR requires [0..n].
 
-     Heuristic: we assume that negative cases are rare, and also that the max
-     value isn't too high. For the positive cases, we will pad the out-of-domain
-     cases to invalid blocks; for the negative cases, we just negate the
-     scrutinee and treat it the same way as the positive case.
-
-     CR selee: This might be too naive, will come back and check *)
-  if min >= 0
-  then
-    let res, positives = create_one_sided_switch_arms ~env ~res ~max arms in
-    ( env,
-      To_jsir_result.end_block_with_last_exn res (Switch (scrutinee, positives))
-    )
-  else
-    (* Negative case *)
-    let res, neg_addr = To_jsir_result.new_block res ~params:[] in
-    let negated = Jsir.Var.fresh () in
-    let res =
-      To_jsir_result.add_instr_exn res
-        (Let (negated, Prim (Extern "%int_neg", [Pv scrutinee])))
-    in
-    let res, negatives =
-      create_one_sided_switch_arms ~env ~res ~max:(-min) arms
-    in
-    let res =
-      To_jsir_result.end_block_with_last_exn res (Switch (negated, negatives))
-    in
-    (* Positive case *)
-    let res, pos_addr = To_jsir_result.new_block res ~params:[] in
-    let res, positives = create_one_sided_switch_arms ~env ~res ~max arms in
-    let res =
-      To_jsir_result.end_block_with_last_exn res (Switch (scrutinee, positives))
-    in
-    (* Jump to either block depending on comparison *)
-    let zero : Jsir.prim_arg = Pc (Int Targetint.zero) in
-    let is_neg = Jsir.Var.fresh () in
-    let res =
-      To_jsir_result.add_instr_exn res
-        (Let (is_neg, Prim (Lt, [Pv scrutinee; zero])))
-    in
-    ( env,
-      To_jsir_result.end_block_with_last_exn res
-        (Switch (is_neg, Array.of_list [pos_addr, []; neg_addr, []])) )
+     We assume that the max value isn't too high, and just pad the out-of-domain
+     cases to invalid blocks. *)
+  assert (min >= 0);
+  let res, positives =
+    Array.fold_left_map
+      (fun res i ->
+        let apply_cont = Targetint_31_63.Map.find_opt i arms in
+        let last, res =
+          match apply_cont with
+          | Some apply_cont -> apply_cont0 ~env ~res apply_cont
+          | None ->
+            let res, addr = To_jsir_result.invalid_switch_block res in
+            (Branch (addr, []) : Jsir.last), res
+        in
+        match last with
+        | Branch cont -> res, cont
+        | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
+          ->
+          let res, addr = To_jsir_result.new_block res ~params:[] in
+          let res = To_jsir_result.end_block_with_last_exn res last in
+          res, (addr, []))
+      res
+      (Array.init (max + 1) Targetint_31_63.of_int)
+  in
+  ( env,
+    To_jsir_result.end_block_with_last_exn res (Switch (scrutinee, positives)) )
 
 and invalid ~env ~res _msg = env, res
 
