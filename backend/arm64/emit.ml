@@ -1051,7 +1051,7 @@ let num_call_gc_points instr =
     | Lend -> call_gc
     | Lop (Alloc { mode = External ; _ }) ->
       Misc.fatal_error
-        "Impossible: external allocs should be generated as as Cextcall in CMM."
+        "Impossible: external allocs should be generated as Cextcall in CMM."
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag ->
       loop instr.next (call_gc + 1)
     | Lop Poll -> loop instr.next (call_gc + 1)
