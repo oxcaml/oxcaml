@@ -543,15 +543,9 @@ let build_initial_env add_type add_extension empty_env =
                              {parent_path = path_mallocd;
                               position = 1; arity = 1}))
        ~jkind:(fun param ->
-                let modality =
-                  Mode.Modality.Value.Const.id
-                  |> Mode.Modality.Value.Const.set (Comonadic Externality)
-                      (Meet_with Jkind_mod_bounds.Externality.min)
-                in
-                Jkind.of_builtin ~why:(Primitive ident_mallocd)
-                  Jkind.Const.Builtin.kind_of_mallocd
-                |> Jkind.add_with_bounds ~modality ~type_expr:param
-          )
+                  Jkind.of_const (Jkind.Const.kind_of_mallocd param)
+                    ~why:(Primitive ident_mallocd)
+                    ~quality:Best ~annotation:None)
   |> add_type_with_jkind ident_lexing_position
        ~kind:(
          let lbl (field, field_type) =

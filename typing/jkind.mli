@@ -248,6 +248,8 @@ module Const : sig
       before doing the proper equality check. *)
   val no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
 
+  val kind_of_mallocd : Types.type_expr -> (allowed * disallowed) t
+
   (* CR layouts: Remove this once we have a better story for printing with jkind
      abbreviations. *)
   module Builtin : sig
@@ -309,8 +311,6 @@ module Const : sig
 
     (** The jkind of unboxed 32-bit native-sized integers with no mode crossing. *)
     val word : t
-
-    val kind_of_mallocd : t
 
     (** The jkind of unboxed 32-bit native-sized integers with mode crossing. *)
     val kind_of_unboxed_nativeint : t
