@@ -183,10 +183,14 @@ module type Solver_mono = sig
         (** [Morph morph_hint morph x_hint] says the current bound is derived by applying
             morphism [morph] (explained by [morph_hint]) to another bound explained by
             [x_hint] *)
-    | Const : hint_const -> ('a, 'd) hint
+    | Const : hint_const -> ('a, 'l * 'r) hint
         (** [Const c] says the current bound is explained by [c] *)
-    | Branch : 'a * ('a, 'd) hint * 'a * ('a, 'd) hint -> ('a, 'd) hint
+    | Branch :
+        'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
+        -> ('a, 'l * 'r) hint
         (** [Branch a0 a0_hint a1 a1_hint] says the current bound is jointly explained by either [a0] (explained by [a0_hint]) or [a1] (explaiend by [a1_hint]) (or both) *)
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
 
   (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
    can be, and [right] will be the highest mode [b] can be. And [left <= right]
