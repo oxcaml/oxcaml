@@ -2130,7 +2130,7 @@ terminated with an [Empty] or [Const] axhint *)
      fun side a_obj x y ->
       match side with Right -> C.le a_obj x y | Left -> C.le a_obj y x
 
-    let rec shint_to_axhint :
+    let rec shint_to_axhint_prod :
         type r a left1 left2 right1 right2.
         r Lattices_mono.obj ->
         r ->
@@ -2154,12 +2154,14 @@ terminated with an [Empty] or [Const] axhint *)
           | SourceIsSingle ->
             (* Note that unlike below, the returned [b] value will be the same as
                the current [b], so we can discard it. *)
-            let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+            let _, b_hint = shint_to_axhint_single b_obj b b_shint side in
             a, Morph (morph_hint, b, b_obj, b_hint, morph)
           | Axis b_ax ->
             (* Note that [ax_b] is different to [b] as it refers to a single-axis
                value in [b] *)
-            let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+            let ax_b, ax_b_hint =
+              shint_to_axhint_prod b_obj b b_shint b_ax side
+            in
             let ax_b_obj = C.proj_obj b_ax b_obj in
             a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
         | Const r_const_hint -> a, Const r_const_hint
@@ -2175,9 +2177,9 @@ terminated with an [Empty] or [Const] axhint *)
               (* As we are dealing with a single axis at a time, it should be totally-ordered, so this case should be impossible *)
               assert false
           in
-          shint_to_axhint r_obj chosen chosen_hint ax side
+          shint_to_axhint_prod r_obj chosen chosen_hint ax side
 
-    and single_axis_shint_to_axhint :
+    and shint_to_axhint_single :
         type a left1 right1 left2 right2.
         a Lattices_mono.obj ->
         a ->
@@ -2197,11 +2199,13 @@ terminated with an [Empty] or [Const] axhint *)
           | NoneResponsible -> a, Empty
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-            let _, b_hint = single_axis_shint_to_axhint b_obj b b_shint side in
+            let _, b_hint = shint_to_axhint_single b_obj b b_shint side in
             a, Morph (morph_hint, b, b_obj, b_hint, morph)
           | Axis b_ax ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-            let ax_b, ax_b_hint = shint_to_axhint b_obj b b_shint b_ax side in
+            let ax_b, ax_b_hint =
+              shint_to_axhint_prod b_obj b b_shint b_ax side
+            in
             let ax_b_obj = C.proj_obj b_ax b_obj in
             a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
         | Const a_const_hint -> a, Const a_const_hint
@@ -2215,7 +2219,7 @@ terminated with an [Empty] or [Const] axhint *)
               (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
               assert false
           in
-          single_axis_shint_to_axhint a_obj chosen chosen_hint side
+          shint_to_axhint_single a_obj chosen chosen_hint side
 
     let flip_axerror { left; left_hint; right; right_hint } =
       { left = right;
@@ -2230,9 +2234,11 @@ convert the error to an [axerror] *)
         type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror
         =
      fun r_obj axis { left; left_hint; right; right_hint } ->
-      let left', left'_hint = shint_to_axhint r_obj left left_hint axis Left in
+      let left', left'_hint =
+        shint_to_axhint_prod r_obj left left_hint axis Left
+      in
       let right', right'_hint =
-        shint_to_axhint r_obj right right_hint axis Right
+        shint_to_axhint_prod r_obj right right_hint axis Right
       in
       { left = left';
         left_hint = left'_hint;
@@ -2244,14 +2250,14 @@ convert the error to an [axerror] *)
       solver_error_to_axerror r_obj axis err |> flip_axerror
 
     (** Take a solver error for a single axis object and convert it to an [axerror] *)
-    let single_axis_solver_error_to_axerror :
+    let solver_error_to_axerror_single :
         type a. a Lattices_mono.obj -> a S.error -> a axerror =
      fun a_obj { left; left_hint; right; right_hint } ->
       let left', left'_hint =
-        single_axis_shint_to_axhint a_obj left left_hint Left
+        shint_to_axhint_single a_obj left left_hint Left
       in
       let right', right'_hint =
-        single_axis_shint_to_axhint a_obj right right_hint Right
+        shint_to_axhint_single a_obj right right_hint Right
       in
       { left = left';
         left_hint = left'_hint;
@@ -2259,8 +2265,8 @@ convert the error to an [axerror] *)
         right_hint = right'_hint
       }
 
-    let flipped_single_axis_solver_error_to_axerror r_obj err =
-      single_axis_solver_error_to_axerror r_obj err |> flip_axerror
+    let flipped_solver_error_to_axerror_single r_obj err =
+      solver_error_to_axerror_single r_obj err |> flip_axerror
   end
 end
 
@@ -2459,7 +2465,7 @@ module Comonadic_axis_gen (Obj : Obj) = struct
   type equate_error = equate_step * error
 
   let solver_error_to_axerror =
-    Axerror.From_solver_error.single_axis_solver_error_to_axerror Obj.obj
+    Axerror.From_solver_error.solver_error_to_axerror_single Obj.obj
 
   let submode_log a b ~log =
     Solver.submode obj a b ~log |> Result.map_error solver_error_to_axerror
@@ -2483,8 +2489,7 @@ module Monadic_axis_gen (Obj : Obj) = struct
   type equate_error = equate_step * error
 
   let flipped_solver_error_to_axerror =
-    Axerror.From_solver_error.flipped_single_axis_solver_error_to_axerror
-      Obj.obj
+    Axerror.From_solver_error.flipped_solver_error_to_axerror_single Obj.obj
 
   let submode_log a b ~log =
     Solver.submode obj b a ~log
