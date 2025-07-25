@@ -650,14 +650,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer e in
-          begin match Types.atomic lbl.lbl_mut with
-          | Atomic ->
+          if Types.is_atomic lbl.lbl_mut
+          then
             Some
               (Patomic_load_field { immediate_or_pointer },
                [targ; Lconst (Const_base (Const_int lbl.lbl_pos))])
-          | Nonatomic ->
+          else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
-          end
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
           let alloc_mode =
@@ -671,14 +670,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
           let immediate_or_pointer, _ = maybe_pointer e in
-          begin match Types.atomic lbl.lbl_mut with
-          | Atomic ->
+          if Types.is_atomic lbl.lbl_mut
+          then
             Some
               (Patomic_load_field { immediate_or_pointer },
                [targ; Lconst (Const_base (Const_int (lbl.lbl_pos + 1)))])
-          | Nonatomic ->
+          else
             Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
-          end
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -753,14 +751,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
-          begin match Types.atomic lbl.lbl_mut with
-          | Nonatomic ->
-            Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
-            [arg_lambda; newval_lambda]
-          | Atomic ->
+          if Types.is_atomic lbl.lbl_mut
+          then
             Patomic_set_field { immediate_or_pointer },
             [arg_lambda; field_lambda; newval_lambda]
-          end
+          else
+            Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
         | Record_float ->
@@ -769,14 +766,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
-          begin match Types.atomic lbl.lbl_mut with
-          | Nonatomic ->
-            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
-            [arg_lambda; newval_lambda]
-          | Atomic ->
+          if Types.is_atomic lbl.lbl_mut
+          then
             Patomic_set_field { immediate_or_pointer },
             [arg_lambda; field_lambda; newval_lambda]
-          end
+          else
+            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
