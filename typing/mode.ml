@@ -1999,13 +1999,6 @@ terminated with an [Empty] or [Const] axhint *)
       | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
           (** The specified axis of the input object is responsible for the output axis *)
 
-    (* A large reason that the "single" cases and the "product" cases below
-       have to be handled separately is that an [Axis.t] must be from a product
-       to a single axis. If we could have an [Axis.t] of the form [Axis (x, x)]
-       then I believe that this would allow us to (or at least get us closer to
-       being able to) merge the two versions of the [find_responsible_axis_*] and
-       [*shint_to_axhint] functions. *)
-
     (** Given a morphism either from a product object to a single axis, or
      from a product object to a single axis, this function
      is used to find the axis in the source that is responsible for the
