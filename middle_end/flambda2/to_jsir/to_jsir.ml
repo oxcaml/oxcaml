@@ -290,7 +290,7 @@ and switch ~env ~res e =
     match Array.length arms with
     | 2 ->
       (* Special case: turn it into if/then/else *)
-      Cond (scrutinee, arms.(0), arms.(1))
+      Cond (scrutinee, arms.(1), arms.(0))
     | _ -> Switch (scrutinee, arms)
   in
   env, To_jsir_result.end_block_with_last_exn res last
