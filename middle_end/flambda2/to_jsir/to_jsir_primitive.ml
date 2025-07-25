@@ -9,11 +9,9 @@ let prim_arg ~env simple =
       Jsir.Pv (To_jsir_env.get_symbol_exn env symbol))
     ~const:(fun const -> Jsir.Pc (To_jsir_shared.reg_width_const const))
 
-type result = Jsir.expr * To_jsir_env.t * To_jsir_result.t
-
 (* CR selee: implement primitives *)
 
-let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) : result =
+let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
   ignore (env, res);
   match f with
   | Invalid kind ->
@@ -32,7 +30,7 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) : result =
   | Poll -> primitive_not_supported ()
   | Cpu_relax -> primitive_not_supported ()
 
-let unary ~env ~res (f : Flambda_primitive.unary_primitive) x : result =
+let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   ignore (env, res, x);
   match f with
   | Block_load { kind; mut; field } ->
@@ -85,12 +83,10 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x : result =
     primitive_not_supported ()
   | Untag_immediate -> primitive_not_supported ()
   | Tag_immediate -> primitive_not_supported ()
-  | Project_function_slot { move_from; move_to } ->
-    ignore (move_from, move_to);
-    primitive_not_supported ()
-  | Project_value_slot { project_from; value_slot } ->
-    ignore (project_from, value_slot);
-    primitive_not_supported ()
+  | Project_function_slot { move_from = _; move_to } ->
+    To_jsir_env.get_function_slot_exn env move_to, env, res
+  | Project_value_slot { project_from = _; value_slot } ->
+    To_jsir_env.get_value_slot_exn env value_slot, env, res
   | Is_boxed_float -> primitive_not_supported ()
   | Is_flat_float_array -> primitive_not_supported ()
   | End_region { ghost } ->
@@ -111,7 +107,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x : result =
     ignore tag;
     primitive_not_supported ()
 
-let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y : result =
+let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   match f with
   | Block_set { kind; init; field } ->
     ignore (kind, init, field);
@@ -126,11 +122,11 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y : result =
     ignore (dims, kind, layout);
     primitive_not_supported ()
   | Phys_equal comparison ->
-    ( (match comparison with
-      | Eq -> Prim (Eq, [x; y])
-      | Neq -> Prim (Neq, [x; y])),
-      env,
-      res )
+    let expr : Jsir.expr =
+      match comparison with Eq -> Prim (Eq, [x; y]) | Neq -> Prim (Neq, [x; y])
+    in
+    let jvar = Jsir.Var.fresh () in
+    jvar, env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
   | Int_arith (kind, op) ->
     ignore (kind, op);
     primitive_not_supported ()
@@ -162,7 +158,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y : result =
     ignore kind;
     primitive_not_supported ()
 
-let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z : result =
+let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   ignore (env, res, x, y, z);
   match f with
   | Array_set (kind, set_kind) ->
@@ -181,7 +177,7 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z : result =
     ignore (atomic_kind, args_kind);
     primitive_not_supported ()
 
-let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs : result =
+let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   ignore (env, res, xs);
   match f with
   | Begin_region { ghost } ->

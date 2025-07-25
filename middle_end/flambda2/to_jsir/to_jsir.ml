@@ -1,19 +1,5 @@
 open! Flambda.Import
 
-(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
-    environment. *)
-let bind_expr_to_var ~env ~res fvar expr =
-  let jvar = Jsir.Var.fresh () in
-  ( To_jsir_env.add_var env fvar jvar,
-    To_jsir_result.add_instr res (Jsir.Let (jvar, expr)) )
-
-(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
-    environment. *)
-let bind_expr_to_symbol ~env ~res symbol expr =
-  let jvar = Jsir.Var.fresh () in
-  ( To_jsir_env.add_symbol env symbol jvar,
-    To_jsir_result.add_instr res (Jsir.Let (jvar, expr)) )
-
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
@@ -29,19 +15,13 @@ let create_let_simple ~env ~res fvar simple =
       env, res)
     ~const:(fun const ->
       let expr = Jsir.Constant (To_jsir_shared.reg_width_const const) in
-      bind_expr_to_var ~env ~res fvar expr)
+      To_jsir_shared.bind_expr_to_var ~env ~res fvar expr)
 
 (** Bind a fresh variable to the result of translating [prim] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_prim ~env ~res fvar prim dbg =
-  let expr, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
-  bind_expr_to_var ~env ~res fvar expr
-
-(** Bind a fresh variable to the result of translating [const] into JSIR, and
-    map [symbol] to this new variable in the environment.*)
-let create_let_block_like ~env ~res symbol const =
-  let expr, env, res = To_jsir_static_const.block_like ~env ~res const in
-  bind_expr_to_symbol ~env ~res symbol expr
+  let jvar, env, res = To_jsir_primitive.primitive ~env ~res prim dbg in
+  To_jsir_env.add_var env fvar jvar, res
 
 let rec expr ~env ~res e =
   match Expr.descr e with
@@ -66,9 +46,7 @@ and let_expr ~env ~res e =
           Let.print e)
 
 and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
-    ~num_normal_occurrences_of_bound_vars ~body =
-  (* CR selee: translate to [Let] *)
-  ignore num_normal_occurrences_of_bound_vars;
+    ~num_normal_occurrences_of_bound_vars:_ ~body =
   let env, res =
     match bound_pattern, Let.defining_expr e with
     | Singleton v, Simple s ->
@@ -78,22 +56,35 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let fvar = Bound_var.var v in
       create_let_prim ~env ~res fvar p dbg
     | Set_of_closures bound_vars, Set_of_closures soc ->
-      ignore (bound_vars, soc);
-      failwith "unimplemented"
+      To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
+      (* To translate closures, we require that code is translated before the
+         corresponding closure, so that the translation environment is set
+         correctly. Code usually does come before it is used in a closure, but
+         for static lets, they may be defined within the same let binding.
+         Hence, we need to run two passes: one only looking at the code, and one
+         skipping the code.
+
+         CR selee: This is slightly tragic, maybe there's a cleaner solution *)
+      let env, res =
+        Static_const_group.match_against_bound_static consts bound_static
+          ~init:(env, res)
+          ~code:(fun (env, res) code_id code ->
+            To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id
+              code)
+          ~deleted_code:(fun (env, res) _code_id -> env, res)
+          ~set_of_closures:(fun (env, res) ~closure_symbols:_ _soc -> env, res)
+          ~block_like:(fun (env, res) _symbol _static_const -> env, res)
+      in
       Static_const_group.match_against_bound_static consts bound_static
         ~init:(env, res)
-        ~code:(fun (env, res) code_id code ->
-          ignore (env, res, code_id, code);
-          failwith "unimplemented")
-        ~deleted_code:(fun (env, res) code_id ->
-          ignore (env, res, code_id);
-          failwith "unimplemented")
+        ~code:(fun (env, res) _code_id _code -> env, res)
+        ~deleted_code:(fun (env, res) _code_id -> env, res)
         ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
-          ignore (env, res, closure_symbols, soc);
-          failwith "unimplemented")
+          To_jsir_set_of_closures.static_set_of_closures ~env ~res
+            ~closure_symbols soc)
         ~block_like:(fun (env, res) symbol static_const ->
-          create_let_block_like ~env ~res symbol static_const)
+          To_jsir_static_const.block_like ~env ~res symbol static_const)
     | Singleton _, Rec_info _ -> expr ~env ~res body
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
@@ -103,15 +94,51 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   in
   expr ~env ~res body
 
-and let_cont ~env ~res e =
-  (* CR selee: probably make a new block *)
-  ignore (env, res, e);
-  failwith "unimplemented"
+and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
+  match e with
+  | Non_recursive
+      { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
+    Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
+        let res, addr = To_jsir_result.new_block res ~params:[] in
+        let env = To_jsir_env.add_continuation env k addr in
+        expr ~env ~res body)
+  | Recursive handlers ->
+    Recursive_let_cont_handlers.pattern_match handlers
+      ~f:(fun ~invariant_params ~body conts ->
+        if Continuation_handlers.contains_exn_handler conts
+        then
+          Misc.fatal_errorf
+            "Recursive continuation bindings cannot involve exception \
+             handlers:@ %a"
+            Let_cont.print e;
+        ignore (invariant_params, body);
+        failwith "recursive continuations not yet supported")
 
 and apply_expr ~env ~res e =
-  (* CR selee: translate to [Apply] *)
-  ignore (env, res, e);
-  failwith "unimplemented"
+  let continuation = Apply_expr.continuation e in
+  let exn_continuation = Apply_expr.exn_continuation e in
+  let expected_continuation : Apply_expr.Result_continuation.t =
+    Return (To_jsir_env.return_continuation env)
+  in
+  (* CR selee: Currently function applications are extremely limited and we're
+     not implementing proper CPS, it's only here essentially to test mutually
+     recursive closures. Will be coming back and fixing this later *)
+  if continuation <> expected_continuation
+     || Exn_continuation.exn_handler exn_continuation
+        <> To_jsir_env.exn_continuation env
+  then failwith "unimplemented for now";
+  let f, res =
+    match Apply_expr.callee e with
+    | None -> failwith "effects not implemented yet"
+    | Some callee -> To_jsir_shared.simple ~env ~res callee
+  in
+  let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
+  (* CR selee: assume exact = false for now, JSIR seems to assume false in the
+     case that we don't know *)
+  let apply : Jsir.expr = Apply { f; args; exact = false } in
+  let var = Jsir.Var.fresh () in
+  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
+  env, To_jsir_result.end_block_with_last_exn res (Return var)
 
 and apply_cont ~env ~res apply_cont =
   let args, res =
@@ -140,7 +167,7 @@ and apply_cont ~env ~res apply_cont =
           in
           let var = Jsir.Var.fresh () in
           let res =
-            To_jsir_result.add_instr res
+            To_jsir_result.add_instr_exn res
               (Jsir.Let
                  ( var,
                    Prim
@@ -153,18 +180,20 @@ and apply_cont ~env ~res apply_cont =
                            (NativeString
                               (Jsir.Native_string.of_string module_name)) ] ) ))
           in
-          To_jsir_result.set_last res Jsir.Stop
+          To_jsir_result.end_block_with_last_exn res Jsir.Stop
         | Return ->
           if List.length args <> 1
           then
             Misc.fatal_error "Currently only one return argument is supported";
-          To_jsir_result.set_last res (Jsir.Return (List.hd args))
+          To_jsir_result.end_block_with_last_exn res
+            (Jsir.Return (List.hd args))
         | Normal_or_exn | Define_root_symbol ->
           (* CR selee: seems odd, review later *)
           Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
             Continuation.print continuation)
       | Exception -> failwith "unimplemented"
-      | Block addr -> To_jsir_result.set_last res (Jsir.Branch (addr, args)))
+      | Block addr ->
+        To_jsir_result.end_block_with_last_exn res (Jsir.Branch (addr, args)))
     | Some (Push { exn_handler }) ->
       ignore exn_handler;
       failwith "unimplemented"
@@ -180,10 +209,7 @@ and switch ~env ~res e =
   ignore (env, res, e);
   failwith "unimplemented"
 
-and invalid ~env ~res msg =
-  (* CR selee: can probably ignore *)
-  ignore (env, res, msg);
-  failwith "unimplemented"
+and invalid ~env ~res _msg = env, res
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
   let env =
@@ -193,5 +219,8 @@ let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
   let res = To_jsir_result.create () in
+  let res, _addr = To_jsir_result.new_block res ~params:[] in
   let _env, res = expr ~env ~res (Flambda_unit.body flambda_unit) in
-  To_jsir_result.to_program_exn res
+  let program = To_jsir_result.to_program_exn res in
+  Jsir.invariant program;
+  program
