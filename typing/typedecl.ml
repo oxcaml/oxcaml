@@ -142,6 +142,7 @@ type error =
   | Illegal_baggage of jkind_l
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
+  | Modalities_on_atomic_field of string
 
 open Typedtree
 
@@ -499,6 +500,17 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
+         (if is_atomic
+          then
+            (* Forbid comonadic modalities on atomic fields, as we can't force
+               them to be respected when setting them via eg [%atomic.loc]. *)
+            match
+              Mode.Modality.Value.Const.equate modalities
+                (Typemode.atomic_mutable_modalities)
+            with
+            | Ok () -> ()
+            | Error _ ->
+              raise (Error (loc, Modalities_on_atomic_field (name.txt))));
          let arg = Ast_helper.Typ.force_poly arg in
          let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
          {ld_id = Ident.create_local name.txt;
@@ -4780,6 +4792,12 @@ let report_error ppf = function
       fprintf ppf
         "@[The label %a must be mutable to be declared atomic.@]"
         Style.inline_code name
+  | Modalities_on_atomic_field name ->
+    fprintf ppf
+      "@[Modalities are not allowed on atomic fields (here, %a). Use one of\n\
+       the modality types from the Modes module in the type of the field\n\
+       instead@]"
+      Style.inline_code name
 
 let () =
   Location.register_error_of_exn

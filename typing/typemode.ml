@@ -477,9 +477,16 @@ let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
       Atom (Monadic Contention, Join_with Contention.Const.legacy);
       Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
   in
-  match mut with
-  | Immutable -> []
-  | Mutable _ -> if for_mutable_variable then monadic else monadic @ comonadic
+  (* We only need to include comonadic mutable implied modalities for now for
+     backwards-compatibility with legacy code which expects them. Atomic record
+     fields and mutable variables are a features, and so don't have this
+     backwards-compatibility requirement. *)
+  match mut, for_mutable_variable with
+  | Immutable, _ -> []
+  | Mutable { atomic = Nonatomic; _ }, false -> monadic @ comonadic
+  | Mutable { atomic = Atomic; _ }, _ | Mutable { atomic = Nonatomic; _ }, true
+    ->
+    monadic
 
 let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
@@ -583,6 +590,11 @@ let let_mutable_modalities m0 =
   mutable_implied_modalities
     (Mutable { mode = m0; atomic = Nonatomic })
     ~for_mutable_variable:true
+
+let atomic_mutable_modalities =
+  mutable_implied_modalities
+    (Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic })
+    ~for_mutable_variable:false
 
 let untransl_modalities mut t =
   t

@@ -82,6 +82,32 @@ end)
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
+module Modalities_forbidden = struct
+  type t = { mutable x : (int -> int) @@ portable [@atomic] }
+end
+[%%expect{|
+Line 2, characters 13-59:
+2 |   type t = { mutable x : (int -> int) @@ portable [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Modalities are not allowed on atomic fields (here, "x"). Use one of
+the modality types from the Modes module in the type of the field
+instead
+|}]
+
+(* Legacy modalities are allowed because they're the same thing as writing
+   nothing at all *)
+module Legacy_modalities_allowed : sig
+  type t = { mutable x : (int -> int) [@atomic] }
+end = struct
+  type t = { mutable x : (int -> int) @@ aliased [@atomic] }
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Legacy_modalities_allowed/313"
+  (makeblock 0))
+module Legacy_modalities_allowed :
+  sig type t = { mutable x : int -> int [@atomic]; } end
+|}]
+
 (* Inline records are supported, including in extensions. *)
 
 module Inline_record = struct
@@ -90,7 +116,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/313"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/321"
   (let (test = (function {nlocal = 0} param : int (field_int 0 param)))
     (makeblock 0 test)))
 module Inline_record :
@@ -111,7 +137,7 @@ module Extension_with_inline_record = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/321"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/329"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -148,7 +174,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic
 float fields, which prevents the float record optimization. The
 fields of this record will be boxed instead of being
 represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/347"
+(apply (field_imm 1 (global Toploop!)) "Float_records/355"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -333,4 +359,57 @@ type suppressed_via_mnemonic = { mutable a : float [@atomic] }
 [%%expect{|
 0
 type suppressed_via_mnemonic = { mutable a : float [@atomic]; }
+|}]
+
+(* Tests for default modalities: atomic fields imply legacy modalities for
+   comonadic axes only *)
+
+type 'a t = { mutable contents : 'a [@atomic] }
+[%%expect{|
+0
+type 'a t = { mutable contents : 'a [@atomic]; }
+|}]
+
+let atomic_implies_legacy_aliased (t @ unique) : _ @ aliased = t.contents
+[%%expect{|
+(let
+  (atomic_implies_legacy_aliased = (function {nlocal = 0} t (field_mut 0 t)))
+  (apply (field_imm 1 (global Toploop!)) "atomic_implies_legacy_aliased"
+    atomic_implies_legacy_aliased))
+val atomic_implies_legacy_aliased : 'a t @ unique -> 'a = <fun>
+|}]
+
+let atomic_implies_id_for_linearity (t @ many) : _ @ once = t.contents
+[%%expect{|
+(let
+  (atomic_implies_id_for_linearity =
+     (function {nlocal = 0} t (field_mut 0 t)))
+  (apply (field_imm 1 (global Toploop!)) "atomic_implies_id_for_linearity"
+    atomic_implies_id_for_linearity))
+val atomic_implies_id_for_linearity : 'a t -> 'a @ once = <fun>
+|}]
+
+let atomic_implies_id_for_portability (t @ nonportable) : _ @ portable = t.contents
+[%%expect{|
+Line 1, characters 73-83:
+1 | let atomic_implies_id_for_portability (t @ nonportable) : _ @ portable = t.contents
+                                                                             ^^^^^^^^^^
+Error: This value is "nonportable" but expected to be "portable".
+|}]
+
+let atomic_implies_id_for_locality (t @ local) : _ @ global = t.contents
+[%%expect{|
+Line 1, characters 62-72:
+1 | let atomic_implies_id_for_locality (t @ local) : _ @ global = t.contents
+                                                                  ^^^^^^^^^^
+Error: This value escapes its region.
+|}]
+
+let atomic_implies_id_for_yielding (t @ yielding) : _ @ unyielding = t.contents
+
+[%%expect{|
+Line 1, characters 69-79:
+1 | let atomic_implies_id_for_yielding (t @ yielding) : _ @ unyielding = t.contents
+                                                                         ^^^^^^^^^^
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
