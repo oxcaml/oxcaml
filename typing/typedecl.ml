@@ -4794,9 +4794,9 @@ let report_error ppf = function
         Style.inline_code name
   | Modalities_on_atomic_field name ->
     fprintf ppf
-      "@[Modalities of future axes are not allowed on atomic fields\n\
-       (here, %a). Use one of the modality types from the Modes module in the\n\
-       type of the field instead]"
+      "@[Modalities are not allowed on atomic fields (here, %a). Use one of\n\
+       the modality types from the Modes module in the type of the field\n\
+       instead@]"
       Style.inline_code name
 
 let () =
