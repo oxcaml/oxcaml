@@ -17,12 +17,12 @@
 
 open Format
 
-val create_archive: string list -> string -> unit
+val create_archive : string list -> string -> unit
 
 type error =
-    File_not_found of string
+  | File_not_found of string
   | Archiver_error of string
 
 exception Error of error
 
-val report_error: formatter -> error -> unit
+val report_error : formatter -> error -> unit

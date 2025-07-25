@@ -1,16 +1,12 @@
 (* TEST_BELOW*)
 
-let print_loc loc =
-  print_endline loc
+let print_loc loc = print_endline loc
 
-let print_file file =
-  print_endline file
+let print_file file = print_endline file
 
-let print_line line =
-  print_endline (Int.to_string line)
+let print_line line = print_endline (Int.to_string line)
 
-let print_module md =
-  print_endline md
+let print_module md = print_endline md
 
 let print_pos (file, line, col1, col2) =
   Printf.printf "%s, %d, %d, %d\n" file line col1 col2
@@ -49,11 +45,9 @@ let bang () = print_endline __FUNCTION__
 
 let fn_multi _ _ = print_endline __FUNCTION__
 
-let fn_function = function
-  | f -> print_endline __FUNCTION__
+let fn_function = function f -> print_endline __FUNCTION__
 
-let fn_poly : 'a . 'a -> unit = fun _ ->
-  print_endline __FUNCTION__
+let fn_poly : 'a. 'a -> unit = fun _ -> print_endline __FUNCTION__
 
 module Mod1 = struct
   module Nested = struct
@@ -63,15 +57,20 @@ end
 
 let anon () =
   print_endline __FUNCTION__;
-  let fn = print_endline __FUNCTION__; id (fun () -> print_endline __FUNCTION__) in
+  let fn =
+    print_endline __FUNCTION__;
+    id (fun () -> print_endline __FUNCTION__)
+  in
   fn ()
 
 let double_anon f =
   print_endline __FUNCTION__;
-  let fn = id (fun () ->
-    print_endline __FUNCTION__;
-    let fn = id (fun () -> print_endline __FUNCTION__) in
-    fn ()) in
+  let fn =
+    id (fun () ->
+        print_endline __FUNCTION__;
+        let fn = id (fun () -> print_endline __FUNCTION__) in
+        fn ())
+  in
   fn ()
 
 let local () =
@@ -84,13 +83,16 @@ let double_local () =
   let inner1 () =
     print_endline __FUNCTION__;
     let inner2 () = print_endline __FUNCTION__ in
-    (id inner2) () in
+    (id inner2) ()
+  in
   (id inner1) ()
 
 let local_no_arg =
   print_endline __FUNCTION__;
   let inner () = print_endline __FUNCTION__ in
-  fun () -> print_endline __FUNCTION__; id inner ()
+  fun () ->
+    print_endline __FUNCTION__;
+    id inner ()
 
 let curried () =
   print_endline __FUNCTION__;
@@ -100,9 +102,12 @@ let curried () =
 let local_module () =
   print_endline __FUNCTION__;
   let module N = struct
-    let foo () =
-      print_endline __FUNCTION__
-    let r = print_endline __FUNCTION__; ref ()
+    let foo () = print_endline __FUNCTION__
+
+    let r =
+      print_endline __FUNCTION__;
+      ref ()
+
     let () = r := id (id foo ())
   end in
   !N.r
@@ -110,35 +115,46 @@ let local_module () =
 module Functor (X : sig end) = struct
   let fn () = print_endline __FUNCTION__
 end
-module Inst = Functor (struct end)
+
+module Inst = Functor ()
 
 module rec Rec1 : sig
   val fn : unit -> unit
 end = struct
-  module M = Rec2 (struct end)
-  let fn () = print_endline __FUNCTION__; M.fn ()
+  module M = Rec2 ()
+
+  let fn () =
+    print_endline __FUNCTION__;
+    M.fn ()
 end
+
 and Rec2 : functor (X : sig end) -> sig
   val fn : unit -> unit
-end = functor (X : sig end) -> struct
-  let fn () = print_endline __FUNCTION__
-end
+end =
+functor
+  (X : sig end)
+  ->
+  struct
+    let fn () = print_endline __FUNCTION__
+  end
 
-let (+@+) _ _ = print_endline __FUNCTION__
+let ( +@+ ) _ _ = print_endline __FUNCTION__
 
-class klass = object (self)
-  method meth () =
-    print_endline __FUNCTION__
-end
+class klass =
+  object (self)
+    method meth () = print_endline __FUNCTION__
+  end
 
 let inline_object () =
-  let obj = object (self)
-    method meth =
-      print_endline __FUNCTION__;
-      self#othermeth
-    method othermeth =
-      print_endline __FUNCTION__
-  end in
+  let obj =
+    object (self)
+      method meth =
+        print_endline __FUNCTION__;
+        self#othermeth
+
+      method othermeth = print_endline __FUNCTION__
+    end
+  in
   obj#meth
 
 let () =

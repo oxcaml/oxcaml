@@ -26,14 +26,14 @@
    key-initialization logic that broke the present test.
 *)
 
-let pause () =
-  Thread.yield ()
+let pause () = Thread.yield ()
 
 let init () =
   pause ();
   Atomic.make 0
 
 let nb_keys = 10
+
 let nb_threads_per_key = 3
 
 let keys = Array.init nb_keys (fun _ -> Domain.DLS.new_key init)
@@ -41,20 +41,18 @@ let keys = Array.init nb_keys (fun _ -> Domain.DLS.new_key init)
 let threads =
   keys
   |> Array.map (fun k ->
-    Array.init nb_threads_per_key (fun _ ->
-      Thread.create (fun () ->
-        pause ();
-        Atomic.incr (Domain.DLS.get k)
-      ) ()
-    )
-  )
+         Array.init nb_threads_per_key (fun _ ->
+             Thread.create
+               (fun () ->
+                 pause ();
+                 Atomic.incr (Domain.DLS.get k))
+               ()))
 
 let () =
   Array.iter (Array.iter Thread.join) threads;
   let total =
-    Array.fold_left (fun sum k ->
-      sum + Atomic.get (Domain.DLS.get k)
-    ) 0 keys
+    Array.fold_left (fun sum k -> sum + Atomic.get (Domain.DLS.get k)) 0 keys
   in
-  print_int total; print_newline ();
+  print_int total;
+  print_newline ();
   assert (total = nb_keys * nb_threads_per_key)

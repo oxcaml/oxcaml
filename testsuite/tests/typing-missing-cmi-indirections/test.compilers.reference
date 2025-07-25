@@ -1,5 +1,5 @@
-File "client.ml", line 2, characters 0-19:
-2 | and alias = missing
+File "client.ml", line 3, characters 0-19:
+3 | and alias = missing
     ^^^^^^^^^^^^^^^^^^^
 Error: 
        The layout of alias is any

@@ -1,5 +1,5 @@
 (* TEST
- skip;
+   skip;
 *)
 
 (* Tests RESUMETERM with extra_args != 0 in bytecode,
@@ -12,12 +12,16 @@ type _ t += E : int t
 
 let handle comp =
   try_with comp ()
-  { effc = fun (type a) (e : a t) ->
-      match e with
-      | E -> Some (fun (k : (a,_) continuation) -> continue k 10)
-      | _ -> None }
+    { effc =
+        (fun (type a) (e : a t) ->
+          match e with
+          | E -> Some (fun (k : (a, _) continuation) -> continue k 10)
+          | _ -> None)
+    }
 
 let () =
-  handle (fun () ->
+  handle
+    (fun () ->
       Printf.printf "%d\n" (perform E);
-      Printf.printf "%d\n") 42
+      Printf.printf "%d\n")
+    42

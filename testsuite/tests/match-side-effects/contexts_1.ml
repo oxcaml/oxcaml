@@ -10,17 +10,21 @@
    (on non-fixed systems) instead of segfaulting. Segfaults are
    painful to record and test reliably in a testsuite. *)
 
-type u = {a: bool; mutable b: (bool, int) Either.t}
+type u =
+  { a : bool;
+    mutable b : (bool, int) Either.t
+  }
 
 let example_1 () =
   let input = { a = true; b = Either.Left true } in
   match input with
-  | {a = false; b = _} -> Result.Error 1
-  | {a = _;     b = Either.Right _} -> Result.Error 2
-
+  | { a = false; b = _ } -> Result.Error 1
+  | { a = _; b = Either.Right _ } -> Result.Error 2
   (* evil trick: mutate the scrutinee from a guard *)
-  | {a = _;     b = _} when (input.b <- Either.Right 3; false) -> Result.Error 3
-
+  | { a = _; b = _ }
+    when input.b <- Either.Right 3;
+         false ->
+    Result.Error 3
   (* At this point, field [b] has been mutated to hold a [Right]
      constructor, but the pattern-matching compiler has already
      checked read the field in the past and checked that the
@@ -39,5 +43,4 @@ let example_1 () =
      context information that the head constructor is [Left]. and
      dereference its field without checking the constructor
      again. This returns the unsound result [Ok (3 : bool)]. *)
-  | {a = true;  b = Either.Left y} -> Result.Ok y
-;;
+  | { a = true; b = Either.Left y } -> Result.Ok y

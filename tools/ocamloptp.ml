@@ -13,13 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Ocamlcp_common.Make(struct
+include Ocamlcp_common.Make (struct
   let bytecode = false
-  module Make_options(Args : Ocamlcp_common.Ocamlcp_args) =
-    Main_args.Make_optcomp_options(struct
-      include Main_args.Default.Optmain
-      include Args
-    end)
+
+  module Make_options (Args : Ocamlcp_common.Ocamlcp_args) =
+  Main_args.Make_optcomp_options (struct
+    include Main_args.Default.Optmain
+    include Args
+  end)
 end)
 
 let () = main ()

@@ -1,18 +1,18 @@
 (* TEST
- include stdlib_upstream_compatible;
- {
-   flags = "-extension layouts_alpha";
-   native;
- }{
-   flags = "-extension layouts_alpha";
-   bytecode;
- }{
-   flags = "-extension layouts_beta";
-   native;
- }{
-   flags = "-extension layouts_beta";
-   bytecode;
- }
+   include stdlib_upstream_compatible;
+   {
+     flags = "-extension layouts_alpha";
+     native;
+   }{
+     flags = "-extension layouts_alpha";
+     bytecode;
+   }{
+     flags = "-extension layouts_beta";
+     native;
+   }{
+     flags = "-extension layouts_beta";
+     bytecode;
+   }
 *)
 
 module Float_u = Stdlib_upstream_compatible.Float_u
@@ -20,62 +20,50 @@ module Float_u = Stdlib_upstream_compatible.Float_u
 (* Constant seed for repeatable random-testing properties *)
 let () = Random.init 1234
 
-type 'a result = {
-  actual : 'a;
-  expected : 'a;
-  equal : 'a -> 'a -> bool;
-  to_string : 'a -> string
-}
+type 'a result =
+  { actual : 'a;
+    expected : 'a;
+    equal : 'a -> 'a -> bool;
+    to_string : 'a -> string
+  }
 
-let float_result ~actual ~expected = {
-  actual;
-  expected;
-  equal = Float.equal;
-  to_string = Float.to_string;
-}
+let float_result ~actual ~expected =
+  { actual; expected; equal = Float.equal; to_string = Float.to_string }
 
-let bool_result ~actual ~expected =  {
-  actual;
-  expected;
-  equal = Bool.equal;
-  to_string = Bool.to_string;
-}
+let bool_result ~actual ~expected =
+  { actual; expected; equal = Bool.equal; to_string = Bool.to_string }
 
-let int_result ~actual ~expected =  {
-  actual;
-  expected;
-  equal = Int.equal;
-  to_string = Int.to_string;
-}
+let int_result ~actual ~expected =
+  { actual; expected; equal = Int.equal; to_string = Int.to_string }
 
-let string_result ~actual ~expected =  {
-  actual;
-  expected;
-  equal = String.equal;
-  to_string = fun x -> x;
-}
+let string_result ~actual ~expected =
+  { actual; expected; equal = String.equal; to_string = (fun x -> x) }
 
 let fpclass_to_string = function
-    FP_normal -> "FP_normal"
+  | FP_normal -> "FP_normal"
   | FP_subnormal -> "FP_subnormal"
   | FP_zero -> "FP_zero"
   | FP_infinite -> "FP_infinite"
   | FP_nan -> "FP_nan"
 
-let fpclass_result ~actual ~expected =  {
-  actual;
-  expected;
-  equal = (=);
-  to_string = fpclass_to_string;
-}
+let fpclass_result ~actual ~expected =
+  { actual; expected; equal = ( = ); to_string = fpclass_to_string }
 
 let interesting_floats =
-  [ 0.; 1.; -1.; Float.max_float; Float.min_float; Float.epsilon;
-    Float.nan; Float.infinity; Float.neg_infinity ]
+  [ 0.;
+    1.;
+    -1.;
+    Float.max_float;
+    Float.min_float;
+    Float.epsilon;
+    Float.nan;
+    Float.infinity;
+    Float.neg_infinity ]
 
-let interesting_ints = [ 0; 1; -1; Int.max_int; Int.min_int ]
+let interesting_ints = [0; 1; -1; Int.max_int; Int.min_int]
 
 let default_min = -10000.
+
 let default_max = 10000.
 
 let floats_in_range ~num min max =
@@ -107,14 +95,14 @@ let string_inputs ~num =
   List.map Float.to_string (float_inputs ~range:None ~num)
 
 let int_inputs ~num =
-  let gen_int _ = (Random.full_int Int.max_int) - (Int.max_int / 2) in
+  let gen_int _ = Random.full_int Int.max_int - (Int.max_int / 2) in
   interesting_ints @ List.init num gen_int
 
 let passed { actual; expected; equal; _ } = equal actual expected
 
 let test inputs input_to_string name prop =
   let test x =
-    let {expected; actual; to_string} as result = prop x in
+    let ({ expected; actual; to_string } as result) = prop x in
     if not (passed result)
     then
       Printf.printf "Test failed: %s. Input = %s; expected = %s; actual = %s\n"
@@ -124,9 +112,7 @@ let test inputs input_to_string name prop =
 
 (* zips that truncate *)
 let rec zip l1 l2 =
-  match l1, l2 with
-  | x1 :: l1, x2 :: l2 -> (x1, x2) :: zip l1 l2
-  | _ -> []
+  match l1, l2 with x1 :: l1, x2 :: l2 -> (x1, x2) :: zip l1 l2 | _ -> []
 
 let rec zip3 l1 l2 l3 =
   match l1, l2, l3 with
@@ -153,14 +139,14 @@ let test_binary ?range name prop =
   let input1 = float_inputs ~range ~num:20 in
   let input2 = List.rev (float_inputs ~range ~num:20) in
   let inputs = zip input1 (List.rev input2) in
-  let input_to_string (f1,f2) = Printf.sprintf "(%f, %f)" f1 f2 in
+  let input_to_string (f1, f2) = Printf.sprintf "(%f, %f)" f1 f2 in
   test inputs input_to_string name prop
 
 let test_binary_float_int ?range name prop =
   let input1 = float_inputs ~range ~num:20 in
   let input2 = List.rev (int_inputs ~num:20) in
   let inputs = zip input1 (List.rev input2) in
-  let input_to_string (f1,f2) = Printf.sprintf "(%f, %d)" f1 f2 in
+  let input_to_string (f1, f2) = Printf.sprintf "(%f, %d)" f1 f2 in
   test inputs input_to_string name prop
 
 let test_ternary ?range name prop =
@@ -180,8 +166,7 @@ let mk1 expected_f actual_f arg =
 let mk2 expected_f actual_f (arg1, arg2) =
   let expected = expected_f arg1 arg2 in
   let actual =
-    Float_u.to_float
-      (actual_f (Float_u.of_float arg1) (Float_u.of_float arg2))
+    Float_u.to_float (actual_f (Float_u.of_float arg1) (Float_u.of_float arg2))
   in
   float_result ~actual ~expected
 
@@ -269,14 +254,12 @@ let () =
   test_unary "floor" (mk1 Float.floor Float_u.floor);
   test_binary "next_after" (mk2 Float.next_after Float_u.next_after);
   test_binary "copy_sign" (mk2 Float.copy_sign Float_u.copy_sign);
-  test_unary "sign_bit"
-    (mk_float_X bool_result Float.sign_bit Float_u.sign_bit);
+  test_unary "sign_bit" (mk_float_X bool_result Float.sign_bit Float_u.sign_bit);
   test_binary_float_int "ldexp" (mk_float_X_float Float.ldexp Float_u.ldexp);
   test_binary "compare"
     (mk_float_float_X int_result Float.compare Float_u.compare);
-  test_binary "equal"
-    (mk_float_float_X bool_result Float.equal Float_u.equal);
+  test_binary "equal" (mk_float_float_X bool_result Float.equal Float_u.equal);
   test_binary "min" (mk2 Float.min Float_u.min);
   test_binary "max" (mk2 Float.max Float_u.max);
   test_binary "min_num" (mk2 Float.min_num Float_u.min_num);
-  test_binary "max_num" (mk2 Float.max_num Float_u.max_num);
+  test_binary "max_num" (mk2 Float.max_num Float_u.max_num)

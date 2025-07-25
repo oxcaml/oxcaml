@@ -9,20 +9,29 @@
 
    Use the communication module Test_scanf2_io. *)
 
-open Tscanf2_io;;
+open Tscanf2_io
 
-let ib = Scanf.Scanning.from_channel stdin;;
+let ib = Scanf.Scanning.from_channel stdin
+
 let ob = Buffer.create 1024
-and oc = stdout;;
 
-let send_string_pong ob = send_string ob oc "-pong";;
+and oc = stdout
+
+let send_string_pong ob = send_string ob oc "-pong"
+
 let send_string_okbye ob = send_string ob oc "OK, bye!";;
 
 while true do
   let s = receive_string ib in
   match s with
-  | " Ping" -> Printf.eprintf "-pong"; flush stderr; send_string_pong ob
-  | "stop" -> Printf.eprintf "!\n"; flush stderr; send_string_okbye ob; exit 0
+  | " Ping" ->
+    Printf.eprintf "-pong";
+    flush stderr;
+    send_string_pong ob
+  | "stop" ->
+    Printf.eprintf "!\n";
+    flush stderr;
+    send_string_okbye ob;
+    exit 0
   | s -> failwith ("Slave: unbound string " ^ s)
 done
-;;

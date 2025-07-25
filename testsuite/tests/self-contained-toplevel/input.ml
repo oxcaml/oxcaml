@@ -1,1 +1,1 @@
-print_endline Foo.value;;
+print_endline Foo.value

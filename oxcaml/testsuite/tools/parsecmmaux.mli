@@ -15,17 +15,18 @@
 
 (* Auxiliary functions for parsing *)
 
-val bind_ident: string -> Backend_var.With_provenance.t
-val find_ident: string -> Backend_var.t
-val unbind_ident: Backend_var.With_provenance.t -> unit
+val bind_ident : string -> Backend_var.With_provenance.t
 
-val find_label: string -> int
+val find_ident : string -> Backend_var.t
 
-val debuginfo: ?loc:Location.t -> unit -> Debuginfo.t
+val unbind_ident : Backend_var.With_provenance.t -> unit
 
-type error =
-    Unbound of string
+val find_label : string -> int
+
+val debuginfo : ?loc:Location.t -> unit -> Debuginfo.t
+
+type error = Unbound of string
 
 exception Error of error
 
-val report_error: error -> unit
+val report_error : error -> unit

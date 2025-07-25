@@ -1,13 +1,10 @@
 (* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
+   (* Blank lines added here to preserve locations. *)
 *)
 
 (* this works as expected *)
 let[@tail_mod_cons] rec tupled_map (f, li) =
-  match li with
-  | [] -> []
-  | x :: xs -> f x :: tupled_map (f, xs)
+  match li with [] -> [] | x :: xs -> f x :: tupled_map (f, xs)
 
 (* The recursive call here is not "direct" for the
    Tupled calling convention (which is only used by the native compiler),
@@ -17,13 +14,13 @@ let[@tail_mod_cons] rec tupled_map_not_direct (f, li) =
   match li with
   | [] -> []
   | x :: xs ->
-      let pair = (f, xs) in
-      f x :: (tupled_map_not_direct[@tailcall true]) pair
+    let pair = f, xs in
+    f x :: (tupled_map_not_direct [@tailcall true]) pair
 
 (* TEST
- {
-   bytecode;
- }{
-   native;
- }
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)

@@ -33,14 +33,13 @@ type _ pass =
   | Raw_flambda2 : Flambda2_terms.Flambda_unit.t pass
   | Flambda2 : Flambda2_terms.Flambda_unit.t pass
   | Reaped_flambda2 : Flambda2_terms.Flambda_unit.t pass
-
   | Linear : Linear.fundecl pass
   | Cfg_combine : Cfg_with_layout.t pass
   | Cfg_cse : Cfg_with_layout.t pass
   | Cfg : Cfg_with_layout.t pass
   | Cmm : Cmm.phrase list pass
-
-  | Inlining_tree : Flambda2_simplify_shared.Inlining_report.Inlining_tree.t pass
+  | Inlining_tree
+      : Flambda2_simplify_shared.Inlining_report.Inlining_tree.t pass
   | Check_allocations : Zero_alloc_checker.iter_witnesses pass
 
 (* Register a new hook for [pass]. *)

@@ -1,6 +1,6 @@
 (* TEST
- flat-float-array;
- expect;
+   flat-float-array;
+   expect;
 *)
 
 (* When the -flat-float-array optimization is active (standard in
@@ -21,21 +21,32 @@
 
 (* In these tests, `z` is known to be a non-float,
    so no unboxing or dynamic check happens, the definition is valid. *)
-let f (z: int) = let rec x = [| y; z |] and y = z in x;;
-let f (z: bytes) = let rec x = [| y; z |] and y = z in x;;
-[%%expect {|
+let f (z : int) =
+  let rec x = [| y; z |] and y = z in
+  x
+
+let f (z : bytes) =
+  let rec x = [| y; z |] and y = z in
+  x
+
+[%%expect
+{|
 val f : int -> int array = <fun>
 val f : bytes -> bytes array = <fun>
-|}];;
+|}]
 
 (* In this test, `z` has a generic/polymorphic type,
    so it could be instantiated with either float or non-float.
    A dynamic check will occur, so the definition must be rejected. *)
-let f z = let rec x = [| y; z |] and y = z in x;;
-[%%expect {|
-Line 1, characters 22-32:
-1 | let f z = let rec x = [| y; z |] and y = z in x;;
-                          ^^^^^^^^^^
+let f z =
+  let rec x = [| y; z |] and y = z in
+  x
+
+[%%expect
+{|
+Line 2, characters 14-24:
+2 |   let rec x = [| y; z |] and y = z in
+                  ^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
@@ -43,10 +54,14 @@ Error: This kind of expression is not allowed as right-hand side of "let rec"
    created. When the flat-float-array optimization is active, the
    array elements will be unboxed, thus evaluated. This definition
    must be rejected. *)
-let f (z: float) = let rec x = [| y; z |] and y = z in x;;
-[%%expect {|
-Line 1, characters 31-41:
-1 | let f (z: float) = let rec x = [| y; z |] and y = z in x;;
-                                   ^^^^^^^^^^
+let f (z : float) =
+  let rec x = [| y; z |] and y = z in
+  x
+
+[%%expect
+{|
+Line 2, characters 14-24:
+2 |   let rec x = [| y; z |] and y = z in
+                  ^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]

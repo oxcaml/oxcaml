@@ -1,13 +1,15 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
-let f _ = 0 in f 0;;
+
+let f _ = 0 in
+f 0
 
 (**
        0 CONSTINT 42

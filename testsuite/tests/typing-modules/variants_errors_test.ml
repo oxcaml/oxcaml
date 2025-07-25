@@ -1,20 +1,19 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module M1 : sig
-  type t =
-    | Foo of int * int
+  type t = Foo of int * int
 end = struct
-  type t =
-    | Foo of float * int
-end;;
-[%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of float * int
-7 | end..
+  type t = Foo of float * int
+end
+
+[%%expect
+{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Foo of float * int
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of float * int end
@@ -29,21 +28,20 @@ Error: Signature mismatch:
        is not the same as:
          "Foo of int * int"
        The type "float" is not equal to the type "int"
-|}];;
+|}]
 
 module M2 : sig
-  type t =
-    | Foo of int * int
+  type t = Foo of int * int
 end = struct
-  type t =
-    | Foo of float
-end;;
-[%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of float
-7 | end..
+  type t = Foo of float
+end
+
+[%%expect
+{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = Foo of float
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of float end
@@ -58,21 +56,32 @@ Error: Signature mismatch:
        is not the same as:
          "Foo of int * int"
        They have different arities.
-|}];;
+|}]
 
 module M3 : sig
   type t =
-    | Foo of {x : int; y : int}
+    | Foo of
+        { x : int;
+          y : int
+        }
 end = struct
   type t =
-    | Foo of {x : float; y : int}
-end;;
-[%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of {x : float; y : int}
-7 | end..
+    | Foo of
+        { x : float;
+          y : int
+        }
+end
+
+[%%expect
+{|
+Lines 7-13, characters 6-3:
+ 7 | ......struct
+ 8 |   type t =
+ 9 |     | Foo of
+10 |         { x : float;
+11 |           y : int
+12 |         }
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of { x : float; y : int; } end
@@ -91,21 +100,24 @@ Error: Signature mismatch:
        is not the same as:
          "x : int;"
        The type "float" is not equal to the type "int"
-|}];;
+|}]
 
 module M4 : sig
   type t =
-    | Foo of {x : int; y : int}
+    | Foo of
+        { x : int;
+          y : int
+        }
 end = struct
-  type t =
-    | Foo of float
-end;;
-[%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type t =
-6 |     | Foo of float
-7 | end..
+  type t = Foo of float
+end
+
+[%%expect
+{|
+Lines 7-9, characters 6-3:
+7 | ......struct
+8 |   type t = Foo of float
+9 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = Foo of float end
@@ -120,21 +132,20 @@ Error: Signature mismatch:
        is not the same as:
          "Foo of { x : int; y : int; }"
        The second uses inline records and the first doesn't.
-|}];;
+|}]
 
 module M5 : sig
-  type 'a t =
-    | Foo : int -> int t
+  type 'a t = Foo : int -> int t
 end = struct
-  type 'a t =
-    | Foo of 'a
-end;;
-[%%expect{|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type 'a t =
-6 |     | Foo of 'a
-7 | end..
+  type 'a t = Foo of 'a
+end
+
+[%%expect
+{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = Foo of 'a
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type 'a t = Foo of 'a end
@@ -149,18 +160,20 @@ Error: Signature mismatch:
        is not the same as:
          "Foo : int -> int t"
        The second has explicit return type and the first doesn't.
-|}];;
+|}]
 
 module M : sig
   type ('a, 'b) t = A of 'a
 end = struct
   type ('a, 'b) t = A of 'b
-end;;
-[%%expect {|
+end
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('a, 'b) t = A of 'b
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('a, 'b) t = A of 'b end
@@ -175,20 +188,22 @@ Error: Signature mismatch:
        is not the same as:
          "A of 'a"
        The type "'b" is not equal to the type "'a"
-|}];;
+|}]
 
 module M : sig
   type ('a, 'b) t = A of 'a
 end = struct
   type ('b, 'a) t = A of 'a
-end;;
+end
+
 (* CR reisenberg: This error message change is unfortunate. But so
    is the original error message! Not quite sure what to do here. *)
-[%%expect {|
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('b, 'a) t = A of 'a
-5 | end..
+5 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type ('b, 'a) t = A of 'a end
@@ -203,9 +218,7 @@ Error: Signature mismatch:
        is not the same as:
          "A of 'a"
        The type "'b" is not equal to the type "'a"
-|}];;
-
-
+|}]
 
 (** Random additions and deletions of constructors *)
 
@@ -223,7 +236,9 @@ end = struct
     | C
     | D
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 9-16, characters 6-3:
  9 | ......struct
 10 |   type t =
@@ -245,7 +260,6 @@ Error: Signature mismatch:
        An extra constructor, "Beta", is provided in the first declaration.
 |}]
 
-
 module Addition : sig
   type t =
     | A
@@ -258,7 +272,9 @@ end = struct
     | B
     | D
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 7-12, characters 6-3:
  7 | ......struct
  8 |   type t =
@@ -278,8 +294,7 @@ Error: Signature mismatch:
        A constructor, "C", is missing in the first declaration.
 |}]
 
-
-module Multi: sig
+module Multi : sig
   type t =
     | A
     | B
@@ -300,7 +315,8 @@ end = struct
     | Phi
 end
 
-[%%expect {|
+[%%expect
+{|
 Lines 10-20, characters 6-3:
 10 | ......struct
 11 |   type t =
@@ -326,7 +342,6 @@ Error: Signature mismatch:
        8. An extra constructor, "Phi", is provided in the first declaration.
 |}]
 
-
 (** Swaps and moves *)
 
 module Swap : sig
@@ -344,7 +359,9 @@ end = struct
     | D
     | E
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 10-17, characters 6-3:
 10 | ......struct
 11 |   type t =
@@ -367,8 +384,7 @@ Error: Signature mismatch:
        2<->5. Constructors "B" and "E" have been swapped.
 |}]
 
-
-module Move: sig
+module Move : sig
   type t =
     | A of int
     | B
@@ -385,7 +401,9 @@ end = struct
     | F
     | C
 end
-[%%expect {|
+
+[%%expect
+{|
 Lines 9-17, characters 6-3:
  9 | ......struct
 10 |   type t =

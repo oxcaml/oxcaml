@@ -17,6 +17,7 @@
 (*** Program loading and initializations. ***)
 
 val loaded : bool ref
+
 val ensure_loaded : unit -> unit
 
 (*** Kill program. ***)

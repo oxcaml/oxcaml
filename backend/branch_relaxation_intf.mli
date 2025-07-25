@@ -60,12 +60,8 @@ module type S = sig
   (* Insertion of target-specific code to relax operations that cannot be
      relaxed generically.  It is assumed that these rewrites do not change
      the size of out-of-line code (cf. branch_relaxation.mli). *)
-  val relax_allocation
-     : num_bytes:int
-    -> dbginfo:Cmm.alloc_dbginfo
-    -> Linear.instruction_desc
+  val relax_allocation :
+    num_bytes:int -> dbginfo:Cmm.alloc_dbginfo -> Linear.instruction_desc
 
-  val relax_poll
-     : unit
-    -> Linear.instruction_desc
+  val relax_poll : unit -> Linear.instruction_desc
 end

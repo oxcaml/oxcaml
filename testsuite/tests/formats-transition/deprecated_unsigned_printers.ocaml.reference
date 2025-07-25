@@ -1,6 +1,5 @@
-val test : (int -> string, unit, string) format -> string = <fun>
-%n: true
-%l: true
-%N: true
-%L: true
+
+
+Line 18, characters 0-0:
+Error: Syntax error
 

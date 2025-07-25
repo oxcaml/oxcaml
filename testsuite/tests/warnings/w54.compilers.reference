@@ -1,19 +1,19 @@
-File "w54.ml", line 12, characters 33-39:
-12 | let f = (fun x -> x) [@inline] [@inline never]
-                                      ^^^^^^
+File "w54.ml", line 5, characters 24-30:
+5 | let f = fun [@inline] [@inline never] x -> x
+                            ^^^^^^
 Warning 54 [duplicated-attribute]: the "inline" attribute is used more than once on this expression
 
-File "w54.ml", line 13, characters 51-63:
-13 | let g = (fun x -> x) [@inline] [@something_else] [@ocaml.inline]
-                                                        ^^^^^^^^^^^^
+File "w54.ml", line 7, characters 42-54:
+7 | let g = fun [@inline] [@something_else] [@ocaml.inline] x -> x
+                                              ^^^^^^^^^^^^
 Warning 54 [duplicated-attribute]: the "ocaml.inline" attribute is used more than once on this expression
 
-File "w54.ml", line 15, characters 26-39:
-15 | let h x = (g [@inlined] [@ocaml.inlined never]) x
-                               ^^^^^^^^^^^^^
+File "w54.ml", line 9, characters 26-39:
+9 | let h x = (g [@inlined] [@ocaml.inlined never]) x
+                              ^^^^^^^^^^^^^
 Warning 54 [duplicated-attribute]: the "ocaml.inlined" attribute is used more than once on this expression
 
-File "w54.ml", line 19, characters 0-43:
-19 | let i = ((fun x -> x) [@inline]) [@@inline]
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "w54.ml", line 13, characters 0-39:
+13 | let i = fun [@inline] x -> x [@@inline]
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 54 [duplicated-attribute]: the "inline" attribute is used more than once on this expression

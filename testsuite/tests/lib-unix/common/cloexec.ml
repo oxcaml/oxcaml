@@ -42,7 +42,7 @@
    run;
    check-program-output;
  }
-*)
+ *)
 
 (* This is a terrible hack that plays on the internal representation
    of file descriptors.  The result is a number (as a string)
@@ -52,14 +52,13 @@
    for its own use, hence we do likewise to try to get handle numbers
    Windows will not allocate to the OCaml runtime of fdstatus.exe *)
 
-let string_of_fd (fd: Unix.file_descr) : string =
+let string_of_fd (fd : Unix.file_descr) : string =
   match Sys.os_type with
-  | "Unix" | "Cygwin" ->  Int.to_string (Obj.magic fd : int)
+  | "Unix" | "Cygwin" -> Int.to_string (Obj.magic fd : int)
   | "Win32" ->
-      if Sys.word_size = 32 then
-        Int32.to_string (Obj.magic fd : int32)
-      else
-        Int64.to_string (Obj.magic fd : int64)
+    if Sys.word_size = 32
+    then Int32.to_string (Obj.magic fd : int32)
+    else Int64.to_string (Obj.magic fd : int64)
   | _ -> assert false
 
 let status_checker = "fdstatus.exe"
@@ -76,35 +75,56 @@ let _ =
   let d0 = Unix.dup f0 in
   let d1 = Unix.dup ~cloexec:false f1 in
   let d2 = Unix.dup ~cloexec:true f2 in
-  let (p0, p0') = Unix.pipe () in
-  let (p1, p1') = Unix.pipe ~cloexec:false () in
-  let (p2, p2') = Unix.pipe ~cloexec:true () in
+  let p0, p0' = Unix.pipe () in
+  let p1, p1' = Unix.pipe ~cloexec:false () in
+  let p2, p2' = Unix.pipe ~cloexec:true () in
   let s0 = Unix.(socket PF_INET SOCK_STREAM 0) in
   let s1 = Unix.(socket ~cloexec:false PF_INET SOCK_STREAM 0) in
   let s2 = Unix.(socket ~cloexec:true PF_INET SOCK_STREAM 0) in
-  let (x0, x0') =
+  let x0, x0' =
     try Unix.(socketpair PF_UNIX SOCK_STREAM 0)
-    with Invalid_argument _ -> (p0, p0') in
-    (* socketpair not available under Win32; keep the same output *)
-  let (x1, x1') =
-    try Unix.(socketpair ~cloexec:false PF_UNIX SOCK_STREAM 0)
-    with Invalid_argument _ -> (p1, p1') in
-  let (x2, x2') =
-    try Unix.(socketpair ~cloexec:true PF_UNIX SOCK_STREAM 0)
-    with Invalid_argument _ -> (p2, p2') in
-
-  let fds = [| f0;f1;f2; d0;d1;d2;
-               p0;p0';p1;p1';p2;p2';
-               s0;s1;s2;
-               x0;x0';x1;x1';x2;x2' |] in
-  let untested =
-    [untested1; untested2; untested3; untested4; untested5]
+    with Invalid_argument _ -> p0, p0'
   in
+  (* socketpair not available under Win32; keep the same output *)
+  let x1, x1' =
+    try Unix.(socketpair ~cloexec:false PF_UNIX SOCK_STREAM 0)
+    with Invalid_argument _ -> p1, p1'
+  in
+  let x2, x2' =
+    try Unix.(socketpair ~cloexec:true PF_UNIX SOCK_STREAM 0)
+    with Invalid_argument _ -> p2, p2'
+  in
+  let fds =
+    [| f0;
+       f1;
+       f2;
+       d0;
+       d1;
+       d2;
+       p0;
+       p0';
+       p1;
+       p1';
+       p2;
+       p2';
+       s0;
+       s1;
+       s2;
+       x0;
+       x0';
+       x1;
+       x1';
+       x2;
+       x2'
+    |]
+  in
+  let untested = [untested1; untested2; untested3; untested4; untested5] in
   let pid =
     Unix.create_process
       (Filename.concat Filename.current_dir_name status_checker)
       (Array.append [| status_checker |] (Array.map string_of_fd fds))
-      Unix.stdin Unix.stdout Unix.stderr in
+      Unix.stdin Unix.stdout Unix.stderr
+  in
   ignore (Unix.waitpid [] pid);
   let close fd = try Unix.close fd with Unix.Unix_error _ -> () in
   Array.iter close fds;

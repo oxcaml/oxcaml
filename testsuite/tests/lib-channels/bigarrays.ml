@@ -17,5 +17,7 @@ let () =
   Out_channel.close oc;
   let ic = In_channel.open_bin filename in
   let buf = bigarray_of_string (String.map (fun _ -> 'X') str) in
-  assert (Option.is_some (In_channel.really_input_bigarray ic buf 1 (String.length str - 2)));
+  assert (
+    Option.is_some
+      (In_channel.really_input_bigarray ic buf 1 (String.length str - 2)));
   print_endline (string_of_bigarray buf)

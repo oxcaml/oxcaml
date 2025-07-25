@@ -25,6 +25,7 @@ let () =
   for i = 1 to 50000 do
     let rs = Sys.opaque_identity f false in
     assert (Array.for_all (fun x -> !x = 1) rs);
-    let _ = Array.make (Random.int 30) 'a' in ()
+    let _ = Array.make (Random.int 30) 'a' in
+    ()
   done;
   print_string "ok\n"

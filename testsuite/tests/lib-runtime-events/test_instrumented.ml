@@ -1,35 +1,34 @@
 (* TEST
- {
-   runtime4;
-   skip;
- }{
-   include runtime_events;
-   flags = "-runtime-variant=i";
-   runtime5;
-   instrumented-runtime;
-   native;
- }
+   {
+     runtime4;
+     skip;
+   }{
+     include runtime_events;
+     flags = "-runtime-variant=i";
+     runtime5;
+     instrumented-runtime;
+     native;
+   }
 *)
 
 open Runtime_events
 
 let list_ref = ref []
+
 let total_blocks = ref 0
+
 let total_minors = ref 0
+
 let lost_event_words = ref 0
 
 let alloc domain_id ts counts =
   total_blocks := Array.fold_left ( + ) !total_blocks counts
 
 let runtime_end domain_id ts phase =
-  match phase with
-  | EV_MINOR ->
-    total_minors := !total_minors + 1
-  | _ -> ()
+  match phase with EV_MINOR -> total_minors := !total_minors + 1 | _ -> ()
 
 (* lost words of events *)
-let lost_events domain_id words =
-  lost_event_words := !lost_event_words + words
+let lost_events domain_id words = lost_event_words := !lost_event_words + words
 
 let callbacks = Callbacks.create ~runtime_end ~alloc ~lost_events ()
 
@@ -41,12 +40,14 @@ let reset cursor =
 let loop n cursor =
   Gc.full_major ();
   reset cursor;
-  let minors_before = Sys.opaque_identity (Gc.((quick_stat ()).minor_collections)) in
+  let minors_before =
+    Sys.opaque_identity Gc.((quick_stat ()).minor_collections)
+  in
   for a = 1 to n do
-    list_ref := (Sys.opaque_identity(ref 42)) :: !list_ref
+    list_ref := Sys.opaque_identity (ref 42) :: !list_ref
   done;
   Gc.full_major ();
-  ignore(read_poll cursor callbacks None);
+  ignore (read_poll cursor callbacks None);
   let minors_after = Gc.((quick_stat ()).minor_collections) in
   minors_after - minors_before
 

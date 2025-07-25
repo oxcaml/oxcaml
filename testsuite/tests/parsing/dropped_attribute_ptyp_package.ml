@@ -7,12 +7,12 @@
 
 module type T = sig
   type t
-end;;
+end
 
 module type U = sig
-  val foo : (module T [@attr] with type t = 'a) -> unit
-end;;
+  val foo : (module T with type t = 'a) -> unit
+end
 
 module U : U = struct
-  let foo (type a) (module M : T [@attr] with type t = a) = ()
-end;;
+  let foo (type a) (module M : T with type t = a) = ()
+end

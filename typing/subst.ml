@@ -19,21 +19,23 @@ open Misc
 open Path
 open Types
 open Btype
-
 open Local_store
 
-type jkind_error =
-  | Unconstrained_jkind_variable
+type jkind_error = Unconstrained_jkind_variable
 
 exception Error of Location.t * jkind_error
 
 type type_replacement =
   | Path of Path.t
-  | Type_function of { params : type_expr list; body : type_expr }
+  | Type_function of
+      { params : type_expr list;
+        body : type_expr
+      }
 
 type additional_action =
   | Prepare_for_saving of
-      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind }
+      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind
+      }
     (* The [Prepare_for_saving] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
        a check that all unconstrained variables have been defaulted to value. *)
@@ -41,20 +43,22 @@ type additional_action =
   | No_action
 
 type s =
-  { types: type_replacement Path.Map.t;
-    modules: Path.t Path.Map.t;
-    modtypes: module_type Path.Map.t;
-
-    additional_action: additional_action;
-
-    loc: Location.t option;
-    mutable last_compose: (s * s) option  (* Memoized composition *)
+  { types : type_replacement Path.Map.t;
+    modules : Path.t Path.Map.t;
+    modtypes : module_type Path.Map.t;
+    additional_action : additional_action;
+    loc : Location.t option;
+    mutable last_compose : (s * s) option (* Memoized composition *)
   }
 
 type 'a subst = s
+
 type safe = [`Safe]
+
 type unsafe = [`Unsafe]
+
 type t = safe subst
+
 exception Module_type_path_substituted_away of Path.t * Types.module_type
 
 let identity =
@@ -63,7 +67,7 @@ let identity =
     modtypes = Path.Map.empty;
     additional_action = No_action;
     loc = None;
-    last_compose = None;
+    last_compose = None
   }
 
 (* Add a replacement for both a path and its unboxed version, even if that
@@ -73,23 +77,24 @@ let add_type_replacement types id replacement =
   match replacement with
   | Path p ->
     let types = Path.Map.add id (Path p) types in
-    if Path.is_unboxed_version p then
-      types
+    if Path.is_unboxed_version p
+    then types
     else
-      Path.Map.add
-        (Path.unboxed_version id) (Path (Path.unboxed_version p)) types
-  | Type_function { params; body } ->
+      Path.Map.add (Path.unboxed_version id)
+        (Path (Path.unboxed_version p))
+        types
+  | Type_function { params; body } -> (
     let types = Path.Map.add id (Type_function { params; body }) types in
     match get_desc body with
-    | Tconstr (path, args, _)
-      when not (Path.is_unboxed_version path) ->
+    | Tconstr (path, args, _) when not (Path.is_unboxed_version path) ->
       let body =
         newty3 ~level:(get_level body) ~scope:(get_scope body)
-          (Tconstr(Path.unboxed_version path, args, ref Mnil))
+          (Tconstr (Path.unboxed_version path, args, ref Mnil))
       in
-      Path.Map.add
-        (Path.unboxed_version id) (Type_function { params; body }) types
-    | _ -> types
+      Path.Map.add (Path.unboxed_version id)
+        (Type_function { params; body })
+        types
+    | _ -> types)
 
 let unsafe x = x
 
@@ -102,7 +107,9 @@ let add_module id p s =
 
 let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
+
 let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
+
 let add_modtype id p s = add_modtype_path (Pident id) p s
 
 type additional_action_config =
@@ -120,48 +127,48 @@ end = struct
 
   type 'd builtins = ('d Jkind.Const.t * 'd jkind) list
 
-  let make_builtins (type l r) (quality : (l * r) jkind_quality) : (l * r) builtins =
+  let make_builtins (type l r) (quality : (l * r) jkind_quality) :
+      (l * r) builtins =
     Jkind.Const.Builtin.all
     |> List.map (fun (builtin : Jkind.Const.Builtin.t) ->
-      let const_jkind : (l * r) Jkind.Const.t =
-        builtin.jkind |> Jkind.Const.allow_left |> Jkind.Const.allow_right in
-      const_jkind,
-      Jkind.of_const
-        const_jkind
-        ~quality
-        ~annotation:(Some { pjkind_loc = Location.none;
-                            pjkind_desc = Abbreviation builtin.name })
-        ~why:Jkind.History.Imported)
+           let const_jkind : (l * r) Jkind.Const.t =
+             builtin.jkind |> Jkind.Const.allow_left |> Jkind.Const.allow_right
+           in
+           ( const_jkind,
+             Jkind.of_const const_jkind ~quality
+               ~annotation:
+                 (Some
+                    { pjkind_loc = Location.none;
+                      pjkind_desc = Abbreviation builtin.name
+                    })
+               ~why:Jkind.History.Imported ))
 
   let best_builtins : (allowed * disallowed) builtins = make_builtins Best
+
   let not_best_builtins : (allowed * allowed) builtins = make_builtins Not_best
 
-  let find
-        (type l r)
-        ~(quality : (l * r) jkind_quality)
-        (const : (l * r) Jkind.Const.t)
-    : (l * r) jkind option
-    =
-    (match quality with
-     | Best ->
-       List.find_opt (fun ((builtin, _) : (allowed * disallowed) Jkind.Const.t * _) ->
-         Jkind.Const.no_with_bounds_and_equal
-           (const |> Jkind.Const.disallow_right)
-           (builtin |> Jkind.Const.allow_left))
-       best_builtins
-       |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left)
-     | Not_best ->
-       List.find_opt (fun (builtin, _) ->
-         Jkind.Const.no_with_bounds_and_equal
-           const
-           (builtin |> Jkind.Const.allow_left |> Jkind.Const.allow_right))
-         not_best_builtins
-       |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left |> Jkind.allow_right)
-    )
+  let find (type l r) ~(quality : (l * r) jkind_quality)
+      (const : (l * r) Jkind.Const.t) : (l * r) jkind option =
+    match quality with
+    | Best ->
+      List.find_opt
+        (fun ((builtin, _) : (allowed * disallowed) Jkind.Const.t * _) ->
+          Jkind.Const.no_with_bounds_and_equal
+            (const |> Jkind.Const.disallow_right)
+            (builtin |> Jkind.Const.allow_left))
+        best_builtins
+      |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left)
+    | Not_best ->
+      List.find_opt
+        (fun (builtin, _) ->
+          Jkind.Const.no_with_bounds_and_equal const
+            (builtin |> Jkind.Const.allow_left |> Jkind.Const.allow_right))
+        not_best_builtins
+      |> Option.map (fun (_, jkind) ->
+             jkind |> Jkind.allow_left |> Jkind.allow_right)
 end
 
-let with_additional_action =
-  fun (config : additional_action_config) s ->
+let with_additional_action (config : additional_action_config) s =
   (* CR layouts: it would be better to put all this stuff outside this
      function, but it's in here because we really want to tailor the reason
      to describe the module a symbol is imported from. But RAE's initial
@@ -176,16 +183,17 @@ let with_additional_action =
     match config with
     | Duplicate_variables -> Duplicate_variables
     | Prepare_for_saving ->
-        let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
-          match Jkind.get_const jkind with
-          | Some const ->
-            begin match Builtins_memo.find ~quality:jkind.quality const with
-            | Some jkind -> jkind
-            | None -> Jkind.of_const ~quality:jkind.quality const ~annotation:None ~why:Imported
-            end
-          | None -> raise(Error (loc, Unconstrained_jkind_variable))
-        in
-        Prepare_for_saving { prepare_jkind }
+      let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
+        match Jkind.get_const jkind with
+        | Some const -> (
+          match Builtins_memo.find ~quality:jkind.quality const with
+          | Some jkind -> jkind
+          | None ->
+            Jkind.of_const ~quality:jkind.quality const ~annotation:None
+              ~why:Imported)
+        | None -> raise (Error (loc, Unconstrained_jkind_variable))
+      in
+      Prepare_for_saving { prepare_jkind }
   in
   { s with additional_action; last_compose = None }
 
@@ -194,22 +202,21 @@ let change_locs s loc = { s with loc = Some loc; last_compose = None }
 let loc s x =
   match s.loc with
   | Some l -> l
-  | None -> begin
-      match s.additional_action with
-      | Prepare_for_saving _ | Duplicate_variables ->
-          if not !Clflags.keep_locs then Location.none else x
-      | No_action -> x
-    end
+  | None -> (
+    match s.additional_action with
+    | Prepare_for_saving _ | Duplicate_variables ->
+      if not !Clflags.keep_locs then Location.none else x
+    | No_action -> x)
 
 let remove_loc =
   let open Ast_mapper in
-  {default_mapper with location = (fun _this _loc -> Location.none)}
+  { default_mapper with location = (fun _this _loc -> Location.none) }
 
 let is_not_doc = function
-  | {Parsetree.attr_name = {Location.txt = "ocaml.doc"}; _} -> false
-  | {Parsetree.attr_name = {Location.txt = "ocaml.text"}; _} -> false
-  | {Parsetree.attr_name = {Location.txt = "doc"}; _} -> false
-  | {Parsetree.attr_name = {Location.txt = "text"}; _} -> false
+  | { Parsetree.attr_name = { Location.txt = "ocaml.doc" }; _ } -> false
+  | { Parsetree.attr_name = { Location.txt = "ocaml.text" }; _ } -> false
+  | { Parsetree.attr_name = { Location.txt = "doc" }; _ } -> false
+  | { Parsetree.attr_name = { Location.txt = "text" }; _ } -> false
   | _ -> true
 
 let attrs s x =
@@ -221,67 +228,56 @@ let attrs s x =
   let x =
     match s.additional_action with
     | Prepare_for_saving _ | Duplicate_variables ->
-        if not !Clflags.keep_docs
-        then List.filter is_not_doc x
-        else x
+      if not !Clflags.keep_docs then List.filter is_not_doc x else x
     | No_action -> x
   in
   match s.additional_action with
   | Prepare_for_saving _ | Duplicate_variables ->
-      if not !Clflags.keep_locs
-      then remove_loc.Ast_mapper.attributes remove_loc x
-      else x
+    if not !Clflags.keep_locs
+    then remove_loc.Ast_mapper.attributes remove_loc x
+    else x
   | No_action -> x
 
 let rec module_path s path =
   try Path.Map.find path s.modules
-  with Not_found ->
+  with Not_found -> (
     match path with
     | Pident _ -> path
-    | Pdot(p, n) ->
-       Pdot(module_path s p, n)
-    | Papply(p1, p2) ->
-       Papply(module_path s p1, module_path s p2)
-    | Pextra_ty _ ->
-       fatal_error "Subst.module_path"
+    | Pdot (p, n) -> Pdot (module_path s p, n)
+    | Papply (p1, p2) -> Papply (module_path s p1, module_path s p2)
+    | Pextra_ty _ -> fatal_error "Subst.module_path")
 
 let modtype_path s path =
-      match Path.Map.find path s.modtypes with
-      | Mty_ident p -> p
-      | Mty_alias _ | Mty_signature _ | Mty_functor _
-      | Mty_strengthen _ as mty ->
-         raise (Module_type_path_substituted_away (path,mty))
-      | exception Not_found ->
-         match path with
-         | Pdot(p, n) ->
-            Pdot(module_path s p, n)
-         | Papply _ | Pextra_ty _ ->
-            fatal_error "Subst.modtype_path"
-         | Pident _ -> path
+  match Path.Map.find path s.modtypes with
+  | Mty_ident p -> p
+  | (Mty_alias _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _) as mty ->
+    raise (Module_type_path_substituted_away (path, mty))
+  | exception Not_found -> (
+    match path with
+    | Pdot (p, n) -> Pdot (module_path s p, n)
+    | Papply _ | Pextra_ty _ -> fatal_error "Subst.modtype_path"
+    | Pident _ -> path)
 
 (* For values, extension constructors, classes and class types *)
 let value_path s path =
   match path with
   | Pident _ -> path
-  | Pdot(p, n) -> Pdot(module_path s p, n)
+  | Pdot (p, n) -> Pdot (module_path s p, n)
   | Papply _ | Pextra_ty _ -> fatal_error "Subst.value_path"
 
 let rec type_path s path =
   match Path.Map.find path s.types with
   | Path p -> p
   | Type_function _ -> assert false
-  | exception Not_found ->
-     match path with
-     | Pident _ -> path
-     | Pdot(p, n) ->
-        Pdot(module_path s p, n)
-     | Papply _ ->
-        fatal_error "Subst.type_path"
-     | Pextra_ty (p, extra) ->
-         match extra with
-         | Pcstr_ty _ | Punboxed_ty ->
-           Pextra_ty (type_path s p, extra)
-         | Pext_ty -> Pextra_ty (value_path s p, extra)
+  | exception Not_found -> (
+    match path with
+    | Pident _ -> path
+    | Pdot (p, n) -> Pdot (module_path s p, n)
+    | Papply _ -> fatal_error "Subst.type_path"
+    | Pextra_ty (p, extra) -> (
+      match extra with
+      | Pcstr_ty _ | Punboxed_ty -> Pextra_ty (type_path s p, extra)
+      | Pext_ty -> Pextra_ty (value_path s p, extra)))
 
 let to_subst_by_type_function s p =
   match Path.Map.find p s.types with
@@ -292,12 +288,12 @@ let to_subst_by_type_function s p =
 (* Special type ids for saved signatures *)
 
 let new_id = s_ref (-1)
+
 let reset_additional_action_type_id () = new_id := -1
 
 let newpersty desc =
   decr new_id;
-  create_expr
-    desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_id
+  create_expr desc ~level:generic_level ~scope:Btype.lowest_level ~id:!new_id
 
 (* CR layouts: remove this. While we're still developing, though, it might
    be nice to get the location of this kind of error. *)
@@ -312,26 +308,28 @@ let location_for_jkind_check_errors = ref Location.none
 let norm desc ~prepare_jkind =
   match desc with
   | Tvar { name; jkind } ->
-      let loc = !location_for_jkind_check_errors in
-      Tvar { name; jkind = prepare_jkind loc jkind }
+    let loc = !location_for_jkind_check_errors in
+    Tvar { name; jkind = prepare_jkind loc jkind }
   | Tunivar { name; jkind } ->
-      let loc = !location_for_jkind_check_errors in
-      Tunivar { name; jkind = prepare_jkind loc jkind }
-    | desc -> desc
+    let loc = !location_for_jkind_check_errors in
+    Tunivar { name; jkind = prepare_jkind loc jkind }
+  | desc -> desc
 
 let apply_type_function params args body =
   For_copy.with_scope (fun copy_scope ->
-    List.iter2
-      (fun param arg ->
-        For_copy.redirect_desc copy_scope param (Tsubst (arg, None)))
-      params args;
-    let rec copy ty =
-      assert (get_level ty = generic_level);
-      match get_desc ty with
-      | Tsubst (ty, _) -> ty
-      | Tvariant row ->
-          let t = newgenstub ~scope:(get_scope ty)
-            (Jkind.Builtin.any ~why:Dummy_jkind) in
+      List.iter2
+        (fun param arg ->
+          For_copy.redirect_desc copy_scope param (Tsubst (arg, None)))
+        params args;
+      let rec copy ty =
+        assert (get_level ty = generic_level);
+        match get_desc ty with
+        | Tsubst (ty, _) -> ty
+        | Tvariant row ->
+          let t =
+            newgenstub ~scope:(get_scope ty)
+              (Jkind.Builtin.any ~why:Dummy_jkind)
+          in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
           let more = row_more row in
           assert (get_level more = generic_level);
@@ -341,48 +339,48 @@ let apply_type_function params args body =
           let desc' =
             match mored with
             | Tsubst (_, Some ty2) ->
-                (* This variant type has been already copied *)
-                (* Change the stub to avoid Tlink in the new type *)
-                For_copy.redirect_desc copy_scope ty (Tsubst (ty2, None));
-                Tlink ty2
+              (* This variant type has been already copied *)
+              (* Change the stub to avoid Tlink in the new type *)
+              For_copy.redirect_desc copy_scope ty (Tsubst (ty2, None));
+              Tlink ty2
             | _ ->
-                let more' =
-                  match mored with
-                    Tsubst (ty, None) -> ty
-                    (* TODO: is this case possible?
-                       possibly an interaction with (copy more) below? *)
-                  | Tconstr _ | Tnil ->
-                      copy more
-                  | Tvar _ | Tunivar _ ->
-                      newgenty mored
-                  |  _ -> assert false
-                in
-                let row =
-                  match get_desc more' with (* PR#6163 *)
-                    Tconstr (x,_,_) when not (is_fixed row) ->
-                      let Row {fields; more; closed; name} = row_repr row in
-                      create_row ~fields ~more ~closed ~name
-                        ~fixed:(Some (Reified x))
-                  | _ -> row
-                in
-                (* Register new type first for recursion *)
-                For_copy.redirect_desc copy_scope more
-                  (Tsubst(more', Some t));
-                (* Return a new copy *)
-                Tvariant (copy_row copy true row false more')
+              let more' =
+                match mored with
+                | Tsubst (ty, None) ->
+                  ty
+                  (* TODO: is this case possible?
+                     possibly an interaction with (copy more) below? *)
+                | Tconstr _ | Tnil -> copy more
+                | Tvar _ | Tunivar _ -> newgenty mored
+                | _ -> assert false
+              in
+              let row =
+                match get_desc more' with
+                (* PR#6163 *)
+                | Tconstr (x, _, _) when not (is_fixed row) ->
+                  let (Row { fields; more; closed; name }) = row_repr row in
+                  create_row ~fields ~more ~closed ~name
+                    ~fixed:(Some (Reified x))
+                | _ -> row
+              in
+              (* Register new type first for recursion *)
+              For_copy.redirect_desc copy_scope more (Tsubst (more', Some t));
+              (* Return a new copy *)
+              Tvariant (copy_row copy true row false more')
           in
           Transient_expr.set_stub_desc t desc';
           t
-      | desc ->
-          let t = newgenstub ~scope:(get_scope ty)
-            (Jkind.Builtin.any ~why:Dummy_jkind) in
+        | desc ->
+          let t =
+            newgenstub ~scope:(get_scope ty)
+              (Jkind.Builtin.any ~why:Dummy_jkind)
+          in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
           let desc' = copy_type_desc copy desc in
           Transient_expr.set_stub_desc t desc';
           t
-    in
-    copy body)
-
+      in
+      copy body)
 
 (* Similar to [Ctype.nondep_type_rec]. *)
 let rec typexp copy_scope s ty =
@@ -393,115 +391,124 @@ let rec typexp copy_scope s ty =
   in
   let desc = get_desc ty in
   match desc with
-    Tvar _ | Tunivar _ ->
-      if should_duplicate_vars || get_id ty < 0 then
-        let ty' =
-          match s.additional_action with
-          | Duplicate_variables -> newpersty desc
-          | Prepare_for_saving { prepare_jkind } ->
-              newpersty (norm desc ~prepare_jkind)
-          | No_action -> newty2 ~level:(get_level ty) desc
-        in
-        For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
-        ty'
-      else ty
-  | Tsubst (ty, _) ->
-      ty
-  | Tfield (m, k, _t1, _t2) when not should_duplicate_vars && m = dummy_method
-      && field_kind_repr k <> Fabsent && get_level ty < generic_level ->
-      (* do not copy the type of self when it is not generalized *)
-      ty
-(* cannot do it, since it would omit substitution
-  | Tvariant row when not (static_row row) ->
-      ty
-*)
+  | Tvar _ | Tunivar _ ->
+    if should_duplicate_vars || get_id ty < 0
+    then (
+      let ty' =
+        match s.additional_action with
+        | Duplicate_variables -> newpersty desc
+        | Prepare_for_saving { prepare_jkind } ->
+          newpersty (norm desc ~prepare_jkind)
+        | No_action -> newty2 ~level:(get_level ty) desc
+      in
+      For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
+      ty')
+    else ty
+  | Tsubst (ty, _) -> ty
+  | Tfield (m, k, _t1, _t2)
+    when (not should_duplicate_vars)
+         && m = dummy_method
+         && field_kind_repr k <> Fabsent
+         && get_level ty < generic_level ->
+    (* do not copy the type of self when it is not generalized *)
+    ty
+  (* cannot do it, since it would omit substitution
+     | Tvariant row when not (static_row row) ->
+         ty
+  *)
   | _ ->
     let tm = row_of_type ty in
     let has_fixed_row =
-      not (is_Tconstr ty) && is_constr_row ~allow_ident:false tm in
+      (not (is_Tconstr ty)) && is_constr_row ~allow_ident:false tm
+    in
     (* Make a stub *)
     let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
     let ty' =
-      if should_duplicate_vars then newpersty (Tvar {name = None; jkind})
+      if should_duplicate_vars
+      then newpersty (Tvar { name = None; jkind })
       else newgenstub ~scope:(get_scope ty) jkind
     in
     For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
     let desc =
-      if has_fixed_row then
-        match get_desc tm with (* PR#7348 *)
-          Tconstr (Pdot(m,i), tl, _abbrev) ->
-            let i' = String.sub i 0 (String.length i - 4) in
-            Tconstr(type_path s (Pdot(m,i')), tl, ref Mnil)
+      if has_fixed_row
+      then
+        match get_desc tm with
+        (* PR#7348 *)
+        | Tconstr (Pdot (m, i), tl, _abbrev) ->
+          let i' = String.sub i 0 (String.length i - 4) in
+          Tconstr (type_path s (Pdot (m, i')), tl, ref Mnil)
         | _ -> assert false
-      else match desc with
-      | Tconstr (p, args, _abbrev) ->
-         let args = List.map (typexp copy_scope s) args in
-         begin match Path.Map.find p s.types with
-         | exception Not_found -> Tconstr(type_path s p, args, ref Mnil)
-         | Path _ -> Tconstr(type_path s p, args, ref Mnil)
-         | Type_function { params; body } ->
-            Tlink (apply_type_function params args body)
-         end
-      | Tpackage(p, fl) ->
-          Tpackage(modtype_path s p,
-                   List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) fl)
-      | Tobject (t1, name) ->
+      else
+        match desc with
+        | Tconstr (p, args, _abbrev) -> (
+          let args = List.map (typexp copy_scope s) args in
+          match Path.Map.find p s.types with
+          | exception Not_found -> Tconstr (type_path s p, args, ref Mnil)
+          | Path _ -> Tconstr (type_path s p, args, ref Mnil)
+          | Type_function { params; body } ->
+            Tlink (apply_type_function params args body))
+        | Tpackage (p, fl) ->
+          Tpackage
+            ( modtype_path s p,
+              List.map (fun (n, ty) -> n, typexp copy_scope s ty) fl )
+        | Tobject (t1, name) ->
           let t1' = typexp copy_scope s t1 in
           let name' =
             match !name with
             | None -> None
             | Some (p, tl) ->
-                if to_subst_by_type_function s p
-                then None
-                else Some (type_path s p, List.map (typexp copy_scope s) tl)
+              if to_subst_by_type_function s p
+              then None
+              else Some (type_path s p, List.map (typexp copy_scope s) tl)
           in
           Tobject (t1', ref name')
-      | Tvariant row ->
+        | Tvariant row -> (
           let more = row_more row in
           let mored = get_desc more in
           (* We must substitute in a subtle way *)
           (* Tsubst takes a tuple containing the row var and the variant *)
-          begin match mored with
-            Tsubst (_, Some ty2) ->
-              (* This variant type has been already copied *)
-              (* Change the stub to avoid Tlink in the new type *)
-              For_copy.redirect_desc copy_scope ty (Tsubst (ty2, None));
-              Tlink ty2
-          | _ ->
-              let dup =
-                should_duplicate_vars || get_level more = generic_level ||
-                static_row row || is_Tconstr more in
-              (* Various cases for the row variable *)
-              let more' =
-                match mored with
-                  Tsubst (ty, None) -> ty
-                | Tconstr _ | Tnil | Tof_kind _ -> typexp copy_scope s more
-                | Tunivar _ | Tvar _ ->
-                    if should_duplicate_vars then newpersty mored
-                    else if dup && is_Tvar more then newgenty mored
-                    else more
-                | _ -> assert false
+          match mored with
+          | Tsubst (_, Some ty2) ->
+            (* This variant type has been already copied *)
+            (* Change the stub to avoid Tlink in the new type *)
+            For_copy.redirect_desc copy_scope ty (Tsubst (ty2, None));
+            Tlink ty2
+          | _ -> (
+            let dup =
+              should_duplicate_vars
+              || get_level more = generic_level
+              || static_row row || is_Tconstr more
+            in
+            (* Various cases for the row variable *)
+            let more' =
+              match mored with
+              | Tsubst (ty, None) -> ty
+              | Tconstr _ | Tnil | Tof_kind _ -> typexp copy_scope s more
+              | Tunivar _ | Tvar _ ->
+                if should_duplicate_vars
+                then newpersty mored
+                else if dup && is_Tvar more
+                then newgenty mored
+                else more
+              | _ -> assert false
+            in
+            (* Register new type first for recursion *)
+            For_copy.redirect_desc copy_scope more (Tsubst (more', Some ty'));
+            (* TODO: check if more' can be eliminated *)
+            (* Return a new copy *)
+            let row = copy_row (typexp copy_scope s) true row (not dup) more' in
+            match row_name row with
+            | Some (p, tl) ->
+              let name =
+                if to_subst_by_type_function s p
+                then None
+                else Some (type_path s p, tl)
               in
-              (* Register new type first for recursion *)
-              For_copy.redirect_desc copy_scope more
-                (Tsubst (more', Some ty'));
-              (* TODO: check if more' can be eliminated *)
-              (* Return a new copy *)
-              let row =
-                copy_row (typexp copy_scope s) true row (not dup) more' in
-              match row_name row with
-              | Some (p, tl) ->
-                  let name =
-                    if to_subst_by_type_function s p then None
-                    else Some (type_path s p, tl)
-                  in
-                  Tvariant (set_row_name row name)
-              | None ->
-                  Tvariant row
-          end
-      | Tfield(_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
+              Tvariant (set_row_name row name)
+            | None -> Tvariant row))
+        | Tfield (_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
           Tlink (typexp copy_scope s t2)
-      | _ -> copy_type_desc (typexp copy_scope s) desc
+        | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
@@ -525,47 +532,43 @@ let type_expr s ty =
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
 
 let label_declaration copy_scope s l =
-  {
-    ld_id = l.ld_id;
+  { ld_id = l.ld_id;
     ld_mutable = l.ld_mutable;
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
     ld_type = typexp copy_scope s l.ld_loc l.ld_type;
     ld_loc = loc s l.ld_loc;
     ld_attributes = attrs s l.ld_attributes;
-    ld_uid = l.ld_uid;
+    ld_uid = l.ld_uid
   }
 
 let constructor_argument copy_scope s ca =
-  {
-    ca_type = typexp copy_scope s ca.ca_loc ca.ca_type;
+  { ca_type = typexp copy_scope s ca.ca_loc ca.ca_type;
     ca_sort = ca.ca_sort;
     ca_loc = loc s ca.ca_loc;
-    ca_modalities = ca.ca_modalities;
+    ca_modalities = ca.ca_modalities
   }
 
 let constructor_arguments copy_scope s = function
-  | Cstr_tuple l ->
-      Cstr_tuple (List.map (constructor_argument copy_scope s) l)
-  | Cstr_record l ->
-      Cstr_record (List.map (label_declaration copy_scope s) l)
+  | Cstr_tuple l -> Cstr_tuple (List.map (constructor_argument copy_scope s) l)
+  | Cstr_record l -> Cstr_record (List.map (label_declaration copy_scope s) l)
 
 let constructor_declaration copy_scope s c =
-  {
-    cd_id = c.cd_id;
+  { cd_id = c.cd_id;
     cd_args = constructor_arguments copy_scope s c.cd_args;
     cd_res = Option.map (typexp copy_scope s c.cd_loc) c.cd_res;
     cd_loc = loc s c.cd_loc;
     cd_attributes = attrs s c.cd_attributes;
-    cd_uid = c.cd_uid;
+    cd_uid = c.cd_uid
   }
 
 let unsafe_mode_crossing copy_scope s loc
-      { unsafe_mod_bounds; unsafe_with_bounds } =
+    { unsafe_mod_bounds; unsafe_with_bounds } =
   { unsafe_mod_bounds;
     unsafe_with_bounds =
       Jkind.With_bounds.map_type_expr (typexp copy_scope s loc)
-        unsafe_with_bounds }
+        unsafe_with_bounds
+  }
 
 let rec type_declaration' copy_scope s decl =
   let unsafe_mode_crossing =
@@ -574,39 +577,36 @@ let rec type_declaration' copy_scope s decl =
   { type_params = List.map (typexp copy_scope s decl.type_loc) decl.type_params;
     type_arity = decl.type_arity;
     type_kind =
-      begin match decl.type_kind with
-        Type_abstract r -> Type_abstract r
+      (match decl.type_kind with
+      | Type_abstract r -> Type_abstract r
       | Type_variant (cstrs, rep, umc) ->
-          Type_variant (List.map (constructor_declaration copy_scope s) cstrs,
-                        rep,
-                        unsafe_mode_crossing umc)
-      | Type_record(lbls, rep, umc) ->
-          Type_record (List.map (label_declaration copy_scope s) lbls,
-                       rep,
-                       unsafe_mode_crossing umc)
-      | Type_record_unboxed_product(lbls, rep, umc) ->
-          Type_record_unboxed_product
-            (List.map (label_declaration copy_scope s) lbls,
-             rep,
-             unsafe_mode_crossing umc)
-      | Type_open -> Type_open
-      end;
+        Type_variant
+          ( List.map (constructor_declaration copy_scope s) cstrs,
+            rep,
+            unsafe_mode_crossing umc )
+      | Type_record (lbls, rep, umc) ->
+        Type_record
+          ( List.map (label_declaration copy_scope s) lbls,
+            rep,
+            unsafe_mode_crossing umc )
+      | Type_record_unboxed_product (lbls, rep, umc) ->
+        Type_record_unboxed_product
+          ( List.map (label_declaration copy_scope s) lbls,
+            rep,
+            unsafe_mode_crossing umc )
+      | Type_open -> Type_open);
     type_manifest =
-      begin
-        match decl.type_manifest with
-          None -> None
-        | Some ty -> Some(typexp copy_scope s decl.type_loc ty)
-      end;
+      (match decl.type_manifest with
+      | None -> None
+      | Some ty -> Some (typexp copy_scope s decl.type_loc ty));
     type_jkind =
-      begin
-        let jkind =
-          match s.additional_action with
-          | Prepare_for_saving { prepare_jkind } ->
-            prepare_jkind decl.type_loc decl.type_jkind
-          | Duplicate_variables | No_action -> decl.type_jkind
-        in
-        Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
-      end;
+      (let jkind =
+         match s.additional_action with
+         | Prepare_for_saving { prepare_jkind } ->
+           prepare_jkind decl.type_loc decl.type_jkind
+         | Duplicate_variables | No_action -> decl.type_jkind
+       in
+       Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind);
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;
@@ -617,7 +617,7 @@ let rec type_declaration' copy_scope s decl =
     type_unboxed_default = decl.type_unboxed_default;
     type_uid = decl.type_uid;
     type_unboxed_version =
-      Option.map (type_declaration' copy_scope s) decl.type_unboxed_version;
+      Option.map (type_declaration' copy_scope s) decl.type_unboxed_version
   }
 
 let type_declaration s decl =
@@ -628,26 +628,25 @@ let class_signature copy_scope s loc sign =
     csig_self_row = typexp copy_scope s loc sign.csig_self_row;
     csig_vars =
       Vars.map
-        (function (m, v, t) -> (m, v, typexp copy_scope s loc t))
+        (function m, v, t -> m, v, typexp copy_scope s loc t)
         sign.csig_vars;
     csig_meths =
       Meths.map
-        (function (p, v, t) -> (p, v, typexp copy_scope s loc t))
-        sign.csig_meths;
+        (function p, v, t -> p, v, typexp copy_scope s loc t)
+        sign.csig_meths
   }
 
 let rec class_type copy_scope s cty =
   let loc = Option.value s.loc ~default:Location.none in
   match cty with
   | Cty_constr (p, tyl, cty) ->
-      let p' = type_path s p in
-      let tyl' = List.map (typexp copy_scope s loc) tyl in
-      let cty' = class_type copy_scope s cty in
-      Cty_constr (p', tyl', cty')
-  | Cty_signature sign ->
-      Cty_signature (class_signature copy_scope s loc sign)
+    let p' = type_path s p in
+    let tyl' = List.map (typexp copy_scope s loc) tyl in
+    let cty' = class_type copy_scope s cty in
+    Cty_constr (p', tyl', cty')
+  | Cty_signature sign -> Cty_signature (class_signature copy_scope s loc sign)
   | Cty_arrow (l, ty, cty) ->
-      Cty_arrow (l, typexp copy_scope s loc ty, class_type copy_scope s cty)
+    Cty_arrow (l, typexp copy_scope s loc ty, class_type copy_scope s cty)
 
 let class_declaration' copy_scope s decl =
   { cty_params = List.map (typexp copy_scope s decl.cty_loc) decl.cty_params;
@@ -655,13 +654,12 @@ let class_declaration' copy_scope s decl =
     cty_type = class_type copy_scope s decl.cty_type;
     cty_path = type_path s decl.cty_path;
     cty_new =
-      begin match decl.cty_new with
-      | None    -> None
-      | Some ty -> Some (typexp copy_scope s decl.cty_loc ty)
-      end;
+      (match decl.cty_new with
+      | None -> None
+      | Some ty -> Some (typexp copy_scope s decl.cty_loc ty));
     cty_loc = loc s decl.cty_loc;
     cty_attributes = attrs s decl.cty_attributes;
-    cty_uid = decl.cty_uid;
+    cty_uid = decl.cty_uid
   }
 
 let class_declaration s decl =
@@ -672,10 +670,10 @@ let cltype_declaration' copy_scope s decl =
     clty_variance = decl.clty_variance;
     clty_type = class_type copy_scope s decl.clty_type;
     clty_path = type_path s decl.clty_path;
-    clty_hash_type = type_declaration' copy_scope s decl.clty_hash_type ;
+    clty_hash_type = type_declaration' copy_scope s decl.clty_hash_type;
     clty_loc = loc s decl.clty_loc;
     clty_attributes = attrs s decl.clty_attributes;
-    clty_uid = decl.clty_uid;
+    clty_uid = decl.clty_uid
   }
 
 let cltype_declaration s decl =
@@ -684,7 +682,6 @@ let cltype_declaration s decl =
 let class_type s cty =
   For_copy.with_scope (fun copy_scope -> class_type copy_scope s cty)
 
-
 let extension_constructor' copy_scope s ext =
   { ext_type_path = type_path s ext.ext_type_path;
     ext_type_params =
@@ -692,49 +689,43 @@ let extension_constructor' copy_scope s ext =
     ext_args = constructor_arguments copy_scope s ext.ext_args;
     ext_shape = ext.ext_shape;
     ext_constant = ext.ext_constant;
-    ext_ret_type =
-      Option.map (typexp copy_scope s ext.ext_loc) ext.ext_ret_type;
+    ext_ret_type = Option.map (typexp copy_scope s ext.ext_loc) ext.ext_ret_type;
     ext_private = ext.ext_private;
     ext_attributes = attrs s ext.ext_attributes;
-    ext_loc = begin match s.additional_action with
+    ext_loc =
+      (match s.additional_action with
       | Prepare_for_saving _ | Duplicate_variables -> Location.none
-      | No_action -> ext.ext_loc
-    end;
-    ext_uid = ext.ext_uid;
+      | No_action -> ext.ext_loc);
+    ext_uid = ext.ext_uid
   }
 
 let extension_constructor s ext =
-  For_copy.with_scope
-    (fun copy_scope -> extension_constructor' copy_scope s ext)
-
+  For_copy.with_scope (fun copy_scope ->
+      extension_constructor' copy_scope s ext)
 
 (* For every binding k |-> d of m1, add k |-> f d to m2
    and return resulting merged map. *)
 let merge_path_maps f m1 m2 =
   Path.Map.fold (fun k d accu -> Path.Map.add k (f d) accu) m1 m2
 
-let merge_type_path_maps (f : type_replacement -> type_replacement)  m1 m2 =
+let merge_type_path_maps (f : type_replacement -> type_replacement) m1 m2 =
   Path.Map.fold
     (fun k d accu ->
-      if Path.is_unboxed_version k then
-        accu
-      else
-        add_type_replacement accu k (f d))
+      if Path.is_unboxed_version k
+      then accu
+      else add_type_replacement accu k (f d))
     m1 m2
 
-let keep_latest_loc l1 l2 =
-  match l2 with
-  | None -> l1
-  | Some _ -> l2
+let keep_latest_loc l1 l2 = match l2 with None -> l1 | Some _ -> l2
 
 let type_replacement s = function
   | Path p -> Path (type_path s p)
   | Type_function { params; body } ->
     let loc = Option.value s.loc ~default:Location.none in
     For_copy.with_scope (fun copy_scope ->
-     let params = List.map (typexp copy_scope s loc) params in
-     let body = typexp copy_scope s loc body in
-     Type_function { params; body })
+        let params = List.map (typexp copy_scope s loc) params in
+        let body = typexp copy_scope s loc body in
+        Type_function { params; body })
 
 type scoping =
   | Keep
@@ -743,11 +734,15 @@ type scoping =
 
 module Wrap : sig
   type subst = t
+
   type 'a t
 
   val of_value : 'a -> 'a t
+
   val of_lazy : 'a Lazy.t -> 'a t
+
   val force : (scoping -> subst -> 'a -> 'a) -> 'a t -> 'a
+
   val substitute :
     compose:(subst -> subst -> subst) -> scoping -> subst -> 'a t -> 'a t
 end = struct
@@ -760,106 +755,112 @@ end = struct
   type 'a t = ((scoping * subst) option * 'a Lazy.t, 'a) Lazy_backtrack.t
 
   let of_value = Lazy_backtrack.create_forced
+
   let of_lazy x = Lazy_backtrack.create (None, x)
 
   let substitute ~compose scoping s x =
     match Lazy_backtrack.get_contents x with
-    | Left (None, x) ->
-      Lazy_backtrack.create (Some (scoping, s), x)
+    | Left (None, x) -> Lazy_backtrack.create (Some (scoping, s), x)
     | Left (Some (scoping', s'), x) ->
-        let scoping =
-          match scoping', scoping with
-          | sc, Keep -> sc
-          | _, (Make_local|Rescope _) -> scoping
-        in
-        let s = compose s' s in
-        Lazy_backtrack.create (Some (scoping, s), x)
-    | Right x ->
-        Lazy_backtrack.create (Some (scoping, s), Lazy.from_val x)
+      let scoping =
+        match scoping', scoping with
+        | sc, Keep -> sc
+        | _, (Make_local | Rescope _) -> scoping
+      in
+      let s = compose s' s in
+      Lazy_backtrack.create (Some (scoping, s), x)
+    | Right x -> Lazy_backtrack.create (Some (scoping, s), Lazy.from_val x)
 
-  let force f = Lazy_backtrack.force (fun (s, x) ->
-    let x = Lazy.force x in
-    match s with
-    | Some (scoping, s) -> f scoping s x
-    | None -> x)
+  let force f =
+    Lazy_backtrack.force (fun (s, x) ->
+        let x = Lazy.force x in
+        match s with Some (scoping, s) -> f scoping s x | None -> x)
 end
 
-module Lazy_types = Types.Make_wrapped(Wrap)
+module Lazy_types = Types.Make_wrapped (Wrap)
 open Lazy_types
 
 let rename_bound_idents scoping s sg =
   let rename =
     let open Ident in
     match scoping with
-    | Keep -> (fun id -> create_scoped ~scope:(scope id) (name id))
+    | Keep -> fun id -> create_scoped ~scope:(scope id) (name id)
     | Make_local -> Ident.rename
-    | Rescope scope -> (fun id -> create_scoped ~scope (name id))
+    | Rescope scope -> fun id -> create_scoped ~scope (name id)
   in
   let rec rename_bound_idents s sg = function
     | [] -> sg, s
-    | Sig_type(id, td, rs, vis) :: rest ->
-        let id' = rename id in
-        rename_bound_idents
-          (add_type id (Pident id') s)
-          (Sig_type(id', td, rs, vis) :: sg)
-          rest
-    | Sig_module(id, pres, md, rs, vis) :: rest ->
-        let id' = rename id in
-        rename_bound_idents
-          (add_module id (Pident id') s)
-          (Sig_module (id', pres, md, rs, vis) :: sg)
-          rest
-    | Sig_modtype(id, mtd, vis) :: rest ->
-        let id' = rename id in
-        rename_bound_idents
-          (add_modtype id (Pident id') s)
-          (Sig_modtype(id', mtd, vis) :: sg)
-          rest
-    | Sig_class(id, cd, rs, vis) :: rest ->
-        (* cheat and pretend they are types cf. PR#6650 *)
-        let id' = rename id in
-        rename_bound_idents
-          (add_type id (Pident id') s)
-          (Sig_class(id', cd, rs, vis) :: sg)
-          rest
-    | Sig_class_type(id, ctd, rs, vis) :: rest ->
-        (* cheat and pretend they are types cf. PR#6650 *)
-        let id' = rename id in
-        rename_bound_idents
-          (add_type id (Pident id') s)
-          (Sig_class_type(id', ctd, rs, vis) :: sg)
-          rest
-    | Sig_value(id, vd, vis) :: rest ->
-        (* scope doesn't matter for value identifiers. *)
-        let id' = Ident.rename id in
-        rename_bound_idents s (Sig_value(id', vd, vis) :: sg) rest
-    | Sig_typext(id, ec, es, vis) :: rest ->
-        let id' = rename id in
-        rename_bound_idents s (Sig_typext(id',ec,es,vis) :: sg) rest
+    | Sig_type (id, td, rs, vis) :: rest ->
+      let id' = rename id in
+      rename_bound_idents
+        (add_type id (Pident id') s)
+        (Sig_type (id', td, rs, vis) :: sg)
+        rest
+    | Sig_module (id, pres, md, rs, vis) :: rest ->
+      let id' = rename id in
+      rename_bound_idents
+        (add_module id (Pident id') s)
+        (Sig_module (id', pres, md, rs, vis) :: sg)
+        rest
+    | Sig_modtype (id, mtd, vis) :: rest ->
+      let id' = rename id in
+      rename_bound_idents
+        (add_modtype id (Pident id') s)
+        (Sig_modtype (id', mtd, vis) :: sg)
+        rest
+    | Sig_class (id, cd, rs, vis) :: rest ->
+      (* cheat and pretend they are types cf. PR#6650 *)
+      let id' = rename id in
+      rename_bound_idents
+        (add_type id (Pident id') s)
+        (Sig_class (id', cd, rs, vis) :: sg)
+        rest
+    | Sig_class_type (id, ctd, rs, vis) :: rest ->
+      (* cheat and pretend they are types cf. PR#6650 *)
+      let id' = rename id in
+      rename_bound_idents
+        (add_type id (Pident id') s)
+        (Sig_class_type (id', ctd, rs, vis) :: sg)
+        rest
+    | Sig_value (id, vd, vis) :: rest ->
+      (* scope doesn't matter for value identifiers. *)
+      let id' = Ident.rename id in
+      rename_bound_idents s (Sig_value (id', vd, vis) :: sg) rest
+    | Sig_typext (id, ec, es, vis) :: rest ->
+      let id' = rename id in
+      rename_bound_idents s (Sig_typext (id', ec, es, vis) :: sg) rest
   in
   rename_bound_idents s [] sg
 
-module To_lazy = Types.Map_wrapped(Types)(Lazy_types)
+module To_lazy = Types.Map_wrapped (Types) (Lazy_types)
 
 let to_lazy =
   let map_signature m sg =
     lazy (List.map (To_lazy.signature_item m) sg) |> Wrap.of_lazy
   in
   let map_type_expr _ = Wrap.of_value in
-  To_lazy.{map_signature; map_type_expr}
+  To_lazy.{ map_signature; map_type_expr }
 
 let lazy_value_description = To_lazy.value_description to_lazy
+
 let lazy_module_decl = To_lazy.module_declaration to_lazy
+
 let lazy_functor_parameter = To_lazy.functor_parameter to_lazy
+
 let lazy_modtype = To_lazy.module_type to_lazy
+
 let lazy_modtype_decl = To_lazy.modtype_declaration to_lazy
+
 let lazy_signature_item = To_lazy.signature_item to_lazy
 
-module From_lazy = Types.Map_wrapped(Lazy_types)(Types)
+module From_lazy = Types.Map_wrapped (Lazy_types) (Types)
 
-let force_type_expr ty = Wrap.force (fun _ s ty ->
-  let loc = Option.value s.loc ~default:Location.none in
-  For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
+let force_type_expr ty =
+  Wrap.force
+    (fun _ s ty ->
+      let loc = Option.value s.loc ~default:Location.none in
+      For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty))
+    ty
 
 let rec subst_lazy_value_description s descr =
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
@@ -873,12 +874,12 @@ let rec subst_lazy_value_description s descr =
          type inference is done by the time we write the cmi file (and anyway
          additional inference steps could only cause the funtion to get checked
          more strictly than the signature indicates, which is sound). *)
-     (match s.additional_action with
+      (match s.additional_action with
       | Prepare_for_saving _ ->
         Zero_alloc.create_const (Zero_alloc.get descr.val_zero_alloc)
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
-    val_uid = descr.val_uid;
+    val_uid = descr.val_uid
   }
 
 and subst_lazy_module_decl scoping s md =
@@ -887,75 +888,70 @@ and subst_lazy_module_decl scoping s md =
     md_modalities = md.md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
-    md_uid = md.md_uid }
+    md_uid = md.md_uid
+  }
 
 and subst_lazy_modtype scoping s = function
-  | Mty_ident p ->
-      begin match Path.Map.find p s.modtypes with
-       | mty -> lazy_modtype mty
-       | exception Not_found ->
-          begin match p with
-          | Pident _ -> Mty_ident p
-          | Pdot(p, n) ->
-             Mty_ident(Pdot(module_path s p, n))
-          | Papply _ | Pextra_ty _ ->
-             fatal_error "Subst.modtype"
-          end
-      end
-  | Mty_signature sg ->
-      Mty_signature(subst_lazy_signature scoping s sg)
-  | Mty_functor(Unit, res) ->
-      Mty_functor(Unit, subst_lazy_modtype scoping s res)
-  | Mty_functor(Named (None, arg), res) ->
-      Mty_functor(Named (None, (subst_lazy_modtype scoping s) arg),
-                   subst_lazy_modtype scoping s res)
-  | Mty_functor(Named (Some id, arg), res) ->
-      let id' = Ident.rename id in
-      Mty_functor(Named (Some id', (subst_lazy_modtype scoping s) arg),
-                  subst_lazy_modtype scoping (add_module id (Pident id') s) res)
-  | Mty_alias p ->
-      Mty_alias (module_path s p)
+  | Mty_ident p -> (
+    match Path.Map.find p s.modtypes with
+    | mty -> lazy_modtype mty
+    | exception Not_found -> (
+      match p with
+      | Pident _ -> Mty_ident p
+      | Pdot (p, n) -> Mty_ident (Pdot (module_path s p, n))
+      | Papply _ | Pextra_ty _ -> fatal_error "Subst.modtype"))
+  | Mty_signature sg -> Mty_signature (subst_lazy_signature scoping s sg)
+  | Mty_functor (Unit, res) ->
+    Mty_functor (Unit, subst_lazy_modtype scoping s res)
+  | Mty_functor (Named (None, arg), res) ->
+    Mty_functor
+      ( Named (None, (subst_lazy_modtype scoping s) arg),
+        subst_lazy_modtype scoping s res )
+  | Mty_functor (Named (Some id, arg), res) ->
+    let id' = Ident.rename id in
+    Mty_functor
+      ( Named (Some id', (subst_lazy_modtype scoping s) arg),
+        subst_lazy_modtype scoping (add_module id (Pident id') s) res )
+  | Mty_alias p -> Mty_alias (module_path s p)
   | Mty_strengthen (mty, p, a) ->
-      Mty_strengthen (subst_lazy_modtype scoping s mty, module_path s p, a)
+    Mty_strengthen (subst_lazy_modtype scoping s mty, module_path s p, a)
 
 and subst_lazy_modtype_decl scoping s mtd =
   { mtd_type = Option.map (subst_lazy_modtype scoping s) mtd.mtd_type;
     mtd_attributes = attrs s mtd.mtd_attributes;
     mtd_loc = loc s mtd.mtd_loc;
-    mtd_uid = mtd.mtd_uid }
+    mtd_uid = mtd.mtd_uid
+  }
 
-and subst_lazy_signature scoping s sg =
-  Wrap.substitute ~compose scoping s sg
+and subst_lazy_signature scoping s sg = Wrap.substitute ~compose scoping s sg
 
-and force_signature_once sg =
-  Wrap.force force_signature_once' sg
+and force_signature_once sg = Wrap.force force_signature_once' sg
 
 and force_signature_once' scoping s sg =
   (* Components of signature may be mutually recursive (e.g. type declarations
      or class and type declarations), so first build global renaming
      substitution... *)
-  let (sg', s') = rename_bound_idents scoping s sg in
+  let sg', s' = rename_bound_idents scoping s sg in
   (* ... then apply it to each signature component in turn *)
   For_copy.with_scope (fun copy_scope ->
-    List.rev_map (subst_lazy_signature_item' copy_scope scoping s') sg'
-  )
+      List.rev_map (subst_lazy_signature_item' copy_scope scoping s') sg')
 
 and subst_lazy_signature_item' copy_scope scoping s comp =
   match comp with
-    Sig_value(id, d, vis) ->
-      Sig_value(id, subst_lazy_value_description s d, vis)
-  | Sig_type(id, d, rs, vis) ->
-      Sig_type(id, type_declaration' copy_scope s d, rs, vis)
-  | Sig_typext(id, ext, es, vis) ->
-      Sig_typext(id, extension_constructor' copy_scope s ext, es, vis)
-  | Sig_module(id, pres, d, rs, vis) ->
-      Sig_module(id, pres, subst_lazy_module_decl scoping s d, rs, vis)
-  | Sig_modtype(id, d, vis) ->
-      Sig_modtype(id, subst_lazy_modtype_decl scoping s d, vis)
-  | Sig_class(id, d, rs, vis) ->
-      Sig_class(id, class_declaration' copy_scope s d, rs, vis)
-  | Sig_class_type(id, d, rs, vis) ->
-      Sig_class_type(id, cltype_declaration' copy_scope s d, rs, vis)
+  | Sig_value (id, d, vis) ->
+    Sig_value (id, subst_lazy_value_description s d, vis)
+  | Sig_type (id, d, rs, vis) ->
+    Sig_type (id, type_declaration' copy_scope s d, rs, vis)
+  | Sig_typext (id, ext, es, vis) ->
+    Sig_typext (id, extension_constructor' copy_scope s ext, es, vis)
+  | Sig_module (id, pres, d, rs, vis) ->
+    Sig_module (id, pres, subst_lazy_module_decl scoping s d, rs, vis)
+  | Sig_modtype (id, d, vis) ->
+    Sig_modtype (id, subst_lazy_modtype_decl scoping s d, vis)
+  | Sig_class (id, d, rs, vis) ->
+    Sig_class (id, class_declaration' copy_scope s d, rs, vis)
+  | Sig_class_type (id, d, rs, vis) ->
+    Sig_class_type (id, cltype_declaration' copy_scope s d, rs, vis)
 
 and modtype scoping s t =
   t |> lazy_modtype |> subst_lazy_modtype scoping s |> force_modtype
@@ -964,40 +960,41 @@ and modtype scoping s t =
      apply (compose s1 s2) x = apply s2 (apply s1 x) *)
 
 and compose s1 s2 =
-  if s1 == identity then s2 else
-  if s2 == identity then s1 else
-  match s2.last_compose with
-  | Some (t,s) when t == s1 -> s
-  | _ ->
+  if s1 == identity
+  then s2
+  else if s2 == identity
+  then s1
+  else
+    match s2.last_compose with
+    | Some (t, s) when t == s1 -> s
+    | _ ->
       let s =
         { types = merge_type_path_maps (type_replacement s2) s1.types s2.types;
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
-          additional_action = begin
-            match s1.additional_action, s2.additional_action with
+          additional_action =
+            (match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action
             | Duplicate_variables, Duplicate_variables -> Duplicate_variables
-
             (* Preparing for saving runs a superset of the things involved with
                copying variables, so we prefer that if composing substitutions.
             *)
             | (Prepare_for_saving _ as prepare), Duplicate_variables
-            | Duplicate_variables, (Prepare_for_saving _ as prepare)
-                -> prepare
-
+            | Duplicate_variables, (Prepare_for_saving _ as prepare) ->
+              prepare
             (* Note [Preparing_for_saving always the same]
                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                The function we put in [Prepare_for_saving] is always the same,
                so we can take either.
             *)
-            | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
-                -> prepare1
-          end;
+            | (Prepare_for_saving _ as prepare1), Prepare_for_saving _ ->
+              prepare1);
           loc = keep_latest_loc s1.loc s2.loc;
           last_compose = None
         }
       in
-      s2.last_compose <- Some (s1,s); s
+      s2.last_compose <- Some (s1, s);
+      s
 
 and from_lazy =
   let map_signature m sg =
@@ -1005,50 +1002,77 @@ and from_lazy =
     List.map (From_lazy.signature_item m) items
   in
   let map_type_expr _ = force_type_expr in
-  From_lazy.{map_signature; map_type_expr}
+  From_lazy.{ map_signature; map_type_expr }
 
 and force_value_description vd = From_lazy.value_description from_lazy vd
+
 and force_module_decl d = From_lazy.module_declaration from_lazy d
+
 and force_functor_parameter x = From_lazy.functor_parameter from_lazy x
+
 and force_modtype x = From_lazy.module_type from_lazy x
+
 and force_modtype_decl x = From_lazy.modtype_declaration from_lazy x
+
 and force_signature_item x = From_lazy.signature_item from_lazy x
+
 and force_signature x = From_lazy.signature from_lazy x
 
 let subst_lazy_signature_item scoping s comp =
-  For_copy.with_scope
-    (fun copy_scope -> subst_lazy_signature_item' copy_scope scoping s comp)
+  For_copy.with_scope (fun copy_scope ->
+      subst_lazy_signature_item' copy_scope scoping s comp)
 
 module Lazy = struct
   include Lazy_types
 
   let of_value x = Wrap.of_value x
+
   let of_lazy = Wrap.of_lazy
+
   let substitute s = Wrap.substitute ~compose Keep s
 
   let of_module_decl = lazy_module_decl
+
   let of_modtype = lazy_modtype
+
   let of_modtype_decl = lazy_modtype_decl
+
   let of_signature sg = Wrap.of_lazy (lazy (List.map lazy_signature_item sg))
+
   let of_signature_item = lazy_signature_item
+
   let of_functor_parameter = lazy_functor_parameter
+
   let of_value_description = lazy_value_description
 
   let module_decl = subst_lazy_module_decl
+
   let modtype = subst_lazy_modtype
+
   let modtype_decl = subst_lazy_modtype_decl
+
   let signature = subst_lazy_signature
+
   let signature_item = subst_lazy_signature_item
+
   let value_description = subst_lazy_value_description
 
   let force_module_decl = force_module_decl
+
   let force_modtype = force_modtype
+
   let force_modtype_decl = force_modtype_decl
+
   let force_signature = force_signature
+
   let force_signature_once = force_signature_once
+
   let force_signature_item = force_signature_item
+
   let force_functor_parameter = force_functor_parameter
+
   let force_value_description = force_value_description
+
   let force_type_expr = force_type_expr
 end
 
@@ -1056,7 +1080,8 @@ let signature sc s sg =
   Lazy.(sg |> of_signature |> signature sc s |> force_signature)
 
 let signature_item sc s comp =
-  Lazy.(comp|> of_signature_item |> signature_item sc s |> force_signature_item)
+  Lazy.(
+    comp |> of_signature_item |> signature_item sc s |> force_signature_item)
 
 let modtype_declaration sc s decl =
   Lazy.(decl |> of_modtype_decl |> modtype_decl sc s |> force_modtype_decl)
@@ -1065,52 +1090,57 @@ let module_declaration scoping s decl =
   Lazy.(decl |> of_module_decl |> module_decl scoping s |> force_module_decl)
 
 module Unsafe = struct
-
   type t = unsafe subst
+
   type error = Fcm_type_substituted_away of Path.t * Types.module_type
 
   let add_modtype_path = add_modtype_gen
+
   let add_modtype id mty s = add_modtype_path (Pident id) mty s
+
   let add_type_path id p s =
     { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
+
   let add_type_function id ~params ~body s =
     let types =
       add_type_replacement s.types id (Type_function { params; body })
     in
     { s with types; last_compose = None }
+
   let add_module_path id p s =
     { s with modules = Path.Map.add id p s.modules; last_compose = None }
 
-  let wrap f : _ result = match f () with
+  let wrap f : _ result =
+    match f () with
     | x -> Ok x
-    | exception Module_type_path_substituted_away (p,mty) ->
-        Error (Fcm_type_substituted_away (p,mty))
+    | exception Module_type_path_substituted_away (p, mty) ->
+      Error (Fcm_type_substituted_away (p, mty))
 
   let signature_item sc s comp = wrap (fun () -> signature_item sc s comp)
-  let signature sc s comp = wrap (fun () -> signature sc s comp )
-  let compose s1 s2 = wrap (fun () -> compose s1 s2)
-  let type_declaration s t = wrap (fun () -> type_declaration s t)
 
+  let signature sc s comp = wrap (fun () -> signature sc s comp)
+
+  let compose s1 s2 = wrap (fun () -> compose s1 s2)
+
+  let type_declaration s t = wrap (fun () -> type_declaration s t)
 end
 
 let value_description s descr =
-  Lazy.(descr |> of_value_description |> value_description s |> force_value_description)
+  Lazy.(
+    descr |> of_value_description |> value_description s
+    |> force_value_description)
 
 (* Error report *)
 open Format
 
 let report_error ppf = function
   | Unconstrained_jkind_variable ->
-      fprintf ppf
-        "Unconstrained layout variable detected when saving artifacts of \
-         compilation to disk.@ Please report this error to \
-         the Jane Street compilers team.@ "
+    fprintf ppf
+      "Unconstrained layout variable detected when saving artifacts of \
+       compilation to disk.@ Please report this error to the Jane Street \
+       compilers team.@ "
 
 let () =
-  Location.register_error_of_exn
-    (function
-      | Error (loc, err) ->
-          Some (Location.error_of_printer ~loc report_error err)
-      | _ ->
-          None
-    )
+  Location.register_error_of_exn (function
+    | Error (loc, err) -> Some (Location.error_of_printer ~loc report_error err)
+    | _ -> None)

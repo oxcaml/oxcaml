@@ -1,12 +1,13 @@
 (* TEST
- modules = "swapgil_stubs.c";
- include systhreads;
- hassysthreads;
- hasunix;
- native;
+   modules = "swapgil_stubs.c";
+   include systhreads;
+   hassysthreads;
+   hasunix;
+   native;
 *)
 
 external setup : unit -> unit = "swap_gil_setup"
+
 let () = setup ()
 
 let counter = ref 0
@@ -14,7 +15,9 @@ let counter = ref 0
 external blocking_section : unit -> unit = "blocking_section"
 
 type c_thread
+
 external create_c_thread : (unit -> unit) -> c_thread = "create_c_thread"
+
 external join_c_thread : c_thread -> unit = "join_c_thread"
 
 external swap_gil : unit -> unit = "swap_gil"
@@ -36,10 +39,11 @@ let () =
   let open Either in
   let threads =
     List.init 40 (fun i ->
-      if i land 1 = 0 then
-        Left (Thread.create threadfn ())
-      else
-        Right (create_c_thread threadfn))
+        if i land 1 = 0
+        then Left (Thread.create threadfn ())
+        else Right (create_c_thread threadfn))
   in
-  List.iter (function Left th -> Thread.join th | Right ct -> join_c_thread ct) threads;
+  List.iter
+    (function Left th -> Thread.join th | Right ct -> join_c_thread ct)
+    threads;
   Printf.printf "%d\n" !counter

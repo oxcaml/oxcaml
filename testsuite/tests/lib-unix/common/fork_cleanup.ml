@@ -1,12 +1,12 @@
 (* TEST
- include unix;
- hasunix;
- not-windows;
- {
-   bytecode;
- }{
-   native;
- }
+   include unix;
+   hasunix;
+   not-windows;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 (* this test checks that the domain lock is properly reinitialized
@@ -16,7 +16,4 @@
 let () =
   let fd = Unix.dup Unix.stdout in
   let ret = Unix.fork () in
-  if ret = 0 then
-    Unix.close fd
-  else
-    print_endline "OK"
+  if ret = 0 then Unix.close fd else print_endline "OK"

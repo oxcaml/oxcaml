@@ -1,12 +1,12 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
-2;;
+2
 
 (**
        0 CONST2

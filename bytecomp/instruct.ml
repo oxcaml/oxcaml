@@ -33,58 +33,60 @@ type closure_entry = Debug_event.closure_entry =
 
 type closure_env = Debug_event.closure_env =
   | Not_in_closure
-  | In_closure of {
-      entries: closure_entry Ident.tbl;
-      env_pos: int;
-    }
+  | In_closure of
+      { entries : closure_entry Ident.tbl;
+        env_pos : int
+      }
 
 type compilation_env = Debug_event.compilation_env =
-  { ce_stack: int Ident.tbl;
-    ce_closure: closure_env }
+  { ce_stack : int Ident.tbl;
+    ce_closure : closure_env
+  }
 
 type debug_event = Debug_event.debug_event =
-  { mutable ev_pos: int;
-    ev_module: string;
-    ev_loc: Location.t;
-    ev_kind: debug_event_kind;
-    ev_defname: string;
-    ev_info: debug_event_info;
-    ev_typenv: Env.summary;
-    ev_typsubst: Subst.t;
-    ev_compenv: compilation_env;
-    ev_stacksize: int;
-    ev_repr: debug_event_repr }
+  { mutable ev_pos : int;
+    ev_module : string;
+    ev_loc : Location.t;
+    ev_kind : debug_event_kind;
+    ev_defname : string;
+    ev_info : debug_event_info;
+    ev_typenv : Env.summary;
+    ev_typsubst : Subst.t;
+    ev_compenv : compilation_env;
+    ev_stacksize : int;
+    ev_repr : debug_event_repr
+  }
 
 and debug_event_kind = Debug_event.debug_event_kind =
-    Event_before
+  | Event_before
   | Event_after of Types.type_expr
   | Event_pseudo
 
 and debug_event_info = Debug_event.debug_event_info =
-    Event_function
+  | Event_function
   | Event_return of int
   | Event_other
 
 and debug_event_repr = Debug_event.debug_event_repr =
-    Event_none
+  | Event_none
   | Event_parent of int ref
   | Event_child of int ref
 
-type label = int                     (* Symbolic code labels *)
+type label = int (* Symbolic code labels *)
 
 type instruction =
-    Klabel of label
+  | Klabel of label
   | Kacc of int
   | Kenvacc of int
   | Kpush
   | Kpop of int
   | Kassign of int
   | Kpush_retaddr of label
-  | Kapply of int                       (* number of arguments *)
-  | Kappterm of int * int               (* number of arguments, slot size *)
-  | Kreturn of int                      (* slot size *)
+  | Kapply of int (* number of arguments *)
+  | Kappterm of int * int (* number of arguments, slot size *)
+  | Kreturn of int (* slot size *)
   | Krestart
-  | Kgrab of int                        (* number of arguments *)
+  | Kgrab of int (* number of arguments *)
   | Kclosure of label * int
   | Kclosurerec of label list * int
   | Koffsetclosure of int
@@ -92,8 +94,8 @@ type instruction =
   | Ksetglobal of Compilation_unit.t
   | Kgetpredef of Ident.t
   | Kconst of structured_constant
-  | Kmakeblock of int * int             (* size, tag *)
-  | Kmake_faux_mixedblock of int * int  (* size, tag *)
+  | Kmakeblock of int * int (* size, tag *)
+  | Kmake_faux_mixedblock of int * int (* size, tag *)
   | Kmakefloatblock of int
   | Kgetfield of int
   | Ksetfield of int
@@ -117,8 +119,18 @@ type instruction =
   | Kraise of raise_kind
   | Kcheck_signals
   | Kccall of string * int
-  | Knegint | Kaddint | Ksubint | Kmulint | Kdivint | Kmodint
-  | Kandint | Korint | Kxorint | Klslint | Klsrint | Kasrint
+  | Knegint
+  | Kaddint
+  | Ksubint
+  | Kmulint
+  | Kdivint
+  | Kmodint
+  | Kandint
+  | Korint
+  | Kxorint
+  | Klslint
+  | Klsrint
+  | Kasrint
   | Kintcomp of comparison
   | Koffsetint of int
   | Koffsetref of int
@@ -134,6 +146,7 @@ type instruction =
   | Kstop
 
 let immed_min = -0x40000000
+
 and immed_max = 0x3FFFFFFF
 
 (* Actually the abstract machine accommodates -0x80000000 to 0x7FFFFFFF,

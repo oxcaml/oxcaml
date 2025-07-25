@@ -1,17 +1,16 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
-open Lib;;
-type t = {
-  a : int;
-};;
+open Lib
 
-if { a = 7 }.a <> 7 then raise Not_found;;
+type t = { a : int };;
+
+if { a = 7 }.a <> 7 then raise Not_found
 
 (**
        0 CONSTINT 42

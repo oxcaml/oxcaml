@@ -24,22 +24,21 @@
 *)
 
 type t =
-    Lident of string
+  | Lident of string
   | Ldot of t * string
   | Lapply of t * t
 
-val flatten: t -> string list
-val unflatten: string list -> t option
+val flatten : t -> string list
+
 (** For a non-empty list [l], [unflatten l] is [Some lid] where [lid] is
     the long identifier created by concatenating the elements of [l]
     with [Ldot].
     [unflatten []] is [None].
 *)
+val unflatten : string list -> t option
 
-val last: t -> string
-val parse: string -> t
-[@@deprecated "this function may misparse its input,\n\
-use \"Parse.longident\" or \"Longident.unflatten\""]
+val last : t -> string
+
 (**
 
    This function is broken on identifiers that are not just "Word.Word.word";
@@ -56,3 +55,7 @@ use \"Parse.longident\" or \"Longident.unflatten\""]
    input-location support.
 
 *)
+val parse : string -> t
+  [@@deprecated
+    "this function may misparse its input,\n\
+     use \"Parse.longident\" or \"Longident.unflatten\""]

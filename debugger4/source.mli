@@ -18,7 +18,7 @@
 
 (*** Conversion function. ***)
 
-val source_of_module: Lexing.position -> string -> string
+val source_of_module : Lexing.position -> string -> string
 
 (*** buffer cache ***)
 
@@ -31,6 +31,7 @@ val flush_buffer_list : unit -> unit
 val get_buffer : Lexing.position -> string -> buffer
 
 val buffer_content : buffer -> string
+
 val buffer_length : buffer -> int
 
 (*** Position conversions. ***)
@@ -59,4 +60,4 @@ val pos_of_line : buffer -> int -> position
 val point_of_coord : buffer -> int -> int -> int
 
 (* Return the offsets of both line start and cnum for the passed position. *)
-val start_and_cnum : buffer -> Lexing.position -> (int * int)
+val start_and_cnum : buffer -> Lexing.position -> int * int

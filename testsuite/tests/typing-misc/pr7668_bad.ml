@@ -1,73 +1,68 @@
 (* TEST
- expect;
+   expect;
 *)
 
 let partition_map f xs =
- let rec part left right = function
-   | [] -> List.rev left, List.rev right
-   | x::xs ->
-       match f x with
-       | `Left v -> part (v::left) right xs
-       | `Right v -> part left (v::right) xs
- in
- part [] [] xs
-;;
+  let rec part left right = function
+    | [] -> List.rev left, List.rev right
+    | x :: xs -> (
+      match f x with
+      | `Left v -> part (v :: left) right xs
+      | `Right v -> part left (v :: right) xs)
+  in
+  part [] [] xs
 
-let f xs : (int list * int list) = partition_map (fun x -> if x then `Left ()
-else `Right ()) xs
-;;
-[%%expect{|
+let f xs : int list * int list =
+  partition_map (fun x -> if x then `Left () else `Right ()) xs
+
+[%%expect
+{|
 val partition_map :
   ('a -> [< `Left of 'b | `Right of 'c ]) -> 'a list -> 'b list * 'c list =
   <fun>
-Lines 12-13, characters 35-18:
-12 | ...................................partition_map (fun x -> if x then `Left ()
-13 | else `Right ()) xs
+Line 12, characters 2-63:
+12 |   partition_map (fun x -> if x then `Left () else `Right ()) xs
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "unit list * unit list"
        but an expression was expected of type "int list * int list"
        Type "unit" is not compatible with type "int"
 |}]
 
 module M : sig
-  type t = [
-    | `A of int
-    | `B of [ `BA | `BB of unit list ]
+  type t =
+    [ `A of int
+    | `B of [`BA | `BB of unit list]
     | `C of unit ]
 
   val a : t -> t
 end = struct
-  type t = [
-    | `A of int
-    | `B of [ `BA | `BB of unit list ]
+  type t =
+    [ `A of int
+    | `B of [`BA | `BB of unit list]
     | `C of unit ]
 
-let a b =
-  let f = function
-    | Ok x -> x
-    | Error _ -> `C ()
-  in
-  f (match b with
-      | `A pc ->
-        begin match pc with
-          | 1 -> Ok (`B `BA)
-          | _ -> Ok (`B (`BB [1;2;3]))
-        end
+  let a b =
+    let f = function Ok x -> x | Error _ -> `C () in
+    f
+      (match b with
+      | `A pc -> (
+        match pc with 1 -> Ok (`B `BA) | _ -> Ok (`B (`BB [1; 2; 3])))
       | _ -> assert false)
-
 end
-;;
-[%%expect{|
-Lines 8-27, characters 6-3:
+
+[%%expect
+{|
+Lines 8-21, characters 6-3:
  8 | ......struct
- 9 |   type t = [
-10 |     | `A of int
-11 |     | `B of [ `BA | `BB of unit list ]
+ 9 |   type t =
+10 |     [ `A of int
+11 |     | `B of [`BA | `BB of unit list]
 12 |     | `C of unit ]
 ...
-24 |         end
-25 |       | _ -> assert false)
-26 |
-27 | end
+18 |       | `A pc -> (
+19 |         match pc with 1 -> Ok (`B `BA) | _ -> Ok (`B (`BB [1; 2; 3])))
+20 |       | _ -> assert false)
+21 | end
 Error: Signature mismatch:
        Modules do not match:
          sig

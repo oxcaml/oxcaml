@@ -68,7 +68,10 @@
     marshalled ast files if no ppx is being used, ensuring we don't miss
     attributes in that case.
 *)
-type current_phase = Parser | Invariant_check
+type current_phase =
+  | Parser
+  | Invariant_check
+
 val register_attr : current_phase -> string Location.loc -> unit
 
 (** Marks the attributes hiding in the payload of another attribute used, for
@@ -120,42 +123,55 @@ val mark_deprecated_mutable_used : Parsetree.attributes -> unit
     Registering them helps detect code that is not checked,
     because it is optimized away by the middle-end.  *)
 val register_zero_alloc_attribute : string Location.loc -> unit
+
 val mark_zero_alloc_attribute_checked : string -> Location.t -> unit
+
 val warn_unchecked_zero_alloc_attribute : unit -> unit
 
 (** {2 Helpers for alert and warning attributes} *)
 
-val check_alerts: Location.t -> Parsetree.attributes -> string -> unit
-val check_alerts_inclusion:
-  def:Location.t -> use:Location.t -> Location.t -> Parsetree.attributes ->
-  Parsetree.attributes -> string -> unit
+val check_alerts : Location.t -> Parsetree.attributes -> string -> unit
+
+val check_alerts_inclusion :
+  def:Location.t ->
+  use:Location.t ->
+  Location.t ->
+  Parsetree.attributes ->
+  Parsetree.attributes ->
+  string ->
+  unit
 
 (** Find alerts (and mark them used, wrt misplaced attribute warnings) *)
-val alerts_of_attrs: Parsetree.attributes -> Misc.alerts
-val alerts_of_sig: mark:bool -> Parsetree.signature -> Misc.alerts
-val alerts_of_str: mark:bool -> Parsetree.structure -> Misc.alerts
+val alerts_of_attrs : Parsetree.attributes -> Misc.alerts
 
-val check_deprecated_mutable:
-    Location.t -> Parsetree.attributes -> string -> unit
-val check_deprecated_mutable_inclusion:
-  def:Location.t -> use:Location.t -> Location.t -> Parsetree.attributes ->
-  Parsetree.attributes -> string -> unit
+val alerts_of_sig : mark:bool -> Parsetree.signature -> Misc.alerts
 
-val error_of_extension: Parsetree.extension -> Location.error
+val alerts_of_str : mark:bool -> Parsetree.structure -> Misc.alerts
 
-val warning_attribute: ?ppwarning:bool -> Parsetree.attribute -> unit
-  (** Apply warning settings from the specified attribute.
+val check_deprecated_mutable :
+  Location.t -> Parsetree.attributes -> string -> unit
+
+val check_deprecated_mutable_inclusion :
+  def:Location.t ->
+  use:Location.t ->
+  Location.t ->
+  Parsetree.attributes ->
+  Parsetree.attributes ->
+  string ->
+  unit
+
+val error_of_extension : Parsetree.extension -> Location.error
+
+(** Apply warning settings from the specified attribute.
       "ocaml.warning"/"ocaml.warnerror" (and variants without the prefix) are
       processed and marked used for warning 53.  Other attributes are ignored.
 
       Also implement ocaml.ppwarning (unless ~ppwarning:false is
       passed).
   *)
+val warning_attribute : ?ppwarning:bool -> Parsetree.attribute -> unit
 
-val warning_scope:
-  ?ppwarning:bool ->
-  Parsetree.attributes -> (unit -> 'a) -> 'a
-  (** Execute a function in a new scope for warning settings.  This
+(** Execute a function in a new scope for warning settings.  This
       means that the effect of any call to [warning_attribute] during
       the execution of this function will be discarded after
       execution.
@@ -164,6 +180,8 @@ val warning_scope:
       with [warning_attribute] in the fresh scope before the function
       is executed.
   *)
+val warning_scope :
+  ?ppwarning:bool -> Parsetree.attributes -> (unit -> 'a) -> 'a
 
 (** {2 Helpers for searching for particular attributes} *)
 
@@ -182,7 +200,10 @@ val has_attribute : string -> Parsetree.attributes -> bool
     used only in some compiler configurations, it's important that we still look
     for it and mark it used when compiling with other configurations.
     Otherwise, we would issue spurious misplaced attribute warnings. *)
-type attr_action = Mark_used_only | Return
+type attr_action =
+  | Mark_used_only
+  | Return
+
 val select_attributes :
   (string * attr_action) list -> Parsetree.attributes -> Parsetree.attributes
 
@@ -193,15 +214,18 @@ val select_attributes :
     or [select_attributes]. *)
 val attr_equals_builtin : Parsetree.attribute -> string -> bool
 
-val warn_on_literal_pattern: Parsetree.attributes -> bool
-val explicit_arity: Parsetree.attributes -> bool
+val warn_on_literal_pattern : Parsetree.attributes -> bool
 
-val has_unboxed: Parsetree.attributes -> bool
-val has_boxed: Parsetree.attributes -> bool
+val explicit_arity : Parsetree.attributes -> bool
+
+val has_unboxed : Parsetree.attributes -> bool
+
+val has_boxed : Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 
 val parse_standard_interface_attributes : Parsetree.attribute -> unit
+
 val parse_standard_implementation_attributes : Parsetree.attribute -> unit
 
 (** The attribute placed on the inner [Ptyp_arrow] node in [x -> (y -> z)]
@@ -210,15 +234,20 @@ val parse_standard_implementation_attributes : Parsetree.attribute -> unit
     [local_ x -> y -> z].
 *)
 val curry_attr_name : string
+
 val curry_attr : Location.t -> Parsetree.attribute
 
-val has_local_opt: Parsetree.attributes -> bool
-val has_layout_poly: Parsetree.attributes -> bool
-val has_curry: Parsetree.attributes -> bool
+val has_local_opt : Parsetree.attributes -> bool
+
+val has_layout_poly : Parsetree.attributes -> bool
+
+val has_curry : Parsetree.attributes -> bool
+
 val has_or_null_reexport : Parsetree.attributes -> bool
 
-val tailcall : Parsetree.attributes ->
-    ([`Tail|`Nontail|`Tail_if_possible] option, [`Conflict]) result
+val tailcall :
+  Parsetree.attributes ->
+  ([`Tail | `Nontail | `Tail_if_possible] option, [`Conflict]) result
 
 (* CR layouts v1.5: Remove everything except for [Immediate64] and [Immediate]
    after rerouting [@@immediate]. *)
@@ -227,6 +256,7 @@ type jkind_attribute =
   | Immediate
 
 val jkind_attribute_to_string : jkind_attribute -> string
+
 val jkind_attribute_of_string : string -> jkind_attribute option
 
 (* [jkind] gets the first jkind in the attributes if one is present.  All such
@@ -260,7 +290,7 @@ val get_int_payload : Parsetree.payload -> (int, unit) Result.t
     constant rather than an int constant, and returns [None] rather than [Error]
     if the payload is empty. *)
 val get_optional_bool_payload :
-    Parsetree.payload -> (bool option, unit) Result.t
+  Parsetree.payload -> (bool option, unit) Result.t
 
 (** [parse_id_payload] is a helper for parsing information from an attribute
    whose payload is an identifier. If the given payload consists of a single
@@ -268,33 +298,37 @@ val get_optional_bool_payload :
    is returned, if it exists.  The [empty] value is returned if the payload is
    empty.  Otherwise, [Error ()] is returned and a warning is issued. *)
 val parse_optional_id_payload :
-  string -> Location.t -> empty:'a -> (string * 'a) list ->
-  Parsetree.payload -> ('a,unit) Result.t
+  string ->
+  Location.t ->
+  empty:'a ->
+  (string * 'a) list ->
+  Parsetree.payload ->
+  ('a, unit) Result.t
 
 (* Support for zero_alloc *)
 type zero_alloc_check =
-  { strict: bool;
+  { strict : bool;
     (* [strict=true] property holds on all paths.
        [strict=false] if the function returns normally,
        then the property holds (but property violations on
        exceptional returns or diverging loops are ignored).
        This definition may not be applicable to new properties. *)
-    opt: bool;
-    arity: int;
-    loc: Location.t;
-    custom_error_msg : string option;
+    opt : bool;
+    arity : int;
+    loc : Location.t;
+    custom_error_msg : string option
   }
 
 type zero_alloc_assume =
-  { strict: bool;
-    never_returns_normally: bool;
-    never_raises: bool;
+  { strict : bool;
+    never_returns_normally : bool;
+    never_raises : bool;
     (* [never_raises=true] the function never returns
        via an exception. The function (directly or transitively)
        may raise exceptions that do not escape, i.e.,
        handled before the function returns. *)
-    arity: int;
-    loc: Location.t;
+    arity : int;
+    loc : Location.t
   }
 
 type zero_alloc_attribute =
@@ -309,7 +343,10 @@ val is_zero_alloc_check_enabled : opt:bool -> bool
    "arity n" field is allowed, and whether we track this attribute for
    warning 199. *)
 val get_zero_alloc_attribute :
-  in_signature:bool -> on_application:bool-> default_arity:int -> Parsetree.attributes ->
+  in_signature:bool ->
+  on_application:bool ->
+  default_arity:int ->
+  Parsetree.attributes ->
   zero_alloc_attribute
 
 (* This returns the [zero_alloc_assume] if the input is an assume.  Otherwise,
@@ -324,13 +361,14 @@ val zero_alloc_attribute_only_assume_allowed :
    zero_alloc.  Note that "inferred" assume annotations are different assume annotations
    "propagated" by the compiler from function definition to all primitives in the
    function's body (via scopes / debug info). *)
-val assume_zero_alloc : inferred:bool -> zero_alloc_assume -> Zero_alloc_utils.Assume_info.t
+val assume_zero_alloc :
+  inferred:bool -> zero_alloc_assume -> Zero_alloc_utils.Assume_info.t
 
 type tracing_probe =
   { name : string;
     name_loc : Location.t;
     enabled_at_init : bool;
-    arg : Parsetree.expression;
+    arg : Parsetree.expression
   }
 
 (* Gets the payload of a [probe] extension node. Example syntax of a probe

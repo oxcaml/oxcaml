@@ -1,41 +1,56 @@
 (* TEST *)
 
 let test n check res =
-  print_string "Test "; print_int n;
+  print_string "Test ";
+  print_int n;
   if check res then print_string " passed.\n" else print_string " FAILED.\n";
   flush stderr
 
 let eq0 = function 0 -> true | _ -> false
+
 let eqm1 = function -1 -> true | _ -> false
+
 let eq1 = function 1 -> true | _ -> false
-let eqtrue (b:bool) = b
-let eqftffff =
-  function (false,true,false,false,false,false) -> true | _ -> false
+
+let eqtrue (b : bool) = b
+
+let eqftffff = function
+  | false, true, false, false, false, false -> true
+  | _ -> false
 
 let eqfun delayed_check =
   match delayed_check () with
   | exception Invalid_argument _ -> true
   | _ -> false
 
-let x = [1;2;3]
+let x = [1; 2; 3]
 
 let f x = 1 :: 2 :: 3 :: x
 
 let mklist len =
   let l = ref [] in
-  for i = 1 to len do l := i :: !l done;
+  for i = 1 to len do
+    l := i :: !l
+  done;
   !l
 
-type tree = Dummy | Leaf | Node of tree * tree
+type tree =
+  | Dummy
+  | Leaf
+  | Node of tree * tree
 
 let rec mktree depth =
-  if depth <= 0 then Leaf else Node(mktree(depth - 1), mktree(depth - 1))
+  if depth <= 0 then Leaf else Node (mktree (depth - 1), mktree (depth - 1))
 
-type 'a leftlist = Nil | Cons of 'a leftlist * 'a
+type 'a leftlist =
+  | Nil
+  | Cons of 'a leftlist * 'a
 
 let mkleftlist len =
   let l = ref Nil in
-  for i = 1 to len do l := Cons(!l, i) done;
+  for i = 1 to len do
+    l := Cons (!l, i)
+  done;
   !l
 
 (* use an existential to check equality with different tags *)
@@ -53,22 +68,22 @@ let _ =
   test 9 eqm1 (compare "abcdef" "foo");
   test 10 eqm1 (compare "abcdefghij" "abcdefghijkl");
   test 11 eq1 (compare "abcdefghij" "abcdefghi");
-  test 12 eq0 (compare (0,1) (0,1));
-  test 13 eqm1 (compare (0,1) (0,2));
-  test 14 eqm1 (compare (0,1) (1,0));
-  test 15 eq1 (compare (0,1) (0,0));
-  test 16 eq1 (compare (1,0) (0,1));
+  test 12 eq0 (compare (0, 1) (0, 1));
+  test 13 eqm1 (compare (0, 1) (0, 2));
+  test 14 eqm1 (compare (0, 1) (1, 0));
+  test 15 eq1 (compare (0, 1) (0, 0));
+  test 16 eq1 (compare (1, 0) (0, 1));
   test 17 eq0 (compare 0.0 0.0);
   test 18 eqm1 (compare 0.0 1.0);
   test 19 eqm1 (compare (-1.0) 0.0);
   test 20 eq0 (compare [| 0.0; 1.0; 2.0 |] [| 0.0; 1.0; 2.0 |]);
   test 21 eqm1 (compare [| 0.0; 1.0; 2.0 |] [| 0.0; 1.0; 3.0 |]);
   test 22 eq1 (compare [| 0.0; 5.0; 2.0 |] [| 0.0; 1.0; 2.0 |]);
-  test 23 eq0 (compare [1;2;3;4] [1;2;3;4]);
-  test 24 eqm1 (compare [1;2;3;4] [1;2;5;6]);
-  test 25 eqm1 (compare [1;2;3;4] [1;2;3;4;5]);
-  test 26 eq1 (compare [1;2;3;4] [1;2;3]);
-  test 27 eq1 (compare [1;2;3;4] [1;2;0;4]);
+  test 23 eq0 (compare [1; 2; 3; 4] [1; 2; 3; 4]);
+  test 24 eqm1 (compare [1; 2; 3; 4] [1; 2; 5; 6]);
+  test 25 eqm1 (compare [1; 2; 3; 4] [1; 2; 3; 4; 5]);
+  test 26 eq1 (compare [1; 2; 3; 4] [1; 2; 3]);
+  test 27 eq1 (compare [1; 2; 3; 4] [1; 2; 0; 4]);
   test 28 eq0 (compare (mklist 1000) (mklist 1000));
   test 29 eq0 (compare (mkleftlist 1000) (mkleftlist 1000));
   test 30 eq0 (compare (mktree 12) (mktree 12));
@@ -80,8 +95,10 @@ let _ =
   test 36 eqm1 (compare (0.0, nan) (0.0, 0.0));
   test 37 eqm1 (compare (0.0, nan) (0.0, neg_infinity));
   test 38 eq0 (compare (nan, 0.0) (nan, 0.0));
-  let cmpgen x y = (x=y, x<>y, x<y, x<=y, x>y, x>=y) in
-  let cmpfloat (x:float) (y:float) = (x=y, x<>y, x<y, x<=y, x>y, x>=y) in
+  let cmpgen x y = x = y, x <> y, x < y, x <= y, x > y, x >= y in
+  let cmpfloat (x : float) (y : float) =
+    x = y, x <> y, x < y, x <= y, x > y, x >= y
+  in
   test 39 eqftffff (cmpgen nan nan);
   test 40 eqftffff (cmpgen nan 0.0);
   test 41 eqftffff (cmpfloat nan nan);
@@ -89,23 +106,48 @@ let _ =
   test 43 eqtrue ([||] = [||]);
   (* Convoluted forms to test both the "positive" and "negative" cases
      of float tests *)
-  let cmpfloatpos (x:float) (y:float) =
-    ((let r = ref false in (if x = y then r := true); !r),
-     (let r = ref false in (if x <> y then r := true); !r),
-     (let r = ref false in (if x < y then r := true); !r),
-     (let r = ref false in (if x <= y then r := true); !r),
-     (let r = ref false in (if x > y then r := true); !r),
-     (let r = ref false in (if x >= y then r := true); !r))
-  and cmpfloatneg (x:float) (y:float) =
-    ((let r = ref true in (if not (x = y) then r := false); !r),
-     (let r = ref true in (if not (x <> y) then r := false); !r),
-     (let r = ref true in (if not (x < y) then r := false); !r),
-     (let r = ref true in (if not (x <= y) then r := false); !r),
-     (let r = ref true in (if not (x > y) then r := false); !r),
-     (let r = ref true in (if not (x >= y) then r := false); !r)) in
+  let cmpfloatpos (x : float) (y : float) =
+    ( (let r = ref false in
+       if x = y then r := true;
+       !r),
+      (let r = ref false in
+       if x <> y then r := true;
+       !r),
+      (let r = ref false in
+       if x < y then r := true;
+       !r),
+      (let r = ref false in
+       if x <= y then r := true;
+       !r),
+      (let r = ref false in
+       if x > y then r := true;
+       !r),
+      let r = ref false in
+      if x >= y then r := true;
+      !r )
+  and cmpfloatneg (x : float) (y : float) =
+    ( (let r = ref true in
+       if not (x = y) then r := false;
+       !r),
+      (let r = ref true in
+       if not (x <> y) then r := false;
+       !r),
+      (let r = ref true in
+       if not (x < y) then r := false;
+       !r),
+      (let r = ref true in
+       if not (x <= y) then r := false;
+       !r),
+      (let r = ref true in
+       if not (x > y) then r := false;
+       !r),
+      let r = ref true in
+      if not (x >= y) then r := false;
+      !r )
+  in
   let testcmpfloat x y =
-    cmpfloatpos x y = cmpgen x y &&
-    cmpfloatneg x y = cmpgen x y in
+    cmpfloatpos x y = cmpgen x y && cmpfloatneg x y = cmpgen x y
+  in
   test 50 eqtrue (testcmpfloat nan nan);
   test 51 eqtrue (testcmpfloat nan 0.0);
   test 52 eqtrue (testcmpfloat 0.0 nan);
@@ -114,22 +156,16 @@ let _ =
   test 55 eqtrue (testcmpfloat 0.0 1.0);
   test 56 eqfun (fun () -> compare (fun x -> x) (fun x -> x));
   test 57 eqfun (fun () ->
-    (* #9521 *)
-    let rec f x = g x and g x = f x in compare f g);
-
+      (* #9521 *)
+      let rec f x = g x and g x = f x in
+      compare f g);
   (* this is the current behavior of comparison
      with values of incoherent types (packed below
      an existential), but it may not be the only specification. *)
-  test 58 eqm1
-    (compare (Any 0) (Any 2));
-  begin
-    (* comparing two function fails *)
-    test 59 eqfun (fun () ->
-      compare (Any (fun x -> x)) (Any (fun x -> x + 1)));
-    (* comparing a function and a non-function succeeds *)
-    test 60 (Fun.negate eq0)
-      (compare (Any (fun x -> x)) (Any 0));
-    test 61 (Fun.negate eq0)
-      (compare (Any 0) (Any (fun x -> x)));
-  end;
+  test 58 eqm1 (compare (Any 0) (Any 2));
+  (* comparing two function fails *)
+  test 59 eqfun (fun () -> compare (Any (fun x -> x)) (Any (fun x -> x + 1)));
+  (* comparing a function and a non-function succeeds *)
+  test 60 (Fun.negate eq0) (compare (Any (fun x -> x)) (Any 0));
+  test 61 (Fun.negate eq0) (compare (Any 0) (Any (fun x -> x)));
   ()

@@ -14,6 +14,4 @@ let rec f =
 (* Original bug report: unused function *)
 let rec foo =
   let _f x = x, foo in
-  function
-  | None -> foo None
-  | Some x -> x
+  function None -> foo None | Some x -> x

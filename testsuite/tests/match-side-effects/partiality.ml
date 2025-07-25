@@ -1,19 +1,25 @@
 (* TEST
- flags = "-dlambda";
- stack-allocation;
- expect;
+   flags = "-dlambda";
+   stack-allocation;
+   expect;
 *)
 
 (* The original example of unsoundness in #7421. *)
-type t = {a: bool; mutable b: int option}
+type t =
+  { a : bool;
+    mutable b : int option
+  }
 
 let f x =
   match x with
-  | {a = false; b = _} -> 0
-  | {a = _;     b = None} -> 1
-  | {a = _;     b = _} when (x.b <- None; false) -> 2
-  | {a = true;  b = Some y} -> y
-;;
+  | { a = false; b = _ } -> 0
+  | { a = _; b = None } -> 1
+  | { a = _; b = _ }
+    when x.b <- None;
+         false ->
+    2
+  | { a = true; b = Some y } -> y
+
 (* Correctness condition: there should either be a single
    (field_mut 1) access, or the second access should include
    a Match_failure case.
@@ -21,7 +27,8 @@ let f x =
    FAIL: the second occurrence of (field_mut 1) is used with a direct
    (field_imm 0) access without a constructor check. The compiler is
    unsound here. *)
-[%%expect {|
+[%%expect
+{|
 0
 type t = { a : bool; mutable b : int option; }
 (let
@@ -39,20 +46,22 @@ type t = { a : bool; mutable b : int option; }
 val f : t -> int = <fun>
 |}]
 
-
-
 (* A simple example of a complete switch
    inside a mutable position. *)
-type t = {a: bool; mutable b: int option}
+type t =
+  { a : bool;
+    mutable b : int option
+  }
 
 let f x =
   match x with
-  | {a = false; b = _} -> 0
-  | {a = _;     b = None} -> 1
-  | {a = true;  b = Some y} -> y
-;;
+  | { a = false; b = _ } -> 0
+  | { a = _; b = None } -> 1
+  | { a = true; b = Some y } -> y
+
 (* Performance expectation: there should not be a Match_failure case. *)
-[%%expect {|
+[%%expect
+{|
 0
 type t = { a : bool; mutable b : int option; }
 (let
@@ -66,16 +75,17 @@ type t = { a : bool; mutable b : int option; }
 val f : t -> int = <fun>
 |}]
 
-
-
 (* A variant of the #7421 example. *)
 let f r =
   match Some r with
   | Some { contents = None } -> 0
-  | _ when (r := None; false) -> 1
+  | _
+    when r := None;
+         false ->
+    1
   | Some { contents = Some n } -> n
   | None -> 3
-;;
+
 (* Correctness condition: there should either be a single
    (field_mut 1) access, or the second access should include
    a Match_failure case.
@@ -83,7 +93,8 @@ let f r =
    FAIL: the second occurrence of (field_mut 0) is used with a direct
    (field_imm 0) access without a constructor check. The compiler is
    unsound here. *)
-[%%expect {|
+[%%expect
+{|
 (let
   (f/309 =
      (function {nlocal = 0} r/310 : int
@@ -107,19 +118,18 @@ let f r =
 val f : int option ref -> int = <fun>
 |}]
 
-
-
 (* This example has an ill-typed counter-example: the type-checker
    finds it Total, but the pattern-matching compiler cannot see that
    (Some (Some (Bool b))) cannot occur. *)
-type _ t = Int : int -> int t | Bool : bool -> bool t
+type _ t =
+  | Int : int -> int t
+  | Bool : bool -> bool t
 
-let test = function
-  | None -> 0
-  | Some (Int n) -> n
-;;
+let test = function None -> 0 | Some (Int n) -> n
+
 (* Performance expectation: there should not be a Match_failure case. *)
-[%%expect {|
+[%%expect
+{|
 0
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
@@ -131,17 +141,19 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
 val test : int t option -> int = <fun>
 |}]
 
-
 (* This example has an ill-typed counter-example, inside
-   a mutable position.  *)
-type _ t = Int : int -> int t | Bool : bool -> bool t
+   a mutable position. *)
+type _ t =
+  | Int : int -> int t
+  | Bool : bool -> bool t
 
 let test = function
   | { contents = None } -> 0
   | { contents = Some (Int n) } -> n
-;;
+
 (* Performance expectation: there should not be a Match_failure case. *)
-[%%expect {|
+[%%expect
+{|
 0
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
@@ -153,20 +165,21 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
 val test : int t option ref -> int = <fun>
 |}]
 
-
-
 (* This example has a ill-typed counter-example,
    and also mutable sub-patterns, but in different places. *)
-type _ t = Int : int -> int t | Bool : bool -> bool t
+type _ t =
+  | Int : int -> int t
+  | Bool : bool -> bool t
 
 let test n =
   match Some (ref true, Int 42) with
   | Some ({ contents = true }, Int n) -> n
   | Some ({ contents = false }, Int n) -> -n
   | None -> 3
-;;
+
 (* Performance expectation: there should not be a Match_failure case. *)
-[%%expect {|
+[%%expect
+{|
 0
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let

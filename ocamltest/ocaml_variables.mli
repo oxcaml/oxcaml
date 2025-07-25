@@ -23,8 +23,8 @@ val arch : Variables.t
 
 val binary_modules : Variables.t
 
-val bytecc_libs : Variables.t
 (** Libraries to link with for bytecode *)
+val bytecc_libs : Variables.t
 
 val cpp : Variables.t
 
@@ -68,33 +68,39 @@ val last_flags : Variables.t
 
 val libraries : Variables.t
 
-val mkdll : Variables.t
 (** Command used to make a DLL *)
+val mkdll : Variables.t
 
-val mkexe : Variables.t
 (** Command used to build an executable program *)
+val mkexe : Variables.t
 
 val module_ : Variables.t
 
 val modules : Variables.t
 
-val nativecc_libs : Variables.t
 (** Libraries to link with for native code *)
+val nativecc_libs : Variables.t
 
 val objext : Variables.t
+
 val libext : Variables.t
+
 val asmext : Variables.t
 
 val ocamlc_byte : Variables.t
+
 val ocamlopt_byte : Variables.t
+
 val ocamlrun : Variables.t
 
 val ocamlc_flags : Variables.t
+
 val ocamlc_default_flags : Variables.t
 
 val ocamllex_flags : Variables.t
 
 val ocamlopt_flags : Variables.t
+
 val ocamlopt_default_flags : Variables.t
 
 val ocamlyacc_flags : Variables.t
@@ -124,9 +130,13 @@ val ocamldebug_script : Variables.t
 val os_type : Variables.t
 
 val ocamldoc_flags : Variables.t
+
 val ocamldoc_backend : Variables.t
+
 val ocamldoc_exit_status : Variables.t
+
 val ocamldoc_output : Variables.t
+
 val ocamldoc_reference : Variables.t
 
 val ocaml_script_as_argument : Variables.t

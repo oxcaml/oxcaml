@@ -1,8 +1,8 @@
 (* TEST
- ocamldoc with html;
+   ocamldoc with html;
 *)
 
 open String
 
 (** This is a documentation comment for [x], not a module preamble. *)
-val x: unit
+val x : unit

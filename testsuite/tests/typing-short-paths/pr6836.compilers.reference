@@ -1,6 +1,5 @@
-type t = [ `A | `B ]
-type 'a u = t
-val a : [< t > `A ] = `A
-type 'a s = 'a
-val b : [< t > `B ] = `B
+
+
+Line 17, characters 0-0:
+Error: Syntax error
 

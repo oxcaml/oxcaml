@@ -1,7 +1,11 @@
 (* TEST *)
 
 let assert_raise_invalid_argument f v =
-  assert (try ignore (f v); false with Invalid_argument _ -> true)
+  assert (
+    try
+      ignore (f v);
+      false
+    with Invalid_argument _ -> true)
 
 let test_constants () =
   assert (Uchar.(to_int min) = 0x0000);
@@ -67,7 +71,7 @@ let test_equal () =
 let test_compare () =
   assert (Uchar.(compare min min) = 0);
   assert (Uchar.(compare max max) = 0);
-  assert (Uchar.(compare min max) = (-1));
+  assert (Uchar.(compare min max) = -1);
   assert (Uchar.(compare max min) = 1);
   ()
 

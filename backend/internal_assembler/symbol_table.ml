@@ -24,7 +24,6 @@
 [@@@ocaml.warning "-27-32"]
 
 open! Int_replace_polymorphic_compare
-
 open X86_binary_emitter
 module String = Misc.Stdlib.String
 
@@ -98,18 +97,18 @@ let get_label t name = String.Tbl.find t.labels_tbl name
 
 let get_label_idx t name =
   let label, symbol = get_label t name in
-  let idx = (IntTbl.find t.section_symbol_tbl (Symbol_entry.get_shndx symbol)) + 1 in
+  let idx =
+    IntTbl.find t.section_symbol_tbl (Symbol_entry.get_shndx symbol) + 1
+  in
   label, idx
 
 let get_symbol_idx_opt t name =
   match String.Tbl.find_opt t.global_symbols_tbl name with
   | Some idx -> Some (t.local_num_symbols + idx + 1)
-  | None ->
-    begin match String.Tbl.find_opt t.weak_symbols_tbl name with
+  | None -> (
+    match String.Tbl.find_opt t.weak_symbols_tbl name with
     | Some idx -> Some (t.local_num_symbols + t.global_num_symbols + idx + 1)
-    | None ->
-      String.Tbl.find_opt t.local_symbols_tbl name |> Option.map succ
-    end
+    | None -> String.Tbl.find_opt t.local_symbols_tbl name |> Option.map succ)
 
 let num_symbols t =
   t.local_num_symbols + t.global_num_symbols + t.weak_num_symbols + 1
@@ -143,4 +142,5 @@ let write t sh_offset buf =
     (fun i symbol ->
       let idx = ((i + 1) * 24) + Int64.to_int sh_offset in
       Symbol_entry.write symbol (Compiler_owee.Owee_buf.cursor buf ~at:idx))
-    (List.rev t.local_symbols @ List.rev t.global_symbols @ List.rev t.weak_symbols)
+    (List.rev t.local_symbols @ List.rev t.global_symbols
+   @ List.rev t.weak_symbols)

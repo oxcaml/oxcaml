@@ -1,16 +1,18 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module M : sig
   val x : bool * int
 end = struct
-  let x = false , "not an int"
+  let x = false, "not an int"
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let x = false , "not an int"
+4 |   let x = false, "not an int"
 5 | end
 Error: Signature mismatch:
        Modules do not match:
@@ -30,7 +32,9 @@ module T : sig
 end = struct
   let f x = x + List.length [0.0, Some true]
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f x = x + List.length [0.0, Some true]
@@ -51,14 +55,16 @@ Error: Signature mismatch:
 
 (* Alpha-equivalence *)
 module T : sig
-  val f : ('a list * 'b list -> int)
+  val f : 'a list * 'b list -> int
 end = struct
-  let f : ('c list * 'd option  -> int) = assert false
+  let f : 'c list * 'd option -> int = assert false
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f : ('c list * 'd option  -> int) = assert false
+4 |   let f : 'c list * 'd option -> int = assert false
 5 | end
 Error: Signature mismatch:
        Modules do not match:
@@ -79,7 +85,9 @@ module T : sig
 end = struct
   type t = bool * float
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type t = bool * float

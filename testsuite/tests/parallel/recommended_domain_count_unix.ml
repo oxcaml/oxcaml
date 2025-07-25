@@ -1,12 +1,12 @@
 (* TEST
- runtime5;
- include unix;
- hasunix;
- {
-   bytecode;
- }{
-   native;
- }
+   runtime5;
+   include unix;
+   hasunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let try_ext cmd =
@@ -19,16 +19,17 @@ let try_ext cmd =
 (* Try to guess the number of cpus via an external method. If we
    can't, assume it passed since we have nothing to compare against *)
 let _ =
-  List.iter (fun cmd ->
+  List.iter
+    (fun cmd ->
       match try_ext cmd with
       | None -> ()
       | Some n ->
-          let recommended_domain_count =
-            Domain.recommended_domain_count () in
-          if recommended_domain_count > n then
-            failwith
-              (Printf.sprintf
-                 "external tool %s says n=%d, recommended domain says=%d\n"
-                 cmd n recommended_domain_count))
+        let recommended_domain_count = Domain.recommended_domain_count () in
+        if recommended_domain_count > n
+        then
+          failwith
+            (Printf.sprintf
+               "external tool %s says n=%d, recommended domain says=%d\n" cmd n
+               recommended_domain_count))
     ["nproc"; "sysctl -n hw.ncpu"];
   print_string "passed\n"

@@ -1,29 +1,30 @@
 (* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
-
-
-
+   (* Blank lines added here to preserve locations. *)
 *)
 
-let a = (fun x -> x) [@inline] (* accepted *)
-let b = (fun x -> x) [@inline never] (* accepted *)
-let c = (fun x -> x) [@inline always] (* accepted *)
-let d = (fun x -> x) [@inline malformed attribute] (* rejected *)
-let e = (fun x -> x) [@inline malformed_attribute] (* rejected *)
-let f = (fun x -> x) [@inline : malformed_attribute] (* rejected *)
-let g = (fun x -> x) [@inline ? malformed_attribute] (* rejected *)
+let a = fun [@inline] x -> x (* accepted *)
+
+let b = fun [@inline never] x -> x (* accepted *)
+
+let c = fun [@inline always] x -> x (* accepted *)
+
+let d = fun [@inline malformed attribute] x -> x (* rejected *)
+
+let e = fun [@inline malformed_attribute] x -> x (* rejected *)
+
+let f = fun [@inline: malformed_attribute] x -> x (* rejected *)
+
+let g = fun [@inline? malformed_attribute] x -> x (* rejected *)
 
 let h x = (a [@inlined]) x (* accepted *)
+
 let i x = (a [@inlined never]) x (* accepted *)
+
 let j x = (a [@inlined always]) x (* accepted *)
+
 let k x = (a [@inlined malformed]) x (* rejected *)
 
 let l x = x [@@inline] (* accepted *)
-
 
 let test x =
   let[@local always] f1 x = x (* ok *) in
@@ -33,17 +34,14 @@ let test x =
   let[@local] f5 x = f1 x (* ok *) in
   let[@local] f6 x = 3 * x (* ok *) in
   let r =
-    if x = 1 then f1 x
-    else if x = 2 then f4 x
-    else if x = 3 then f1 x
-    else f5 x
+    if x = 1 then f1 x else if x = 2 then f4 x else if x = 3 then f1 x else f5 x
   in
   f4 (f6 r)
 
 (* TEST
- flags = "-w +A-70";
- setup-ocamlc.byte-build-env;
- compile_only = "true";
- ocamlc.byte;
- check-ocamlc.byte-output;
+   flags = "-w +A-70";
+   setup-ocamlc.byte-build-env;
+   compile_only = "true";
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)

@@ -1,12 +1,12 @@
 module Make (Endpoint : Range_intf.Endpoint_intf) :
-  Range_intf.S with module Endpoint = Endpoint
-= struct
+  Range_intf.S with module Endpoint = Endpoint = struct
   module Endpoint = Endpoint
 
-  type finite = [ `Before of Endpoint.t ]
-  type infinite = [ `Until_infinity ]
+  type finite = [`Before of Endpoint.t]
 
-  type +'a range = { until : 'a } constraint 'a = [< finite | infinite ]
+  type infinite = [`Until_infinity]
+
+  type +'a range = { until : 'a } constraint 'a = [< finite | infinite]
 
   let until r = r.until
 

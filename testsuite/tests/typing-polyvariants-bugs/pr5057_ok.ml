@@ -1,14 +1,18 @@
 (* TEST
- flags = " -w -a ";
- setup-ocamlc.byte-build-env;
- ocamlc.byte;
- check-ocamlc.byte-output;
+   flags = " -w -a ";
+   setup-ocamlc.byte-build-env;
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)
 
 (* PR5057 *)
 
 module TT = struct
-  module IntSet = Set.Make(struct type t = int let compare = compare end)
+  module IntSet = Set.Make (struct
+    type t = int
+
+    let compare = compare
+  end)
 end
 
 let () =

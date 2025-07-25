@@ -26,6 +26,7 @@ module Int : sig
 
   (** [zero_to_n n] is the set of numbers \{0, ..., n\} (inclusive). *)
   val zero_to_n : int -> Set.t
+
   val to_string : int -> string
 end
 
@@ -33,10 +34,13 @@ module Int8 : sig
   type t
 
   val zero : t
+
   val one : t
 
   val of_int_exn : int -> t
+
   val to_int : t -> int
+
   val print : Format.formatter -> t -> unit
 end
 
@@ -60,12 +64,15 @@ module Int16 : sig
   type t
 
   val zero : t
+
   val one : t
 
   val of_int_exn : int -> t
+
   val of_int64_exn : Int64.t -> t
 
   val to_int : t -> int
+
   val print : Format.formatter -> t -> unit
 end
 
@@ -121,11 +128,8 @@ module Uint64 : sig
   include Identifiable.S with type t := t
 end
 
-
 module Float : Identifiable.S with type t = float
 
 module Int64 : sig
-
-  val to_int32_exn: int64 -> int32
-
+  val to_int32_exn : int64 -> int32
 end

@@ -29,61 +29,80 @@ module Scoped_location : sig
 
   type scopes = private
     | Empty
-    | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
-               assume_zero_alloc: ZA.Assume_info.t}
+    | Cons of
+        { item : scope_item;
+          str : string;
+          str_fun : string;
+          name : string;
+          prev : scopes;
+          assume_zero_alloc : ZA.Assume_info.t
+        }
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
   val compilation_unit : scopes -> Compilation_unit.t option
 
   val empty_scopes : scopes
+
   val enter_anonymous_function :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
+
   val enter_value_definition :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> Ident.t -> scopes
+
   val enter_compilation_unit : scopes:scopes -> Compilation_unit.t -> scopes
+
   val enter_module_definition : scopes:scopes -> Ident.t -> scopes
+
   val enter_class_definition : scopes:scopes -> Ident.t -> scopes
+
   val enter_method_definition : scopes:scopes -> Asttypes.label -> scopes
+
   val enter_lazy : scopes:scopes -> scopes
+
   val enter_partial_or_eta_wrapper : scopes:scopes -> scopes
+
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
+
   val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t
 
   type t =
     | Loc_unknown
     | Loc_known of
         { loc : Location.t;
-          scopes : scopes; }
+          scopes : scopes
+        }
 
   val of_location : scopes:scopes -> Location.t -> t
+
   val to_location : t -> Location.t
+
   val string_of_scoped_location : include_zero_alloc:bool -> t -> string
 
   val map_scopes : (scopes:scopes -> scopes) -> t -> t
 end
 
-type item = private {
-  dinfo_file: string;
-  dinfo_line: int;
-  dinfo_char_start: int;
-  dinfo_char_end: int;
-  dinfo_start_bol: int;
-  dinfo_end_bol: int;
-  dinfo_end_line: int;
-  dinfo_scopes: Scoped_location.scopes;
-  (** See the [Inlined_debuginfo] module in Flambda 2 for an explanation
+type item = private
+  { dinfo_file : string;
+    dinfo_line : int;
+    dinfo_char_start : int;
+    dinfo_char_end : int;
+    dinfo_start_bol : int;
+    dinfo_end_bol : int;
+    dinfo_end_line : int;
+    dinfo_scopes : Scoped_location.scopes;
+        (** See the [Inlined_debuginfo] module in Flambda 2 for an explanation
       of the uid and function symbol fields.  (They are used for generation
       of DWARF inlined frame information.)  These fields should only be
       set to [Some] by Flambda 2. *)
-  dinfo_uid: string option;
-  dinfo_function_symbol: string option;
-  dinfo_dir: string option;
-}
+    dinfo_uid : string option;
+    dinfo_function_symbol : string option;
+    dinfo_dir : string option
+  }
 
-val item_with_uid_and_function_symbol : item -> dinfo_uid:string option
-  -> dinfo_function_symbol:string option -> item
+val item_with_uid_and_function_symbol :
+  item -> dinfo_uid:string option -> dinfo_function_symbol:string option -> item
 
 type t
 
@@ -131,9 +150,10 @@ module Dbg : sig
   val compare_outer_first : t -> t -> int
 
   val hash : t -> int
+
   val to_list : t -> item list
+
   val length : t -> int
 end
 
 val get_dbg : t -> Dbg.t
-

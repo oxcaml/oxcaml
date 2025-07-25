@@ -2,11 +2,10 @@
 
 (* See PR#10339 *)
 
-let access (a: string array) n =
+let access (a : string array) n =
   try
-    ignore (a.(n)); -1
-  with _ ->
-    n
+    ignore a.(n);
+    -1
+  with _ -> n
 
-let _ =
-  assert (access [||] 1 = 1)
+let _ = assert (access [||] 1 = 1)

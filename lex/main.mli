@@ -15,5 +15,5 @@
 
 (* The lexer generator. Command-line parsing. *)
 
-val main : unit -> unit
 (** The entry point for ocamllex *)
+val main : unit -> unit

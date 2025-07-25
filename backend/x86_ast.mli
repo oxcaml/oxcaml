@@ -18,14 +18,22 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 type condition =
-  | L | GE     (* signed comparisons: less/greater *)
-  | LE | G
-  | B | AE     (* unsigned comparisons: below/above *)
-  | BE | A
-  | E | NE     (* equal *)
-  | O | NO     (* overflow *)
-  | S | NS     (* sign *)
-  | P | NP     (* parity *)
+  | L
+  | GE (* signed comparisons: less/greater *)
+  | LE
+  | G
+  | B
+  | AE (* unsigned comparisons: below/above *)
+  | BE
+  | A
+  | E
+  | NE (* equal *)
+  | O
+  | NO (* overflow *)
+  | S
+  | NS (* sign *)
+  | P
+  | NP (* parity *)
 
 type float_condition =
   | EQf
@@ -59,59 +67,82 @@ type constant =
 
 type data_type =
   | NONE
-  | REAL4 | REAL8 (* floating point values *)
-  | BYTE | WORD | DWORD | QWORD (* integer values *)
+  | REAL4
+  | REAL8 (* floating point values *)
+  | BYTE
+  | WORD
+  | DWORD
+  | QWORD (* integer values *)
   | VEC128 (* vector values (float & integer) *)
   | VEC256
   | VEC512
-  | NEAR | PROC
+  | NEAR
+  | PROC
 
 type reg64 =
-  | RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI
-  | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
+  | RAX
+  | RBX
+  | RCX
+  | RDX
+  | RSP
+  | RBP
+  | RSI
+  | RDI
+  | R8
+  | R9
+  | R10
+  | R11
+  | R12
+  | R13
+  | R14
+  | R15
 
 type reg8h =
-  | AH | BH | CH | DH
+  | AH
+  | BH
+  | CH
+  | DH
 
 type regf =
   | XMM of int
   | YMM of int
   | ZMM of int
 
-type arch = X64 | X86
+type arch =
+  | X64
+  | X86
 
-type addr =
-  {
-    arch: arch;
-    typ: data_type;
-    idx: reg64;
-    scale: int;
-    base: reg64 option;
-    sym: string option;
-    displ: int;
-  }
-  (** Addressing modes:
+(** Addressing modes:
       displ + sym + base + idx * scale
       (if scale = 0, idx is ignored and base must be None)
   *)
+type addr =
+  { arch : arch;
+    typ : data_type;
+    idx : reg64;
+    scale : int;
+    base : reg64 option;
+    sym : string option;
+    displ : int
+  }
 
-type prefetch_temporal_locality_hint = Nta | T1 | T2 | T0
+type prefetch_temporal_locality_hint =
+  | Nta
+  | T1
+  | T2
+  | T0
 
 type arg =
-  | Imm of int64
-  (** Operand is an immediate constant integer *)
-
+  | Imm of int64  (** Operand is an immediate constant integer *)
   | Sym of string
-  (** Address of a symbol (absolute address except for call/jmp target
+      (** Address of a symbol (absolute address except for call/jmp target
       where it is interpreted as a relative displacement *)
-
   | Reg8L of reg64
   | Reg8H of reg8h
   | Reg16 of reg64
   | Reg32 of reg64
   | Reg64 of reg64
   | Regf of regf
-
   | Mem of addr
   | Mem64_RIP of data_type * string * int
 
@@ -175,13 +206,12 @@ type instruction =
   | SIMD of Amd64_simd_instrs.instr * arg array
 
 (* ELF specific *)
-type reloc_type =
-  | R_X86_64_PLT32
+type reloc_type = R_X86_64_PLT32
 
 type reloc =
   { offset : constant;
     name : reloc_type;
-    expr : constant;
+    expr : constant
   }
 
 (* CR gyorsh: use inline record for Section and File constructors. *)

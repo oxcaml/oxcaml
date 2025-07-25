@@ -7,44 +7,53 @@ val mkTarrow :
   Asttypes.arg_label * type_expr * type_expr * commutable -> type_desc
 
 type apply_arg
+
 type texp_function_param_identifier
+
 type texp_function_cases_identifier
 
 val texp_function_cases_identifier_defaults : texp_function_cases_identifier
+
 val texp_function_param_identifier_defaults : texp_function_param_identifier
 
-type texp_function_param = {
-  arg_label : Asttypes.arg_label;
-  pattern : pattern;
-  param : Ident.t;
-  partial : partial;
-  optional_default : expression option;
-      (** The optional argument's default value. If [optional_default] is
+type texp_function_param =
+  { arg_label : Asttypes.arg_label;
+    pattern : pattern;
+    param : Ident.t;
+    partial : partial;
+    optional_default : expression option;
+        (** The optional argument's default value. If [optional_default] is
           present, [arg_label] must be [Optional], and [pattern] matches values
           of type [t] if the parameter type is [t option]. *)
-  param_identifier : texp_function_param_identifier;
-}
+    param_identifier : texp_function_param_identifier
+  }
 
 type texp_function_body =
   | Function_body of expression
-  | Function_cases of {
-      cases : value case list;
-      param : Ident.t;
-      partial : partial;
-      function_cases_identifier : texp_function_cases_identifier;
-    }
+  | Function_cases of
+      { cases : value case list;
+        param : Ident.t;
+        partial : partial;
+        function_cases_identifier : texp_function_cases_identifier
+      }
 
-type texp_function = {
-  params : texp_function_param list;
-  body : texp_function_body;
-}
+type texp_function =
+  { params : texp_function_param list;
+    body : texp_function_body
+  }
 
 type texp_ident_identifier
+
 type texp_apply_identifier
+
 type texp_tuple_identifier
+
 type texp_construct_identifier
+
 type texp_function_identifier
+
 type texp_sequence_identifier
+
 type texp_match_identifier
 
 val mkTexp_ident :
@@ -77,8 +86,11 @@ val mkTexp_match :
   expression_desc
 
 val mkTexp_assert : expression -> Location.t -> expression_desc
+
 val mkTtyp_any : core_type_desc
+
 val mkTtyp_var : string -> core_type_desc
+
 val is_type_name_used : core_type_desc -> string -> bool
 
 type matched_expression_desc =
@@ -113,8 +125,11 @@ val mkpattern_data :
   'a pattern_data
 
 type tpat_var_identifier
+
 type tpat_alias_identifier
+
 type tpat_array_identifier
+
 type tpat_tuple_identifier
 
 val mkTpat_var :
@@ -165,12 +180,14 @@ val view_tstr : structure_item_desc -> matched_structure_item_desc
 type arg_identifier
 
 val mkArg : ?id:arg_identifier -> expression -> apply_arg
+
 val map_arg_or_omitted : (expression -> expression) -> apply_arg -> apply_arg
 
 val fold_arg_or_omitted :
   ('a -> expression * arg_identifier -> 'a) -> 'a -> apply_arg -> 'a
 
 val option_of_arg_or_omitted : apply_arg -> (expression * arg_identifier) option
+
 val mk_constructor_description : string -> constructor_description
 
 val mk_value_binding :
@@ -186,4 +203,5 @@ val mk_value_description :
   value_description
 
 val print_path : Path.t -> string
+
 val replace_id_in_path : Path.t -> Ident.t -> Path.t

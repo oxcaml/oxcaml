@@ -1,16 +1,15 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let x = 1 in
-try if x <> 1 then raise Not_found
-with End_of_file -> ()
-;;
+try if x <> 1 then raise Not_found with End_of_file -> ()
 
 (**
        0 CONSTINT 42

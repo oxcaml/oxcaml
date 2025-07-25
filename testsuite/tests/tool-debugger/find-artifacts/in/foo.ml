@@ -1,7 +1,7 @@
 open Blah
 
 let print = function
-  | Foo -> print_endline "Foo";
+  | Foo -> print_endline "Foo"
   | Bar s -> print_endline ("Bar(" ^ s ^ ")")
 
 let main () =

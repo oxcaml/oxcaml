@@ -58,11 +58,10 @@ type boo =
 let[@zero_alloc] [@inline never] test18 n boo =
   if n > 0
   then n + n
-  else begin
+  else
     let k = 45 in
     let p = match boo with A -> n, k | B x -> n, x in
     raise (Exn3 p)
-  end
 
 let[@inline never] test19 n =
   let rec create n = if n = 0 then [] else n :: create (n - 1) in

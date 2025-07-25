@@ -273,15 +273,14 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     in
     ());
   let duration = end_time -. start_time in
-  if config.csv_output
-  then begin
+  (if config.csv_output
+  then
     let out_stats = collect_out_stats cfg_with_infos in
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     print_row
       ~allocator:(string_of_register_allocator allocator)
       ~function_name:cfg.fun_name ~duration ~rounds:!rounds_ref ~in_stats
-      ~out_stats
-  end;
+      ~out_stats);
   if config.debug_output
   then Printf.eprintf "  register allocation took %gs...\n%!" duration;
   ()
@@ -290,18 +289,16 @@ let process_file (file : string) (config : config) =
   if config.debug_output then Printf.eprintf "processing file %S...\n%!" file;
   let unit_info, _digest = Cfg_format.restore file in
   List.iter unit_info.items ~f:(fun (item : Cfg_format.cfg_item_info) ->
-      begin
-        match item with
-        | Cfg _ -> ()
-        | Data _ -> ()
-        | Cfg_before_regalloc
-            { cfg_with_layout_and_relocatable_regs; cmm_label; reg_stamp } ->
-          let cfg_with_layout, relocatable_regs =
-            cfg_with_layout_and_relocatable_regs
-          in
-          process_function config cfg_with_layout cmm_label reg_stamp
-            relocatable_regs
-      end)
+      match item with
+      | Cfg _ -> ()
+      | Data _ -> ()
+      | Cfg_before_regalloc
+          { cfg_with_layout_and_relocatable_regs; cmm_label; reg_stamp } ->
+        let cfg_with_layout, relocatable_regs =
+          cfg_with_layout_and_relocatable_regs
+        in
+        process_function config cfg_with_layout cmm_label reg_stamp
+          relocatable_regs)
 
 let is_regalloc_file (file : string) =
   Filename.check_suffix file ".cmir-cfg-regalloc"
@@ -311,17 +308,14 @@ let collect_files (paths : string list) =
   let add_file file = if is_regalloc_file file then files := file :: !files in
   let rec collect path =
     if not (Sys.file_exists path)
-    then begin
-      fatal "%S does not exist" path
-    end
+    then fatal "%S does not exist" path
     else if Sys.is_directory path
-    then begin
+    then
       Array.iter
         (fun elem ->
           let elem_path = Filename.concat path elem in
           collect elem_path)
         (Sys.readdir path)
-    end
     else add_file path
   in
   List.iter paths ~f:collect;
@@ -370,9 +364,6 @@ let parse_command_line () =
 
 let () =
   let config = parse_command_line () in
-  if config.csv_output
-  then begin
-    Printf.printf "%s\n%!" row_header
-  end;
+  if config.csv_output then Printf.printf "%s\n%!" row_header;
   let files = collect_files config.paths in
   List.iter files ~f:(fun file -> process_file file config)

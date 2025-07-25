@@ -17,23 +17,20 @@
 open! Int_replace_polymorphic_compare
 
 type info =
-  {
-    dbg: Debuginfo.t;
-    discriminator: int;
+  { dbg : Debuginfo.t;
+    discriminator : int
   }
+
 type t = info option
+
 let none = None
+
 let is_none = Option.is_none
-let create ~dbg ~discriminator =
-  Some
-    {
-      dbg;
-      discriminator;
-    }
+
+let create ~dbg ~discriminator = Some { dbg; discriminator }
 
 let equal_info left right =
   Debuginfo.(Dbg.compare (get_dbg left.dbg) (get_dbg right.dbg) = 0)
   && Int.equal left.discriminator right.discriminator
 
-let equal left right =
-  Option.equal equal_info left right
+let equal left right = Option.equal equal_info left right

@@ -15,7 +15,6 @@
 
 open Asttypes
 open Parsetree
-
 module Style = Misc.Style
 
 type error =
@@ -25,18 +24,18 @@ type error =
 exception Error of Location.t * error
 
 let get_no_payload_attribute nm attrs =
-  let actions = [(nm, Builtin_attributes.Return)] in
+  let actions = [nm, Builtin_attributes.Return] in
   match Builtin_attributes.select_attributes actions attrs with
   | [] -> None
-  | [ {attr_name = name; attr_payload = PStr []; attr_loc = _} ] -> Some name
-  | [ {attr_name = name; _} ] ->
+  | [{ attr_name = name; attr_payload = PStr []; attr_loc = _ }] -> Some name
+  | [{ attr_name = name; _ }] ->
     raise (Error (name.loc, No_payload_expected name.txt))
-  | _ :: {attr_name = name; _} :: _ ->
+  | _ :: { attr_name = name; _ } :: _ ->
     raise (Error (name.loc, Multiple_attributes name.txt))
 
 let has_no_payload_attribute alt_names attrs =
   match get_no_payload_attribute alt_names attrs with
-  | None   -> false
+  | None -> false
   | Some _ -> true
 
 open Format
@@ -48,10 +47,6 @@ let report_error ppf = function
     fprintf ppf "Attribute %a does not accept a payload" Style.inline_code name
 
 let () =
-  Location.register_error_of_exn
-    (function
-      | Error (loc, err) ->
-        Some (Location.error_of_printer ~loc report_error err)
-      | _ ->
-        None
-    )
+  Location.register_error_of_exn (function
+    | Error (loc, err) -> Some (Location.error_of_printer ~loc report_error err)
+    | _ -> None)

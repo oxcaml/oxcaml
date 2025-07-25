@@ -30,24 +30,25 @@ open Format
    They aren't used for the native toplevel.
 *)
 val getvalue : string -> Obj.t
+
 val setvalue : string -> Obj.t -> unit
 
 (* Label appended after [OCaml version XXX] when starting the toplevel. *)
-val implementation_label: string
+val implementation_label : string
 
 val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase -> bool
-        (* Read and execute commands from a file.
-           [use_file] prints the types and values of the results.
-           [use_silently] does not print them.
-           [mod_use_file] wrap the file contents into a module. *)
+(* Read and execute commands from a file.
+   [use_file] prints the types and values of the results.
+   [use_silently] does not print them.
+   [mod_use_file] wrap the file contents into a module. *)
 
 val may_trace : bool ref
 
-module EvalBase: Topcommon.EVAL_BASE
+module EvalBase : Topcommon.EVAL_BASE
 
-include module type of Topcommon.MakeEvalPrinter(EvalBase)
+include module type of Topcommon.MakeEvalPrinter (EvalBase)
 
 (* For topmain.ml. Maybe shouldn't be there *)
 val load_file : bool -> formatter -> string -> bool
 
-val init: unit -> unit
+val init : unit -> unit

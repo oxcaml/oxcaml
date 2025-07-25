@@ -1,18 +1,19 @@
 (* TEST
- readonly_files = "contexts_1.ml contexts_2.ml contexts_3.ml";
- flags = "-dsource -dlambda";
- stack-allocation;
- expect;
+   readonly_files = "contexts_1.ml contexts_2.ml contexts_3.ml";
+   flags = "-dsource -dlambda";
+   stack-allocation;
+   expect;
 *)
+#use "contexts_1.ml"
 
-#use "contexts_1.ml";;
 (* Notice that (field_mut 1 input) occurs twice, it
    is evaluated once in the 'false' branch and once in the 'true'
    branch. The compiler assumes that its static knowledge about the
    first read (it cannot be a [Right] as we already matched against it
    and failed) also applies to the second read, which is unsound.
 *)
-[%%expect {|
+[%%expect
+{|
 
 #use  "contexts_1.ml";;
 
@@ -54,9 +55,12 @@ let example_1 () =
   (apply (field_imm 1 (global Toploop!)) "example_1" example_1/304))
 val example_1 : unit -> (bool, int) Result.t = <fun>
 |}]
+;;
 
-#use "contexts_2.ml";;
-[%%expect {|
+#use "contexts_2.ml"
+
+[%%expect
+{|
 
 #use  "contexts_2.ml";;
 
@@ -109,9 +113,12 @@ let example_2 () =
   (apply (field_imm 1 (global Toploop!)) "example_2" example_2/343))
 val example_2 : unit -> (bool, int) Result.t = <fun>
 |}]
+;;
 
-#use "contexts_3.ml";;
-[%%expect {|
+#use "contexts_3.ml"
+
+[%%expect
+{|
 
 #use  "contexts_3.ml";;
 

@@ -14,7 +14,7 @@
 (**************************************************************************)
 
 type ref_kind =
-    RK_module
+  | RK_module
   | RK_module_type
   | RK_class
   | RK_class_type
@@ -57,20 +57,23 @@ and text_element =
 and text = text_element list
 
 type see_ref =
-    See_url of string
+  | See_url of string
   | See_file of string
   | See_doc of string
 
 type see = see_ref * text
 
-type param = (string * text)
+type param = string * text
 
-type raised_exception = (string * text)
+type raised_exception = string * text
 
-type alert = { alert_name : string; alert_payload : string option }
+type alert =
+  { alert_name : string;
+    alert_payload : string option
+  }
 
-type info = {
-    i_desc : text option;
+type info =
+  { i_desc : text option;
     i_authors : string list;
     i_version : string option;
     i_sees : see list;
@@ -79,32 +82,32 @@ type info = {
     i_deprecated : text option;
     i_params : param list;
     i_raised_exceptions : raised_exception list;
-    i_return_value : text option ;
-    i_custom : (string * text) list ;
-    i_alerts : alert list ;
+    i_return_value : text option;
+    i_custom : (string * text) list;
+    i_alerts : alert list
   }
 
-let dummy_info = {
-  i_desc = None ;
-  i_authors = [] ;
-  i_version = None ;
-  i_sees = [] ;
-  i_since = None ;
-  i_before = [] ;
-  i_deprecated = None ;
-  i_params = [] ;
-  i_raised_exceptions = [] ;
-  i_return_value = None ;
-  i_custom = [] ;
-  i_alerts = [] ;
-}
-
-type location = {
-    loc_impl : Location.t option ;
-    loc_inter : Location.t option ;
+let dummy_info =
+  { i_desc = None;
+    i_authors = [];
+    i_version = None;
+    i_sees = [];
+    i_since = None;
+    i_before = [];
+    i_deprecated = None;
+    i_params = [];
+    i_raised_exceptions = [];
+    i_return_value = None;
+    i_custom = [];
+    i_alerts = []
   }
 
-let dummy_loc = { loc_impl = None ; loc_inter = None }
+type location =
+  { loc_impl : Location.t option;
+    loc_inter : Location.t option
+  }
+
+let dummy_loc = { loc_impl = None; loc_inter = None }
 
 type merge_option =
   | Merge_description
@@ -119,19 +122,18 @@ type merge_option =
   | Merge_return_value
   | Merge_custom
 
-let all_merge_options = [
-  Merge_description ;
-  Merge_author ;
-  Merge_version ;
-  Merge_see ;
-  Merge_since ;
-  Merge_before ;
-  Merge_deprecated ;
-  Merge_param ;
-  Merge_raised_exception ;
-  Merge_return_value ;
-  Merge_custom ;
-]
+let all_merge_options =
+  [ Merge_description;
+    Merge_author;
+    Merge_version;
+    Merge_see;
+    Merge_since;
+    Merge_before;
+    Merge_deprecated;
+    Merge_param;
+    Merge_raised_exception;
+    Merge_return_value;
+    Merge_custom ]
 
 type magic = string
 
@@ -142,6 +144,5 @@ type 'a dump = Dump of magic * 'a
 let make_dump a = Dump (magic, a)
 
 let open_dump = function
-    Dump (m, a) ->
-      if m = magic then a
-      else raise (Failure Odoc_messages.bad_magic_number)
+  | Dump (m, a) ->
+    if m = magic then a else raise (Failure Odoc_messages.bad_magic_number)

@@ -1,18 +1,15 @@
-type header = {
-  owner : string;
-  typ : int;  (** each owner defines its own types *)
-  size : int;  (** size of the note's descriptor that follows the header  *)
-}
+type header =
+  { owner : string;
+    typ : int;  (** each owner defines its own types *)
+    size : int  (** size of the note's descriptor that follows the header  *)
+  }
 
 val read_header : Owee_buf.cursor -> header
 
 (** Reads the header and returns the size of the note's descriptor.
     Raises if the [expected_owner] or [expected_type] does not match the header. *)
-val read_desc_size
-  : Owee_buf.cursor
-  -> expected_owner:string
-  -> expected_type:int
-  -> int
+val read_desc_size :
+  Owee_buf.cursor -> expected_owner:string -> expected_type:int -> int
 
 (** Wrapper around [Owee_elf.find_section] that checks section type is SHT_NOTE. *)
 val find_notes_section : Owee_elf.section array -> string -> Owee_elf.section
@@ -21,11 +18,12 @@ exception Section_not_found of string
 
 module Stapsdt : sig
   type t =
-    { addr : int64 (** address of the probe site *)
-    ; semaphore : int64 option (** address of the semaphore corresponding to the probe *)
-    ; provider : string
-    ; name : string
-    ; args : string (** probe arguments  *)
+    { addr : int64;  (** address of the probe site *)
+      semaphore : int64 option;
+          (** address of the semaphore corresponding to the probe *)
+      provider : string;
+      name : string;
+      args : string  (** probe arguments  *)
     }
 
   (** [iter buf sections ~f] applies [f] to each stapsdt note,

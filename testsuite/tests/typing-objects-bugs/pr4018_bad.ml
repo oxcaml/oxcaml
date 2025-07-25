@@ -1,30 +1,29 @@
 (* TEST_BELOW
-(* Blank lines added here to preserve locations. *)
-
-
-
-
+   (* Blank lines added here to preserve locations. *)
 *)
 
 class virtual ['subject, 'event] observer =
-   object
-     method virtual notify : 'subject ->  'event -> unit
-   end
+  object
+    method virtual notify : 'subject -> 'event -> unit
+  end
 
 class ['event] subject =
-   object (self : 'subject)
-     val mutable observers = ([]: (('subject, 'event) observer) list)
-     method add_observer obs = observers <- (obs :: observers)
-     method notify_observers (e : 'event) =
-         List.iter (fun x -> x#notify self e) observers
-   end
+  object (self : 'subject)
+    val mutable observers : ('subject, 'event) observer list = []
+
+    method add_observer obs = observers <- obs :: observers
+
+    method notify_observers (e : 'event) =
+      List.iter (fun x -> x#notify self e) observers
+  end
 
 type id = int
 
 class entity (id : id) =
   object
     val ent_destroy_subject = new subject
-    method destroy_subject : (id) subject = ent_destroy_subject
+
+    method destroy_subject : id subject = ent_destroy_subject
 
     method entity_id = id
   end
@@ -33,8 +32,7 @@ class ['entity] entity_container =
   object (self)
     inherit ['entity, id] observer as observer
 
-    method add_entity (e : 'entity) =
-      e#destroy_subject#add_observer (self)
+    method add_entity (e : 'entity) = e#destroy_subject#add_observer self
 
     method notify _ id = ()
   end
@@ -53,9 +51,9 @@ class world =
 *)
 
 (* TEST
- flags = " -w -a ";
- ocamlc_byte_exit_status = "2";
- setup-ocamlc.byte-build-env;
- ocamlc.byte;
- check-ocamlc.byte-output;
+   flags = " -w -a ";
+   ocamlc_byte_exit_status = "2";
+   setup-ocamlc.byte-build-env;
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)

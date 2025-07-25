@@ -16,49 +16,46 @@ let is_simplified e =
   | O (Texp_constant (Const_int 0))
   | O (Texp_constant (Const_char '0'))
   | O (Texp_constant (Const_string ("", _, None))) ->
-      true
+    true
   | Texp_ident (_, name, _, _) ->
+    Longident.last name.txt = "__dummy2__"
+    || Longident.last name.txt = "__dummy1__"
+    || Longident.last name.txt = "__ignore__"
+  | Texp_construct (name, _, _, _) -> Longident.last name.txt = ""
+  | Texp_apply (d, _, _) -> (
+    match view_texp d.exp_desc with
+    | Texp_ident (_, name, _, _) ->
       Longident.last name.txt = "__dummy2__"
       || Longident.last name.txt = "__dummy1__"
       || Longident.last name.txt = "__ignore__"
-  | Texp_construct (name, _, _, _) -> Longident.last name.txt = ""
-  | Texp_apply (d, _, _) -> (
-      match view_texp d.exp_desc with
-      | Texp_ident (_, name, _, _) ->
-          Longident.last name.txt = "__dummy2__"
-          || Longident.last name.txt = "__dummy1__"
-          || Longident.last name.txt = "__ignore__"
-      | _ -> false)
+    | _ -> false)
   | _ -> false
 
 let simplify apply_dummy e =
   match get_desc e.exp_type with
   | Tconstr (path, [], _) -> (
-      match path with
-      | Path.Pident id -> (
-          match name id with
-          | "int" -> { e with exp_desc = Texp_constant (Const_int 0) }
-          | "char" -> { e with exp_desc = Texp_constant (Const_char '0') }
-          | "string" ->
-              {
-                e with
-                exp_desc =
-                  Texp_constant (Const_string ("", Location.none, None));
-              }
-          | "unit" -> { e with exp_desc = mkTexp_tuple [] }
-          | _ -> apply_dummy)
+    match path with
+    | Path.Pident id -> (
+      match name id with
+      | "int" -> { e with exp_desc = Texp_constant (Const_int 0) }
+      | "char" -> { e with exp_desc = Texp_constant (Const_char '0') }
+      | "string" ->
+        { e with
+          exp_desc = Texp_constant (Const_string ("", Location.none, None))
+        }
+      | "unit" -> { e with exp_desc = mkTexp_tuple [] }
       | _ -> apply_dummy)
+    | _ -> apply_dummy)
   | _ -> apply_dummy
 
 let minimize apply_dummy should_remove map cur_name =
   let reduce_def_mapper =
-    {
-      Tast_mapper.default with
+    { Tast_mapper.default with
       expr =
         (fun mapper e ->
-          if (not (is_simplified e)) && should_remove () then
-            simplify apply_dummy e
-          else Tast_mapper.default.expr mapper e);
+          if (not (is_simplified e)) && should_remove ()
+          then simplify apply_dummy e
+          else Tast_mapper.default.expr mapper e)
     }
   in
   let nstr =

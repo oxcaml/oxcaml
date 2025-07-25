@@ -1,7 +1,7 @@
 (* TEST
- flambda;
- ocamlopt_flags = "-O3 -flambda2-inline-small-function-size 0";
- native;
+   flambda;
+   ocamlopt_flags = "-O3 -flambda2-inline-small-function-size 0";
+   native;
 *)
 
 (* This test need to *not* be in classic mode to run,
@@ -20,10 +20,8 @@ let[@loop] rec loop () =
      the Flow analaysis will raise an error because in the context
      of the inlined body, the `self` continuation is not
      defined/bound. *)
-  let[@local never] t = (fun _ ->
+  let[@local never] t _ =
     let _x = __opaque__ 0 in
-    (loop[@inlined]) ()
-    )
+    (loop [@inlined]) ()
   in
   t ()
-

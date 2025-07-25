@@ -1,4 +1,3 @@
 let x = ref 0
 
-let () =
-  x := 1
+let () = x := 1

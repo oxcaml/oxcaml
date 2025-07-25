@@ -15,9 +15,12 @@
 
 (* Data types for annotations (Stypes.ml) *)
 
-type call = Tail | Stack | Inline
+type call =
+  | Tail
+  | Stack
+  | Inline
 
 type ident =
   | Iref_internal of Location.t (* defining occurrence *)
   | Iref_external
-  | Idef of Location.t          (* scope *)
+  | Idef of Location.t (* scope *)

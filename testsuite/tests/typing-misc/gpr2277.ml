@@ -1,5 +1,5 @@
 (* TEST
- expect;
+   expect;
 *)
 
 let f (type t) (x : t) = x
@@ -21,21 +21,23 @@ let h (type a'bc) (x : a'bc) = x
 
 let h' (x : ' a'bc) = x
 
-[%%expect {|
+[%%expect
+{|
 val h : ' a'bc -> ' a'bc = <fun>
 val h' : ' a'bc -> ' a'bc = <fun>
 |}]
 
-let i (type fst snd) (x : fst) (y : snd) = (x, y)
+let i (type fst snd) (x : fst) (y : snd) = x, y
 
 [%%expect {|
 val i : 'fst -> 'snd -> 'fst * 'snd = <fun>
 |}]
 
 let j (type fst snd fst' snd') (x : fst) (y : snd) (a : fst') (b : snd') =
-  ((x, y), (a, b))
+  (x, y), (a, b)
 
-[%%expect {|
+[%%expect
+{|
 val j : 'fst -> 'snd -> 'fst' -> 'snd' -> ('fst * 'snd) * ('fst' * 'snd') =
   <fun>
 |}]

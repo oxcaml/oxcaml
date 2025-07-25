@@ -24,9 +24,8 @@ type linear_item_info =
   | Data of Cmm.data_item list
 
 type linear_unit_info =
-  {
-    mutable unit : Compilation_unit.t;
-    mutable items : linear_item_info list;
+  { mutable unit : Compilation_unit.t;
+    mutable items : linear_item_info list
   }
 
 (* Marshal and unmarshal a compilation unit in Linear format.
@@ -34,4 +33,5 @@ type linear_unit_info =
    that currently consists of Cmm.label_counter.
 *)
 val save : string -> linear_unit_info -> unit
+
 val restore : string -> linear_unit_info * Digest.t

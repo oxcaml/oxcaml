@@ -1,10 +1,10 @@
 (* TEST
- set foo = "bar";
- set expand = "\$foo";
- set var0 = "var";
- set var1 = "$var0";
- set var2 = "$var1";
- arguments = "str \$notvar $unsetvar $expand $foo $var2";
+   set foo = "bar";
+   set expand = "\$foo";
+   set var0 = "var";
+   set var1 = "$var0";
+   set var2 = "$var1";
+   arguments = "str \$notvar $unsetvar $expand $foo $var2";
 *)
 
 let () =

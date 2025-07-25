@@ -1,5 +1,5 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module X = struct
@@ -7,7 +7,9 @@ module X = struct
 end
 
 module type X' = module type of X
-[%%expect{|
+
+[%%expect
+{|
 module X : sig val t : '_weak1 option ref end
 Line 5, characters 32-33:
 5 | module type X' = module type of X

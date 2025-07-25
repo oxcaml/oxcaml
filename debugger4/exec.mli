@@ -17,4 +17,5 @@
 (* Handling of keyboard interrupts *)
 
 val protect : (unit -> unit) -> unit
+
 val unprotect : (unit -> unit) -> unit

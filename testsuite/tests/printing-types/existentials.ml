@@ -1,20 +1,17 @@
 (* TEST
- expect;
+   expect;
 *)
 
-type foo1 =
-  | Foo : ('a * 'b * 'c * 'd * 'e * 'f) -> foo1
-
-let bar1 x =
-  match x with
-  | Foo a -> a + 1
-  | _ -> 0
-;;
-[%%expect {|
 type foo1 = Foo : ('a * 'b * 'c * 'd * 'e * 'f) -> foo1
-Line 6, characters 13-14:
-6 |   | Foo a -> a + 1
-                 ^
+
+let bar1 x = match x with Foo a -> a + 1 | _ -> 0
+
+[%%expect
+{|
+type foo1 = Foo : ('a * 'b * 'c * 'd * 'e * 'f) -> foo1
+Line 3, characters 35-36:
+3 | let bar1 x = match x with Foo a -> a + 1 | _ -> 0
+                                       ^
 Error: This expression has type "$a * $b * $c * $d * $e * $f"
        but an expression was expected of type "int"
        Hint: "$a", "$b", "$c", "$d", "$e" and "$f" are existential types
@@ -33,10 +30,12 @@ type foo2 =
 let bar2 x =
   match x with
   | Foo1 a1, Foo2 a2, Foo3 a3, Foo4 a4, Foo5 a5, Foo6 a6, Foo7 a7 ->
-      let x = (a1, a2, a3, a4, a5, a6, a7) in x + 1
+    let x = a1, a2, a3, a4, a5, a6, a7 in
+    x + 1
   | _ -> 0
-;;
-[%%expect {|
+
+[%%expect
+{|
 type foo2 =
     Foo1 : 'a -> foo2
   | Foo2 : 'a -> foo2
@@ -45,9 +44,9 @@ type foo2 =
   | Foo5 : 'a -> foo2
   | Foo6 : 'a -> foo2
   | Foo7 : 'a -> foo2
-Line 13, characters 46-47:
-13 |       let x = (a1, a2, a3, a4, a5, a6, a7) in x + 1
-                                                   ^
+Line 14, characters 4-5:
+14 |     x + 1
+         ^
 Error: This expression has type "$a * $a1 * $a2 * $a3 * $a4 * $a5 * $a6"
        but an expression was expected of type "int"
        Hint: "$a" is an existential type bound by the constructor "Foo1".
@@ -71,10 +70,12 @@ type foo3 =
 let bar2 x =
   match x with
   | Foo1 a1, Foo2 a2, Foo3 a3, Foo4 a4, Foo5 a5, Foo6 a6, Foo7 a7 ->
-      let x = (a1, a2, a3, a4, a5, a6, a7) in x + 1
+    let x = a1, a2, a3, a4, a5, a6, a7 in
+    x + 1
   | _ -> 0
-;;
-[%%expect {|
+
+[%%expect
+{|
 type foo3 =
     Foo1 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3
   | Foo2 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3
@@ -83,9 +84,9 @@ type foo3 =
   | Foo5 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3
   | Foo6 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3
   | Foo7 : ('a * 'b * 'c * 'd * 'e * 'f) -> foo3
-Line 13, characters 46-47:
-13 |       let x = (a1, a2, a3, a4, a5, a6, a7) in x + 1
-                                                   ^
+Line 14, characters 4-5:
+14 |     x + 1
+         ^
 Error: This expression has type
          "($a * $b * $c * $d * $e * $f) *
          ($a1 * $b1 * $c1 * $d1 * $e1 * $f1) *

@@ -1,20 +1,28 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* Report from Jeremy Yallop *)
-module F (S : sig type 'a s end) = struct
+module F (S : sig
+  type 'a s
+end) =
+struct
   include S
+
   type _ t = T : 'a -> 'a s t
-end;; (* fail *)
-[%%expect{|
-Line 3, characters 2-29:
-3 |   type _ t = T : 'a -> 'a s t
+end
+
+(* fail *)
+[%%expect
+{|
+Line 7, characters 2-29:
+7 |   type _ t = T : 'a -> 'a s t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "T : 'a -> 'a s t"
        the type variable "'a" cannot be deduced from the type parameters.
-|}];;
+|}]
+
 (*
 module M = F (struct type 'a s = int end) ;;
 let M.T x = M.T 3 in x = true;;
@@ -33,60 +41,93 @@ let M.T x = M.T 3 in x = 3;; (* ok *)
 *)
 
 (* Another version using OCaml 2.00 objects *)
-module F(T:sig type 'a t end) = struct
+module F (T : sig
+  type 'a t
+end) =
+struct
   class ['a] c x =
-    object constraint 'a = 'b T.t val x' : 'b = x method x = x' end
-end;; (* fail *)
-[%%expect{|
-Lines 2-3, characters 2-67:
-2 | ..class ['a] c x =
-3 |     object constraint 'a = 'b T.t val x' : 'b = x method x = x' end
+    object
+      constraint 'a = 'b T.t
+
+      val x' : 'b = x
+
+      method x = x'
+    end
+end
+
+(* fail *)
+[%%expect
+{|
+Lines 5-12, characters 2-7:
+ 5 | ..class ['a] c x =
+ 6 |     object
+ 7 |       constraint 'a = 'b T.t
+ 8 |
+ 9 |       val x' : 'b = x
+10 |
+11 |       method x = x'
+12 |     end
 Error: In the definition
          "type 'a c = < x : 'b > constraint 'a = 'b T.t"
        the type variable "'b" cannot be deduced from the type parameters.
-|}];;
+|}]
 
 (* Another (more direct) instance using polymorphic variants *)
 (* PR#6275 *)
-type 'x t = A of 'a constraint 'x = [< `X of 'a ] ;; (* fail *)
-let magic (x : int) : bool  =
-  let A x = A x in
-  x;; (* fail *)
-[%%expect{|
-Line 1, characters 0-49:
-1 | type 'x t = A of 'a constraint 'x = [< `X of 'a ] ;; (* fail *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type 'x t = A of 'a constraint 'x = [< `X of 'a]
+
+(* fail *)
+let magic (x : int) : bool =
+  let (A x) = A x in
+  x
+
+(* fail *)
+[%%expect
+{|
+Line 1, characters 0-48:
+1 | type 'x t = A of 'a constraint 'x = [< `X of 'a]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type 'b t = A of 'a constraint 'b = [< `X of 'a ]"
        the type variable "'a" cannot be deduced from the type parameters.
-|}];;
+|}]
 
-type 'a t = A : 'a -> [< `X of 'a ] t;; (* fail *)
-[%%expect{|
-Line 1, characters 0-37:
-1 | type 'a t = A : 'a -> [< `X of 'a ] t;; (* fail *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type 'a t = A : 'a -> [< `X of 'a] t
+
+(* fail *)
+[%%expect
+{|
+Line 1, characters 0-36:
+1 | type 'a t = A : 'a -> [< `X of 'a] t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "A : 'a -> [< `X of 'a ] t"
        the type variable "'a" cannot be deduced from the type parameters.
-|}];;
+|}]
 
 (* It is not OK to allow modules exported by other compilation units *)
-type (_,_) eq = Eq : ('a,'a) eq;;
-let eq = Obj.magic Eq;;
-let eq : (('a, 'b) Ephemeron.K1.t, ('c, 'd) Ephemeron.K1.t) eq = eq;;
-type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t;; (* fail *)
-[%%expect{|
+type (_, _) eq = Eq : ('a, 'a) eq
+
+let eq = Obj.magic Eq
+
+let eq : (('a, 'b) Ephemeron.K1.t, ('c, 'd) Ephemeron.K1.t) eq = eq
+
+type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t
+
+(* fail *)
+[%%expect
+{|
 type (_, _) eq = Eq : ('a, 'a) eq
 val eq : 'a = <poly>
 val eq : (('a, 'b) Ephemeron.K1.t, ('c, 'd) Ephemeron.K1.t) eq = Eq
-Line 4, characters 0-46:
-4 | type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t;; (* fail *)
+Line 7, characters 0-46:
+7 | type _ t = T : 'a -> ('a, 'b) Ephemeron.K1.t t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "T : 'a -> ('a, 'b) Ephemeron.K1.t t"
        the type variable "'a" cannot be deduced from the type parameters.
-|}];;
+|}]
+
 (*
 let castT (type a) (type b) (x : a t) (e: (a, b) eq) : b t =
   let Eq = e in (x : b t);;
@@ -96,28 +137,35 @@ let T (x : bool) = castT (T 3) eq;; (* we found a contradiction *)
 (* The following signature should not be accepted *)
 module type S = sig
   type 'a s
+
   type _ t = T : 'a -> 'a s t
-end;; (* fail *)
-[%%expect{|
-Line 3, characters 2-29:
-3 |   type _ t = T : 'a -> 'a s t
+end
+
+(* fail *)
+[%%expect
+{|
+Line 4, characters 2-29:
+4 |   type _ t = T : 'a -> 'a s t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "T : 'a -> 'a s t"
        the type variable "'a" cannot be deduced from the type parameters.
-|}];;
+|}]
+
 (* Otherwise we can write the following *)
-module rec M : (S with type 'a s = unit) = M;;
-[%%expect{|
+module rec M : (S with type 'a s = unit) = M
+
+[%%expect
+{|
 Line 1, characters 16-17:
-1 | module rec M : (S with type 'a s = unit) = M;;
+1 | module rec M : (S with type 'a s = unit) = M
                     ^
 Error: Unbound module type "S"
-|}];;
+|}]
+
 (* For the above reason, we cannot allow the abstract declaration
    of s and the definition of t to be in the same module, as
    we could create the signature using [module type of ...] *)
-
 
 (* Another problem with variance *)
 (*
@@ -130,62 +178,85 @@ let N.S o' = (o :> <m : int> M.t N.s);; (* unsound! *)
 *)
 
 (* And yet another *)
-type 'a q = Q;;
-type +'a t = 'b constraint 'a = 'b q;;
-[%%expect{|
 type 'a q = Q
-Line 2, characters 0-36:
-2 | type +'a t = 'b constraint 'a = 'b q;;
+
+type +'a t = 'b constraint 'a = 'b q
+
+[%%expect
+{|
+type 'a q = Q
+Line 3, characters 0-36:
+3 | type +'a t = 'b constraint 'a = 'b q
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type +'a t = 'b constraint 'a = 'b q"
        the type variable "'b" has a variance that
        cannot be deduced from the type parameters.
        It was expected to be unrestricted, but it is covariant.
-|}];;
+|}]
+
 (* should fail: we do not know for sure the variance of Queue.t *)
 
-type +'a t = T of 'a;;
-type +'a s = 'b constraint 'a = 'b t;; (* ok *)
-[%%expect{|
+type +'a t = T of 'a
+
+type +'a s = 'b constraint 'a = 'b t
+
+(* ok *)
+[%%expect {|
 type 'a t = T of 'a
 type +'a s = 'b constraint 'a = 'b t
-|}];;
-type -'a s = 'b constraint 'a = 'b t;; (* fail *)
-[%%expect{|
+|}]
+
+type -'a s = 'b constraint 'a = 'b t
+
+(* fail *)
+[%%expect
+{|
 Line 1, characters 0-36:
-1 | type -'a s = 'b constraint 'a = 'b t;; (* fail *)
+1 | type -'a s = 'b constraint 'a = 'b t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type -'a s = 'b constraint 'a = 'b t"
        the type variable "'b" has a variance that
        is not reflected by its occurrence in type parameters.
        It was expected to be contravariant, but it is covariant.
-|}];;
-type +'a u = 'a t;;
-type 'a t = T of ('a -> 'a);;
-type -'a s = 'b constraint 'a = 'b t;; (* ok *)
-[%%expect{|
+|}]
+
+type +'a u = 'a t
+
+type 'a t = T of ('a -> 'a)
+
+type -'a s = 'b constraint 'a = 'b t
+
+(* ok *)
+[%%expect
+{|
 type 'a u = 'a t
 type 'a t = T of ('a -> 'a)
 type -'a s = 'b constraint 'a = 'b t
-|}];;
-type +'a s = 'b constraint 'a = 'b q t;; (* ok *)
-[%%expect{|
+|}]
+
 type +'a s = 'b constraint 'a = 'b q t
-|}];;
-type +'a s = 'b constraint 'a = 'b t q;; (* fail *)
-[%%expect{|
+
+(* ok *)
+[%%expect {|
+type +'a s = 'b constraint 'a = 'b q t
+|}]
+
+type +'a s = 'b constraint 'a = 'b t q
+
+(* fail *)
+[%%expect
+{|
 Line 1, characters 0-38:
-1 | type +'a s = 'b constraint 'a = 'b t q;; (* fail *)
+1 | type +'a s = 'b constraint 'a = 'b t q
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the definition
          "type +'a s = 'b constraint 'a = 'b t q"
        the type variable "'b" has a variance that
        cannot be deduced from the type parameters.
        It was expected to be unrestricted, but it is covariant.
-|}];;
-
+|}]
 
 (* the problem from lablgtk2 *)
 (*
@@ -202,14 +273,18 @@ class virtual ['a] item_container =
 *)
 
 (* Another variance anomaly, should not expand t in g before checking *)
-type +'a t = unit constraint 'a = 'b list;;
-type _ g = G : 'a -> 'a t g;; (* fail *)
-[%%expect{|
 type +'a t = unit constraint 'a = 'b list
-Line 2, characters 0-27:
-2 | type _ g = G : 'a -> 'a t g;; (* fail *)
+
+type _ g = G : 'a -> 'a t g
+
+(* fail *)
+[%%expect
+{|
+type +'a t = unit constraint 'a = 'b list
+Line 3, characters 0-27:
+3 | type _ g = G : 'a -> 'a t g
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the GADT constructor
          "G : 'a list -> 'a list t g"
        the type variable "'a" cannot be deduced from the type parameters.
-|}];;
+|}]

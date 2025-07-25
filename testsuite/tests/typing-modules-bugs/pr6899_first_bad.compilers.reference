@@ -1,5 +1,5 @@
-File "pr6899_first_bad.ml", line 9, characters 4-17:
-9 | let should_reject =
+File "pr6899_first_bad.ml", line 5, characters 4-17:
+5 | let should_reject =
         ^^^^^^^^^^^^^
 Error: The type of this expression, "'_weak1 -> '_weak2 -> unit",
        contains the non-generalizable type variable(s): "'_weak2", "'_weak1".

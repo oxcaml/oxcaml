@@ -16,19 +16,17 @@
 (* Access paths *)
 
 type t =
-  | Pident of Ident.t
-  (** Examples: x, List, int *)
-  | Pdot of t * string
-  (** Examples: List.map, Float.Array *)
-  | Papply of t * t
-  (** Examples: Set.Make(Int), Map.Make(Set.Make(Int)) *)
+  | Pident of Ident.t  (** Examples: x, List, int *)
+  | Pdot of t * string  (** Examples: List.map, Float.Array *)
+  | Papply of t * t  (** Examples: Set.Make(Int), Map.Make(Set.Make(Int)) *)
   | Pextra_ty of t * extra_ty
-  (** [Pextra_ty (p, extra)] are additional paths of types
+      (** [Pextra_ty (p, extra)] are additional paths of types
       introduced by specific OCaml constructs. See below.
   *)
+
 and extra_ty =
   | Pcstr_ty of string
-  (** [Pextra_ty (p, Pcstr_ty c)] is the type of the inline record for
+      (** [Pextra_ty (p, Pcstr_ty c)] is the type of the inline record for
       constructor [c] inside type [p].
 
       For example, in
@@ -42,7 +40,7 @@ and extra_ty =
         [Pextra_ty (Pident `t`, Pcstr_ty "Cons")].
   *)
   | Pext_ty
-  (** [Pextra_ty (p, Pext_ty)] is the type of the inline record for
+      (** [Pextra_ty (p, Pext_ty)] is the type of the inline record for
       the extension constructor [p].
 
       For example, in
@@ -56,33 +54,42 @@ and extra_ty =
         [Pextra_ty (Pident `Error`, Pext_ty)].
   *)
   | Punboxed_ty
-  (** [Pextra_ty (p, Punboxed_ty)] is the type of the unboxed version of [p].
+      (** [Pextra_ty (p, Punboxed_ty)] is the type of the unboxed version of [p].
 
       Example: [float#], or [t#] given [type t = { i : int ; s : string }].
   *)
 
 val unboxed_version : t -> t
+
 val is_unboxed_version : t -> bool
 
-val same: t -> t -> bool
-val compare: t -> t -> int
-val compare_extra: extra_ty -> extra_ty -> int
-val find_free_opt: Ident.t list -> t -> Ident.t option
-val exists_free: Ident.t list -> t -> bool
-val scope: t -> int
-val flatten : t -> [ `Contains_apply | `Ok of Ident.t * string list ]
+val same : t -> t -> bool
 
-val name: ?paren:(string -> bool) -> t -> string
-    (* [paren] tells whether a path suffix needs parentheses *)
-val head: t -> Ident.t
+val compare : t -> t -> int
 
-val print: Format.formatter -> t -> unit
+val compare_extra : extra_ty -> extra_ty -> int
 
-val heads: t -> Ident.t list
+val find_free_opt : Ident.t list -> t -> Ident.t option
 
-val last: t -> string
+val exists_free : Ident.t list -> t -> bool
 
-val is_constructor_typath: t -> bool
+val scope : t -> int
+
+val flatten : t -> [`Contains_apply | `Ok of Ident.t * string list]
+
+val name : ?paren:(string -> bool) -> t -> string
+(* [paren] tells whether a path suffix needs parentheses *)
+
+val head : t -> Ident.t
+
+val print : Format.formatter -> t -> unit
+
+val heads : t -> Ident.t list
+
+val last : t -> string
+
+val is_constructor_typath : t -> bool
 
 module Map : Map.S with type key = t
+
 module Set : Set.S with type elt = t

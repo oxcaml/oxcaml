@@ -1,9 +1,9 @@
 (* TEST
- include ocamlcommon;
- include unix;
- arguments = "${ocamlsrcdir}";
- hasunix;
- native;
+   include ocamlcommon;
+   include unix;
+   arguments = "${ocamlsrcdir}";
+   hasunix;
+   native;
 *)
 
 (* This test checks all ml files in the ocaml repository that are accepted
@@ -40,13 +40,10 @@ let check_file kind fn =
     (* A few files don't parse as they are meant for the toplevel;
        ignore them *)
     close_in ic
-  | ast ->
+  | ast -> (
     close_in ic;
-    try
-      invariants kind ast
-    with
-    | exn ->
-        Location.report_exception Format.std_formatter exn
+    try invariants kind ast
+    with exn -> Location.report_exception Format.std_formatter exn)
 
 type file_kind =
   | Regular_file
@@ -58,31 +55,30 @@ let kind fn =
   | exception _ -> Other
   | { Unix.st_kind = Unix.S_DIR } -> Directory
   | { Unix.st_kind = Unix.S_REG } -> Regular_file
-  | { Unix.st_kind = _          } -> Other
+  | { Unix.st_kind = _ } -> Other
 
 (* some test directories contain files that intentionally violate the
    expectations of ast-invariants *)
-let is_ok_dir dir =
-  not (String.ends_with ~suffix:"tests/parse-errors" dir)
+let is_ok_dir dir = not (String.ends_with ~suffix:"tests/parse-errors" dir)
 
 let rec walk dir =
-  if is_ok_dir dir then
-  Array.iter
-    (fun fn ->
-       if fn = "" || fn.[0] = '.' then
-         ()
-       else begin
-         let fn = Filename.concat dir fn in
-         match kind fn with
-         | Other -> ()
-         | Directory -> walk fn
-         | Regular_file ->
-           if Filename.check_suffix fn ".mli" then
-             check_file Interf fn
-           else if Filename.check_suffix fn ".ml" then
-             check_file Implem fn
-       end)
-    (Sys.readdir dir)
+  if is_ok_dir dir
+  then
+    Array.iter
+      (fun fn ->
+        if fn = "" || fn.[0] = '.'
+        then ()
+        else
+          let fn = Filename.concat dir fn in
+          match kind fn with
+          | Other -> ()
+          | Directory -> walk fn
+          | Regular_file ->
+            if Filename.check_suffix fn ".mli"
+            then check_file Interf fn
+            else if Filename.check_suffix fn ".ml"
+            then check_file Implem fn)
+      (Sys.readdir dir)
 
 let () =
   Language_extension.set_universe_and_enable_all

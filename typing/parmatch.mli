@@ -26,52 +26,52 @@ open Types
 type 'pattern parmatch_case =
   { pattern : 'pattern;
     has_guard : bool;
-    needs_refute : bool;
-    (** true if the program text claims the case is unreachable, a la
+    needs_refute : bool
+        (** true if the program text claims the case is unreachable, a la
         [function _ -> .]
     *)
   }
 
 type 'category typed_case := 'category general_pattern parmatch_case
 
-val typed_case   : 'category case -> 'category typed_case
+val typed_case : 'category case -> 'category typed_case
+
 val untyped_case : Parsetree.case -> Parsetree.pattern parmatch_case
 
-val const_compare : constant -> constant -> int
 (** [const_compare c1 c2] compares the actual values represented by [c1] and
     [c2], while simply using [Stdlib.compare] would compare the
     representations.
 
     cf. MPR#5758 *)
+val const_compare : constant -> constant -> int
 
-val le_pat : pattern -> pattern -> bool
 (** [le_pat p q]  means: forall V,  V matches q implies V matches p *)
+val le_pat : pattern -> pattern -> bool
 
-val le_pats : pattern list -> pattern list -> bool
 (** [le_pats (p1 .. pm) (q1 .. qn)] means: forall i <= m, [le_pat pi qi] *)
+val le_pats : pattern list -> pattern list -> bool
 
 (** Exported compatibility functor, abstracted over constructor equality *)
-module Compat :
-  functor
-    (_ : sig
-      val equal :
-          Types.constructor_description ->
-            Types.constructor_description ->
-              bool
-     end) -> sig
-       val compat : pattern -> pattern -> bool
-       val compats : pattern list -> pattern list -> bool
-     end
+module Compat : functor
+  (_ : sig
+     val equal :
+       Types.constructor_description -> Types.constructor_description -> bool
+   end)
+  -> sig
+  val compat : pattern -> pattern -> bool
+
+  val compats : pattern list -> pattern list -> bool
+end
 
 exception Empty
 
-val lub : pattern -> pattern -> pattern
 (** [lub p q] is a pattern that matches all values matched by [p] and [q].
     May raise [Empty], when [p] and [q] are not compatible. *)
+val lub : pattern -> pattern -> pattern
 
-val lubs : pattern list -> pattern list -> pattern list
 (** [lubs [p1; ...; pn] [q1; ...; qk]], where [n < k], is
     [[lub p1 q1; ...; lub pk qk]].  *)
+val lubs : pattern list -> pattern list -> pattern list
 
 val get_mins : ('a -> 'a -> bool) -> 'a list -> 'a list
 
@@ -81,13 +81,15 @@ val get_mins : ('a -> 'a -> bool) -> 'a list -> 'a list
     The second one will replace mutable arguments by '_'
 *)
 val set_args : pattern -> pattern list -> pattern list
+
 val set_args_erase_mutable : pattern -> pattern list -> pattern list
 
 val pat_of_constr : pattern -> constructor_description -> pattern
+
 val complete_constrs :
-    constructor_description pattern_data ->
-    constructor_description list ->
-    constructor_description list
+  constructor_description pattern_data ->
+  constructor_description list ->
+  constructor_description list
 
 (** [pats_of_type] builds a list of patterns from a given expected type,
     for explosion of wildcard patterns in Typecore.type_pat.
@@ -102,9 +104,9 @@ val complete_constrs :
  *)
 val pats_of_type : Env.t -> type_expr -> pattern list
 
-val pressure_variants:
-  Env.t -> pattern list -> unit
-val pressure_variants_in_computation_pattern:
+val pressure_variants : Env.t -> pattern list -> unit
+
+val pressure_variants_in_computation_pattern :
   Env.t -> computation general_pattern list -> unit
 
 (** [check_partial pred loc caselist] and [check_unused refute pred caselist]
@@ -114,12 +116,11 @@ val pressure_variants_in_computation_pattern:
     [pred] returns a valid counter-example or [None].
     [refute] indicates that [check_unused] was called on a refutation clause.
  *)
-val check_partial:
-    (pattern -> pattern option) -> Location.t -> value typed_case list
-    -> partial
+val check_partial :
+  (pattern -> pattern option) -> Location.t -> value typed_case list -> partial
 
-val check_unused:
-    (bool -> pattern -> pattern option) -> value typed_case list -> unit
+val check_unused :
+  (bool -> pattern -> pattern option) -> value typed_case list -> unit
 
 (* Irrefutability tests *)
 val irrefutable : pattern -> bool

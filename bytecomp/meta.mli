@@ -16,15 +16,20 @@
 (* To control the runtime system and bytecode interpreter *)
 
 external global_data : unit -> Obj.t array = "caml_get_global_data"
+
 external realloc_global_data : int -> unit = "caml_realloc_global"
+
 type closure = unit -> Obj.t
+
 type bytecode
+
 external reify_bytecode :
   bytes array ->
-  Debug_event.debug_event list array -> string option ->
-    bytecode * closure
-                           = "caml_reify_bytecode"
-external release_bytecode : bytecode -> unit
-                                 = "caml_static_release_bytecode"
+  Debug_event.debug_event list array ->
+  string option ->
+  bytecode * closure = "caml_reify_bytecode"
+
+external release_bytecode : bytecode -> unit = "caml_static_release_bytecode"
+
 external invoke_traced_function : Obj.raw_data -> Obj.t -> Obj.t -> Obj.t
-                                = "caml_invoke_traced_function"
+  = "caml_invoke_traced_function"

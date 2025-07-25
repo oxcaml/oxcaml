@@ -1,41 +1,53 @@
 (* TEST_BELOW
-Fille
+   Fille
 *)
 
 let x = [%src_pos]
-[%%expect{|
+
+[%%expect
+{|
 val x : lexing_position =
-  {pos_fname = ""; pos_lnum = 1; pos_bol = 24; pos_cnum = 32}
+  {pos_fname = ""; pos_lnum = 1; pos_bol = 27; pos_cnum = 35}
 |}]
 
-let f = fun ~(call_pos:[%call_pos]) () -> call_pos
-[%%expect{|
+let f ~(call_pos : [%call_pos]) () = call_pos
+
+[%%expect {|
 val f : call_pos:[%call_pos] -> unit -> lexing_position = <fun>
 |}]
 
-let _ = f ~call_pos:x () ;;
-[%%expect{|
+let _ = f ~call_pos:x ()
+
+[%%expect
+{|
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 1; pos_bol = 24; pos_cnum = 32}
+{pos_fname = ""; pos_lnum = 1; pos_bol = 27; pos_cnum = 35}
 |}]
 
 let _ = "Increment line count"
-let _ = f ~call_pos:[%src_pos] () ;;
-[%%expect{|
+
+let _ = f ~call_pos:[%src_pos] ()
+
+[%%expect
+{|
 - : string = "Increment line count"
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 2; pos_bol = 438; pos_cnum = 458}
+{pos_fname = ""; pos_lnum = 3; pos_bol = 440; pos_cnum = 460}
+|}, Principal{|
+- : string = "Increment line count"
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 3; pos_bol = 642; pos_cnum = 662}
 |}]
 
 (* passing an argment explicitly as call_pos *)
 let wrap x f g h ~here =
   match x with
   | `F -> f ~here
-  | `G -> g ~(here : [%call_pos]) ()
+  | `G -> g ~here:(here : [%call_pos]) ()
   | `H -> h ~h_arg:(here : [%call_pos]) ()
-;;
 
-[%%expect{|
+[%%expect
+{|
 val wrap :
   [< `F | `G | `H ] ->
   (here:lexing_position -> 'a) ->
@@ -43,29 +55,38 @@ val wrap :
   (h_arg:[%call_pos] -> unit -> 'a) -> here:lexing_position -> 'a = <fun>
 |}]
 
-let _ = wrap `G (fun ~here:_ -> assert false)
-                (fun ~(here:[%call_pos]) () -> here)
-                (fun ~h_arg:(_ : [%call_pos]) () -> assert false)
-                ~here:[%src_pos]
-[%%expect{|
+let _ =
+  wrap `G
+    (fun ~here:_ -> assert false)
+    (fun ~(here : [%call_pos]) () -> here)
+    (fun ~h_arg:(_ : [%call_pos]) () -> assert false)
+    ~here:[%src_pos]
+
+[%%expect
+{|
 - : lexing_position =
-{pos_fname = ""; pos_lnum = 4; pos_bol = 1164; pos_cnum = 1186}
+{pos_fname = ""; pos_lnum = 6; pos_bol = 1152; pos_cnum = 1162}
+|}, Principal{|
+- : lexing_position =
+{pos_fname = ""; pos_lnum = 6; pos_bol = 1490; pos_cnum = 1500}
 |}]
 
 (* call_pos type annotations not permitted anywhere other than labelled arg
    position *)
-let error1 x = (x : [%call_pos])
+let error1 x : [%call_pos] = x
 
-[%%expect{|
-Line 1, characters 22-30:
-1 | let error1 x = (x : [%call_pos])
-                          ^^^^^^^^
+[%%expect
+{|
+Line 1, characters 17-25:
+1 | let error1 x : [%call_pos] = x
+                     ^^^^^^^^
 Error: [%call_pos] can only exist as the type of a labelled argument
 |}]
 
 let error2 f x = f (x : [%call_pos])
 
-[%%expect{|
+[%%expect
+{|
 Line 1, characters 24-35:
 1 | let error2 f x = f (x : [%call_pos])
                             ^^^^^^^^^^^
@@ -74,7 +95,8 @@ Error: A position argument must not be unlabelled.
 
 let error3 f x = f ?x:(x : [%call_pos])
 
-[%%expect{|
+[%%expect
+{|
 Line 1, characters 27-38:
 1 | let error3 f x = f ?x:(x : [%call_pos])
                                ^^^^^^^^^^^
@@ -82,5 +104,5 @@ Error: A position argument must not be optional.
 |}]
 
 (* TEST
- expect;
+   expect;
 *)

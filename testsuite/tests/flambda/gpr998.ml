@@ -1,5 +1,5 @@
 (* TEST
- ocamlopt_flags = "-unbox-closures";
+   ocamlopt_flags = "-unbox-closures";
 *)
 
 (* This test attempts to check that unused closures are not deleted
@@ -28,14 +28,11 @@ let main x =
     let[@inline never] foo y () () () () () () () = x + y in
     let x1, x2, x3 = x + 1, x + 2, x + 3 in
     let bar p y () () () =
-      if p then foo y () () () () () () ()
-      else x1 + x2 + x3
+      if p then foo y () () () () () () () else x1 + x2 + x3
     in
     let[@inline never] baz0 y () () () () () () () =
       let y1 = y + 1 in
-      let[@inline never] baz1 () () () () () =
-        bar false y1 () () ()
-      in
+      let[@inline never] baz1 () () () () () = bar false y1 () () () in
       baz1 () () () () ()
     in
     baz0 1 () () () () () () ()

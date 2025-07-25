@@ -17,26 +17,32 @@
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-include module type of struct include Ident end
+include module type of struct
+  include Ident
+end
 
 type backend_var = t
 
 val name_for_debugger : t -> string
+
 val unique_name_for_debugger : t -> string
 
 module Provenance : sig
   type t
 
-  val create
-     : module_path:Path.t
-    -> location:Debuginfo.t
-    -> original_ident:Ident.t
-    -> debug_uid:Flambda2_identifiers.Flambda_debug_uid.t
-    -> t
+  val create :
+    module_path:Path.t ->
+    location:Debuginfo.t ->
+    original_ident:Ident.t ->
+    debug_uid:Flambda2_identifiers.Flambda_debug_uid.t ->
+    t
 
   val module_path : t -> Path.t
+
   val location : t -> Debuginfo.t
+
   val original_ident : t -> Ident.t
+
   val debug_uid : t -> Flambda2_identifiers.Flambda_debug_uid.t
 
   val print : Format.formatter -> t -> unit
@@ -53,6 +59,7 @@ module With_provenance : sig
   val create : ?provenance:Provenance.t -> backend_var -> t
 
   val var : t -> backend_var
+
   val provenance : t -> Provenance.t option
 
   val name : t -> string

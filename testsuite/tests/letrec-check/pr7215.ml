@@ -1,13 +1,14 @@
 (* TEST
- toplevel;
+   toplevel;
 *)
 
 (* From Stephen Dolan *)
-type (_,_) eq = Refl : ('a, 'a) eq;;
-let cast (type a) (type b) (Refl : (a, b) eq) (x : a) = (x : b);;
+type (_, _) eq = Refl : ('a, 'a) eq
+
+let cast (type a b) (Refl : (a, b) eq) (x : a) : b = x
 
 let is_int (type a) =
   let rec (p : (int, a) eq) = match p with Refl -> Refl in
   p
 
-let bang = print_string (cast (is_int : (int, string) eq) 42);;
+let bang = print_string (cast (is_int : (int, string) eq) 42)

@@ -18,5 +18,4 @@
 val associate : Odoc_module.t_module list -> unit
 
 val assoc_comments_info :
-    string -> Odoc_module.t_module list ->
-      Odoc_types.info -> Odoc_types.info
+  string -> Odoc_module.t_module list -> Odoc_types.info -> Odoc_types.info

@@ -19,18 +19,17 @@
 type cfg_item_info =
   | Cfg of Cfg_with_layout.t
   | Data of Cmm.data_item list
-  | Cfg_before_regalloc of {
-    (* `cfg_with_layout` and `relocatable_regs` need to be marshalled together
-       in order to preserve sharing. *)
-    cfg_with_layout_and_relocatable_regs : Cfg_with_layout.t * (Reg.t list);
-    cmm_label: Label.t;
-    reg_stamp: int;
-  } 
+  | Cfg_before_regalloc of
+      { (* `cfg_with_layout` and `relocatable_regs` need to be marshalled together
+           in order to preserve sharing. *)
+        cfg_with_layout_and_relocatable_regs : Cfg_with_layout.t * Reg.t list;
+        cmm_label : Label.t;
+        reg_stamp : int
+      }
 
 type cfg_unit_info =
-  {
-    mutable unit : Compilation_unit.t;
-    mutable items : cfg_item_info list;
+  { mutable unit : Compilation_unit.t;
+    mutable items : cfg_item_info list
   }
 
 type error =
@@ -43,16 +42,16 @@ exception Error of error
 
 let save filename cfg_unit_info =
   let ch = open_out_bin filename in
-  Misc.try_finally (fun () ->
-    output_string ch Config.cfg_magic_number;
-    output_value ch cfg_unit_info;
-    (* Saved because Emit depends on Cmm.label. *)
-    output_value ch (Cmm.cur_label ());
-    (* Compute digest of the contents and append it to the file. *)
-    flush ch;
-    let crc = Digest.file filename in
-    Digest.output ch crc
-  )
+  Misc.try_finally
+    (fun () ->
+      output_string ch Config.cfg_magic_number;
+      output_value ch cfg_unit_info;
+      (* Saved because Emit depends on Cmm.label. *)
+      output_value ch (Cmm.cur_label ());
+      (* Compute digest of the contents and append it to the file. *)
+      flush ch;
+      let crc = Digest.file filename in
+      Digest.output ch crc)
     ~always:(fun () -> close_out ch)
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
 
@@ -60,24 +59,23 @@ let restore filename =
   let ic = open_in_bin filename in
   Misc.try_finally
     (fun () ->
-       let magic = Config.cfg_magic_number in
-       let buffer = really_input_string ic (String.length magic) in
-       if String.equal buffer magic then begin
-         try
-           let cfg_unit_info = (input_value ic : cfg_unit_info) in
-           let last_label = (input_value ic : Cmm.label) in
-           Cmm.reset ();
-           Cmm.set_label last_label;
-           let crc = Digest.input ic in
-           cfg_unit_info, crc
-         with End_of_file | Failure _ -> raise (Error (Corrupted filename))
-            | Error e -> raise (Error e)
-       end
-       else if String.sub buffer 0 9 = String.sub magic 0 9 then
-         raise (Error (Wrong_version filename))
-       else
-         raise (Error (Wrong_format filename))
-    )
+      let magic = Config.cfg_magic_number in
+      let buffer = really_input_string ic (String.length magic) in
+      if String.equal buffer magic
+      then
+        try
+          let cfg_unit_info = (input_value ic : cfg_unit_info) in
+          let last_label = (input_value ic : Cmm.label) in
+          Cmm.reset ();
+          Cmm.set_label last_label;
+          let crc = Digest.input ic in
+          cfg_unit_info, crc
+        with
+        | End_of_file | Failure _ -> raise (Error (Corrupted filename))
+        | Error e -> raise (Error e)
+      else if String.sub buffer 0 9 = String.sub magic 0 9
+      then raise (Error (Wrong_version filename))
+      else raise (Error (Wrong_format filename)))
     ~always:(fun () -> close_in ic)
 
 (* Error report *)
@@ -86,22 +84,18 @@ open Format
 
 let report_error ppf = function
   | Wrong_format filename ->
-      fprintf ppf "Expected Cfg format. Incompatible file %a"
-        Location.print_filename filename
+    fprintf ppf "Expected Cfg format. Incompatible file %a"
+      Location.print_filename filename
   | Wrong_version filename ->
-      fprintf ppf
-        "%a@ is not compatible with this version of OCaml"
-        Location.print_filename filename
+    fprintf ppf "%a@ is not compatible with this version of OCaml"
+      Location.print_filename filename
   | Corrupted filename ->
-      fprintf ppf "Corrupted format@ %a"
-        Location.print_filename filename
+    fprintf ppf "Corrupted format@ %a" Location.print_filename filename
   | Marshal_failed filename ->
-      fprintf ppf "Failed to marshal Cfg to file@ %a"
-        Location.print_filename filename
+    fprintf ppf "Failed to marshal Cfg to file@ %a" Location.print_filename
+      filename
 
 let () =
-  Location.register_error_of_exn
-    (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
-      | _ -> None
-    )
+  Location.register_error_of_exn (function
+    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | _ -> None)

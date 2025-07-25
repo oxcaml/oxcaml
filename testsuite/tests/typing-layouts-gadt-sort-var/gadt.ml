@@ -1,2 +1,1 @@
-type t =
-  | Mk : (unit -> 'a) * ('a -> unit) -> t
+type t = Mk : (unit -> 'a) * ('a -> unit) -> t

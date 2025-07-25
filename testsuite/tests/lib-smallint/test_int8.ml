@@ -5,7 +5,4 @@
 *)
 
 let () =
-  Test_smallint.run
-    (module Stdlib_beta.Int8)
-    ~min_int:(-0x80)
-    ~max_int:0x7f
+  Test_smallint.run (module Stdlib_beta.Int8) ~min_int:(-0x80) ~max_int:0x7f

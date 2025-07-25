@@ -1,14 +1,13 @@
 (* TEST
- flags = "-dlambda -dno-unique-ids";
- expect;
+   flags = "-dlambda -dno-unique-ids";
+   expect;
 *)
 
 (* Check that the code produced by TMC reads reasonably well. *)
-let[@tail_mod_cons] rec map f = function
-  | [] -> []
-  | x :: xs -> f x :: map f xs
-;;
-[%%expect{|
+let[@tail_mod_cons] rec map f = function [] -> [] | x :: xs -> f x :: map f xs
+
+[%%expect
+{|
 (letrec
   (map
      (function {nlocal = 0} f
@@ -59,9 +58,15 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 |}]
 
 (* check that TMC works for records as well *)
-type 'a cell = { hd : 'a; tl : 'a rec_list }
+type 'a cell =
+  { hd : 'a;
+    tl : 'a rec_list
+  }
+
 and 'a rec_list = 'a cell option
-[%%expect{|
+
+[%%expect
+{|
 0
 type 'a cell = { hd : 'a; tl : 'a rec_list; }
 and 'a rec_list = 'a cell option
@@ -69,9 +74,10 @@ and 'a rec_list = 'a cell option
 
 let[@tail_mod_cons] rec rec_map f = function
   | None -> None
-  | Some {hd; tl} -> Some { hd = f hd; tl = rec_map f tl }
-;;
-[%%expect{|
+  | Some { hd; tl } -> Some { hd = f hd; tl = rec_map f tl }
+
+[%%expect
+{|
 (letrec
   (rec_map
      (function {nlocal = 0} f
@@ -119,12 +125,13 @@ val rec_map : ('a -> 'b) -> 'a rec_list -> 'b rec_list = <fun>
 
 (* check the case where several constructors are nested;
    we want to avoid creating an intermediate destination
-   for each constructor.  *)
+   for each constructor. *)
 let[@tail_mod_cons] rec trip = function
   | [] -> []
   | x :: xs -> (x, 0) :: (x, 1) :: (x, 2) :: trip xs
-;;
-[%%expect{|
+
+[%%expect
+{|
 (letrec
   (trip
      (function {nlocal = 0}
@@ -217,8 +224,9 @@ val trip : 'a list -> ('a * int) list = <fun>
 let[@tail_mod_cons] rec effects f = function
   | [] -> []
   | (x, y) :: xs -> f x :: f y :: effects f xs
-;;
-[%%expect{|
+
+[%%expect
+{|
 (letrec
   (effects
      (function {nlocal = 0} f
@@ -290,13 +298,11 @@ val effects : ('a -> 'b) -> ('a * 'a) list -> 'b list = <fun>
    are nested across a duplicating context: the [f None ::]
    part should not be duplicated in each branch. *)
 let[@tail_mod_cons] rec map_stutter f xs =
-  f None :: (
-    match xs with
-    | [] -> []
-    | x :: xs -> f (Some x) :: map_stutter f xs
-  )
-;;
-[%%expect{|
+  f None
+  :: (match xs with [] -> [] | x :: xs -> f (Some x) :: map_stutter f xs)
+
+[%%expect
+{|
 (letrec
   (map_stutter
      (function {nlocal = 0} f
@@ -367,15 +373,22 @@ val map_stutter : ('a option -> 'b) -> 'a list -> 'b list = <fun>
    the [f None :: .] part can be delayed below the let..in,
    buts it expression argument must be let-bound
    before the let..in is evaluated. *)
-type 'a stream = { hd : 'a; tl : unit -> 'a stream }
+type 'a stream =
+  { hd : 'a;
+    tl : unit -> 'a stream
+  }
+
 let[@tail_mod_cons] rec smap_stutter f xs n =
-  if n = 0 then []
-  else f None :: (
-    let v = f (Some xs.hd) in
-    v :: smap_stutter f (xs.tl ()) (n - 1)
-  )
-;;
-[%%expect{|
+  if n = 0
+  then []
+  else
+    f None
+    ::
+    (let v = f (Some xs.hd) in
+     v :: smap_stutter f (xs.tl ()) (n - 1))
+
+[%%expect
+{|
 0
 type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
 (letrec

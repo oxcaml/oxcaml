@@ -27,13 +27,18 @@ let copy ic oc up_to =
 
 let text =
   "Filler_text_added_to_preserve_locations_while_translating_from_old_syntax__"
+
 let len = String.length text
+
 let index = ref (-1)
-let lorem () = incr index; text.[!index mod len]
+
+let lorem () =
+  incr index;
+  text.[!index mod len]
 
 type mode =
-| Keep_chars of int (* how many chars to skip before keeping chars *)
-| Keep_lines
+  | Keep_chars of int (* how many chars to skip before keeping chars *)
+  | Keep_lines
 
 let copy_newlines ~mode ic oc up_to =
   let skip, insert =
@@ -45,14 +50,14 @@ let copy_newlines ~mode ic oc up_to =
   try
     while pos_in ic < up_to do
       let c = input_char ic in
-      if c = '\n' || c = '\r' then begin
+      if c = '\n' || c = '\r'
+      then (
         output_char oc c;
         output_string oc !insert;
-        insert := "";
-      end else if !skip <= 0 then
-        output_char oc (lorem ())
-      else
-        decr skip
+        insert := "")
+      else if !skip <= 0
+      then output_char oc (lorem ())
+      else decr skip
     done
   with End_of_file -> ()
 
@@ -63,31 +68,35 @@ let tsl_block_of_file test_filename =
   try
     let block = Tsl_parser.tsl_block Tsl_lexer.token lexbuf in
     close_in input_channel;
-    if !Tsl_lexer.has_comments then
-      eprintf "%s:1.0: warning: test script has comments\n" test_filename;
+    if !Tsl_lexer.has_comments
+    then eprintf "%s:1.0: warning: test script has comments\n" test_filename;
     block
-  with
-  | Parsing.Parse_error ->
+  with Parsing.Parse_error ->
     let open Lexing in
     let p = lexbuf.lex_start_p in
-    Printf.eprintf "%s:%d.%d: syntax error in test script\n%!"
-      test_filename p.pos_lnum (p.pos_cnum - p.pos_bol);
+    Printf.eprintf "%s:%d.%d: syntax error in test script\n%!" test_filename
+      p.pos_lnum (p.pos_cnum - p.pos_bol);
     raise Parsing.Parse_error
 
 (* In what style to output the translated test file *)
 type style =
-| Plain
-| Lines
-| Chars
+  | Plain
+  | Lines
+  | Chars
 
 (* What kind of comments are used in the test file *)
-type kind = { opening : string; closing : string }
+type kind =
+  { opening : string;
+    closing : string
+  }
+
 let c_kind = { opening = "/*"; closing = "*/" }
+
 let ocaml_kind = { opening = "(*"; closing = "*)" }
 
 let file ~style ~compact f =
   let tsl_block = tsl_block_of_file f in
-  let (rootenv_statements, test_trees) =
+  let rootenv_statements, test_trees =
     Tsl_semantics.test_trees_of_tsl_block tsl_block
   in
   let ast =
@@ -99,8 +108,8 @@ let file ~style ~compact f =
   Location.init lexbuf f;
   let rec seek_to_begin () =
     match[@ocaml.warning "-fragile-match"] Tsl_lexer.token lexbuf with
-    | Tsl_parser.TSL_BEGIN_C_STYLE position -> (c_kind, position)
-    | Tsl_parser.TSL_BEGIN_OCAML_STYLE position -> (ocaml_kind, position)
+    | Tsl_parser.TSL_BEGIN_C_STYLE position -> c_kind, position
+    | Tsl_parser.TSL_BEGIN_OCAML_STYLE position -> ocaml_kind, position
     | _ -> seek_to_begin ()
   in
   let rec seek_to_end () =
@@ -109,15 +118,16 @@ let file ~style ~compact f =
     | Tsl_parser.TSL_END_OCAML_STYLE -> ()
     | _ -> seek_to_end ()
   in
-  let (kind, position) = seek_to_begin () in
+  let kind, position = seek_to_begin () in
   copy copy_ic stdout Lexing.(lexbuf.lex_curr_p.pos_cnum);
-  if position = `Below || style = Plain then begin
+  if position = `Below || style = Plain
+  then (
     print_string (if ast = Tsl_ast.Ast ([], []) then " " else "\n");
     Tsl_semantics.print_tsl_ast ~compact stdout ast;
     seek_to_end ();
     seek_in copy_ic Lexing.(lexbuf.lex_start_p.pos_cnum);
-    copy copy_ic stdout max_int;
-  end else begin
+    copy copy_ic stdout max_int)
+  else (
     printf "_BELOW";
     seek_to_end ();
     let limit = Lexing.(lexbuf.lex_start_p.pos_cnum) in
@@ -131,8 +141,7 @@ let file ~style ~compact f =
     copy copy_ic stdout max_int;
     printf "\n%s TEST\n" kind.opening;
     Tsl_semantics.print_tsl_ast ~compact stdout ast;
-    printf "%s\n" kind.closing;
-  end;
+    printf "%s\n" kind.closing);
   flush stdout;
   close_in lex_ic;
-  close_in copy_ic;
+  close_in copy_ic

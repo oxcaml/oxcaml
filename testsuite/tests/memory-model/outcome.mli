@@ -4,43 +4,47 @@
 
 module type T = sig
   type t
+
   val compare : t -> t -> int
+
   val pp : t -> string
 end
 
-module type Allow = sig val allowed : bool end
+module type Allow = sig
+  val allowed : bool
+end
 
 module Int : T with type t = int
 
-module Make :
-functor(T0:T) ->
-functor(T1:T) ->
-functor
-  (N:
-     sig
-       val name : string
-       val tag0 : string
-       val tag1 : string
-       val ok : T0.t -> T1.t -> bool
-     end) ->
-functor
-  (A:Allow) ->
-    sig
+module Make : functor
+  (T0 : T)
+  (T1 : T)
+  (N : sig
+     val name : string
 
-    type t
+     val tag0 : string
 
-    val compare : t -> t -> int
+     val tag1 : string
 
-    val ok : t -> bool
+     val ok : T0.t -> T1.t -> bool
+   end)
+  (A : Allow)
+  -> sig
+  type t
 
-    val allowed : bool
+  val compare : t -> t -> int
 
-    val name : string
+  val ok : t -> bool
 
-    val make : T0.t -> T1.t -> t
+  val allowed : bool
 
-    val pp : out_channel -> t -> unit
-  end
+  val name : string
+
+  val make : T0.t -> T1.t -> t
+
+  val pp : out_channel -> t -> unit
+end
 
 module OK : Allow
+
 module NO : Allow

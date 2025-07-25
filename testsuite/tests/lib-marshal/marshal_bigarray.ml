@@ -8,7 +8,8 @@ let () =
   in
   (* Bigarray dimension marshalling scheme: use an extra 8 bytes
      to marshal dimensions >=0xffff to avoid overflow *)
-  assert
-    (((String.length (marshalled large) - String.length (marshalled small))
-      - (large - small))
-     = 8)
+  assert (
+    String.length (marshalled large)
+    - String.length (marshalled small)
+    - (large - small)
+    = 8)

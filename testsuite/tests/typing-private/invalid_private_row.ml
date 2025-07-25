@@ -1,19 +1,40 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (** Error message for trying to make private a row type variable
     that only exists syntactically *)
 
-type a = [`A | `C | `D]
-type b = [`B | `D | `E]
-type c = private [< a | b > `A `B `C `D `E]
-[%%expect {|
+type a =
+  [ `A
+  | `C
+  | `D ]
+
+type b =
+  [ `B
+  | `D
+  | `E ]
+
+type c = private
+  [< a
+  | b > `A
+  `B
+  `C
+  `D
+  `E ]
+
+[%%expect
+{|
 type a = [ `A | `C | `D ]
 type b = [ `B | `D | `E ]
-Line 6, characters 0-43:
-6 | type c = private [< a | b > `A `B `C `D `E]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Lines 14-20, characters 0-6:
+14 | type c = private
+15 |   [< a
+16 |   | b > `A
+17 |   `B
+18 |   `C
+19 |   `D
+20 |   `E ]
 Error: This private row type declaration is invalid.
        The type expression on the right-hand side reduces to
          "[ `A | `B | `C | `D | `E ]"
@@ -23,11 +44,13 @@ Error: This private row type declaration is invalid.
          "private [ `A | `B | `C | `D | `E ]"
 |}]
 
-type u = private < x:int; .. > as 'a constraint 'a = < x: int > ;;
-[%%expect {|
-Line 1, characters 0-63:
-1 | type u = private < x:int; .. > as 'a constraint 'a = < x: int > ;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type u = private < x : int ; .. > as 'a constraint 'a = < x : int >
+
+[%%expect
+{|
+Line 1, characters 0-67:
+1 | type u = private < x : int ; .. > as 'a constraint 'a = < x : int >
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This private row type declaration is invalid.
        The type expression on the right-hand side reduces to
          "< x : int >"
@@ -37,11 +60,13 @@ Error: This private row type declaration is invalid.
          "private < x : int >"
 |}]
 
-type u = private [> `A ] as 'a constraint 'a = [< `A ] ;;
-[%%expect {|
-Line 1, characters 0-54:
-1 | type u = private [> `A ] as 'a constraint 'a = [< `A ] ;;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type u = private [> `A] as 'a constraint 'a = [< `A]
+
+[%%expect
+{|
+Line 1, characters 0-52:
+1 | type u = private [> `A] as 'a constraint 'a = [< `A]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This private row type declaration is invalid.
        The type expression on the right-hand side reduces to
          "[ `A ]"

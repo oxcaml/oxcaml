@@ -1,7 +1,7 @@
 (* TEST
- set OCAMLRUNPARAM = "s32";
- runtime5;
- native;
+   set OCAMLRUNPARAM = "s32";
+   runtime5;
+   native;
 *)
 
 (* This test verifies that stack frames are correct when raising unhandled
@@ -20,9 +20,7 @@ open Effect
 type _ t += Yield : unit t
 
 let rec burn l =
-  if List.hd l > 12 then ()
-  else
-    burn (l @ l |> List.map (fun x -> x + 1))
+  if List.hd l > 12 then () else burn (l @ l |> List.map (fun x -> x + 1))
 
 let foo l =
   burn l;
@@ -32,6 +30,5 @@ let bar i = foo [i]
 
 let () =
   for _ = 1 to 10_000 do
-    try bar 8
-    with Unhandled _ -> ()
+    try bar 8 with Unhandled _ -> ()
   done

@@ -1,19 +1,24 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let x = 5 in
 let y = 2 in
 let z = 1 in
 let a = 4 in
-let f _ = ignore x; ignore y; ignore z; a in
+let f _ =
+  ignore x;
+  ignore y;
+  ignore z;
+  a
+in
 if f 0 <> 4 then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

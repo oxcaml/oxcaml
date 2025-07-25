@@ -1,17 +1,17 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 try
   ignore (2 mod 0);
-  raise Not_found;
+  raise Not_found
 with Division_by_zero -> ()
-;;
 
 (**
        0 CONSTINT 42

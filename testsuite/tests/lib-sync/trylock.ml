@@ -1,7 +1,7 @@
 (* TEST
- runtime5;
- { bytecode; }
- { native; }
+   runtime5;
+   { bytecode; }
+   { native; }
 *)
 
 (* Test Mutex.try_lock *)
@@ -11,7 +11,6 @@ let () =
   Mutex.lock m;
   let res = Mutex.try_lock m in
   Mutex.unlock m;
-  if res = false then
-    print_endline "passed"
-  else
-    print_endline "FAILED (try_lock returned true)"
+  if res = false
+  then print_endline "passed"
+  else print_endline "FAILED (try_lock returned true)"

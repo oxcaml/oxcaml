@@ -23,8 +23,9 @@ let to_keep = ref Compilation_unit.Name.Set.empty
 let negate = Sys.argv.(3) = "-v"
 
 let keep0 name =
-  if negate then not (Compilation_unit.Name.Set.mem name !to_keep)
-  else (Compilation_unit.Name.Set.mem name !to_keep)
+  if negate
+  then not (Compilation_unit.Name.Set.mem name !to_keep)
+  else Compilation_unit.Name.Set.mem name !to_keep
 
 let keep = function
   | Symtable.Global.Glob_predef _ -> true
@@ -32,8 +33,7 @@ let keep = function
     let name = Compilation_unit.name cu in
     keep0 name
 
-let expunge_map tbl =
-  Symtable.filter_global_map keep tbl
+let expunge_map tbl = Symtable.filter_global_map keep tbl
 
 let expunge_crcs tbl =
   Array.to_list tbl
@@ -43,7 +43,7 @@ let expunge_crcs tbl =
 let main () =
   let input_name = Sys.argv.(1) in
   let output_name = Sys.argv.(2) in
-  for i = (if negate then 4 else 3) to Array.length Sys.argv - 1 do
+  for i = if negate then 4 else 3 to Array.length Sys.argv - 1 do
     let modname = Unit_info.modulize Sys.argv.(i) in
     let cu_name = Compilation_unit.Name.of_string modname in
     to_keep := Compilation_unit.Name.Set.add cu_name !to_keep
@@ -52,26 +52,26 @@ let main () =
   let toc = Bytesections.read_toc ic in
   seek_in ic 0;
   let oc =
-    open_out_gen [Open_wronly; Open_creat; Open_trunc; Open_binary] 0o777
-      output_name in
+    open_out_gen
+      [Open_wronly; Open_creat; Open_trunc; Open_binary]
+      0o777 output_name
+  in
   let first_pos = Bytesections.pos_first_section toc in
   (* Copy the file up to the first section as is *)
   copy_file_chunk ic oc first_pos;
   (* Copy each section, modifying the symbol section in passing *)
   let toc_writer = Bytesections.init_record oc in
   List.iter
-    (fun {Bytesections.name; pos; len} ->
+    (fun { Bytesections.name; pos; len } ->
       seek_in ic pos;
-      begin match name with
-        SYMB ->
-          let global_map : Symtable.global_map = input_value ic in
-          output_value oc (expunge_map global_map)
+      (match name with
+      | SYMB ->
+        let global_map : Symtable.global_map = input_value ic in
+        output_value oc (expunge_map global_map)
       | CRCS ->
-          let crcs : Import_info.t array = input_value ic in
-          output_value oc (expunge_crcs crcs)
-      | _ ->
-          copy_file_chunk ic oc len
-      end;
+        let crcs : Import_info.t array = input_value ic in
+        output_value oc (expunge_crcs crcs)
+      | _ -> copy_file_chunk ic oc len);
       Bytesections.record toc_writer name)
     (Bytesections.all toc);
   (* Rewrite the toc and trailer *)
@@ -80,4 +80,6 @@ let main () =
   close_in ic;
   close_out oc
 
-let _ = main (); exit 0
+let _ =
+  main ();
+  exit 0

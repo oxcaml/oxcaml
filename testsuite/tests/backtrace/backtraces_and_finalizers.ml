@@ -1,7 +1,7 @@
 (* TEST
- flags = "-g -inline 0";
- ocamlrunparam += ",b=1";
- native;
+   flags = "-g -inline 0";
+   ocamlrunparam += ",b=1";
+   native;
 *)
 
 let finaliser _ = try raise Exit with _ -> ()
@@ -21,7 +21,7 @@ let () =
       ignore (create () : unit ref);
       f ()
     with _ ->
-      for i = 1 to minor_size / 2 - 1 do
+      for i = 1 to (minor_size / 2) - 1 do
         ignore (ref ())
       done;
       ignore (Printexc.get_backtrace () : string)

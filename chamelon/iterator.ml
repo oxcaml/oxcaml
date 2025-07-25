@@ -15,7 +15,7 @@ let minimize_basic (state : 'a) (f : 'a -> pos:int -> 'a minimized_step_result)
     match f state ~pos with
     | New_state nstate -> aux nstate pos true
     | Change_removes_error -> aux state (pos + 1) ever_changed
-    | No_more_changes -> (state, ever_changed)
+    | No_more_changes -> state, ever_changed
   in
   aux state 0 false
 
@@ -26,15 +26,16 @@ let minimize_ranged (state : 'a)
     match f state ~pos ~len with
     | New_state nstate -> loop_increasing nstate pos (2 * len) true
     | Change_removes_error -> loop_decreasing state pos (len / 2) ever_changed
-    | No_more_changes -> (state, ever_changed)
+    | No_more_changes -> state, ever_changed
   and loop_decreasing (state : 'a) (pos : int) (len : int) (ever_changed : bool)
       =
-    if len = 0 then loop_increasing state (pos + 1) 1 ever_changed
+    if len = 0
+    then loop_increasing state (pos + 1) 1 ever_changed
     else
       match f state ~pos ~len with
       | New_state nstate -> loop_decreasing nstate pos (len / 2) true
       | Change_removes_error -> loop_decreasing state pos (len / 2) ever_changed
-      | No_more_changes -> (state, ever_changed)
+      | No_more_changes -> state, ever_changed
   in
   loop_increasing state 0 1 false
 
@@ -47,15 +48,17 @@ let minimize_at minimize cur_file map ~pos ~len =
         pos <= !r && !r < pos + len)
       map cur_file
   in
-  (nmap, pos <= !r)
+  nmap, pos <= !r
 
 let step_minimizer c minimize cur_file map ~pos ~len =
   Format.eprintf "Trying %s: pos=%d, len=%d... " minimize.minimizer_name pos len;
   let map, changed = minimize_at minimize cur_file map ~pos ~len in
   let r =
-    if changed then (
+    if changed
+    then (
       update_output map;
-      if raise_error c then (
+      if raise_error c
+      then (
         save_outputs map;
         New_state map)
       else Change_removes_error)
@@ -76,9 +79,11 @@ let dicho = true
 
 let apply_minimizer test map cur_file minimize (c : string) =
   let result, has_changed =
-    if test then minimize_at minimize cur_file map ~pos:0 ~len:1
-    else if dicho then minimize_ranged map (step_minimizer c minimize cur_file)
+    if test
+    then minimize_at minimize cur_file map ~pos:0 ~len:1
+    else if dicho
+    then minimize_ranged map (step_minimizer c minimize cur_file)
     else minimize_basic map (step_minimizer c minimize cur_file ~len:1)
   in
   update_output result;
-  (result, has_changed)
+  result, has_changed

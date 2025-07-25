@@ -1,5 +1,5 @@
-File "pr6752_bad.ml", line 26, characters 31-40:
-26 | let q' : Common0.msg Queue.t = Common0.q
+File "pr6752_bad.ml", line 24, characters 31-40:
+24 | let q' : Common0.msg Queue.t = Common0.q
                                     ^^^^^^^^^
 Error: This expression has type "'a Queue.t"
        but an expression was expected of type "Common0.msg Queue.t"

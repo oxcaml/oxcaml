@@ -1,6 +1,9 @@
-File "t04bad.ml", line 10, characters 0-73:
-10 | module rec A : sig type t = int * A.t end = struct type t = int * A.t end;;
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "t04bad.ml", lines 6-10, characters 0-3:
+ 6 | module rec A : sig
+ 7 |   type t = int * A.t
+ 8 | end = struct
+ 9 |   type t = int * A.t
+10 | end
 Error: The type abbreviation "A.t" is cyclic:
          "int * A.t" contains "A.t",
          "A.t" = "int * A.t",

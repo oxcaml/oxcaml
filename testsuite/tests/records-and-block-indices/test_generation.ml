@@ -28,8 +28,7 @@ let interesting_type_trees : Type_structure.t Tree.t list =
       [Int; Int32_u];
       [Int; Int64x2_u];
       [Float; Float_u];
-      [Unit_u; String]
-    ]
+      [Unit_u; String] ]
     ~f:(fun leaves ->
       List.concat_map
         (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
@@ -39,12 +38,9 @@ let interesting_type_trees : Type_structure.t Tree.t list =
           [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
             Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
             Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
-            Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
-          ]
-        else []
-        )
-        ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
-    )
+            Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]] ]
+        else [])
+        ~f:(fun shape -> Tree.enumerate ~shape ~leaves))
   @ List.concat_map
       (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:2)
       ~f:(fun shape ->
@@ -57,8 +53,7 @@ let interesting_type_trees : Type_structure.t Tree.t list =
                Int64_u;
                Nativeint_u;
                Unit_u;
-               Variant [[Unit_u]]
-             ]
+               Variant [[Unit_u]] ]
             @
             if patient
             then
@@ -69,12 +64,8 @@ let interesting_type_trees : Type_structure.t Tree.t list =
                 Variant
                   [ [Unit_u];
                     [Unit_u; Unit_u];
-                    [Tuple ([Unit_u; Unit_u], Unboxed)]
-                  ]
-              ]
-            else []
-            )
-    )
+                    [Tuple ([Unit_u; Unit_u], Unboxed)] ] ]
+            else []))
   @ (* Some particular interesting trees *)
   [ Branch
       (* Mixed then all flat *)
@@ -96,8 +87,7 @@ let interesting_type_trees : Type_structure.t Tree.t list =
       [Branch [Leaf Int64x2_u; Leaf String]; Branch [Leaf Int64; Leaf Float_u]];
     Branch
       (* An int64x2 that would be reordered to the gap of an inner record *)
-      [Leaf Int64x2_u; Branch [Leaf String; Leaf Float_u]]
-  ]
+      [Leaf Int64x2_u; Branch [Leaf String; Leaf Float_u]] ]
   |> List.sort_uniq ~cmp:(Tree.compare Type_structure.compare)
 
 let preamble =
@@ -155,8 +145,7 @@ let line fmt =
     (fun s ->
       let indent = Seq.init (!indent * 2) (fun _ -> ' ') |> String.of_seq in
       print_endline (indent ^ s);
-      flush stdout
-    )
+      flush stdout)
     fmt
 
 let print_in_test s =
@@ -201,8 +190,7 @@ let for_ var ~from ~to_ ~debug_exprs f =
   line "for %s = %s to %s do" var from to_;
   with_indent (fun () ->
       let debug_exprs = { expr = var; format_s = "%d" } :: debug_exprs in
-      f ~debug_exprs
-  );
+      f ~debug_exprs);
   line "done;"
 
 (* Iterate through a list of ints *)
@@ -210,8 +198,7 @@ let iter l var ~debug_exprs f =
   line "iter (%s) ~f:(fun %s ->" l var;
   with_indent (fun () ->
       let debug_exprs = { expr = var; format_s = "%d" } :: debug_exprs in
-      f ~debug_exprs
-  );
+      f ~debug_exprs);
   line ") [@nontail];"
 
 let section s =
@@ -261,13 +248,9 @@ let test_record_access ty ~local =
               line "let actual = r%s in" (Path.to_string full_path);
               line "let expected = %s in"
                 (Type.value_code sub_ty
-                   (Type.num_subvals_left_of_path ty full_path)
-                );
+                   (Type.num_subvals_left_of_path ty full_path));
               seq_assert ~debug_exprs:[]
-                (sprintf "%s actual expected" (Type.eq_code sub_ty))
-          )
-      )
-  );
+                (sprintf "%s actual expected" (Type.eq_code sub_ty)))));
   line "Gc.compact ();";
   line "(* 2. Test field set *)";
   line "(* Change [r] to [next_r] one field at a time *)";
@@ -282,8 +265,7 @@ let test_record_access ty ~local =
       line "r.%s <- next_r.%s;" lbl lbl;
       line "let r_expected = { r_expected with %s = next_r.%s } in" lbl lbl;
       seq_assert ~debug_exprs:[] "eq r r_expected";
-      line "Gc.compact ();"
-  );
+      line "Gc.compact ();");
   line "(* 3. Test deep matching *)";
   let rec mk_deep_record_el_pat (ty : Type.t) : string option =
     match ty with
@@ -292,8 +274,7 @@ let test_record_access ty ~local =
         List.map fields ~f:(fun (s, fld_ty) ->
             match mk_deep_record_el_pat fld_ty with
             | Some pat -> sprintf "%s = %s" s pat
-            | None -> s
-        )
+            | None -> s)
       in
       Some (sprintf "#{ %s }" (String.concat ~sep:"; " field_pats))
     | _ -> None
@@ -311,8 +292,7 @@ let test_record_access ty ~local =
               match mk_deep_record_el_pat fld_ty with
               | Some pat -> sprintf "%s = %s" s pat
               | None -> s
-            else s
-        )
+            else s)
       in
       sprintf "{ %s }" (String.concat ~sep:"; " field_pats)
     | _ -> invalid_arg "expected boxed record"
@@ -335,16 +315,10 @@ let test_record_access ty ~local =
                 let sub_ty = Type.follow_path ty full_path in
                 line "let expected_%s = %s in" last_lbl
                   (Type.value_code sub_ty
-                     (Type.num_subvals_left_of_path ty full_path + 100)
-                  );
+                     (Type.num_subvals_left_of_path ty full_path + 100));
                 seq_assert ~debug_exprs:[]
                   (sprintf "%s expected_%s %s" (Type.eq_code sub_ty) last_lbl
-                     last_lbl
-                  )
-              )
-          )
-      )
-  );
+                     last_lbl)))));
   line "Gc.compact ();";
   line "(* 4. Test shallow matching *)";
   let pat = mk_record_pat ty ~deep:false in
@@ -352,11 +326,9 @@ let test_record_access ty ~local =
   List.iter fields ~f:(fun (lbl, fld_ty) ->
       line "let expected_%s = %s in" lbl
         (Type.value_code fld_ty
-           (Type.num_subvals_left_of_path ty [Path.Field lbl] + 100)
-        );
+           (Type.num_subvals_left_of_path ty [Path.Field lbl] + 100));
       seq_assert ~debug_exprs:[]
-        (sprintf "%s expected_%s %s" (Type.eq_code fld_ty) lbl lbl)
-  );
+        (sprintf "%s expected_%s %s" (Type.eq_code fld_ty) lbl lbl));
   print_newline ()
 
 let toplevel_unit_block f =
@@ -364,8 +336,7 @@ let toplevel_unit_block f =
   line "let to_run () =";
   with_indent (fun () ->
       f ();
-      line "()"
-  );
+      line "()");
   line ";;";
   line "let () = to_run ();;";
   line ""
@@ -394,14 +365,14 @@ let main test ~bytecode =
   in
   let types =
     if bytecode
-    then List.filter types ~f:(fun ty -> not (Type_structure.contains_vec128 ty))
+    then
+      List.filter types ~f:(fun ty -> not (Type_structure.contains_vec128 ty))
     else types
   in
   let naming = Type_naming.empty in
   let (naming : Type_naming.t), (types : Type.t list) =
     List.fold_left_map types ~init:naming ~f:(fun naming ty ->
-        Type_naming.add_names naming ty
-    )
+        Type_naming.add_names naming ty)
   in
   line
     {|(* TEST
@@ -411,15 +382,13 @@ let main test ~bytecode =
   if bytecode
   then (
     line {| flags = "-extension layouts_alpha";|};
-    line {| bytecode;|}
-  )
+    line {| bytecode;|})
   else (
     line {| modules = "stubs.c";|};
     line {| flags = "-extension simd_beta -extension layouts_alpha";|};
     line {| flambda2;|};
     line {| stack-allocation;|};
-    line {| native;|}
-  );
+    line {| native;|});
   line {|*)|};
   line "(** This is code generated by [test_generation.ml]. *)";
   line "";
@@ -428,22 +397,17 @@ let main test ~bytecode =
   line "%s" preamble;
   List.iter (Type_naming.decls_code naming) ~f:(fun s -> line "%s" s);
   line "";
-  begin
-    match test with
-    | Record_size ->
-      List.iter types ~f:(fun ty ->
-          toplevel_unit_block (fun () -> test_record_size ~bytecode ty)
-      )
-    | Record_access { local } ->
-      List.iter types ~f:(fun ty ->
-          toplevel_unit_block (fun () -> test_record_access ~local ty)
-      )
-  end;
+  (match test with
+  | Record_size ->
+    List.iter types ~f:(fun ty ->
+        toplevel_unit_block (fun () -> test_record_size ~bytecode ty))
+  | Record_access { local } ->
+    List.iter types ~f:(fun ty ->
+        toplevel_unit_block (fun () -> test_record_access ~local ty)));
   line "for i = 1 to %d do" !test_id;
   with_indent (fun () ->
       line
-        {|if not (Int_set.mem i !tests_run) then failwithf "test %%d not run" i|}
-  );
+        {|if not (Int_set.mem i !tests_run) then failwithf "test %%d not run" i|});
   line "done;;";
   print_in_test "All tests passed."
 
@@ -453,15 +417,13 @@ let tests =
     "record_access_local", Record_access { local = true; with_void = false };
     "record_access_with_void", Record_access { local = false; with_void = true };
     ( "record_access_with_void_local",
-      Record_access { local = true; with_void = true } )
-  ]
+      Record_access { local = true; with_void = true } ) ]
 
 let () =
   let fail () =
     failwith
       (sprintf "Usage %s <bytecode|native> <%s>" Sys.argv.(0)
-         (String.concat ~sep:"|" (List.map ~f:fst tests))
-      )
+         (String.concat ~sep:"|" (List.map ~f:fst tests)))
   in
   let bytecode, test_name =
     match Sys.argv with

@@ -47,5 +47,5 @@ let init () =
   deprecated := None;
   params := [];
   raised_exceptions := [];
-  return_value := None ;
+  return_value := None;
   customs := []

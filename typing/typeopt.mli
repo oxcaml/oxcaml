@@ -16,25 +16,37 @@
 (* Auxiliaries for type-based optimizations, e.g. array kinds *)
 
 val is_function_type :
-      Env.t -> Types.type_expr -> (Types.type_expr * Types.type_expr) option
+  Env.t -> Types.type_expr -> (Types.type_expr * Types.type_expr) option
+
 val is_base_type : Env.t -> Types.type_expr -> Path.t -> bool
 
-val maybe_pointer_type : Env.t -> Types.type_expr
-  -> Lambda.immediate_or_pointer * Lambda.nullable
-val maybe_pointer : Typedtree.expression
-  -> Lambda.immediate_or_pointer * Lambda.nullable
+val maybe_pointer_type :
+  Env.t -> Types.type_expr -> Lambda.immediate_or_pointer * Lambda.nullable
+
+val maybe_pointer :
+  Typedtree.expression -> Lambda.immediate_or_pointer * Lambda.nullable
 
 (* Supplying [None] for [elt_sort] should be avoided when possible. It
    will result in a call to [Ctype.type_sort] which can be expensive. *)
 val array_type_kind :
-  elt_sort:(Jkind.Sort.Const.t option) -> elt_ty:(Types.type_expr option)
-  -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
+  elt_sort:Jkind.Sort.Const.t option ->
+  elt_ty:Types.type_expr option ->
+  Env.t ->
+  Location.t ->
+  Types.type_expr ->
+  Lambda.array_kind
+
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
+
 val array_kind_of_elt :
-  elt_sort:(Jkind.Sort.Const.t option)
-  -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
-val array_kind :
-  Typedtree.expression -> Jkind.Sort.Const.t -> Lambda.array_kind
+  elt_sort:Jkind.Sort.Const.t option ->
+  Env.t ->
+  Location.t ->
+  Types.type_expr ->
+  Lambda.array_kind
+
+val array_kind : Typedtree.expression -> Jkind.Sort.Const.t -> Lambda.array_kind
+
 val array_pattern_kind :
   Typedtree.pattern -> Jkind.Sort.Const.t -> Lambda.array_kind
 
@@ -42,8 +54,11 @@ val array_pattern_kind :
    type parameters of the bigarray. If [kind] or [length] is not unknown, returns
    it unmodified. *)
 val bigarray_specialize_kind_and_layout :
-  Env.t -> kind:Lambda.bigarray_kind -> layout:Lambda.bigarray_layout ->
-  Types.type_expr -> Lambda.bigarray_kind * Lambda.bigarray_layout
+  Env.t ->
+  kind:Lambda.bigarray_kind ->
+  layout:Lambda.bigarray_layout ->
+  Types.type_expr ->
+  Lambda.bigarray_kind * Lambda.bigarray_layout
 
 (* CR layouts v7: [layout], [function_return_layout], [function2_return_layout],
    and [layout_of_sort] have had location arguments added just to support the
@@ -59,6 +74,7 @@ val layout :
    optimization.  [layout_of_sort] gracefully errors on void, while
    [layout_of_non_void_sort] loudly fails on void. *)
 val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
+
 val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
 
 (* Given a function type and the sort of its return type, compute the layout of
@@ -78,13 +94,13 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
-val classify_lazy_argument : Typedtree.expression ->
-                             [ `Constant_or_function
-                             | `Float_that_cannot_be_shortcut
-                             | `Identifier of [`Forward_value | `Other]
-                             | `Other]
+val classify_lazy_argument :
+  Typedtree.expression ->
+  [ `Constant_or_function
+  | `Float_that_cannot_be_shortcut
+  | `Identifier of [`Forward_value | `Other]
+  | `Other ]
 
-val layout_union :
-      Lambda.layout -> Lambda.layout -> Lambda.layout
-  (** [layout_union layout1 layout2] is a layout at least as general as
+(** [layout_union layout1 layout2] is a layout at least as general as
       [layout1] and [layout2] *)
+val layout_union : Lambda.layout -> Lambda.layout -> Lambda.layout

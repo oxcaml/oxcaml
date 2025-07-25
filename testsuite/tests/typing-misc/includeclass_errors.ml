@@ -1,24 +1,28 @@
 (* TEST
- expect;
+   expect;
 *)
 
 class type foo_t =
   object
-    method foo: string
+    method foo : string
   end
 
-module M: sig
-  class type ct = object val m: string end
+module M : sig
+  class type ct =
+    object
+      val m : string
+    end
 end = struct
   class type ct = object end
 end
 
-[%%expect{|
+[%%expect
+{|
 class type foo_t = object method foo : string end
-Lines 8-10, characters 6-3:
- 8 | ......struct
- 9 |   class type ct = object end
-10 | end
+Lines 11-13, characters 6-3:
+11 | ......struct
+12 |   class type ct = object end
+13 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class type ct = object  end end
@@ -31,23 +35,27 @@ Error: Signature mismatch:
        The first class type has no instance variable m
 |}]
 
-module M: sig
-  class c : object
-    method a: string
-  end
+module M : sig
+  class c :
+    object
+      method a : string
+    end
 end = struct
-  class virtual c = object
-    method virtual a: string
-  end
+  class virtual c =
+    object
+      method virtual a : string
+    end
 end
-;;
-[%%expect{|
-Lines 5-9, characters 6-3:
-5 | ......struct
-6 |   class virtual c = object
-7 |     method virtual a: string
-8 |   end
-9 | end
+
+[%%expect
+{|
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   class virtual c =
+ 8 |     object
+ 9 |       method virtual a : string
+10 |     end
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class virtual c : object method virtual a : string end end
@@ -60,21 +68,24 @@ Error: Signature mismatch:
        A class cannot be changed from virtual to concrete
 |}]
 
-class type ['a] ct = object val x: 'a end
+class type ['a] ct =
+  object
+    val x : 'a
+  end
 
-module M: sig
+module M : sig
   class type ['a] c = object end
 end = struct
   class type c = object end
 end
-;;
 
-[%%expect{|
+[%%expect
+{|
 class type ['a] ct = object val x : 'a end
-Lines 5-7, characters 6-3:
-5 | ......struct
-6 |   class type c = object end
-7 | end
+Lines 8-10, characters 6-3:
+ 8 | ......struct
+ 9 |   class type c = object end
+10 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class type c = object  end end
@@ -87,17 +98,24 @@ Error: Signature mismatch:
        The classes do not have the same number of type parameters
 |}]
 
-module Confusing: sig
-  class ['x, 'y] c: object end
+module Confusing : sig
+  class ['x, 'y] c : object end
 end = struct
-  class ['y, 'x] c  = object method private id (x : 'y) = x + 1 end
+  class ['y, 'x] c =
+    object
+      method private id (x : 'y) = x + 1
+    end
 end
-;;
-[%%expect{|
-Lines 3-5, characters 6-3:
+
+[%%expect
+{|
+Lines 3-8, characters 6-3:
 3 | ......struct
-4 |   class ['y, 'x] c  = object method private id (x : 'y) = x + 1 end
-5 | end
+4 |   class ['y, 'x] c =
+5 |     object
+6 |       method private id (x : 'y) = x + 1
+7 |     end
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
@@ -114,17 +132,21 @@ Error: Signature mismatch:
        The 1st type parameter has type "int" but is expected to have type "'x"
 |}]
 
-module M: sig
-  class ['a] c: object constraint 'a = int end
+module M : sig
+  class ['a] c :
+    object
+      constraint 'a = int
+    end
 end = struct
   class ['a] c = object end
 end
-;;
-[%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   class ['a] c = object end
-5 | end
+
+[%%expect
+{|
+Lines 6-8, characters 6-3:
+6 | ......struct
+7 |   class ['a] c = object end
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class ['a] c : object  end end
@@ -137,17 +159,21 @@ Error: Signature mismatch:
        The 1st type parameter has type "'a" but is expected to have type "int"
 |}]
 
-module M: sig
-  class ['a, 'b] c: object constraint 'b = int end
+module M : sig
+  class ['a, 'b] c :
+    object
+      constraint 'b = int
+    end
 end = struct
   class ['a, 'b] c = object end
 end
-;;
-[%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   class ['a, 'b] c = object end
-5 | end
+
+[%%expect
+{|
+Lines 6-8, characters 6-3:
+6 | ......struct
+7 |   class ['a, 'b] c = object end
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class ['a, 'b] c : object  end end
@@ -160,13 +186,14 @@ Error: Signature mismatch:
        The 2nd type parameter has type "'b" but is expected to have type "int"
 |}]
 
-module M: sig
+module M : sig
   class c : int -> object end
 end = struct
   class c (x : float) = object end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   class c (x : float) = object end
@@ -183,13 +210,14 @@ Error: Signature mismatch:
        The 1st parameter has type "float" but is expected to have type "int"
 |}]
 
-module M: sig
+module M : sig
   class c : int -> int -> object end
 end = struct
   class c (_ : int) (x : float) = object end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   class c (_ : int) (x : float) = object end
@@ -206,19 +234,21 @@ Error: Signature mismatch:
        The 2nd parameter has type "float" but is expected to have type "int"
 |}]
 
-class virtual foo: foo_t =
-    object
-        method foo = "foo"
-        method private virtual cast: int
-    end
-;;
+class virtual foo : foo_t =
+  object
+    method foo = "foo"
 
-[%%expect{|
-Lines 2-5, characters 4-7:
-2 | ....object
-3 |         method foo = "foo"
-4 |         method private virtual cast: int
-5 |     end
+    method private virtual cast : int
+  end
+
+[%%expect
+{|
+Lines 2-6, characters 2-5:
+2 | ..object
+3 |     method foo = "foo"
+4 |
+5 |     method private virtual cast : int
+6 |   end
 Error: The class type
          object method private virtual cast : int method foo : string end
        is not matched by the class type foo_t
@@ -226,94 +256,108 @@ Error: The class type
 |}]
 
 class type foo_t2 =
-    object
-        method private foo: string
-    end
+  object
+    method private foo : string
+  end
 
-class foo: foo_t2 =
-    object
-        method foo = "foo"
-    end
-;;
-[%%expect{|
+class foo : foo_t2 =
+  object
+    method foo = "foo"
+  end
+
+[%%expect
+{|
 class type foo_t2 = object method private foo : string end
-Lines 7-9, characters 4-7:
-7 | ....object
-8 |         method foo = "foo"
-9 |     end
+Lines 7-9, characters 2-5:
+7 | ..object
+8 |     method foo = "foo"
+9 |   end
 Error: The class type object method foo : string end
        is not matched by the class type foo_t2
        The public method foo cannot become private
 |}]
 
-class virtual foo: foo_t =
-    object
-        method virtual foo: string
-    end
-;;
-[%%expect{|
-Lines 2-4, characters 4-7:
-2 | ....object
-3 |         method virtual foo: string
-4 |     end
+class virtual foo : foo_t =
+  object
+    method virtual foo : string
+  end
+
+[%%expect
+{|
+Lines 2-4, characters 2-5:
+2 | ..object
+3 |     method virtual foo : string
+4 |   end
 Error: The class type object method virtual foo : string end
        is not matched by the class type foo_t
        The virtual method foo cannot become concrete
 |}]
 
 class type foo_t3 =
-    object
-        val mutable x : int
-    end
+  object
+    val mutable x : int
+  end
 
-class foo: foo_t3 =
-    object
-        val x = 1
-    end
-;;
-[%%expect{|
+class foo : foo_t3 =
+  object
+    val x = 1
+  end
+
+[%%expect
+{|
 class type foo_t3 = object val mutable x : int end
-Lines 7-9, characters 4-7:
-7 | ....object
-8 |         val x = 1
-9 |     end
+Lines 7-9, characters 2-5:
+7 | ..object
+8 |     val x = 1
+9 |   end
 Error: The class type object val x : int end is not matched by the class type
          foo_t3
        The non-mutable instance variable x cannot become mutable
 |}]
 
 class type foo_t4 =
-    object
-        val x : int
-    end
+  object
+    val x : int
+  end
 
-class virtual foo: foo_t4 =
-    object
-        val virtual x : int
-    end
-;;
-[%%expect{|
+class virtual foo : foo_t4 =
+  object
+    val virtual x : int
+  end
+
+[%%expect
+{|
 class type foo_t4 = object val x : int end
-Lines 7-9, characters 4-7:
-7 | ....object
-8 |         val virtual x : int
-9 |     end
+Lines 7-9, characters 2-5:
+7 | ..object
+8 |     val virtual x : int
+9 |   end
 Error: The class type object val virtual x : int end
        is not matched by the class type foo_t4
        The virtual instance variable x cannot become concrete
 |}]
 
-module M: sig
-  class type c = object method m: string end
+module M : sig
+  class type c =
+    object
+      method m : string
+    end
 end = struct
-  class type c = object method private m: string end
+  class type c =
+    object
+      method private m : string
+    end
 end
-;;
-[%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   class type c = object method private m: string end
-5 | end
+
+[%%expect
+{|
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   class type c =
+ 8 |     object
+ 9 |       method private m : string
+10 |     end
+11 | end
 Error: Signature mismatch:
        Modules do not match:
          sig class type c = object method private m : string end end

@@ -1,14 +1,12 @@
 (* TEST
- flambda2;
- native;
+   flambda2;
+   native;
 *)
 
 module M : sig
   val bits_of_float : float -> int64
 end = struct
-  external bits_of_float
-    :  (float[@local_opt])
-    -> (int64[@local_opt])
+  external bits_of_float : (float[@local_opt]) -> (int64[@local_opt])
     = "caml_int64_bits_of_float" "caml_int64_bits_of_float_unboxed"
     [@@unboxed] [@@noalloc]
 end

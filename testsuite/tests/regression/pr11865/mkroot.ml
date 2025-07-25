@@ -1,9 +1,11 @@
 (* TEST
    modules = "mkroot_stubs.c";
- *)
+*)
 
 type 'a box
+
 external box_make : 'a -> 'a box = "box_make"
+
 external box_deref : 'a box -> 'a = "box_deref"
 
 type chain =
@@ -12,7 +14,7 @@ type chain =
 
 let rec make_chain = function
   | 0 -> Nil
-  | n -> Cons (box_make (make_chain (n-1)))
+  | n -> Cons (box_make (make_chain (n - 1)))
 
 let rec check_chain len = function
   | Nil -> assert (len = 0)

@@ -18,16 +18,25 @@
 open Format
 
 val dir_quit : unit -> unit
+
 val dir_directory : string -> unit
+
 val dir_remove_directory : string -> unit
+
 val dir_cd : string -> unit
+
 val dir_load : formatter -> string -> unit
+
 val dir_use : formatter -> string -> unit
+
 val dir_use_output : formatter -> string -> unit
+
 val dir_install_printer : formatter -> Longident.t -> unit
+
 val dir_remove_printer : formatter -> Longident.t -> unit
 
 type 'a printer_type_new = Format.formatter -> 'a -> unit
+
 type 'a printer_type_old = 'a -> unit
 
 (* For topmain.ml. Maybe shouldn't be there *)

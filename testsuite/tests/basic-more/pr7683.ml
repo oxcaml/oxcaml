@@ -1,7 +1,6 @@
 (* TEST *)
 
-let f () n () =
-  n
+let f () n () = n
 
 let g () =
   let r = ref 0 in

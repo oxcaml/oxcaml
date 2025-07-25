@@ -1,8 +1,9 @@
 (* TEST
- modules = "alloc_async_stubs.c";
+   modules = "alloc_async_stubs.c";
 *)
 
 external test : int ref -> unit = "stub"
+
 external print_status : string -> int -> unit = "print_status_caml" [@@noalloc]
 
 (* This tests checks that the finaliser does not run during various

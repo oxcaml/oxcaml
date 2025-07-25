@@ -15,4 +15,4 @@
 
 (* Start the [ocaml] toplevel loop *)
 
-val main: unit -> int
+val main : unit -> int

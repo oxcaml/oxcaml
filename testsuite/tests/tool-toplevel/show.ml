@@ -1,70 +1,101 @@
 (* TEST
- expect;
+   expect;
 *)
 
 (* this is a set of tests to test the #show functionality
  * of toplevel *)
 
-class o = object val x = 0 end;;
-[%%expect{|
+class o =
+  object
+    val x = 0
+  end
+
+[%%expect {|
 class o : object val x : int end
 |}];;
-#show o;;
-[%%expect{|
+
+#show o
+
+[%%expect
+{|
 type o = <  >
 class o : object val x : int end
 class type o = object val x : int end
-|}];;
-class type t = object val x : int end;;
-[%%expect{|
+|}]
+
+class type t =
+  object
+    val x : int
+  end
+
+[%%expect {|
 class type t = object val x : int end
 |}];;
-#show t;;
-[%%expect{|
+
+#show t
+
+[%%expect {|
 type t = <  >
 class type t = object val x : int end
 |}];;
 
-#show Foo;;
+#show Foo
+
 [%%expect {|
 Unknown element.
-|}];;
+|}]
 
-module type S = sig type t val x : t end;;
-module M : S = struct type t = int let x = 3 end;;
+module type S = sig
+  type t
+
+  val x : t
+end
+
+module M : S = struct
+  type t = int
+
+  let x = 3
+end
 
 [%%expect {|
 module type S = sig type t val x : t end
 module M : S
 |}];;
 
-#show M;;
+#show M
+
 [%%expect {|
 module M : S
 |}];;
 
-#show S;;
+#show S
+
 [%%expect {|
 module type S = sig type t val x : t end
 |}];;
 
-#show Invalid_argument;;
+#show Invalid_argument
+
 [%%expect {|
 exception Invalid_argument of string
 |}];;
 
-#show Some;;
+#show Some
+
 [%%expect {|
 type 'a option = None | Some of 'a
 |}];;
 
-#show option;;
+#show option
+
 [%%expect {|
 type 'a option = None | Some of 'a
 |}];;
 
-#show Open_binary;;
-[%%expect {|
+#show Open_binary
+
+[%%expect
+{|
 type Stdlib.open_flag =
     Open_rdonly
   | Open_wronly
@@ -75,10 +106,13 @@ type Stdlib.open_flag =
   | Open_binary
   | Open_text
   | Open_nonblock
-|}];;
+|}]
+;;
 
-#show open_flag;;
-[%%expect {|
+#show open_flag
+
+[%%expect
+{|
 type open_flag =
     Open_rdonly
   | Open_wronly
@@ -89,50 +123,57 @@ type open_flag =
   | Open_binary
   | Open_text
   | Open_nonblock
-|}];;
+|}]
 
-type extensible = ..;;
-type extensible += A | B of int;;
+type extensible = ..
+
+type extensible += A | B of int
+
 [%%expect {|
 type extensible = ..
 type extensible += A | B of int
 |}];;
 
-#show A;;
+#show A
+
 [%%expect {|
 type extensible += A
 |}];;
 
-#show B;;
+#show B
+
 [%%expect {|
 type extensible += B of int
 |}];;
 
-#show extensible;;
+#show extensible
+
 [%%expect {|
 type extensible = ..
-|}];;
+|}]
 
-type 'a t = ..;;
-type _ t += A : int t;;
-[%%expect{|
+type 'a t = ..
+
+type _ t += A : int t
+
+[%%expect {|
 type 'a t = ..
 type _ t += A : int t
 |}];;
 
-#show A;;
-[%%expect{|
+#show A
+
+[%%expect {|
 type 'a t += A : int t
 |}];;
 
-
-
-
 (* regression tests for #11533 *)
-#show Set.OrderedType;;
-[%%expect {|
+#show Set.OrderedType
+
+[%%expect
+{|
 module type OrderedType = sig type t val compare : t -> t -> int end
-|}];;
+|}]
 
 (* extra tests after #11533
 
@@ -149,15 +190,19 @@ module type OrderedType = sig type t val compare : t -> t -> int end
      that is less likely to change very often (there are only
      so many features you can add to 'unit').
 *)
-module U = Stdlib.Unit;;
-module type OT = Set.OrderedType;;
+module U = Stdlib.Unit
+
+module type OT = Set.OrderedType
+
 [%%expect {|
 module U = Unit
 module type OT = Set.OrderedType
 |}];;
 
-#show U;;
-[%%expect {|
+#show U
+
+[%%expect
+{|
 module U = Unit
 module U :
   sig
@@ -166,10 +211,13 @@ module U :
     val compare : t -> t -> int @@ portable
     val to_string : t -> string @@ portable
   end
-|}];;
+|}]
+;;
 
-#show OT;;
-[%%expect {|
+#show OT
+
+[%%expect
+{|
 module type OT = Set.OrderedType
 module type OT = sig type t val compare : t -> t -> int end
-|}];;
+|}]

@@ -1,14 +1,16 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
-Gc.compact ();;
-let _ = Stdlib.do_at_exit();;
+
+Gc.compact ()
+
+let _ = Stdlib.do_at_exit ()
 
 (**
        0 CONSTINT 42

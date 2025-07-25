@@ -1,37 +1,60 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module Width = struct
   module type S1 = sig
     val a : int
+
     val b : int
+
     val c : int
+
     val d : int
+
     val e : int
   end
 
-
   module type F = functor
-    (X :
-      sig
-        module M1 : sig include S1 end
-        module M2 : sig include S1 end
-        module M3 : sig include S1 end
-        module M4 : sig include S1 end
-        module M5 : sig include S1 end
-        module M6 : sig include S1 end
-        module M7 : sig include S1 end
-      end
-    ) -> S1
+    (X : sig
+       module M1 : sig
+         include S1
+       end
 
-  module G(F:F)(X:functor() -> S1) = F(X)
+       module M2 : sig
+         include S1
+       end
+
+       module M3 : sig
+         include S1
+       end
+
+       module M4 : sig
+         include S1
+       end
+
+       module M5 : sig
+         include S1
+       end
+
+       module M6 : sig
+         include S1
+       end
+
+       module M7 : sig
+         include S1
+       end
+     end)
+    -> S1
+
+  module G (F : F) (X : functor () -> S1) = F (X)
 end
 
-[%%expect{|
-Line 24, characters 37-41:
-24 |   module G(F:F)(X:functor() -> S1) = F(X)
-                                          ^^^^
+[%%expect
+{|
+Line 46, characters 44-49:
+46 |   module G (F : F) (X : functor () -> S1) = F (X)
+                                                 ^^^^^
 Error: Modules do not match: functor () -> S1 is not included in
        sig
          module M1 :
@@ -65,6 +88,7 @@ module Depth = struct
           module P : sig
             module Q : sig
               val x : int
+
               val y : int
             end
           end
@@ -73,15 +97,20 @@ module Depth = struct
     end
   end
 
-  module type F = functor(X:S) -> S
+  module type F = functor (X : S) -> S
 
-  module F(F : F)(X : sig module M : sig end end) = F(X)
+  module F
+      (F : F) (X : sig
+        module M : sig end
+      end) =
+    F (X)
 end
 
-[%%expect{|
-Line 19, characters 52-56:
-19 |   module F(F : F)(X : sig module M : sig end end) = F(X)
-                                                         ^^^^
+[%%expect
+{|
+Line 24, characters 4-9:
+24 |     F (X)
+         ^^^^^
 Error: Modules do not match: sig module M : sig end end is not included in
        S
      In module "M":

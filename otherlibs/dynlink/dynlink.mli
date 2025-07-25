@@ -17,13 +17,12 @@
 
 (** Dynamic loading of .cmo, .cma and .cmxs files. *)
 
-val is_native : bool
 (** [true] if the program is native,
     [false] if the program is bytecode. *)
+val is_native : bool
 
 (** {1 Dynamic loading of compiled files} *)
 
-val loadfile : string -> unit
 (** In bytecode: load the given bytecode object file ([.cmo] file) or
     bytecode library file ([.cma] file), and link it with the running
     program. In native code: load the given OCaml plugin file (usually
@@ -43,8 +42,8 @@ val loadfile : string -> unit
 
     The compilation units loaded by this function are added to the
     "allowed units" list (see {!set_allowed_units}). *)
+val loadfile : string -> unit
 
-val loadfile_private : string -> unit
 (** Same as [loadfile], except that the compilation units just loaded
     are hidden (cannot be referenced) from other modules dynamically
     loaded afterwards.
@@ -65,14 +64,14 @@ val loadfile_private : string -> unit
     The compilation units loaded by this function are not added to the
     "allowed units" list (see {!set_allowed_units}) since they cannot
     be referenced from other compilation units. *)
+val loadfile_private : string -> unit
 
-val adapt_filename : string -> string
 (** In bytecode, the identity function. In native code, replace the last
     extension with [.cmxs]. *)
+val adapt_filename : string -> string
 
 (** {1 Access control} *)
 
-val set_allowed_units : string list -> unit
 (** Set the list of compilation units that may be referenced from units that
     are dynamically loaded in the future to be exactly the given value.
 
@@ -84,39 +83,40 @@ val set_allowed_units : string list -> unit
     e.g. private, internal modules of the running program.
 
     Note that {!loadfile} changes the allowed-units list. *)
+val set_allowed_units : string list -> unit
 
-val allow_only: string list -> unit
 (** [allow_only units] sets the list of allowed units to be the intersection
     of the existing allowed units and the given list of units.  As such it
     can never increase the set of allowed units. *)
+val allow_only : string list -> unit
 
-val prohibit : string list -> unit
 (** [prohibit units] prohibits dynamically-linked units from referencing
     the units named in list [units] by removing such units from the allowed
     units list.  This can be used to prevent access to selected units,
     e.g. private, internal modules of the running program. *)
+val prohibit : string list -> unit
 
-val main_program_units : unit -> string list
 (** Return the list of compilation units that form the main program (i.e.
     are not dynamically linked). *)
+val main_program_units : unit -> string list
 
-val public_dynamically_loaded_units : unit -> string list
 (** Return the list of compilation units that have been dynamically loaded via
     [loadfile] (and not via [loadfile_private]).  Note that compilation units
     loaded dynamically cannot be unloaded. *)
+val public_dynamically_loaded_units : unit -> string list
 
-val all_units : unit -> string list
 (** Return the list of compilation units that form the main program together
     with those that have been dynamically loaded via [loadfile] (and not via
     [loadfile_private]). *)
+val all_units : unit -> string list
 
-val allow_unsafe_modules : bool -> unit
 (** Govern whether unsafe object files are allowed to be
     dynamically linked. A compilation unit is 'unsafe' if it contains
     declarations of external functions, which can break type safety.
     By default, dynamic linking of unsafe object files is
     not allowed. In native code, this function does nothing; object files
     with external functions are always allowed to be dynamically linked. *)
+val allow_unsafe_modules : bool -> unit
 
 (** {1 Error reporting} *)
 
@@ -137,27 +137,26 @@ type error = private
   | Inconsistent_implementation of string
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
-  | Library_file_already_loaded_privately of { filename : string; }
-    (** In native code, it is forbidden to dynamically load the same .cmxs
+  | Library_file_already_loaded_privately of { filename : string }
+      (** In native code, it is forbidden to dynamically load the same .cmxs
         file more than once in private mode. *)
 
 (* CR-someday mshinwell: Consider implementing the check required for
    [Library_file_already_loaded_privately] in bytecode mode.  It might be
    worth using [RTLD_NOLOAD] to help with this. *)
 
-exception Error of error
 (** Errors in dynamic linking are reported by raising the [Error]
     exception with a description of the error.
     A common case is the dynamic library not being found on the system: this
     is reported via [Cannot_open_dynamic_library] (the enclosed exception may
     be platform-specific). *)
+exception Error of error
 
-val error_message : error -> string
 (** Convert an error description to a printable message. *)
+val error_message : error -> string
 
 (**/**)
 
-val unsafe_get_global_value : bytecode_or_asm_symbol:string -> Obj.t option
 (** Obtain the globally-visible value whose address is that of the given symbol.
     The symbol name must be the mangled form as would occur in bytecode or
     a native object file.  [None] is returned if the value is inaccessible.
@@ -180,6 +179,7 @@ val unsafe_get_global_value : bytecode_or_asm_symbol:string -> Obj.t option
     client's version of [Symtable]). This is why we can't use [Dynlink] from the
     toplevel interactive loop, in particular.
 *)
+val unsafe_get_global_value : bytecode_or_asm_symbol:string -> Obj.t option
 
 (** Like [unsafe_get_global_value], but only tests whether the given symbol
     exists, and in native code may be used for any symbol (whether or not such

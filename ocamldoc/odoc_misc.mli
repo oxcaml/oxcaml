@@ -78,7 +78,7 @@ val first_sentence_of_text : Odoc_types.text -> Odoc_types.text
    Don't stop in the middle of [Code], [Verbatim], [List], [Lnum],
    [Latex], [Link], or [Ref]. *)
 val first_sentence_and_rest_of_text :
-    Odoc_types.text -> Odoc_types.text * Odoc_types.text
+  Odoc_types.text -> Odoc_types.text * Odoc_types.text
 
 (** Return the given [text] without any title or list. *)
 val text_no_title_no_list : Odoc_types.text -> Odoc_types.text
@@ -89,7 +89,8 @@ val text_concat : Odoc_types.text -> Odoc_types.text list -> Odoc_types.text
 
 (** Return the list of titles in a [text].
    A title is a title level, an optional label and a text.*)
-val get_titles_in_text : Odoc_types.text -> (int * string option * Odoc_types.text) list
+val get_titles_in_text :
+  Odoc_types.text -> (int * string option * Odoc_types.text) list
 
 (** Take a sorted list of elements, a function to get the name
    of an element and return the list of list of elements,
@@ -107,7 +108,7 @@ val remove_ending_newline : string -> string
 
 (** [search_string_backward pat s] searches backward string [pat] in string [s].
    Return position in string [s] where [pat] appears, orelse raise [Not_found]. *)
-val search_string_backward : pat: string -> s: string -> int
+val search_string_backward : pat:string -> s:string -> int
 
 (** Take a type and remove the option top constructor. This is
    useful when printing labels, we then remove the top option constructor

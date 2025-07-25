@@ -1,9 +1,9 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
 *)
 
 (* Testing unsynchronized, parallel Weak usage *)
@@ -15,20 +15,20 @@ let test () =
   let () = Weak.set t 3 (Some 2L) in
   let wait = Atomic.make true in
   let d1 =
-    Domain.spawn
-      (fun () ->
-         while Atomic.get wait do Domain.cpu_relax() done; Weak.set t 3 None
-      ) in
+    Domain.spawn (fun () ->
+        while Atomic.get wait do
+          Domain.cpu_relax ()
+        done;
+        Weak.set t 3 None)
+  in
   let d2 =
-    Domain.spawn
-      (fun () ->
-         Atomic.set wait false;
-         let res = Weak.get t 3 in
-         match res with
-         | None
-         | Some 2L -> ()
-         | Some i -> failwith ("received: " ^ (Int64.to_string i))
-      ) in
+    Domain.spawn (fun () ->
+        Atomic.set wait false;
+        let res = Weak.get t 3 in
+        match res with
+        | None | Some 2L -> ()
+        | Some i -> failwith ("received: " ^ Int64.to_string i))
+  in
   let () = Domain.join d1 in
   let () = Domain.join d2 in
   ()

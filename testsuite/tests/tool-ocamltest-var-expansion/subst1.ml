@@ -1,7 +1,7 @@
 (* TEST
- set foo = "bar";
- set expand = "\$foo";
- arguments = "str \$notvar $unsetvar $expand $foo";
+   set foo = "bar";
+   set expand = "\$foo";
+   arguments = "str \$notvar $unsetvar $expand $foo";
 *)
 
 let () =

@@ -1,20 +1,21 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
-open Lib;;
+open Lib
 
-class c = object
-  method m = 23
-end;;
+class c =
+  object
+    method m = 23
+  end
+;;
 
 let o = new c in
 if o#m <> 23 then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

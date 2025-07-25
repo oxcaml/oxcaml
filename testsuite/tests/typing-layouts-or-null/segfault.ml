@@ -3,13 +3,7 @@
    native;
 *)
 
-let[@inline] id f = fun x -> f x;;
+let[@inline] id f x = f x
 
 let () =
-  id
-    (fun value ->
-      match value with
-      | Null -> ()
-      | This _ -> assert false)
-    Null
-;;
+  id (fun value -> match value with Null -> () | This _ -> assert false) Null

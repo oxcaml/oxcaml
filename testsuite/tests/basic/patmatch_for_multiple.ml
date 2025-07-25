@@ -1,31 +1,29 @@
 (* TEST
- flags = "-drawlambda -dlambda";
- expect;
+   flags = "-drawlambda -dlambda";
+   expect;
 *)
 
 (* Note: the tests below contain *both* the -drawlambda and
-   the -dlambda intermediate representations:
-   -drawlambda is the Lambda code generated directly by the
-     pattern-matching compiler; it contain "alias" bindings or static
-     exits that are unused, and will be removed by simplification, or
-     that are used only once, and will be inlined by simplification.
-   -dlambda is the Lambda code resulting from simplification.
+    the -dlambda intermediate representations:
+    -drawlambda is the Lambda code generated directly by the
+      pattern-matching compiler; it contain "alias" bindings or static
+      exits that are unused, and will be removed by simplification, or
+      that are used only once, and will be inlined by simplification.
+    -dlambda is the Lambda code resulting from simplification.
 
-  The -drawlambda output more closely matches what the
-  pattern-compiler produces, and the -dlambda output more closely
-  matches the final generated code.
+   The -drawlambda output more closely matches what the
+   pattern-compiler produces, and the -dlambda output more closely
+   matches the final generated code.
 
-  In this test we decided to show both to notice that some allocations
-  are "optimized away" during simplification (see "here flattening is
-  an optimization" below).
+   In this test we decided to show both to notice that some allocations
+   are "optimized away" during simplification (see "here flattening is
+   an optimization" below).
 *)
 
-match (3, 2, 1) with
-| (_, 3, _)
-| (1, _, _) -> true
-| _ -> false
-;;
-[%%expect{|
+match 3, 2, 1 with _, 3, _ | 1, _, _ -> true | _ -> false
+
+[%%expect
+{|
 (let
   (*match*/284 =[value<int>] 3
    *match*/285 =[value<int>] 2
@@ -43,16 +41,19 @@ match (3, 2, 1) with
   (catch (if (!= *match*/285 3) (if (!= *match*/284 1) 0 (exit 1)) (exit 1))
    with (1) 1))
 - : bool = false
-|}];;
+|}]
+;;
 
 (* This tests needs to allocate the tuple to bind 'x',
    but this is only done in the branches that use it. *)
-match (3, 2, 1) with
-| ((_, 3, _) as x)
-| ((1, _, _) as x) -> ignore x; true
+match 3, 2, 1 with
+| ((_, 3, _) as x) | ((1, _, _) as x) ->
+  ignore x;
+  true
 | _ -> false
-;;
-[%%expect{|
+
+[%%expect
+{|
 (let
   (*match*/289 =[value<int>] 3
    *match*/290 =[value<int>] 2
@@ -94,18 +95,18 @@ match (3, 2, 1) with
                    (non_consts ([0: value<int>, value<int>, value<int>]))>])
     (seq (ignore x/287) 1)))
 - : bool = false
-|}];;
+|}]
 
 (* Regression test for #3780 *)
-let _ = fun a b ->
-  match a, b with
-  | ((true, _) as _g)
-  | ((false, _) as _g) -> ()
-[%%expect{|
+let _ =
+ fun a b -> match a, b with ((true, _) as _g) | ((false, _) as _g) -> ()
+
+[%%expect
+{|
 (function {nlocal = 0} a/294[value<int>] b/295? : int 0)
 (function {nlocal = 0} a/294[value<int>] b/295? : int 0)
 - : bool -> 'a -> unit = <fun>
-|}];;
+|}]
 
 (* More complete tests.
 
@@ -117,11 +118,11 @@ let _ = fun a b ->
    different code generated in both cases, but now the compilation strategy
    is fairly similar.
 *)
-let _ = fun a b -> match a, b with
-| (true, _) as p -> p
-| (false, _) as p -> p
+let _ = fun a b -> match a, b with (true, _) as p -> p | (false, _) as p -> p
+
 (* outside, trivial *)
-[%%expect {|
+[%%expect
+{|
 (function {nlocal = 0} a/298[value<int>] b/299?
   : (consts ()) (non_consts ([0: value<int>, ?]))
   (let
@@ -133,11 +134,11 @@ let _ = fun a b -> match a, b with
 - : bool -> 'a -> bool * 'a = <fun>
 |}]
 
-let _ = fun a b -> match a, b with
-| ((true, _) as p)
-| ((false, _) as p) -> p
+let _ = fun a b -> match a, b with ((true, _) as p) | ((false, _) as p) -> p
+
 (* inside, trivial *)
-[%%expect{|
+[%%expect
+{|
 (function {nlocal = 0} a/302[value<int>] b/303?
   : (consts ()) (non_consts ([0: value<int>, ?]))
   (let
@@ -147,13 +148,17 @@ let _ = fun a b -> match a, b with
 (function {nlocal = 0} a/302[value<int>] b/303?
   : (consts ()) (non_consts ([0: value<int>, ?])) (makeblock 0 a/302 b/303))
 - : bool -> 'a -> bool * 'a = <fun>
-|}];;
+|}]
 
-let _ = fun a b -> match a, b with
-| (true as x, _) as p -> x, p
-| (false as x, _) as p -> x, p
+let _ =
+ fun a b ->
+  match a, b with
+  | ((true as x), _) as p -> x, p
+  | ((false as x), _) as p -> x, p
+
 (* outside, simple *)
-[%%expect {|
+[%%expect
+{|
 (function {nlocal = 0} a/308[value<int>] b/309?
   : (consts ())
      (non_consts ([0: value<int>,
@@ -175,11 +180,13 @@ let _ = fun a b -> match a, b with
 - : bool -> 'a -> bool * (bool * 'a) = <fun>
 |}]
 
-let _ = fun a b -> match a, b with
-| ((true as x, _) as p)
-| ((false as x, _) as p) -> x, p
+let _ =
+ fun a b ->
+  match a, b with (((true as x), _) as p) | (((false as x), _) as p) -> x, p
+
 (* inside, simple *)
-[%%expect {|
+[%%expect
+{|
 (function {nlocal = 0} a/314[value<int>] b/315?
   : (consts ())
      (non_consts ([0: value<int>,
@@ -201,11 +208,13 @@ let _ = fun a b -> match a, b with
 - : bool -> 'a -> bool * (bool * 'a) = <fun>
 |}]
 
-let _ = fun a b -> match a, b with
-| (true as x, _) as p -> x, p
-| (false, x) as p -> x, p
+let _ =
+ fun a b ->
+  match a, b with ((true as x), _) as p -> x, p | (false, x) as p -> x, p
+
 (* outside, complex *)
-[%%expect{|
+[%%expect
+{|
 (function {nlocal = 0} a/324[value<int>] b/325[value<int>]
   : (consts ())
      (non_consts ([0: value<int>,
@@ -245,12 +254,13 @@ let _ = fun a b -> match a, b with
 - : bool -> bool -> bool * (bool * bool) = <fun>
 |}]
 
-let _ = fun a b -> match a, b with
-| ((true as x, _) as p)
-| ((false, x) as p)
-  -> x, p
+let _ =
+ fun a b ->
+  match a, b with (((true as x), _) as p) | ((false, x) as p) -> x, p
+
 (* inside, complex *)
-[%%expect{|
+[%%expect
+{|
 (function {nlocal = 0} a/330[value<int>] b/331[value<int>]
   : (consts ())
      (non_consts ([0: value<int>,
@@ -301,11 +311,15 @@ let _ = fun a b -> match a, b with
    alias within each branch, and in the first branch it is unused and
    will be removed by simplification, so the final code
    (see the -dlambda output) will not allocate in the first branch. *)
-let _ = fun a b -> match a, b with
-| (true as x, _) as _p -> x, (true, true)
-| (false as x, _) as p -> x, p
+let _ =
+ fun a b ->
+  match a, b with
+  | ((true as x), _) as _p -> x, (true, true)
+  | ((false as x), _) as p -> x, p
+
 (* outside, onecase *)
-[%%expect {|
+[%%expect
+{|
 (function {nlocal = 0} a/340[value<int>] b/341[value<int>]
   : (consts ())
      (non_consts ([0: value<int>,
@@ -346,11 +360,13 @@ let _ = fun a b -> match a, b with
 - : bool -> bool -> bool * (bool * bool) = <fun>
 |}]
 
-let _ = fun a b -> match a, b with
-| ((true as x, _) as p)
-| ((false as x, _) as p) -> x, p
+let _ =
+ fun a b ->
+  match a, b with (((true as x), _) as p) | (((false as x), _) as p) -> x, p
+
 (* inside, onecase *)
-[%%expect{|
+[%%expect
+{|
 (function {nlocal = 0} a/346[value<int>] b/347?
   : (consts ())
      (non_consts ([0: value<int>,
@@ -372,19 +388,22 @@ let _ = fun a b -> match a, b with
 - : bool -> 'a -> bool * (bool * 'a) = <fun>
 |}]
 
-type 'a tuplist = Nil | Cons of ('a * 'a tuplist)
-[%%expect{|
+type 'a tuplist =
+  | Nil
+  | Cons of ('a * 'a tuplist)
+
+[%%expect {|
 0
 0
 type 'a tuplist = Nil | Cons of ('a * 'a tuplist)
 |}]
 
 (* another example where we avoid an allocation in the first case *)
-let _ =fun a b -> match a, b with
-| (true, Cons p) -> p
-| (_, _) as p -> p
+let _ = fun a b -> match a, b with true, Cons p -> p | (_, _) as p -> p
+
 (* outside, tuplist *)
-[%%expect {|
+[%%expect
+{|
 (function {nlocal = 0} a/359[value<int>]
   b/360[value<
          (consts (0))
@@ -414,11 +433,11 @@ let _ =fun a b -> match a, b with
 - : bool -> bool tuplist -> bool * bool tuplist = <fun>
 |}]
 
-let _ = fun a b -> match a, b with
-| (true, Cons p)
-| ((_, _) as p) -> p
+let _ = fun a b -> match a, b with true, Cons p | ((_, _) as p) -> p
+
 (* inside, tuplist *)
-[%%expect{|
+[%%expect
+{|
 (function {nlocal = 0} a/363[value<int>]
   b/364[value<
          (consts (0))

@@ -13,18 +13,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-external zstd_initialize: unit -> bool = "caml_zstd_initialize"
+external zstd_initialize : unit -> bool = "caml_zstd_initialize"
 
 let compression_supported = zstd_initialize ()
 
-type [@warning "-unused-constructor"] extern_flags =
-    No_sharing                          (** Don't preserve sharing *)
-  | Closures                            (** Send function closures *)
-  | Compat_32                           (** Ensure 32-bit compatibility *)
-  | Compression                         (** Optional compression *)
+type extern_flags =
+  | No_sharing  (** Don't preserve sharing *)
+  | Closures  (** Send function closures *)
+  | Compat_32  (** Ensure 32-bit compatibility *)
+  | Compression  (** Optional compression *)
+[@@warning "-unused-constructor"]
 
-external to_channel: out_channel -> 'a -> extern_flags list -> unit
-                   = "caml_output_value"
+external to_channel : out_channel -> 'a -> extern_flags list -> unit
+  = "caml_output_value"
 
 let output_value ch v = to_channel ch v [Compression]
 

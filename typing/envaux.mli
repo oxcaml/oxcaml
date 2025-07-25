@@ -22,11 +22,12 @@ open Format
    the resulting environment. If it set to [false], an exception is raised when missing
    modules are encountered. *)
 
-val env_from_summary : allow_missing_modules:bool -> Env.summary -> Subst.t -> Env.t
+val env_from_summary :
+  allow_missing_modules:bool -> Env.summary -> Subst.t -> Env.t
 
 (* Empty the environment caches. To be called when load_path changes. *)
 
-val reset_cache: preserve_persistent_env:bool -> unit
+val reset_cache : preserve_persistent_env:bool -> unit
 
 (* Reconstructs an environment from a summary. The Boolean [allow_missing_modules]
    controls whether missing modules are allowed. If it set to [true], missing modules
@@ -37,9 +38,8 @@ val env_of_only_summary : ?allow_missing_modules:bool -> Env.t -> Env.t
 
 (* Error report *)
 
-type error =
-    Module_not_found of Path.t
+type error = Module_not_found of Path.t
 
 exception Error of error
 
-val report_error: formatter -> error -> unit
+val report_error : formatter -> error -> unit

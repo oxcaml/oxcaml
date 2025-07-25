@@ -16,7 +16,7 @@
 (** Interface for analysing documented OCaml source files and to the collected information. *)
 
 type ref_kind = Odoc_types.ref_kind =
-    RK_module
+  | RK_module
   | RK_module_type
   | RK_class
   | RK_class_type
@@ -61,42 +61,42 @@ and text = text_element list
 exception Text_syntax = Odoc_text.Text_syntax
 
 type see_ref = Odoc_types.see_ref =
-    See_url of string
+  | See_url of string
   | See_file of string
   | See_doc of string
 
 type see = see_ref * text
 
-type param = (string * text)
+type param = string * text
 
-type raised_exception = (string * text)
+type raised_exception = string * text
 
-type alert = Odoc_types.alert = {
-  alert_name : string;
-  alert_payload : string option;
-}
+type alert = Odoc_types.alert =
+  { alert_name : string;
+    alert_payload : string option
+  }
 
-type info = Odoc_types.info = {
-    i_desc : text option;
+type info = Odoc_types.info =
+  { i_desc : text option;
     i_authors : string list;
     i_version : string option;
     i_sees : see list;
     i_since : string option;
-    i_before : (string * text) list ;
+    i_before : (string * text) list;
     i_deprecated : text option;
     i_params : param list;
     i_raised_exceptions : raised_exception list;
-    i_return_value : text option ;
-    i_custom : (string * text) list ;
-    i_alerts : alert list ;
+    i_return_value : text option;
+    i_custom : (string * text) list;
+    i_alerts : alert list
   }
 
-type location = Odoc_types.location = {
-    loc_impl : Location.t option ;
-    loc_inter : Location.t option ;
+type location = Odoc_types.location =
+  { loc_impl : Location.t option;
+    loc_inter : Location.t option
   }
 
-let dummy_loc = { loc_impl = None ; loc_inter = None }
+let dummy_loc = { loc_impl = None; loc_inter = None }
 
 module Name = Odoc_name
 module Parameter = Odoc_parameter
@@ -107,23 +107,17 @@ module Value = Odoc_value
 module Class = Odoc_class
 module Module = Odoc_module
 
-
-let analyse_files
-    ?(merge_options=([] : Odoc_types.merge_option list))
-    ?(include_dirs=([] : string list))
-    ?(hidden_include_dirs=([] : string list))
-    ?(labels=false)
-    ?(sort_modules=false)
-    ?(no_stop=false)
-    ?(init=[])
-    files =
+let analyse_files ?(merge_options = ([] : Odoc_types.merge_option list))
+    ?(include_dirs = ([] : string list))
+    ?(hidden_include_dirs = ([] : string list)) ?(labels = false)
+    ?(sort_modules = false) ?(no_stop = false) ?(init = []) files =
   Odoc_global.merge_options := merge_options;
   Odoc_global.include_dirs := include_dirs;
   Odoc_global.hidden_include_dirs := hidden_include_dirs;
   Odoc_global.classic := not labels;
   Odoc_global.sort_modules := sort_modules;
   Odoc_global.no_stop := no_stop;
-  Odoc_analyse.analyse_files ~init: init files
+  Odoc_analyse.analyse_files ~init files
 
 let dump_modules = Odoc_analyse.dump_modules
 
@@ -137,13 +131,16 @@ let string_of_type_expr t = Odoc_print.string_of_type_expr t
 
 let string_of_class_params = Odoc_str.string_of_class_params
 
-let string_of_type_list ?par sep type_list = Odoc_str.string_of_type_list ?par sep type_list
+let string_of_type_list ?par sep type_list =
+  Odoc_str.string_of_type_list ?par sep type_list
 
 let string_of_type_param_list t = Odoc_str.string_of_type_param_list t
 
-let string_of_type_extension_param_list te = Odoc_str.string_of_type_extension_param_list te
+let string_of_type_extension_param_list te =
+  Odoc_str.string_of_type_extension_param_list te
 
-let string_of_class_type_param_list l = Odoc_str.string_of_class_type_param_list l
+let string_of_class_type_param_list l =
+  Odoc_str.string_of_class_type_param_list l
 
 let string_of_module_type = Odoc_print.string_of_module_type
 
@@ -154,6 +151,7 @@ let string_of_text t = Odoc_misc.string_of_text t
 let string_of_info i = Odoc_misc.string_of_info i
 
 let string_of_type t = Odoc_str.string_of_type t
+
 let string_of_record t = Odoc_str.string_of_record t
 
 let string_of_type_extension te = Odoc_str.string_of_type_extension te
@@ -190,73 +188,79 @@ let use_hidden_modules n =
   Odoc_name.hide_given_modules !Odoc_global.hidden_modules n
 
 let verbose s =
-  if !Odoc_global.verbose then
-    (print_string s ; print_newline ())
-  else
-    ()
+  if !Odoc_global.verbose
+  then (
+    print_string s;
+    print_newline ())
+  else ()
 
 let warning s = Odoc_global.pwarning s
+
 let print_warnings = Odoc_config.print_warnings
 
 let errors = Odoc_global.errors
 
 let apply_opt = Odoc_misc.apply_opt
 
-let apply_if_equal f v1 v2 =
-  if v1 = v2 then
-    f v1
-  else
-    v2
+let apply_if_equal f v1 v2 = if v1 = v2 then f v1 else v2
 
 let text_of_string = Odoc_text.Texter.text_of_string
 
 let text_string_of_text = Odoc_text.Texter.string_of_text
 
 let info_of_string = Odoc_comments.info_of_string
+
 let info_of_comment_file = Odoc_comments.info_of_comment_file
 
-module Search =
-  struct
-    type result_element = Odoc_search.result_element =
-          Res_module of Module.t_module
-        | Res_module_type of Module.t_module_type
-        | Res_class of Class.t_class
-        | Res_class_type of Class.t_class_type
-        | Res_value of Value.t_value
-        | Res_type of Type.t_type
-        | Res_extension of Extension.t_extension_constructor
-        | Res_exception of Exception.t_exception
-        | Res_attribute of Value.t_attribute
-        | Res_method of Value.t_method
-        | Res_section of string * text
-        | Res_recfield of Type.t_type * Type.record_field
-        | Res_const of Type.t_type * Type.variant_constructor
+module Search = struct
+  type result_element = Odoc_search.result_element =
+    | Res_module of Module.t_module
+    | Res_module_type of Module.t_module_type
+    | Res_class of Class.t_class
+    | Res_class_type of Class.t_class_type
+    | Res_value of Value.t_value
+    | Res_type of Type.t_type
+    | Res_extension of Extension.t_extension_constructor
+    | Res_exception of Exception.t_exception
+    | Res_attribute of Value.t_attribute
+    | Res_method of Value.t_method
+    | Res_section of string * text
+    | Res_recfield of Type.t_type * Type.record_field
+    | Res_const of Type.t_type * Type.variant_constructor
 
-    type search_result = result_element list
+  type search_result = result_element list
 
-    let search_by_name = Odoc_search.Search_by_name.search
+  let search_by_name = Odoc_search.Search_by_name.search
 
-    let values = Odoc_search.values
-    let extensions = Odoc_search.extensions
-    let exceptions = Odoc_search.exceptions
-    let types = Odoc_search.types
-    let attributes = Odoc_search.attributes
-    let methods = Odoc_search.methods
-    let classes = Odoc_search.classes
-    let class_types = Odoc_search.class_types
-    let modules = Odoc_search.modules
-    let module_types = Odoc_search.module_types
-  end
+  let values = Odoc_search.values
 
-module Scan =
-  struct
-    class scanner = Odoc_scan.scanner
-  end
+  let extensions = Odoc_search.extensions
 
-module Dep =
-  struct
-    let kernel_deps_of_modules = Odoc_dep.kernel_deps_of_modules
-    let deps_of_types = Odoc_dep.deps_of_types
-  end
+  let exceptions = Odoc_search.exceptions
+
+  let types = Odoc_search.types
+
+  let attributes = Odoc_search.attributes
+
+  let methods = Odoc_search.methods
+
+  let classes = Odoc_search.classes
+
+  let class_types = Odoc_search.class_types
+
+  let modules = Odoc_search.modules
+
+  let module_types = Odoc_search.module_types
+end
+
+module Scan = struct
+  class scanner = Odoc_scan.scanner
+end
+
+module Dep = struct
+  let kernel_deps_of_modules = Odoc_dep.kernel_deps_of_modules
+
+  let deps_of_types = Odoc_dep.deps_of_types
+end
 
 module Global = Odoc_global

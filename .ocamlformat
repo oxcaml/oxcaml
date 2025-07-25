@@ -1,4 +1,17 @@
-# Please make a pull request to change this file.
-# Each directory that enables ocamlformat sets its own options, so here we just
-# disable it by default.
-disable=true
+assignment-operator=begin-line
+cases-exp-indent=2
+doc-comments=before
+dock-collection-brackets=false
+if-then-else=keyword-first
+module-item-spacing=sparse
+parens-tuple=multi-line-only
+sequence-blank-line=compact
+space-around-lists=false
+space-around-variants=false
+type-decl=sparse
+version=0.24.1
+
+# CR-soon jvanburen: Many of the existing comments are hand-formatted and lose a
+# lot of readability if we wrap them. We should convert the comments we care
+# about to doc comments, and set this to true.
+wrap-comments=false

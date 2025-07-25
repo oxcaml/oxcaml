@@ -1,8 +1,8 @@
 (* TEST
- flags = " -w -a ";
- setup-ocamlc.byte-build-env;
- ocamlc.byte;
- check-ocamlc.byte-output;
+   flags = " -w -a ";
+   setup-ocamlc.byte-build-env;
+   ocamlc.byte;
+   check-ocamlc.byte-output;
 *)
 
 (**************************************************************************)
@@ -15,16 +15,15 @@
 
 module type Analysis = sig
   type t
-  type 'a maybe_region =
-    [< `Location of t
-    |  `Value of t
-    |  `None ] as 'a
+
+  type 'a maybe_region = [< `Location of t | `Value of t | `None] as 'a
+
   val of_var :
-    ?f:string -> string ->
-      [ `Location of _ | `Value of _  | `None ] maybe_region
+    ?f:string -> string -> [`Location of _ | `Value of _ | `None] maybe_region
 end
 
 module Make (Analysis : Analysis) = struct
   include Analysis
-  let of_var  = of_var ~f:""
+
+  let of_var = of_var ~f:""
 end

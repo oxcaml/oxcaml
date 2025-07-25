@@ -14,13 +14,15 @@
 (**************************************************************************)
 
 open Clflags
+
 let write_asm_file = ref false
 
 let compile_file filename =
-  if !write_asm_file then begin
+  (if !write_asm_file
+  then
     let out_name = Filename.chop_extension filename ^ ".s" in
-    Emitaux.output_channel := open_out out_name
-  end; (* otherwise, stdout *)
+    Emitaux.output_channel := open_out out_name);
+  (* otherwise, stdout *)
   let compilation_unit =
     Compilation_unit.create Compilation_unit.Prefix.empty
       ("test" |> Compilation_unit.Name.of_string)
@@ -28,7 +30,7 @@ let compile_file filename =
   let unit_info = Unit_info.make_dummy ~input_name:"test" compilation_unit in
   Compilenv.reset unit_info;
   Clflags.cmm_invariants := true;
-  Emit.begin_assembly();
+  Emit.begin_assembly ();
   let ic = open_in filename in
   let lb = Lexing.from_channel ic in
   lb.Lexing.lex_curr_p <- Lexing.{ lb.lex_curr_p with pos_fname = filename };
@@ -38,51 +40,56 @@ let compile_file filename =
         (Parsecmm.phrase Lexcmm.token lb)
     done
   with
-      End_of_file ->
-        close_in ic; Emit.end_assembly();
-        if !write_asm_file then close_out !Emitaux.output_channel
-    | Lexcmm.Error msg ->
-        close_in ic; Lexcmm.report_error lb msg
-    | Parsing.Parse_error ->
-        close_in ic;
-        let start_p = Lexing.lexeme_start_p lb in
-        let end_p = Lexing.lexeme_end_p lb in
-        Printf.eprintf "File \"%s\", line %i, characters %i-%i:\n\
-                        Syntax error.\n%!"
-          filename
-          start_p.Lexing.pos_lnum
-          (start_p.Lexing.pos_cnum - start_p.Lexing.pos_bol)
-          (end_p.Lexing.pos_cnum - start_p.Lexing.pos_bol)
-    | Parsecmmaux.Error msg ->
-        close_in ic; Parsecmmaux.report_error msg
-    | x ->
-        close_in ic; raise x
+  | End_of_file ->
+    close_in ic;
+    Emit.end_assembly ();
+    if !write_asm_file then close_out !Emitaux.output_channel
+  | Lexcmm.Error msg ->
+    close_in ic;
+    Lexcmm.report_error lb msg
+  | Parsing.Parse_error ->
+    close_in ic;
+    let start_p = Lexing.lexeme_start_p lb in
+    let end_p = Lexing.lexeme_end_p lb in
+    Printf.eprintf "File \"%s\", line %i, characters %i-%i:\nSyntax error.\n%!"
+      filename start_p.Lexing.pos_lnum
+      (start_p.Lexing.pos_cnum - start_p.Lexing.pos_bol)
+      (end_p.Lexing.pos_cnum - start_p.Lexing.pos_bol)
+  | Parsecmmaux.Error msg ->
+    close_in ic;
+    Parsecmmaux.report_error msg
+  | x ->
+    close_in ic;
+    raise x
 
 let usage = "Usage: codegen <options> <files>\noptions are:"
 
-let main() =
-  Arg.parse [
-     "-S", Arg.Set write_asm_file,
-       " Output file to filename.s (default is stdout)";
-     "-g", Arg.Set Clflags.debug, "";
-     "-dcmm", Arg.Set dump_cmm, "";
-     "-dcse", Arg.Set dump_cse, "";
-     "-dspill", Arg.Set dump_spill, "";
-     "-dsplit", Arg.Set dump_split, "";
-     "-dinterf", Arg.Set dump_interf, "";
-     "-dprefer", Arg.Set dump_prefer, "";
-     "-dalloc", Arg.Set dump_regalloc, "";
-     "-dreload", Arg.Set dump_reload, "";
-     "-dlinear", Arg.Set dump_linear, "";
-     "-dtimings", Arg.Unit (fun () -> profile_columns := [ `Time ]), "";
-     "-dcounters", Arg.Unit (fun () -> profile_columns := [ `Counters ]), "";
-     ( "-dgranularity",
+let main () =
+  Arg.parse
+    [ ( "-S",
+        Arg.Set write_asm_file,
+        " Output file to filename.s (default is stdout)" );
+      "-g", Arg.Set Clflags.debug, "";
+      "-dcmm", Arg.Set dump_cmm, "";
+      "-dcse", Arg.Set dump_cse, "";
+      "-dspill", Arg.Set dump_spill, "";
+      "-dsplit", Arg.Set dump_split, "";
+      "-dinterf", Arg.Set dump_interf, "";
+      "-dprefer", Arg.Set dump_prefer, "";
+      "-dalloc", Arg.Set dump_regalloc, "";
+      "-dreload", Arg.Set dump_reload, "";
+      "-dlinear", Arg.Set dump_linear, "";
+      "-dtimings", Arg.Unit (fun () -> profile_columns := [`Time]), "";
+      "-dcounters", Arg.Unit (fun () -> profile_columns := [`Counters]), "";
+      ( "-dgranularity",
         Arg.Symbol
-          (Clflags.all_profile_granularity_levels, Clflags.set_profile_granularity),
-        "" );
-    ] compile_file usage
+          ( Clflags.all_profile_granularity_levels,
+            Clflags.set_profile_granularity ),
+        "" ) ]
+    compile_file usage
 
 let () =
   main ();
-  Profile.print Format.std_formatter !Clflags.profile_columns ~timings_precision:!Clflags.timings_precision;
+  Profile.print Format.std_formatter !Clflags.profile_columns
+    ~timings_precision:!Clflags.timings_precision;
   exit 0

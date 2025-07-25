@@ -1,17 +1,17 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let x = ref 32 in
 incr x;
 if !x <> 33 then raise Not_found;
 x
-;;
 
 (**
        0 CONSTINT 42

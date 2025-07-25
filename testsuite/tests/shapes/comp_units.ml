@@ -1,13 +1,15 @@
 (* TEST
- flags = "-dshape";
- expect;
+   flags = "-dshape";
+   expect;
 *)
 
 (* Make sure that shapes of compilation units are never eagerly loaded,
    regardless of the context. *)
 
 module Mdirect = Stdlib__Unit
-[%%expect{|
+
+[%%expect
+{|
 {
  "Mdirect"[module] -> Alias(<.0>
                             CU Stdlib__Unit);
@@ -16,7 +18,9 @@ module Mdirect = Unit
 |}]
 
 module Mproj = Stdlib.Unit
-[%%expect{|
+
+[%%expect
+{|
 {
  "Mproj"[module] -> Alias(<.1>
                           CU Stdlib . "Unit"[module]);
@@ -24,8 +28,13 @@ module Mproj = Stdlib.Unit
 module Mproj = Unit
 |}]
 
-module F (X : sig type t end) = X
-[%%expect{|
+module F (X : sig
+  type t
+end) =
+  X
+
+[%%expect
+{|
 {
  "F"[module] -> Abs<.4>(X, X<.3>);
  }
@@ -33,7 +42,9 @@ module F : functor (X : sig type t end) -> sig type t = X.t end
 |}]
 
 module App_direct = F (Stdlib__Unit)
-[%%expect{|
+
+[%%expect
+{|
 {
  "App_direct"[module] -> CU Stdlib__Unit;
  }
@@ -41,7 +52,9 @@ module App_direct : sig type t = Unit.t end
 |}]
 
 module App_proj = F (Stdlib.Unit)
-[%%expect{|
+
+[%%expect
+{|
 {
  "App_proj"[module] -> (CU Stdlib . "Unit"[module])<.6>;
  }
@@ -49,7 +62,9 @@ module App_proj : sig type t = Unit.t end
 |}]
 
 module App_direct_indir = F (Mdirect)
-[%%expect{|
+
+[%%expect
+{|
 {
  "App_direct_indir"[module] -> Alias(<.7>
                                      CU Stdlib__Unit);
@@ -58,7 +73,9 @@ module App_direct_indir : sig type t = Mdirect.t end
 |}]
 
 module App_proj_indir = F (Mproj)
-[%%expect{|
+
+[%%expect
+{|
 {
  "App_proj_indir"[module] -> Alias(<.8>
                                    CU Stdlib . "Unit"[module]);
@@ -70,7 +87,9 @@ module App_proj_indir : sig type t = Mproj.t end
    are and build shapes from them. *)
 
 include Stdlib__Unit
-[%%expect{|
+
+[%%expect
+{|
 {
  "compare"[value] -> CU Stdlib__Unit . "compare"[value];
  "equal"[value] -> CU Stdlib__Unit . "equal"[value];
@@ -84,7 +103,9 @@ val to_string : t -> string = <fun>
 |}]
 
 include Stdlib.Unit
-[%%expect{|
+
+[%%expect
+{|
 {
  "compare"[value] -> CU Stdlib . "Unit"[module] . "compare"[value];
  "equal"[value] -> CU Stdlib . "Unit"[module] . "equal"[value];
@@ -97,8 +118,10 @@ val compare : t -> t -> int = <fun>
 val to_string : t -> string = <fun>
 |}]
 
-module Without_constraint = Set.Make(Int)
-[%%expect{|
+module Without_constraint = Set.Make (Int)
+
+[%%expect
+{|
 {
  "Without_constraint"[module] ->
    CU Stdlib . "Set"[module] . "Make"[module](CU Stdlib . "Int"[module])<.9>;
@@ -156,9 +179,11 @@ module Without_constraint :
 module With_identity_constraint : sig
   module M : Set.S
 end = struct
-  module M = Set.Make(Int)
+  module M = Set.Make (Int)
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "With_identity_constraint"[module] ->
    {<.12>
@@ -171,11 +196,15 @@ module With_identity_constraint : sig module M : Set.S end
 |}]
 
 module With_constraining_constraint : sig
-  module M : sig type t end
+  module M : sig
+    type t
+  end
 end = struct
-  module M = Set.Make(Int)
+  module M = Set.Make (Int)
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "With_constraining_constraint"[module] ->
    {<.16>

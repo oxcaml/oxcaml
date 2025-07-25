@@ -68,14 +68,17 @@
    is the following: a concrete instance [(foo, bar) t] of the type is
    separable if [foo] has mode [m1] and [bar] has mode [m2]. *)
 
-type error =
-  | Non_separable_evar of string option
-exception Error of Location.t * error
+type error = Non_separable_evar of string option
+
 (** Exception raised when a type declaration is not separable, or when its
     separability cannot be established. *)
+exception Error of Location.t * error
 
-type mode = Types.Separability.t = Ind | Sep | Deepsep
-(** The mode [Sep] ("separable") characterizes types that are indeed separable:
+type mode = Types.Separability.t =
+  | Ind
+  | Sep
+  | Deepsep
+      (** The mode [Sep] ("separable") characterizes types that are indeed separable:
     either they only contain floating-point values, or none of the values
     at this type are floating-point values.
     On a type parameter, it indicates that this parameter must be
@@ -103,7 +106,6 @@ type mode = Types.Separability.t = Ind | Sep | Deepsep
     The different modes are ordered as [Ind < Sep < Deepsep] (from the least
     demanding to the most demanding). *)
 
-val compute_decl : Env.t -> Types.type_declaration -> mode list
 (** [compute_decl env def] returns the signature required
     for the type definition [def] in the typing environment [env]
     -- including signatures for the current recursive block.
@@ -121,11 +123,14 @@ val compute_decl : Env.t -> Types.type_declaration -> mode list
     is not required anymore; we just use [Ind] as the mode of each parameter
     without any check.
 *)
+val compute_decl : Env.t -> Types.type_declaration -> mode list
 
 (** Property interface (see {!Typedecl_properties}). These functions
     rely on {!compute_decl} and raise the {!Error} exception on error. *)
 type prop = Types.Separability.signature
+
 val property : (prop, unit) Typedecl_properties.property
+
 val update_decls :
   Env.t ->
   (Ident.t * Typedecl_properties.decl) list ->

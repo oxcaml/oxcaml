@@ -1,53 +1,52 @@
 (* TEST
- expect;
+   expect;
 *)
 
 class type foo_t =
   object
-    method foo: string
+    method foo : string
   end
 
 type 'a name =
-    Foo: foo_t name
-  | Int: int name
-;;
+  | Foo : foo_t name
+  | Int : int name
 
-[%%expect{|
+[%%expect
+{|
 class type foo_t = object method foo : string end
 type 'a name = Foo : foo_t name | Int : int name
 |}]
 
 class foo =
-  object(self)
+  object (self)
     method foo = "foo"
-    method cast =
-      function
-          Foo -> (self :> <foo : string>)
+
+    method cast = function Foo -> (self :> < foo : string >)
   end
-;;
-[%%expect{|
+
+[%%expect
+{|
 class foo :
   object method cast : foo_t name -> < foo : string > method foo : string end
 |}]
 
-class foo: foo_t =
-  object(self)
+class foo : foo_t =
+  object (self)
     method foo = "foo"
-    method cast: type a. a name -> a =
-      function
-          Foo -> (self :> foo_t)
-        | _ -> raise Exit
+
+    method cast : type a. a name -> a =
+      function Foo -> (self :> foo_t) | _ -> raise Exit
   end
-;;
-[%%expect{|
-Lines 2-8, characters 2-5:
-2 | ..object(self)
+
+[%%expect
+{|
+Lines 2-7, characters 2-5:
+2 | ..object (self)
 3 |     method foo = "foo"
-4 |     method cast: type a. a name -> a =
-5 |       function
-6 |           Foo -> (self :> foo_t)
-7 |         | _ -> raise Exit
-8 |   end
+4 |
+5 |     method cast : type a. a name -> a =
+6 |       function Foo -> (self :> foo_t) | _ -> raise Exit
+7 |   end
 Error: The class type
          object method cast : 'a name -> 'a method foo : string end
        is not matched by the class type foo_t

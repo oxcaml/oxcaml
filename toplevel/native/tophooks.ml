@@ -19,13 +19,15 @@ open Config
 open Misc
 open Topcommon
 
-type[@warning "-37"] res = Ok of Obj.t | Err of string
+type res =
+  | Ok of Obj.t
+  | Err of string
+[@@warning "-37"]
 
-external ndl_run_toplevel: string -> string -> res
+external ndl_run_toplevel : string -> string -> res
   = "caml_natdynlink_run_toplevel"
 
-let lookup sym =
-  Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol:sym
+let lookup sym = Dynlink.unsafe_get_global_value ~bytecode_or_asm_symbol:sym
 
 let need_symbol sym =
   not (Dynlink.does_symbol_exist ~bytecode_or_asm_symbol:sym)
@@ -43,37 +45,41 @@ module Backend = struct
   (* See backend_intf.mli. *)
 
   let really_import_approx = Import_approx.really_import_approx
+
   let import_symbol = Import_approx.import_symbol
 
   let size_int = Arch.size_int
+
   let big_endian = Arch.big_endian
 
   let max_sensible_number_of_arguments =
     (* The "-1" is to allow for a potential closure environment parameter. *)
     Proc.max_arguments_for_tailcalls - 1
 end
+
 let backend = (module Backend : Backend_intf.S)
 
 let load ppf phrase_name program =
   let dll =
-    if !Clflags.keep_asm_file then phrase_name ^ ext_dll
+    if !Clflags.keep_asm_file
+    then phrase_name ^ ext_dll
     else Filename.temp_file ("caml" ^ phrase_name) ext_dll
   in
   let filename = Filename.chop_extension dll in
   let middle_end =
-    if Config.flambda then Flambda_middle_end.lambda_to_clambda
+    if Config.flambda
+    then Flambda_middle_end.lambda_to_clambda
     else Closure_middle_end.lambda_to_clambda
   in
-  Asmgen.compile_implementation ~toplevel:need_symbol
-    ~backend ~prefixname:filename
-    ~middle_end ~ppf_dump:ppf program;
+  Asmgen.compile_implementation ~toplevel:need_symbol ~backend
+    ~prefixname:filename ~middle_end ~ppf_dump:ppf program;
   Asmlink.call_linker_shared [filename ^ ext_obj] dll;
   Sys.remove (filename ^ ext_obj);
-
   let dll =
     if Filename.is_implicit dll
     then Filename.concat (Sys.getcwd ()) dll
-    else dll in
+    else dll
+  in
   let remove_dll () =
     (* note: under windows, cannot remove a loaded dll
        (should remember the handles, close them in at_exit, and then
@@ -82,25 +88,30 @@ let load ppf phrase_name program =
   in
   match
     (* CR-someday lmaurer: The manual prefixing here feels wrong. Probably
-      [phrase_name] should be a [Compilation_unit.t] (from which we can extract
-      a linkage name like civilized folk). That will be easier to do once we have
-      better types in, say, the [Translmod] API. *)
+       [phrase_name] should be a [Compilation_unit.t] (from which we can extract
+       a linkage name like civilized folk). That will be easier to do once we have
+       better types in, say, the [Translmod] API. *)
     dll_run dll ("caml" ^ phrase_name)
   with
   | res ->
-     remove_dll ();
-     res
+    remove_dll ();
+    res
   | exception x ->
-     record_backtrace ();
-     remove_dll ();
-     Exception x
+    record_backtrace ();
+    remove_dll ();
+    Exception x
 
 type lookup_fn = string -> Obj.t option
+
 type load_fn =
   Format.formatter -> string -> Lambda.program -> Topcommon.evaluation_outcome
-type assembler = {mutable lookup: lookup_fn; mutable load: load_fn}
 
-let fns = {lookup; load}
+type assembler =
+  { mutable lookup : lookup_fn;
+    mutable load : load_fn
+  }
+
+let fns = { lookup; load }
 
 let load ppf = fns.load ppf
 

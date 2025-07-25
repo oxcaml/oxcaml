@@ -1,14 +1,15 @@
 (* TEST
- include unix;
- hasunix;
- {
-   bytecode;
- }{
-   native;
- }
+   include unix;
+   hasunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let str = "Hello, OCaml!"
+
 let txt = "truncate.txt"
 
 let test file openfile stat truncate delta close =
@@ -17,9 +18,7 @@ let test file openfile stat truncate delta close =
     output_string c str;
     close_out c
   in
-  let size file =
-    (stat file).Unix.st_size
-  in
+  let size file = (stat file).Unix.st_size in
   let file = openfile file in
   Printf.printf "initial size: %d\n%!" (size file);
   truncate file (size file - delta);
@@ -28,8 +27,7 @@ let test file openfile stat truncate delta close =
   Printf.printf "final size: %d\n%!" (size file);
   close file
 
-let () =
-  test "truncate.txt" (fun x -> x) Unix.stat Unix.truncate 2 ignore
+let () = test "truncate.txt" (fun x -> x) Unix.stat Unix.truncate 2 ignore
 
 let () =
   let open_it file = Unix.openfile file [O_RDWR] 0 in

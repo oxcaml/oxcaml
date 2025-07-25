@@ -1,10 +1,10 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- ocamlopt_flags += " -O3 ";
- runtime5;
- multidomain;
- { bytecode; }
- { native; }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   ocamlopt_flags += " -O3 ";
+   runtime5;
+   multidomain;
+   { bytecode; }
+   { native; }
 *)
 
 open Domain

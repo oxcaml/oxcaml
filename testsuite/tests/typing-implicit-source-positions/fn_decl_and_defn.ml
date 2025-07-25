@@ -1,5 +1,5 @@
 (* TEST
- expect;
+   expect;
 *)
 
 type t = call_pos:[%call_pos] -> unit -> unit
@@ -8,34 +8,38 @@ type t = call_pos:[%call_pos] -> unit -> unit
 type t = call_pos:[%call_pos] -> unit -> unit
 |}]
 
-let f : t = fun ~(call_pos:[%call_pos]) () -> ()
+let f : t = fun ~(call_pos : [%call_pos]) () -> ()
 
-[%%expect{|
+[%%expect {|
 val f : t = <fun>
 |}]
 
-let g ~(call_pos:[%call_pos]) () = ()
+let g ~(call_pos : [%call_pos]) () = ()
 
-[%%expect{|
+[%%expect {|
 val g : call_pos:[%call_pos] -> unit -> unit = <fun>
 |}]
 
-let apply (f : t) = f ~call_pos:Lexing.dummy_pos () ;;
+let apply (f : t) = f ~call_pos:Lexing.dummy_pos ()
+
 [%%expect {|
 val apply : t -> unit = <fun>
 |}]
 
-let _ = apply f ;;
-[%%expect{|
+let _ = apply f
+
+[%%expect {|
 - : unit = ()
 |}]
 
-let _ = apply g ;;
-[%%expect{|
+let _ = apply g
+
+[%%expect {|
 - : unit = ()
 |}]
 
-let _ = g ~call_pos:Lexing.dummy_pos () ;;
-[%%expect{|
+let _ = g ~call_pos:Lexing.dummy_pos ()
+
+[%%expect {|
 - : unit = ()
 |}]

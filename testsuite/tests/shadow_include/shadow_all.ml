@@ -1,6 +1,6 @@
 (* TEST
- flags = "-nopervasives"; (* can't pass -nostdlib because of objects. *)
- expect;
+   flags = "-nopervasives"; (* can't pass -nostdlib because of objects. *)
+   expect;
 *)
 
 (* Signatures *)
@@ -14,21 +14,25 @@ module type S = sig
 
   external e : unit -> unit = "%identity"
 
-  module M : sig type t end
+  module M : sig
+    type t
+  end
 
   module type T
 
   exception E
 
   type ext = ..
+
   type ext += C
 
   class c : object end
 
   class type ct = object end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type S =
   sig
     type t
@@ -46,10 +50,12 @@ module type S =
 
 module type SS = sig
   include S
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type SS =
   sig
     type t
@@ -69,11 +75,14 @@ module type SS =
 
 module type Type = sig
   include S
+
   type u = t
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Type =
   sig
     type u
@@ -92,32 +101,38 @@ module type Type =
 
 module type Type_fail = sig
   include S
+
   val ignore : t -> unit
+
   include S
 end
-;;
-[%%expect{|
-Line 4, characters 2-11:
-4 |   include S
+
+[%%expect
+{|
+Line 6, characters 2-11:
+6 |   include S
       ^^^^^^^^^
 Error: Illegal shadowing of included type "t/2" by "t/1".
 Line 2, characters 2-11:
 2 |   include S
       ^^^^^^^^^
   Type "t/2" came from this include.
-Line 3, characters 2-24:
-3 |   val ignore : t -> unit
+Line 4, characters 2-24:
+4 |   val ignore : t -> unit
       ^^^^^^^^^^^^^^^^^^^^^^
   The value "ignore" has no valid type if "t/2" is shadowed.
 |}]
 
 module type Module = sig
   include S
+
   module N = M
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Module =
   sig
     module N : sig type t end
@@ -136,33 +151,38 @@ module type Module =
 
 module type Module_fail = sig
   include S
+
   val ignore : M.t -> unit
+
   include S
 end
-;;
-[%%expect{|
-Line 4, characters 2-11:
-4 |   include S
+
+[%%expect
+{|
+Line 6, characters 2-11:
+6 |   include S
       ^^^^^^^^^
 Error: Illegal shadowing of included module "M/2" by "M/1".
 Line 2, characters 2-11:
 2 |   include S
       ^^^^^^^^^
   Module "M/2" came from this include.
-Line 3, characters 2-26:
-3 |   val ignore : M.t -> unit
+Line 4, characters 2-26:
+4 |   val ignore : M.t -> unit
       ^^^^^^^^^^^^^^^^^^^^^^^^
   The value "ignore" has no valid type if "M/2" is shadowed.
 |}]
 
-
 module type Module_type = sig
   include S
+
   module type U = T
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Module_type =
   sig
     module type U
@@ -181,53 +201,62 @@ module type Module_type =
 
 module type Module_type_fail = sig
   include S
+
   module F : functor (_ : T) -> sig end
+
   include S
 end
-;;
-[%%expect{|
-Line 4, characters 2-11:
-4 |   include S
+
+[%%expect
+{|
+Line 6, characters 2-11:
+6 |   include S
       ^^^^^^^^^
 Error: Illegal shadowing of included module type "T/2" by "T/1".
 Line 2, characters 2-11:
 2 |   include S
       ^^^^^^^^^
   Module type "T/2" came from this include.
-Line 3, characters 2-39:
-3 |   module F : functor (_ : T) -> sig end
+Line 4, characters 2-39:
+4 |   module F : functor (_ : T) -> sig end
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   The module "F" has no valid type if "T/2" is shadowed.
 |}]
 
 module type Extension = sig
   include S
+
   type ext += C2
+
   include S
 end
-;;
-[%%expect{|
-Line 4, characters 2-11:
-4 |   include S
+
+[%%expect
+{|
+Line 6, characters 2-11:
+6 |   include S
       ^^^^^^^^^
 Error: Illegal shadowing of included type "ext/2" by "ext/1".
 Line 2, characters 2-11:
 2 |   include S
       ^^^^^^^^^
   Type "ext/2" came from this include.
-Line 3, characters 14-16:
-3 |   type ext += C2
+Line 4, characters 14-16:
+4 |   type ext += C2
                   ^^
   The extension constructor "C2" has no valid type if "ext/2" is shadowed.
 |}]
 
 module type Class = sig
   include S
+
   class parametrized : int -> c
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Class =
   sig
     class parametrized : int -> object  end
@@ -246,11 +275,14 @@ module type Class =
 
 module type Class_type = sig
   include S
+
   class type parametrized = ct
+
   include S
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module type Class_type =
   sig
     class type parametrized = object  end
@@ -285,14 +317,16 @@ module N = struct
   exception E
 
   type ext = ..
+
   type ext += C
 
   class c = object end
 
   class type ct = object end
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module N :
   sig
     type t
@@ -312,8 +346,9 @@ module NN = struct
   include N
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module NN :
   sig
     type t = N.t
@@ -333,11 +368,14 @@ module NN :
 
 module Type = struct
   include N
+
   type u = t
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Type :
   sig
     type u = N.t
@@ -359,8 +397,9 @@ module Module = struct
   module O = M
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Module :
   sig
     module O = N.M
@@ -379,11 +418,14 @@ module Module :
 
 module Module_type = struct
   include N
+
   module type U = T
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Module_type :
   sig
     module type U = N.T
@@ -402,11 +444,14 @@ module Module_type :
 
 module Exception = struct
   include N
+
   exception Exn = E
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Exception :
   sig
     exception Exn
@@ -425,11 +470,14 @@ module Exception :
 
 module Extension = struct
   include N
+
   type ext += C2
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Extension :
   sig
     type N.ext += C2
@@ -448,11 +496,14 @@ module Extension :
 
 module Class = struct
   include N
+
   class parametrized _ = c
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Class :
   sig
     class parametrized : 'a -> object  end
@@ -471,11 +522,14 @@ module Class :
 
 module Class_type = struct
   include N
+
   class type parametrized = ct
+
   include N
 end
-;;
-[%%expect{|
+
+[%%expect
+{|
 module Class_type :
   sig
     class type parametrized = object  end
@@ -496,25 +550,36 @@ module Class_type :
 module M = struct
   include struct
     type t = A
+
     let x = A
   end
-  open struct type t end
-  open struct type t end
+
+  open struct
+    type t
+  end
+
+  open struct
+    type t
+  end
+
   type t
 end
-[%%expect {|
-Line 8, characters 2-8:
-8 |   type t
-      ^^^^^^
+
+[%%expect
+{|
+Line 16, characters 2-8:
+16 |   type t
+       ^^^^^^
 Error: Illegal shadowing of included type "t/2" by "t/1".
-Lines 2-5, characters 2-5:
+Lines 2-6, characters 2-5:
 2 | ..include struct
 3 |     type t = A
-4 |     let x = A
-5 |   end
+4 |
+5 |     let x = A
+6 |   end
   Type "t/2" came from this include.
-Line 4, characters 8-9:
-4 |     let x = A
+Line 5, characters 8-9:
+5 |     let x = A
             ^
   The value "x" has no valid type if "t/2" is shadowed.
 |}]

@@ -1,11 +1,11 @@
 (* TEST
- modules = "cstubs.c np.ml";
- runtime4;
- {
-   bytecode;
- }{
-   native;
- }
+   modules = "cstubs.c np.ml";
+   runtime4;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 open Np
@@ -14,4 +14,4 @@ open Np
    mode.  GC doesn't scan black objects.  However, if the size in the
    head is crazily big, the naked pointer detector will warn. *)
 
-let x = do_gc [ make_block (-1n) Black 100n ]
+let x = do_gc [make_block (-1n) Black 100n]

@@ -1,6 +1,9 @@
-File "t07bad.ml", lines 10-11, characters 0-54:
-10 | module rec A : sig type 'a t = <m: 'a list A.t> end
-11 |              = struct type 'a t = <m: 'a list A.t> end..
+File "t07bad.ml", lines 6-10, characters 0-3:
+ 6 | module rec A : sig
+ 7 |   type 'a t = < m : 'a list A.t >
+ 8 | end = struct
+ 9 |   type 'a t = < m : 'a list A.t >
+10 | end
 Error: This recursive type is not regular.
        The type constructor "A.t" is defined as
          type "'a A.t"

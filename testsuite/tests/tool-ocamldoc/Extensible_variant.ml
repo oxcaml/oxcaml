@@ -1,5 +1,5 @@
 (* TEST
- ocamldoc with latex;
+   ocamldoc with latex;
 *)
 
 (** Testing display of extensible variant types and exceptions.
@@ -13,17 +13,11 @@
 type e = ..
 
 module M = struct
-  type e +=
-  | A (** A doc *)
-  | B (** B doc *)
-  | C (** C doc *)
+  type e += A  (** A doc *) | B  (** B doc *) | C  (** C doc *)
 end
 
 module type MT = sig
-  type e +=
-  | A (** A doc *)
-  | B (** B doc *)
-  | C (** C doc *)
+  type e += A  (** A doc *) | B  (** B doc *) | C  (** C doc *)
 end
 
 exception E

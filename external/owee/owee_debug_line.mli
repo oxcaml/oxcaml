@@ -2,10 +2,10 @@ open Owee_buf
 
 type header
 
-type pointers_to_other_sections = {
-  debug_line_str : t option;
-  debug_str      : t option;
-}
+type pointers_to_other_sections =
+  { debug_line_str : t option;
+    debug_str : t option
+  }
 
 (** [read_chunk cursor ~pointers_to_other_sections] expects the [cursor] to be
     pointing to the beginning of a DWARF linenumber program. Those are usually
@@ -17,28 +17,28 @@ type pointers_to_other_sections = {
     [pointers_to_other_sections] are needed in DWARF 5 because filenames can be
     pointers to strings in entirely separate sections of DWARF. You can use
     {! Owee_elf.debug_line_pointers} to construct such a value. *)
-val read_chunk
-  :  cursor
-  -> pointers_to_other_sections:pointers_to_other_sections
-  -> (header * cursor) option
+val read_chunk :
+  cursor ->
+  pointers_to_other_sections:pointers_to_other_sections ->
+  (header * cursor) option
 
 (** State of the linenumber automaton.
     IMPORTANT: this state is mutable!
     A value of this type can change as the file is scanned. *)
-type state = {
-  mutable address        : int;
-  mutable filename       : string;
-  mutable file           : int;
-  mutable line           : int;
-  mutable col            : int;
-  mutable is_statement   : bool;
-  mutable basic_block    : bool;
-  mutable end_sequence   : bool;
-  mutable prologue_end   : bool;
-  mutable epilogue_begin : bool;
-  mutable isa            : int;
-  mutable discriminator  : int;
-}
+type state =
+  { mutable address : int;
+    mutable filename : string;
+    mutable file : int;
+    mutable line : int;
+    mutable col : int;
+    mutable is_statement : bool;
+    mutable basic_block : bool;
+    mutable end_sequence : bool;
+    mutable prologue_end : bool;
+    mutable epilogue_begin : bool;
+    mutable isa : int;
+    mutable discriminator : int
+  }
 
 (** [get_filename header state] get the filename associated to the row
     described by [state].
@@ -50,8 +50,7 @@ val get_filename : header -> state -> string option
 (** [fold_rows (header, cursor) f init] will fold over the rows defined by the
     program described by [(header, cursor)], using the function [f] and
     initial state [init]. *)
-val fold_rows : header * cursor ->
-  (header -> state -> 'a -> 'a) -> 'a -> 'a
+val fold_rows : header * cursor -> (header -> state -> 'a -> 'a) -> 'a -> 'a
 
 (** [copy state] returns a copy of the mutable state *)
 val copy : state -> state

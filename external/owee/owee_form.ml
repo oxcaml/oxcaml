@@ -43,8 +43,7 @@ type t =
   | `addrx1
   | `addrx2
   | `addrx3
-  | `addrx4
-  ]
+  | `addrx4 ]
 
 let of_int_exn = function
   | 0x01 -> `addr
@@ -90,109 +89,38 @@ let of_int_exn = function
   | 0x2a -> `addrx2
   | 0x2b -> `addrx3
   | 0x2c -> `addrx4
-  | _    -> failwith "invalid form code"
+  | _ -> failwith "invalid form code"
 
-let read cursor =
-  of_int_exn (Read.uleb128 cursor)
+let read cursor = of_int_exn (Read.uleb128 cursor)
 
 let rec skip t cursor ~is_64bit ~address_size =
   match t with
-  | ( `flag_present
-    | `implicit_const
-    | `flag
-    | `data1
-    | `ref1
-    | `strx1
-    | `addrx1
-    | `data2
-    | `ref2
-    | `strx2
-    | `addrx2
-    | `strx3
-    | `addrx3
-    | `data4
-    | `ref4
-    | `ref_sup4
-    | `strx4
-    | `addrx4
-    | `data8
-    | `ref8
-    | `ref_sig8
-    | `ref_sup8
-    | `data16
-    | `addr
-    | `strp
-    | `line_strp
-    | `sec_offset
-    | `strp_sup
-    | `ref_addr
-    | `exprloc
-    | `block
-    | `block1
-    | `block2
-    | `block4
-    ) as form ->
+  | ( `flag_present | `implicit_const | `flag | `data1 | `ref1 | `strx1
+    | `addrx1 | `data2 | `ref2 | `strx2 | `addrx2 | `strx3 | `addrx3 | `data4
+    | `ref4 | `ref_sup4 | `strx4 | `addrx4 | `data8 | `ref8 | `ref_sig8
+    | `ref_sup8 | `data16 | `addr | `strp | `line_strp | `sec_offset | `strp_sup
+    | `ref_addr | `exprloc | `block | `block1 | `block2 | `block4 ) as form ->
     let size =
       match form with
-      | `flag_present
-      | `implicit_const
-        -> 0
-      | `flag
-      | `data1
-      | `ref1
-      | `strx1
-      | `addrx1
-        -> 1
-      | `data2
-      | `ref2
-      | `strx2
-      | `addrx2
-        -> 2
-      | `strx3
-      | `addrx3
-        -> 3
-      | `data4
-      | `ref4
-      | `ref_sup4
-      | `strx4
-      | `addrx4
-        -> 4
-      | `data8
-      | `ref8
-      | `ref_sig8
-      | `ref_sup8
-        -> 8
-      | `data16
-        -> 16
-      | `addr
-        -> address_size
-      | `strp
-      | `line_strp
-      | `sec_offset
-      | `strp_sup
-      | `ref_addr
-        -> if is_64bit then 8 else 4
-      | `exprloc
-      | `block
-        -> Read.uleb128 cursor
-      | `block1
-        -> Read.u8 cursor
-      | `block2
-        -> Read.u16 cursor
-      | `block4
-        -> Read.u32 cursor
+      | `flag_present | `implicit_const -> 0
+      | `flag | `data1 | `ref1 | `strx1 | `addrx1 -> 1
+      | `data2 | `ref2 | `strx2 | `addrx2 -> 2
+      | `strx3 | `addrx3 -> 3
+      | `data4 | `ref4 | `ref_sup4 | `strx4 | `addrx4 -> 4
+      | `data8 | `ref8 | `ref_sig8 | `ref_sup8 -> 8
+      | `data16 -> 16
+      | `addr -> address_size
+      | `strp | `line_strp | `sec_offset | `strp_sup | `ref_addr ->
+        if is_64bit then 8 else 4
+      | `exprloc | `block -> Read.uleb128 cursor
+      | `block1 -> Read.u8 cursor
+      | `block2 -> Read.u16 cursor
+      | `block4 -> Read.u32 cursor
     in
     advance cursor size
-  | `string ->
-    ignore (Read.zero_string cursor () : string option)
-  | `sdata ->
-    ignore (Read.sleb128 cursor : s128)
-  | `udata
-  | `ref_udata
-  | `strx
-  | `addrx
-  | `loclistx
-  | `rnglistx ->
+  | `string -> ignore (Read.zero_string cursor () : string option)
+  | `sdata -> ignore (Read.sleb128 cursor : s128)
+  | `udata | `ref_udata | `strx | `addrx | `loclistx | `rnglistx ->
     ignore (Read.uleb128 cursor : u128)
   | `indirect ->
     let t = of_int_exn (Read.uleb128 cursor) in

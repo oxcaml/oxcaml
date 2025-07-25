@@ -1,11 +1,11 @@
 (* TEST
- include systhreads;
- hassysthreads;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   hassysthreads;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 (* Producer-consumer with events and multiple producers *)
@@ -20,20 +20,20 @@ let rec consume chans sum =
   let rec mkreceive prev = function
     | [] -> []
     | chan :: rem as chans ->
-        wrap (receive chan) (fun n ->
+      wrap (receive chan) (fun n ->
           if n < 0
           then consume (List.rev_append rem prev) sum
           else consume (List.rev_append chans prev) (sum + n))
-        :: mkreceive (chan :: prev) rem
+      :: mkreceive (chan :: prev) rem
   in
-    if chans = [] then sum else select (mkreceive [] chans)
+  if chans = [] then sum else select (mkreceive [] chans)
 
 let sum_0_n n = n * (n + 1) / 2
 
 let _ =
-  let chan1 = new_channel()
-  and chan2 = new_channel()
-  and chan3 = new_channel() in
+  let chan1 = new_channel ()
+  and chan2 = new_channel ()
+  and chan3 = new_channel () in
   ignore (Thread.create (fun () -> produce chan1 0 5000) ());
   ignore (Thread.create (fun () -> produce chan2 0 2000) ());
   ignore (Thread.create (fun () -> produce chan3 0 1000) ());

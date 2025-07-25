@@ -19,8 +19,10 @@ open Parser_aux
 open Format
 
 val expression :
-    Events.code_event option -> Env.t -> expression ->
-    Debugcom.Remote_value.t * type_expr
+  Events.code_event option ->
+  Env.t ->
+  expression ->
+  Debugcom.Remote_value.t * type_expr
 
 type error =
   | Unbound_global of Symtable.Global.t
@@ -39,4 +41,4 @@ type error =
 
 exception Error of error
 
-val report_error: formatter -> error -> unit
+val report_error : formatter -> error -> unit

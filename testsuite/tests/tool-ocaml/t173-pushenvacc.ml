@@ -1,12 +1,13 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let x = 5 in
 let y = 4 in
 let z = 3 in
@@ -14,7 +15,6 @@ let a = 2 in
 let b = 1 in
 let f _ = b + a + z + y + x in
 if f 0 <> 15 then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

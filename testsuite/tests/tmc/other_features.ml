@@ -1,5 +1,5 @@
 (* TEST
- expect;
+   expect;
 *)
 
 module Non_recursive_let_bad = struct
@@ -11,28 +11,30 @@ module Non_recursive_let_bad = struct
     match l with
     | N v -> N (f v)
     | C (a, b) ->
-        let map' l = map f l in
-        C (map' a, (map' [@tailcall]) b)
+      let map' l = map f l in
+      C (map' a, (map' [@tailcall]) b)
 end
-[%%expect {|
-Lines 6-11, characters 30-40:
+
+[%%expect
+{|
+Lines 6-11, characters 30-38:
  6 | ..............................f l =
  7 |     match l with
  8 |     | N v -> N (f v)
  9 |     | C (a, b) ->
-10 |         let map' l = map f l in
-11 |         C (map' a, (map' [@tailcall]) b)
+10 |       let map' l = map f l in
+11 |       C (map' a, (map' [@tailcall]) b)
 Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
 but is never applied in TMC position.
 
-Line 11, characters 19-39:
-11 |         C (map' a, (map' [@tailcall]) b)
-                        ^^^^^^^^^^^^^^^^^^^^
+Line 11, characters 17-37:
+11 |       C (map' a, (map' [@tailcall]) b)
+                      ^^^^^^^^^^^^^^^^^^^^
 Warning 51 [wrong-tailcall-expectation]: expected tailcall
 
-Line 11, characters 19-39:
-11 |         C (map' a, (map' [@tailcall]) b)
-                        ^^^^^^^^^^^^^^^^^^^^
+Line 11, characters 17-37:
+11 |       C (map' a, (map' [@tailcall]) b)
+                      ^^^^^^^^^^^^^^^^^^^^
 Warning 51 [wrong-tailcall-expectation]: expected tailcall
 
 module Non_recursive_let_bad :
@@ -41,7 +43,6 @@ module Non_recursive_let_bad :
     val map : ('a -> 'b) -> 'a t -> 'b t
   end
 |}]
-
 
 module Non_recursive_let_good = struct
   type 'a t =
@@ -52,10 +53,12 @@ module Non_recursive_let_good = struct
     match l with
     | N v -> N (f v)
     | C (a, b) ->
-        let[@tail_mod_cons] map' l = map f l in
-        C (map' a, (map' [@tailcall]) b)
+      let[@tail_mod_cons] map' l = map f l in
+      C (map' a, (map' [@tailcall]) b)
 end
-[%%expect {|
+
+[%%expect
+{|
 module Non_recursive_let_good :
   sig
     type 'a t = N of 'a | C of 'a t * 'a t

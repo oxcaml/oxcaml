@@ -32,10 +32,7 @@ let h (type a) (eff : a t) : ((a, 'b) continuation -> 'b) option =
     fp_backtrace Sys.argv.(0);
     v + 1
   in
-  match eff with
-  | E v -> Some (h_effect_e v)
-  | e -> None
-
+  match eff with E v -> Some (h_effect_e v) | e -> None
 
 let v =
   let[@inline never] v_retc v =
@@ -43,9 +40,6 @@ let v =
     fp_backtrace Sys.argv.(0);
     v + 1
   in
-  match_with f ()
-  { retc = v_retc;
-    exnc = (fun e -> raise e);
-    effc = h }
+  match_with f () { retc = v_retc; exnc = (fun e -> raise e); effc = h }
 
 let () = printf "# result=%d\n%!" v

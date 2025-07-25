@@ -5,14 +5,22 @@
  * By contrast, option `-q` (default) does not runs
  * forbidden tests only, whose occurrence are not legal
  * according to the memory model.
-*)
+ *)
 
 module type Config = sig
   val verbose : bool
+
   val size : int
+
   val nruns : int
+
   val navail : int
 end
 
-module Make :
-functor (N:sig val pgm:string end) -> sig module Config : Config end
+module Make : functor
+  (N : sig
+     val pgm : string
+   end)
+  -> sig
+  module Config : Config
+end

@@ -1,17 +1,17 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
 open Lib;;
+
 let v = Array.make 200000 2 in
 let t = ref 0 in
 Array.iter (fun x -> t := !t + x) v;
 if !t <> 400000 then raise Not_found
-;;
 
 (**
        0 CONSTINT 42

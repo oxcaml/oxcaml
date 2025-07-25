@@ -13,5 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val err_msgs: Includemod.explanation -> Format.formatter -> unit
-val register: unit -> unit
+val err_msgs : Includemod.explanation -> Format.formatter -> unit
+
+val register : unit -> unit

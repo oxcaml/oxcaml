@@ -1,42 +1,34 @@
 (* TEST
- ocamldoc with html;
+   ocamldoc with html;
 *)
 
 (** Test the rendering of alerts. *)
 
-val a : int
-[@@alert foo "bar"]
 (** Documentation after. *)
+val a : int [@@alert foo "bar"]
 
 (** Documentation before. *)
-val b : int
-[@@alert foo "bar"]
+val b : int [@@alert foo "bar"]
 
 (* No documentation. *)
-val c : int
-[@@alert foo "bar"]
+val c : int [@@alert foo "bar"]
 
 (** The deprecated attribute. *)
 
-val d : int
-[@@deprecated "foo"]
+val d : int [@@deprecated "foo"]
 
-val d' : int
-[@@alert deprecated "foo"]
+val d' : int [@@alert deprecated "foo"]
 
 (** No payload *)
 
-val e : int
-[@@deprecated]
+val e : int [@@deprecated]
 
-val f : int
-[@@alert foo]
+val f : int [@@alert foo]
 
 (** Both deprecated tag and alert *)
 
-val g : int
-[@@deprecated "foo"]
 (** @deprecated bar *)
+val g : int [@@deprecated "foo"]
 
 (** Constructors and fields and other items. *)
 
@@ -51,5 +43,7 @@ exception E [@deprecated "foo"]
 external f : int -> int = "" [@@deprecated "foo"]
 
 type e = ..
+
 type e += Ext [@@deprecated "foo"]
+
 type e += Ext2 [@deprecated "foo"]

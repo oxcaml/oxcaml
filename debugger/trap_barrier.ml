@@ -21,19 +21,17 @@ open Checkpoints
 
 let current_trap_barrier = ref Sp.null
 
-let install_trap_barrier pos =
-  current_trap_barrier := pos
+let install_trap_barrier pos = current_trap_barrier := pos
 
-let remove_trap_barrier () =
-  current_trap_barrier := Sp.null
+let remove_trap_barrier () = current_trap_barrier := Sp.null
 
 (* Ensure the trap barrier state is up to date in current checkpoint. *)
 let update_trap_barrier () =
-  if !current_checkpoint.c_trap_barrier <> !current_trap_barrier then
-    Exec.protect
-      (function () ->
-         set_trap_barrier !current_trap_barrier;
-         !current_checkpoint.c_trap_barrier <- !current_trap_barrier)
+  if !current_checkpoint.c_trap_barrier <> !current_trap_barrier
+  then
+    Exec.protect (function () ->
+        set_trap_barrier !current_trap_barrier;
+        !current_checkpoint.c_trap_barrier <- !current_trap_barrier)
 
 (* Execute `funct' with a trap barrier. *)
 (* --- Used by `finish'. *)

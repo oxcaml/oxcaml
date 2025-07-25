@@ -1,12 +1,12 @@
 (* TEST
- include unix;
- flags = "-alert -unsafe_multidomain";
- libunix;
- {
-   bytecode;
- }{
-   native;
- }
+   include unix;
+   flags = "-alert -unsafe_multidomain";
+   libunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let () =

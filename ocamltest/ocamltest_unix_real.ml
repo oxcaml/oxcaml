@@ -14,17 +14,19 @@
 
 (* Unix.gettimeofday and Unix.has_symlink never raise *)
 let has_symlink = Unix.has_symlink
+
 let gettimeofday = Unix.gettimeofday
 
 (* Convert Unix_error to Sys_error *)
 let wrap f x =
   try f x
-  with Unix.Unix_error(err, fn_name, arg) ->
+  with Unix.Unix_error (err, fn_name, arg) ->
     let msg =
-      Printf.sprintf "%s failed on %S with %s"
-                     fn_name arg (Unix.error_message err)
+      Printf.sprintf "%s failed on %S with %s" fn_name arg
+        (Unix.error_message err)
     in
-      raise (Sys_error msg)
+    raise (Sys_error msg)
 
 let symlink ?to_dir source = wrap (Unix.symlink ?to_dir source)
+
 let chmod file = wrap (Unix.chmod file)

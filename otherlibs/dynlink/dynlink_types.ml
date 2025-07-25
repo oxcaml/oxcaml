@@ -41,79 +41,74 @@ type error =
   | Inconsistent_implementation of string
   | Module_already_loaded of string
   | Private_library_cannot_implement_interface of string
-  | Library_file_already_loaded_privately of { filename : string; }
+  | Library_file_already_loaded_privately of { filename : string }
 
 exception Error of error
 
 let error_message = function
-  | Not_a_bytecode_file name ->
-    name ^ " is not an object file"
-  | Inconsistent_import name ->
-    "interface mismatch on " ^ name
-  | Unavailable_unit name ->
-    "no implementation available for " ^ name
-  | Unsafe_file ->
-    "this object file uses unsafe features"
+  | Not_a_bytecode_file name -> name ^ " is not an object file"
+  | Inconsistent_import name -> "interface mismatch on " ^ name
+  | Unavailable_unit name -> "no implementation available for " ^ name
+  | Unsafe_file -> "this object file uses unsafe features"
   | Linking_error (name, Undefined_global s) ->
-    "error while linking " ^ name ^ ".\n" ^
-      "Reference to undefined global `" ^ s ^ "'"
+    "error while linking " ^ name ^ ".\n" ^ "Reference to undefined global `"
+    ^ s ^ "'"
   | Linking_error (name, Unavailable_primitive s) ->
-    "error while linking " ^ name ^ ".\n" ^
-      "The external function `" ^ s ^ "' is not available"
+    "error while linking " ^ name ^ ".\n" ^ "The external function `" ^ s
+    ^ "' is not available"
   | Linking_error (name, Uninitialized_global s) ->
-    "error while linking " ^ name ^ ".\n" ^
-      "The module `" ^ s ^ "' is not yet initialized"
-  | Corrupted_interface name ->
-    "corrupted interface file " ^ name
+    "error while linking " ^ name ^ ".\n" ^ "The module `" ^ s
+    ^ "' is not yet initialized"
+  | Corrupted_interface name -> "corrupted interface file " ^ name
   | Cannot_open_dynamic_library exn ->
-    "error loading shared library: " ^ (Printexc.to_string exn)
-  | Inconsistent_implementation name ->
-    "implementation mismatch on " ^ name
+    "error loading shared library: " ^ Printexc.to_string exn
+  | Inconsistent_implementation name -> "implementation mismatch on " ^ name
   | Library's_module_initializers_failed exn ->
     "execution of module initializers in the shared library failed: "
-      ^ (Printexc.to_string exn)
+    ^ Printexc.to_string exn
   | Module_already_loaded name ->
-    "The module `" ^ name ^ "' is already loaded \
-      (either by the main program or a previously-dynlinked library)"
+    "The module `" ^ name
+    ^ "' is already loaded (either by the main program or a \
+       previously-dynlinked library)"
   | Private_library_cannot_implement_interface name ->
-    "The interface `" ^ name ^ "' cannot be implemented by a \
-      library loaded privately"
+    "The interface `" ^ name
+    ^ "' cannot be implemented by a library loaded privately"
   | Library_file_already_loaded_privately { filename } ->
-    "The dynamic library file `" ^ filename ^ "' has already been loaded \
-      privately (make a copy of the file to load it a second time)"
+    "The dynamic library file `" ^ filename
+    ^ "' has already been loaded privately (make a copy of the file to load it \
+       a second time)"
 
 let () =
   Printexc.Safe.register_printer (function
     | Error err ->
-      let msg = match err with
-      | Not_a_bytecode_file s -> Printf.sprintf "Not_a_bytecode_file %S" s
-      | Inconsistent_import s -> Printf.sprintf "Inconsistent_import %S" s
-      | Unavailable_unit s -> Printf.sprintf "Unavailable_unit %S" s
-      | Unsafe_file -> "Unsafe_file"
-      | Linking_error (s, Undefined_global s') ->
-        Printf.sprintf "Linking_error (%S, Dynlink.Undefined_global %S)"
-          s s'
-      | Linking_error (s, Unavailable_primitive s') ->
-        Printf.sprintf "Linking_error (%S, Dynlink.Unavailable_primitive %S)"
-          s s'
-      | Linking_error (s, Uninitialized_global s') ->
-        Printf.sprintf "Linking_error (%S, Dynlink.Uninitialized_global %S)"
-          s s'
-      | Corrupted_interface s ->
-        Printf.sprintf "Corrupted_interface %S" s
-      | Cannot_open_dynamic_library exn ->
-        Printf.sprintf "Cannot_open_dll %s" (Printexc.to_string exn)
-      | Inconsistent_implementation s ->
-        Printf.sprintf "Inconsistent_implementation %S" s
-      | Library's_module_initializers_failed exn ->
-        Printf.sprintf "Library's_module_initializers_failed %S"
-          (Printexc.to_string exn)
-      | Module_already_loaded name ->
-        Printf.sprintf "Module_already_loaded %S" name
-      | Private_library_cannot_implement_interface name ->
-        Printf.sprintf "Private_library_cannot_implement_interface %S" name
-      | Library_file_already_loaded_privately { filename } ->
-        Printf.sprintf "Library_file_already_loaded_privately %S" filename
+      let msg =
+        match err with
+        | Not_a_bytecode_file s -> Printf.sprintf "Not_a_bytecode_file %S" s
+        | Inconsistent_import s -> Printf.sprintf "Inconsistent_import %S" s
+        | Unavailable_unit s -> Printf.sprintf "Unavailable_unit %S" s
+        | Unsafe_file -> "Unsafe_file"
+        | Linking_error (s, Undefined_global s') ->
+          Printf.sprintf "Linking_error (%S, Dynlink.Undefined_global %S)" s s'
+        | Linking_error (s, Unavailable_primitive s') ->
+          Printf.sprintf "Linking_error (%S, Dynlink.Unavailable_primitive %S)"
+            s s'
+        | Linking_error (s, Uninitialized_global s') ->
+          Printf.sprintf "Linking_error (%S, Dynlink.Uninitialized_global %S)" s
+            s'
+        | Corrupted_interface s -> Printf.sprintf "Corrupted_interface %S" s
+        | Cannot_open_dynamic_library exn ->
+          Printf.sprintf "Cannot_open_dll %s" (Printexc.to_string exn)
+        | Inconsistent_implementation s ->
+          Printf.sprintf "Inconsistent_implementation %S" s
+        | Library's_module_initializers_failed exn ->
+          Printf.sprintf "Library's_module_initializers_failed %S"
+            (Printexc.to_string exn)
+        | Module_already_loaded name ->
+          Printf.sprintf "Module_already_loaded %S" name
+        | Private_library_cannot_implement_interface name ->
+          Printf.sprintf "Private_library_cannot_implement_interface %S" name
+        | Library_file_already_loaded_privately { filename } ->
+          Printf.sprintf "Library_file_already_loaded_privately %S" filename
       in
       Some (Printf.sprintf "Dynlink.Error (Dynlink.%s)" msg)
     | _ -> None)

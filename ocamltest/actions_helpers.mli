@@ -19,9 +19,13 @@ val fail_with_reason : string -> Actions.t
 
 val skip_with_reason : string -> Actions.t
 
-val predicate
-  : bool -> string -> string -> out_channel -> Environments.t
-         -> Result.t * Environments.t
+val predicate :
+  bool ->
+  string ->
+  string ->
+  out_channel ->
+  Environments.t ->
+  Result.t * Environments.t
 
 val mkreason : string -> string -> int -> string
 
@@ -44,16 +48,19 @@ val setup_build_env : bool -> string list -> Actions.code
 val setup_simple_build_env : bool -> string list -> Actions.code
 
 val run_cmd :
-  ?environment : string array ->
-  ?stdin_variable : Variables.t ->
-  ?stdout_variable : Variables.t ->
-  ?stderr_variable : Variables.t ->
-  ?append : bool ->
-  ?timeout : int ->
-  out_channel -> Environments.t -> string list -> int
+  ?environment:string array ->
+  ?stdin_variable:Variables.t ->
+  ?stdout_variable:Variables.t ->
+  ?stderr_variable:Variables.t ->
+  ?append:bool ->
+  ?timeout:int ->
+  out_channel ->
+  Environments.t ->
+  string list ->
+  int
 
-val run : string -> bool -> bool -> Variables.t
-                 -> Variables.t option -> Actions.code
+val run :
+  string -> bool -> bool -> Variables.t -> Variables.t option -> Actions.code
 
 val run_program : Actions.code
 

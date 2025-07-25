@@ -1,17 +1,19 @@
 (* TEST
- include testing;
+   include testing;
 *)
 
 let r = ref 0
 
 let true_effect () =
   incr r;
-  print_int !r; print_char ' ';
+  print_int !r;
+  print_char ' ';
   true
 
 let false_effect () =
   incr r;
-  print_int !r; print_char ' ';
+  print_int !r;
+  print_char ' ';
   false
 
 let test i f =
@@ -20,15 +22,14 @@ let test i f =
   print_endline (string_of_bool (f ()))
 
 let s = Bytes.of_string "\000"
+
 let () =
   (* ensure that the string is not constant *)
   Bytes.set s 0 '\001'
 
-let unknown_true =
-  Bytes.get s 0 = '\001'
+let unknown_true = Bytes.get s 0 = '\001'
 
-let unknown_false =
-  Bytes.get s 0 <> '\001'
+let unknown_false = Bytes.get s 0 <> '\001'
 
 let () =
   test 1 (fun () -> true || true);

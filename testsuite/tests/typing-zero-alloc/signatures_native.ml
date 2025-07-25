@@ -9,7 +9,7 @@
 module type S = sig
   type t
 
-  val[@zero_alloc] f : int -> int
+  val f : int -> int [@@zero_alloc]
 
-  val[@zero_alloc arity 3] g : t
+  val g : t [@@zero_alloc arity 3]
 end

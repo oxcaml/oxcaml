@@ -31,8 +31,9 @@ type error =
     attribute we are looking for.  If the argument is ["foo"], these functions
     will find attributes with the name ["foo"] or ["ocaml.foo"] *)
 val get_no_payload_attribute : string -> attributes -> string loc option
+
 val has_no_payload_attribute : string -> attributes -> bool
 
 exception Error of Location.t * error
 
-val report_error: Format.formatter -> error -> unit
+val report_error : Format.formatter -> error -> unit

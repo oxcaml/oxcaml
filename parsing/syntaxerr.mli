@@ -29,7 +29,7 @@ type invalid_package_type =
   | Misplaced_attribute
 
 type error =
-    Unclosed of Location.t * string * Location.t * string
+  | Unclosed of Location.t * string * Location.t * string
   | Expecting of Location.t * string
   | Not_expecting of Location.t * string
   | Applicative_path of Location.t
@@ -46,7 +46,9 @@ type error =
   | Let_mutable_not_allowed_with_function_bindings of Location.t
 
 exception Error of error
+
 exception Escape_error
 
-val location_of_error: error -> Location.t
-val ill_formed_ast: Location.t -> string -> 'a
+val location_of_error : error -> Location.t
+
+val ill_formed_ast : Location.t -> string -> 'a

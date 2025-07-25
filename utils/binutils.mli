@@ -19,12 +19,12 @@ type error =
   | Unsupported of string * int64
   | Out_of_range of string
 
-val error_to_string: error -> string
+val error_to_string : error -> string
 
 type t
 
-val read: string -> (t, error) Result.t
+val read : string -> (t, error) Result.t
 
-val defines_symbol: t -> string -> bool
+val defines_symbol : t -> string -> bool
 
-val symbol_offset: t -> string -> int64 option
+val symbol_offset : t -> string -> int64 option

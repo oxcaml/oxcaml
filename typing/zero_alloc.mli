@@ -1,17 +1,17 @@
 type check = Builtin_attributes.zero_alloc_check =
-  { strict: bool;
-    opt: bool;
-    arity: int;
-    loc: Location.t;
-    custom_error_msg : string option;
+  { strict : bool;
+    opt : bool;
+    arity : int;
+    loc : Location.t;
+    custom_error_msg : string option
   }
 
 type assume = Builtin_attributes.zero_alloc_assume =
-  { strict: bool;
-    never_returns_normally: bool;
-    never_raises: bool;
-    arity: int;
-    loc: Location.t;
+  { strict : bool;
+    never_returns_normally : bool;
+    never_raises : bool;
+    arity : int;
+    loc : Location.t
   }
 
 type const = Builtin_attributes.zero_alloc_attribute =
@@ -47,11 +47,14 @@ val get : t -> const
 
 (* For types.ml's backtracking mechanism. *)
 type change
+
 val set_change_log : (change -> unit) -> unit
+
 val undo_change : change -> unit
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
+
 val print_error : Format.formatter -> error -> unit
 
 (* [sub t1 t2] checks whether the zero_alloc check t1 is stronger than the

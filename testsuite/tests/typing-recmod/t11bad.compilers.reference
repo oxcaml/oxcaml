@@ -1,6 +1,9 @@
-File "t11bad.ml", lines 12-13, characters 7-55:
-12 | .......and B : sig type 'a t = <m: 'a array B.t> end
-13 |              = struct type 'a t = <m: 'a array B.t> end..
+File "t11bad.ml", lines 12-16, characters 0-3:
+12 | and B : sig
+13 |   type 'a t = < m : 'a array B.t >
+14 | end = struct
+15 |   type 'a t = < m : 'a array B.t >
+16 | end
 Error: This recursive type is not regular.
        The type constructor "B.t" is defined as
          type "'a B.t"

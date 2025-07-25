@@ -22,12 +22,28 @@ type unboxed_integer =
   | Unboxed_int16
   | Unboxed_int8
 
-type unboxed_float = Unboxed_float64 | Unboxed_float32
-type unboxed_vector = Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512
+type unboxed_float =
+  | Unboxed_float64
+  | Unboxed_float32
 
-type boxed_integer = Boxed_int64 | Boxed_nativeint | Boxed_int32
-type boxed_float = Boxed_float64 | Boxed_float32
-type boxed_vector = Boxed_vec128 | Boxed_vec256 | Boxed_vec512
+type unboxed_vector =
+  | Unboxed_vec128
+  | Unboxed_vec256
+  | Unboxed_vec512
+
+type boxed_integer =
+  | Boxed_int64
+  | Boxed_nativeint
+  | Boxed_int32
+
+type boxed_float =
+  | Boxed_float64
+  | Boxed_float32
+
+type boxed_vector =
+  | Boxed_vec128
+  | Boxed_vec256
+  | Boxed_vec512
 
 (* Representation of arguments/result for the native code version
    of a primitive *)
@@ -40,8 +56,14 @@ type native_repr =
   | Untagged_immediate
 
 (* See [middle_end/semantics_of_primitives.mli] *)
-type effects = No_effects | Only_generative_effects | Arbitrary_effects
-type coeffects = No_coeffects | Has_coeffects
+type effects =
+  | No_effects
+  | Only_generative_effects
+  | Arbitrary_effects
+
+type coeffects =
+  | No_coeffects
+  | Has_coeffects
 
 type mode =
   | Prim_local
@@ -53,21 +75,22 @@ type mode =
    will be instantiated either all to [Local] or all to [Global] *)
 
 type 'repr description_gen = private
-  { prim_name: string;         (* Name of primitive  or C function *)
-    prim_arity: int;           (* Number of arguments *)
-    prim_alloc: bool;          (* Does it allocates or raise? *)
-    prim_c_builtin: bool;
+  { prim_name : string; (* Name of primitive  or C function *)
+    prim_arity : int; (* Number of arguments *)
+    prim_alloc : bool; (* Does it allocates or raise? *)
+    prim_c_builtin : bool;
     (* When [prim_c_builtin] is true, the native compiler is allowed to rewrite
        calls to the external C function that implements this primitive,
        based on its name [prim_name], into a predetermined instruction sequence.
        [prim_c_builtin] is ignored on compiler primitives
        whose name [prim_name] starts with %. *)
-    prim_effects: effects;
-    prim_coeffects: coeffects;
-    prim_native_name: string;  (* Name of C function for the nat. code gen. *)
-    prim_native_repr_args: (mode * 'repr) list;
-    prim_native_repr_res: mode * 'repr;
-    prim_is_layout_poly: bool }
+    prim_effects : effects;
+    prim_coeffects : coeffects;
+    prim_native_name : string; (* Name of C function for the nat. code gen. *)
+    prim_native_repr_args : (mode * 'repr) list;
+    prim_native_repr_res : mode * 'repr;
+    prim_is_layout_poly : bool
+  }
 
 type description = native_repr description_gen
 
@@ -78,49 +101,61 @@ type description = native_repr description_gen
     intended for use with [make]. *)
 val make_prim_repr_args : int -> 'a -> 'a list
 
-val make
-  :  name:string
-  -> alloc:bool
-  -> c_builtin:bool
-  -> effects:effects
-  -> coeffects:coeffects
-  -> native_name:string
-  -> native_repr_args: (mode * 'repr) list
-  -> native_repr_res: mode * 'repr
-  -> is_layout_poly: bool
-  -> 'repr description_gen
+val make :
+  name:string ->
+  alloc:bool ->
+  c_builtin:bool ->
+  effects:effects ->
+  coeffects:coeffects ->
+  native_name:string ->
+  native_repr_args:(mode * 'repr) list ->
+  native_repr_res:mode * 'repr ->
+  is_layout_poly:bool ->
+  'repr description_gen
 
-val parse_declaration
-  :  Parsetree.value_description
-  -> native_repr_args:(mode * native_repr) list
-  -> native_repr_res:(mode * native_repr)
-  -> is_layout_poly:bool
-  -> description
+val parse_declaration :
+  Parsetree.value_description ->
+  native_repr_args:(mode * native_repr) list ->
+  native_repr_res:mode * native_repr ->
+  is_layout_poly:bool ->
+  description
 
-val print
-  :  description
-  -> Outcometree.out_val_decl
-  -> Outcometree.out_val_decl
+val print : description -> Outcometree.out_val_decl -> Outcometree.out_val_decl
 
-val native_name: 'a description_gen -> string
-val byte_name: 'a description_gen -> string
+val native_name : 'a description_gen -> string
 
+val byte_name : 'a description_gen -> string
 
 val unboxed_float : boxed_float -> unboxed_float
+
 val unboxed_integer : boxed_integer -> unboxed_integer
+
 val unboxed_vector : boxed_vector -> unboxed_vector
+
 val equal_unboxed_integer : unboxed_integer -> unboxed_integer -> bool
+
 val equal_unboxed_float : unboxed_float -> unboxed_float -> bool
+
 val equal_unboxed_vector : unboxed_vector -> unboxed_vector -> bool
+
 val compare_unboxed_float : unboxed_float -> unboxed_float -> int
+
 val compare_unboxed_vector : unboxed_vector -> unboxed_vector -> int
+
 val equal_boxed_integer : boxed_integer -> boxed_integer -> bool
+
 val equal_boxed_float : boxed_float -> boxed_float -> bool
+
 val equal_boxed_vector : boxed_vector -> boxed_vector -> bool
+
 val compare_boxed_float : boxed_float -> boxed_float -> int
+
 val compare_boxed_vector : boxed_vector -> boxed_vector -> int
+
 val equal_native_repr : native_repr -> native_repr -> bool
+
 val equal_effects : effects -> effects -> bool
+
 val equal_coeffects : coeffects -> coeffects -> bool
 
 (** [native_name_is_externa] returns [true] iff the [native_name] for the

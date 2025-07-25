@@ -2,9 +2,9 @@
 
 let () =
   let test f e =
-    assert(Filename.extension f = e);
-    assert(Filename.extension ("foo/" ^ f) = e);
-    assert(f = Filename.remove_extension f ^ Filename.extension f)
+    assert (Filename.extension f = e);
+    assert (Filename.extension ("foo/" ^ f) = e);
+    assert (f = Filename.remove_extension f ^ Filename.extension f)
   in
   test "" "";
   test "foo" "";

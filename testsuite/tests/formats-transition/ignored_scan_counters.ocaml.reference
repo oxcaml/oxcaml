@@ -1,14 +1,7 @@
-- : unit = ()
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Exception: Invalid_argument "Printf: bad conversion %_".
-Hello World!
-Hello World!
-Hello World!
-Hello World!
+
+
+Line 11, characters 0-3:
+11 | let () = Printf.printf "%_n"
+     ^^^
+Error: Syntax error
 

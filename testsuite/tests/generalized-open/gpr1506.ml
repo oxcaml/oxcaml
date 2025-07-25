@@ -1,49 +1,66 @@
 (* TEST
- expect;
+   expect;
 *)
 
 type t = A
-[%%expect{|
+
+[%%expect {|
 type t = A
 |}]
 
 module M = struct
-    open struct type t' = t end
-    type t = B of t * t' | C
+  open struct
+    type t' = t
+  end
+
+  type t =
+    | B of t * t'
+    | C
 end
-[%%expect{|
+
+[%%expect {|
 module M : sig type t = B of t/1 * t/2 | C end
 |}]
 
 (* test *)
 include struct
   open M
+
   let test = B (B (C, A), A)
 end
-[%%expect{|
+
+[%%expect {|
 val test : M.t = M.B (M.B (M.C, A), A)
 |}]
 
 include struct
-  open struct let aux x y = x / y end
+  open struct
+    let aux x y = x / y
+  end
+
   let f x = aux x 2
+
   let g y = aux 3 y
 end
-[%%expect{|
+
+[%%expect {|
 val f : int -> int = <fun>
 val g : int -> int = <fun>
-|}];;
+|}]
 
 include struct
-  open struct exception Interrupt end
-  let run () =
-    raise Interrupt
-  let () =
-    match run() with exception Interrupt -> () | _ -> assert false
+  open struct
+    exception Interrupt
+  end
+
+  let run () = raise Interrupt
+
+  let () = match run () with exception Interrupt -> () | _ -> assert false
 end
-[%%expect{|
+
+[%%expect {|
 val run : unit -> 'a = <fun>
-|}];;
+|}]
 
 (* It was decided to not allow this anymore. *)
 (*
@@ -69,86 +86,122 @@ module M : S
 *)
 
 module M = struct
-  module M (F: sig end) (X: sig end) = struct end
-  open M(struct end)
+  module M (F : sig end) (X : sig end) = struct end
+
+  open M ()
 end
-[%%expect{|
-Line 3, characters 7-20:
-3 |   open M(struct end)
-           ^^^^^^^^^^^^^
-Error: This module is not a structure; it has type
-       "functor (X : sig end) -> sig end"
+
+[%%expect
+{|
+Line 4, characters 7-11:
+4 |   open M ()
+           ^^^^
+Error: This application of the functor "M" is ill-typed.
+       These arguments:
+         ()
+       do not match these parameters:
+         functor (F : sig end) (X : sig end) -> ...
+       1. An argument appears to be missing with module type sig end
+       2. The functor was expected to be applicative at this position
 |}]
 
 open struct
-  open struct let counter = ref 0 end
+  open struct
+    let counter = ref 0
+  end
+
   let inc () = incr counter
+
   let dec () = decr counter
+
   let current () = !counter
 end
-[%%expect{|
+
+[%%expect
+{|
 val inc : unit -> unit = <fun>
 val dec : unit -> unit = <fun>
 val current : unit -> int = <fun>
 |}]
 
 let () =
-  inc(); inc(); dec ();
+  inc ();
+  inc ();
+  dec ();
   assert (current () = 1)
-[%%expect{|
-|}];;
 
-include struct open struct type t = T end let x = T end
-[%%expect{|
-Line 1, characters 15-41:
-1 | include struct open struct type t = T end let x = T end
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[%%expect {|
+|}]
+
+include struct
+  open struct
+    type t = T
+  end
+
+  let x = T
+end
+
+[%%expect
+{|
+Lines 2-4, characters 2-5:
+2 | ..open struct
+3 |     type t = T
+4 |   end
 Error: The type "t" introduced by this open appears in the signature.
-Line 1, characters 46-47:
-1 | include struct open struct type t = T end let x = T end
-                                                  ^
+Line 6, characters 6-7:
+6 |   let x = T
+          ^
   The value "x" has no valid type if "t" is hidden.
-|}];;
+|}]
 
 module A = struct
   open struct
     open struct
       type t = T
+
       let x = T
     end
+
     let y = x
   end
 end
-[%%expect{|
-Lines 3-6, characters 4-7:
+
+[%%expect
+{|
+Lines 3-7, characters 4-7:
 3 | ....open struct
 4 |       type t = T
-5 |       let x = T
-6 |     end
+5 |
+6 |       let x = T
+7 |     end
 Error: The type "t" introduced by this open appears in the signature.
-Line 7, characters 8-9:
-7 |     let y = x
+Line 9, characters 8-9:
+9 |     let y = x
             ^
   The value "y" has no valid type if "t" is hidden.
-|}];;
+|}]
 
 module A = struct
   open struct
     open struct
       type t = T
     end
+
     let y = T
   end
+
   let g = y
 end
-[%%expect{|
+
+[%%expect
+{|
 Lines 3-5, characters 4-7:
 3 | ....open struct
 4 |       type t = T
 5 |     end
 Error: The type "t" introduced by this open appears in the signature.
-Line 6, characters 8-9:
-6 |     let y = T
+Line 7, characters 8-9:
+7 |     let y = T
             ^
   The value "y" has no valid type if "t" is hidden.
 |}]
@@ -163,7 +216,6 @@ Line _, characters 20-46:
 Error: The module identifier M#13 cannot be eliminated from val x : M#13.t
 |}];;
 *)
-
 
 (* It was decided to not allow this anymore. *)
 (*
@@ -206,54 +258,93 @@ module type S = sig
   *)
   type s = int
 end
-[%%expect{|
+
+[%%expect {|
 module type S = sig type s = int end
 |}]
 
-module type T = sig type s = int end
-module F(X:S) : T = X
-module G(X:T) : S = X
-[%%expect{|
+module type T = sig
+  type s = int
+end
+
+module F (X : S) : T = X
+
+module G (X : T) : S = X
+
+[%%expect
+{|
 module type T = sig type s = int end
 module F : functor (X : S) -> T
 module G : functor (X : T) -> S
 |}]
 
-module Counter : sig val inc : unit -> unit val current : unit -> int val z : int val zz : int end = struct
-  open struct let counter = ref 0 end
+module Counter : sig
+  val inc : unit -> unit
+
+  val current : unit -> int
+
+  val z : int
+
+  val zz : int
+end = struct
+  open struct
+    let counter = ref 0
+  end
+
   let x = 1
+
   let y = 2
+
   let dec () = decr counter
 
   open struct
-    module A : sig val z : int end = struct
+    module A : sig
+      val z : int
+    end = struct
       open struct
         let n = 3
+
         module A = struct
           open struct
             let x = 1
           end
+
           let y = x
         end
+
         let h = A.y
+
         let g = A.y + n
       end
+
       let z = h + g
     end
 
     let z = 12
 
-    module B : sig val z : int end = struct
+    module B : sig
+      val z : int
+    end = struct
       open struct
         module A = struct
-          open struct let x = 1 end
+          open struct
+            let x = 1
+          end
+
           let y = x
-          open struct let x = 1 end
+
+          open struct
+            let x = 1
+          end
+
           let z = y + x
         end
+
         let h = A.y
+
         let g = A.z + 1
       end
+
       let z = h + g
     end
 
@@ -261,13 +352,20 @@ module Counter : sig val inc : unit -> unit val current : unit -> int val z : in
   end
 
   let z = z + h
+
   let g = 1
+
   let ggg = 2
+
   let inc () = incr counter
+
   let zz = 5
+
   let current () = !counter
 end
-[%%expect{|
+
+[%%expect
+{|
 module Counter :
   sig
     val inc : unit -> unit
@@ -277,10 +375,9 @@ module Counter :
   end
 |}]
 
-let () = begin
-  assert (Counter.z = 21)
-end
-[%%expect{|
+let () = assert (Counter.z = 21)
+
+[%%expect {|
 |}]
 
 (* It was decided to not allow parts of this example anymore, see below for a
@@ -299,14 +396,23 @@ module N : sig  end
 |}]
 *)
 module N = struct
-  open (functor
-    (N: sig val x : int end) ->
-    (struct let y = N.x end))(struct let x = 1 end)
+  open
+    (functor
+      (N : sig
+         val x : int
+       end)
+      ->
+      struct
+        let y = N.x
+      end)
+      (struct
+        let x = 1
+      end)
 
-  let () =
-    assert(y = 1)
+  let () = assert (y = 1)
 end
-[%%expect{|
+
+[%%expect {|
 module N : sig end
 |}]
 
@@ -318,11 +424,15 @@ module M = struct
         (* open struct type t = int end val x : t *)
         val x : int
       end
-      module M : S = struct let x = 1 end
+
+      module M : S = struct
+        let x = 1
+      end
     end
   end
 end
-[%%expect{|
+
+[%%expect {|
 module M : sig end
 |}]
 
@@ -341,45 +451,78 @@ Error: The module identifier M#32 cannot be eliminated from val x : M#32.t
 |}]
 *)
 
-let x = let open struct open struct let y = 1 end let x = y + 1 end in x
-[%%expect{|
+let x =
+  let open struct
+    open struct
+      let y = 1
+    end
+
+    let x = y + 1
+  end in
+  x
+
+[%%expect {|
 val x : int = 2
 |}]
 
 let y =
-  let
-    open ((functor (X: sig val x : int end) -> struct X.x end)(struct let x = 1 end))
-  in x
+  let open
+    (functor
+      (X : sig
+         val x : int
+       end)
+      ->
+      struct
+        X.x
+      end)
+      (struct
+        let x = 1
+      end) in
+  x
 
-[%%expect{|
+[%%expect {|
 val y : int = 2
 |}]
 
-let x = let open struct type t = T end in T
+let x =
+  let open struct
+    type t = T
+  end in
+  T
 
-[%%expect{|
-Line 1, characters 42-43:
-1 | let x = let open struct type t = T end in T
-                                              ^
+[%%expect
+{|
+Line 5, characters 2-3:
+5 |   T
+      ^
 Error: This expression has type "t" but an expression was expected of type "'a"
        The type constructor "t" would escape its scope
 |}]
 
 module type Print = sig
   type t
-  val print: t -> unit
+
+  val print : t -> unit
 end
 
-module Print_int: Print with type t = int = struct
-  type t = int let print = print_int
+module Print_int : Print with type t = int = struct
+  type t = int
+
+  let print = print_int
 end
-module Print_list(P: Print): Print with type t = P.t list = struct
+
+module Print_list (P : Print) : Print with type t = P.t list = struct
   type t = P.t list
+
   let print = List.iter P.print
 end
-let print_list_of_int = let open Print_list(Print_int) in print
 
-[%%expect{|
+let print_list_of_int =
+  let open Print_list (Print_int) in
+  print
+
+[%%expect
+{|
 module type Print = sig type t val print : t -> unit end
 module Print_int : sig type t = int val print : t -> unit end
 module Print_list :
@@ -387,12 +530,15 @@ module Print_list :
 val print_list_of_int : Print_int.t list -> unit = <fun>
 |}]
 
-let f () = let open functor(X: sig end) -> struct end in ();;
+let f () =
+  let open functor (X : sig end) -> struct end in
+  ()
 
-[%%expect{|
-Line 1, characters 27-53:
-1 | let f () = let open functor(X: sig end) -> struct end in ();;
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[%%expect
+{|
+Line 2, characters 19-46:
+2 |   let open functor (X : sig end) -> struct end in
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This module is not a structure; it has type
        "functor (X : sig end) -> sig end"
 |}]

@@ -1,22 +1,20 @@
 (* TEST
- include tool-ocaml-lib;
- flags = "-w -a";
- ocaml_script_as_argument = "true";
- setup-ocaml-build-env;
- ocaml;
+   include tool-ocaml-lib;
+   flags = "-w -a";
+   ocaml_script_as_argument = "true";
+   setup-ocaml-build-env;
+   ocaml;
 *)
 
-open Lib;;
+open Lib
+
 type t =
- | A
- | B of int
- | C of int
+  | A
+  | B of int
+  | C of int
 ;;
 
-match C 0 with
-| C _ -> ()
-| _ -> raise Not_found
-;;
+match C 0 with C _ -> () | _ -> raise Not_found
 
 (**
        0 CONSTINT 42

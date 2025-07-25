@@ -14,8 +14,8 @@
 (**************************************************************************)
 
 let auto_include find_in_dir fn =
-  if !Clflags.no_auto_include_otherlibs || !Clflags.no_std_include then
-    raise Not_found
+  if !Clflags.no_auto_include_otherlibs || !Clflags.no_std_include
+  then raise Not_found
   else
     let alert = Location.auto_include_alert in
     Load_path.auto_include_otherlibs alert find_in_dir fn
@@ -26,20 +26,20 @@ let auto_include find_in_dir fn =
    then the directories specified with the -I option (in command line order),
    then the standard library directory (unless the -nostdlib option is given),
    then the directories specified with the -H option (in command line order).
- *)
+*)
 
-let init_path ?(auto_include=auto_include) ?(dir="") () =
+let init_path ?(auto_include = auto_include) ?(dir = "") () =
   let visible =
-    if !Clflags.use_threads then "+threads" :: !Clflags.include_dirs
-    else
-      !Clflags.include_dirs
+    if !Clflags.use_threads
+    then "+threads" :: !Clflags.include_dirs
+    else !Clflags.include_dirs
   in
   let visible =
     List.concat
-      [!Compenv.last_include_dirs;
-       visible;
-       Config.flexdll_dirs;
-       !Compenv.first_include_dirs]
+      [ !Compenv.last_include_dirs;
+        visible;
+        Config.flexdll_dirs;
+        !Compenv.first_include_dirs ]
   in
   let visible =
     List.map (Misc.expand_directory Config.standard_library) visible
@@ -49,7 +49,8 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
     @ List.rev_append visible (Clflags.std_include_dir ())
   in
   let hidden =
-    List.rev_map (Misc.expand_directory Config.standard_library)
+    List.rev_map
+      (Misc.expand_directory Config.standard_library)
       !Clflags.hidden_include_dirs
   in
   Load_path.init ~auto_include ~visible ~hidden;
@@ -61,9 +62,8 @@ let init_parameters () =
   let param_names = !Clflags.parameters in
   List.iter
     (fun param_name ->
-        let param = Global_module.Parameter_name.of_string param_name in
-        Env.register_parameter param
-    )
+      let param = Global_module.Parameter_name.of_string param_name in
+      Env.register_parameter param)
     param_names
 
 (* Return the initial environment in which compilation proceeds. *)
@@ -72,13 +72,10 @@ let init_parameters () =
    toplevel initialization (PR#8227) *)
 
 let initial_env () =
-  Ident.reinit();
-  Types.Uid.reinit();
+  Ident.reinit ();
+  Types.Uid.reinit ();
   let initially_opened_module =
-    if !Clflags.nopervasives then
-      None
-    else
-      Some "Stdlib"
+    if !Clflags.nopervasives then None else Some "Stdlib"
   in
   Typemod.initial_env
     ~loc:(Location.in_file "command line")
@@ -89,40 +86,36 @@ let set_from_env flag Clflags.{ parse; usage; env_var } =
   try
     match parse (Sys.getenv env_var) with
     | None ->
-        Location.prerr_warning Location.none
-          (Warnings.Bad_env_variable (env_var, usage))
-    | Some x -> match !flag with
-      | None -> flag := Some x
-      | Some _ -> ()
-  with
-    Not_found -> ()
+      Location.prerr_warning Location.none
+        (Warnings.Bad_env_variable (env_var, usage))
+    | Some x -> ( match !flag with None -> flag := Some x | Some _ -> ())
+  with Not_found -> ()
 
 let read_clflags_from_env () =
   set_from_env Clflags.color Clflags.color_reader;
-  let no_color () = (* See https://no-color.org/ *)
-    match Sys.getenv_opt "NO_COLOR" with
-    | None | Some "" -> false
-    | _ -> true
+  let no_color () =
+    (* See https://no-color.org/ *)
+    match Sys.getenv_opt "NO_COLOR" with None | Some "" -> false | _ -> true
   in
-  if Option.is_none !Clflags.color && no_color () then
-    Clflags.color := Some Misc.Color.Never;
+  if Option.is_none !Clflags.color && no_color ()
+  then Clflags.color := Some Misc.Color.Never;
   set_from_env Clflags.error_style Clflags.error_style_reader;
   ()
 
 let rec make_directory dir =
-  if Sys.file_exists dir then () else
-    begin
-      make_directory (Filename.dirname dir);
-      Sys.mkdir dir 0o777
-    end
+  if Sys.file_exists dir
+  then ()
+  else (
+    make_directory (Filename.dirname dir);
+    Sys.mkdir dir 0o777)
 
 let with_ppf_file ~file_prefix ~file_extension f =
   let with_ch ch =
     let ppf = Format.formatter_of_out_channel ch in
-    ppf,
-    (fun () ->
-       Format.pp_print_flush ppf ();
-       close_out ch)
+    ( ppf,
+      fun () ->
+        Format.pp_print_flush ppf ();
+        close_out ch )
   in
   let ppf_dump, finally =
     match !Clflags.dump_dir with
@@ -140,6 +133,9 @@ let with_ppf_dump ?stdout ~file_prefix f =
   match !Clflags.dump_into_file with
   | false ->
     let formatter =
-      if Option.is_some stdout then Format.std_formatter else Format.err_formatter in
+      if Option.is_some stdout
+      then Format.std_formatter
+      else Format.err_formatter
+    in
     Misc.try_finally (fun () -> f formatter)
   | true -> with_ppf_file ~file_prefix ~file_extension:".dump" f

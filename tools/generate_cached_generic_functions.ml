@@ -27,12 +27,12 @@
 open Printf
 open Misc
 open Config
-
 module CU = Compilation_unit
 
 let make_cached_generic_functions unix ~ppf_dump ~id genfns =
   let name = Generic_fns.Partition.name id in
-  Location.input_name := name; (* set name of "current" input *)
+  Location.input_name := name;
+  (* set name of "current" input *)
   let startup_comp_unit = Generic_fns.Partition.to_cu id in
   let startup_unit_info =
     Unit_info.make_dummy ~input_name:name startup_comp_unit
@@ -41,25 +41,19 @@ let make_cached_generic_functions unix ~ppf_dump ~id genfns =
   Emit.begin_assembly unix;
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   Profile.record_call "genfns" (fun () ->
-    List.iter compile_phrase (
-      Generic_fns.compile ~cache:true ~shared:true genfns));
- Emit.end_assembly ()
+      List.iter compile_phrase
+        (Generic_fns.compile ~cache:true ~shared:true genfns));
+  Emit.end_assembly ()
 
 let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
   Profile.record_call output_name (fun () ->
-    let startup = output_name ^ ext_asm in
-    Profile.record_call "compile_unit" (fun () ->
-      let obj_filename = output_name ^ ext_obj in
-      Asmgen.compile_unit ~output_prefix:output_name
-        ~asm_filename:startup ~keep_asm:false
-        ~obj_filename
-        ~may_reduce_heap:true
-        ~ppf_dump
-        (fun () ->
-          make_cached_generic_functions unix ~ppf_dump ~id genfns);
-      obj_filename
-    );
-  )
+      let startup = output_name ^ ext_asm in
+      Profile.record_call "compile_unit" (fun () ->
+          let obj_filename = output_name ^ ext_obj in
+          Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+            ~keep_asm:false ~obj_filename ~may_reduce_heap:true ~ppf_dump
+            (fun () -> make_cached_generic_functions unix ~ppf_dump ~id genfns);
+          obj_filename))
 
 let main filename =
   let unix = (module Unix : Compiler_owee.Unix_intf.S) in
@@ -73,18 +67,26 @@ let main filename =
   Fun.protect
     ~finally:(fun () -> List.iter remove_file !objects)
     (fun () ->
-       Hashtbl.iter (fun name partition ->
-         let output_name = Filename.temp_file ("cached-generated-" ^ Generic_fns.Partition.to_string name) "" in
-         let obj =
-           cached_generic_functions
-             unix ~ppf_dump:Format.std_formatter ~id:name output_name partition
-         in
-         objects := obj :: !objects
-       ) genfns_partitions;
-       ignore (Ccomp.create_archive file_prefix !objects : int))
+      Hashtbl.iter
+        (fun name partition ->
+          let output_name =
+            Filename.temp_file
+              ("cached-generated-" ^ Generic_fns.Partition.to_string name)
+              ""
+          in
+          let obj =
+            cached_generic_functions unix ~ppf_dump:Format.std_formatter
+              ~id:name output_name partition
+          in
+          objects := obj :: !objects)
+        genfns_partitions;
+      ignore (Ccomp.create_archive file_prefix !objects : int))
 
 let arg_usage =
-  Printf.sprintf "%s FILE : Generate an obj file containing cached generatic functions named FILE" Sys.argv.(0)
+  Printf.sprintf
+    "%s FILE : Generate an obj file containing cached generatic functions \
+     named FILE"
+    Sys.argv.(0)
 
 let main () =
   Memtrace.trace_if_requested ~context:"ocamlopt" ();

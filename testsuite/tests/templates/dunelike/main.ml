@@ -16,6 +16,6 @@ let run () =
   print_endline (Use_fancy_q_impl_p_int.fancy |> Util_p_int.to_string);
   fancy_int, fancy_string
 
-let _ : Fancy_int.PI.t =
+let (_ : Fancy_int.PI.t) =
   (* See [Fancy__] for what we're testing here *)
   Fancy_int.PI.create ()

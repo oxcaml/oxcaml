@@ -1,6 +1,6 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
-open! Int_replace_polymorphic_compare[@@ocaml.warning "-66"]
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open X86_ast
 
 let equal_data_type left right =
@@ -18,8 +18,9 @@ let equal_data_type left right =
   | NEAR, NEAR
   | PROC, PROC ->
     true
-  | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD |
-     VEC128 | VEC256 | VEC512 | NEAR | PROC), _ ->
+  | ( ( NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | VEC256
+      | VEC512 | NEAR | PROC ),
+      _ ) ->
     false
 
 let equal_reg64 left right =
@@ -41,31 +42,23 @@ let equal_reg64 left right =
   | R14, R14
   | R15, R15 ->
     true
-  | (RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI
-    | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15), _ -> false
+  | ( ( RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11
+      | R12 | R13 | R14 | R15 ),
+      _ ) ->
+    false
 
 let equal_reg8h left right =
   match left, right with
-  | AH, AH
-  | BH, BH
-  | CH, CH
-  | DH, DH ->
-    true
+  | AH, AH | BH, BH | CH, CH | DH, DH -> true
   | (AH | BH | CH | DH), _ -> false
 
 let equal_regf left right =
   match left, right with
-  | XMM l, XMM r
-  | YMM l, YMM r
-  | ZMM l, ZMM r -> Int.equal l r
+  | XMM l, XMM r | YMM l, YMM r | ZMM l, ZMM r -> Int.equal l r
   | (XMM _ | YMM _ | ZMM _), _ -> false
 
 let equal_arch left right =
-  match left, right with
-  | X64, X64
-  | X86, X86 ->
-    true
-  | (X64 | X86), _ -> false
+  match left, right with X64, X64 | X86, X86 -> true | (X64 | X86), _ -> false
 
 let equal_addr left right =
   equal_arch left.arch right.arch
@@ -89,7 +82,10 @@ let equal_arg left right =
   | Mem l, Mem r -> equal_addr l r
   | Mem64_RIP (l_dt, l_s, l_i), Mem64_RIP (r_dt, r_s, r_i) ->
     equal_data_type l_dt r_dt && String.equal l_s r_s && Int.equal l_i r_i
-  | (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _ | Mem64_RIP _), _ -> false
+  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Mem _ | Mem64_RIP _ ),
+      _ ) ->
+    false
 
 let is_mem = function
   | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->

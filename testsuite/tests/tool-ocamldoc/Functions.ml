@@ -29,7 +29,7 @@ let f2 x ~y = function
  @param z third arg
  @param y second arg
  *)
-let f3 = fun x -> fun y -> fun z -> x + y + z
+let f3 x y z = x + y + z
 
 (**
  This output is a bit weird: we should probably refer
@@ -40,20 +40,19 @@ let f3 = fun x -> fun y -> fun z -> x + y + z
  @param blah third arg
  @param y second arg
  *)
-let f4 ?x ?(y = 4) ?z:(blah = 3) () =
-  Option.value x ~default:5 + y + blah
+let f4 ?x ?(y = 4) ?z:(blah = 3) () = Option.value x ~default:5 + y + blah
 
-class m = object (self)
-
-  (**
+class m =
+  object (self)
+    (**
    @param self this param should be dropped.
    *)
-  method no_args = ()
+    method no_args = ()
 
-  (**
+    (**
    @param x first arg
    @param z third arg
    @param y second arg
    *)
-  method a_few_args x y z = x + y + z
-end
+    method a_few_args x y z = x + y + z
+  end

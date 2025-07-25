@@ -1,22 +1,22 @@
 (* TEST
- expect;
+   expect;
 *)
 
 let r = ref None
 
 module M : sig
-  val write : ([< `A of string | `B of int ] -> unit)
+  val write : [< `A of string | `B of int] -> unit
 end = struct
-  let write x =
-    match x with `A _ | `B _ -> r := Some x
+  let write x = match x with `A _ | `B _ -> r := Some x
 end
-[%%expect{|
+
+[%%expect
+{|
 val r : '_weak1 option ref = {contents = None}
-Lines 5-8, characters 6-3:
+Lines 5-7, characters 6-3:
 5 | ......struct
-6 |   let write x =
-7 |     match x with `A _ | `B _ -> r := Some x
-8 | end
+6 |   let write x = match x with `A _ | `B _ -> r := Some x
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig

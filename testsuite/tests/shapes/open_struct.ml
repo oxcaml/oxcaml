@@ -1,6 +1,6 @@
 (* TEST
- flags = "-dshape";
- expect;
+   flags = "-dshape";
+   expect;
 *)
 
 (* Everything that couldn't go anywhere else. *)
@@ -10,13 +10,16 @@ open struct
     type t = A
   end
 end
-[%%expect{|
+
+[%%expect {|
 {}
 module M : sig type t = A end
 |}]
 
 include M
-[%%expect{|
+
+[%%expect
+{|
 {
  "t"[type] -> {<.0>
                "A"[constructor] -> {<.1>};
@@ -26,7 +29,9 @@ type t = M.t = A
 |}]
 
 module N = M
-[%%expect{|
+
+[%%expect
+{|
 {
  "N"[module] ->
    Alias(<.3>
@@ -48,7 +53,9 @@ include struct
     type t = A
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "M'"[module] -> {<.6>
                   "t"[type] -> {<.4>
@@ -60,7 +67,9 @@ module M' : sig type t = A end
 |}]
 
 module N' = M'
-[%%expect{|
+
+[%%expect
+{|
 {
  "N'"[module] ->
    Alias(<.7>
@@ -78,7 +87,9 @@ module Test = struct
     type t = A
   end
 end
-[%%expect{|
+
+[%%expect
+{|
 {
  "Test"[module] ->
    {<.11>
@@ -93,7 +104,9 @@ module Test : sig module M : sig type t = A end end
 |}]
 
 include Test
-[%%expect{|
+
+[%%expect
+{|
 {
  "M"[module] -> {<.10>
                  "t"[type] -> {<.8>
@@ -105,7 +118,9 @@ module M = Test.M
 |}]
 
 module N = M
-[%%expect{|
+
+[%%expect
+{|
 {
  "N"[module] ->
    Alias(<.12>

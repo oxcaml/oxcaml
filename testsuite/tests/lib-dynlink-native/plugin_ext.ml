@@ -1,4 +1,4 @@
-external fact: int -> string = "factorial"
+external fact : int -> string = "factorial"
 
 let () =
   Api.reg_mod "plugin_ext";

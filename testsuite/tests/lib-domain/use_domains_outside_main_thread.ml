@@ -6,5 +6,4 @@
    { native; }
 *)
 
-let () =
-  Thread.join (Thread.create (fun () -> Thread.use_domains ()) ())
+let () = Thread.join (Thread.create (fun () -> Thread.use_domains ()) ())

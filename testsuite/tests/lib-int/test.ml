@@ -24,10 +24,11 @@ let test_logops () =
   assert (Int.logxor 0xF0FF 0x0F0F = 0xFFF0);
   assert (Int.lognot Int.max_int = Int.min_int);
   assert (Int.shift_left 1 4 = 16);
-  assert (Int.shift_left (Int.compare 0 0) 63 = 0); (* Issue #8864 *)
+  assert (Int.shift_left (Int.compare 0 0) 63 = 0);
+  (* Issue #8864 *)
   assert (Int.shift_right 16 4 = 1);
-  assert (Int.shift_right (-16) 4 = (-1));
-  assert (Int.shift_right (-16) 4 = (-1));
+  assert (Int.shift_right (-16) 4 = -1);
+  assert (Int.shift_right (-16) 4 = -1);
   assert (Int.shift_right_logical Int.min_int (Sys.int_size - 1) = 1);
   ()
 
@@ -38,7 +39,7 @@ let test_equal () =
 
 let test_compare () =
   assert (Int.compare 3 3 = 0);
-  assert (Int.compare 3 4 = (-1));
+  assert (Int.compare 3 4 = -1);
   assert (Int.compare 4 3 = 1);
   assert (Int.compare (-4) 3 = -1);
   assert (Int.compare 3 (-4) = 1);
@@ -52,8 +53,8 @@ let test_float_conv () =
 
 let test_string_conv () =
   assert (Int.to_string 50 = "50");
-(*  assert (Int.of_string "50" = Some 50);
-  assert (Int.of_string "" = None); *)
+  (* assert (Int.of_string "50" = Some 50);
+     assert (Int.of_string "" = None); *)
   ()
 
 let test_min_max () =
@@ -65,7 +66,11 @@ let test_hash () =
     assert (Hashtbl.hash n = Int.hash n);
     assert (Hashtbl.seeded_hash 16 n = Int.seeded_hash 16 n)
   in
-  f 0; f 123; f (-456); f 0x3FFFFFFF; f (-0x40000000)
+  f 0;
+  f 123;
+  f (-456);
+  f 0x3FFFFFFF;
+  f (-0x40000000)
 
 let tests () =
   test_consts ();

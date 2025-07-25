@@ -16,5 +16,7 @@ module Util = Util
 type t
 
 val create : P.t -> Flourish.t -> Ornament.t -> t
+
 val basic : t -> Basic.t
+
 val to_string : t -> string

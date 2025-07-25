@@ -1,11 +1,12 @@
 type t = ..
 type t += A
 - : extension_constructor = <abstr>
-- : extension_constructor = <abstr>
-module M : sig type extension_constructor = int end
-Line 2, characters 1-27:
-2 | ([%extension_constructor A] : extension_constructor);;
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "extension_constructor"
-       but an expression was expected of type "M.extension_constructor" = "int"
+Line 4, characters 0-6:
+4 | module M = struct
+    ^^^^^^
+Error: Syntax error
+
+
+Line 3, characters 0-0:
+Error: Syntax error
 

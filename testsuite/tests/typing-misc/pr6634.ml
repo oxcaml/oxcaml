@@ -1,19 +1,23 @@
 (* TEST
- expect;
+   expect;
 *)
 
 type t = int
-module M : sig type t end with type t = [`T of t] =
-struct
-  type t = [`T of t]
-end;;
 
-[%%expect{|
+module M : sig
+  type t
+end
+with type t = [`T of t] = struct
+  type t = [`T of t]
+end
+
+[%%expect
+{|
 type t = int
-Lines 3-5, characters 0-3:
-3 | struct
-4 |   type t = [`T of t]
-5 | end..
+Lines 6-8, characters 26-3:
+6 | ..........................struct
+7 |   type t = [`T of t]
+8 | end
 Error: Signature mismatch:
        Modules do not match:
          sig type t = [ `T of t ] end
@@ -26,7 +30,7 @@ Error: Signature mismatch:
        The type "[ `T of t/1 ]" is not equal to the type "[ `T of t/2 ]"
        Type "t/1" = "[ `T of t/1 ]" is not equal to type "t/2" = "int"
        Types for tag "`T" are incompatible
-       Line 4, characters 2-20:
+       Line 7, characters 2-20:
          Definition of type "t/1"
        Line 1, characters 0-12:
          Definition of type "t/2"

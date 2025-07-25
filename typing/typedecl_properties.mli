@@ -23,16 +23,6 @@ type decl = Types.type_declaration
    computation, and then (optionally) check that the result is
    consistent with the declaration or user expectations. *)
 
-type ('prop, 'req) property = {
-  eq : 'prop -> 'prop -> bool;
-  merge : prop:'prop -> new_prop:'prop -> 'prop;
-
-  default : decl -> 'prop;
-  compute : Env.t -> decl -> 'req -> 'prop;
-  update_decl : decl -> 'prop -> decl;
-
-  check : Env.t -> Ident.t -> decl -> 'req * 'req option -> unit;
-}
 (** ['prop] represents the type of property values
     ({!Types.Variance.t}, just 'bool' for immediacy, etc).
 
@@ -42,7 +32,14 @@ type ('prop, 'req) property = {
     Some properties have no natural notion of user requirement, or
     their requirement is global, or already stored in
     [type_declaration]; they can just use [unit] as ['req] parameter. *)
-
+type ('prop, 'req) property =
+  { eq : 'prop -> 'prop -> bool;
+    merge : prop:'prop -> new_prop:'prop -> 'prop;
+    default : decl -> 'prop;
+    compute : Env.t -> decl -> 'req -> 'prop;
+    update_decl : decl -> 'prop -> decl;
+    check : Env.t -> Ident.t -> decl -> 'req * 'req option -> unit
+  }
 
 (** [compute_property prop env decls req] performs a fixpoint computation
     to determine the final values of a property on a set of mutually-recursive
@@ -52,8 +49,15 @@ type ('prop, 'req) property = {
     For each corresponding ['req * 'req option] and declaration, if the
     declaration has an unboxed version, the ['req option] is [Some] and contains
     the user requirement for the unboxed version. *)
-val compute_property : ('prop, 'req) property -> Env.t ->
-  (Ident.t * decl) list -> ('req * 'req option) list -> (Ident.t * decl) list
+val compute_property :
+  ('prop, 'req) property ->
+  Env.t ->
+  (Ident.t * decl) list ->
+  ('req * 'req option) list ->
+  (Ident.t * decl) list
 
-val compute_property_noreq : ('prop, unit) property -> Env.t ->
-  (Ident.t * decl) list -> (Ident.t * decl) list
+val compute_property_noreq :
+  ('prop, unit) property ->
+  Env.t ->
+  (Ident.t * decl) list ->
+  (Ident.t * decl) list

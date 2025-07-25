@@ -22,5 +22,5 @@ let () =
   test ~suffix:".txt" "" false;
   test ~suffix:".txt" "foo.txt.bak" false;
   test ~suffix:".txt" "foo.TXT" win32;
-  if win32 then
-    assert (Filename.chop_suffix_opt ~suffix:".txt" "foo.TXT" = Some "foo")
+  if win32
+  then assert (Filename.chop_suffix_opt ~suffix:".txt" "foo.TXT" = Some "foo")

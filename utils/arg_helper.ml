@@ -21,39 +21,41 @@ let fatal err =
 module Make (S : sig
   module Key : sig
     type t
+
     val of_string : string -> t
+
     module Map : Map.S with type key = t
   end
 
   module Value : sig
     type t
+
     val of_string : string -> t
   end
-end) = struct
-  type parsed = {
-    base_default : S.Value.t;
-    base_override : S.Value.t S.Key.Map.t;
-    user_default : S.Value.t option;
-    user_override : S.Value.t S.Key.Map.t;
-  }
+end) =
+struct
+  type parsed =
+    { base_default : S.Value.t;
+      base_override : S.Value.t S.Key.Map.t;
+      user_default : S.Value.t option;
+      user_override : S.Value.t S.Key.Map.t
+    }
 
   let default v =
     { base_default = v;
       base_override = S.Key.Map.empty;
       user_default = None;
-      user_override = S.Key.Map.empty; }
+      user_override = S.Key.Map.empty
+    }
 
-  let set_base_default value t =
-    { t with base_default = value }
+  let set_base_default value t = { t with base_default = value }
 
   let add_base_override key value t =
     { t with base_override = S.Key.Map.add key value t.base_override }
 
-  let reset_base_overrides t =
-    { t with base_override = S.Key.Map.empty }
+  let reset_base_overrides t = { t with base_override = S.Key.Map.empty }
 
-  let set_user_default value t =
-    { t with user_default = Some value }
+  let set_user_default value t = { t with user_default = Some value }
 
   let add_user_override key value t =
     { t with user_override = S.Key.Map.add key value t.user_override }
@@ -63,27 +65,26 @@ end) = struct
   let parse_exn str ~update =
     (* Is the removal of empty chunks really relevant here? *)
     (* (It has been added to mimic the old Misc.String.split.) *)
-    let values = String.split_on_char ',' str |> List.filter ((<>) "") in
+    let values = String.split_on_char ',' str |> List.filter (( <> ) "") in
     let parsed =
-      List.fold_left (fun acc value ->
+      List.fold_left
+        (fun acc value ->
           match String.index value '=' with
-          | exception Not_found ->
-            begin match S.Value.of_string value with
+          | exception Not_found -> (
+            match S.Value.of_string value with
             | value -> set_user_default value acc
-            | exception exn -> raise (Parse_failure exn)
-            end
+            | exception exn -> raise (Parse_failure exn))
           | equals ->
             let key_value_pair = value in
             let length = String.length key_value_pair in
             assert (equals >= 0 && equals < length);
-            if equals = 0 then begin
-              raise (Parse_failure (
-                Failure "Missing key in argument specification"))
-            end;
+            if equals = 0
+            then
+              raise
+                (Parse_failure (Failure "Missing key in argument specification"));
             let key =
               let key = String.sub key_value_pair 0 equals in
-              try S.Key.of_string key
-              with exn -> raise (Parse_failure exn)
+              try S.Key.of_string key with exn -> raise (Parse_failure exn)
             in
             let value =
               let value =
@@ -93,15 +94,14 @@ end) = struct
               with exn -> raise (Parse_failure exn)
             in
             add_user_override key value acc)
-        !update
-        values
+        !update values
     in
     update := parsed
 
   let parse str help_text update =
     match parse_exn str ~update with
     | () -> ()
-    | exception (Parse_failure exn) ->
+    | exception Parse_failure exn ->
       fatal (Printf.sprintf "%s: %s" (Printexc.to_string exn) help_text)
 
   type parse_result =
@@ -111,17 +111,16 @@ end) = struct
   let parse_no_error str update =
     match parse_exn str ~update with
     | () -> Ok
-    | exception (Parse_failure exn) -> Parse_failed exn
+    | exception Parse_failure exn -> Parse_failed exn
 
   let get ~key parsed =
     match S.Key.Map.find key parsed.user_override with
     | value -> value
-    | exception Not_found ->
+    | exception Not_found -> (
       match parsed.user_default with
       | Some value -> value
-      | None ->
+      | None -> (
         match S.Key.Map.find key parsed.base_override with
         | value -> value
-        | exception Not_found -> parsed.base_default
-
+        | exception Not_found -> parsed.base_default))
 end

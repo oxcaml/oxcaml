@@ -7,4 +7,5 @@
 module A = M
 
 type t1 = M.Foo(M).t
+
 type t2 = A.Foo(A).t

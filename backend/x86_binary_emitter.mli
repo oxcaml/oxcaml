@@ -17,22 +17,32 @@
 open X86_ast
 module String = Misc.Stdlib.String
 
-type section = { sec_name : string; mutable sec_instrs : asm_line array }
+type section =
+  { sec_name : string;
+    mutable sec_instrs : asm_line array
+  }
 
-type data_size = B8 | B16 | B32 | B64
+type data_size =
+  | B8
+  | B16
+  | B32
+  | B64
 
-type symbol_binding = Sy_local | Sy_global | Sy_weak
+type symbol_binding =
+  | Sy_local
+  | Sy_global
+  | Sy_weak
 
-type symbol = {
-  sy_name : string;
-  mutable sy_type : Asm_targets.Asm_directives.symbol_type option;
-  mutable sy_size : int option;
-  mutable sy_binding : symbol_binding;
-  mutable sy_protected : bool;
-  mutable sy_sec : section;
-  mutable sy_pos : int option;
-  mutable sy_num : int option; (* position in .symtab *)
-}
+type symbol =
+  { sy_name : string;
+    mutable sy_type : Asm_targets.Asm_directives.symbol_type option;
+    mutable sy_size : int option;
+    mutable sy_binding : symbol_binding;
+    mutable sy_protected : bool;
+    mutable sy_sec : section;
+    mutable sy_pos : int option;
+    mutable sy_num : int option (* position in .symtab *)
+  }
 
 module Relocation : sig
   module Kind : sig
@@ -43,7 +53,10 @@ module Relocation : sig
       | DIR64 of string * int64
   end
 
-  type t = { offset_from_section_beginning : int; kind : Kind.t }
+  type t =
+    { offset_from_section_beginning : int;
+      kind : Kind.t
+    }
 end
 
 module StringMap : Map.S with type key = string

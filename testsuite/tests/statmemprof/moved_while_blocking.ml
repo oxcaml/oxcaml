@@ -1,30 +1,35 @@
 (* TEST
- include systhreads;
- flags = "-alert -unsafe_multidomain";
- hassysthreads;
- {
-   bytecode;
- }{
-   native;
- }
+   include systhreads;
+   flags = "-alert -unsafe_multidomain";
+   hassysthreads;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 (* A few triggers, to control timing of events between threads.
    `await a` will wait until after `set a` has been called. *)
 
 let t2_begin = Atomic.make false
+
 let t2_promoting = Atomic.make false
+
 let t2_finish_promote = Atomic.make false
+
 let t2_done = Atomic.make false
+
 let t2_quit = Atomic.make false
 
 (* `await a` waits for the trigger `a` *)
 let await a =
-  while not (Atomic.get a) do Thread.yield () done
+  while not (Atomic.get a) do
+    Thread.yield ()
+  done
 
 (* `set a` pulls the trigger `a` *)
-let set a =
-  Atomic.set a true
+let set a = Atomic.set a true
 
 (* no-alloc printing to stdout *)
 let say msg =
@@ -81,7 +86,9 @@ so that it doesn't track minor allocations of sizes larger than 1.
 *)
 
 let static_ref = ref 0
+
 let global = ref static_ref
+
 let thread_fn () =
   await t2_begin;
   say "T2: alloc\n";
@@ -93,30 +100,43 @@ let thread_fn () =
   set t2_done;
   await t2_quit
 
-let big = ref [| |]
+let big = ref [||]
 
-let fill_big () = big := Array.make 1000 42
-  [@@inline never] (* Prevent flambda to move the allocated array in a global
-                      root (see #9978). *)
-let empty_big () = big := [| |]
-  [@@inline never]
+let fill_big () = big := Array.make 1000 42 [@@inline never]
+(* Prevent flambda to move the allocated array in a global
+   root (see #9978). *)
+
+let empty_big () = big := [||] [@@inline never]
 
 let () =
   let th = Thread.create thread_fn () in
-  let _:Gc.Memprof.t = Gc.Memprof.(start ~sampling_rate:1.
-    { null_tracker with
-      alloc_minor = (fun info -> if info.size = 1 then
-                                     (say "    minor alloc\n"; Some ())
-                                 else None);
-      alloc_major = (fun _ -> say "    major alloc\n"; Some "major block\n");
-      promote = (fun () ->
-        say "    promoting...\n";
-        set t2_promoting;
-        await t2_finish_promote;
-        say "    ...done promoting\n";
-        Some "promoted block\n");
-      dealloc_major = (fun msg ->
-        say "    major dealloc: "; say msg)})
+  let (_ : Gc.Memprof.t) =
+    Gc.Memprof.(
+      start ~sampling_rate:1.
+        { null_tracker with
+          alloc_minor =
+            (fun info ->
+              if info.size = 1
+              then (
+                say "    minor alloc\n";
+                Some ())
+              else None);
+          alloc_major =
+            (fun _ ->
+              say "    major alloc\n";
+              Some "major block\n");
+          promote =
+            (fun () ->
+              say "    promoting...\n";
+              set t2_promoting;
+              await t2_finish_promote;
+              say "    ...done promoting\n";
+              Some "promoted block\n");
+          dealloc_major =
+            (fun msg ->
+              say "    major dealloc: ";
+              say msg)
+        })
   in
   say "T1: alloc\n";
   fill_big ();

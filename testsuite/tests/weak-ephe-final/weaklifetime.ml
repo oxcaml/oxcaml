@@ -2,33 +2,30 @@
 
 let () = Random.init 12345
 
-let size, num_gcs =
-  1000, 10
+let size, num_gcs = 1000, 10
 
 type block = int array
 
 type objdata =
   | Present of block
-  | Absent of int  (* GC count at time of erase *)
+  | Absent of int (* GC count at time of erase *)
 
-
-type bunch = {
-  objs : objdata array;
-  wp : block Weak.t;
-}
+type bunch =
+  { objs : objdata array;
+    wp : block Weak.t
+  }
 
 let data =
   Array.init size (fun i ->
-    let n = 1 + Random.int size in
-    {
-      objs = Array.make n (Absent 0);
-      wp = Weak.create n;
-    }
-  )
+      let n = 1 + Random.int size in
+      { objs = Array.make n (Absent 0); wp = Weak.create n })
 
 let gccount () = (Gc.quick_stat ()).Gc.major_collections
 
-type change = No_change | Fill | Erase
+type change =
+  | No_change
+  | Fill
+  | Erase
 
 (* Check the correctness condition on the data at (i,j):
    1. if the block is present, the weak pointer must be full
@@ -47,25 +44,25 @@ let check_and_change i j =
     (* we only read data.(i).objs.(j) in this local binding to ensure
         that it does not remain reachable on the bytecode stack
         in the rest of the function below, when we overwrite the value
-        and try to observe its collection.  *)
+        and try to observe its collection. *)
     match data.(i).objs.(j), Weak.check data.(i).wp j with
     | Present x, false -> assert false
-    | Absent n, true -> assert (gc1 <= n+2); No_change
+    | Absent n, true ->
+      assert (gc1 <= n + 2);
+      No_change
     | Absent _, false -> Fill
-    | Present _, true ->
-      if Random.int 10 = 0 then Erase else No_change
+    | Present _, true -> if Random.int 10 = 0 then Erase else No_change
   in
-  begin match change with
+  match change with
   | No_change -> ()
   | Fill ->
     let x = Array.make (1 + Random.int 10) 42 in
     data.(i).objs.(j) <- Present x;
-    Weak.set data.(i).wp j (Some x);
+    Weak.set data.(i).wp j (Some x)
   | Erase ->
     data.(i).objs.(j) <- Absent gc1;
     let gc2 = gccount () in
-    if gc1 <> gc2 then data.(i).objs.(j) <- Absent gc2;
-  end
+    if gc1 <> gc2 then data.(i).objs.(j) <- Absent gc2
 
 let dummy = ref [||]
 
@@ -74,5 +71,5 @@ let () =
     dummy := Array.make (Random.int 300) 0;
     let i = Random.int size in
     let j = Random.int (Array.length data.(i).objs) in
-    check_and_change i j;
+    check_and_change i j
   done

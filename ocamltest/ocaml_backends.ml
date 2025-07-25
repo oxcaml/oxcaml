@@ -15,15 +15,15 @@
 
 (* Backends of the OCaml compiler and their properties *)
 
-type t = Native | Bytecode
+type t =
+  | Native
+  | Bytecode
 
-let is_bytecode t = t=Bytecode
+let is_bytecode t = t = Bytecode
 
-let is_native t = t=Native
+let is_native t = t = Native
 
-let string_of_backend = function
-  | Native -> "native"
-  | Bytecode -> "bytecode"
+let string_of_backend = function Native -> "native" | Bytecode -> "bytecode"
 
 (* Creates a function that returns its first argument for Bytecode           *)
 (* and its second argument for Native code                                   *)

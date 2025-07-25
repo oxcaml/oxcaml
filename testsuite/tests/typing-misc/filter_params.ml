@@ -1,8 +1,9 @@
 (* TEST
- expect;
+   expect;
 *)
 
 type ('a, 'b) t constraint 'a = 'b
-[%%expect{|
+
+[%%expect {|
 type ('b, 'a) t constraint 'a = 'b
 |}]

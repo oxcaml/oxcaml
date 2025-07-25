@@ -17,7 +17,7 @@
 
 (** The kind of source file in arguments. *)
 type source_file =
-    Impl_file of string
+  | Impl_file of string
   | Intf_file of string
   | Text_file of string
 
@@ -73,7 +73,7 @@ val errors : int ref
 val warn_error : bool ref
 
 (** Show code fragments that could be transformed into a cross-reference. *)
-val show_missed_crossref: bool ref
+val show_missed_crossref : bool ref
 
 (** Print the given warning, adding it to the list of {!errors}
 if {!warn_error} is [true]. *)
@@ -110,4 +110,4 @@ val with_trailer : bool ref
 val initially_opened_module : string ref
 
 (** Name of the library namespace for a prefixed library *)
-val library_namespace: string ref
+val library_namespace : string ref

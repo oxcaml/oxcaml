@@ -1,17 +1,19 @@
 (* TEST
- modules = "stubs.c";
- native;
+   modules = "stubs.c";
+   native;
 *)
 
-external ( + ) : int64 -> int64 -> int64
-  = "" "test_int64_add" [@@noalloc] [@@unboxed]
-external ( - ) : int64 -> int64 -> int64
-  = "" "test_int64_sub" [@@noalloc] [@@unboxed]
-external ( * ) : int64 -> int64 -> int64
-  = "" "test_int64_mul" [@@noalloc] [@@unboxed]
+external ( + ) : int64 -> int64 -> int64 = "" "test_int64_add"
+  [@@noalloc] [@@unboxed]
 
-external ignore_int64 : (int64 [@unboxed]) -> unit
-  = "" "test_ignore_int64" [@@noalloc]
+external ( - ) : int64 -> int64 -> int64 = "" "test_int64_sub"
+  [@@noalloc] [@@unboxed]
+
+external ( * ) : int64 -> int64 -> int64 = "" "test_int64_mul"
+  [@@noalloc] [@@unboxed]
+
+external ignore_int64 : (int64[@unboxed]) -> unit = "" "test_ignore_int64"
+  [@@noalloc]
 
 let f () =
   let r = ref 1L in
@@ -24,7 +26,7 @@ let f () =
 let () =
   let a0 = Gc.allocated_bytes () in
   let a1 = Gc.allocated_bytes () in
-  let _x = (f[@inlined never]) () in
+  let _x = (f [@inlined never]) () in
   let a2 = Gc.allocated_bytes () in
-  let alloc = (a2 -. 2. *. a1 +. a0) in
-  assert(alloc = 0.)
+  let alloc = a2 -. (2. *. a1) +. a0 in
+  assert (alloc = 0.)

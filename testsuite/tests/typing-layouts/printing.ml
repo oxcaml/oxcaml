@@ -1,6 +1,6 @@
 (* TEST
- flags = "-verbose-types";
- expect;
+   flags = "-verbose-types";
+   expect;
 *)
 
 module M : sig
@@ -9,7 +9,8 @@ end = struct
   let f () _ = ()
 end
 
-[%%expect{|
+[%%expect
+{|
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   let f () _ = ()

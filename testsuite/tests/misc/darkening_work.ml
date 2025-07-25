@@ -1,6 +1,6 @@
 (* TEST
- runtime5;
- { native; }
+   runtime5;
+   { native; }
 *)
 
 (* This test checks that the extra marking work done by caml_modify is correctly accounted
@@ -16,9 +16,9 @@ let major_cycles () = (Gc.quick_stat ()).major_collections
 
 let[@inline never] f ~writes =
   List.init (Array.length table) (fun i ->
-    let buf = table.(i) in
-    if Sys.opaque_identity writes then table.(i) <- buf;
-    Bytes.get buf 42)
+      let buf = table.(i) in
+      if Sys.opaque_identity writes then table.(i) <- buf;
+      Bytes.get buf 42)
 
 let count_cycles ~f =
   Gc.major ();
@@ -38,7 +38,6 @@ let () =
   let wfalse = count_cycles ~f:(fun () -> f ~writes:false) in
   let wtrue = count_cycles ~f:(fun () -> f ~writes:true) in
   let wdiff = wtrue - wfalse in
-  if abs wdiff > 2 then
-    Printf.printf "error: writes caused %d more cycles\n" wdiff
-  else
-    Printf.printf "ok\n"
+  if abs wdiff > 2
+  then Printf.printf "error: writes caused %d more cycles\n" wdiff
+  else Printf.printf "ok\n"

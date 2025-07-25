@@ -1,14 +1,14 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
- runtime5;
- multidomain;
- include str;
- hasstr;
- {
-   bytecode;
- }{
-   native;
- }
+   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   runtime5;
+   multidomain;
+   include str;
+   hasstr;
+   {
+     bytecode;
+   }{
+     native;
+   }
 *)
 
 let total = Atomic.make 0
@@ -19,16 +19,13 @@ let run str () =
   match Str.search_forward re input 0 with
   | exception Not_found -> Atomic.decr total
   | _ ->
-      let s = Str.matched_group 0 input in
-      if not (String.equal s str) then
-        Atomic.decr total
-      else
-        Atomic.incr total
+    let s = Str.matched_group 0 input in
+    if not (String.equal s str) then Atomic.decr total else Atomic.incr total
 
 let _ =
   (* generate a set of cases matching the reference input or not. *)
-  let domain_params = List.init 7
-    (fun i -> if i mod 2 == 0 then "the lazy_t" else "the lazy dog")
+  let domain_params =
+    List.init 7 (fun i -> if i mod 2 == 0 then "the lazy_t" else "the lazy dog")
   in
   for i = 0 to 3 do
     let domains =
@@ -39,7 +36,6 @@ let _ =
     List.iter Domain.join domains
   done;
   let total' = Atomic.get total in
-  if total' != 0 then
-    Printf.eprintf "NOK: total is not 0: %d\n" total'
-  else
-    print_endline "OK"
+  if total' != 0
+  then Printf.eprintf "NOK: total is not 0: %d\n" total'
+  else print_endline "OK"
