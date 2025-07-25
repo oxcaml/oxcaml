@@ -1999,6 +1999,13 @@ terminated with an [Empty] or [Const] axhint *)
       | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
           (** The specified axis of the input object is responsible for the output axis *)
 
+    (* A large reason that the "single" cases and the "product" cases below
+       have to be handled separately is that an [Axis.t] must be from a product
+       to a single axis. If we could have an [Axis.t] of the form [Axis (x, x)]
+       then I believe that this would allow us to (or at least get us closer to
+       being able to) merge the two versions of the [find_responsible_axis_*] and
+       [*shint_to_axhint] functions. *)
+
     (** Given a morphism either from a product object to a single axis, or
      from a product object to a single axis, this function
      is used to find the axis in the source that is responsible for the
@@ -2007,11 +2014,9 @@ terminated with an [Empty] or [Const] axhint *)
      If the source object is a single axis, this function should end up
      returning [SourceIsSingle], otherwise the source object is a product, and the
      function should return [Axis ax] where [ax] is the single axis in the
-     source object that is responsible for the output.
-
-     NOTE: there is also a rare special case where none of the axes of the source object
-      (whether it is a product or a single axis) are responsible, in which
-      case [NoneResponsible] is returned.
+     source object that is responsible for the output. There is also a case where
+     none of the axes of the source object (whether it is a product or a single axis)
+     are responsible, in which case [NoneResponsible] is returned.
 
      NOTE: given the morphisms defined, there should only ever be a single source
      axis responsible for the output axis, otherwise this function wouldn't be properly
@@ -2023,8 +2028,8 @@ terminated with an [Empty] or [Const] axhint *)
          being responsible. See notes below. This will take some work to have it
          threaded through the rest of the code.
          Really, what we are looking to output is one of three cases:
-         1. The input itself (one or all the axes) is solely responsible for the output. If
-             it isn't this case then we can skip the rest of the chain.
+         1. The input itself (one or all the axes) is solely responsible for the output.
+              If it isn't this case then we can skip the rest of the chain.
          2. The morphism itself is solely responsible for the output. Beware, applying
               [Meet_with c] on some [m] where [m <= c] is a nop, so behaves like [Id],
               and so it is the input that is responsible here, not the morphism.
