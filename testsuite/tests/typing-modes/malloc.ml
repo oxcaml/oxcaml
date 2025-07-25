@@ -237,7 +237,7 @@ type 'a t : word mod immutable with 'a = 'a mallocd
 type 'a t = 'a mallocd
 |}]
 
-(* Layotu checks: [t mallocd] is ok only if t is value_or_null *)
+(* Layout checks: [t mallocd] is ok only if t is value_or_null *)
 type t = float# mallocd
 [%%expect {|
 Line 1, characters 9-15:
