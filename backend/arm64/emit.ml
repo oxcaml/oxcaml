@@ -1228,7 +1228,7 @@ module BR = Branch_relaxation.Make (struct
       based + barrier + single
     | Lop (Alloc { mode = External ; _ }) ->
       Misc.fatal_error
-        "Impossible: external allocs should be generated as as Cextcall in CMM."
+        "Impossible: external allocs should be generated as Cextcall in CMM."
     | Lop (Alloc { mode = Local; _ }) -> 9
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> 5
     | Lop (Specific (Ifar_alloc _)) when !fastcode_flag -> 6
@@ -1916,7 +1916,7 @@ let emit_instr i =
       Misc.fatal_error "arm64: got 256/512 bit vector")
   | Lop (Alloc { mode = External ; _ }) ->
     Misc.fatal_error
-      "Impossible: external allocs should be generated as as Cextcall in CMM."
+      "Impossible: external allocs should be generated as Cextcall in CMM."
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->

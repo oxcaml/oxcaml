@@ -1948,7 +1948,7 @@ let emit_instr ~first ~fallthrough i =
          :: !local_realloc_sites
   | Lop (Alloc { mode = External ; _ }) ->
     Misc.fatal_error
-      "Impossible: external allocs should be generated as as Cextcall in CMM. "
+      "Impossible: external allocs should be generated as Cextcall in CMM. "
   | Lop Poll ->
     I.cmp (domain_field Domainstate.Domain_young_limit) r15;
     let gc_call_label = L.create Text in
