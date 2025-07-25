@@ -170,15 +170,29 @@ and apply_expr ~env ~res e =
   if Exn_continuation.exn_handler exn_continuation
      <> To_jsir_env.exn_continuation env
   then failwith "unimplemented for now";
-  let f, res =
+  let var, res =
     match Apply_expr.callee e with
     | None -> failwith "effects not implemented yet"
-    | Some callee -> To_jsir_shared.simple ~env ~res callee
+    | Some callee -> (
+      let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
+      match Simple.must_be_symbol callee with
+      | Some (symbol, _coercion)
+        when Compilation_unit.equal
+               (Symbol.compilation_unit symbol)
+               (Symbol.external_symbols_compilation_unit ()) ->
+        let name = Symbol.linkage_name symbol |> Linkage_name.to_string in
+        let expr : Jsir.expr =
+          Prim (Extern name, List.map (fun arg : Jsir.prim_arg -> Pv arg) args)
+        in
+        let var = Jsir.Var.fresh () in
+        let res = To_jsir_result.add_instr_exn res (Let (var, expr)) in
+        var, res
+      | None | Some _ ->
+        let f, res = To_jsir_shared.simple ~env ~res callee in
+        (* CR selee: assume exact = false for now, JSIR seems to assume false in
+           the case that we don't know *)
+        apply_fn ~res ~f ~args ~exact:false)
   in
-  let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
-  (* CR selee: assume exact = false for now, JSIR seems to assume false in the
-     case that we don't know *)
-  let var, res = apply_fn ~res ~f ~args ~exact:false in
   match continuation with
   | Never_returns ->
     env, To_jsir_result.end_block_with_last_exn res (Return var)
