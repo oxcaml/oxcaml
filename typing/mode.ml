@@ -2122,9 +2122,9 @@ terminated with an [Empty] or [Const] axhint *)
       | Left -> C.right_adjoint
 
     (** Perform a "less-than-or-equal" test for the conversion side.
-        [conv_side_le Right obj x y] will perform the query [x <= y],
-        and [conv_side_le Left obj x y] will perform the query [y <= x] *)
-    let conv_side_le :
+        [conv_side_compare Right obj x y] will perform the query [x <= y],
+        and [conv_side_compare Left obj x y] will perform the query [y <= x] *)
+    let conv_side_compare :
         type a l1 l2 r1 r2.
         (l1, r1, l2, r2) conv_side -> a C.obj -> a -> a -> bool =
      fun side a_obj x y ->
@@ -2141,37 +2141,38 @@ terminated with an [Empty] or [Const] axhint *)
       let open Lattices_mono in
       fun r_obj r r_shint ax side ->
         (* This function is for when we have a solver hint (aka "shint") for a product lattice and
-           wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
+           wish to project the hint to be an "axhint", for a single axis. *)
+        (* In this function, [r] refers to the product and [a] refers to a value in an
+           axis of [r] *)
         let a_obj = proj_obj ax r_obj in
         let a = Axis.proj ax r in
         match r_shint with
-        | Morph (morph_hint, morph, b_shint) -> (
-          let b_obj = src r_obj morph in
+        | Morph (morph_hint, morph, rb_shint) -> (
+          (* In this branch, [rb] refers to the product (or possibly single axis)
+             of the morphism's source *)
+          let rb_obj = src r_obj morph in
           let morph_inv = conv_side_adj side r_obj morph in
-          let b = apply b_obj morph_inv r in
+          let rb = apply rb_obj morph_inv r in
           match find_responsible_axis_prod morph ax with
           | NoneResponsible -> a, Empty
           | SourceIsSingle ->
-            (* Note that unlike below, the returned [b] value will be the same as
+            (* Note that unlike below, the returned [_b] value will be the same as
                the current [b], so we can discard it. *)
-            let _, b_hint = shint_to_axhint_single b_obj b b_shint side in
-            a, Morph (morph_hint, b, b_obj, b_hint, morph)
+            let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
+            a, Morph (morph_hint, rb, rb_obj, b_hint, morph)
           | Axis b_ax ->
-            (* Note that [ax_b] is different to [b] as it refers to a single-axis
-               value in [b] *)
-            let ax_b, ax_b_hint =
-              shint_to_axhint_prod b_obj b b_shint b_ax side
-            in
-            let ax_b_obj = C.proj_obj b_ax b_obj in
-            a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
+            (* [b] refers to a value in the [b_ax] axis of [rb] *)
+            let b, b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
+            let b_obj = C.proj_obj b_ax rb_obj in
+            a, Morph (morph_hint, b, b_obj, b_hint, morph))
         | Const r_const_hint -> a, Const r_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let x_axval = Axis.proj ax x in
           let y_axval = Axis.proj ax y in
           let chosen, chosen_hint =
-            if conv_side_le side a_obj x_axval y_axval
+            if conv_side_compare side a_obj x_axval y_axval
             then x, x_hint
-            else if conv_side_le side a_obj y_axval x_axval
+            else if conv_side_compare side a_obj y_axval x_axval
             then y, y_hint
             else
               (* As we are dealing with a single axis at a time, it should be totally-ordered, so this case should be impossible *)
@@ -2190,30 +2191,29 @@ terminated with an [Empty] or [Const] axhint *)
       fun a_obj a a_shint side ->
         (* This function is for when we have a solver hint (aka "shint") for a
            single axis and wish to convert it to a mode "axhint". *)
+        (* See comments in [shint_to_axhint_prod] for more information *)
         match a_shint with
-        | Morph (morph_hint, morph, b_shint) -> (
-          let b_obj = src a_obj morph in
+        | Morph (morph_hint, morph, rb_shint) -> (
+          let rb_obj = src a_obj morph in
           let morph_inv = conv_side_adj side a_obj morph in
-          let b = apply b_obj morph_inv a in
+          let rb = apply rb_obj morph_inv a in
           match find_responsible_axis_single morph with
           | NoneResponsible -> a, Empty
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-            let _, b_hint = shint_to_axhint_single b_obj b b_shint side in
-            a, Morph (morph_hint, b, b_obj, b_hint, morph)
+            let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
+            a, Morph (morph_hint, rb, rb_obj, b_hint, morph)
           | Axis b_ax ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
-            let ax_b, ax_b_hint =
-              shint_to_axhint_prod b_obj b b_shint b_ax side
-            in
-            let ax_b_obj = C.proj_obj b_ax b_obj in
-            a, Morph (morph_hint, ax_b, ax_b_obj, ax_b_hint, morph))
+            let b, b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
+            let b_obj = C.proj_obj b_ax rb_obj in
+            a, Morph (morph_hint, b, b_obj, b_hint, morph))
         | Const a_const_hint -> a, Const a_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let chosen, chosen_hint =
-            if conv_side_le side a_obj x y
+            if conv_side_compare side a_obj x y
             then x, x_hint
-            else if conv_side_le side a_obj y x
+            else if conv_side_compare side a_obj y x
             then y, y_hint
             else
               (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
