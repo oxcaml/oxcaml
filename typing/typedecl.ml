@@ -1866,12 +1866,7 @@ let rec update_decl_jkind env dpath decl =
            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
                              | Vec128 | Vec256 | Vec512 | Word | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
-           | Value_element ->
-               repr_summary.values <- true;
-               (* Check if this value field is atomic and float *)
-               if Types.is_atomic lbl.Types.ld_mutable
-               && is_float env lbl.Types.ld_type
-               then repr_summary.atomic_floats <- true
+           | Value_element -> repr_summary.values <- true;
            | Element_without_runtime_component _ -> ())
         reprs lbls;
       let rep =
@@ -1927,23 +1922,15 @@ let rec update_decl_jkind env dpath decl =
             float64s = true; non_float64_unboxed_fields = false } ->
           Record_ufloat
         (* Records with atomic float fields cannot use flat representation *)
-        | { atomic_floats = true; _ } ->
+        | { atomic_floats = true; floats; values; _ } ->
+          if floats && not values
+          then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
           rep
         | { values = false; floats = false; atomic_floats = false;
             float64s = false; non_float64_unboxed_fields = false }
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
-      (* Emit warning if atomic float fields prevented float record
-         optimization *)
-      if repr_summary.atomic_floats then begin
-        (* Check if all fields are floats (atomic or not) *)
-        let all_float_fields =
-          List.for_all (fun lbl -> is_float env lbl.Types.ld_type) lbls
-        in
-        if all_float_fields then
-          Location.prerr_warning loc Warnings.Atomic_float_record_boxed
-      end;
       lbls, rep, jkind
     | _, ( Record_inlined _ | Record_float | Record_ufloat
          | Record_mixed _)
