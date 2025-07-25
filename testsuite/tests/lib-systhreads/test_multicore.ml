@@ -25,8 +25,7 @@ let () =
       ()
    with
    | Spawned -> ()
-   | Failed ((), exn, bt) -> Printexc.raise_with_backtrace exn bt
-  ;
+   | Failed ((), exn, bt) -> Printexc.raise_with_backtrace exn bt);
   while Option.is_none (Atomic.get non_initial) do
     Thread.yield ()
   done;
