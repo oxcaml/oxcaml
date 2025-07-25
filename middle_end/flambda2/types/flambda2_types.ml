@@ -26,8 +26,11 @@ module Typing_env = struct
       ~meet_expanded_head:(Meet.meet_expanded_head ())
 
   let add_is_null_relation t name ~scrutinee =
+    let machine_width = machine_width t in
     use_meet_env t ~f:(fun t ->
-        let t = add_equation t name (Type_grammar.is_null ~scrutinee) in
+        let t =
+          add_equation t name (Type_grammar.is_null ~machine_width ~scrutinee)
+        in
         Name.pattern_match name
           ~symbol:(fun _ -> t)
           ~var:(fun var ->
@@ -40,9 +43,11 @@ module Typing_env = struct
             add_equation_on_simple t scrutinee scrutinee_ty))
 
   let add_is_int_relation t name ~scrutinee =
+    let machine_width = machine_width t in
     use_meet_env t ~f:(fun t ->
         let t =
-          add_equation t name (Type_grammar.is_int_for_scrutinee ~scrutinee)
+          add_equation t name
+            (Type_grammar.is_int_for_scrutinee ~machine_width ~scrutinee)
         in
         Name.pattern_match name
           ~symbol:(fun _ -> t)
@@ -108,12 +113,13 @@ end
 module Typing_env_extension = struct
   include Typing_env_extension
 
-  let add_is_null_relation t name ~scrutinee =
-    add_or_replace_equation t name (Type_grammar.is_null ~scrutinee)
-
-  let add_is_int_relation t name ~scrutinee =
+  let add_is_null_relation ~machine_width t name ~scrutinee =
     add_or_replace_equation t name
-      (Type_grammar.is_int_for_scrutinee ~scrutinee)
+      (Type_grammar.is_null ~machine_width ~scrutinee)
+
+  let add_is_int_relation ~machine_width t name ~scrutinee =
+    add_or_replace_equation t name
+      (Type_grammar.is_int_for_scrutinee ~machine_width ~scrutinee)
 
   let add_get_tag_relation t name ~scrutinee =
     add_or_replace_equation t name
