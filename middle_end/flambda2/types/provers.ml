@@ -231,46 +231,62 @@ let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
     =
   let machine_width = TE.machine_width env in
   match expand_head env t with
-  | Naked_immediate (Ok (Naked_immediates is)) ->
-    if Target_ocaml_int.Set.is_empty is then Invalid else Proved is
-  | Naked_immediate (Ok (Is_int scrutinee_ty)) -> (
-    match prove_is_int_generic ~variant_only:true env scrutinee_ty with
-    | Proved true ->
-      Proved
-        (Target_ocaml_int.Set.singleton
-           (Target_ocaml_int.bool_true machine_width))
-    | Proved false ->
-      Proved
-        (Target_ocaml_int.Set.singleton
-           (Target_ocaml_int.bool_false machine_width))
-    | Unknown -> Unknown
-    | Invalid -> Invalid)
-  | Naked_immediate (Ok (Is_null scrutinee_ty)) -> (
-    match prove_is_null_generic env scrutinee_ty with
-    | Proved true ->
-      Proved
-        (Target_ocaml_int.Set.singleton
-           (Target_ocaml_int.bool_true machine_width))
-    | Proved false ->
-      Proved
-        (Target_ocaml_int.Set.singleton
-           (Target_ocaml_int.bool_false machine_width))
-    | Unknown -> Unknown
-    | Invalid -> Invalid)
-  | Naked_immediate (Ok (Get_tag block_ty)) -> (
-    match prove_get_tag_generic env block_ty with
-    | Proved tags ->
-      let is =
-        Tag.Set.fold
-          (fun tag is ->
-            Target_ocaml_int.Set.add
-              (Tag.to_targetint_31_63 machine_width tag)
-              is)
-          tags Target_ocaml_int.Set.empty
-      in
-      Proved is
-    | Unknown -> Unknown
-    | Invalid -> Invalid)
+  | Naked_immediate (Ok head) ->
+    let these_immediates imms =
+      if Target_ocaml_int.Set.is_empty imms then Invalid else Proved imms
+    in
+    let meet_these_immediates imms (proof : _ generic_proof) =
+      match proof with
+      | Proved imms' -> these_immediates (Target_ocaml_int.Set.inter imms imms')
+      | Unknown -> these_immediates imms
+      | Invalid -> Invalid
+    in
+    let meet_this_immediate imm proof =
+      meet_these_immediates (Target_ocaml_int.Set.singleton imm) proof
+    in
+    let { TG.Head_of_kind_naked_immediate.naked_immediates; inverse_relations }
+        =
+      TG.Head_of_kind_naked_immediate.descr head
+    in
+    let proof : _ generic_proof =
+      match naked_immediates with
+      | Known imms -> these_immediates imms
+      | Unknown -> Unknown
+    in
+    TG.Relation.Map.fold
+      (fun relation names imms ->
+        Name.Set.fold
+          (fun name imms ->
+            let ty = TG.alias_type_of K.value (Simple.name name) in
+            match TG.Relation.descr relation with
+            | Is_null -> (
+              match prove_is_null_generic env ty with
+              | Proved b ->
+                meet_this_immediate (Target_ocaml_int.bool machine_width b) imms
+              | Unknown -> imms
+              | Invalid -> Invalid)
+            | Is_int -> (
+              match prove_is_int_generic ~variant_only:true env ty with
+              | Proved b ->
+                meet_this_immediate (Target_ocaml_int.bool machine_width b) imms
+              | Unknown -> imms
+              | Invalid -> Invalid)
+            | Get_tag -> (
+              match prove_get_tag_generic env ty with
+              | Proved tags ->
+                let is =
+                  Tag.Set.fold
+                    (fun tag is ->
+                      Target_ocaml_int.Set.add
+                        (Tag.to_targetint_31_63 machine_width tag)
+                        is)
+                    tags Target_ocaml_int.Set.empty
+                in
+                meet_these_immediates is imms
+              | Unknown -> imms
+              | Invalid -> Invalid))
+          names imms)
+      inverse_relations proof
   | Naked_immediate Unknown -> Unknown
   | Naked_immediate Bottom -> Invalid
   | Value _ | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _

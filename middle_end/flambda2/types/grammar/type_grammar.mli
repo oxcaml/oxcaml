@@ -33,6 +33,31 @@ type is_null =
   | Not_null
   | Maybe_null of { is_null : Variable.t option }
 
+module Relation : sig
+  type t
+
+  include Container_types.S with type t := t
+
+  val is_null : t
+
+  val is_int : t
+
+  val get_tag : t
+
+  val of_const :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Reg_width_const.t ->
+    Target_ocaml_int.t Or_bottom.t
+
+  type descr =
+    | Is_null
+    | Is_int
+    | Get_tag
+
+  val descr : t -> descr
+end
+
 type t = private
   | Value of head_of_kind_value Type_descr.t
   | Naked_immediate of head_of_kind_naked_immediate Type_descr.t
@@ -86,11 +111,7 @@ and head_of_kind_value_non_null = private
         alloc_mode : Alloc_mode.For_types.t
       }
 
-and head_of_kind_naked_immediate = private
-  | Naked_immediates of Target_ocaml_int.Set.t
-  | Is_int of t  (** For variants only *)
-  | Get_tag of t  (** For variants only *)
-  | Is_null of t
+and head_of_kind_naked_immediate
 
 (** Invariant: the float/integer sets for naked float, int<N>, and
     nativeint heads are non-empty. (Empty sets are represented as an overall
@@ -389,11 +410,13 @@ val tagged_immediate_alias_to : naked_immediate:Variable.t -> t
 (** This function checks the kind of its argument. *)
 val tag_immediate : t -> t
 
-val is_int_for_scrutinee : scrutinee:Simple.t -> t
+val is_int_for_scrutinee :
+  machine_width:Target_system.Machine_width.t -> scrutinee:Simple.t -> t
 
 val get_tag_for_block : block:Simple.t -> t
 
-val is_null : scrutinee:Simple.t -> t
+val is_null :
+  machine_width:Target_system.Machine_width.t -> scrutinee:Simple.t -> t
 
 val create_variant :
   is_unique:bool ->
@@ -871,17 +894,22 @@ end
 module Head_of_kind_naked_immediate : sig
   type t = head_of_kind_naked_immediate
 
+  type descr =
+    { naked_immediates : Target_ocaml_int.Set.t Or_unknown.t;
+      inverse_relations : Name.Set.t Relation.Map.t
+    }
+
+  val descr : t -> descr
+
+  val from_descr : descr -> t Or_bottom.t
+
+  val from_descr_non_empty : descr -> t
+
   val create_naked_immediate : Target_ocaml_int.t -> t
 
   val create_naked_immediates : Target_ocaml_int.Set.t -> t Or_bottom.t
 
   val create_naked_immediates_non_empty : Target_ocaml_int.Set.t -> t
-
-  val create_is_int : flambda_type -> t
-
-  val create_get_tag : flambda_type -> t
-
-  val create_is_null : flambda_type -> t
 end
 
 module type Head_of_kind_naked_number_intf = sig
