@@ -9,6 +9,17 @@ let prim_arg ~env simple =
       Jsir.Pv (To_jsir_env.get_symbol_exn env symbol))
     ~const:(fun const -> Jsir.Pc (To_jsir_shared.reg_width_const const))
 
+let with_int_prefix (kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
+  let prefix =
+    match kind, percent_for_imms with
+    | (Tagged_immediate | Naked_immediate), true -> "%int"
+    | (Tagged_immediate | Naked_immediate), false -> "caml_int"
+    | Naked_int32, _ -> "caml_int32"
+    | Naked_int64, _ -> "caml_int64"
+    | Naked_nativeint, _ -> "caml_nativeint"
+  in
+  prefix ^ "_" ^ op
+
 (* CR selee: implement primitives *)
 
 let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
@@ -108,11 +119,12 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     primitive_not_supported ()
 
 let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
-  let use_prim ~env ~res prim =
+  let use_prim' ~env ~res prim x y =
     let expr : Jsir.expr = Prim (prim, [x; y]) in
     let var = Jsir.Var.fresh () in
     var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
   in
+  let use_prim ~env ~res prim = use_prim' ~env ~res prim x y in
   match f with
   | Block_set { kind; init; field } ->
     ignore (kind, init, field);
@@ -130,30 +142,56 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
     use_prim ~env ~res prim
   | Int_arith (kind, op) ->
-    (* CR selee: this is almost certainly wrong *)
-    ignore kind;
-    let extern_name =
+    let op_name =
       match op with
-      | Add -> "%int_add"
-      | Sub -> "%int_sub"
-      | Mul -> "%int_mul"
-      | Div -> "%int_div"
-      | Mod -> "%int_mod"
-      | And -> "%int_and"
-      | Or -> "%int_or"
-      | Xor -> "%int_xor"
+      | Add -> "add"
+      | Sub -> "sub"
+      | Mul -> "mul"
+      | Div -> "div"
+      | Mod -> "mod"
+      | And -> "and"
+      | Or -> "or"
+      | Xor -> "xor"
     in
+    let extern_name = with_int_prefix kind op_name ~percent_for_imms:true in
     use_prim ~env ~res (Extern extern_name)
   | Int_shift (kind, op) ->
-    (* CR selee: this is almost certainly wrong *)
-    ignore kind;
-    let extern_name =
-      match op with Lsl -> "%int_lsl" | Lsr -> "%int_lsr" | Asr -> "%int_asr"
+    let op_name =
+      match kind, op with
+      | (Tagged_immediate | Naked_immediate), Lsl -> "lsl"
+      | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsl -> "shift_left"
+      | (Tagged_immediate | Naked_immediate), Lsr -> "lsr"
+      | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsr ->
+        "shift_right_unsigned"
+      | (Tagged_immediate | Naked_immediate), Asr -> "shift_right"
+      | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
     in
+    let extern_name = with_int_prefix kind op_name ~percent_for_imms:true in
     use_prim ~env ~res (Extern extern_name)
-  | Int_comp (kind, behaviour) ->
-    ignore (kind, behaviour);
-    primitive_not_supported ()
+  | Int_comp (kind, behaviour) -> (
+    match behaviour with
+    | Yielding_bool comparison -> (
+      match comparison with
+      | Eq -> use_prim' ~env ~res Eq x y
+      | Neq -> use_prim' ~env ~res Neq x y
+      | Lt Signed -> use_prim' ~env ~res Lt x y
+      | Lt Unsigned -> use_prim' ~env ~res Ult x y
+      | Gt Signed -> use_prim' ~env ~res Lt y x
+      | Gt Unsigned -> use_prim' ~env ~res Ult y x
+      | Le Signed -> use_prim' ~env ~res Le x y
+      | Le Unsigned -> failwith "bruh"
+      | Ge Signed -> use_prim' ~env ~res Le y x
+      | Ge Unsigned -> failwith "bruh")
+    | Yielding_int_like_compare_functions signed_or_unsigned ->
+      let env, res =
+        match signed_or_unsigned with
+        | Signed -> env, res
+        | Unsigned -> failwith "bruh"
+      in
+      let extern_name =
+        with_int_prefix kind "compare" ~percent_for_imms:false
+      in
+      use_prim ~env ~res (Extern extern_name))
   | Float_arith (bitwidth, op) ->
     ignore (bitwidth, op);
     primitive_not_supported ()
