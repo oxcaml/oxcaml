@@ -7185,8 +7185,7 @@ and type_expect_
           (* NOTE: we intentionally ignore lbl.ld_modalities here, since we
              force it to always be legacy in typecore. The mode of the
              atomic_loc is then exactly the mode of the record *)
-          let mode = cross_left env ty_arg rmode in
-          submode ~loc ~env mode argument_mode;
+          submode ~loc ~env rmode argument_mode;
           rue {
             exp_desc =
               Texp_atomic_loc
