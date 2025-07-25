@@ -31,3 +31,14 @@ Line 1, characters 38-62:
                                           ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value escapes its region.
 |}]
+
+
+let contents_can't_escape_by_mode_crossing
+  : int atomic @ local -> int atomic_loc @ global
+= fun t -> [%atomic.loc t.contents]
+[%%expect{|
+Line 3, characters 11-35:
+3 | = fun t -> [%atomic.loc t.contents]
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value escapes its region.
+|}]
