@@ -47,6 +47,12 @@ val c_has_debug_prefix_map : bool
 val as_has_debug_prefix_map : bool
 (** Whether the assembler supports --debug-prefix-map *)
 
+val as_compress_debug_sections_flag : string
+(** The flag to use for assembler debug section compression ("" if none) *)
+
+val cc_compress_debug_sections_flag : string
+(** The flag to use for C compiler debug section compression ("" if none) *)
+
 val ocamlc_cflags : string
 (** The flags ocamlc should pass to the C compiler *)
 
