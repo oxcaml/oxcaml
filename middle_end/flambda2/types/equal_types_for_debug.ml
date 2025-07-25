@@ -19,6 +19,10 @@ module TG = Type_grammar
 module ET = Expand_head.Expanded_type
 module ME = Meet_env
 
+type config = { ignore_alloc_mode : bool }
+
+let create_config ?(ignore_alloc_mode = true) () = { ignore_alloc_mode }
+
 type renaming =
   { mutable left_renaming : Variable.t Variable.Map.t;
     mutable right_renaming : Variable.t Variable.Map.t
@@ -45,11 +49,19 @@ type env =
     left_env : TE.t;
     right_env : TE.t;
     meet_type : ME.meet_type;
+    config : config;
     renaming : renaming
   }
 
-let create_env ~meet_type parent_env left_env right_env =
-  { parent_env; left_env; right_env; meet_type; renaming = create_renaming () }
+let create_env ?(config = create_config ()) ~meet_type parent_env left_env
+    right_env =
+  { parent_env;
+    left_env;
+    right_env;
+    meet_type;
+    config;
+    renaming = create_renaming ()
+  }
 
 let extension_env env left_env right_env = { env with left_env; right_env }
 
@@ -67,6 +79,10 @@ let exists_in_parent_env env name =
 
 let simple_exists_in_parent_env env simple =
   TE.mem_simple ~min_name_mode:Name_mode.in_types env.parent_env simple
+
+let equal_alloc_mode env alloc_mode1 alloc_mode2 =
+  env.config.ignore_alloc_mode
+  || Alloc_mode.For_types.equal alloc_mode1 alloc_mode2
 
 let equal_bottom equal (x1 : _ Or_bottom.t) (x2 : _ Or_bottom.t) =
   match x1, x2 with
@@ -160,7 +176,7 @@ let equal_row_like_for_blocks ~equal_type env (t1 : TG.row_like_for_blocks)
   && equal_bottom
        (equal_row_like_block_case ~equal_type env)
        t1.other_tags t2.other_tags
-  && Alloc_mode.For_types.equal t1.alloc_mode t2.alloc_mode
+  && equal_alloc_mode env t1.alloc_mode t2.alloc_mode
 
 let equal_function_slot_indexed_product ~equal_type env
     (t1 : TG.function_slot_indexed_product)
@@ -248,27 +264,27 @@ let equal_head_of_kind_value_non_null ~equal_type env
            (extension_env env left_env right_env))
         t1.blocks t2.blocks)
   | Mutable_block t1, Mutable_block t2 ->
-    Alloc_mode.For_types.equal t1.alloc_mode t2.alloc_mode
+    equal_alloc_mode env t1.alloc_mode t2.alloc_mode
   | Boxed_float32 (t1, a1), Boxed_float32 (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_float (t1, a1), Boxed_float (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_int32 (t1, a1), Boxed_int32 (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_int64 (t1, a1), Boxed_int64 (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_nativeint (t1, a1), Boxed_nativeint (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_vec128 (t1, a1), Boxed_vec128 (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_vec256 (t1, a1), Boxed_vec256 (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_vec512 (t1, a1), Boxed_vec512 (t2, a2) ->
-    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Closures c1, Closures c2 ->
     equal_row_like_for_closures ~equal_type env c1.by_function_slot
       c2.by_function_slot
-    && Alloc_mode.For_types.equal c1.alloc_mode c2.alloc_mode
+    && equal_alloc_mode env c1.alloc_mode c2.alloc_mode
   | String t1, String t2 -> String_info.Set.equal t1 t2
   | Array t1, Array t2 ->
     Or_unknown_or_bottom.equal Flambda_kind.With_subkind.equal t1.element_kind
@@ -277,7 +293,7 @@ let equal_head_of_kind_value_non_null ~equal_type env
     && Or_unknown.equal
          (equal_array_contents ~equal_type env)
          t1.contents t2.contents
-    && Alloc_mode.For_types.equal t1.alloc_mode t2.alloc_mode
+    && equal_alloc_mode env t1.alloc_mode t2.alloc_mode
   | ( ( Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
       | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
       | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _ | Array _ ),
@@ -490,8 +506,8 @@ let rec equal_type env t1 t2 =
       (Expand_head.expand_head env.left_env t1)
       (Expand_head.expand_head env.right_env t2)
 
-let names_with_non_equal_types_level_ignoring_name_mode ~meet_type env level1
-    level2 =
+let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
+    level1 level2 =
   let left_env =
     Typing_env_level.fold_on_defined_vars
       (fun var kind left_env ->
@@ -519,23 +535,23 @@ let names_with_non_equal_types_level_ignoring_name_mode ~meet_type env level1
       level2 env
   in
   names_with_non_equal_types_env_extension ~equal_type
-    (create_env ~meet_type env left_env right_env)
+    (create_env ?config ~meet_type env left_env right_env)
     (TEE.from_map (Typing_env_level.equations level1))
     (TEE.from_map (Typing_env_level.equations level2))
 
-let equal_level_ignoring_name_mode ~meet_type env level1 level2 =
+let equal_level_ignoring_name_mode ?config ~meet_type env level1 level2 =
   Name.Set.is_empty
-    (names_with_non_equal_types_level_ignoring_name_mode ~meet_type env level1
-       level2)
+    (names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
+       level1 level2)
 
-let names_with_non_equal_types_env_extension ~meet_type env ext1 ext2 =
+let names_with_non_equal_types_env_extension ?config ~meet_type env ext1 ext2 =
   names_with_non_equal_types_env_extension ~equal_type
-    (create_env ~meet_type env env env)
+    (create_env ?config ~meet_type env env env)
     ext1 ext2
 
-let equal_env_extension ~meet_type env ext1 ext2 =
+let equal_env_extension ?config ~meet_type env ext1 ext2 =
   Name.Set.is_empty
-    (names_with_non_equal_types_env_extension ~meet_type env ext1 ext2)
+    (names_with_non_equal_types_env_extension ?config ~meet_type env ext1 ext2)
 
-let equal_type ~meet_type env t1 t2 =
-  equal_type (create_env ~meet_type env env env) t1 t2
+let equal_type ?config ~meet_type env t1 t2 =
+  equal_type (create_env ?config ~meet_type env env env) t1 t2
