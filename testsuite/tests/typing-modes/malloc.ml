@@ -260,8 +260,8 @@ type t = int or_null mallocd
 type t = int or_null mallocd
 |}]
 
-(* Basic type behavior: does malloc_ returrn a mallocd, and does it
-   requires that its arguments are passed @ external *)
+(* Basic type behavior: does malloc_ return a mallocd, and does it
+   require that its arguments are passed @ external *)
 let foo () = malloc_ (1,2)
 [%%expect {|
 val foo : unit -> (int * int) mallocd = <fun>
