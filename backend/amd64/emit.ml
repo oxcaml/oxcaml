@@ -1946,7 +1946,7 @@ let emit_instr ~first ~fallthrough i =
            lr_save_simd = must_save_simd_regs i.live
          }
          :: !local_realloc_sites
-  | Lop (Alloc { bytes = _n; dbginfo = _dbginfo; mode = External }) ->
+  | Lop (Alloc { mode = External ; _ }) ->
     Misc.fatal_error
       "Impossible: external allocs should be generated as as Cextcall in CMM. "
   | Lop Poll ->
