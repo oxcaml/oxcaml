@@ -2982,9 +2982,9 @@ module Monadic = struct
   [axerror] in that axis, as well as the axis itself. Before returning, since
   the monadic fragment is flipped, this function will flip the error sides *)
   let flipped_axis_of_solver_error (err : Obj.const S.error) : error =
-    let left = err.left in
-    let right = err.right in
-    let (Axis_with_proj_pair (ax, _, _)) = axis_of_error left right in
+    (* Note, the left and right arguments are passed in opposite order here,
+       as the monadic fragment is inverted *)
+    let (Axis_with_proj_pair (ax, _, _)) = axis_of_error err.right err.left in
     Error
       ( ax,
         Axerror.From_solver_error.flipped_solver_error_to_axerror Obj.obj ax err
