@@ -628,8 +628,8 @@ let is_optional_parsetree : Parsetree.arg_label -> bool = function
 type optional_module_path = Stdlib_option | Stdlib_or_null
 
 let classify_module_path : Longident.t -> optional_module_path = function
-  | Ldot(Lident "Stdlib", "Option") -> Stdlib_option
-  | Ldot(Lident "Stdlib", "Or_null") -> Stdlib_or_null
+  | Lident "option" -> Stdlib_option
+  | Lident "or_null" -> Stdlib_or_null
   | _ -> failwith "Only expected Stdlib.Option and Stdlib.Or_null"
 
 type optionality = Optional_arg of optional_module_path
@@ -637,13 +637,31 @@ type optionality = Optional_arg of optional_module_path
 
 let classify_optionality (lbl: Types.arg_label) = match lbl with
   | Optional _ -> Optional_arg Stdlib_option
-  | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
+  | Generic_optional(path, _) -> Optional_arg (classify_module_path path)
   | Labelled _ | Position _ | Nolabel -> Required_or_position_arg
 
-let classify_optionality_parsetree (lbl : Parsetree.arg_label) = match lbl with
+let extract_optional_tp_from_pattern_constraint pat = match pat with
+  | {Parsetree.ppat_desc = Ppat_constraint (under_pat, ty, modes); _} ->
+    (match ty with
+    | Some {ptyp_desc = Ptyp_constr ({ txt = Lident ident_name}, [arg]); _} ->
+        Some (ident_name, arg,
+        {pat with
+          Parsetree.ppat_desc = Ppat_constraint (under_pat, Some arg, modes)})
+    | _ -> None)
+  | _ -> None
+
+let classify_optionality_parsetree (lbl : Parsetree.arg_label)
+  (pat : Parsetree.pattern) =
+  match lbl with
   | Optional _ -> Optional_arg Stdlib_option
-  | Generic_optional(path, _) -> Optional_arg (classify_module_path path.txt)
   | Labelled _ | Nolabel -> Required_or_position_arg
+  | Generic_optional(_) ->
+    match extract_optional_tp_from_pattern_constraint pat with
+    | Some ("option", _, _) -> Optional_arg Stdlib_option
+    | Some ("or_null", _, _) -> Optional_arg Stdlib_or_null
+    | Some (name, _, _) ->
+        failwith ("Unrecognized generic optional type: " ^ name)
+    | None  -> failwith "Missing type annotation"
 
 let get_optional_module_path_exn lbl =
   match classify_optionality lbl with
@@ -676,25 +694,10 @@ let prefixed_label_name ppf l =
     Nolabel -> fprintf ppf  ""
   | Labelled s | Position s -> fprintf ppf "~%s" s
   | Optional s -> fprintf ppf "?%s" s
-  | Generic_optional (path, s) ->
-      fprintf ppf "%a.?'%s" Pprintast.longident path.txt s
+  | Generic_optional (_, s) -> fprintf ppf "(?%s)" s
 
 let arg_label_compatible param_label arg_label =
-  match param_label, arg_label with
-  | Nolabel, Nolabel -> true
-  | Nolabel, _ | _, Nolabel -> false
-  | (Labelled s | Optional s | Generic_optional(_, s) | Position s), Labelled s'
-      -> s = s'
-  | _, (Optional _ | Generic_optional _ | Position _) ->
-    (match classify_optionality param_label, classify_optionality arg_label with
-    | Optional_arg l_path, Optional_arg l_path' ->
-        l_path = l_path' && label_name param_label = label_name arg_label
-    | Optional_arg _, Required_or_position_arg
-    | Required_or_position_arg, Optional_arg _
-    | Required_or_position_arg, Required_or_position_arg
-        (* when positional labels are involved,
-          we only care whether label names are equal*)
-        -> label_name param_label = label_name arg_label)
+  label_name param_label = label_name arg_label
 
 let rec extract_label_aux hd l (* param label*) = function
   | [] -> None
