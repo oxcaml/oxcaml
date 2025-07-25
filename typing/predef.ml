@@ -545,8 +545,6 @@ let build_initial_env add_type add_extension empty_env =
        ~jkind:(fun param ->
                 let modality =
                   Mode.Modality.Value.Const.id
-                  |> Mode.Modality.Value.Const.set (Monadic Uniqueness)
-                      (Join_with Jkind_mod_bounds.Uniqueness.min)
                   |> Mode.Modality.Value.Const.set (Comonadic Externality)
                       (Meet_with Jkind_mod_bounds.Externality.min)
                 in
