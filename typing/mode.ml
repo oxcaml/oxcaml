@@ -2108,25 +2108,27 @@ terminated with an [Empty] or [Const] axhint *)
     (** Container and type description for an adjoint function. Helps with typing
         of the following functions *)
     type ('l1, 'r1, 'l2, 'r2) conv_side =
-      | LeftAdjoint : (_, allowed, allowed, disallowed) conv_side
-      | RightAdjoint : (allowed, _, disallowed, allowed) conv_side
+      | Left : (allowed, _, disallowed, allowed) conv_side
+      | Right : (_, allowed, allowed, disallowed) conv_side
 
-    let shint_to_axhint_side_fn :
+    (** Get the adjunction function for the given conversion side *)
+    let conv_side_adj :
         type a b l1 l2 r1 r2.
         (l1, r1, l2, r2) conv_side ->
         b C.obj ->
         (a, b, l1 * r1) C.morph ->
         (b, a, l2 * r2) C.morph = function
-      | LeftAdjoint -> C.left_adjoint
-      | RightAdjoint -> C.right_adjoint
+      | Right -> C.left_adjoint
+      | Left -> C.right_adjoint
 
-    let shint_to_axhint_side_le :
+    (** Perform a "less-than-or-equal" test for the conversion side.
+        [conv_side_le Right obj x y] will perform the query [x <= y],
+        and [conv_side_le Left obj x y] will perform the query [y <= x] *)
+    let conv_side_le :
         type a l1 l2 r1 r2.
         (l1, r1, l2, r2) conv_side -> a C.obj -> a -> a -> bool =
      fun side a_obj x y ->
-      match side with
-      | LeftAdjoint -> C.le a_obj x y
-      | RightAdjoint -> C.le a_obj y x
+      match side with Right -> C.le a_obj x y | Left -> C.le a_obj y x
 
     let rec shint_to_axhint :
         type r a left1 left2 right1 right2.
@@ -2145,7 +2147,7 @@ terminated with an [Empty] or [Const] axhint *)
         match r_shint with
         | Morph (morph_hint, morph, b_shint) -> (
           let b_obj = src r_obj morph in
-          let morph_inv = shint_to_axhint_side_fn side r_obj morph in
+          let morph_inv = conv_side_adj side r_obj morph in
           let b = apply b_obj morph_inv r in
           match find_responsible_axis_prod morph ax with
           | NoneResponsible -> a, Empty
@@ -2165,9 +2167,9 @@ terminated with an [Empty] or [Const] axhint *)
           let x_axval = Axis.proj ax x in
           let y_axval = Axis.proj ax y in
           let chosen, chosen_hint =
-            if shint_to_axhint_side_le side a_obj x_axval y_axval
+            if conv_side_le side a_obj x_axval y_axval
             then x, x_hint
-            else if shint_to_axhint_side_le side a_obj y_axval x_axval
+            else if conv_side_le side a_obj y_axval x_axval
             then y, y_hint
             else
               (* As we are dealing with a single axis at a time, it should be totally-ordered, so this case should be impossible *)
@@ -2189,7 +2191,7 @@ terminated with an [Empty] or [Const] axhint *)
         match a_shint with
         | Morph (morph_hint, morph, b_shint) -> (
           let b_obj = src a_obj morph in
-          let morph_inv = shint_to_axhint_side_fn side a_obj morph in
+          let morph_inv = conv_side_adj side a_obj morph in
           let b = apply b_obj morph_inv a in
           match find_responsible_axis_single morph with
           | NoneResponsible -> a, Empty
@@ -2205,9 +2207,9 @@ terminated with an [Empty] or [Const] axhint *)
         | Const a_const_hint -> a, Const a_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let chosen, chosen_hint =
-            if shint_to_axhint_side_le side a_obj x y
+            if conv_side_le side a_obj x y
             then x, x_hint
-            else if shint_to_axhint_side_le side a_obj y x
+            else if conv_side_le side a_obj y x
             then y, y_hint
             else
               (* As we are dealing with a single axis, it should be totally-ordered, so this case should be impossible *)
@@ -2228,11 +2230,9 @@ convert the error to an [axerror] *)
         type r a. r Lattices_mono.obj -> (r, a) Axis.t -> r S.error -> a axerror
         =
      fun r_obj axis { left; left_hint; right; right_hint } ->
-      let left', left'_hint =
-        shint_to_axhint r_obj left left_hint axis RightAdjoint
-      in
+      let left', left'_hint = shint_to_axhint r_obj left left_hint axis Left in
       let right', right'_hint =
-        shint_to_axhint r_obj right right_hint axis LeftAdjoint
+        shint_to_axhint r_obj right right_hint axis Right
       in
       { left = left';
         left_hint = left'_hint;
@@ -2248,10 +2248,10 @@ convert the error to an [axerror] *)
         type a. a Lattices_mono.obj -> a S.error -> a axerror =
      fun a_obj { left; left_hint; right; right_hint } ->
       let left', left'_hint =
-        single_axis_shint_to_axhint a_obj left left_hint RightAdjoint
+        single_axis_shint_to_axhint a_obj left left_hint Left
       in
       let right', right'_hint =
-        single_axis_shint_to_axhint a_obj right right_hint LeftAdjoint
+        single_axis_shint_to_axhint a_obj right right_hint Right
       in
       { left = left';
         left_hint = left'_hint;
