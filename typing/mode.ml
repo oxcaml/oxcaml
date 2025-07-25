@@ -2020,21 +2020,20 @@ let rec find_responsible_axis_single :
           and so it is the input that is responsible here, not the morphism.
      3. Both the input and the morphism are partly responsible for the output. *)
   let open Lattices_mono in
-  fun (type a b l r) (m : (a, b, l * r) morph) ->
-    match m with
-    | Proj (_a_obj, ax) -> Axis ax
-    | Compose (g, f) -> (
-      match find_responsible_axis_single g with
-      | NoneResponsible -> NoneResponsible
-      | SourceIsSingle -> find_responsible_axis_single f
-      | Axis c_ax -> find_responsible_axis_prod f c_ax)
-    | Id | Meet_with _ | Imply _ -> SourceIsSingle
-    | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
-    | Comonadic_to_monadic _ | Monadic_to_comonadic_max ->
-      assert false
-    | Local_to_regional | Regional_to_local | Locality_as_regionality
-    | Regional_to_global | Global_to_regional ->
-      SourceIsSingle
+  function
+  | Proj (_a_obj, ax) -> Axis ax
+  | Compose (g, f) -> (
+    match find_responsible_axis_single g with
+    | NoneResponsible -> NoneResponsible
+    | SourceIsSingle -> find_responsible_axis_single f
+    | Axis c_ax -> find_responsible_axis_prod f c_ax)
+  | Id | Meet_with _ | Imply _ -> SourceIsSingle
+  | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
+  | Comonadic_to_monadic _ | Monadic_to_comonadic_max ->
+    assert false
+  | Local_to_regional | Regional_to_local | Locality_as_regionality
+  | Regional_to_global | Global_to_regional ->
+    SourceIsSingle
 
 (** This function is similar to [find_responsible_axis_single] but assumes that the
 output object of the morphism is a product object. *)
@@ -2107,21 +2106,17 @@ let shint_to_axhint_side_fn :
     (l1, r1, l2, r2) shint_to_axhint_side ->
     b C.obj ->
     (a, b, l1 * r1) C.morph ->
-    (b, a, l2 * r2) C.morph =
-  fun (type a b l1 l2 r1 r2) (side : (l1, r1, l2, r2) shint_to_axhint_side) :
-      (b C.obj -> (a, b, l1 * r1) C.morph -> (b, a, l2 * r2) C.morph) ->
-   match side with
-   | LeftAdjoint -> C.left_adjoint
-   | RightAdjoint -> C.right_adjoint
+    (b, a, l2 * r2) C.morph = function
+  | LeftAdjoint -> C.left_adjoint
+  | RightAdjoint -> C.right_adjoint
 
 let shint_to_axhint_side_le :
     type a l1 l2 r1 r2.
     (l1, r1, l2, r2) shint_to_axhint_side -> a C.obj -> a -> a -> bool =
-  fun (type a l1 l2 r1 r2) (side : (l1, r1, l2, r2) shint_to_axhint_side)
-      (a_obj : a C.obj) x y ->
-   match side with
-   | LeftAdjoint -> C.le a_obj x y
-   | RightAdjoint -> C.le a_obj y x
+ fun side a_obj x y ->
+  match side with
+  | LeftAdjoint -> C.le a_obj x y
+  | RightAdjoint -> C.le a_obj y x
 
 let rec shint_to_axhint :
     type r a left1 left2 right1 right2.
@@ -2132,8 +2127,7 @@ let rec shint_to_axhint :
     (left1, right1, left2, right2) shint_to_axhint_side ->
     a * a axhint =
   let open Lattices_mono in
-  fun (type r a) (r_obj : r obj) (r : r) (r_shint : (r, left1 * right1) S.hint)
-      (ax : (r, a) Axis.t) side ->
+  fun r_obj r r_shint ax side ->
     (* This function is for when we have a solver hint (aka "shint") for a product lattice and
        wish to project the hint to be for a single axis and convert it to a mode "axhint". *)
     let a_obj = proj_obj ax r_obj in
@@ -2141,9 +2135,7 @@ let rec shint_to_axhint :
     match r_shint with
     | Morph (morph_hint, morph, b_shint) -> (
       let b_obj = src r_obj morph in
-      let morph_inv : (r, _, left2 * right2) morph =
-        shint_to_axhint_side_fn side r_obj morph
-      in
+      let morph_inv = shint_to_axhint_side_fn side r_obj morph in
       let b = apply b_obj morph_inv r in
       match find_responsible_axis_prod morph ax with
       | NoneResponsible -> a, Empty
@@ -2181,17 +2173,13 @@ and single_axis_shint_to_axhint :
     (left1, right1, left2, right2) shint_to_axhint_side ->
     a * a axhint =
   let open Lattices_mono in
-  fun (type a left1 right1 left2 right2) (a_obj : a obj) (a : a)
-      (a_shint : (a, left1 * right1) S.hint)
-      (side : (left1, right1, left2, right2) shint_to_axhint_side) ->
+  fun a_obj a a_shint side ->
     (* This function is for when we have a solver hint (aka "shint") for a
        single axis and wish to convert it to a mode "axhint". *)
     match a_shint with
     | Morph (morph_hint, morph, b_shint) -> (
       let b_obj = src a_obj morph in
-      let morph_inv : (a, _, left2 * right2) morph =
-        shint_to_axhint_side_fn side a_obj morph
-      in
+      let morph_inv = shint_to_axhint_side_fn side a_obj morph in
       let b = apply b_obj morph_inv a in
       match find_responsible_axis_single morph with
       | NoneResponsible -> a, Empty
@@ -2217,8 +2205,7 @@ and single_axis_shint_to_axhint :
       in
       single_axis_shint_to_axhint a_obj chosen chosen_hint side
 
-let flip_axerror ({ left; left_hint; right; right_hint } : 'a axerror) :
-    'a axerror =
+let flip_axerror { left; left_hint; right; right_hint } =
   { left = right; left_hint = right_hint; right = left; right_hint = left_hint }
 
 (** Take a solver error for a product object, and an axis to project to, and
