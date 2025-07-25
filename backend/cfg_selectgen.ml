@@ -116,7 +116,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
         | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
         | Calloc (Heap, _) -> EC.none
-        | Calloc (External, _) -> EC.none
+        | Calloc (External, _) ->
+            Misc.fatal_error "Impossible, external allocations are Cextcalls"
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
         | Cbeginregion | Cendregion -> EC.arbitrary
