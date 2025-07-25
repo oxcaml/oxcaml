@@ -1,7 +1,7 @@
 (** Blocks with the continuation potentially not yet defined.
 
     For efficiency reasons, [body] will be inserted head-first,
-    so the instructions are in reverse. [archive_block] will
+    so the instructions are in reverse. [end_block_with_last_exn] will
     therefore reverse this before archiving. *)
 type partial_block =
   { params : Jsir.Var.t list;
@@ -10,7 +10,7 @@ type partial_block =
   }
 
 type t =
-  { archived_blocks : Jsir.block Jsir.Addr.Map.t;
+  { complete_blocks : Jsir.block Jsir.Addr.Map.t;
     current_blocks : partial_block list;
     next_addr : Jsir.Addr.t;
     reserved_addrs : Jsir.Addr.Set.t;
@@ -18,7 +18,7 @@ type t =
   }
 
 let create () =
-  { archived_blocks = Jsir.Addr.Map.empty;
+  { complete_blocks = Jsir.Addr.Map.empty;
     current_blocks = [];
     next_addr = Jsir.Addr.zero;
     reserved_addrs = Jsir.Addr.Set.empty;
@@ -78,11 +78,11 @@ let end_block_with_last_exn t last =
   let new_block : Jsir.block =
     { params; body = List.rev body; branch = last }
   in
-  let archived_blocks = Jsir.Addr.Map.add addr new_block t.archived_blocks in
-  { t with archived_blocks; current_blocks = rest_current_blocks }
+  let complete_blocks = Jsir.Addr.Map.add addr new_block t.complete_blocks in
+  { t with complete_blocks; current_blocks = rest_current_blocks }
 
 let to_program_exn
-    { archived_blocks;
+    { complete_blocks;
       current_blocks;
       next_addr = _;
       reserved_addrs;
@@ -97,8 +97,8 @@ let to_program_exn
     Misc.fatal_error
       "To_jsir_result.to_program_exn: expected all reserved addresses to be \
        used";
-  let free_pc = (Jsir.Addr.Map.max_binding archived_blocks |> fst) + 1 in
-  { Jsir.start = Jsir.Addr.zero; blocks = archived_blocks; free_pc }
+  let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
+  { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
 
 let invalid_switch_block t =
   match t.invalid_switch_block with
