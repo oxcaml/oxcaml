@@ -861,6 +861,8 @@ module Function_decls = struct
 
     let inline t = t.attr.inline
 
+    let expose t = t.attr.expose
+
     let specialise t = t.attr.specialise
 
     let poll_attribute t = t.attr.poll
