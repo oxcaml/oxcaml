@@ -2855,9 +2855,7 @@ module Comonadic_with (Areality : Areality) = struct
   the operation we were trying to do was [left <= right], then return an
   [axerror] in that axis, as well as the axis itself *)
   let axis_of_solver_error (err : Obj.const S.error) : error =
-    let left = err.left in
-    let right = err.right in
-    let (Axis_with_proj_pair (ax, _, _)) = axis_of_error left right in
+    let (Axis_with_proj_pair (ax, _, _)) = axis_of_error err.left err.right in
     Error (ax, Axerror.From_solver_error.solver_error_to_axerror Obj.obj ax err)
 
   (* unlike for a single axis object, the below submoding and equality functions
@@ -3450,8 +3448,7 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.meet mo in
     { comonadic; monadic }
 
-  let comonadic_to_monadic (type l r) ?(hint : (l * r) Hint.morph option)
-      (m : (l * r) Comonadic.t) : (r * l) Monadic.t =
+  let comonadic_to_monadic ?hint m =
     S.apply ?hint Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
 
   let monadic_to_comonadic_min m =
