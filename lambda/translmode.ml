@@ -35,8 +35,7 @@ let transl_alloc_mode_r mode =
   (* we only take the locality axis *)
   Alloc.proj_comonadic Areality mode |> transl_locality_mode_r
 
-let transl_alloc_mode (mode : Typedtree.alloc_mode) =
-  transl_alloc_mode_r mode.mode
+let transl_alloc_mode (mode : Typedtree.alloc_mode) = transl_alloc_mode_r mode
 
 let transl_modify_mode locality =
   match Locality.zap_to_floor locality with

@@ -70,7 +70,8 @@ let () = with_effect (fun k ->
 Line 2, characters 45-46:
 2 |   let closure @ local unyielding = fun () -> k () in
                                                  ^
-Error: The value "k" is yielding, so cannot be used inside a function that may not yield.
+Error: The value "k" is "yielding" but expected to be "unyielding"
+       because it is used inside a function which is "unyielding".
 |}]
 
 

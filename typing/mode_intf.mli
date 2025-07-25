@@ -70,6 +70,8 @@ type equate_step =
 module type Common = sig
   module Const : Lattice
 
+  type hint_const
+
   type error
 
   type equate_error = equate_step * error
@@ -116,7 +118,7 @@ module type Common = sig
 
   val print : ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
 
-  val of_const : Const.t -> ('l * 'r) t
+  val of_const : ?hint:hint_const -> Const.t -> ('l * 'r) t
 
   val zap_to_ceil : ('l * allowed) t -> Const.t
 
@@ -126,8 +128,19 @@ end
 module type Common_axis = sig
   module Const : Lattice
 
+  type 'd hint_morph constraint 'd = 'l * 'r
+
+  type hint_const
+
+  type 'a axerror
+
   include
-    Common with module Const := Const and type error = Const.t Solver.error
+    Common
+      with module Const := Const
+       and type hint_const := hint_const
+       and type error = Const.t axerror
+
+  val apply_hint : ('l * 'r) hint_morph -> ('l * 'r) t -> ('l * 'r) t
 end
 
 module type Axis = sig
@@ -149,14 +162,111 @@ end
 module type Common_product = sig
   module Axis : Axis
 
+  type 'd hint_morph constraint 'd = 'l * 'r
+
+  type hint_const
+
+  type 'a axerror
+
+  type lock_item
+
   module Const : Lattice_product with type 'a axis := 'a Axis.t
 
-  type error = Error : 'a Axis.t * 'a Solver.error -> error
+  type error = Error : 'a Axis.t * 'a axerror -> error
 
-  include Common with type error := error and module Const := Const
+  val report_error :
+    ?target:lock_item * Longident.t -> Format.formatter -> error -> unit
+
+  include
+    Common
+      with type hint_const := hint_const
+       and type error := error
+       and module Const := Const
+
+  val apply_hint : ('l * 'r) hint_morph -> ('l * 'r) t -> ('l * 'r) t
 end
 
 module type S = sig
+  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+
+  module Hint : sig
+    type const =
+      | None
+      | Result_of_lazy
+      | Lazy_closure
+      | Class
+      | Tailcall_function
+      | Tailcall_argument
+      | Mutable_read
+      | Mutable_write
+      | Forced_lazy_expression
+      | Is_function_return
+      | Stack_expression
+
+    (** A description of what type of item is being closed over *)
+    type lock_item =
+      | Value
+      | Module
+      | Class
+
+    val print_lock_item : Format.formatter -> lock_item -> unit
+
+    (** A description of what type of closure is closing a value *)
+    type closure_context =
+      | Function
+      | Functor
+      | Lazy
+
+    (** Details of an item being closed by a context *)
+    type closure_details =
+      { (* CR pdsouza: add a field, [closure_loc], here for the location of the closing context *)
+        closure_context : closure_context;
+        value_loc : Location.t;  (** Location of the value being closed over *)
+        value_lid : Longident.t;
+            (** Identifier for the value being closed over *)
+        value_item : lock_item
+            (** The item type of the value being closed over *)
+      }
+
+    type 'd morph =
+      | Debug : string -> (_ * _) morph
+      | None : (_ * _) morph
+          (** An empty morphism hint. The error reporter should terminate the
+            trace on seeing this. *)
+      | Skip : (_ * _) morph
+          (** An empty morphism hint, but telling the error reporter to continue the trace,
+            instead of terminating it there, as it would for [None]. *)
+      | Close_over : closure_details -> ('l * disallowed) morph
+      | Is_closed_by : closure_details -> (disallowed * 'r) morph
+      | Captured_by_partial_application : (disallowed * 'r) morph
+      | Adj_captured_by_partial_application : ('l * disallowed) morph
+      | Crossing_left : ('l * disallowed) morph
+      | Crossing_right : (disallowed * 'r) morph
+      | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
+          (** A composition of morphism hints. The *)
+      constraint 'd = _ * _
+    [@@ocaml.warning "-62"]
+
+    (* This is needed for the destructive substitutions in [Common_axis] for
+       the monadic axis modules, as we can't use [neg] within the substitution due
+       to type checker limitations *)
+    type 'd neg_morph = 'd neg morph constraint 'd = _ * _
+  end
+
+  (** Hints for the mode solvers. These are axis-specific hints that contain a trace
+      of the values in a single axis from an error. *)
+  type axhint
+
+  (** Errors for the mode solvers. These are axis-specific processed versions of
+      the errors returned by the solver, as the solver errors consider axis products.
+      The hints in this error type are [axhint] values. *)
+  type 'a axerror =
+    { left : 'a;
+      left_hint : axhint;
+      right : 'a;
+      right_hint : axhint
+    }
+
   type changes
 
   val undo_changes : changes -> unit
@@ -189,6 +299,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val global : lr
 
@@ -225,6 +338,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val global : lr
 
@@ -246,6 +362,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val many : lr
 
@@ -265,6 +384,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
   end
 
   module Uniqueness : sig
@@ -282,6 +404,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
+         and type 'd hint_morph := 'd Hint.neg_morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val aliased : lr
 
@@ -304,6 +429,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
+         and type 'd hint_morph := 'd Hint.neg_morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
   end
 
   module Yielding : sig
@@ -319,6 +447,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val yielding : lr
 
@@ -339,6 +470,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val stateless : lr
 
@@ -363,6 +497,9 @@ module type S = sig
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
+         and type 'd hint_morph := 'd Hint.neg_morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
 
     val immutable : lr
 
@@ -406,13 +543,17 @@ module type S = sig
   end
 
   module type Mode := sig
-    module Areality : Common
+    module Areality : Common with type hint_const := Hint.const
 
     module Monadic : sig
       include
         Common_product
           with type Const.t = monadic
            and type 'a Axis.t = (monadic, 'a) Axis.t
+           and type 'd hint_morph := 'd Hint.neg_morph
+           and type hint_const := Hint.const
+           and type 'a axerror := 'a axerror
+           and type lock_item := Hint.lock_item
 
       module Const_op : Lattice with type t = Const.t
     end
@@ -421,6 +562,10 @@ module type S = sig
       Common_product
         with type Const.t = Areality.Const.t comonadic_with
          and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
+         and type 'd hint_morph := 'd Hint.morph
+         and type hint_const := Hint.const
+         and type 'a axerror := 'a axerror
+         and type lock_item := Hint.lock_item
 
     module Axis : sig
       (** Represents a mode axis in this product whose constant is ['a], and whose
@@ -504,13 +649,17 @@ module type S = sig
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
 
-    type error = Error : 'a Axis.t * 'a Solver.error -> error
+    type error = Error : 'a Axis.t * 'a axerror -> error
+
+    val report_error :
+      ?target:Hint.lock_item * Longident.t -> Format.formatter -> error -> unit
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
     include
       Common
         with module Const := Const
+         and type hint_const := Hint.const
          and type error := error
          and type 'd t := 'd t
 
@@ -524,7 +673,11 @@ module type S = sig
 
     val proj_monadic : 'a Monadic.Axis.t -> ('l * 'r) t -> ('a, 'r * 'l) mode
 
-    val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
+    val meet_const :
+      ?hint:('l * 'r) Hint.morph ->
+      Comonadic.Const.t ->
+      ('l * 'r) t ->
+      ('l * 'r) t
 
     val join_const : Monadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
 
@@ -536,13 +689,24 @@ module type S = sig
     val min_with_comonadic :
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
-    val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val meet_with :
+      ?hint:('l0 * 'r0) Hint.morph ->
+      'a Comonadic.Axis.t ->
+      'a ->
+      ('l0 * 'r0) t ->
+      ('l0 * 'r0) t
 
-    val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val join_with :
+      ?hint:('r * 'l) Hint.morph ->
+      'a Monadic.Axis.t ->
+      'a ->
+      ('l * 'r) t ->
+      ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
-    val comonadic_to_monadic : ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+    val comonadic_to_monadic :
+      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
 
     (* The following two are about the scenario where we partially apply a
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the
@@ -555,6 +719,12 @@ module type S = sig
 
     (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C] *)
     val partial_apply : (allowed * 'r) t -> l
+
+    val apply_hint :
+      comonadic:('l * 'r) Hint.morph ->
+      monadic:('r * 'l) Hint.morph ->
+      ('l * 'r) t ->
+      ('l * 'r) t
   end
 
   (** The most general mode. Used in most type checking,
@@ -577,25 +747,32 @@ module type S = sig
   end
 
   (** Converts regional to local, identity otherwise *)
-  val regional_to_local : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
+  val regional_to_local :
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Inject locality into regionality *)
   val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
 
   (** Converts regional to global, identity otherwise *)
-  val regional_to_global : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
+  val regional_to_global :
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
-  val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
+  val alloc_to_value_l2r :
+    hint:('l * disallowed) Hint.morph ->
+    ('l * 'r) Alloc.t ->
+    ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2l :
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
-  val value_to_alloc_r2g : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2g :
+    hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   module Modality : sig
     type 'a raw =
@@ -621,7 +798,7 @@ module type S = sig
     module Value : sig
       type atom := t
 
-      type error = Error : 'a Value.Axis.t * 'a raw Solver.error -> error
+      type error = Error : 'a Value.Axis.t * 'a raw axerror -> error
 
       type nonrec equate_error = equate_step * error
 

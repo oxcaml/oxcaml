@@ -38,6 +38,7 @@ let u =
         ()
     in
     portable_use foo
+(* Note, "Line 7" is relative to this test case, but "Line 15" is referring to [foo] in the previous test block *)
 [%%expect{|
 Line 10, characters 17-20:
 10 |     portable_use foo
@@ -174,7 +175,8 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
-Error: The value "N.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N.foo" is "nonportable" but expected to be "portable"
+       because it is used inside a function which is "portable".
 |}]
 
 let (bar @ portable) () =
@@ -184,7 +186,8 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
-Error: The value "M.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M.foo" is "nonportable" but expected to be "portable"
+       because it is used inside a function which is "portable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -207,7 +210,8 @@ let (bar @ portable) () =
 Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
-Error: The value "N'.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N'.foo" is "nonportable" but expected to be "portable"
+       because it is used inside a function which is "portable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -220,7 +224,8 @@ let (bar @ portable) () =
 Line 3, characters 19-20:
 3 |         module L = M
                        ^
-Error: The module "M" is nonportable, so cannot be used inside a function that is portable.
+Error: The module "M" is "nonportable" but expected to be "portable"
+       because it is used inside a function which is "portable".
 |}]
 
 module F (X : S @ portable) = struct
@@ -374,7 +379,8 @@ val foo : unit -> unit = <fun>
 Line 4, characters 14-17:
 4 |     let bar = foo
                   ^^^
-Error: The value "foo" is nonportable, so cannot be used inside a functor that is portable.
+Error: The value "foo" is "nonportable" but expected to be "portable"
+       because it is used inside a functor which is "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct
