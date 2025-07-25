@@ -1,0 +1,7 @@
+=== Testing records with nativeint# fields ===
+Record with nativeint# fields:
+4660
+22136
+39612
+Setting nativeint# field to 0xDEF0:
+57072

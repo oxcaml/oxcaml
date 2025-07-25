@@ -1,0 +1,41 @@
+=== Testing tuples ===
+Tuple (42, 100):
+85
+201
+Tuple (1, 2, 3):
+3
+5
+7
+
+=== Testing variants ===
+B 42:
+85
+C (10, 20):
+21
+41
+D (100, 200, 300):
+201
+401
+601
+
+=== Testing immutable records ===
+Record { x = 11; y = 22; z = 33 }:
+23
+45
+67
+
+=== Testing mutable records ===
+Initial record { a = 111; b = 222; c = 333; d = 444 }:
+223
+445
+667
+889
+Setting field 0 to 999:
+999
+r.a = 499
+Setting field 1 to 888:
+888
+r.b = 444
+Setting field 3 to 777:
+777
+r.d = 388
