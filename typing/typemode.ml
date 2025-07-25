@@ -580,7 +580,9 @@ let transl_modalities ~maturity mut modalities =
     mut_modalities modalities
 
 let let_mutable_modalities m0 =
-  mutable_implied_modalities (Mutable m0) ~for_mutable_variable:true
+  mutable_implied_modalities
+    (Mutable { mode = m0; atomic = Nonatomic })
+    ~for_mutable_variable:true
 
 let untransl_modalities mut t =
   t
