@@ -2043,15 +2043,15 @@ terminated with an [Empty] or [Const] axhint *)
       | Regional_to_global | Global_to_regional ->
         SourceIsSingle
 
-    (** This function is similar to [find_responsible_axis_single] but assumes that the
-output object of the morphism is a product object. *)
+    (** This function is similar to [find_responsible_axis_single] but the
+        output object of the morphism must be a product object, as proved by
+        the axis value provided. *)
     and find_responsible_axis_prod :
         type a b b_ax l r.
         (a, b, l * r) C.morph -> (b, b_ax) Axis.t -> a responsible_axis =
       (* CR pdsouza: should add a new parameter, something like "b" and/or "b_ax", so
          that we can return NoneResponsible for certain cases of [Meet_with] and [Imply] *)
       let open Lattices_mono in
-      (* fun (type a b b_ax l r) (m : (a, b, l * r) morph) (ax : (b, b_ax) Axis.t) -> *)
       fun m ax ->
         let handle_monadic_to_comonadic (type x y)
             (ax : (x comonadic_with, y) Axis.t) =
@@ -2074,6 +2074,8 @@ output object of the morphism is a product object. *)
         | Meet_with _, ax -> Axis ax
         | Imply _, ax -> Axis ax
         | Map_comonadic _, ax -> (
+          (* The [Map_comonadic] morphism applies a morphsim to the areality axis and
+             the result is put back into the areality axis. See [Lattices_mono.apply] *)
           match ax with
           | Areality -> Axis Areality
           | Yielding -> Axis Yielding
@@ -2103,15 +2105,15 @@ output object of the morphism is a product object. *)
         | Global_to_regional, _ ->
           .
 
-    (** Container for an adjoint function. We use a special record type instead of inlining
-the type so that we can have universal quantification over the input object types. *)
-    type ('l1, 'r1, 'l2, 'r2) shint_to_axhint_side =
-      | LeftAdjoint : (_, allowed, allowed, disallowed) shint_to_axhint_side
-      | RightAdjoint : (allowed, _, disallowed, allowed) shint_to_axhint_side
+    (** Container and type description for an adjoint function. Helps with typing
+        of the following functions *)
+    type ('l1, 'r1, 'l2, 'r2) conv_side =
+      | LeftAdjoint : (_, allowed, allowed, disallowed) conv_side
+      | RightAdjoint : (allowed, _, disallowed, allowed) conv_side
 
     let shint_to_axhint_side_fn :
         type a b l1 l2 r1 r2.
-        (l1, r1, l2, r2) shint_to_axhint_side ->
+        (l1, r1, l2, r2) conv_side ->
         b C.obj ->
         (a, b, l1 * r1) C.morph ->
         (b, a, l2 * r2) C.morph = function
@@ -2120,7 +2122,7 @@ the type so that we can have universal quantification over the input object type
 
     let shint_to_axhint_side_le :
         type a l1 l2 r1 r2.
-        (l1, r1, l2, r2) shint_to_axhint_side -> a C.obj -> a -> a -> bool =
+        (l1, r1, l2, r2) conv_side -> a C.obj -> a -> a -> bool =
      fun side a_obj x y ->
       match side with
       | LeftAdjoint -> C.le a_obj x y
@@ -2132,7 +2134,7 @@ the type so that we can have universal quantification over the input object type
         r ->
         (r, left1 * right1) S.hint ->
         (r, a) Axis.t ->
-        (left1, right1, left2, right2) shint_to_axhint_side ->
+        (left1, right1, left2, right2) conv_side ->
         a * axhint =
       let open Lattices_mono in
       fun r_obj r r_shint ax side ->
@@ -2178,7 +2180,7 @@ the type so that we can have universal quantification over the input object type
         a Lattices_mono.obj ->
         a ->
         (a, left1 * right1) S.hint ->
-        (left1, right1, left2, right2) shint_to_axhint_side ->
+        (left1, right1, left2, right2) conv_side ->
         a * axhint =
       let open Lattices_mono in
       fun a_obj a a_shint side ->
