@@ -2147,8 +2147,7 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
       match (mode : Cmm.Alloc_mode.t) with
       | Local -> local_block_header ~block_kind tag wordsize
       | Heap -> block_header ~block_kind tag wordsize
-      | External ->
-        Misc.fatal_error "Impossible, externals are allocated with Cextcall"
+      | External -> Misc.fatal_error "Impossible, mode is not External"
     in
     Cop (Calloc (mode, alloc_block_kind), Cconst_natint (hdr, dbg) :: args, dbg)
   else
