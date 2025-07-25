@@ -9,5 +9,5 @@
 
 (* Interface *)
 module type S = sig
-  val concat : Stdlib.Option.?'sep:string -> string list -> string
+  val concat : (?sep):string or_null -> string list -> string
 end

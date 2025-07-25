@@ -4,19 +4,19 @@
 
 (* Interface *)
 module type S = sig
-val concat : Stdlib.Option.?'sep:string -> string list -> string
+val concat : (?sep):string option -> string list -> string
 
-val concat_2 : Stdlib.Or_null.?'sep:string -> string list -> string
+val concat_2 : (?sep):string or_null -> string list -> string
 end
 
 (* Implementation *)
 module M : S = struct
-let concat Stdlib.Option.?'(sep : string = " ") xs =
+let concat (?(sep = " ") : string option) xs =
   String.concat sep xs
-let concat_2 Stdlib.Or_null.?'(sep : string = " ") xs =
+let concat_2 (?(sep = " ") : string or_null) xs =
   String.concat sep xs
 
-let concat_3 Stdlib.Or_null.?'(sep : string or_null) xs =
+let concat_3 (?sep : string or_null) xs =
   String.concat (
     match sep with
     | Null -> " "
@@ -27,12 +27,12 @@ end
 (* Usage *)
 let default_concat ys = M.concat ys
 let comma_concat zs = M.concat ~sep:"," zs
-let chain_call Stdlib.Option.?'(sep : string option) arg =
+let chain_call (?sep : string option) arg =
   (* CR generic-optional : also need to parse without the Module_name. prefix *)
-  M.concat Stdlib.Option.?'sep arg
+  M.concat ?sep arg
 
-let chain_call_2 Stdlib.Option.?'(sep) arg =
-  M.concat_2 Stdlib.Or_null.?'sep:(
+let chain_call_2 ?sep arg =
+  M.concat_2 ?sep:(
     match sep with
     | None -> Null
     | Some x -> This x
