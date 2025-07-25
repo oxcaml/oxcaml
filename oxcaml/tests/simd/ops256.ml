@@ -2,23 +2,21 @@
 
 open Utils256
 
-let word0_32 = int32x8_fourth_int64
+let word0_32 = int32x8_first_int64
 
-let word1_32 = int32x8_third_int64
+let word1_32 = int32x8_second_int64
 
-let word2_32 = int32x8_second_int64
+let word2_32 = int32x8_third_int64
 
-let word3_32 = int32x8_first_int64
+let word3_32 = int32x8_fourth_int64
 
-let make64 a b c d = int64x4_of_int64s d c b a
+let word0 = int64x4_first_int64
 
-let word0 = int64x4_fourth_int64
+let word1 = int64x4_second_int64
 
-let word1 = int64x4_third_int64
+let word2 = int64x4_third_int64
 
-let word2 = int64x4_second_int64
-
-let word3 = int64x4_first_int64
+let word3 = int64x4_fourth_int64
 
 let check_binop scalar vector i0 i1 =
   (failmsg := fun () -> Printf.printf "%016Lx | %016Lx\n%!" i0 i1);
@@ -56,16 +54,14 @@ module AVX_Util = struct
     let _00110000 = Int32s.to_int32x8 0l 0l 1l 1l 0l 0l 0l 0l in
     let _11000000 = Int32s.to_int32x8 1l 1l 0l 0l 0l 0l 0l 0l in
     let _00001100 = Int32s.to_int32x8 0l 0l 0l 0l 1l 1l 0l 0l in
-    let _01010101 = Int32s.to_int32x8 0l 1l 0l 1l 0l 1l 0l 1l in
-    let _10101010 = Int32s.to_int32x8 1l 0l 1l 0l 1l 0l 1l 0l in
-    let res = interleave_high_32 _00110000 _00000011 in
+    let res = interleave_high_32 _00000011 _00110000 in
     eq4 (word0_32 res) (word1_32 res) (word2_32 res) (word3_32 res)
-      (word0_32 _10101010) (word1_32 _10101010) (word2_32 _01010101)
-      (word3_32 _01010101);
+      (Int32s.to_int64 0l 1l) (Int32s.to_int64 0l 1l) (Int32s.to_int64 1l 0l)
+      (Int32s.to_int64 1l 0l);
     let res = interleave_low_32 _11000000 _00001100 in
     eq4 (word0_32 res) (word1_32 res) (word2_32 res) (word3_32 res)
-      (word0_32 _10101010) (word1_32 _10101010) (word2_32 _01010101)
-      (word3_32 _01010101)
+      (Int32s.to_int64 1l 0l) (Int32s.to_int64 1l 0l) (Int32s.to_int64 0l 1l)
+      (Int32s.to_int64 0l 1l)
 
   let () =
     (failmsg := fun () -> Printf.printf "shuffle_32");
@@ -89,23 +85,24 @@ module AVX_Util = struct
   let () =
     (failmsg := fun () -> Printf.printf "movemask_64");
     let v0 =
-      make64 0xffffffffffffffffL 0x8000000000000000L 0x7fffffffffffffffL 0x0L
+      int64x4_of_int64s 0x0L 0x7fffffffffffffffL 0x8000000000000000L
+        0xffffffffffffffffL
     in
     let i0 = movemask_64 v0 in
-    eqi i0 0 0b0011 0;
+    eqi i0 0 0b1100 0;
     ()
 
   let () =
     (failmsg := fun () -> Printf.printf "movemask_32");
     let v0 =
-      Int32s.to_int32x8 (-1l) 1l 2l 0x80000000l (-1l) 1l 2l 0x80000000l
+      Int32s.to_int32x8 (-1l) 1l 2l Int32.min_int (-1l) 1l 2l Int32.min_int
     in
     let i0 = movemask_32 v0 in
     eqi i0 0 0b10011001 0
 
   let () =
     (failmsg := fun () -> Printf.printf "shuffle_64");
-    let _1234 = make64 1L 2L 3L 4L in
+    let _1234 = int64x4_of_int64s 1L 2L 3L 4L in
     let v0 = shuffle_64 0b0000 _1234 _1234 in
     let v1 = shuffle_64 0b0101 _1234 _1234 in
     let v2 = shuffle_64 0b1010 _1234 _1234 in
@@ -118,8 +115,8 @@ module AVX_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "interleave_64");
-    let v0 = make64 0L 1L 2L 3L in
-    let v1 = make64 4L 5L 6L 7L in
+    let v0 = int64x4_of_int64s 0L 1L 2L 3L in
+    let v1 = int64x4_of_int64s 4L 5L 6L 7L in
     let i0 = interleave_high_64 v0 v1 in
     let i1 = interleave_low_64 v0 v1 in
     eq4 (word0 i0) (word1 i0) (word2 i0) (word3 i0) 1L 5L 3L 7L;
@@ -127,7 +124,7 @@ module AVX_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "dup_64");
-    let v0 = make64 1L 2L 3L 4L in
+    let v0 = int64x4_of_int64s 1L 2L 3L 4L in
     let d0 = dup_even_64 v0 in
     eq4 (word0 d0) (word1 d0) (word2 d0) (word3 d0) 1L 1L 3L 3L;
     let v0 = Int32s.to_int32x8 0l 1l 2l 3l 4l 5l 6l 7l in
@@ -142,8 +139,8 @@ module AVX_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "blend_64");
-    let v0 = make64 0L 1L 2L 3L in
-    let v1 = make64 4L 5L 6L 7L in
+    let v0 = int64x4_of_int64s 0L 1L 2L 3L in
+    let v1 = int64x4_of_int64s 4L 5L 6L 7L in
     let b0 = blend_64 0b0000 v0 v1 in
     let b1 = blend_64 0b0101 v0 v1 in
     let b2 = blend_64 0b1010 v0 v1 in
@@ -179,8 +176,8 @@ module AVX_Util = struct
   let () =
     (failmsg := fun () -> Printf.printf "extract/insert_128");
     let v256 =
-      make64 0x0123456789abcdefL 0xfedcba9876543210L 0x1111222233334444L
-        0x5555666677778888L
+      int64x4_of_int64s 0x0123456789abcdefL 0xfedcba9876543210L
+        0x1111222233334444L 0x5555666677778888L
     in
     let low = extract_128 0 v256 in
     let high = extract_128 1 v256 in
@@ -199,22 +196,24 @@ module AVX_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "permute2_128");
-    let v0 = make64 0L 1L 2L 3L in
-    let v1 = make64 4L 5L 6L 7L in
+    let v0 = int64x4_of_int64s 0L 1L 2L 3L in
+    let v1 = int64x4_of_int64s 4L 5L 6L 7L in
     let p0 = permute2_128 0b00000000 v0 v1 in
     let p1 = permute2_128 0b00110001 v0 v1 in
     let p2 = permute2_128 0b00100000 v0 v1 in
     let p3 = permute2_128 0b00010011 v0 v1 in
+    let p4 = permute2_128 0b10000000 v0 v1 in
     eq4 (word0 p0) (word1 p0) (word2 p0) (word3 p0) 0L 1L 0L 1L;
     eq4 (word0 p1) (word1 p1) (word2 p1) (word3 p1) 2L 3L 6L 7L;
     eq4 (word0 p2) (word1 p2) (word2 p2) (word3 p2) 0L 1L 4L 5L;
-    eq4 (word0 p3) (word1 p3) (word2 p3) (word3 p3) 6L 7L 2L 3L
+    eq4 (word0 p3) (word1 p3) (word2 p3) (word3 p3) 6L 7L 2L 3L;
+    eq4 (word0 p4) (word1 p4) (word2 p4) (word3 p4) 0L 1L 0L 0L
 
   let () =
     (failmsg := fun () -> Printf.printf "vzeroall/vzeroupper");
     let vec256 =
-      make64 0x1122334455667788L 0x99aabbccddeeff00L 0xfedcba9876543210L
-        0x0123456789abcdefL
+      int64x4_of_int64s 0x1122334455667788L 0x99aabbccddeeff00L
+        0xfedcba9876543210L 0x0123456789abcdefL
     in
     let vec128 = int64x2_of_int64s 0xaaaaaaaabbbbbbbbL 0xccccccccddddddddL in
     let f32 = 1.25s in
@@ -250,7 +249,8 @@ module AVX2_Util = struct
         0x0 0x1 0xcc 0x33 0x55
     in
     let i0 = movemask_8 v0 in
-    eqi i0 0 0b100101001001010010010100100101 0
+    (* Read bits right-to-left *)
+    eqi i0 0 0b00100101_00100101_00100101_00100101 0
 
   let () =
     (failmsg := fun () -> Printf.printf "shift_left_bytes");
@@ -261,8 +261,8 @@ module AVX2_Util = struct
     in
     let v1 = shift_left_bytes 1 v0 in
     eq4 (int8x32_first_int64 v1) (int8x32_second_int64 v1)
-      (int8x32_third_int64 v1) (int8x32_fourth_int64 v1) 0x060504030201000fL
-      0x0e0d0c0b0a090800L 0x161514131211101fL 0x1e1d1c1b1a191800L;
+      (int8x32_third_int64 v1) (int8x32_fourth_int64 v1) 0x0605040302010000L
+      0x0e0d0c0b0a090807L 0x1615141312111000L 0x1e1d1c1b1a191817L;
     ()
 
   let () =
@@ -274,8 +274,8 @@ module AVX2_Util = struct
     in
     let v2 = shift_right_bytes 1 v0 in
     eq4 (int8x32_first_int64 v2) (int8x32_second_int64 v2)
-      (int8x32_third_int64 v2) (int8x32_fourth_int64 v2) 0x0007060504030201L
-      0x000f0e0d0c0b0a09L 0x0017161514131211L 0x101f1e1d1c1b1a19L
+      (int8x32_third_int64 v2) (int8x32_fourth_int64 v2) 0x0807060504030201L
+      0x000f0e0d0c0b0a09L 0x1817161514131211L 0x001f1e1d1c1b1a19L
 
   let () =
     (failmsg := fun () -> Printf.printf "shuffle_16");
@@ -284,22 +284,6 @@ module AVX2_Util = struct
     let s1 = shuffle_high_16 0b01010101 v0 in
     let s2 = shuffle_high_16 0b10101010 v0 in
     let s3 = shuffle_high_16 0b11111111 v0 in
-    eq4 (int16x16_first_int64 s0) (int16x16_second_int64 s0)
-      (int16x16_third_int64 s0) (int16x16_fourth_int64 s0) 0x0001000100010001L
-      0x0008000700060005L 0x0009000900090009L 0x0010000f000e000dL;
-    eq4 (int16x16_first_int64 s1) (int16x16_second_int64 s1)
-      (int16x16_third_int64 s1) (int16x16_fourth_int64 s1) 0x0002000200020002L
-      0x0008000700060005L 0x000a000a000a000aL 0x0010000f000e000dL;
-    eq4 (int16x16_first_int64 s2) (int16x16_second_int64 s2)
-      (int16x16_third_int64 s2) (int16x16_fourth_int64 s2) 0x0003000300030003L
-      0x0008000700060005L 0x000b000b000b000bL 0x0010000f000e000dL;
-    eq4 (int16x16_first_int64 s3) (int16x16_second_int64 s3)
-      (int16x16_third_int64 s3) (int16x16_fourth_int64 s3) 0x0004000400040004L
-      0x0008000700060005L 0x000c000c000c000cL 0x0010000f000e000dL;
-    let s0 = shuffle_low_16 0 v0 in
-    let s1 = shuffle_low_16 0b01010101 v0 in
-    let s2 = shuffle_low_16 0b10101010 v0 in
-    let s3 = shuffle_low_16 0b11111111 v0 in
     eq4 (int16x16_first_int64 s0) (int16x16_second_int64 s0)
       (int16x16_third_int64 s0) (int16x16_fourth_int64 s0) 0x0004000300020001L
       0x0005000500050005L 0x000c000b000a0009L 0x000d000d000d000dL;
@@ -311,7 +295,23 @@ module AVX2_Util = struct
       0x0007000700070007L 0x000c000b000a0009L 0x000f000f000f000fL;
     eq4 (int16x16_first_int64 s3) (int16x16_second_int64 s3)
       (int16x16_third_int64 s3) (int16x16_fourth_int64 s3) 0x0004000300020001L
-      0x0008000800080008L 0x000c000b000a0009L 0x0010001000100010L
+      0x0008000800080008L 0x000c000b000a0009L 0x0010001000100010L;
+    let s0 = shuffle_low_16 0 v0 in
+    let s1 = shuffle_low_16 0b01010101 v0 in
+    let s2 = shuffle_low_16 0b10101010 v0 in
+    let s3 = shuffle_low_16 0b11111111 v0 in
+    eq4 (int16x16_first_int64 s0) (int16x16_second_int64 s0)
+      (int16x16_third_int64 s0) (int16x16_fourth_int64 s0) 0x0001000100010001L
+      0x0008000700060005L 0x0009000900090009L 0x0010000f000e000dL;
+    eq4 (int16x16_first_int64 s1) (int16x16_second_int64 s1)
+      (int16x16_third_int64 s1) (int16x16_fourth_int64 s1) 0x0002000200020002L
+      0x0008000700060005L 0x000a000a000a000aL 0x0010000f000e000dL;
+    eq4 (int16x16_first_int64 s2) (int16x16_second_int64 s2)
+      (int16x16_third_int64 s2) (int16x16_fourth_int64 s2) 0x0003000300030003L
+      0x0008000700060005L 0x000b000b000b000bL 0x0010000f000e000dL;
+    eq4 (int16x16_first_int64 s3) (int16x16_second_int64 s3)
+      (int16x16_third_int64 s3) (int16x16_fourth_int64 s3) 0x0004000400040004L
+      0x0008000700060005L 0x000c000c000c000cL 0x0010000f000e000dL
 
   let () =
     (failmsg := fun () -> Printf.printf "interleave_8");
@@ -327,11 +327,11 @@ module AVX2_Util = struct
     let i0 = interleave_high_8 v0 v1 in
     let i1 = interleave_low_8 v0 v1 in
     eq4 (int8x32_first_int64 i0) (int8x32_second_int64 i0)
-      (int8x32_third_int64 i0) (int8x32_fourth_int64 i0) 0x2707260625052404L
-      0x2303220221012000L 0x3717361635153414L 0x3313321231113010L;
+      (int8x32_third_int64 i0) (int8x32_fourth_int64 i0) 0x2b0b2a0a29092808L
+      0x2f0f2e0e2d0d2c0cL 0x3b1b3a1a39193818L 0x3f1f3e1e3d1d3c1cL;
     eq4 (int8x32_first_int64 i1) (int8x32_second_int64 i1)
-      (int8x32_third_int64 i1) (int8x32_fourth_int64 i1) 0x2f0f2e0e2d0d2c0cL
-      0x2b0b2a0a29092808L 0x3f1f3e1e3d1d3c1cL 0x3b1b3a1a39193818L;
+      (int8x32_third_int64 i1) (int8x32_fourth_int64 i1) 0x2303220221012000L
+      0x2707260625052404L 0x3313321231113010L 0x3717361635153414L;
     ()
 
   let () =
@@ -344,13 +344,11 @@ module AVX2_Util = struct
     let i0 = interleave_high_16 v0 v1 in
     let i1 = interleave_low_16 v0 v1 in
     eq4 (int16x16_first_int64 i0) (int16x16_second_int64 i0)
-      (int16x16_third_int64 i0) (int16x16_fourth_int64 i0)
-      0x0013_0003_0012_0002L 0x0011_0001_0010_0000L 0x001b_000b_001a_000aL
-      0x0019_0009_0018_0008L;
+      (int16x16_third_int64 i0) (int16x16_fourth_int64 i0) 0x0015000500140004L
+      0x0017000700160006L 0x001d000d001c000cL 0x001f000f001e000eL;
     eq4 (int16x16_first_int64 i1) (int16x16_second_int64 i1)
-      (int16x16_third_int64 i1) (int16x16_fourth_int64 i1)
-      0x0017_0007_0016_0006L 0x0015_0005_0014_0004L 0x001f_000f_001e_000eL
-      0x001d_000d_001c_000cL;
+      (int16x16_third_int64 i1) (int16x16_fourth_int64 i1) 0x0011000100100000L
+      0x0013000300120002L 0x0019000900180008L 0x001b000b001a000aL;
     ()
 
   let () =
@@ -363,18 +361,18 @@ module AVX2_Util = struct
     let b1 = blend_16 0b01010101 v0 v1 in
     let b2 = blend_16 0b10101010 v0 v1 in
     let b3 = blend_16 0b11111111 v0 v1 in
-    eq4 (int16x16_first_int64 b0) (int16x16_second_int64 b0)
-      (int16x16_third_int64 b0) (int16x16_fourth_int64 b0) 0x0003000200010000L
-      0x0007000600050004L 0x000b000a00090008L 0x000f000e000d000cL;
-    eq4 (int16x16_first_int64 b1) (int16x16_second_int64 b1)
-      (int16x16_third_int64 b1) (int16x16_fourth_int64 b1) 0x0003001200010010L
-      0x0007001600050014L 0x000b001a00090018L 0x000f001e000d001cL;
-    eq4 (int16x16_first_int64 b2) (int16x16_second_int64 b2)
-      (int16x16_third_int64 b2) (int16x16_fourth_int64 b2) 0x0013000200110000L
-      0x0017000600150004L 0x001b000a00190008L 0x001f000e001d000cL;
-    eq4 (int16x16_first_int64 b3) (int16x16_second_int64 b3)
-      (int16x16_third_int64 b3) (int16x16_fourth_int64 b3) 0x0013001200110010L
-      0x0017001600150014L 0x001b001a00190018L 0x001f001e001d001cL
+    eq4 (int16x16_fourth_int64 b0) (int16x16_third_int64 b0)
+      (int16x16_second_int64 b0) (int16x16_first_int64 b0) 0x000f000e000d000cL
+      0x000b000a00090008L 0x0007000600050004L 0x0003000200010000L;
+    eq4 (int16x16_fourth_int64 b1) (int16x16_third_int64 b1)
+      (int16x16_second_int64 b1) (int16x16_first_int64 b1) 0x000f001e000d001cL
+      0x000b001a00090018L 0x0007001600050014L 0x0003001200010010L;
+    eq4 (int16x16_fourth_int64 b2) (int16x16_third_int64 b2)
+      (int16x16_second_int64 b2) (int16x16_first_int64 b2) 0x001f000e001d000cL
+      0x001b000a00190008L 0x0017000600150004L 0x0013000200110000L;
+    eq4 (int16x16_fourth_int64 b3) (int16x16_third_int64 b3)
+      (int16x16_second_int64 b3) (int16x16_first_int64 b3) 0x001f001e001d001cL
+      0x001b001a00190018L 0x0017001600150014L 0x0013001200110010L
 
   let () =
     (failmsg := fun () -> Printf.printf "broadcast 8/16");
@@ -410,7 +408,7 @@ module AVX2_Util = struct
 
   let () =
     (failmsg := fun () -> Printf.printf "permute_64");
-    let v0 = make64 0L 1L 2L 3L in
+    let v0 = int64x4_of_int64s 0L 1L 2L 3L in
     let p0 = permute_64 0b00000000 v0 in
     let p1 = permute_64 0b01010101 v0 in
     let p2 = permute_64 0b10101010 v0 in

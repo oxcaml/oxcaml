@@ -203,12 +203,12 @@ let should_use_linscan fd =
 let if_emit_do f x = if should_emit () then f x else ()
 
 let emit_begin_assembly ~sourcefile unix =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~sourcefile
   else if_emit_do (fun () -> Emit.begin_assembly unix) ()
 
 let emit_end_assembly ~sourcefile () =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
   else
     if_emit_do
@@ -220,12 +220,10 @@ let emit_end_assembly ~sourcefile () =
       ()
 
 let emit_data dl =
-  if !Oxcaml_flags.llvm_backend
-  then Llvmize.data dl
-  else if_emit_do Emit.data dl
+  if !Clflags.llvm_backend then Llvmize.data dl else if_emit_do Emit.data dl
 
 let emit_fundecl f =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
@@ -459,7 +457,7 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
        ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-         if !Oxcaml_flags.llvm_backend
+         if !Clflags.llvm_backend
          then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
          else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
@@ -523,23 +521,23 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
-  if !Oxcaml_flags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
+  if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
   let open_asm_file () =
     if create_asm
     then
-      if !Oxcaml_flags.llvm_backend
+      if !Clflags.llvm_backend
       then Llvmize.open_out ~asm_filename
       else Emitaux.output_channel := open_out asm_filename
   in
   let close_asm_file () =
     if create_asm
     then
-      if !Oxcaml_flags.llvm_backend
+      if !Clflags.llvm_backend
       then Llvmize.close_out ()
       else close_out !Emitaux.output_channel
   in
   let assemble_file () =
-    if !Oxcaml_flags.llvm_backend
+    if !Clflags.llvm_backend
     then Llvmize.assemble_file ~asm_filename ~obj_filename
     else if not (should_emit ())
     then 0

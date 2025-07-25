@@ -44,6 +44,8 @@ module Const_data = struct
     | Tagged_immediate of Targetint_31_63.t
     | Naked_float32 of Numeric_types.Float32_by_bit_pattern.t
     | Naked_float of Numeric_types.Float_by_bit_pattern.t
+    | Naked_int8 of Numeric_types.Int8.t
+    | Naked_int16 of Numeric_types.Int16.t
     | Naked_int32 of Int32.t
     | Naked_int64 of Int64.t
     | Naked_nativeint of Targetint_32_64.t
@@ -78,6 +80,18 @@ module Const_data = struct
         Format.fprintf ppf "%t#%a%t"
           Flambda_colours.naked_number
           Numeric_types.Float_by_bit_pattern.print f
+          Flambda_colours.pop
+      | Naked_int8 n ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Int8.print
+          n
+          Flambda_colours.pop
+      | Naked_int16 n ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Int16.print
+          n
           Flambda_colours.pop
       | Naked_int32 n ->
         Format.fprintf ppf "%t#%ldl%t"
@@ -123,6 +137,8 @@ module Const_data = struct
         Numeric_types.Float32_by_bit_pattern.compare f1 f2
       | Naked_float f1, Naked_float f2 ->
         Numeric_types.Float_by_bit_pattern.compare f1 f2
+      | Naked_int8 n1, Naked_int8 n2 -> Numeric_types.Int8.compare n1 n2
+      | Naked_int16 n1, Naked_int16 n2 -> Numeric_types.Int16.compare n1 n2
       | Naked_int32 n1, Naked_int32 n2 -> Int32.compare n1 n2
       | Naked_int64 n1, Naked_int64 n2 -> Int64.compare n1 n2
       | Naked_nativeint n1, Naked_nativeint n2 -> Targetint_32_64.compare n1 n2
@@ -141,18 +157,22 @@ module Const_data = struct
       | _, Naked_float _ -> 1
       | Naked_float32 _, _ -> -1
       | _, Naked_float32 _ -> 1
+      | Naked_int8 _, _ -> -1
+      | _, Naked_int8 _ -> 1
+      | Naked_int16 _, _ -> -1
+      | _, Naked_int16 _ -> 1
       | Naked_int32 _, _ -> -1
       | _, Naked_int32 _ -> 1
       | Naked_int64 _, _ -> -1
       | _, Naked_int64 _ -> 1
+      | Naked_nativeint _, _ -> -1
+      | _, Naked_nativeint _ -> 1
       | Naked_vec128 _, _ -> -1
       | _, Naked_vec128 _ -> 1
       | Naked_vec256 _, _ -> -1
       | _, Naked_vec256 _ -> 1
       | Naked_vec512 _, _ -> -1
       | _, Naked_vec512 _ -> 1
-      | Null, _ -> -1
-      | _, Null -> 1
 
     let equal t1 t2 =
       if t1 == t2
@@ -166,6 +186,8 @@ module Const_data = struct
           Numeric_types.Float32_by_bit_pattern.equal f1 f2
         | Naked_float f1, Naked_float f2 ->
           Numeric_types.Float_by_bit_pattern.equal f1 f2
+        | Naked_int8 n1, Naked_int8 n2 -> Numeric_types.Int8.equal n1 n2
+        | Naked_int16 n1, Naked_int16 n2 -> Numeric_types.Int16.equal n1 n2
         | Naked_int32 n1, Naked_int32 n2 -> Int32.equal n1 n2
         | Naked_int64 n1, Naked_int64 n2 -> Int64.equal n1 n2
         | Naked_nativeint n1, Naked_nativeint n2 -> Targetint_32_64.equal n1 n2
@@ -178,7 +200,8 @@ module Const_data = struct
         | Null, Null -> true
         | ( ( Naked_immediate _ | Tagged_immediate _ | Naked_float _
             | Naked_float32 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-            | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Null ),
+            | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
+            | Naked_nativeint _ | Null ),
             _ ) ->
           false
 
@@ -188,6 +211,8 @@ module Const_data = struct
       | Tagged_immediate n -> Targetint_31_63.hash n
       | Naked_float32 n -> Numeric_types.Float32_by_bit_pattern.hash n
       | Naked_float n -> Numeric_types.Float_by_bit_pattern.hash n
+      | Naked_int8 n -> Numeric_types.Int8.hash n
+      | Naked_int16 n -> Numeric_types.Int16.hash n
       | Naked_int32 n -> Hashtbl.hash n
       | Naked_int64 n -> Hashtbl.hash n
       | Naked_nativeint n -> Targetint_32_64.hash n
@@ -320,6 +345,10 @@ module Const = struct
   let naked_float32 f = create (Naked_float32 f)
 
   let naked_float f = create (Naked_float f)
+
+  let naked_int8 i = create (Naked_int8 i)
+
+  let naked_int16 i = create (Naked_int16 i)
 
   let naked_int32 i = create (Naked_int32 i)
 

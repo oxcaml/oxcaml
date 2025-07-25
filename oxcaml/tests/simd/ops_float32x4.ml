@@ -84,7 +84,7 @@ let check_unop msg scalar vector f =
 let () =
   Float32.check_floats (fun f _ -> check_unop "rcp" Float32.rcp rcp f);
   Float32.check_floats (fun f _ -> check_unop "sqrt" Float32.sqrt sqrt f);
-  Float32.check_floats (fun f _ -> check_unop "rqrt" Float32.rsqrt rsqrt f)
+  Float32.check_floats (fun f _ -> check_unop "rsqrt" Float32.rsqrt rsqrt f)
 
 let () =
   Float32.check_floats (fun f0 f1 ->

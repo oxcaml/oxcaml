@@ -127,6 +127,8 @@ let ge_component comp1 comp2 =
 
 type exttype =
   | XInt
+  | XInt8
+  | XInt16
   | XInt32
   | XInt64
   | XFloat32
@@ -137,6 +139,8 @@ type exttype =
 
 let machtype_of_exttype = function
   | XInt -> typ_int
+  | XInt8 -> typ_int
+  | XInt16 -> typ_int
   | XInt32 -> typ_int
   | XInt64 -> typ_int
   | XFloat -> typ_float
@@ -296,6 +300,11 @@ type float_width =
   | Float64
   | Float32
 
+type vector_width =
+  | Vec128
+  | Vec256
+  | Vec512
+
 type memory_chunk =
   | Byte_unsigned
   | Byte_signed
@@ -323,9 +332,9 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128
-  | V256_of_v256
-  | V512_of_v512
+  | V128_of_vec of vector_width
+  | V256_of_vec of vector_width
+  | V512_of_vec of vector_width
 
 type static_cast =
   | Float_of_int of float_width
@@ -754,25 +763,12 @@ let equal_machtype_component
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
-let equal_exttype left right =
-  match left, right with
-  | XInt, XInt -> true
-  | XInt32, XInt32 -> true
-  | XInt64, XInt64 -> true
-  | XFloat32, XFloat32 -> true
-  | XFloat, XFloat -> true
-  | XVec128, XVec128 -> true
-  | XVec256, XVec256 -> true
-  | XVec512, XVec512 -> true
-  | XInt, (XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XInt32, (XInt | XInt64 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XInt64, (XInt | XInt32 | XFloat | XFloat32 | XVec128 | XVec256 | XVec512)
-  | XFloat, (XInt | XInt32 | XFloat32 | XInt64 | XVec128 | XVec256 | XVec512)
-  | XVec128, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec256 | XVec512)
-  | XVec256, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec512)
-  | XVec512, (XInt | XInt32 | XInt64 | XFloat | XFloat32 | XVec128 | XVec256)
-  | XFloat32, (XInt | XInt32 | XInt64 | XFloat | XVec128 | XVec256 | XVec512) ->
-    false
+let equal_exttype
+    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
+     | XVec256 | XVec512 ) as left) right =
+  (* we can use polymorphic compare as long as exttype is all constant
+     constructors *)
+  Stdlib.( = ) left right
 
 let equal_vec128_type v1 v2 =
   match v1, v2 with
@@ -811,6 +807,13 @@ let equal_float_width left right =
   | Float32, Float32 -> true
   | (Float32 | Float64), _ -> false
 
+let equal_vector_width left right =
+  match left, right with
+  | Vec128, Vec128 -> true
+  | Vec256, Vec256 -> true
+  | Vec512, Vec512 -> true
+  | (Vec128 | Vec256 | Vec512), _ -> false
+
 let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
     =
   match left, right with
@@ -822,12 +825,13 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | Int64_of_float, Int64_of_float -> true
   | Float32_of_int32, Float32_of_int32 -> true
   | Int32_of_float32, Int32_of_float32 -> true
-  | V128_of_v128, V128_of_v128 -> true
-  | V256_of_v256, V256_of_v256 -> true
-  | V512_of_v512, V512_of_v512 -> true
+  | V128_of_vec w1, V128_of_vec w2
+  | V256_of_vec w1, V256_of_vec w2
+  | V512_of_vec w1, V512_of_vec w2 ->
+    equal_vector_width w1 w2
   | ( ( Int_of_value | Value_of_int | Float_of_float32 | Float32_of_float
       | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | V128_of_v128 | V256_of_v256 | V512_of_v512 ),
+      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
       _ ) ->
     false
 

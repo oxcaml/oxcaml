@@ -1268,8 +1268,10 @@ module BR = Branch_relaxation.Make (struct
           ( Float32_of_float | Float_of_float32 | Float32_of_int32
           | Int32_of_float32 )) ->
       1
-    | Lop (Reinterpret_cast V128_of_v128) -> 1
-    | Lop (Reinterpret_cast (V256_of_v256 | V512_of_v512)) ->
+    | Lop (Reinterpret_cast (V128_of_vec Vec128)) -> 1
+    | Lop
+        (Reinterpret_cast
+          (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
     | Lop
@@ -1568,13 +1570,13 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       DSL.check_reg Float32 src;
       DSL.check_reg Float dst;
       DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg_d src |])
-  | V128_of_v128 ->
+  | V128_of_vec Vec128 ->
     if distinct
     then (
       DSL.check_reg Vec128 src;
       DSL.check_reg Vec128 dst;
       DSL.ins I.MOV [| DSL.emit_reg_v16b dst; DSL.emit_reg_v16b src |])
-  | V256_of_v256 | V512_of_v512 ->
+  | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | Int_of_value | Value_of_int -> move src dst
 

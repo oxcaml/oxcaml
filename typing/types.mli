@@ -827,6 +827,8 @@ and mixed_block_element =
   (* A [Float_boxed] is a float that's stored flat but boxed upon projection. *)
   | Float64
   | Float32
+  | Bits8
+  | Bits16
   | Bits32
   | Bits64
   | Vec128
@@ -835,6 +837,7 @@ and mixed_block_element =
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 

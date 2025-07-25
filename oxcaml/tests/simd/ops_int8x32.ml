@@ -12,8 +12,8 @@ external low_to : (t[@unboxed]) -> (int[@untagged])
 let () =
   let v1 = low_of 1 in
   let v2 = low_of 2 in
-  let i1 = int8x32_fourth_int64 v1 |> Int64.logand 0xffL in
-  let i2 = int8x32_fourth_int64 v2 |> Int64.logand 0xffL in
+  let i1 = int8x32_first_int64 v1 |> Int64.logand 0xffL in
+  let i2 = int8x32_first_int64 v2 |> Int64.logand 0xffL in
   eq i1 i2 1L 2L;
   let i1 = low_to v1 in
   let i2 = low_to v2 in
@@ -66,31 +66,31 @@ let () =
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtsx_int64x4\n%!" l r);
       let v = Int8.to_int8x16 l r l r 0 0 0 0 in
-      let result = Builtins.Int8x32.cvtsx_int64x4 v in
+      let result = Builtins.Int8x16.cvtsx_int64x4 v in
       let expectl = Int8.cvtsx_i64 l in
       let expectr = Int8.cvtsx_i64 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtzx_int64x4\n%!" l r);
       let v = Int8.to_int8x16 l r l r 0 0 0 0 in
-      let result = Builtins.Int8x32.cvtzx_int64x4 v in
+      let result = Builtins.Int8x16.cvtzx_int64x4 v in
       let expectl = Int8.cvtzx_i64 l in
       let expectr = Int8.cvtzx_i64 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtsx_int32x8\n%!" l r);
       let v = Int8.to_int8x16 l r l r l r l r in
-      let result = Builtins.Int8x32.cvtsx_int32x8 v in
+      let result = Builtins.Int8x16.cvtsx_int32x8 v in
       let expectl = Int8.cvtsx_i32 l in
       let expectr = Int8.cvtsx_i32 r in
       let expect =
@@ -109,7 +109,7 @@ let () =
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtzx_int32x8\n%!" l r);
       let v = Int8.to_int8x16 l r l r l r l r in
-      let result = Builtins.Int8x32.cvtzx_int32x8 v in
+      let result = Builtins.Int8x16.cvtzx_int32x8 v in
       let expectl = Int8.cvtzx_i32 l in
       let expectr = Int8.cvtzx_i32 r in
       let expect =
@@ -128,7 +128,7 @@ let () =
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtsx_int16x16\n%!" l r);
       let v = Int8.to_int8x16 l r l r l r l r in
-      let result = Builtins.Int8x32.cvtsx_int16x16 v in
+      let result = Builtins.Int8x16.cvtsx_int16x16 v in
       let expectl = Int8.cvtsx_i16 l in
       let expectr = Int8.cvtsx_i16 r in
       let expect =
@@ -148,7 +148,7 @@ let () =
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtzx_int16x16\n%!" l r);
       let v = Int8.to_int8x16 l r l r l r l r in
-      let result = Builtins.Int8x32.cvtzx_int16x16 v in
+      let result = Builtins.Int8x16.cvtzx_int16x16 v in
       let expectl = Int8.cvtzx_i16 l in
       let expectr = Int8.cvtzx_i16 r in
       let expect =
@@ -234,4 +234,28 @@ let () =
         (int64x4_second_int64 result)
         (int64x4_third_int64 result)
         (int64x4_fourth_int64 result)
-        expect expect expect expect)
+        expect expect expect expect);
+  Int8.check_ints (fun l r ->
+      (failmsg := fun () -> Printf.printf "%02x|%02x msadu\n%!" l r);
+      let v0 =
+        Int8.to_int8x32 l l r r l l r r l l r 0 0 0 0 0 l l r r l l r r l l r 0
+          0 0 0 0
+      in
+      let v1 =
+        Int8.to_int8x32 l r l r 0 0 0 0 0 0 0 0 0 0 0 0 l r l r 0 0 0 0 0 0 0 0
+          0 0 0 0
+      in
+      let result = multi_sad_unsigned 0 v0 v1 in
+      let lr = 2 * Int8.diffu l r in
+      let expect =
+        Int16.to_int16x16 lr lr lr lr lr lr lr lr lr lr lr lr lr lr lr lr
+      in
+      eq4
+        (int16x16_first_int64 result)
+        (int16x16_second_int64 result)
+        (int16x16_third_int64 result)
+        (int16x16_fourth_int64 result)
+        (int16x16_first_int64 expect)
+        (int16x16_second_int64 expect)
+        (int16x16_third_int64 expect)
+        (int16x16_fourth_int64 expect))

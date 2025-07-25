@@ -12,8 +12,8 @@ external low_to : t -> int32
 let () =
   let v1 = low_of 1l in
   let v2 = low_of 2l in
-  let i1 = int32x8_fourth_int64 v1 |> Int64.logand 0xffffffffL in
-  let i2 = int32x8_fourth_int64 v2 |> Int64.logand 0xffffffffL in
+  let i1 = int32x8_first_int64 v1 |> Int64.logand 0xffffffffL in
+  let i2 = int32x8_first_int64 v2 |> Int64.logand 0xffffffffL in
   eq i1 i2 1L 2L;
   let i1 = low_to v1 in
   let i2 = low_to v2 in
@@ -123,15 +123,15 @@ let () =
         (int32x8_fourth_int64 expect));
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx mul_even\n%!" l r);
-      let v1 = Int32s.to_int32x8 l r l r l r l r in
-      let v2 = Int32s.to_int32x8 r l r l r l r l in
+      let v1 = Int32s.to_int32x8 l 0l r 0l l 0l r 0l in
+      let v2 = Int32s.to_int32x8 r 0l l 0l r 0l l 0l in
       let result = mul_even v1 v2 in
       let expect = Int64.mul (Int64.of_int32 l) (Int64.of_int32 r) in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expect expect expect expect);
   Int32s.check_ints (fun l r ->
       (failmsg
@@ -143,34 +143,34 @@ let () =
       let ur = Int64.logand (Int64.of_int32 r) 0xffffffffL in
       let expect = Int64.mul ul ur in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expect expect expect expect);
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx cvtsx_int64x4\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
-      let result = cvtsx_int64x4 v in
+      let result = Builtins.Int32x4.cvtsx_int64x4 v in
       let expectl = Int64.of_int32 l in
       let expectr = Int64.of_int32 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx cvtzx_int64x4\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
-      let result = cvtzx_int64x4 v in
+      let result = Builtins.Int32x4.cvtzx_int64x4 v in
       let expectl = Int64.logand (Int64.of_int32 l) 0xffffffffL in
       let expectr = Int64.logand (Int64.of_int32 r) 0xffffffffL in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int32s.check_ints (fun l r ->
       (failmsg
@@ -218,11 +218,16 @@ let () =
         (int16x16_third_int64 expect)
         (int16x16_fourth_int64 expect))
 
+(* Arbitrary test shift *)
+let const_shift = 7
+
+let to_shift x = Int32.logand x 31l
+
 let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx << %08lx\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
-      let shift = Int32.logand r 0x1fl in
+      let shift = to_shift r in
       let result = sll v (int64x2_of_int64s (Int64.of_int32 shift) 0L) in
       let expectl = Int32.shift_left l (Int32.to_int shift) in
       let expectr = Int32.shift_left r (Int32.to_int shift) in
@@ -242,7 +247,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx >> %08lx\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
-      let shift = Int32.logand r 0x1fl in
+      let shift = to_shift r in
       let result = srl v (int64x2_of_int64s (Int64.of_int32 shift) 0L) in
       let expectl = Int32.shift_right_logical l (Int32.to_int shift) in
       let expectr = Int32.shift_right_logical r (Int32.to_int shift) in
@@ -262,7 +267,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx >>a %08lx\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
-      let shift = Int32.logand r 0x1fl in
+      let shift = to_shift r in
       let result = sra v (int64x2_of_int64s (Int64.of_int32 shift) 0L) in
       let expectl = Int32.shift_right l (Int32.to_int shift) in
       let expectr = Int32.shift_right r (Int32.to_int shift) in
@@ -282,7 +287,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx << 7\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
-      let result = slli 7 v in
+      let result = slli const_shift v in
       let expectl = Int32.shift_left l 7 in
       let expectr = Int32.shift_left r 7 in
       let expect =
@@ -301,7 +306,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx >> 7\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
-      let result = srli 7 v in
+      let result = srli const_shift v in
       let expectl = Int32.shift_right_logical l 7 in
       let expectr = Int32.shift_right_logical r 7 in
       let expect =
@@ -320,7 +325,7 @@ let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx >>a 7\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
-      let result = srai 7 v in
+      let result = srai const_shift v in
       let expectl = Int32.shift_right l 7 in
       let expectr = Int32.shift_right r 7 in
       let expect =
@@ -340,13 +345,12 @@ let () =
       (failmsg := fun () -> Printf.printf "%08lx|%08lx sllv\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
       let shifts =
-        Int32s.to_int32x8 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
-          (Int32.logand r 0x1fl) (Int32.logand l 0x1fl) (Int32.logand r 0x1fl)
-          (Int32.logand l 0x1fl) (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
+        Int32s.to_int32x8 (to_shift r) (to_shift l) (to_shift r) (to_shift l)
+          (to_shift r) (to_shift l) (to_shift r) (to_shift l)
       in
       let result = sllv v shifts in
-      let expectl = Int32.shift_left l (Int32.to_int (Int32.logand r 0x1fl)) in
-      let expectr = Int32.shift_left r (Int32.to_int (Int32.logand l 0x1fl)) in
+      let expectl = Int32.shift_left l (Int32.to_int (to_shift r)) in
+      let expectr = Int32.shift_left r (Int32.to_int (to_shift l)) in
       let expect =
         Int32s.to_int32x8 expectl expectr expectl expectr expectl expectr
           expectl expectr
@@ -364,13 +368,12 @@ let () =
       (failmsg := fun () -> Printf.printf "%08lx|%08lx srav\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
       let shifts =
-        Int32s.to_int32x8 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
-          (Int32.logand r 0x1fl) (Int32.logand l 0x1fl) (Int32.logand r 0x1fl)
-          (Int32.logand l 0x1fl) (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
+        Int32s.to_int32x8 (to_shift r) (to_shift l) (to_shift r) (to_shift l)
+          (to_shift r) (to_shift l) (to_shift r) (to_shift l)
       in
       let result = srav v shifts in
-      let expectl = Int32.shift_right l (Int32.to_int (Int32.logand r 0x1fl)) in
-      let expectr = Int32.shift_right r (Int32.to_int (Int32.logand l 0x1fl)) in
+      let expectl = Int32.shift_right l (Int32.to_int (to_shift r)) in
+      let expectr = Int32.shift_right r (Int32.to_int (to_shift l)) in
       let expect =
         Int32s.to_int32x8 expectl expectr expectl expectr expectl expectr
           expectl expectr
@@ -388,17 +391,12 @@ let () =
       (failmsg := fun () -> Printf.printf "%08lx|%08lx srlv\n%!" l r);
       let v = Int32s.to_int32x8 l r l r l r l r in
       let shifts =
-        Int32s.to_int32x8 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
-          (Int32.logand r 0x1fl) (Int32.logand l 0x1fl) (Int32.logand r 0x1fl)
-          (Int32.logand l 0x1fl) (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
+        Int32s.to_int32x8 (to_shift r) (to_shift l) (to_shift r) (to_shift l)
+          (to_shift r) (to_shift l) (to_shift r) (to_shift l)
       in
       let result = srlv v shifts in
-      let expectl =
-        Int32.shift_right_logical l (Int32.to_int (Int32.logand r 0x1fl))
-      in
-      let expectr =
-        Int32.shift_right_logical r (Int32.to_int (Int32.logand l 0x1fl))
-      in
+      let expectl = Int32.shift_right_logical l (Int32.to_int (to_shift r)) in
+      let expectr = Int32.shift_right_logical r (Int32.to_int (to_shift l)) in
       let expect =
         Int32s.to_int32x8 expectl expectr expectl expectr expectl expectr
           expectl expectr
@@ -411,17 +409,19 @@ let () =
         (int32x8_first_int64 expect)
         (int32x8_second_int64 expect)
         (int32x8_third_int64 expect)
-        (int32x8_fourth_int64 expect));
+        (int32x8_fourth_int64 expect))
+
+(* Tests for AVX operations on int32x4 *)
+let () =
   Int32s.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08lx|%08lx sllv_128\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
       let shifts =
-        Int32s.to_int32x4 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
-          (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
+        Int32s.to_int32x4 (to_shift r) (to_shift l) (to_shift r) (to_shift l)
       in
-      let result = sllv_128 v shifts in
-      let expectl = Int32.shift_left l (Int32.to_int (Int32.logand r 0x1fl)) in
-      let expectr = Int32.shift_left r (Int32.to_int (Int32.logand l 0x1fl)) in
+      let result = Builtins.Int32x4.sllv v shifts in
+      let expectl = Int32.shift_left l (Int32.to_int (to_shift r)) in
+      let expectr = Int32.shift_left r (Int32.to_int (to_shift l)) in
       let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)
@@ -431,12 +431,11 @@ let () =
       (failmsg := fun () -> Printf.printf "%08lx|%08lx srav_128\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
       let shifts =
-        Int32s.to_int32x4 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
-          (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
+        Int32s.to_int32x4 (to_shift r) (to_shift l) (to_shift r) (to_shift l)
       in
-      let result = srav_128 v shifts in
-      let expectl = Int32.shift_right l (Int32.to_int (Int32.logand r 0x1fl)) in
-      let expectr = Int32.shift_right r (Int32.to_int (Int32.logand l 0x1fl)) in
+      let result = Builtins.Int32x4.srav v shifts in
+      let expectl = Int32.shift_right l (Int32.to_int (to_shift r)) in
+      let expectr = Int32.shift_right r (Int32.to_int (to_shift l)) in
       let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)
@@ -446,16 +445,11 @@ let () =
       (failmsg := fun () -> Printf.printf "%08lx|%08lx srlv_128\n%!" l r);
       let v = Int32s.to_int32x4 l r l r in
       let shifts =
-        Int32s.to_int32x4 (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
-          (Int32.logand r 0x1fl) (Int32.logand l 0x1fl)
+        Int32s.to_int32x4 (to_shift r) (to_shift l) (to_shift r) (to_shift l)
       in
-      let result = srlv_128 v shifts in
-      let expectl =
-        Int32.shift_right_logical l (Int32.to_int (Int32.logand r 0x1fl))
-      in
-      let expectr =
-        Int32.shift_right_logical r (Int32.to_int (Int32.logand l 0x1fl))
-      in
+      let result = Builtins.Int32x4.srlv v shifts in
+      let expectl = Int32.shift_right_logical l (Int32.to_int (to_shift r)) in
+      let expectr = Int32.shift_right_logical r (Int32.to_int (to_shift l)) in
       let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)

@@ -12,8 +12,8 @@ external low_to : (t[@unboxed]) -> (int[@untagged])
 let () =
   let v1 = low_of 1 in
   let v2 = low_of 2 in
-  let i1 = int16x16_fourth_int64 v1 |> Int64.logand 0xffffL in
-  let i2 = int16x16_fourth_int64 v2 |> Int64.logand 0xffffL in
+  let i1 = int16x16_first_int64 v1 |> Int64.logand 0xffffL in
+  let i2 = int16x16_first_int64 v2 |> Int64.logand 0xffffL in
   eq i1 i2 1L 2L;
   let i1 = low_to v1 in
   let i2 = low_to v2 in
@@ -29,6 +29,7 @@ let check_binop msg scalar vector i0 i1 =
   let v1 = Int16.to_int16x16 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 in
   let v2 = Int16.to_int16x16 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 i1 i0 in
   let result = vector v1 v2 in
+  (* CR-someday mslater: abstract these sort of checks *)
   eq4
     (int16x16_first_int64 result)
     (int16x16_second_int64 result)
@@ -58,6 +59,7 @@ let () =
   Int16.check_ints
     (check_binop "mul_high_unsigned" Int16.mul_high_unsigned mul_high_unsigned);
   Int16.check_ints (check_binop "mul_low" Int16.mul_low mul_low);
+  Int16.check_ints (check_binop "mul_round" Int16.mul_round mul_round);
   Int16.check_ints (check_binop "avg_unsigned" Int16.avgu avg_unsigned);
   Int16.check_ints (check_binop "mulsign" Int16.mulsign mulsign);
   ()
@@ -136,11 +138,11 @@ let () =
       let v1 = Int16.to_int16x16 r r l l r r l l r r l l r r l l in
       let result = hadd v0 v1 in
       let expect =
-        Int16.to_int16x16 (Int16.add r r) (Int16.add l l) (Int16.add r r)
-          (Int16.add l l) (Int16.add l l) (Int16.add r r) (Int16.add l l)
+        Int16.to_int16x16 (Int16.add l l) (Int16.add r r) (Int16.add l l)
           (Int16.add r r) (Int16.add r r) (Int16.add l l) (Int16.add r r)
           (Int16.add l l) (Int16.add l l) (Int16.add r r) (Int16.add l l)
-          (Int16.add r r)
+          (Int16.add r r) (Int16.add r r) (Int16.add l l) (Int16.add r r)
+          (Int16.add l l)
       in
       eq4
         (int16x16_first_int64 result)
@@ -157,11 +159,11 @@ let () =
       let v1 = Int16.to_int16x16 r l r l r l r l r l r l r l r l in
       let result = hsub v0 v1 in
       let expect =
-        Int16.to_int16x16 (Int16.sub r l) (Int16.sub r l) (Int16.sub r l)
-          (Int16.sub r l) (Int16.sub l r) (Int16.sub l r) (Int16.sub l r)
+        Int16.to_int16x16 (Int16.sub l r) (Int16.sub l r) (Int16.sub l r)
           (Int16.sub l r) (Int16.sub r l) (Int16.sub r l) (Int16.sub r l)
           (Int16.sub r l) (Int16.sub l r) (Int16.sub l r) (Int16.sub l r)
-          (Int16.sub l r)
+          (Int16.sub l r) (Int16.sub r l) (Int16.sub r l) (Int16.sub r l)
+          (Int16.sub r l)
       in
       eq4
         (int16x16_first_int64 result)
@@ -175,31 +177,31 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtsx_int64x4\n%!" l r);
       let v = Int16.to_int16x8 l r l r 0 0 0 0 in
-      let result = Builtins.Int16x16.cvtsx_int64x4 v in
+      let result = Builtins.Int16x8.cvtsx_int64x4 v in
       let expectl = Int16.cvtsx_i64 l in
       let expectr = Int16.cvtsx_i64 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtzx_int64x4\n%!" l r);
       let v = Int16.to_int16x8 l r l r 0 0 0 0 in
-      let result = Builtins.Int16x16.cvtzx_int64x4 v in
+      let result = Builtins.Int16x8.cvtzx_int64x4 v in
       let expectl = Int16.cvtzx_i64 l in
       let expectr = Int16.cvtzx_i64 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtsx_int32x8\n%!" l r);
       let v = Int16.to_int16x8 l r l r l r l r in
-      let result = Builtins.Int16x16.cvtsx_int32x8 v in
+      let result = Builtins.Int16x8.cvtsx_int32x8 v in
       let expectl = Int16.cvtsx_i32 l in
       let expectr = Int16.cvtsx_i32 r in
       let expect =
@@ -218,7 +220,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%04x|%04x cvtzx_int32x8\n%!" l r);
       let v = Int16.to_int16x8 l r l r l r l r in
-      let result = Builtins.Int16x16.cvtzx_int32x8 v in
+      let result = Builtins.Int16x8.cvtzx_int32x8 v in
       let expectl = Int16.cvtzx_i32 l in
       let expectr = Int16.cvtzx_i32 r in
       let expect =
@@ -240,11 +242,11 @@ let () =
       let v1 = Int16.to_int16x16 r r l l r r l l r r l l r r l l in
       let result = hadd_saturating v0 v1 in
       let expect =
-        Int16.to_int16x16 (Int16.adds r r) (Int16.adds l l) (Int16.adds r r)
-          (Int16.adds l l) (Int16.adds l l) (Int16.adds r r) (Int16.adds l l)
+        Int16.to_int16x16 (Int16.adds l l) (Int16.adds r r) (Int16.adds l l)
           (Int16.adds r r) (Int16.adds r r) (Int16.adds l l) (Int16.adds r r)
           (Int16.adds l l) (Int16.adds l l) (Int16.adds r r) (Int16.adds l l)
-          (Int16.adds r r)
+          (Int16.adds r r) (Int16.adds r r) (Int16.adds l l) (Int16.adds r r)
+          (Int16.adds l l)
       in
       eq4
         (int16x16_first_int64 result)
@@ -261,11 +263,11 @@ let () =
       let v1 = Int16.to_int16x16 r l r l r l r l r l r l r l r l in
       let result = hsub_saturating v0 v1 in
       let expect =
-        Int16.to_int16x16 (Int16.subs r l) (Int16.subs r l) (Int16.subs r l)
-          (Int16.subs r l) (Int16.subs l r) (Int16.subs l r) (Int16.subs l r)
+        Int16.to_int16x16 (Int16.subs l r) (Int16.subs l r) (Int16.subs l r)
           (Int16.subs l r) (Int16.subs r l) (Int16.subs r l) (Int16.subs r l)
           (Int16.subs r l) (Int16.subs l r) (Int16.subs l r) (Int16.subs l r)
-          (Int16.subs l r)
+          (Int16.subs l r) (Int16.subs r l) (Int16.subs r l) (Int16.subs r l)
+          (Int16.subs r l)
       in
       eq4
         (int16x16_first_int64 result)
@@ -293,6 +295,9 @@ let () =
         (int32x8_third_int64 expect)
         (int32x8_second_int64 expect)
         (int32x8_first_int64 expect))
+
+(* Arbitrary test shift *)
+let const_shift = 7
 
 let () =
   Int16.check_ints (fun l r ->
@@ -361,7 +366,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x|%08x << 7\n%!" l r);
       let v = Int16.to_int16x16 l r l r l r l r l r l r l r l r in
-      let result = slli 7 v in
+      let result = slli const_shift v in
       let expectl = Int16.shift_left l 7 in
       let expectr = Int16.shift_left r 7 in
       let expect =
@@ -381,7 +386,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x|%08x >> 7\n%!" l r);
       let v = Int16.to_int16x16 l r l r l r l r l r l r l r l r in
-      let result = srli 7 v in
+      let result = srli const_shift v in
       let expectl = Int16.shift_right_logical l 7 in
       let expectr = Int16.shift_right_logical r 7 in
       let expect =
@@ -401,7 +406,7 @@ let () =
   Int16.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%08x|%08x >>a 7\n%!" l r);
       let v = Int16.to_int16x16 l r l r l r l r l r l r l r l r in
-      let result = srai 7 v in
+      let result = srai const_shift v in
       let expectl = Int16.shift_right l 7 in
       let expectr = Int16.shift_right r 7 in
       let expect =
