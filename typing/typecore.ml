@@ -5299,7 +5299,7 @@ let split_function_ty
   begin match expected_mode.allocator with
         | Allocator_stack -> Locality.submode_exn Locality.local
                               (Alloc.proj_comonadic Areality alloc_mode);
-        | _ -> ()
+        | Allocator_heap | Allocator_malloc -> ()
   end;
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in

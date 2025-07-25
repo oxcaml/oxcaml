@@ -250,11 +250,6 @@ Error: This type "float#" should be an instance of type "('a : value_or_null)"
          because the type argument of mallocd has layout value_or_null.
 |}]
 
-type t = #(int * int)
-[%%expect {|
-type t = #(int * int)
-|}]
-
 type t = int or_null mallocd
 [%%expect {|
 type t = int or_null mallocd

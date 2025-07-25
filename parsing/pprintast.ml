@@ -27,7 +27,7 @@ open Location
 open Longident
 open Parsetree
 
-let prefix_symbols  = [ '!'; '?'; '~']
+let prefix_symbols  = [ '!'; '?'; '~' ]
 let infix_symbols = [ '='; '<'; '>'; '@'; '^'; '|'; '&'; '+'; '-'; '*'; '/';
                       '$'; '%'; '#' ]
 
