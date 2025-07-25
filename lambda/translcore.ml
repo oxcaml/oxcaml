@@ -645,13 +645,19 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
-      begin match lbl.lbl_repres with
+      let prim_and_args =
+        match lbl.lbl_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let ptr_or_imm, _ = maybe_pointer e in
-          Lprim (Pfield (lbl.lbl_pos, ptr_or_imm, sem), [targ],
-                 of_location ~scopes e.exp_loc)
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> targ
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ; Lconst (Const_base (Const_int lbl.lbl_pos))])
+          else
+            Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
+        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
           let alloc_mode =
             match float with
@@ -659,15 +665,18 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | Non_boxing _ -> assert false
           in
           let mode = transl_alloc_mode alloc_mode in
-          Lprim (Pfloatfield (lbl.lbl_pos, sem, mode), [targ],
-                 of_location ~scopes e.exp_loc)
+          Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
-          Lprim (Pufloatfield (lbl.lbl_pos, sem), [targ],
-                 of_location ~scopes e.exp_loc)
+          Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let ptr_or_imm, _ = maybe_pointer e in
-          Lprim (Pfield (lbl.lbl_pos + 1, ptr_or_imm, sem), [targ],
-                 of_location ~scopes e.exp_loc)
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ; Lconst (Const_base (Const_int (lbl.lbl_pos + 1)))])
+          else
+            Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -699,9 +708,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           \ present for float field read")
               shape
           in
-          Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ],
-                  of_location ~scopes e.exp_loc)
+          Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
+      in
+      begin match prim_and_args with
+      | None -> targ
+      | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
   | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
     begin match lbl.lbl_repres with
@@ -725,19 +737,42 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let mode =
         Assignment (transl_modify_mode arg_mode)
       in
-      let access =
+      let sort_arg =
+        (* We know the record is boxed because [@@unboxed] records don't have
+           mutable fields, and this is double checked by the assert in [access]
+           above. *)
+        Jkind.Sort.Const.for_boxed_record
+      in
+      let arg_lambda = transl_exp ~scopes sort_arg arg in
+      let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
+      let newval_lambda = transl_exp ~scopes lbl.lbl_sort newval in
+      let prim, args =
         match lbl.lbl_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let ptr_or_imm, _ = maybe_pointer newval in
-          Psetfield(lbl.lbl_pos, ptr_or_imm, mode)
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
-        | Record_float -> Psetfloatfield (lbl.lbl_pos, mode)
-        | Record_ufloat -> Psetufloatfield (lbl.lbl_pos, mode)
+        | Record_float ->
+          Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+        | Record_ufloat ->
+          Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let ptr_or_imm, _ = maybe_pointer newval in
-          Psetfield (lbl.lbl_pos + 1, ptr_or_imm, mode)
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -762,18 +797,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lambda.{ raw_kind; nullable })
               shape
             in
-            Psetmixedfield([lbl.lbl_pos], shape, mode)
+            Psetmixedfield([lbl.lbl_pos], shape, mode),
+            [arg_lambda; newval_lambda]
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
-      let sort_arg =
-        (* We know the record is boxed because [@@unboxed] records don't have
-           mutable fields, and this is double checked by the assert in [access]
-           above. *)
-        Jkind.Sort.Const.for_boxed_record
-      in
-      Lprim(access, [transl_exp ~scopes sort_arg arg;
-                     transl_exp ~scopes lbl.lbl_sort newval],
-            of_location ~scopes e.exp_loc)
+      Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
