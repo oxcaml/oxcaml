@@ -98,6 +98,7 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
+  | Invalid_generic_optional_argument_module_path of Longident.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -670,6 +671,23 @@ let transl_label (label : Parsetree.arg_label)
       -> raise (Error (arg.ptyp_loc, Env.empty, Invalid_label_for_call_pos label))
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
+  | Generic_optional (path, l), _ -> (
+    match Language_extension.is_enabled Generic_optional_arguments with
+    | false ->
+      raise
+        (Error (path.loc,
+                Env.empty,
+                Unsupported_extension Generic_optional_arguments));
+    | true ->
+        (* CR generic-optional: allow more module names / use path lookup *)
+        if path.txt = Longident.Ldot (Lident "Stdlib", "Option") ||
+          path.txt = Longident.Ldot (Lident "Stdlib", "Or_null")
+        then
+          Generic_optional(path, l)
+        else
+          raise (Error (path.loc, Env.empty,
+            Invalid_generic_optional_argument_module_path path.txt))
+  )
   | Nolabel, _ -> Nolabel
 
 (* Parallel to [transl_label_from_expr]. *)
@@ -775,8 +793,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
+              let path = Ctype.predef_path_of_optional_module_path
+                           (Btype.get_optional_module_path_exn l)
+              in
               newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+                (newconstr path [Btype.tpoly_get_mono arg_ty])
             end
           in
           let arg_mode = Alloc.of_const arg_mode in
@@ -1628,7 +1649,16 @@ let report_error env ppf =
         (match arg_label with
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
+        | Generic_optional _ -> "generic optional"
         | Labelled _ -> assert false )
+  | Invalid_generic_optional_argument_module_path lid ->
+      (* CR generic-optional : Add Hint.
+        Hint: the specified module path should contain a submodule named <NAME>.
+      *)
+      fprintf ppf
+        "Invalid generic optional argument module path: %a"
+        (Style.as_inline_code longident) lid
+
 
 let () =
   Location.register_error_of_exn

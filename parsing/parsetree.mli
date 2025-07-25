@@ -116,6 +116,8 @@ and core_type_desc =
                                      {{!arg_label.Labelled}[Labelled]},
             - [?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
                                      {{!arg_label.Optional}[Optional]}.
+            - [M.?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
+                            {{!arg_label.Generic_optional}[Generic_optional]}.
          *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
@@ -209,6 +211,8 @@ and arg_label = Asttypes.arg_label =
     Nolabel
   | Labelled of string
   | Optional of string
+  | Generic_optional of Longident.t loc * string
+
 
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
 (** As {!package_type} typed values:
