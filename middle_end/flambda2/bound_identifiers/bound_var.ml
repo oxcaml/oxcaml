@@ -20,9 +20,12 @@ type t =
     name_mode : Name_mode.t
   }
 
-let [@ocamlformat "disable"] print ppf { var; debug_uid = _; name_mode = _; } =
-  Format.fprintf ppf "%a" Variable.print var
-(* CR sspies: Add printing for debug uids, guarded by a flag. *)
+let print_debug_uid ppf duid =
+  if !Clflags.dump_debug_uids
+  then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
+
+let [@ocamlformat "disable"] print ppf { var; debug_uid; name_mode = _; } =
+  Format.fprintf ppf "%a%a" Variable.print var print_debug_uid debug_uid
 
 let create var debug_uid name_mode =
   (* Note that [name_mode] might be [In_types], e.g. when dealing with function

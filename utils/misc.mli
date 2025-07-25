@@ -778,7 +778,8 @@ end
 
 val print_if :
   Format.formatter -> bool ref -> (Format.formatter -> 'a -> unit) -> 'a -> 'a
-(** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf] if [b] is true. *)
+(** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf]
+    if [flag] is true. *)
 
 val pp_two_columns :
   ?sep:string -> ?max_lines:int ->
@@ -805,6 +806,11 @@ val pp_two_columns :
     bb  | dddddd
     v}
 *)
+
+val pp_table : Format.formatter -> (string * string list) list -> unit
+(** [pp_table ppf l] prints the table [l], a list of columns with their
+    header. The function fails with a fatal error if the columns have
+    different length. *)
 
 val pp_parens_if :
      bool

@@ -151,8 +151,8 @@ let rbp = phys_reg Int 12
 let destroy_xmm =
   let types =
     ([ Float; Float32; Vec128 ] : machtype_component list)
-    |> add_hard_vec256_regs ~f:(fun _ -> Vec256)
-    |> add_hard_vec512_regs ~f:(fun _ -> Vec512)
+    |> add_hard_vec256_regs ~f:(fun _ : machtype_component -> Vec256)
+    |> add_hard_vec512_regs ~f:(fun _ : machtype_component -> Vec512)
     |> Array.of_list
   in
   fun n -> Array.map (fun t -> phys_reg t (100 + n)) types
@@ -713,10 +713,10 @@ let has_three_operand_float_ops () = Arch.Extension.enabled AVX
 
 let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
-  | Creinterpret_cast V256_of_v256
+  | Creinterpret_cast (V256_of_vec (Vec128 | Vec256) | V128_of_vec Vec256)
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
     Arch.Extension.enabled_vec256 ()
-  | Creinterpret_cast V512_of_v512
+  | Creinterpret_cast (V512_of_vec _ | V128_of_vec Vec512 | V256_of_vec Vec512)
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
@@ -739,7 +739,7 @@ let operation_supported = function
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128)
+                       V128_of_vec Vec128)
   | Cstatic_cast (Float_of_float32 | Float32_of_float |
                   Int_of_float Float32 | Float_of_int Float32 |
                   Float_of_int Float64 | Int_of_float Float64 |
