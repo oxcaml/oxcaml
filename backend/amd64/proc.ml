@@ -132,12 +132,8 @@ let phys_reg ty n =
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
-  | Vec256 ->
-    Arch.Extension.require_vec256 ();
-    hard_vec256_reg.(n - 100)
-  | Vec512 ->
-    Arch.Extension.require_vec512 ();
-    hard_vec512_reg.(n - 100)
+  | Vec256 -> hard_vec256_reg.(n - 100)
+  | Vec512 -> hard_vec512_reg.(n - 100)
 
 let rax = phys_reg Int 0
 let rdi = phys_reg Int 2
@@ -222,7 +218,6 @@ let calling_conventions
         ofs := !ofs + size_vec128
       end
     | Vec256 ->
-      Arch.Extension.require_vec256 ();
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec256 !float;
         incr float
@@ -233,7 +228,6 @@ let calling_conventions
         ofs := !ofs + size_vec256
       end
     | Vec512 ->
-      Arch.Extension.require_vec512 ();
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec512 !float;
         incr float
