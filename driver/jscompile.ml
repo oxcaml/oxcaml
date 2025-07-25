@@ -47,20 +47,26 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
          |> Simplif.simplify_lambda
          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
-         |> fun code ->
-         (* CR selee: Currently the flambda2 codebase assumes that the target integer size
-            is the same as the compiler integer size, which is a wrong assumption. This
-            will need to be fixed (see doc) *)
-         Flambda2.lambda_to_flambda ~ppf_dump:i.ppf_dump
-           ~prefixname:(Unit_info.prefix i.target)
-           { program with code }
-         |> fun _ ->
+         |> fun lambda ->
          (* CR selee: we don't need it at this point, but this seems important
             so I'll keep it around *)
          let arg_descr =
            make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
          in
-         ignore arg_descr |> fun _ -> failwith "unimplemented")
+         let () = ignore arg_descr in
+         lambda |> fun code ->
+         (* CR selee: Currently the flambda2 codebase assumes that the target integer
+            size is the same as the compiler integer size, which is a wrong assumption.
+            This will need to be fixed (see doc) *)
+         Flambda2.lambda_to_flambda ~ppf_dump:i.ppf_dump
+           ~prefixname:(Unit_info.prefix i.target)
+           { program with code }
+         |> fun (program : Flambda2.flambda_result) ->
+         Flambda2_to_jsir.To_jsir.unit ~offsets:program.offsets
+           ~all_code:program.all_code ~reachable_names:program.reachable_names
+           program.flambda
+         |> print_if i.ppf_dump Clflags.dump_jsir (fun ppf jsir ->
+                Flambda2_to_jsir.Jsir.Print.program ppf (fun _ _ -> "") jsir))
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   let argument_coercion =

@@ -849,6 +849,9 @@ let mk_dflambda_verbose f =
   "-dflambda-verbose", Arg.Unit f, " Print Flambda 1 terms including around \
       each pass"
 
+let mk_djsir f =
+  "-djsir", Arg.Unit f, " Print Js_of_ocaml IR (JSIR) representation"
+
 let mk_dinstr f =
   "-dinstr", Arg.Unit f, " (undocumented)"
 
@@ -1171,6 +1174,7 @@ module type Jscomp_options = sig
   val _dflambda_let : int -> unit
   val _dflambda_no_invariants : unit -> unit
   val _dflambda_verbose : unit -> unit
+  val _djsir : unit -> unit
   val _drawflambda : unit -> unit
 end
 
@@ -1853,6 +1857,7 @@ struct
     mk_dflambda_no_invariants F._dflambda_no_invariants;
     mk_dflambda_let F._dflambda_let;
     mk_dflambda_verbose F._dflambda_verbose;
+    mk_djsir F._djsir;
   ]
 end;;
 
@@ -2354,6 +2359,7 @@ third-party libraries such as Lwt, but with a different API."
       flambda_invariant_checks := No_checks
     let _dflambda_verbose () =
       set dump_flambda (); set dump_flambda_verbose ()
+    let _djsir = set dump_jsir
     let _drawflambda = set dump_rawflambda
 
     let _output_complete_obj () =
