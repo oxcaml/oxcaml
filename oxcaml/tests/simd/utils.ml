@@ -23,6 +23,9 @@ let eqi lv hv l h =
   then Printf.printf "high: actual = 0x%016x <> 0x%016x = expected\n" hv h;
   if l <> lv || h <> hv then failure ()
 
+let eq64 a b =
+  if a <> b then Printf.printf "actual = 0x%016Lx <> 0x%016Lx = expected\n" a b
+
 let eqf lv hv l h =
   if l <> lv then Printf.printf "%f <> %f\n" l lv;
   if h <> hv then Printf.printf "%f <> %f\n" h hv;

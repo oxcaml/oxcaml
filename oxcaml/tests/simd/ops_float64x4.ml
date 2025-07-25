@@ -14,12 +14,10 @@ external low_to : t -> float
 let () =
   let v1 = low_of 1. in
   let v2 = low_of 2. in
-  let i1 = float64x4_fourth_int64 v1 in
-  let i2 = float64x4_fourth_int64 v2 in
-  eq4 i1 i1 i1 i1 0x3ff0000000000000L 0x3ff0000000000000L 0x3ff0000000000000L
-    0x3ff0000000000000L;
-  eq4 i2 i2 i2 i2 0x4000000000000000L 0x4000000000000000L 0x4000000000000000L
-    0x4000000000000000L;
+  let i1 = float64x4_first_int64 v1 in
+  let i2 = float64x4_first_int64 v2 in
+  eq64 i1 0x3ff0000000000000L;
+  eq64 i2 0x4000000000000000L;
   let f1 = low_to v1 in
   let f2 = low_to v2 in
   eqf f1 f2 1. 2.
@@ -53,34 +51,34 @@ let () =
   let remove_nan p l r = p l r && not (Float.is_nan l || Float.is_nan r) in
   let add_nan p l r = p l r || Float.is_nan l || Float.is_nan r in
   Float64.check_floats
-    (check_cmp "0" (remove_nan Float.equal) (fun l r -> cmp 0 l r));
+    (check_cmp "eq" (remove_nan Float.equal) (fun l r -> cmp 0 l r));
   Float64.check_floats
-    (check_cmp "1"
+    (check_cmp "lt"
        (remove_nan (fun l r -> Float.compare l r = -1))
        (fun l r -> cmp 1 l r));
   Float64.check_floats
-    (check_cmp "2"
+    (check_cmp "le"
        (remove_nan (fun l r -> Float.compare l r <= 0))
        (fun l r -> cmp 2 l r));
   Float64.check_floats
-    (check_cmp "3"
+    (check_cmp "uord"
        (fun l r -> Float.is_nan l || Float.is_nan r)
        (fun l r -> cmp 3 l r));
   Float64.check_floats
-    (check_cmp "4"
+    (check_cmp "neq"
        (fun l r ->
          (not (Float.equal l r)) || (Float.is_nan l && Float.is_nan r))
        (fun l r -> cmp 4 l r));
   Float64.check_floats
-    (check_cmp "5"
+    (check_cmp "nlt"
        (add_nan (fun l r -> Float.compare l r >= 0))
        (fun l r -> cmp 5 l r));
   Float64.check_floats
-    (check_cmp "6"
+    (check_cmp "nle"
        (add_nan (fun l r -> Float.compare l r = 1))
        (fun l r -> cmp 6 l r));
   Float64.check_floats
-    (check_cmp "7"
+    (check_cmp "ord"
        (fun l r -> (not (Float.is_nan l)) && not (Float.is_nan r))
        (fun l r -> cmp 7 l r))
 

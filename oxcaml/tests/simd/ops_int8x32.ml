@@ -12,8 +12,8 @@ external low_to : (t[@unboxed]) -> (int[@untagged])
 let () =
   let v1 = low_of 1 in
   let v2 = low_of 2 in
-  let i1 = int8x32_fourth_int64 v1 |> Int64.logand 0xffL in
-  let i2 = int8x32_fourth_int64 v2 |> Int64.logand 0xffL in
+  let i1 = int8x32_first_int64 v1 |> Int64.logand 0xffL in
+  let i2 = int8x32_first_int64 v2 |> Int64.logand 0xffL in
   eq i1 i2 1L 2L;
   let i1 = low_to v1 in
   let i2 = low_to v2 in
@@ -70,10 +70,10 @@ let () =
       let expectl = Int8.cvtsx_i64 l in
       let expectr = Int8.cvtsx_i64 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtzx_int64x4\n%!" l r);
@@ -82,10 +82,10 @@ let () =
       let expectl = Int8.cvtzx_i64 l in
       let expectr = Int8.cvtzx_i64 r in
       eq4
-        (int64x4_fourth_int64 result)
-        (int64x4_third_int64 result)
-        (int64x4_second_int64 result)
         (int64x4_first_int64 result)
+        (int64x4_second_int64 result)
+        (int64x4_third_int64 result)
+        (int64x4_fourth_int64 result)
         expectl expectr expectl expectr);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x\n   cvtsx_int32x8\n%!" l r);
@@ -238,12 +238,12 @@ let () =
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x msadu\n%!" l r);
       let v0 =
-        Int8.to_int8x32 l l r r l l r r l l r r l l r r l l r r l l r r l l r r
-          l l r r
+        Int8.to_int8x32 l l r r l l r r l l r 0 0 0 0 0 l l r r l l r r l l r 0
+          0 0 0 0
       in
       let v1 =
-        Int8.to_int8x32 l r l r l r l r l r l r l r l r l r l r l r l r l r l r
-          l r l r
+        Int8.to_int8x32 l r l r 0 0 0 0 0 0 0 0 0 0 0 0 l r l r 0 0 0 0 0 0 0 0
+          0 0 0 0
       in
       let result = multi_sad_unsigned 0 v0 v1 in
       let lr = 2 * Int8.diffu l r in
