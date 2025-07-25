@@ -164,15 +164,7 @@ module Extension = struct
   let enabled_vec256 () = enabled AVX
   let enabled_vec512 () = enabled AVX512F
 
-  let require_vec256 () =
-    if not (enabled AVX) then Misc.fatal_error
-      "Using 256-bit registers requires AVX, which is not enabled."
-
-  let require_vec512 () =
-    if not (enabled AVX512F) then Misc.fatal_error
-      "Using 512-bit registers requires AVX512F, which is not enabled."
-
-  let require_instruction (instr : Amd64_simd_instrs.instr) =
+  let enabled_instruction (instr : Amd64_simd_instrs.instr) =
     let enabled : Amd64_simd_defs.ext -> bool = function
       | SSE | SSE2 -> true
       | SSE3 -> enabled SSE3
@@ -184,8 +176,7 @@ module Extension = struct
       | AVX -> enabled AVX
       | AVX2 -> enabled AVX2
     in
-    if not (Array.for_all enabled instr.ext)
-    then Misc.fatal_errorf "Emitted %s, which is not enabled." instr.mnemonic
+    Array.for_all enabled instr.ext
 end
 
 (* Emit elf notes with trap handling information. *)

@@ -43,11 +43,52 @@ module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
 
+(* Name of current function *)
+let function_name = ref ""
+
+(* Keep the name of the current block section to get back to it after emitting
+   data. *)
+let current_basic_block_section = ref ""
+
 module I = struct
   include I
 
-  let simd simd args =
-    Arch.Extension.require_instruction simd;
+  exception Extension_disabled of string
+
+  let () =
+    Printexc.register_printer (function
+      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
+      | _ -> None)
+
+  let require_vec256 () =
+    if not (Arch.Extension.enabled_vec256 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 256-bit register whilst emitting %s, but AVX is not \
+               enabled."
+              !function_name))
+
+  let require_vec512 () =
+    if not (Arch.Extension.enabled_vec512 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 512-bit register whilst emitting %s, but AVX512F is not \
+               enabled."
+              !function_name))
+
+  let simd (simd : Simd_instrs.instr) args =
+    if not (Arch.Extension.enabled_instruction simd)
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found '%s' whilst emitting %s, but %s is not enabled."
+              simd.mnemonic !function_name
+              (Amd64_simd_defs.exts_to_string simd.ext)));
     I.simd simd args
 end
 
@@ -80,10 +121,10 @@ let register_name typ r : X86_ast.arg =
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     Regf ymm_reg_name.(r - 100)
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     Regf zmm_reg_name.(r - 100)
 
 let phys_rax = phys_reg Int 0
@@ -299,13 +340,6 @@ let emit_named_text_section ?(suffix = "") func_name =
       D.unsafe_set_internal_section_ref Text)
   else D.text ()
 
-(* Name of current function *)
-let function_name = ref ""
-
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
-
 let emit_function_or_basic_block_section_name () =
   let suffix =
     if String.length !current_basic_block_section = 0
@@ -337,10 +371,10 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   | Float -> REAL8
   | Vec128 -> VEC128
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     VEC256
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
   | Int | Addr | Val -> QWORD
@@ -444,11 +478,11 @@ let must_save_simd_regs live =
     live;
   if !v512
   then (
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     Save_zmm)
   else if !v256
   then (
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     Save_ymm)
   else Save_xmm
 
@@ -2374,8 +2408,9 @@ let emit_instr ~first ~fallthrough i =
       ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~fallthrough i =
-  try emit_instr ~first ~fallthrough i
-  with exn ->
+  try emit_instr ~first ~fallthrough i with
+  | I.Extension_disabled _ as exn -> raise exn
+  | exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
@@ -2389,11 +2424,12 @@ let rec emit_all ~first ~fallthrough i =
   | Lcondbranch3 (_, _, _)
   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
     ->
-    (try emit_instr ~first ~fallthrough i
-     with exn ->
-       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-         Printlinear.instr i;
-       raise exn);
+    (try emit_instr ~first ~fallthrough i with
+    | I.Extension_disabled _ as exn -> raise exn
+    | exn ->
+      Format.eprintf "Exception whilst emitting instruction:@ %a\n"
+        Printlinear.instr i;
+      raise exn);
     emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
 
 let all_functions = ref []

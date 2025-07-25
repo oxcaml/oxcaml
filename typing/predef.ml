@@ -638,6 +638,8 @@ let add_simd_beta_extension_types add_type env =
   |> add_type ident_float64x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
 
+let add_simd_beta_extension_types _add_type env = env
+
 let add_simd_alpha_extension_types add_type env =
   let _, add_type = mk_add_type add_type in
   env
