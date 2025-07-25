@@ -27,12 +27,6 @@ val n_way_join :
   Type_grammar.t Join_env.join_arg list ->
   Type_grammar.t Or_unknown.t * Join_env.t
 
-val meet_shape :
-  Typing_env.t ->
-  Type_grammar.t ->
-  shape:Type_grammar.t ->
-  Typing_env.t Or_bottom.t
-
 (* This function has a slightly different interface; it is meant to be used only
    by functions in Typing_env *)
 val meet_type :

@@ -181,12 +181,19 @@ CAMLexport void caml_do_exit(int retcode)
           "forced_major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
           (intnat)s.alloc_stats.forced_major_collections);
       CAML_GC_MESSAGE(STATS,
+          "compactions: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+          atomic_load(&caml_compactions_count));
+      CAML_GC_MESSAGE(STATS,
           "major_work_done: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
           (intnat)s.alloc_stats.major_work_done);
-      caml_gc_message(0x400, "heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      CAML_GC_MESSAGE(STATS, "heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
                     heap_words);
       CAML_GC_MESSAGE(STATS, "top_heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
                       top_heap_words);
+      CAML_GC_MESSAGE(STATS, "chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+                      s.global_stats.chunk_words);
+      CAML_GC_MESSAGE(STATS, "max chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+                      s.global_stats.max_chunk_words);
     }
   }
 

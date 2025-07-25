@@ -140,6 +140,8 @@ val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
 
+val addressing_displacement_for_llvmize : addressing_mode -> int
+
 val print_addressing :
   (Format.formatter -> 'a -> unit) -> addressing_mode ->
   Format.formatter -> 'a array -> unit

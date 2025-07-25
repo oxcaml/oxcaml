@@ -2,7 +2,7 @@ File "c.ml", line 1, characters 5-15:
 Error: Annotation check for zero_alloc failed on function C.test_foo (camlC.test_foo_HIDE_STAMP).
 
 File "c.ml", line 1, characters 30-42:
-Error: called function may allocate (direct tailcall camlA.inner_foo_HIDE_STAMP) (c.ml:1,30--42;b.ml:1,17--24;a.ml:3,28--39)
+Error: called function may allocate (direct tailcall camlA.inner_foo_HIDE_STAMP) (a.ml:3,28--39;b.ml:1,17--24;c.ml:1,30--42)
 Hint: Build artifacts for the library containing the callee are not available.
 Try adding the library as an explicit dependency.
 
@@ -11,7 +11,7 @@ File "c.ml", line 3, characters 5-15:
 Error: Annotation check for zero_alloc failed on function C.test_bar (camlC.test_bar_HIDE_STAMP).
 
 File "c.ml", line 3, characters 30-42:
-Error: called function may allocate (direct tailcall camlA.inner_bar_HIDE_STAMP) (c.ml:3,30--42;b.ml:3,17--24;a.ml:7,28--39)
+Error: called function may allocate (direct tailcall camlA.inner_bar_HIDE_STAMP) (a.ml:7,28--39;b.ml:3,17--24;c.ml:3,30--42)
 Hint: Build artifacts for the library containing the callee are not available.
 Try adding the library as an explicit dependency.
 

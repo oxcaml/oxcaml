@@ -39,7 +39,7 @@ let () =
           while true do
             (* This allocation will eventually trigger the finaliser *)
             extra_arg2 := Sys.opaque_identity "K";
-            let _ = Sys.opaque_identity (42, Random.int 42) in
+            let _ @ global = Sys.opaque_identity (42, Random.int 42) in
             ()
           done
         with exn -> Printf.printf "1. wrong handler\n%!"; assert false
@@ -72,7 +72,7 @@ let raise_break_from_finaliser () =
   try
     r := None;
     while true do
-      let _ = Sys.opaque_identity (42, Random.int 42) in
+      let _ @ global = Sys.opaque_identity (42, Random.int 42) in
       ()
     done
   with exn -> Printf.printf "3a/b/c/d. wrong handler\n%!"; exit 1

@@ -766,7 +766,7 @@ CFI_STARTPROC
         movq    C_ARG_2, %rdi      /* closure */
         movq    0(C_ARG_3), %rax   /* first argument */
         movq    8(C_ARG_3), %rbx   /* second argument */
-        LEA_VAR(caml_apply2, %r12) /* code pointer */
+        LEA_VAR(caml_apply2L, %r12)/* code pointer */
         jmp     LBL(caml_start_program)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_callback2_asm))
@@ -781,7 +781,7 @@ CFI_STARTPROC
         movq    8(C_ARG_3), %rbx   /* second argument */
         movq    C_ARG_2, %rsi      /* closure */
         movq    16(C_ARG_3), %rdi  /* third argument */
-        LEA_VAR(caml_apply3, %r12) /* code pointer */
+        LEA_VAR(caml_apply3L, %r12)/* code pointer */
         jmp     LBL(caml_start_program)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_callback3_asm))

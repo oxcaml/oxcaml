@@ -1037,7 +1037,7 @@ FUNCTION(caml_callback2_asm)
         mov     TMP2, x1
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         mov     x2, TMP2         /* x2 = closure environment */
-        ADDRGLOBAL(TMP2, caml_apply2)
+        ADDRGLOBAL(TMP2, caml_apply2L)
         b       L(jump_to_caml)
         CFI_ENDPROC
 END_FUNCTION(caml_callback2_asm)
@@ -1064,7 +1064,7 @@ FUNCTION(caml_callback3_asm)
         mov     x3, x1          /* x3 = closure environment */
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         ldr     x2, [x2, 16]    /* x2 = third arg */
-        ADDRGLOBAL(TMP2, caml_apply3)
+        ADDRGLOBAL(TMP2, caml_apply3L)
         b       L(jump_to_caml)
         CFI_ENDPROC
 END_FUNCTION(caml_callback3_asm)

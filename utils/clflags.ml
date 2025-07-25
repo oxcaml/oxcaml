@@ -142,6 +142,7 @@ let dump_cse = ref false                (* -dcse *)
 let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
+let llvm_backend = ref false            (* -llvm-backend *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
@@ -450,6 +451,10 @@ let error_style_reader = {
 }
 
 let unboxed_types = ref false
+
+let dump_debug_uids = ref false         (* -ddebug-uids *)
+
+let dump_debug_uid_tables = ref false    (* -ddebug-uid-tables *)
 
 (* This is used by the -save-ir-after and -save-ir-before options. *)
 module Compiler_ir = struct
