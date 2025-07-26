@@ -1557,3 +1557,43 @@ G(caml_absf32_mask):
     /* Mark stack as non-executable, PR#4564 */
         .section .note.GNU-stack,"",%progbits
 #endif
+
+/******************************************************************************/
+/* ASAN */
+/******************************************************************************/
+
+#ifdef WITH_ADDRESS_SANITIZER
+
+.extern __asan_report_load_n_noabort
+.extern __asan_report_store_n_noabort
+
+#define Make_report_fun(kind, bytes, regs, simd)                    \
+FUNCTION(G(caml_asan_report_ ## kind ## bytes ## _noabort ## simd)) \
+CFI_STARTPROC;                                                      \
+        ENTER_FUNCTION;                                             \
+        SAVE_ALL_REGS(regs);                                        \
+        movq $bytes, %rsi;                                          \
+        call __asan_report_ ## kind ## _n_noabort;                  \
+        RESTORE_ALL_REGS(regs);                                     \
+        LEAVE_FUNCTION;                                             \
+        ret;                                                        \
+CFI_ENDPROC;                                                        \
+ENDFUNCTION(G(caml_asan_report_ ## kind ## bytes ## _noabort ## simd));
+
+#define Make_report_funs(bytes)            \
+Make_report_fun(load, bytes, XMM,)         \
+Make_report_fun(load, bytes, YMM, _avx)    \
+Make_report_fun(load, bytes, ZMM, _avx512) \
+Make_report_fun(store, bytes, XMM,)        \
+Make_report_fun(store, bytes, YMM, _avx)   \
+Make_report_fun(store, bytes, ZMM, _avx512)
+
+Make_report_funs(1)
+Make_report_funs(2)
+Make_report_funs(4)
+Make_report_funs(8)
+Make_report_funs(16)
+Make_report_funs(32)
+Make_report_funs(64)
+
+#endif
