@@ -2550,6 +2550,7 @@ end = struct
              poll insertion is enabled. [@poll error] should be used instead. *)
           next
         | Alloc { mode = Local; _ } -> next
+        | Alloc { mode = External; _ } -> next
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect =

@@ -16,46 +16,45 @@ module For_types = struct
   type t =
     | Heap
     | Local
-    | Heap_or_local
+    | Unknown
   [@@warning "-37"]
 
   let print ppf t =
     match t with
     | Heap -> Format.pp_print_string ppf "Heap"
     | Local -> Format.pp_print_string ppf "Local"
-    | Heap_or_local -> Format.pp_print_string ppf "Heap_or_local"
+    | Unknown -> Format.pp_print_string ppf "Unknown"
 
   let compare t1 t2 =
     match t1, t2 with
-    | Heap, Heap | Local, Local | Heap_or_local, Heap_or_local -> 0
-    | Heap, (Local | Heap_or_local) -> -1
-    | (Local | Heap_or_local), Heap -> 1
-    | Local, Heap_or_local -> -1
-    | Heap_or_local, Local -> 1
+    | Heap, Heap | Local, Local | Unknown, Unknown -> 0
+    | Heap, (Local | Unknown) -> -1
+    | (Local | Unknown), Heap -> 1
+    | Local, Unknown -> -1
+    | Unknown, Local -> 1
 
   let equal t1 t2 = compare t1 t2 = 0
 
   let heap = Heap
 
   let local () =
-    if not (Flambda_features.stack_allocation_enabled ())
-    then Heap
-    else Heap_or_local
+    if not (Flambda_features.stack_allocation_enabled ()) then Heap else Unknown
 
   let unknown () =
-    if not (Flambda_features.stack_allocation_enabled ())
-    then Heap
-    else Heap_or_local
+    if not (Flambda_features.stack_allocation_enabled ()) then Heap else Unknown
 
-  let from_lambda (mode : Lambda.locality_mode) =
+  let from_lambda (mode : Lambda.allocation_mode) =
     if not (Flambda_features.stack_allocation_enabled ())
     then Heap
-    else match mode with Alloc_heap -> Heap | Alloc_local -> Heap_or_local
+    else
+      match mode with
+      | Alloc_heap -> Heap
+      | Alloc_local | Alloc_external -> Unknown
 
   let to_lambda t =
     match t with
     | Heap -> Lambda.alloc_heap
-    | Local | Heap_or_local ->
+    | Local | Unknown ->
       assert (Flambda_features.stack_allocation_enabled ());
       Lambda.alloc_local
 end
@@ -92,16 +91,18 @@ module For_applications = struct
     then Local { region; ghost_region }
     else Heap
 
-  let as_type t : For_types.t =
-    match t with Heap -> Heap | Local _ -> Heap_or_local
+  let as_type t : For_types.t = match t with Heap -> Heap | Local _ -> Unknown
 
-  let from_lambda (mode : Lambda.locality_mode) ~current_region
+  let from_lambda (mode : Lambda.allocation_mode) ~current_region
       ~current_ghost_region =
     if not (Flambda_features.stack_allocation_enabled ())
     then Heap
     else
       match mode with
       | Alloc_heap -> Heap
+      | Alloc_external ->
+        Misc.fatal_error
+          "Impossible, externally-allocated functions are not supported"
       | Alloc_local -> (
         match current_region, current_ghost_region with
         | Some current_region, Some current_ghost_region ->
@@ -140,22 +141,29 @@ module For_allocations = struct
   type t =
     | Heap
     | Local of { region : Variable.t }
+    | External
 
   let print ppf t =
     match t with
     | Heap -> Format.pp_print_string ppf "Heap"
     | Local { region } ->
       Format.fprintf ppf "@[<hov 1>(Local (region@ %a))@]" Variable.print region
+    | External -> Format.pp_print_string ppf "External"
 
   let compare t1 t2 =
     match t1, t2 with
     | Heap, Heap -> 0
     | Local { region = region1 }, Local { region = region2 } ->
       Variable.compare region1 region2
-    | Heap, Local _ -> -1
+    | External, External -> 0
+    | Heap, (Local _ | External) -> -1
     | Local _, Heap -> 1
+    | Local _, External -> -1
+    | External, (Local _ | Heap) -> 1
 
   let heap = Heap
+
+  let external_ = External
 
   let local ~region =
     if Flambda_features.stack_allocation_enabled ()
@@ -163,9 +171,9 @@ module For_allocations = struct
     else Heap
 
   let as_type t : For_types.t =
-    match t with Heap -> Heap | Local _ -> Heap_or_local
+    match t with Heap -> Heap | Local _ | External -> Unknown
 
-  let from_lambda (mode : Lambda.locality_mode) ~current_region =
+  let from_lambda (mode : Lambda.allocation_mode) ~current_region =
     if not (Flambda_features.stack_allocation_enabled ())
     then Heap
     else
@@ -175,12 +183,14 @@ module For_allocations = struct
         match current_region with
         | Some region -> Local { region }
         | None -> Misc.fatal_error "Local allocation without a region")
+      | Alloc_external -> External
 
   let free_names t =
     match t with
     | Heap -> Name_occurrences.empty
     | Local { region } ->
       Name_occurrences.singleton_variable region Name_mode.normal
+    | External -> Name_occurrences.empty
 
   let apply_renaming t renaming =
     match t with
@@ -188,11 +198,13 @@ module For_allocations = struct
     | Local { region } ->
       let region' = Renaming.apply_variable renaming region in
       if region == region' then t else Local { region = region' }
+    | External -> External
 
   let ids_for_export t =
     match t with
     | Heap -> Ids_for_export.empty
     | Local { region } -> Ids_for_export.singleton_variable region
+    | External -> Ids_for_export.empty
 end
 
 module For_assignments = struct

@@ -313,6 +313,7 @@ module Alloc_mode : sig
   type t =
     | Heap
     | Local
+    | External
 
   val equal : t -> t -> bool
 
@@ -321,6 +322,8 @@ module Alloc_mode : sig
   val is_local : t -> bool
 
   val is_heap : t -> bool
+
+  val is_external : t -> bool
 end
 
 type alloc_block_kind =

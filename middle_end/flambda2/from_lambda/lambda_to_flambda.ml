@@ -1299,7 +1299,9 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
     ({ kind; params; return; body; attr; loc; mode; ret_mode } : L.lfunction) :
     Function_decl.t =
   let contains_no_escaping_local_allocs =
-    match ret_mode with Alloc_heap -> true | Alloc_local -> false
+    match ret_mode with
+    | Alloc_heap | Alloc_external -> true
+    | Alloc_local -> false
   in
   let first_complex_local_param =
     List.length params

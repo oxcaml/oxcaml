@@ -291,6 +291,7 @@ let extra sub = function
   | Texp_newtype _ -> ()
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
   | Texp_stack -> ()
+  | Texp_alloc -> ()
   | Texp_mode _ -> ()
 
 let function_param sub { fp_loc; fp_kind; fp_newtypes; _ } =
@@ -456,8 +457,6 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     sub.expr sub exp1;
     sub.expr sub exp2
   | Texp_hole _ -> ()
-  | Texp_alloc (exp, _) ->
-      sub.expr sub exp
 
 
 let package_type sub {pack_fields; pack_txt; _} =

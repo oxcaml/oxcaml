@@ -920,3 +920,19 @@ Line 1, characters 19-26:
                        ^^^^^^^
 Error: This expression is not an allocation site.
 |}]
+
+let f (x @ external_) (y @ external_) = stack_ (malloc_ (x,y))
+[%%expect{|
+Line 1, characters 47-62:
+1 | let f (x @ external_) (y @ external_) = stack_ (malloc_ (x,y))
+                                                   ^^^^^^^^^^^^^^^
+Error: Stack allocating externally allocated expressions is unsupported yet.
+|}]
+
+let f (x @ external_) (y @ external_) = malloc_ (stack_ (x,y))
+[%%expect{|
+Line 1, characters 48-62:
+1 | let f (x @ external_) (y @ external_) = malloc_ (stack_ (x,y))
+                                                    ^^^^^^^^^^^^^^
+Error: This expression is not an allocation site.
+|}]
