@@ -37,8 +37,6 @@ type immediate_or_pointer =
   | Immediate
   | Pointer
 
-(* CR jcutler: should be called something else. allocation_mode? Also a bunch of
-   funcs named after this that should also change. *)
 type allocation_mode = private
   | Alloc_heap
   | Alloc_local
