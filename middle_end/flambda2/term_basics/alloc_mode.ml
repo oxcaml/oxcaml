@@ -95,7 +95,8 @@ module For_applications = struct
     then Local { region; ghost_region }
     else Heap
 
-  let as_type t : For_types.t = match t with Heap -> Heap | Local _ -> Heap_or_local
+  let as_type t : For_types.t =
+    match t with Heap -> Heap | Local _ -> Heap_or_local
 
   let from_lambda (mode : Lambda.allocation_mode) ~current_region
       ~current_ghost_region =
