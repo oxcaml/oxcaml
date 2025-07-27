@@ -365,7 +365,9 @@ let makearray_dynamic_non_scannable_unboxed_product env
       (L.array_set_kind
          (match mode with
          | Alloc_heap -> L.modify_heap
-         | Alloc_local | Alloc_external -> L.modify_maybe_stack)
+         | Alloc_local -> L.modify_maybe_stack
+         | Alloc_external ->
+           Misc.fatal_error "Externally allocated arrays are not supported")
          lambda_array_kind)
       (* There is no packing in unboxed product arrays, even if the elements are
          all float32# or int32#. *)
@@ -388,8 +390,10 @@ let makearray_dynamic_scannable_unboxed_product0
   let is_local =
     L.of_bool
       (match mode with
-      | Alloc_heap | Alloc_external -> false
-      | Alloc_local -> true)
+      | Alloc_heap -> false
+      | Alloc_local -> true
+      | Alloc_external ->
+        Misc.fatal_error "Externally allocated arrays are not supported")
   in
   let external_call_desc =
     makearray_dynamic_unboxed_product_c_stub
