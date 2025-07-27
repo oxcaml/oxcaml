@@ -431,9 +431,9 @@ let meet_alloc_mode env (alloc_mode1 : Alloc_mode.For_types.t)
 let join_alloc_mode (alloc_mode1 : Alloc_mode.For_types.t)
     (alloc_mode2 : Alloc_mode.For_types.t) : Alloc_mode.For_types.t =
   match alloc_mode1, alloc_mode2 with
-  | Heap, Heap -> Alloc_mode.For_types.heap
   | (Heap_or_local | Local), _ | _, (Heap_or_local | Local) ->
     Alloc_mode.For_types.unknown ()
+  | Heap, Heap -> Alloc_mode.For_types.heap
 
 let[@inline always] meet_unknown meet_contents ~contents_is_bottom env
     (or_unknown1 : _ Or_unknown.t) (or_unknown2 : _ Or_unknown.t) :
