@@ -548,12 +548,16 @@ val with_type_mark: (type_mark -> 'a) -> 'a
 val not_marked_node: type_mark -> type_expr -> bool
         (* Return true if a type node is not yet marked *)
 
+val marked_node: type_mark -> type_expr -> bool
+        (* Return true if a type node is marked *)
+
 val try_mark_node: type_mark -> type_expr -> bool
         (* Mark a type node if it is not yet marked.
            Marks will be automatically removed when leaving the
            scope of [with_type_mark].
 
            Return false if it was already marked *)
+val mark_node: type_mark -> type_expr -> unit
 
 (** Transient [type_expr].
     Should only be used immediately after [Transient_expr.repr] *)
@@ -789,14 +793,17 @@ module Variance : sig
       May_pos                (* allow positive occurrences *)
     | May_neg                (* allow negative occurrences *)
     | May_weak               (* allow occurrences under a negative position *)
+    | May_noncontractive     (* allow occurences that are not contractive *)
     | Inj                    (* type is injective in this parameter *)
     | Pos                    (* there is a positive occurrence *)
     | Neg                    (* there is a negative occurrence *)
     | Inv                    (* both negative and positive occurrences *)
   val null : t               (* no occurrence *)
   val full : t               (* strictly invariant (all flags) *)
-  val covariant : t          (* strictly covariant (May_pos, Pos and Inj) *)
-  val contravariant : t      (* strictly contravariant *)
+  val covariant : t          (* strictly covariant
+                                (May_pos, Pos, Inj and May_noncontractive) *)
+  val contravariant : t      (* strictly contravariant
+                                (May_neg, Neg, Inj and May_noncontractive) *)
   val unknown : t            (* allow everything, guarantee nothing *)
   val union  : t -> t -> t
   val inter  : t -> t -> t
@@ -806,10 +813,13 @@ module Variance : sig
   val set_if : bool -> f -> t -> t
   val mem : f -> t -> bool
   val conjugate : t -> t                (* exchange positive and negative *)
+  val contractive : t -> t
+  val contractive_if_rectypes_enabled : t -> t
   val compose : t -> t -> t
   val strengthen : t -> t                (* remove May_weak when possible *)
   val get_upper : t -> bool * bool                    (* may_pos, may_neg *)
   val get_lower : t -> bool * bool * bool                (* pos, neg, inj *)
+  val is_null : t -> bool
   val unknown_signature : injective:bool -> arity:int -> t list
   (** The most pessimistic variance for a completely unknown type. *)
 end
