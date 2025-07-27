@@ -315,7 +315,7 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.allocation_mode) =
         | Alloc_heap -> Prim_global
         | Alloc_local -> Prim_local
         | Alloc_external ->
-          Misc.fatal_error "Externally allocated arrays are not supported"),
+          Misc.fatal_error "External arrays are not supported"),
         L.Same_as_ocaml_repr (Base Value) )
     ~is_layout_poly:false
 
@@ -326,8 +326,10 @@ let makearray_dynamic_non_scannable_unboxed_product env
   let is_local =
     L.of_bool
       (match mode with
-      | Alloc_heap | Alloc_external -> false
-      | Alloc_local -> true)
+      | Alloc_heap -> false
+      | Alloc_local -> true
+      | Alloc_external ->
+        Misc.fatal_error "External arrays are not supported")
   in
   let external_call_desc =
     makearray_dynamic_unboxed_product_c_stub
