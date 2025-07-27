@@ -74,9 +74,15 @@ include (struct
 
   let join_allocation_mode a b =
     match a, b with
-    | Alloc_local, _ | _, Alloc_local -> Alloc_local
+    | Alloc_local, Alloc_local
+    | Alloc_local, Alloc_heap
+    | Alloc_heap, Alloc_local -> Alloc_local
     | Alloc_heap, Alloc_heap -> Alloc_heap
-    | Alloc_external,_ | _,Alloc_external -> Alloc_external
+    | Alloc_external, Alloc_heap
+    | Alloc_heap, Alloc_external
+    | Alloc_external, Alloc_external -> Alloc_external
+    | Alloc_external, Alloc_local | Alloc_local, Alloc_external ->
+      Misc.fatal_error "Incompatible allocation modes in join"
 end : sig
 
   type allocation_mode = private
@@ -117,7 +123,6 @@ let sub_allocation_mode a b =
   | Alloc_local, (Alloc_heap | Alloc_external) -> false
   | Alloc_external, Alloc_external -> true
   | Alloc_external, Alloc_heap -> false
-
 
 let eq_allocation_mode a b =
   match a, b with
