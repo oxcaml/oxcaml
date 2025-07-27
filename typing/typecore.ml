@@ -7083,19 +7083,22 @@ and type_expect_
       | Texp_record {alloc_mode = Some alloc_mode; _}
       | Texp_array (_, _, _, alloc_mode)
       | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
-        (match alloc_mode with
-        | External -> unsupported External_allocation
-        | Internal alloc_mode ->
-          submode ~loc ~env
-            (Value.min_with_comonadic Areality Regionality.local)
-            expected_mode;
-          match
-            Locality.submode Locality.local
-              (Alloc.proj_comonadic Areality alloc_mode.mode)
-          with
-          | Ok () -> ()
-          | Error _ -> raise (Error (e.pexp_loc, env,
-              Cannot_stack_allocate alloc_mode.locality_context)))
+        begin
+          match alloc_mode with
+          | External -> unsupported External_allocation
+          | Internal alloc_mode ->
+            submode ~loc ~env
+              (Value.min_with_comonadic Areality Regionality.local)
+              expected_mode;
+            begin match
+              Locality.submode Locality.local
+                (Alloc.proj_comonadic Areality alloc_mode.mode)
+            with
+            | Ok () -> ()
+            | Error _ -> raise (Error (e.pexp_loc, env,
+                Cannot_stack_allocate alloc_mode.locality_context))
+            end
+        end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension
       | Texp_new _ -> unsupported Object
