@@ -17,9 +17,13 @@
 open Types
 open Typedecl_properties
 
-type surface_variance = bool * bool * bool
+type surface_variance =
+  { plus: bool;
+    minus: bool;
+    bang: bool;
+    rec_: bool; }
 
-val variance_of_params :
+val variance_of_pparams :
   (Parsetree.core_type * (Asttypes.variance * Asttypes.injectivity)) list ->
   surface_variance list
 

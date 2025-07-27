@@ -147,13 +147,20 @@ module Stdlib = struct
       in
       aux [] l1 l2
 
-    let map3 f =
-      let rec loop acc as_ bs cs = match as_, bs, cs with
+    let map3 f as_ bs cs =
+      let rec loop f acc as_ bs cs =
+        match as_, bs, cs with
         | [], [], [] -> List.rev acc
-        | a :: as_, b :: bs, c :: cs -> loop (f a b c :: acc) as_ bs cs
+        | a :: as_, b :: bs, c :: cs -> loop f (f a b c :: acc) as_ bs cs
         | _ -> invalid_arg "map3"
       in
-      loop []
+      loop f [] as_ bs cs
+
+    let rec iter3 f as_ bs cs =
+      match as_, bs, cs with
+      | [], [], [] -> ()
+      | a :: as_, b :: bs, c :: cs -> f a b c; iter3 f as_ bs cs
+      | _ -> invalid_arg "iter3"
 
     let concat_map2 f l1 l2 =
       let rec aux f acc = function

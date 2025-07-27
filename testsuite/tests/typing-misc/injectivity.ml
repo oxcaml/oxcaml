@@ -96,7 +96,7 @@ Line 2, characters 0-16:
     ^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       but it is recursive .
 |}]
 type !'a t = private 'a list
 type !'a t = private int
@@ -107,7 +107,7 @@ Line 2, characters 0-24:
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
-       but it is unrestricted.
+       but it is recursive .
 |}]
 
 (* Can also use to add injectivity in private row types *)
@@ -415,7 +415,7 @@ Line 1, characters 19-47:
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       but it is recursive invariant.
 |}]
 
 (* The parameter of R.t is never used, so we can build an equality witness
@@ -462,7 +462,7 @@ Line 3, characters 2-35:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       but it is recursive invariant.
 |}]
 
 module Priv2 :
@@ -483,5 +483,5 @@ Line 3, characters 2-31:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be injective invariant,
-       but it is invariant.
+       but it is recursive invariant.
 |}]
