@@ -7,6 +7,11 @@ external is_young : ('a : word) -> bool = "is_young" "is_young"
 
 external print_external_block_entries : ('a : word) -> int64# -> string -> unit = "print_block" "print_block"
 
+external deref : ('a : word) -> 'b = "deref" "deref"
+
+let use : 'a mallocd -> ('a @ local -> 'b) -> 'b =
+  fun m f -> f (deref m)
+
 let is_a_malloc name ~num_fields f =
   let prebefore = Gc.allocated_bytes () in
   let before = Gc.allocated_bytes () in
