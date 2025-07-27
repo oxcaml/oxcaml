@@ -17,7 +17,7 @@ module For_types : sig
   type t = private
     | Heap  (** Normal allocation on the OCaml heap. *)
     | Local  (** Allocation on the local allocation stack. *)
-    | Heap_or_local (** Allocation with unknown location *)
+    | Heap_or_local  (** Allocation with unknown location *)
 
   val print : Format.formatter -> t -> unit
 
