@@ -556,7 +556,7 @@ To ensure that your C code will need to be updated when the layout changes, use
 the `Assert_mixed_block_layout_v#` family of macros. For example,
 
 ```
-Assert_mixed_block_layout_v3;
+Assert_mixed_block_layout_v4;
 ```
 
 Write the above in statement context, i.e. either at the top-level of a file or
@@ -586,7 +586,7 @@ type t =
 Here is the recommend way to access fields:
 
 ```c
-Assert_mixed_block_layout_v3;
+Assert_mixed_block_layout_v4;
 #define Foo_t_x(foo) (*(int32_t*)&Field(foo, 0))
 #define Foo_t_y(foo) (*(int32_t*)&Field(foo, 1))
 ```

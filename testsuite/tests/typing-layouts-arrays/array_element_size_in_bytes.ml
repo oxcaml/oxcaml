@@ -8,16 +8,7 @@
  }
 *)
 
-(* CR layouts v4: The below definition is just to give this test slightly
-   different behavior on native code and bytecode, because some arrays of
-   unboxed things are represented as custom blocks on only native code, and
-   therefore the size calculations differ slightly. Delete this when we change
-   the representation to not use custom blocks. *)
-let custom_block_padding =
-  match Sys.backend_type with
-  | Native -> 1
-  | Bytecode -> 0
-  | Other _ -> failwith "Don't know what to do"
+(* Unboxed arrays now use normal blocks instead of custom blocks *)
 
 (* We only compile for 64 bits. *)
 let bytes_per_word = 8
@@ -71,8 +62,7 @@ let _ = check_floatu ~init:#42.0 ~element_size:floatu_array_element_size
 let check_int64u ~(init : int64#) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((custom_block_padding + (element_size * n / bytes_per_word))
-            = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
   in
   List.iter check_one array_sizes_to_check
 
@@ -91,8 +81,7 @@ let check_float32u ~(init : float32#) ~element_size =
       | Bytecode -> n
       | Other _ -> failwith "Don't know what to do"
     in
-    assert ((custom_block_padding + (element_size * n / bytes_per_word))
-            = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
   in
   List.iter check_one array_sizes_to_check
 
@@ -111,8 +100,7 @@ let check_int32u ~(init : int32#) ~element_size =
       | Bytecode -> n
       | Other _ -> failwith "Don't know what to do"
     in
-    assert ((custom_block_padding + (element_size * n / bytes_per_word))
-            = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
   in
   List.iter check_one array_sizes_to_check
 
