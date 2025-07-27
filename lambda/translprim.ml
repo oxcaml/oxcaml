@@ -2208,9 +2208,7 @@ let report_error ppf = function
         Style.inline_code "[@local_opt]" Style.inline_code "local_"
   | Invalid_stack_primitive Allocating_externally ->
       fprintf ppf
-        "This primitive always allocates externally@ \
-        (maybe it should be declared with %a or %a?)"
-        Style.inline_code "[@local_opt]" Style.inline_code "local_"
+        "This primitive always allocates externally"
 
 let () =
   Location.register_error_of_exn
