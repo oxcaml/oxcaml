@@ -597,7 +597,7 @@ CAMLexport value caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
   } 
 
   //CR jcutler for ccasinghino: what color to use here?
-  //NOT_MARKABLE is not available on runtime4...
+  //NOT_MARKABLE does not seem to exist on runtime4...
   uintnat color = 0;
   Hd_hp(res) = Make_header_with_reserved(wosize, tag, color, reserved);
   value v = Val_hp(res);
