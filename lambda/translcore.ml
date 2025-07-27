@@ -1284,7 +1284,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
 
-
 and pure_module m =
   match m.mod_desc with
     Tmod_ident _ -> Alias
