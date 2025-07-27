@@ -7,15 +7,15 @@ CAMLprim value is_young(uint64_t v){
     return Val_bool(Is_young(v));
 }
 
-CAMLprim value deref(value v){
-    CAMLparam1(v);
+CAMLprim uint64_t deref(uint64_t v){
     return v;
 }
 
 CAMLprim value print_block(uint64_t v, uint64_t fields, value name){
+    CAMLparam1(name);
     printf("Test %s:\n", String_val(name));
     for(int i = 0; i < fields; i++){
-        printf("  Field %d: %u\n",i,(uint64_t) Field(v,i));
+        printf("  Field %d: %llu\n",i,(uint64_t) Field(v,i));
     }
     printf("\n");
     fflush(stdout);

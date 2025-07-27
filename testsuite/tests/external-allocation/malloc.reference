@@ -2,114 +2,128 @@ Test tuple:
   Field 0: 3
   Field 1: 7
 
-tuple: No GC-visible Allocation, result value is outside small heap
+tuple: No GC-visible Allocation, result value is outside minor heap
 
-record: No GC-visible Allocation, result value is outside small heap
+record: No GC-visible Allocation, result value is outside minor heap
 Test record:
   Field 0: 7
   Field 1: 9
 
 
-record_mixed: No GC-visible Allocation, result value is outside small heap
+record_mixed: No GC-visible Allocation, result value is outside minor heap
 Test record_mixed:
   Field 0: 3
   Field 1: 42
 
 
-record_mixed2: No GC-visible Allocation, result value is outside small heap
+record_mixed2: No GC-visible Allocation, result value is outside minor heap
 Test record_mixed2:
   Field 0: 3
   Field 1: 42
 
 
-mixed_int64: No GC-visible Allocation, result value is outside small heap
-Test mixed_int64:
+t0: No GC-visible Allocation, result value is outside minor heap
+Test t0:
   Field 0: 233
   Field 1: 85
   Field 2: 100
 
 
-mixed_float: No GC-visible Allocation, result value is outside small heap
-Test mixed_float:
+t1: No GC-visible Allocation, result value is outside minor heap
+Test t1:
   Field 0: 21
-  Field 1: 1374389535
+  Field 1: 4614253070214989087
   Field 2: 4
 
 
-mixed_int32: No GC-visible Allocation, result value is outside small heap
-Test mixed_int32:
+t2 : No GC-visible Allocation, result value is outside minor heap
+Test t2 :
   Field 0: 3
   Field 1: 199
   Field 2: 777
 
 
-bool_record_mixed: No GC-visible Allocation, result value is outside small heap
-Test bool_record_mixed:
+r0: No GC-visible Allocation, result value is outside minor heap
+Test r0:
   Field 0: 3
   Field 1: 1
 
 
-variant_allocation: No GC-visible Allocation, result value is outside small heap
-Test variant_allocation:
+r1: No GC-visible Allocation, result value is outside minor heap
+Test r1:
+  Field 0: 3
+  Field 1: 1
+
+
+Bar: No GC-visible Allocation, result value is outside minor heap
+Test Bar:
   Field 0: 21
 
 
-variant_string_arg: No GC-visible Allocation, result value is outside small heap
-Test variant_string_arg:
-  Field 0: 5337776
-
-
-int_variant_single: No GC-visible Allocation, result value is outside small heap
-Test int_variant_single:
+B5: No GC-visible Allocation, result value is outside minor heap
+Test B5:
   Field 0: 11
 
 
-int_variant_tuple: No GC-visible Allocation, result value is outside small heap
-Test int_variant_tuple:
+C10d: No GC-visible Allocation, result value is outside minor heap
+Test C10d:
   Field 0: 21
   Field 1: 201
 
 
-int_var_unboxed: No GC-visible Allocation, result value is outside small heap
-Test int_var_unboxed:
+D1d5: No GC-visible Allocation, result value is outside minor heap
+Test D1d5:
   Field 0: 3
   Field 1: 201
   Field 2: 11
 
 
-option_allocation: No GC-visible Allocation, result value is outside small heap
-Test option_allocation:
+Some15: No GC-visible Allocation, result value is outside minor heap
+Test Some15:
   Field 0: 31
 
 
-single_element_list: No GC-visible Allocation, result value is outside small heap
-Test single_element_list:
+list5: No GC-visible Allocation, result value is outside minor heap
+Test list5:
   Field 0: 11
   Field 1: 1
 
 
-gadt_allocation: No GC-visible Allocation, result value is outside small heap
-Test gadt_allocation:
+Pack100: No GC-visible Allocation, result value is outside minor heap
+Test Pack100:
   Field 0: 201
 
 
-typed_gadt_int: No GC-visible Allocation, result value is outside small heap
-Test typed_gadt_int:
+gadt_int: No GC-visible Allocation, result value is outside minor heap
+Test gadt_int:
   Field 0: 199
 
 
-typed_gadt_char: No GC-visible Allocation, result value is outside small heap
-Test typed_gadt_char:
+gadt_char: No GC-visible Allocation, result value is outside minor heap
+Test gadt_char:
   Field 0: 199
 
 
-poly_variant: No GC-visible Allocation, result value is outside small heap
-Test poly_variant:
-  Field 0: 1859250805
+gadt_char: No GC-visible Allocation, result value is outside minor heap
+Test gadt_char:
+  Field 0: 3
 
 
-poly_apple_const: No GC-visible Allocation, result value is outside small heap
-Test poly_apple_const:
+apple: No GC-visible Allocation, result value is outside minor heap
+Test apple:
   Field 0: 1859250805
+  Field 1: 15
+
+
+apple2: No GC-visible Allocation, result value is outside minor heap
+Test apple2:
+  Field 0: 1859250805
+  Field 1: 85
+
+
+pear: No GC-visible Allocation, result value is outside minor heap
+Test pear:
+  Field 0: 1784419469
+  Field 1: 85
 
 
