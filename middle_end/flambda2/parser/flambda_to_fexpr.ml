@@ -963,7 +963,11 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         match Code.result_mode code with
         | Alloc_heap -> Heap
         | Alloc_local -> Local
-        | Alloc_external -> failwith "fixme" (* CR jcutler:??*)
+        (* CR jcutler for ccasinghino: I've done my best to understand the
+        surrounding code and I've managed to convince myself that Heap should be
+        fine here, maybe up to some [caml_modify]s. But we should talk about
+        this case *)
+        | Alloc_external -> Heap
       in
       Code
         { id = code_id;
