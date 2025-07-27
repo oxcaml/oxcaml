@@ -874,7 +874,7 @@ and lfunction = private
     body: lambda;
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc : scoped_location;
-    mode : allocation_mode;     (* locality of the closure itself *)
+    mode : allocation_mode;     (* alloc mode of the closure itself *)
     ret_mode: allocation_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
