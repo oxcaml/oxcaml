@@ -24,7 +24,6 @@
 extern "C" {
 #endif
 
-// CR jcutler: ensure runtime4 looks the same
 CAMLexport value caml_alloc_malloc(mlsize_t wosize, tag_t tag);
 CAMLexport value caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag,
                                          mlsize_t scannable_prefix);
