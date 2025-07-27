@@ -1100,7 +1100,9 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
       | Mutable_block { alloc_mode }
       | Closures { alloc_mode; _ }
       | Array { alloc_mode; _ } -> (
-        match alloc_mode with Heap -> Proved () | Local | Heap_or_local -> Unknown)
+        match alloc_mode with
+        | Heap -> Proved ()
+        | Local | Heap_or_local -> Unknown)
       | String _ -> Proved ())
     | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int32 _
     | Naked_int64 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
