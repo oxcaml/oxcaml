@@ -259,7 +259,7 @@ let makearray_dynamic_singleton name (mode : L.allocation_mode) ~length ~init
       (match mode with
       | Alloc_heap -> ""
       | Alloc_local -> "_local"
-      | Alloc_external -> Misc.fatal_error "External Vectors not supported")
+      | Alloc_external -> Misc.fatal_error "External arrays not supported")
       name
       (if String.length name > 0 then "_" else "")
   in
@@ -278,7 +278,7 @@ let makearray_dynamic_singleton name (mode : L.allocation_mode) ~length ~init
         ( (match mode with
           | Alloc_heap -> Prim_global
           | Alloc_local -> Prim_local
-          | Alloc_external -> Misc.fatal_error "External Vectors not supported"),
+          | Alloc_external -> Misc.fatal_error "External arrays not supported"),
           L.Same_as_ocaml_repr (Base Value) )
       ~is_layout_poly:false
   in
