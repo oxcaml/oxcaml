@@ -141,7 +141,7 @@ let array_set_kind ppf k =
   | Pgcignorableproductarray_set kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
 
-let allocation_mode_if_local = function
+let allocation_mode_if_nonheap = function
   | Alloc_heap -> ""
   | Alloc_local -> "local"
   | Alloc_external -> "external"
@@ -250,7 +250,7 @@ let rec layout' is_top ppf layout_ =
 let layout ppf layout_ = layout' true ppf layout_
 
 let return_kind ppf (mode, kind) =
-  let smode = allocation_mode_if_local mode in
+  let smode = allocation_mode_if_nonheap mode in
   match kind with
   | Pvalue { raw_kind; nullable } -> begin
     let or_null_suffix =
@@ -466,31 +466,31 @@ let primitive ppf = function
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
-        (allocation_mode_if_local mode) tag block_shape shape
+        (allocation_mode_if_nonheap mode) tag block_shape shape
   | Pmakeblock(tag, Immutable_unique, shape, mode) ->
       fprintf ppf "make%sblock_unique %i%a"
-        (allocation_mode_if_local mode) tag block_shape shape
+        (allocation_mode_if_nonheap mode) tag block_shape shape
   | Pmakeblock(tag, Mutable, shape, mode) ->
       fprintf ppf "make%smutable %i%a"
-        (allocation_mode_if_local mode) tag block_shape shape
+        (allocation_mode_if_nonheap mode) tag block_shape shape
   | Pmakefloatblock (Immutable, mode) ->
       fprintf ppf "make%sfloatblock Immutable"
-        (allocation_mode_if_local mode)
+        (allocation_mode_if_nonheap mode)
   | Pmakefloatblock (Immutable_unique, mode) ->
      fprintf ppf "make%sfloatblock Immutable_unique"
-        (allocation_mode_if_local mode)
+        (allocation_mode_if_nonheap mode)
   | Pmakefloatblock (Mutable, mode) ->
      fprintf ppf "make%sfloatblock Mutable"
-        (allocation_mode_if_local mode)
+        (allocation_mode_if_nonheap mode)
   | Pmakeufloatblock (Immutable, mode) ->
       fprintf ppf "make%sufloatblock Immutable"
-        (allocation_mode_if_local mode)
+        (allocation_mode_if_nonheap mode)
   | Pmakeufloatblock (Immutable_unique, mode) ->
      fprintf ppf "make%sufloatblock Immutable_unique"
-        (allocation_mode_if_local mode)
+        (allocation_mode_if_nonheap mode)
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
-        (allocation_mode_if_local mode)
+        (allocation_mode_if_nonheap mode)
   | Pmakemixedblock (tag, Immutable, abs, mode) ->
       fprintf ppf "make%amixedblock %i Immutable%a"
         allocation_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
@@ -544,7 +544,7 @@ let primitive ppf = function
       fprintf ppf "setfield_%s%s_computed" instr init
   | Pfloatfield (n, sem, mode) ->
       fprintf ppf "floatfield%a%s %i"
-        field_read_semantics sem (allocation_mode_if_local mode) n
+        field_read_semantics sem (allocation_mode_if_nonheap mode) n
   | Pufloatfield (n, sem) ->
       fprintf ppf "ufloatfield%a %i"
         field_read_semantics sem n
@@ -553,7 +553,7 @@ let primitive ppf = function
         field_read_semantics sem
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape
-          (fun ppf mode -> fprintf ppf "%s" (allocation_mode_if_local mode)))
+          (fun ppf mode -> fprintf ppf "%s" (allocation_mode_if_nonheap mode)))
         shape
   | Psetfloatfield (n, init) ->
       let init =
@@ -653,14 +653,14 @@ let primitive ppf = function
 
   | Parraylength k -> fprintf ppf "array.length[%s]" (array_kind k)
   | Pmakearray (k, Mutable, mode) ->
-     fprintf ppf "make%sarray[%s]" (allocation_mode_if_local mode) (array_kind k)
+     fprintf ppf "make%sarray[%s]" (allocation_mode_if_nonheap mode) (array_kind k)
   | Pmakearray (k, Immutable, mode) ->
-     fprintf ppf "make%sarray_imm[%s]" (allocation_mode_if_local mode) (array_kind k)
+     fprintf ppf "make%sarray_imm[%s]" (allocation_mode_if_nonheap mode) (array_kind k)
   | Pmakearray (k, Immutable_unique, mode) ->
-      fprintf ppf "make%sarray_unique[%s]" (allocation_mode_if_local mode)
+      fprintf ppf "make%sarray_unique[%s]" (allocation_mode_if_nonheap mode)
         (array_kind k)
   | Pmakearray_dynamic (k, mode, has_init) ->
-      fprintf ppf "make%sarray_any[%s]%s" (allocation_mode_if_local mode)
+      fprintf ppf "make%sarray_any[%s]%s" (allocation_mode_if_nonheap mode)
         (array_kind k)
         (match has_init with
          | With_initializer -> ""
