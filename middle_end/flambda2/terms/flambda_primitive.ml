@@ -1147,7 +1147,11 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Bigarray_length _ -> false
   | String_length _ -> true
   | Int_as_pointer m -> (
-    match m with Heap -> true | Local _ | External -> false)
+    match m with
+    | Heap -> true
+    | Local _ -> false
+    | External ->
+      Misc.fatal_error "External Int_as_pointer not supported")
   | Opaque_identity _ -> false
   | Int_arith _ -> true
   | Float_arith _ ->
@@ -1159,7 +1163,8 @@ let unary_primitive_eligible_for_cse p ~arg =
     (* For the moment we don't CSE any local allocations. *)
     (* CR mshinwell: relax this in the future? *)
     false
-  | Box_number (_, External) -> false
+  | Box_number (_, External) ->
+    Misc.fatal_error "External Box_number not supported"
   | Box_number (_, Heap) | Tag_immediate ->
     (* Boxing or tagging of constants will yield values that can be lifted and
        if needs be deduplicated -- so there's no point in adding CSE variables
