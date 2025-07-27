@@ -47,7 +47,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Alloc { bytes = n; mode = Cmm.Alloc_mode.Local; dbginfo = _ } ->
     fprintf ppf "alloc_local %i" n
   | Alloc { bytes = n; mode = Cmm.Alloc_mode.External; dbginfo = _ } ->
-    fprintf ppf "alloc_external %i" n
+    Misc.fatal_error "External allocations are generated as Cextcall"
   | Intop op ->
     if Operation.is_unary_integer_operation op
     then (
