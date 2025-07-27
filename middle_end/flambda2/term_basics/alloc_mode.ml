@@ -38,10 +38,14 @@ module For_types = struct
   let heap = Heap
 
   let local () =
-    if not (Flambda_features.stack_allocation_enabled ()) then Heap else Heap_or_local
+    if not (Flambda_features.stack_allocation_enabled ())
+    then Heap
+    else Heap_or_local
 
   let unknown () =
-    if not (Flambda_features.stack_allocation_enabled ()) then Heap else Heap_or_local
+    if not (Flambda_features.stack_allocation_enabled ())
+    then Heap
+    else Heap_or_local
 
   let from_lambda (mode : Lambda.allocation_mode) =
     if not (Flambda_features.stack_allocation_enabled ())
