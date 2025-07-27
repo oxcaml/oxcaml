@@ -424,7 +424,7 @@ let meet_alloc_mode env (alloc_mode1 : Alloc_mode.For_types.t)
     =
   match alloc_mode1, alloc_mode2 with
   | (Unknown | Local), (Unknown | Local) | Heap, Heap ->
-    Ok (Both_inputs, env) (* Bottom (New_result ()) *)
+    Ok (Both_inputs, env)
   | (Unknown | Local), _ -> Ok (Right_input, env)
   | _, (Unknown | Local) -> Ok (Left_input, env)
 
