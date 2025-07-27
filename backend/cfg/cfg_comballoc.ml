@@ -82,7 +82,8 @@ let find_compatible_allocations :
         | Heap ->
           loop allocations (DLL.next cell) ~curr_mode ~curr_size
         | External ->
-          Misc.fatal_error "Impossible, external allocations are external calls")
+          Misc.fatal_error
+            "Impossible: external allocs are generated as Cextcall.")
       | Op Poll -> return ()
       | Reloadretaddr | Poptrap _ | Prologue | Pushtrap _ | Stack_check _ ->
         (* CR-soon xclerc for xclerc: is it too conservative? (note: only the
