@@ -526,7 +526,6 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
-  (* CR external-mode: at the moment, this is only ever Allocator_malloc. *)
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }
