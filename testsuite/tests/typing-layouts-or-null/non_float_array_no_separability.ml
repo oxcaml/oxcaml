@@ -7,7 +7,7 @@
 
 let mk_gen (x : 'a) = [| x |]
 [%%expect{|
-(let (mk_gen = (function {nlocal = 0} x : genarray (makearray[gen] x)))
+(let (mk_gen = (function {nlocal = 0} x? : genarray (makearray[gen] x)))
   (apply (field_imm 1 (global Toploop!)) "mk_gen" mk_gen))
 val mk_gen : ('a : value_or_null mod separable). 'a -> 'a array = <fun>
 |}]
