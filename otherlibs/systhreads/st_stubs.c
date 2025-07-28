@@ -630,7 +630,7 @@ CAMLprim value caml_thread_use_domains(value unit)
      so we can switch lockmode */
   domain_lockmode = LOCKMODE_DOMAINS;
 
-  return Val_unit; 
+  return Val_unit;
 }
 
 static void caml_thread_domain_spawn_hook(void)
@@ -842,9 +842,9 @@ static void * caml_thread_start(void * v)
   return 0;
 }
 
-static st_retcode create_tick_thread(void)
+static st_retcode start_tick_thread(void)
 {
-  if (Tick_thread_running) return 0;
+  if (Tick_thread_running || Tick_thread_disabled) return 0;
 
 #ifdef POSIX_SIGNALS
   sigset_t mask, old_mask;
@@ -858,7 +858,7 @@ static st_retcode create_tick_thread(void)
   struct caml_thread_tick_args* tick_thread_args =
     caml_stat_alloc_noexc(sizeof(struct caml_thread_tick_args));
   if (tick_thread_args == NULL)
-    caml_fatal_error("create_tick_thread: failed to allocate thread args");
+    caml_fatal_error("start_tick_thread: failed to allocate thread args");
 
   tick_thread_args->domain_id = Caml_state->id;
   tick_thread_args->stop = &Tick_thread_stop;
@@ -876,17 +876,10 @@ static st_retcode create_tick_thread(void)
   return 0;
 }
 
-static st_retcode start_tick_thread(void)
-{
-  if (Tick_thread_running) return 0;
-  st_retcode err = create_tick_thread();
-  if (err == 0) Tick_thread_running = 1;
-  return err;
-}
-
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
   int enable = Long_val(v_enable) ? 1 : 0;
+  Tick_thread_disabled = !enable;
 
   if (enable) {
     st_retcode err = start_tick_thread();
@@ -895,7 +888,6 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
     stop_tick_thread();
   }
 
-  Tick_thread_disabled = !enable;
   return Val_unit;
 }
 
@@ -911,7 +903,7 @@ CAMLprim value caml_thread_new(value clos)
   /* Create the tick thread if not already done.
      Because of PR#4666, we start the tick thread late, only when we create
      the first additional thread in the current process */
-  st_retcode err = create_tick_thread();
+  st_retcode err = start_tick_thread();
   sync_check_error(err, "Thread.create");
 
   /* Create a thread info block */
@@ -954,7 +946,7 @@ CAMLexport int caml_c_thread_register(void)
   thread_lock_acquire(Dom_c_threads);
 
   /* Create tick thread if not already done */
-  st_retcode err = create_tick_thread();
+  st_retcode err = start_tick_thread();
   if (err != 0) goto out_err;
 
   /* Set a thread info block */
