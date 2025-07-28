@@ -770,10 +770,9 @@ CAMLexport value caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
                                                  reserved_t reserved)
 {
   void* res = (void*) malloc(Bhsize_wosize(wosize));
-
   if (res == NULL) {
     caml_fatal_out_of_memory();
-  } 
+  }
   // CR jcutler for ccasinghino: I think this is the tag we want,
   // as described in the comment at the top of address_class.h.
   uintnat color = NOT_MARKABLE;
