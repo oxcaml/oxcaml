@@ -70,6 +70,18 @@ let int64u_array_element_size = size_in_bytes ([||] : int64# array)
 
 let _ = check_int64u ~init:#42L ~element_size:int64u_array_element_size
 
+(* unboxed nativeints *)
+let check_nativeintu ~(init : nativeint#) ~element_size =
+  let check_one n =
+    let x = makearray_dynamic n init in
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+  in
+  List.iter check_one array_sizes_to_check
+
+let nativeintu_array_element_size = size_in_bytes ([||] : nativeint# array)
+
+let _ = check_nativeintu ~init:#42n ~element_size:nativeintu_array_element_size
+
 (* unboxed float32s *)
 let check_float32u ~(init : float32#) ~element_size =
   let check_one n =
