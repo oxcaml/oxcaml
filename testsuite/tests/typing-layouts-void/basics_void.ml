@@ -226,8 +226,8 @@ external get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_ge
 [%%expect{|
 external length : ('a : any mod separable). 'a array -> int = "%array_length"
   [@@layout_poly]
-external get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_get"
-  [@@layout_poly]
+external get : ('a : any mod separable). 'a array -> int -> 'a
+  = "%array_safe_get" [@@layout_poly]
 |}]
 
 let f (a : unit_u array) = length a
