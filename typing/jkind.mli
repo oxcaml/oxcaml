@@ -261,9 +261,6 @@ module Const : sig
     [any]. *)
     val any : t
 
-    (** [any], except for null pointers. *)
-    val any_non_null : t
-
     (** Value of types of this jkind are not retained at all at runtime *)
     val void : t
 
@@ -365,11 +362,6 @@ module Builtin : sig
     But we cannot compile run-time manipulations of values of types with jkind
     [any]. *)
   val any : why:History.any_creation_reason -> 'd Types.jkind
-
-  (* CR layouts v3: change to [any_separable]. *)
-
-  (** Jkind of array elements. *)
-  val any_non_null : why:History.any_creation_reason -> 'd Types.jkind
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
@@ -573,6 +565,11 @@ val for_abbreviation :
   Types.type_expr ->
   Types.jkind_l
 
+(** The jkind for [array] type arguments. *)
+val for_array_argument : Types.jkind_lr
+
+(** The jkind for array elements, creating a new sort variable. *)
+val for_array_element_sort : unit -> Types.jkind_lr * sort
 (******************************)
 (* elimination and defaulting *)
 

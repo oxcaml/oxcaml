@@ -219,15 +219,15 @@ Error: Records must contain at least one runtime value.
 
 (* [void] in arrays is not yet allowed *)
 
-external length : ('a : any_non_null) . 'a array -> int = "%array_length"
+external length : ('a : any mod separable) . 'a array -> int = "%array_length"
 [@@layout_poly]
-external get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
+external get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_get"
 [@@layout_poly]
 [%%expect{|
-external length : ('a : any_non_null). 'a array -> int = "%array_length"
+external length : ('a : any mod separable). 'a array -> int = "%array_length"
   [@@layout_poly]
-external get : ('a : any_non_null). 'a array -> int -> 'a = "%array_safe_get"
-  [@@layout_poly]
+external get : ('a : any mod separable). 'a array -> int -> 'a
+  = "%array_safe_get" [@@layout_poly]
 |}]
 
 let f (a : unit_u array) = length a
