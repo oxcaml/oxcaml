@@ -1603,15 +1603,24 @@ module Hint = struct
 
   type 'd morph =
     | Debug : string -> (_ * _) morph
-    | None : (_ * _) morph
-    | Skip : (_ * _) morph
+    | None : ('l * 'r) morph
+    | Skip : ('l * 'r) morph
+    | Wait_compose : ('l * 'r) morph
+    | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
     | Close_over : closure_details -> ('l * disallowed) morph
     | Is_closed_by : closure_details -> (disallowed * 'r) morph
     | Captured_by_partial_application : (disallowed * 'r) morph
     | Adj_captured_by_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
-    | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
+    | Exclave_lock : ('l * 'r) morph
+    | Exclave_body_exp : (disallowed * 'r) morph
+    | Adj_exclave_body_exp : ('l * disallowed) morph
+    | Region_lock : ('l * 'r) morph
+    | Register_alloc_mode : ('l * 'r) morph
+    | Closed_omitted_parameter : ('l * 'r) morph
+    | Function_arg_value : ('l * 'r) morph
+    | Argument_let_expand : ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -1619,14 +1628,23 @@ module Hint = struct
 
   let rec is_rigid : type l r. (l * r) morph -> bool = function
     | Debug _ -> true
-    | None | Skip -> assert false
-    | Close_over _ -> true
-    | Is_closed_by _ -> true
-    | Captured_by_partial_application -> true
-    | Adj_captured_by_partial_application -> true
-    | Crossing_left -> false
-    | Crossing_right -> false
+    | None ->
+      (* The function that calls this is the printing function for morphism hints.
+         That function should always chekc the printing behaviour of a hint before
+         checking if it is rigid. Therefore it should have already eliminated this case
+         before trying to check if the function is rigid. See the morphism
+         hint-printing function *)
+      assert false
+    | Skip -> false
+    | Wait_compose -> true
     | Compose (x, y) -> is_rigid x || is_rigid y
+    | Close_over _ | Is_closed_by _ | Captured_by_partial_application
+    | Adj_captured_by_partial_application ->
+      true
+    | Crossing_left | Crossing_right | Exclave_lock | Exclave_body_exp
+    | Adj_exclave_body_exp | Region_lock | Register_alloc_mode
+    | Closed_omitted_parameter | Function_arg_value | Argument_let_expand ->
+      false
 
   let morph_none = None
 
@@ -1637,20 +1655,36 @@ module Hint = struct
     | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
+    | Wait_compose -> Wait_compose
+    | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
     | Crossing_right -> Crossing_left
-    | Compose (x, y) -> Compose (left_adjoint y, left_adjoint x)
+    | Exclave_lock -> Exclave_lock
+    | Exclave_body_exp -> Adj_exclave_body_exp
+    | Region_lock -> Region_lock
+    | Register_alloc_mode -> Register_alloc_mode
+    | Closed_omitted_parameter -> Closed_omitted_parameter
+    | Function_arg_value -> Function_arg_value
+    | Argument_let_expand -> Argument_let_expand
 
   let rec right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
     | Debug s -> Debug s
     | None -> None
     | Skip -> Skip
+    | Wait_compose -> Wait_compose
+    | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
     | Crossing_left -> Crossing_right
-    | Compose (x, y) -> Compose (right_adjoint y, right_adjoint x)
+    | Exclave_lock -> Exclave_lock
+    | Adj_exclave_body_exp -> Exclave_body_exp
+    | Region_lock -> Region_lock
+    | Register_alloc_mode -> Register_alloc_mode
+    | Closed_omitted_parameter -> Closed_omitted_parameter
+    | Function_arg_value -> Function_arg_value
+    | Argument_let_expand -> Argument_let_expand
 
   let rec maybe_compose :
       type l r. (l * r) morph -> (l * r) morph -> (l * r) morph option =
@@ -1664,6 +1698,8 @@ module Hint = struct
     | _x, None -> Some None
     | Skip, y -> Some y
     | x, Skip -> Some x
+    | Wait_compose, y -> Some y
+    | x, Wait_compose -> Some x
     | Compose (x0, x1), y -> (
       match maybe_compose x1 y with
       | Some z -> Some (compose x0 z)
@@ -1688,11 +1724,19 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
+       | Wait_compose -> Wait_compose
+       | Compose (x, y) -> Compose (allow_left x, allow_left y)
        | Close_over x -> Close_over x
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
-       | Compose (x, y) -> Compose (allow_left x, allow_left y)
+       | Exclave_lock -> Exclave_lock
+       | Adj_exclave_body_exp -> Adj_exclave_body_exp
+       | Region_lock -> Region_lock
+       | Register_alloc_mode -> Register_alloc_mode
+       | Closed_omitted_parameter -> Closed_omitted_parameter
+       | Function_arg_value -> Function_arg_value
+       | Argument_let_expand -> Argument_let_expand
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
@@ -1700,10 +1744,18 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
+       | Wait_compose -> Wait_compose
+       | Compose (x, y) -> Compose (allow_right x, allow_right y)
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
        | Crossing_right -> Crossing_right
-       | Compose (x, y) -> Compose (allow_right x, allow_right y)
+       | Exclave_lock -> Exclave_lock
+       | Exclave_body_exp -> Exclave_body_exp
+       | Region_lock -> Region_lock
+       | Register_alloc_mode -> Register_alloc_mode
+       | Closed_omitted_parameter -> Closed_omitted_parameter
+       | Function_arg_value -> Function_arg_value
+       | Argument_let_expand -> Argument_let_expand
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
@@ -1711,6 +1763,8 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
+       | Wait_compose -> Wait_compose
+       | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
        | Close_over x -> Close_over x
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
@@ -1718,7 +1772,14 @@ module Hint = struct
          Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
-       | Compose (x, y) -> Compose (disallow_left x, disallow_left y)
+       | Exclave_lock -> Exclave_lock
+       | Exclave_body_exp -> Exclave_body_exp
+       | Adj_exclave_body_exp -> Adj_exclave_body_exp
+       | Region_lock -> Region_lock
+       | Register_alloc_mode -> Register_alloc_mode
+       | Closed_omitted_parameter -> Closed_omitted_parameter
+       | Function_arg_value -> Function_arg_value
+       | Argument_let_expand -> Argument_let_expand
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
@@ -1726,6 +1787,8 @@ module Hint = struct
        | Debug s -> Debug s
        | None -> None
        | Skip -> Skip
+       | Wait_compose -> Wait_compose
+       | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
        | Close_over x -> Close_over x
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
@@ -1733,7 +1796,14 @@ module Hint = struct
          Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
-       | Compose (x, y) -> Compose (disallow_right x, disallow_right y)
+       | Exclave_lock -> Exclave_lock
+       | Exclave_body_exp -> Exclave_body_exp
+       | Adj_exclave_body_exp -> Adj_exclave_body_exp
+       | Region_lock -> Region_lock
+       | Register_alloc_mode -> Register_alloc_mode
+       | Closed_omitted_parameter -> Closed_omitted_parameter
+       | Function_arg_value -> Function_arg_value
+       | Argument_let_expand -> Argument_let_expand
   end)
 end
 
@@ -1832,7 +1902,6 @@ module Axerror = struct
       | Print_then_continue of (Format.formatter -> unit)
           (** [Print_then_continue pp] means we print this line, using [pp] to print the
       morph hint, then continue onto the next hint *)
-      | Debug_print_then_continue of (Format.formatter -> unit)
 
     (** Get a printer for a single morph hint, or a special output if the hint requires
   special behaviour *)
@@ -1853,6 +1922,21 @@ module Axerror = struct
            let _ = Skip in
            Debug_print_then_continue (dprintf "[Skip]") *)
         | Skip -> Skip
+        | Wait_compose ->
+          (* [Wait_compose] is not allowed to be used without composing it,
+             and the composition function should remove it. Therefore this
+             branch should never be reached *)
+          assert false
+        | Compose (hint1, hint2) -> (
+          match print_morph_hint hint1 with
+          | Skip -> print_morph_hint hint2
+          | Stop -> Stop
+          | Print_then_continue pp1 -> (
+            match print_morph_hint hint2 with
+            | Skip -> Print_then_continue pp1
+            | Stop -> Stop
+            | Print_then_continue pp2 ->
+              Print_then_continue (dprintf "%t@ which %t" pp1 pp2)))
         | Close_over closure ->
           (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
           Print_then_continue
@@ -1871,26 +1955,26 @@ module Axerror = struct
             (dprintf "has a partial application capturing a value")
         | Crossing_left | Crossing_right ->
           Print_then_continue (dprintf "crosses with something")
-        | Compose (hint1, hint2) -> (
-          match print_morph_hint hint1 with
-          | Skip -> print_morph_hint hint2
-          | Stop -> Stop
-          | Print_then_continue pp1 -> (
-            match print_morph_hint hint2 with
-            | Skip -> Print_then_continue pp1
-            | Stop -> Stop
-            | Print_then_continue pp2 ->
-              Print_then_continue (dprintf "%t@ which %t" pp1 pp2)
-            | Debug_print_then_continue pp2 ->
-              Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2))
-          | Debug_print_then_continue pp1 -> (
-            match print_morph_hint hint2 with
-            | Skip -> Print_then_continue pp1
-            | Stop -> Stop
-            | Print_then_continue pp2 ->
-              Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)
-            | Debug_print_then_continue pp2 ->
-              Debug_print_then_continue (dprintf "%t@ which %t" pp1 pp2)))
+        | Exclave_lock ->
+          Print_then_continue (dprintf "is regional in the function body")
+        | Exclave_body_exp ->
+          Print_then_continue (dprintf "is an exclave return of a function")
+        | Adj_exclave_body_exp ->
+          Print_then_continue (dprintf "has an exclave return")
+        | Region_lock ->
+          (* CR pdsouza: this will end up printing a strange message on the lines of,
+             "it is local because it is local to the parent region which is local to
+             the parent region".  Need to fix this. Probably is best to just have a
+             special case for it *)
+          Print_then_continue (dprintf "is local to the parent region")
+        | Register_alloc_mode ->
+          Print_then_continue (dprintf "is has an allocation")
+        | Closed_omitted_parameter ->
+          Print_then_continue (dprintf "MSG_FOR(Closed_omitted_parameter)")
+        | Function_arg_value ->
+          Print_then_continue (dprintf "is a function parameter")
+        | Argument_let_expand ->
+          Print_then_continue (dprintf "MSG_FOR(Argument_let_expand)")
 
     (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
 terminated with an [Empty] or [Const] axhint *)
@@ -1929,14 +2013,28 @@ terminated with an [Empty] or [Const] axhint *)
           default_printer ()
        [@@ocaml.warning "-4"]
       in
+      let override_mode_eq : type a b. a C.obj -> b C.obj -> a -> b -> bool =
+       (* An overridden equality function for modes. This makes sure that the "Global"
+          and "Local" values of the regionality and locality modes are equated, even
+          though they don't come from the actual same axis. In the default case,
+          we perform a normal equality check, first equating the objects, then the
+          values *)
+       fun a_obj b_obj a b ->
+        match a_obj, a, b_obj, b with
+        (* Equating "global" and "local" for regionality and locality *)
+        | Locality, Global, Regionality, Global
+        | Regionality, Global, Locality, Global
+        | Locality, Local, Regionality, Local
+        | Regionality, Local, Locality, Local ->
+          true (* Default case *)
+        | _ -> (
+          match C.eq_obj a_obj b_obj with
+          | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
+          | None -> false)
+       [@@ocaml.warning "-4"]
+      in
       match hint with
       | Morph (morph_hint, b, b_obj, b_hint, _morph) -> (
-        let temp_thing pp =
-          print_mode a_obj a;
-          fprintf ppf "@ because it %t@ which is " pp;
-          ignore (print_axhint_chain side b b_obj b_hint ppf);
-          HintPrinted
-        in
         match print_morph_hint morph_hint with
         | Skip ->
           (* This is a case where we skip a line without printing the mode first *)
@@ -1944,22 +2042,73 @@ terminated with an [Empty] or [Const] axhint *)
         | Stop ->
           print_mode a_obj a;
           NothingPrinted
-        | Print_then_continue pp -> (
-          match C.eq_obj a_obj b_obj with
-          | Some Refl
-            when Misc.Le_result.equal ~le:(C.le a_obj) a b
-                 && not (Hint.is_rigid morph_hint) ->
+        | Print_then_continue pp ->
+          if override_mode_eq a_obj b_obj a b && not (Hint.is_rigid morph_hint)
+          then
             (* When the [a] and [b] modes are equal, and the hint is non-rigid,
                we can definitely skip printing this line. *)
             print_axhint_chain side b b_obj b_hint ppf
-          | Some Refl | None -> temp_thing pp)
-        | Debug_print_then_continue pp -> temp_thing pp)
+          else (
+            print_mode a_obj a;
+            fprintf ppf "@ because it %t@ which is " pp;
+            ignore (print_axhint_chain side b b_obj b_hint ppf);
+            HintPrinted))
       | Const const_hint ->
         print_mode a_obj a;
         print_const_hint a_obj a ppf const_hint
       | Empty ->
         print_mode a_obj a;
         NothingPrinted
+
+    let rec debug_print_axhint_chain :
+        type a. a -> a C.obj -> Format.formatter -> axhint -> unit =
+     fun a a_obj ppf hint ->
+      let open Format in
+      let debug_print_const_hint ppf : Hint.const -> unit = function
+        | None -> fprintf ppf "[none const hint]"
+        | h -> (
+          match print_const_hint a_obj a ppf h with
+          | NothingPrinted -> assert false
+          | HintPrinted -> ())
+        [@@ocaml.warning "-4"]
+      in
+      let rec debug_print_morph_hint :
+          type l r. Format.formatter -> (l * r) Hint.morph -> unit =
+       fun ppf -> function
+        | Debug s -> fprintf ppf "[Debug %s]" s
+        | None -> fprintf ppf "[None]"
+        | Skip -> fprintf ppf "[Skip]"
+        | Wait_compose -> fprintf ppf "[Wait_compose]"
+        | Compose (h1, h2) ->
+          fprintf ppf "[Compose (%a) (%a)]" debug_print_morph_hint h1
+            debug_print_morph_hint h2
+        | Close_over x ->
+          fprintf ppf "Close_over(%a)" !print_longident x.value_lid
+        | Is_closed_by _ -> fprintf ppf "Is_closed_by"
+        | Captured_by_partial_application ->
+          fprintf ppf "Captured_by_partial_application"
+        | Adj_captured_by_partial_application ->
+          fprintf ppf "Adj_captured_by_partial_application"
+        | Crossing_left -> fprintf ppf "Crossing_left"
+        | Crossing_right -> fprintf ppf "Crossing_right"
+        | Exclave_lock -> fprintf ppf "Exclave_lock"
+        | Exclave_body_exp -> fprintf ppf "Exclave_body_exp"
+        | Adj_exclave_body_exp -> fprintf ppf "Adj_exclave_body_exp"
+        | Region_lock -> fprintf ppf "Region_lock"
+        | Register_alloc_mode -> fprintf ppf "Register_alloc_mode"
+        | Closed_omitted_parameter -> fprintf ppf "Closed_omitted_parameter"
+        | Function_arg_value -> fprintf ppf "Function_arg_value"
+        | Argument_let_expand -> fprintf ppf "Argument_let_expand"
+       [@@ocaml.warning "-4"]
+      in
+      fprintf ppf "(%a)" (C.print a_obj) a;
+      match hint with
+      | Empty -> fprintf ppf "[empty hint]"
+      | Const const_hint ->
+        fprintf ppf "[Const (%a)]" debug_print_const_hint const_hint
+      | Morph (morph_hint, b, b_obj, b_hint, _) ->
+        fprintf ppf "[Morph (%a)]" debug_print_morph_hint morph_hint;
+        debug_print_axhint_chain b b_obj ppf b_hint
 
     (** Report an axerror, printing error traces for both the left and the right sides *)
     let report_axerror :
@@ -1972,6 +2121,12 @@ terminated with an [Empty] or [Const] axhint *)
         unit =
      fun ?target ~left_obj ~right_obj err ppf ->
       let open Format in
+      ignore debug_print_axhint_chain;
+      (* fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
+         (debug_print_axhint_chain err.left left_obj)
+         err.left_hint
+         (debug_print_axhint_chain err.right right_obj)
+         err.right_hint; *)
       (match target with
       | None -> fprintf ppf "This value is "
       | Some (target_item, target_lid) ->
@@ -4242,19 +4397,17 @@ module Crossing = struct
      [regional_to_local] the left adjoint. *)
 
   let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left t
-    |> value_to_alloc_r2l ~hint:(Debug "apply_left_alloc 1")
+    m |> alloc_as_value |> apply_left t |> value_to_alloc_r2l ~hint:Skip
 
   let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right t
-    |> value_to_alloc_r2g ~hint:(Debug "apply_right_alloc 1")
+    m |> alloc_as_value |> apply_right t |> value_to_alloc_r2g ~hint:Skip
 
   let apply_left_right_alloc t { monadic; comonadic } =
     let monadic = Monadic.apply_right t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
       |> Comonadic.apply_left t.comonadic
-      |> comonadic_regional_to_local ~hint:(Debug "apply_left_right_alloc 1")
+      |> comonadic_regional_to_local ~hint:Skip
       (* the left adjoint of [locality_as_regionality]*)
     in
     { monadic; comonadic }

@@ -230,20 +230,35 @@ module type S = sig
 
     type 'd morph =
       | Debug : string -> (_ * _) morph
-      | None : (_ * _) morph
+      | None : ('l * 'r) morph
           (** An empty morphism hint. The error reporter should terminate the
             trace on seeing this. *)
-      | Skip : (_ * _) morph
+      | Skip : ('l * 'r) morph
           (** An empty morphism hint, but telling the error reporter to continue the trace,
-            instead of terminating it there, as it would for [None]. *)
+            instead of terminating it there, as it would for [None].
+
+            This hint must only be used when it is known that the source and result
+            of the morphism are the same, and the value is left unchanged *)
+      | Wait_compose : ('l * 'r) morph
+          (** An empty morphism hint, that is used for when we know we will later
+            compose it with a descriptive morphism hint. This should never be left
+            on its own. *)
+      | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
+          (** A composition of morphism hints. The *)
       | Close_over : closure_details -> ('l * disallowed) morph
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Captured_by_partial_application : (disallowed * 'r) morph
       | Adj_captured_by_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph
       | Crossing_right : (disallowed * 'r) morph
-      | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
-          (** A composition of morphism hints. The *)
+      | Exclave_lock : ('l * 'r) morph
+      | Exclave_body_exp : (disallowed * 'r) morph
+      | Adj_exclave_body_exp : ('l * disallowed) morph
+      | Region_lock : ('l * 'r) morph
+      | Register_alloc_mode : ('l * 'r) morph
+      | Closed_omitted_parameter : ('l * 'r) morph
+      | Function_arg_value : ('l * 'r) morph
+      | Argument_let_expand : ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
 
