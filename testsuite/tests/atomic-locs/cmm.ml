@@ -30,6 +30,8 @@ let set_imm (r : int atomic) v =
    arch_amd64;
    flambda;
    no-tsan;
+   (* frame_pointers causes different, unstable CMM output, so we skip this test
+      when it's enabled *)
    no-frame_pointers;
 
    flags = "-c -dcmm -dno-locations -dno-unique-ids";
