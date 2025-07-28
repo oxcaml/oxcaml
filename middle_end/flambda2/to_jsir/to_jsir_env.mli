@@ -68,8 +68,9 @@ val get_continuation_exn : t -> Continuation.t -> continuation
     an unbound variable. *)
 val get_var_exn : t -> Variable.t -> Jsir.Var.t
 
-(** Return the JSIR variable for the given Flambda symbol. Raises if given
-    an unbound symbol. *)
+(** Return the JSIR variable for the given Flambda symbol. *)
+val get_symbol : t -> Symbol.t -> Jsir.Var.t option
+
 val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
 
 (** Return the block address and parameter variables corresponding to the given
@@ -77,9 +78,13 @@ val get_symbol_exn : t -> Symbol.t -> Jsir.Var.t
 val get_code_id_exn : t -> Code_id.t -> Jsir.Addr.t * Jsir.Var.t list
 
 (** Return the variable corresponding to a function slot. *)
+val get_function_slot : t -> Function_slot.t -> Jsir.Var.t option
+
 val get_function_slot_exn : t -> Function_slot.t -> Jsir.Var.t
 
 (** Return the variable corresponding to a value slot. *)
+val get_value_slot : t -> Value_slot.t -> Jsir.Var.t option
+
 val get_value_slot_exn : t -> Value_slot.t -> Jsir.Var.t
 
 (** These functions first check whether the given item exists in the environment.
