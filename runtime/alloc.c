@@ -67,7 +67,6 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag) {
   return caml_alloc_with_reserved (wosize, tag, 0);
 }
 
-
 CAMLexport value caml_alloc_malloc(mlsize_t wosize, tag_t tag) {
   return caml_alloc_malloc_with_reserved(wosize,tag,0);
 }
