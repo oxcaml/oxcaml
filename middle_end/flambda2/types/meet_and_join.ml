@@ -1058,7 +1058,13 @@ and meet_relation env var1 var2 =
               (* CR bclement: We want to add an equality here, but it can
                  currently cause loops due to the reductions that could be
                  stored on the relation variables. *)
-              Ok (Both_inputs, env)))
+              match
+                add_equation simple1
+                  (TG.alias_type_of K.naked_immediate simple2)
+                  env ~meet_type
+              with
+              | Ok (_, env) -> Ok (Both_inputs, env)
+              | Bottom r -> Bottom r))
 
 and meet_variant env ~(get_tag1 : Variable.t option)
     ~(blocks1 : TG.Row_like_for_blocks.t Or_unknown.t)
