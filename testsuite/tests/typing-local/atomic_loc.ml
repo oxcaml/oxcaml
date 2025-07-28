@@ -18,9 +18,10 @@ let contents_loc_local (t @ local) = exclave_ [%atomic.loc t.contents]
 val contents_loc_local : local_ 'a atomic -> local_ 'a atomic_loc = <fun>
 |}]
 
+(* This is allowed because mutable implies global *)
 let regular_field_escape (t @ local) = t.contents
 [%%expect{|
-val regular_field_escape : local_ 'a atomic -> local_ 'a = <fun>
+val regular_field_escape : local_ 'a atomic -> 'a = <fun>
 |}]
 
 
