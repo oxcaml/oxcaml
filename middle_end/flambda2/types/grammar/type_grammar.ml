@@ -45,6 +45,7 @@ end
 type is_null =
   | Not_null
   | Maybe_null
+  | Is_null of Variable.t
 
 (* The grammar of Flambda types. *)
 type t =
@@ -74,7 +75,9 @@ and head_of_kind_value =
 
 and head_of_kind_value_non_null =
   | Variant of
-      { immediates : t Or_unknown.t;
+      { is_int : Variable.t option;
+        immediates : t Or_unknown.t;
+        get_tag : Variable.t option;
         blocks : row_like_for_blocks Or_unknown.t;
         extensions : variant_extensions;
         is_unique : bool
@@ -318,15 +321,23 @@ and free_names_head_of_kind_value0 ~follow_value_slots { non_null; is_null = _ }
   | Ok non_null ->
     free_names_head_of_kind_value_non_null ~follow_value_slots non_null
 
+and free_names_relation ~follow_value_slots:_ relation =
+  match relation with
+  | None -> Name_occurrences.empty
+  | Some var -> Name_occurrences.singleton_variable var Name_mode.in_types
+
 and free_names_head_of_kind_value_non_null ~follow_value_slots head =
   match head with
-  | Variant { blocks; immediates; extensions; is_unique = _ } ->
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique = _ }
+    ->
     Name_occurrences.union_list
       [ Or_unknown.free_names
           (free_names_row_like_for_blocks ~follow_value_slots)
           blocks;
         Or_unknown.free_names (free_names0 ~follow_value_slots) immediates;
-        free_names_variant_extensions ~follow_value_slots extensions ]
+        free_names_variant_extensions ~follow_value_slots extensions;
+        free_names_relation ~follow_value_slots is_int;
+        free_names_relation ~follow_value_slots get_tag ]
   | Mutable_block { alloc_mode = _ } -> Name_occurrences.empty
   | Boxed_float32 (ty, _alloc_mode) -> free_names0 ~follow_value_slots ty
   | Boxed_float (ty, _alloc_mode) -> free_names0 ~follow_value_slots ty
@@ -653,9 +664,18 @@ and apply_renaming_head_of_kind_value head renaming =
     then head
     else { non_null = Ok non_null'; is_null = head.is_null }
 
+and apply_renaming_relation relation renaming =
+  match relation with
+  | None -> None
+  | Some var ->
+    let var' = Renaming.apply_variable renaming var in
+    if var' == var then relation else Some var'
+
 and apply_renaming_head_of_kind_value_non_null head renaming =
   match head with
-  | Variant { blocks; immediates; extensions; is_unique } ->
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique } ->
+    let is_int' = apply_renaming_relation is_int renaming in
+    let get_tag' = apply_renaming_relation get_tag renaming in
     let immediates' =
       let>+$ immediates = immediates in
       apply_renaming immediates renaming
@@ -665,12 +685,14 @@ and apply_renaming_head_of_kind_value_non_null head renaming =
       apply_renaming_row_like_for_blocks blocks renaming
     in
     let extensions' = apply_renaming_variant_extensions extensions renaming in
-    if immediates == immediates' && blocks == blocks'
-       && extensions == extensions'
+    if is_int == is_int' && get_tag == get_tag' && immediates == immediates'
+       && blocks == blocks' && extensions == extensions'
     then head
     else
       Variant
         { is_unique;
+          is_int = is_int';
+          get_tag = get_tag';
           blocks = blocks';
           immediates = immediates';
           extensions = extensions'
@@ -987,22 +1009,31 @@ let rec print ppf t =
       ty
 
 and print_head_of_kind_value ppf { non_null; is_null } =
-  let null_string = match is_null with Maybe_null -> "?" | Not_null -> "!" in
+  let null_string =
+    match is_null with Maybe_null | Is_null _ -> "?" | Not_null -> "!"
+  in
   Format.fprintf ppf "@[<hov 1> %a%s@]"
     (Or_unknown_or_bottom.print print_head_of_kind_value_non_null)
     non_null null_string
 
+and print_relation relation ppf value =
+  match value with
+  | None -> ()
+  | Some var ->
+    Format.fprintf ppf "@ @[<hov 1>(%s@ %a)@]" relation Variable.print var
+
 and print_head_of_kind_value_non_null ppf head =
   match head with
-  | Variant { blocks; immediates; extensions; is_unique } ->
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique } ->
     (* CR-someday mshinwell: Improve so that we elide blocks and/or immediates
        when they're empty. *)
     Format.fprintf ppf
       "@[<hov 1>(Variant%s@ @[<hov 1>(blocks@ %a)@]@ @[<hov 1>(tagged_imms@ \
-       %a)@]%a)@]"
+       %a)@]%a%a%a)@]"
       (if is_unique then " unique" else "")
       (Or_unknown.print print_row_like_for_blocks)
-      blocks (Or_unknown.print print) immediates print_variant_extensions
+      blocks (Or_unknown.print print) immediates (print_relation "Is_int")
+      is_int (print_relation "Get_tag") get_tag print_variant_extensions
       extensions
   | Mutable_block { alloc_mode } ->
     Format.fprintf ppf "@[<hov 1>(Mutable_block@ %a)@]"
@@ -1287,13 +1318,21 @@ and ids_for_export_head_of_kind_value { non_null; is_null = _ } =
   | Unknown | Bottom -> Ids_for_export.empty
   | Ok non_null -> ids_for_export_head_of_kind_value_non_null non_null
 
+and ids_for_export_relation relation =
+  match relation with
+  | None -> Ids_for_export.empty
+  | Some var -> Ids_for_export.singleton_variable var
+
 and ids_for_export_head_of_kind_value_non_null head =
   match head with
-  | Variant { blocks; immediates; extensions; is_unique = _ } ->
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique = _ }
+    ->
     Ids_for_export.union_list
       [ Or_unknown.ids_for_export ids_for_export_row_like_for_blocks blocks;
         Or_unknown.ids_for_export ids_for_export immediates;
-        ids_for_export_variant_extensions extensions ]
+        ids_for_export_variant_extensions extensions;
+        ids_for_export_relation is_int;
+        ids_for_export_relation get_tag ]
   | Mutable_block { alloc_mode = _ } -> Ids_for_export.empty
   | Boxed_float (t, _alloc_mode) -> ids_for_export t
   | Boxed_float32 (t, _alloc_mode) -> ids_for_export t
@@ -1983,10 +2022,32 @@ and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value head
     then head
     else { non_null = Ok non_null'; is_null = head.is_null }
 
+and remove_unused_value_slots_and_shortcut_aliases_relation relation
+    ~used_value_slots:_ ~canonicalise =
+  match relation with
+  | None -> None
+  | Some var ->
+    Simple.pattern_match'
+      (canonicalise (Simple.var var))
+      ~const:(fun _ -> None)
+      ~symbol:(fun _ ~coercion:_ ->
+        (* Should not happen: relation variables are not values and cannot be
+           symbols. *)
+        None)
+      ~var:(fun var' ~coercion:_ -> if var' != var then Some var' else relation)
+
 and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
     head ~used_value_slots ~canonicalise =
   match head with
-  | Variant { blocks; immediates; extensions; is_unique } ->
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique } ->
+    let is_int' =
+      remove_unused_value_slots_and_shortcut_aliases_relation is_int
+        ~used_value_slots ~canonicalise
+    in
+    let get_tag' =
+      remove_unused_value_slots_and_shortcut_aliases_relation get_tag
+        ~used_value_slots ~canonicalise
+    in
     let immediates' =
       let>+$ immediates = immediates in
       remove_unused_value_slots_and_shortcut_aliases immediates
@@ -2001,12 +2062,14 @@ and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
       remove_unused_value_slots_and_shortcut_aliases_variant_extensions
         extensions ~used_value_slots ~canonicalise
     in
-    if immediates == immediates' && blocks == blocks'
-       && extensions == extensions'
+    if is_int == is_int' && get_tag == get_tag' && immediates == immediates'
+       && blocks == blocks' && extensions == extensions'
     then head
     else
       Variant
         { is_unique;
+          is_int = is_int';
+          get_tag = get_tag';
           blocks = blocks';
           immediates = immediates';
           extensions = extensions'
@@ -2700,9 +2763,27 @@ and project_head_of_kind_value ~to_project ~expand head =
     then head
     else { non_null = Ok non_null'; is_null = head.is_null }
 
+and project_relation ~to_project ~expand relation =
+  match relation with
+  | None -> None
+  | Some var -> (
+    if not (Variable.Set.mem var to_project)
+    then relation
+    else
+      match get_alias_opt (expand var) with
+      | None -> None
+      | Some simple ->
+        Simple.pattern_match' simple
+          ~const:(fun _ -> None)
+          ~symbol:(fun _ ~coercion:_ -> None)
+          ~var:(fun var' ~coercion:_ ->
+            if var == var' then relation else Some var'))
+
 and project_head_of_kind_value_non_null ~to_project ~expand head =
   match head with
-  | Variant { blocks; immediates; extensions; is_unique } ->
+  | Variant { is_int; get_tag; blocks; immediates; extensions; is_unique } ->
+    let is_int' = project_relation ~to_project ~expand is_int in
+    let get_tag' = project_relation ~to_project ~expand get_tag in
     let immediates' =
       let>+$ immediates = immediates in
       project_variables_out ~to_project ~expand immediates
@@ -2714,12 +2795,14 @@ and project_head_of_kind_value_non_null ~to_project ~expand head =
     let extensions' =
       project_variant_extensions ~to_project ~expand extensions
     in
-    if immediates == immediates' && blocks == blocks'
-       && extensions == extensions'
+    if is_int == is_int' && get_tag == get_tag' && immediates == immediates'
+       && blocks == blocks' && extensions == extensions'
     then head
     else
       Variant
         { is_unique;
+          is_int = is_int';
+          get_tag = get_tag';
           blocks = blocks';
           immediates = immediates';
           extensions = extensions'
@@ -3032,7 +3115,15 @@ let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~extensions
         "Cannot create [immediates] with type that is not of kind \
          [Naked_immediate]:@ %a"
         print immediates);
-  non_null_value (Variant { immediates; blocks; extensions; is_unique })
+  non_null_value
+    (Variant
+       { is_int = None;
+         get_tag = None;
+         immediates;
+         blocks;
+         extensions;
+         is_unique
+       })
 
 let mutable_block alloc_mode = non_null_value (Mutable_block { alloc_mode })
 
@@ -3711,6 +3802,8 @@ let tag_int8 (t : t) : t =
       non_null_value
         (Variant
            { is_unique = false;
+             is_int = None;
+             get_tag = None;
              immediates = Unknown;
              blocks = Known Row_like_for_blocks.bottom;
              extensions = No_extensions
@@ -3724,6 +3817,8 @@ let tag_int8 (t : t) : t =
       non_null_value
         (Variant
            { is_unique = false;
+             is_int = None;
+             get_tag = None;
              immediates = Known (these_naked_immediates ints);
              blocks = Known Row_like_for_blocks.bottom;
              extensions = No_extensions
@@ -3742,6 +3837,8 @@ let tag_int16 (t : t) : t =
       non_null_value
         (Variant
            { is_unique = false;
+             is_int = None;
+             get_tag = None;
              immediates = Unknown;
              blocks = Known Row_like_for_blocks.bottom;
              extensions = No_extensions
@@ -3756,6 +3853,8 @@ let tag_int16 (t : t) : t =
       non_null_value
         (Variant
            { is_unique = false;
+             is_int = None;
+             get_tag = None;
              immediates = Known (these_naked_immediates ints);
              blocks = Known Row_like_for_blocks.bottom;
              extensions = No_extensions
@@ -3827,6 +3926,8 @@ let tag_immediate t : t =
     non_null_value
       (Variant
          { is_unique = false;
+           is_int = None;
+           get_tag = None;
            immediates = Known t;
            extensions = No_extensions;
            blocks = Known Row_like_for_blocks.bottom
@@ -3990,7 +4091,15 @@ module Head_of_kind_value = struct
   let mk_non_null non_null = { non_null = Ok non_null; is_null = Not_null }
 
   let create_variant ~is_unique ~blocks ~immediates ~extensions =
-    mk_non_null (Variant { is_unique; blocks; immediates; extensions })
+    mk_non_null
+      (Variant
+         { is_int = None;
+           get_tag = None;
+           is_unique;
+           blocks;
+           immediates;
+           extensions
+         })
 
   let create_mutable_block alloc_mode =
     mk_non_null (Mutable_block { alloc_mode })
@@ -4023,6 +4132,8 @@ module Head_of_kind_value = struct
     mk_non_null
       (Variant
          { is_unique = false;
+           is_int = None;
+           get_tag = None;
            immediates = Known (this_naked_immediate imm);
            blocks = Known Row_like_for_blocks.bottom;
            extensions = No_extensions
@@ -4040,8 +4151,9 @@ end
 module Head_of_kind_value_non_null = struct
   type t = head_of_kind_value_non_null
 
-  let create_variant ~is_unique ~blocks ~immediates ~extensions =
-    Variant { is_unique; blocks; immediates; extensions }
+  let create_variant ~is_unique ~blocks ~immediates ~extensions ~is_int ~get_tag
+      =
+    Variant { is_int; get_tag; is_unique; blocks; immediates; extensions }
 
   let create_mutable_block alloc_mode = Mutable_block { alloc_mode }
 
@@ -4064,6 +4176,8 @@ module Head_of_kind_value_non_null = struct
   let create_tagged_immediate imm : t =
     Variant
       { is_unique = false;
+        is_int = None;
+        get_tag = None;
         immediates = Known (this_naked_immediate imm);
         blocks = Known Row_like_for_blocks.bottom;
         extensions = No_extensions
@@ -4166,7 +4280,7 @@ let rec must_be_singleton t : RWC.t option =
     match TD.descr ty with
     | Unknown | Bottom
     (* CR vlaviron: Recover null aliases *)
-    | Ok (No_alias { is_null = Maybe_null; _ })
+    | Ok (No_alias { is_null = Maybe_null | Is_null _; _ })
     | Ok
         (No_alias
           { is_null = Not_null;
@@ -4184,7 +4298,15 @@ let rec must_be_singleton t : RWC.t option =
         (No_alias
           { is_null = Not_null;
             non_null =
-              Ok (Variant { immediates; blocks; extensions = _; is_unique = _ })
+              Ok
+                (Variant
+                  { is_int = _;
+                    get_tag = _;
+                    immediates;
+                    blocks;
+                    extensions = _;
+                    is_unique = _
+                  })
           }) -> (
       match blocks with
       | Unknown -> None
