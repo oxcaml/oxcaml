@@ -54,6 +54,8 @@ let rec to_layout : Jkind.Layout.Const.t -> layout = function
   | Base Float32 -> Punboxed_float Unboxed_float32
   | Base Float64 -> Punboxed_float Unboxed_float64
   | Base Word -> Punboxed_int Unboxed_nativeint
+  | Base Bits8 -> Punboxed_int Unboxed_int8
+  | Base Bits16 -> Punboxed_int Unboxed_int16
   | Base Bits32 -> Punboxed_int Unboxed_int32
   | Base Bits64 -> Punboxed_int Unboxed_int64
   | Base Vec128 -> Punboxed_vector Unboxed_vec128
@@ -953,9 +955,6 @@ and transl_structure ~scopes loc
                   in
                   let body, repr =
                     rebind_idents (pos + 1) ((id, shape) :: newfields)
-                      (* ((Jkind.Layout.to_sort layout *)
-                      (*   |> Option.get *)
-                      (*   |> Jkind.Sort.default_for_transl_and_get) :: newsorts) *)
                       ids_with_layouts
                   in
                   let id_duid = Lambda.debug_uid_none in
@@ -1101,7 +1100,7 @@ let transl_implementation_module ~scopes module_id (str, cc, cc2) =
   | Some cc2 ->
     let _ = add_arg_block_to_module_block in
     let _ = cc2 in
-    failwith "TODO"
+    failwith "CR jrayman"
     (* add_arg_block_to_module_block lam size cc2 *)
 
 let wrap_toplevel_functor_in_struct code =
