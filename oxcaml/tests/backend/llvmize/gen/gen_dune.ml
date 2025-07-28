@@ -13,7 +13,7 @@ let print_test ~extra_subst ~name ~buf rule_template =
         List.find_opt (fun (label', _) -> String.equal label label') extra_subst
       with
       | Some (_, res) -> res
-      | None -> "what")
+      | None -> assert false)
   in
   Buffer.clear buf;
   Buffer.add_substitute buf subst rule_template;
@@ -99,7 +99,8 @@ let () =
           "run_extra_dep", run_extra_dep;
           "extra_dep_llvm_flags", extra_dep_llvm_flags;
           "llvm_flags", llvm_flags;
-          "common_flags", common_flags ]
+          "common_flags", common_flags;
+          "filter", "filter.sh" ]
       ~name ~buf
       {|
 (rule
@@ -112,7 +113,12 @@ let () =
    (run ${ocamlopt} ${name}.ml -c ${common_flags} ${llvm_flags})
    (run ${ocamlopt} ${main}.ml -c ${common_flags})
    (run ${ocamlopt} ${extra_dep_cmx} ${name}.cmx ${main}.cmx -opaque -o ${output}.exe)
-   (run mv ${name}.ll ${ir_output}.corrected))))
+   (run mv ${name}.ll ${ir_output}.corrected))
+   (with-outputs-to
+    ${ir_output}.corrected
+    (pipe-outputs
+      (run cat ${name}.ll)
+      (run ./${filter})))))
 
 (rule
  ${enabled_if}
@@ -145,4 +151,5 @@ let () =
   print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev";
   print_test_ir_and_run "float_ops";
   print_test_ir_and_run ~extra_dep_suffix:"defn"
-    ~extra_dep_with_llvm_backend:true "many_args"
+    ~extra_dep_with_llvm_backend:true "many_args";
+  print_test_ir_and_run "multi_ret"

@@ -228,3 +228,38 @@
  (deps many_args.output many_args.output.corrected)
  (action
   (diff many_args.output many_args.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (targets multi_ret.output.exe multi_ret_ir.output.corrected)
+ (deps  multi_ret_main.ml multi_ret.ml)
+ (action
+  (progn
+   
+   (run %{bin:ocamlopt.opt} multi_ret.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
+   (run %{bin:ocamlopt.opt} multi_ret_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt}  multi_ret.cmx multi_ret_main.cmx -opaque -o multi_ret.output.exe)
+   (run mv multi_ret.ll multi_ret_ir.output.corrected))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest)
+ (deps multi_ret_ir.output multi_ret_ir.output.corrected)
+ (action
+  (diff multi_ret_ir.output multi_ret_ir.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (deps multi_ret.output.exe)
+ (targets multi_ret.output.corrected)
+ (action
+  (with-outputs-to
+   multi_ret.output.corrected
+   (run ./multi_ret.output.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest)
+ (deps multi_ret.output multi_ret.output.corrected)
+ (action
+  (diff multi_ret.output multi_ret.output.corrected)))
