@@ -22,10 +22,9 @@
 #include "caml/simd.h"
 
 #define Max_array_wosize                   (Max_wosize)
-#define Max_custom_array_wosize            (Max_wosize - 1)
 
-#define Max_unboxed_vec128_array_wosize    (Max_wosize / Words_per_vec128)
-#define Max_unboxed_vec256_array_wosize    (Max_wosize / Words_per_vec256)
+#define Max_unboxed_vec128_array_wosize    (Max_array_wosize / Words_per_vec128)
+#define Max_unboxed_vec256_array_wosize    (Max_array_wosize / Words_per_vec256)
 
 CAMLprim value caml_simd_bytecode_not_supported(void) {
   caml_fatal_error("SIMD is not supported in bytecode mode.");
