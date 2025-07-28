@@ -231,14 +231,22 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     match
       Expand_head.expand_head env t |> Expand_head.Expanded_type.descr_oub
     with
-    | Value (Ok { is_null = Maybe_null; _ })
+    | Value (Ok { is_null = Maybe_null | Is_null _; _ })
     | Value (Ok { non_null = Bottom | Unknown; _ }) ->
       try_canonical_simple ()
     | Value
         (Ok
           { is_null = Not_null;
             non_null =
-              Ok (Variant { is_unique; blocks; immediates; extensions = _ })
+              Ok
+                (Variant
+                  { is_unique;
+                    blocks;
+                    immediates;
+                    is_int = _;
+                    get_tag = _;
+                    extensions = _
+                  })
           }) -> (
       match blocks, immediates with
       | Known blocks, Known imms ->
