@@ -154,7 +154,9 @@ let maybe_region_layout layout lam =
 let maybe_region_exp sort exp lam =
   maybe_region (fun () -> layout_exp sort exp) lam
 
-let is_alloc_heap = function Alloc_heap -> true | Alloc_local | Alloc_external -> false
+let is_alloc_heap = function
+  | Alloc_heap -> true
+  | Alloc_local | Alloc_external -> false
 
 (* In cases where we're careful to preserve syntactic arity, we disable
    the arity fusion attempted by simplif.ml *)
