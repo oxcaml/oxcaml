@@ -29,16 +29,14 @@
 static const mlsize_t mlsize_t_max = -1;
 
 #define Max_array_wosize                   (Max_wosize)
-#define Max_unboxed_float_array_wosize     (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
-#define Max_unboxed_int64_array_wosize     (Max_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
-#define Max_unboxed_int32_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
-#define Max_unboxed_nativeint_array_wosize (Max_array_wosize)
-
-/* Unboxed arrays */
 
 // Note: if polymorphic comparison and/or hashing are implemented for
 // the int32 unboxed arrays, care needs to be taken with the last word
 // when the array is of odd length -- this is not currently initialized.
+#define Max_unboxed_float_array_wosize     (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
+#define Max_unboxed_int64_array_wosize     (Max_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
+#define Max_unboxed_int32_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
+#define Max_unboxed_nativeint_array_wosize (Max_array_wosize)
 
 
 
