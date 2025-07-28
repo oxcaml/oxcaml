@@ -289,7 +289,8 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_format = Mb_struct { mb_size = size };
+      main_module_block_format =
+        Mb_struct { mb_repr = Module_value_only size };
       arg_block_idx = None;
       compilation_unit;
       required_globals;
@@ -436,7 +437,10 @@ let execute_phrase print_outcome ppf phr =
         remember compilation_unit sg';
         let size =
           match main_module_block_format with
-          | Mb_struct { mb_size } -> mb_size;
+          | Mb_struct { mb_repr = Module_value_only size } -> size
+          | Mb_struct _ ->
+            Misc.fatal_error "Unsupported module format in toplevel"
+            (* CR jrayman: add support *)
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
