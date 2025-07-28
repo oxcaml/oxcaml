@@ -518,6 +518,8 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
+  | Texp_quotation of expression
+  | Texp_antiquotation of expression
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }
@@ -1009,6 +1011,8 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_quote of core_type
+  | Ttyp_splice of core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
@@ -1320,6 +1324,10 @@ val function_arity : function_param list -> function_body -> int
 
 (** Given a declaration, return the location of the bound identifier *)
 val loc_of_decl : uid:Shape.Uid.t -> item_declaration -> string Location.loc
+
+(** Fold over the antiquotations in an expression. This function defines the
+    evaluation order of antiquotations. *)
+val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
 
 (** When type checking F(M).t, which does not involve modes, we say F(M) is of
     the strongest mode, to avoid modes in error messages. *)

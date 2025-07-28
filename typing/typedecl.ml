@@ -597,7 +597,7 @@ let make_constructor
           let univar_list =
             TyVarEnv.make_poly_univars_jkinds
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
-              svars
+              (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
           let univars = if closed then Some univar_list else None in
           let args, targs =
@@ -3020,7 +3020,9 @@ let transl_extension_constructor ~scope env type_path type_params
         let usage : Env.constructor_usage =
           if priv = Public then Env.Exported else Env.Exported_private
         in
-        let cdescr = Env.lookup_constructor ~loc:lid.loc usage lid.txt env in
+        let cdescr, _ =
+          Env.lookup_constructor ~loc:lid.loc usage lid.txt env
+        in
         let (args, cstr_res, _ex) =
           Ctype.instance_constructor Keep_existentials_flexible cdescr
         in
@@ -3215,7 +3217,8 @@ let transl_type_extension extend env loc styext =
       List.iter Ctype.generalize type_params;
       List.iter
         (fun (ext, _shape) ->
-          Btype.iter_type_expr_cstr_args Ctype.generalize ext.ext_type.ext_args;
+          Btype.iter_type_expr_cstr_args
+             Ctype.generalize ext.ext_type.ext_args;
           Option.iter Ctype.generalize ext.ext_type.ext_ret_type)
         constructors;
     end
@@ -3274,7 +3277,8 @@ let transl_exception env sext =
         transl_extension_constructor ~scope env
           Predef.path_exn [] [] Asttypes.Public sext)
       ~post: begin fun (ext, _shape) ->
-        Btype.iter_type_expr_cstr_args Ctype.generalize ext.ext_type.ext_args;
+        Btype.iter_type_expr_cstr_args
+          Ctype.generalize ext.ext_type.ext_args;
         Option.iter Ctype.generalize ext.ext_type.ext_ret_type;
       end
   in
@@ -3734,7 +3738,7 @@ let transl_value_decl env loc ~modalities valdecl =
           ~on_application:false
           ~default_arity valdecl.pval_attributes
       in
-      let zero_alloc =
+      let zero_alloc  =
         match zero_alloc with
         | Default_zero_alloc ->
           (* We fabricate a "Check" attribute if a top-level annotation

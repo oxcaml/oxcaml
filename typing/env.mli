@@ -236,6 +236,7 @@ type lock_item =
   | Value
   | Module
   | Class
+  | Constructor
 
 type structure_components_reason =
   | Project
@@ -276,9 +277,10 @@ type lookup_error =
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
+  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | No_constructor_in_stage of Longident.t * Location.t * int
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
-
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
 
@@ -339,14 +341,14 @@ val lookup_module_instance_path:
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  constructor_description
+  constructor_description * locks
 val lookup_all_constructors:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
-  ((constructor_description * (unit -> unit)) list,
+  (((constructor_description * locks) * (unit -> unit)) list,
    Location.t * t * lookup_error) result
 val lookup_all_constructors_from_type:
   ?use:bool -> loc:Location.t -> constructor_usage -> Path.t -> t ->
-  (constructor_description * (unit -> unit)) list
+  ((constructor_description * locks) * (unit -> unit)) list
 
 val lookup_label:
   ?use:bool -> record_form:'rcd record_form -> loc:Location.t -> label_usage -> Longident.t -> t ->
@@ -542,6 +544,14 @@ val add_closure_lock : closure_context
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val add_local_env_lock : t -> t
+val add_quotation_lock : t -> t
+val add_splice_lock : t -> t
+
+val without_open_quotations : t -> bool
+val has_open_quotations : t -> bool
+val stage : t -> int
+val quotation_locks_offset : locks -> int option
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit

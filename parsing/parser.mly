@@ -287,8 +287,8 @@ let unclosed opening_name opening_loc closing_name closing_loc =
   raise(Syntaxerr.Error(Syntaxerr.Unclosed(make_loc opening_loc, opening_name,
                                            make_loc closing_loc, closing_name)))
 
-let quotation_reserved name loc =
-  raise(Syntaxerr.Error(Syntaxerr.Quotation_reserved(make_loc loc, name)))
+let unspliceable loc =
+  raise(Syntaxerr.Error(Syntaxerr.Unspliceable (make_loc loc)))
 
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
@@ -1168,7 +1168,7 @@ The precedences must be listed from low to high.
 %nonassoc LBRACKETAT
 %right    COLONCOLON                    /* expr (e :: e :: e) */
 %left     INFIXOP2 PLUS PLUSDOT MINUS MINUSDOT PLUSEQ /* expr (e OP e OP e) */
-%left     PERCENT INFIXOP3 MOD STAR                 /* expr (e OP e OP e) */
+%left     PERCENT INFIXOP3 MOD STAR     /* expr (e OP e OP e) */
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
 %nonassoc prec_unary_minus prec_unary_plus /* unary - */
@@ -2777,21 +2777,21 @@ pattern_with_modes_or_poly:
         mkpat_with_modes ~loc:$sloc ~pat ~cty:(Some cty) ~modes:[]
       }
 
-%inline indexop_expr(dot, index, right):
-  | array=simple_expr d=dot LPAREN i=index RPAREN r=right
+%inline indexop_expr(dot, index, expr_type, right):
+  | array=expr_type d=dot LPAREN i=index RPAREN r=right
     { array, d, Paren,   i, r }
-  | array=simple_expr d=dot LBRACE i=index RBRACE r=right
+  | array=expr_type d=dot LBRACE i=index RBRACE r=right
     { array, d, Brace,   i, r }
-  | array=simple_expr d=dot LBRACKET i=index RBRACKET r=right
+  | array=expr_type d=dot LBRACKET i=index RBRACKET r=right
     { array, d, Bracket, i, r }
 ;
 
-%inline indexop_error(dot, index):
-  | simple_expr dot _p=LPAREN index  _e=error
+%inline indexop_error(dot, index, expr_type):
+  | expr_type dot _p=LPAREN index  _e=error
     { indexop_unclosed_error $loc(_p)  Paren $loc(_e) }
-  | simple_expr dot _p=LBRACE index  _e=error
+  | expr_type dot _p=LBRACE index  _e=error
     { indexop_unclosed_error $loc(_p) Brace $loc(_e) }
-  | simple_expr dot _p=LBRACKET index  _e=error
+  | expr_type dot _p=LBRACKET index  _e=error
     { indexop_unclosed_error $loc(_p) Bracket $loc(_e) }
 ;
 
@@ -2823,7 +2823,7 @@ fun_:
 fun_expr:
     simple_expr %prec below_HASH
       { $1 }
-  | fun_expr_attrs
+  | fun_expr_attrs(seq_expr)
       { let desc, attrs = $1 in
         mkexp_attrs ~loc:$sloc desc attrs }
   | fun_
@@ -2845,9 +2845,9 @@ fun_expr:
       { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setfield($1, $3, $5)) }
-  | indexop_expr(DOT, seq_expr, LESSMINUS v=expr {Some v})
+  | indexop_expr(DOT, seq_expr, simple_expr, LESSMINUS v=expr {Some v})
     { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
-  | indexop_expr(qualified_dotop, expr_semi_list, LESSMINUS v=expr {Some v})
+  | indexop_expr(qualified_dotop, expr_semi_list, simple_expr, LESSMINUS v=expr {Some v})
     { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
   | fun_expr attribute
       { Exp.attr $1 $2 }
@@ -2861,33 +2861,33 @@ fun_expr:
 %inline expr:
   | or_function(fun_expr) { $1 }
 ;
-%inline fun_expr_attrs:
-  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN seq_expr
+%inline fun_expr_attrs(expr_type):
+  | LET MODULE ext_attributes module_name_modal(at_mode_expr) module_binding_body IN expr_type
       {
         let name, modes = $4 in
         let body = maybe_pmod_constraint modes $5 in
         Pexp_letmodule(name, body, $7), $3 }
-  | LET EXCEPTION ext_attributes let_exception_declaration IN seq_expr
+  | LET EXCEPTION ext_attributes let_exception_declaration IN expr_type
       { Pexp_letexception($4, $6), $3 }
-  | LET OPEN override_flag ext_attributes module_expr IN seq_expr
+  | LET OPEN override_flag ext_attributes module_expr IN expr_type
       { let open_loc = make_loc ($startpos($2), $endpos($5)) in
         let od = Opn.mk $5 ~override:$3 ~loc:open_loc in
         Pexp_open(od, $7), $4 }
-  | MATCH ext_attributes seq_expr WITH match_cases
+  | MATCH ext_attributes expr_type WITH match_cases
       { Pexp_match($3, $5), $2 }
-  | TRY ext_attributes seq_expr WITH match_cases
+  | TRY ext_attributes expr_type WITH match_cases
       { Pexp_try($3, $5), $2 }
-  | TRY ext_attributes seq_expr WITH error
+  | TRY ext_attributes expr_type WITH error
       { syntax_error() }
-  | OVERWRITE ext_attributes seq_expr WITH expr
+  | OVERWRITE ext_attributes expr_type WITH expr
       { Pexp_overwrite($3, $5), $2 }
-  | IF ext_attributes seq_expr THEN expr ELSE expr
+  | IF ext_attributes expr_type THEN expr ELSE expr
       { Pexp_ifthenelse($3, $5, Some $7), $2 }
-  | IF ext_attributes seq_expr THEN expr
+  | IF ext_attributes expr_type THEN expr
       { Pexp_ifthenelse($3, $5, None), $2 }
-  | WHILE ext_attributes seq_expr do_done_expr
+  | WHILE ext_attributes expr_type do_done_expr
       { Pexp_while($3, $4), $2 }
-  | FOR ext_attributes pattern EQUAL seq_expr direction_flag seq_expr
+  | FOR ext_attributes pattern EQUAL expr_type direction_flag expr_type
     do_done_expr
       { Pexp_for($3, $5, $7, $6, $8), $2 }
   | ASSERT ext_attributes simple_expr %prec below_HASH
@@ -2923,6 +2923,22 @@ fun_expr:
       { mkexp ~loc:$sloc (mkinfix e1 op e2) }
 ;
 
+spliceable_expr:
+  | LESSLBRACKET seq_expr RBRACKETGREATER
+      { mkexp ~loc:$sloc (Pexp_quotation ($2)) }
+  | LPAREN seq_expr RPAREN
+      { reloc_exp ~loc:$sloc $2 }
+  | LPAREN seq_expr error
+      { unclosed "(" $loc($1) ")" $loc($3) }
+  | LPAREN seq_expr type_constraint_with_modes RPAREN
+      { let (t, m) = $3 in
+        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+  | mkrhs(val_longident)
+      { mkexp ~loc:$sloc (Pexp_ident ($1)) }
+  | error
+      { unspliceable $sloc }
+;
+
 simple_expr:
   | LPAREN seq_expr RPAREN
       { reloc_exp ~loc:$sloc $2 }
@@ -2931,14 +2947,14 @@ simple_expr:
   | LPAREN seq_expr type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
         mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
-  | indexop_expr(DOT, seq_expr, { None })
+  | indexop_expr(DOT, seq_expr, simple_expr, { None })
       { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
   (* Immutable array indexing is a regular operator, so it doesn't need its own
      rule and is handled by the next case *)
-  | indexop_expr(qualified_dotop, expr_semi_list, { None })
+  | indexop_expr(qualified_dotop, expr_semi_list, simple_expr, { None })
       { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
-  | indexop_error (DOT, seq_expr) { $1 }
-  | indexop_error (qualified_dotop, expr_semi_list) { $1 }
+  | indexop_error (DOT, seq_expr, simple_expr) { $1 }
+  | indexop_error (qualified_dotop, expr_semi_list, simple_expr) { $1 }
   | simple_expr_attrs
     { let desc, attrs = $1 in
       mkexp_attrs ~loc:$sloc desc attrs }
@@ -3144,17 +3160,17 @@ comprehension_clause:
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
         Pexp_open(od, modexp) }
-  | LESSLBRACKET expr_semi_list RBRACKETGREATER
-      { quotation_reserved "<[" $loc($1) }
-  | LESSLBRACKET expr_semi_list error
-      { unclosed "<[" $loc($1) "]>" $loc($3) }
-  | DOLLAR error
-      { quotation_reserved "$" $loc($1) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($3) ")" $loc($8) }
   | HASHLPAREN labeled_tuple RPAREN
       { Pexp_unboxed_tuple $2 }
+  | DOLLAR spliceable_expr
+      { Pexp_splice $2 }
+  | LESSLBRACKET seq_expr RBRACKETGREATER
+      { Pexp_quotation $2 }
+  | LESSLBRACKET seq_expr error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
@@ -4672,6 +4688,7 @@ tuple_type:
     - object types                < x: t; ... >
     - variant types               [ `A ]
     - extension                   [%foo ...]
+    - quoted types                << t >>
 
   We support local opens on the following classes of types:
     - parenthesised
@@ -4711,6 +4728,8 @@ delimited_type_supporting_local_open:
         { Ptyp_variant(fields, Closed, Some tags) }
     | HASHLPAREN unboxed_tuple_type_body RPAREN
         { Ptyp_unboxed_tuple $2 }
+    | LESSLBRACKET core_type RBRACKETGREATER
+        { Ptyp_quote $2 }
   )
   { $1 }
 ;
@@ -4740,6 +4759,18 @@ delimited_type:
     { $1 }
 ;
 
+spliceable_type:
+  | type_ = delimited_type_supporting_local_open
+      { type_ }
+  | mktyp( /* begin mktyp group */
+        tid = mkrhs(type_longident)
+          { Ptyp_constr (tid, []) }
+      | QUOTE ident = ident
+          { Ptyp_var (ident, None) }
+  )
+  { $1 } /* end mktyp group */
+;
+
 atomic_type:
   | type_ = delimited_type
       { type_ }
@@ -4762,6 +4793,8 @@ atomic_type:
         { Ptyp_var (ident, None) }
     | UNDERSCORE
         { Ptyp_any None }
+    | DOLLAR type_ = spliceable_type
+        { Ptyp_splice type_ }
   )
   { $1 } /* end mktyp group */
   | LPAREN QUOTE name=ident COLON jkind=jkind_annotation RPAREN
@@ -4770,12 +4803,7 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
-  | LESSLBRACKET core_type RBRACKETGREATER
-      { quotation_reserved "<[" $loc($1) }
-  | LESSLBRACKET core_type error
-      { unclosed "<[" $loc($1) "]>" $loc($3) }
-  | DOLLAR error
-      { quotation_reserved "$" $loc($1) }
+;
 
 
 (* This is the syntax of the actual type parameters in an application of
@@ -4959,25 +4987,25 @@ operator:
   /* Still support the two symbols as infix operators */
   | AT             {"@"}
   | ATAT           {"@@"}
-  | op = INFIXOP1 { op }
-  | op = INFIXOP2 { op }
-  | op = infixop3 { op }
-  | op = INFIXOP4 { op }
-  | PLUS           {"+"}
-  | PLUSDOT       {"+."}
-  | PLUSEQ        {"+="}
-  | MINUS          {"-"}
-  | MINUSDOT      {"-."}
-  | STAR           {"*"}
-  | PERCENT        {"%"}
-  | EQUAL          {"="}
-  | LESS           {"<"}
-  | GREATER        {">"}
-  | OR            {"or"}
-  | BARBAR        {"||"}
-  | AMPERSAND      {"&"}
-  | AMPERAMPER    {"&&"}
-  | COLONEQUAL    {":="}
+  | op = INFIXOP1  { op }
+  | op = INFIXOP2  { op }
+  | op = infixop3  { op }
+  | op = INFIXOP4  { op }
+  | PLUS            {"+"}
+  | PLUSDOT        {"+."}
+  | PLUSEQ         {"+="}
+  | MINUS           {"-"}
+  | MINUSDOT       {"-."}
+  | STAR            {"*"}
+  | PERCENT         {"%"}
+  | EQUAL           {"="}
+  | LESS            {"<"}
+  | GREATER         {">"}
+  | OR             {"or"}
+  | BARBAR         {"||"}
+  | AMPERSAND       {"&"}
+  | AMPERAMPER     {"&&"}
+  | COLONEQUAL     {":="}
 ;
 index_mod:
 | { "" }
