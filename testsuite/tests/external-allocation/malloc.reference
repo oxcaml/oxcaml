@@ -78,9 +78,12 @@ Test D1d5:
   Field 2: 11
 
 
-Some15: No GC-visible Allocation, result value is outside minor heap
-Test Some15:
-  Field 0: 31
+f2: No GC-visible Allocation, result value is outside minor heap
+Test f2:
+  Field 0: 3
+  Field 1: 201
+  Field 2: 11
+  Field 3: 13
 
 
 list5: No GC-visible Allocation, result value is outside minor heap

@@ -68,7 +68,8 @@ let () = is_a_malloc "B5" ~num_fields:#1L (fun () -> malloc_ (B 5))
 let () = is_a_malloc "C10d" ~num_fields:#2L (fun () -> malloc_ (C (10, 'd')))
 let () = is_a_malloc "D1d5" ~num_fields:#3L (fun () -> malloc_ (D #(1, 'd', 5)))
 
-let () = is_a_malloc "Some15" ~num_fields:#1L (fun () -> malloc_ (Some 15))
+type f =  D of #(int * char * int) * int
+let () = is_a_malloc "f2" ~num_fields:#4L (fun () -> malloc_ (D (#(1,'d',5),6)))
 
 (* List allocations *)
 let () = is_a_malloc "list5" ~num_fields:#2L (fun () -> malloc_ [5])
