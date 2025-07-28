@@ -183,11 +183,19 @@ let block_header ?(block_kind = Regular_block) tag sz =
    structured constants and static module definitions. *)
 let black_block_header tag sz = Nativeint.logor (block_header tag sz) caml_black
 
+(* Generic mixed block header creation *)
+let mixed_block_header tag sz ~scannable_prefix_len ~color =
+  let header = 
+    block_header tag sz
+      ~block_kind:(Mixed_block { scannable_prefix = scannable_prefix_len })
+  in
+  Nativeint.logor header color
+
 let black_mixed_block_header tag sz ~scannable_prefix_len =
-  Nativeint.logor
-    (block_header tag sz
-       ~block_kind:(Mixed_block { scannable_prefix = scannable_prefix_len }))
-    caml_black
+  mixed_block_header tag sz ~scannable_prefix_len ~color:caml_black
+
+let white_mixed_block_header tag sz ~scannable_prefix_len =
+  mixed_block_header tag sz ~scannable_prefix_len ~color:0n
 
 let local_block_header ?block_kind tag sz =
   Nativeint.logor (block_header ?block_kind tag sz) caml_local
@@ -4738,7 +4746,7 @@ let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~base_tag ~elements
     let size = List.length payload in
     match mode with
     | Cmm.Alloc_mode.Heap ->
-      black_mixed_block_header tag size ~scannable_prefix_len:0
+      white_mixed_block_header tag size ~scannable_prefix_len:0
     | Cmm.Alloc_mode.Local ->
       local_block_header tag size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
@@ -4780,7 +4788,7 @@ let allocate_unboxed_int64_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     let size = List.length elements in
     match mode with
     | Heap ->
-      black_mixed_block_header Unboxed_array_tags.unboxed_int64_array_tag size
+      white_mixed_block_header Unboxed_array_tags.unboxed_int64_array_tag size
         ~scannable_prefix_len:0
     | Local ->
       local_block_header Unboxed_array_tags.unboxed_int64_array_tag size
@@ -4796,7 +4804,7 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     let size = List.length elements in
     match mode with
     | Heap ->
-      black_mixed_block_header Unboxed_array_tags.unboxed_nativeint_array_tag
+      white_mixed_block_header Unboxed_array_tags.unboxed_nativeint_array_tag
         size ~scannable_prefix_len:0
     | Local ->
       local_block_header Unboxed_array_tags.unboxed_nativeint_array_tag size
@@ -4812,7 +4820,7 @@ let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
   let header =
     let size = ints_per_vec * List.length elements in
     match mode with
-    | Heap -> black_mixed_block_header tag size ~scannable_prefix_len:0
+    | Heap -> white_mixed_block_header tag size ~scannable_prefix_len:0
     | Local ->
       local_block_header tag size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
