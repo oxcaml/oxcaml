@@ -184,6 +184,8 @@ module Predef : sig
 
   val to_string : t -> string
 
+  val equal : t -> t -> bool
+
   val unboxed_type_to_base_layout : unboxed -> base_layout
 
   val to_layout : t -> Layout.t
@@ -298,6 +300,11 @@ val print : Format.formatter -> t -> unit
 val strip_head_aliases : t -> t
 
 val equal : t -> t -> bool
+
+val equal_record_kind : record_kind -> record_kind -> bool
+
+val equal_complex_constructor : 
+  ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
 
 (* Smart constructors *)
 

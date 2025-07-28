@@ -503,6 +503,18 @@ let complex_constructor_map f { name; kind; args } =
 
 let complex_constructors_map f = List.map (complex_constructor_map f)
 
+let equal_complex_constructor_arguments eq
+  { field_name = field_name1; field_value = field_value1 }
+  { field_name = field_name2; field_value = field_value2 } =
+  Option.equal String.equal field_name1 field_name2 &&
+  eq field_value1 field_value2
+
+let equal_complex_constructor eq
+  { name = name1; kind = kind1; args = args1 }
+  { name = name2; kind = kind2; args = args2 } =
+  String.equal name1 name2 &&
+  Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
+  List.equal (equal_complex_constructor_arguments eq) args1 args2
 
 let rec equal_desc d1 d2 =
   if d1 == d2 then true else
@@ -617,23 +629,6 @@ and equal_field (s1, sh1, ly1) (s2, sh2, ly2) =
   Layout.equal ly1 ly2
 
 and equal_simple_constructor c1 c2 = String.equal c1 c2
-
-and equal_complex_constructor eq
-  { name = name1; kind = kind1; args = args1 }
-  { name = name2; kind = kind2; args = args2 } =
-  String.equal name1 name2 &&
-  equal_constructor_representation kind1 kind2 &&
-  List.equal (equal_complex_constructor_arguments eq) args1 args2
-
-and equal_complex_constructor_arguments eq
-  { field_name = field_name1; field_value = field_value1 }
-  { field_name = field_name2; field_value = field_value2 } =
-  Option.equal String.equal field_name1 field_name2 &&
-  eq field_value1 field_value2
-
-and equal_constructor_representation lys1 lys2 =
-  Misc.Stdlib.Array.equal Layout.equal lys1 lys2
-
 
 and equal_poly_variant_constructor
   { pv_constr_name = name1; pv_constr_args = args1 }

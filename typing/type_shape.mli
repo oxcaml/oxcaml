@@ -35,11 +35,7 @@ val add_to_type_decls :
   (Ident.t * Types.type_declaration) list -> path_lookup -> unit
 
 val add_to_type_shapes :
-  Uid.t ->
-  Types.type_expr ->
-  Jkind_types.Sort.Const.t ->
-  path_lookup ->
-  unit
+  Uid.t -> Types.type_expr -> Layout.t -> path_lookup -> unit
 
 val find_in_type_decls : Uid.t -> Shape.t option
 
