@@ -50,6 +50,8 @@ module Var : sig
 
   val of_idx : int -> t
 
+  val last : unit -> t
+
   val fresh : unit -> t
 
   val fresh_n : string -> t
@@ -227,6 +229,14 @@ type program =
   { start : Addr.t;
     blocks : block Addr.Map.t;
     free_pc : Addr.t
+  }
+
+type cmj_body =
+  { program : program;
+    last_var : Addr.t
+        (** Highest used variable in the translation, since it is kept track by a
+        mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
+        need to have these in sync *)
   }
 
 module Print : sig
