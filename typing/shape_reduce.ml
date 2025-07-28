@@ -48,6 +48,7 @@ let find_shape env id =
 module Make(Params : sig
   val fuel : int
   val read_unit_shape : unit_name:string -> t option
+  val remove_uids : bool
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
@@ -63,6 +64,9 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
+    | NMu of delayed_nf
+    | NRec_var of int
+    | NDelayed of delayed_nf
 
   (* A type of normal forms for strong call-by-need evaluation.
      The normal form of an abstraction
@@ -113,6 +117,8 @@ end) = struct
       if equal_nf v1 v2 then equal_nf t1 t2
       else false
     | NLeaf, NLeaf -> true
+    | NMu (nf1), NMu (nf2) -> equal_delayed_nf nf1 nf2
+    | NRec_var i1, NRec_var i2 -> Int.equal i1 i2
     | NStruct t1, NStruct t2 ->
       Item.Map.equal equal_delayed_nf t1 t2
     | NProj (t1, i1), NProj (t2, i2) ->
@@ -121,15 +127,19 @@ end) = struct
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
-    | NVar _, (NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NLeaf, (NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NApp _, (NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NAbs _, (NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NStruct _, (NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _ | NAlias _ | NError _)
-    | NProj _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _ | NAlias _ | NError _)
-    | NComp_unit _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _ | NError _)
-    | NAlias _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NError _)
-    | NError _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _)
+    | NDelayed nf1, NDelayed nf2 -> equal_delayed_nf nf1 nf2
+    | NVar _, (NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NLeaf, (NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NApp _, (NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NAbs _, (NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NStruct _, (NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NProj _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NComp_unit _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NAlias _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NError _ | NDelayed _ | NMu _| NRec_var _)
+    | NError _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NDelayed _ | NMu _| NRec_var _)
+    | NMu _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NRec_var _  )
+    | NRec_var _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NDelayed _ | NMu _ )
+    | NDelayed _, (NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _ )
     -> false
 
   and equal_nf t1 t2 =
@@ -304,11 +314,16 @@ end) = struct
               reduce env res
           end
       | Leaf -> return NLeaf
+      | Mu t_body -> return (NMu (delay_reduce env t_body))
+      | Rec_var n -> return (NRec_var n)
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
       | Alias t -> return (NAlias (delay_reduce env t))
       | Error s -> approx_nf (return (NError s))
+      | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+      | Variant _ | Variant_unboxed _ | Record _ | Constr _ | Mutrec _ | ProjDecl _ ->
+        (return (NDelayed (delay_reduce env t)))
 
   and read_back env (nf : nf) : t =
   in_read_back_memo_table env.read_back_memo_table nf (read_back_ env) nf
@@ -323,9 +338,10 @@ end) = struct
   and read_back_desc ~uid env desc =
     let read_back nf = read_back env nf in
     let read_back_force dnf = read_back (force env dnf) in
+    let uid = if Params.remove_uids then None else uid in
     match desc with
     | NVar v ->
-      var (Option.get uid) v
+      var' uid v
     | NApp (nft, nfu) ->
         let f = read_back nft in
         let arg = read_back nfu in
@@ -343,6 +359,69 @@ end) = struct
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
+    | NMu (t_body) ->
+      mu ?uid (read_back_force t_body)
+    | NRec_var n ->
+      rec_var ?uid n
+    | NDelayed dnf ->
+      read_back_delayed ~uid env dnf
+
+
+  and read_back_delayed ~uid env (dnf : delayed_nf) : t =
+    let Thunk (l, t) = dnf in
+    let env = { env with local_env = l } in
+    force_reduce ~uid env t
+
+  (* CR sspies: We currently do not match the delayed reduction strategy for
+     type declarations that is used for the other parts, and instead
+     aggressively reduce the occurrences of shapes in type declarations. *)
+  and force_reduce ~uid env (t: t) =
+    let uid  = if Params.remove_uids then None else uid in
+    let reduce t = read_back env (reduce_ env t) in
+    (* For any recursive occurrence, we should reduce the internal shapes. *)
+    match t.desc with
+    | Variant { simple_constructors; complex_constructors } ->
+      Shape.variant ?uid simple_constructors
+      (List.map
+            (Shape.complex_constructor_map
+              (fun ((sh, ly): t * _) -> force_reduce ~uid:sh.uid env sh, ly)
+            )
+          complex_constructors)
+
+    | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
+      Shape.variant_unboxed ?uid name arg_name
+      (force_reduce ~uid:arg_shape.uid env arg_shape) arg_layout
+    | Record { fields; kind } ->
+      Shape.record ?uid
+        kind
+        (List.map
+           (fun ((name, sh, ly): _ * t * _) -> name, force_reduce ~uid:sh.uid env sh, ly)
+           fields)
+    | Poly_variant constrs ->
+      Shape.poly_variant ?uid
+        (poly_variant_constructors_map (fun (sh: t) -> force_reduce ~uid:sh.uid env sh) constrs)
+    | Tuple args ->
+      Shape.tuple ?uid (List.map (fun (sh: t) -> force_reduce ~uid:sh.uid env sh) args)
+    | Unboxed_tuple args ->
+      Shape.unboxed_tuple ?uid (List.map (fun (sh: t) -> force_reduce ~uid:sh.uid env sh) args)
+    | Arrow (arg, ret) ->
+      Shape.arrow ?uid
+        (force_reduce ~uid:arg.uid env arg)
+        (force_reduce ~uid:ret.uid env ret)
+    | Predef (predef, args) ->
+      Shape.predef ?uid predef (List.map (fun (sh: t) -> force_reduce ~uid:sh.uid env sh) args)
+    | Constr (id, args) ->
+        let args = List.map (fun (sh: t) -> force_reduce ~uid:sh.uid env sh) args in
+        constr ?uid id args
+    | Mutrec defs ->
+        let defs = Ident.Map.map (fun (sh: t) -> force_reduce ~uid:sh.uid env sh) defs in
+        mutrec ?uid defs
+    | ProjDecl (t, id) -> proj_decl ?uid (force_reduce ~uid:t.uid env t) id
+    | (Mu _ | Rec_var _ | Alias _ | Error _ | Leaf | App _ | Proj _ | Var _
+       | Abs _ | Comp_unit _ | Struct _ )  ->
+      (* all of these are potentially type expressions *)
+      reduce t
+
 
   (* Sharing the memo tables is safe at the level of a compilation unit since
     idents should be unique *)
@@ -359,7 +438,7 @@ end) = struct
       read_back_memo_table = !read_back_memo_table;
       local_env;
     } in
-    reduce_ env t |> read_back env
+     reduce_ env t |> read_back env
 
   let rec is_stuck_on_comp_unit (nf : nf) =
     match nf.desc with
@@ -372,6 +451,9 @@ end) = struct
     | NComp_unit _ -> true
     | NError _ -> false
     | NLeaf -> false
+    | NMu _ -> false
+    | NRec_var _ -> false
+    | NDelayed _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with
@@ -409,6 +491,7 @@ module Local_reduce =
   Make(struct
     let fuel = 10
     let read_unit_shape ~unit_name:_ = None
+    let remove_uids = false
   end)
 
 let local_reduce = Local_reduce.reduce
