@@ -247,6 +247,7 @@ type error =
   | Atomic_in_pattern of Longident.t
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
+  | Modalities_on_atomic_field of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -7036,9 +7037,13 @@ and type_expect_
           let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
           unify_exp env record ty_res;
           let alloc_mode, argument_mode = register_allocation expected_mode in
-          (* NOTE: we intentionally ignore lbl.ld_modalities here, since we
-             force it to always be legacy in typecore. The mode of the
-             atomic_loc is then exactly the mode of the record *)
+          begin match Mode.Modality.Value.Const.equate label.lbl_modalities
+                        (Typemode.atomic_mutable_modalities)
+          with
+          | Ok () -> ()
+          | Error _ ->
+            raise (Error (loc, env, Modalities_on_atomic_field lid.txt))
+          end;
           submode ~loc ~env rmode argument_mode;
           rue {
             exp_desc =
@@ -11143,6 +11148,11 @@ let report_error ~loc env =
   | Label_not_atomic lid ->
       Location.errorf ~loc "The record field %a is not atomic"
         (Style.as_inline_code longident) lid
+  | Modalities_on_atomic_field lid ->
+    Location.errorf ~loc
+      "Modalities are not allowed on fields given to %a (here, %a)"
+      Style.inline_code  "[%atomic.loc]"
+      (Style.as_inline_code longident) lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
