@@ -24,8 +24,8 @@
 extern "C" {
 #endif
 
-CAMLexport value caml_alloc_malloc(mlsize_t wosize, tag_t tag);
-CAMLexport value caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag,
+CAMLexport intnat caml_alloc_malloc(mlsize_t wosize, tag_t tag);
+CAMLexport intnat caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag,
                                          mlsize_t scannable_prefix);
 
 /* It is guaranteed that these allocation functions will not trigger

@@ -766,7 +766,7 @@ CAMLexport value caml_alloc_shr_noexc(mlsize_t wosize, tag_t tag) {
 //CR jcutler for ccasinghino: I believe this works on single-threaded mode.
 //I do not know the invariants of the multicore GC, and have no idea how to reason about
 //if this might break them.
-CAMLexport value caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
+CAMLexport intnat caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
                                                  reserved_t reserved)
 {
   void* res = (void*) malloc(Bhsize_wosize(wosize));
@@ -777,7 +777,7 @@ CAMLexport value caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
   // as described in the comment at the top of address_class.h.
   uintnat color = NOT_MARKABLE;
   Hd_hp(res) = Make_header_with_reserved(wosize, tag, color, reserved);
-  value v = Val_hp(res);
+  intnat v = (intnat) Val_hp(res);
   mlsize_t scannable_wosize = Scannable_wosize_reserved(reserved, wosize);
   if (tag < No_scan_tag){
     for (int i = 0; i < scannable_wosize; i++) Field(v,i) = Val_unit;
