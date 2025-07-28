@@ -184,7 +184,8 @@ type submode_reason =
   | Application of type_expr
       (* Check that the result of an application is a submode of the expected mode
          from the context *)
-
+  | Constructor of Longident.t
+      (* Check that this constructor is allowed in this context. *)
   | Other (* add more cases here for better hints *)
 
 val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.Value.t -> unit
