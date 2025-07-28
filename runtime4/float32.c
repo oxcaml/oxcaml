@@ -850,6 +850,11 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   if (num_elements > Max_unboxed_float32_array_wosize) 
     caml_invalid_argument("Array.make");
 
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
   
   /* Use appropriate unboxed array tag based on even/odd length */

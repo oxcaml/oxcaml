@@ -597,6 +597,11 @@ static value caml_make_unboxed_int32_vect0(value len, int local)
   if (num_elements > Max_unboxed_int32_array_wosize)
     caml_invalid_argument("Array.make");
 
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
   
   /* Use appropriate unboxed array tag based on even/odd length */
@@ -633,6 +638,11 @@ static value caml_make_unboxed_int64_vect0(value len, int local)
   if (num_elements > Max_unboxed_int64_array_wosize)
     caml_invalid_argument("Array.make");
 
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
   /* Mixed block with no scannable fields */
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
@@ -664,6 +674,11 @@ static value caml_make_unboxed_nativeint_vect0(value len, int local)
   mlsize_t num_elements = Long_val(len);
   if (num_elements > Max_unboxed_nativeint_array_wosize)
     caml_invalid_argument("Array.make");
+
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
 
   /* Mixed block with no scannable fields */
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);

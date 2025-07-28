@@ -46,6 +46,11 @@ static value caml_make_unboxed_vec128_vect0(value len, int local)
   if (num_elements > Max_unboxed_vec128_array_wosize)
     caml_invalid_argument("Array.make");
 
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
   mlsize_t num_fields = num_elements * Words_per_vec128;
   
   /* Mixed block with no scannable fields */
@@ -85,6 +90,11 @@ static value caml_make_unboxed_vec256_vect0(value len, int local)
   mlsize_t num_elements = Long_val(len);
   if (num_elements > Max_unboxed_vec256_array_wosize)
     caml_invalid_argument("Array.make");
+
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
 
   mlsize_t num_fields = num_elements * Words_per_vec256;
   
