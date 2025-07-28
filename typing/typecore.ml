@@ -1185,6 +1185,7 @@ type pattern_variable =
     pv_loc: Location.t;
     pv_as_var: bool;
     pv_attributes: attributes;
+    pv_layout: Jkind.Sort.t Jkind.Layout.t;
   }
 
 type module_variable =
@@ -1289,7 +1290,8 @@ let add_pattern_variables ?check ?check_as env pv =
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind;
+          Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.Value.id;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -1338,7 +1340,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-    ~kind ty attrs =
+    ~kind ty attrs layout =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
   then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
@@ -1376,7 +1378,8 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
      pv_loc = loc;
      pv_as_var = is_as_variable;
      pv_attributes = attrs;
-     pv_uid} :: tps.tps_pattern_variables;
+     pv_uid;
+     pv_layout = layout} :: tps.tps_pattern_variables;
   id, pv_uid
 
 let sort_pattern_variables vs =
@@ -1994,8 +1997,13 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
               { pv_id; pv_uid; pv_mode;
-                pv_kind=Val_reg; pv_type; pv_loc; pv_as_var;
-                pv_attributes }
+                pv_kind=Val_reg Jkind.(Layout.of_const
+                  (Layout.Const.of_sort_const Sort.Const.for_loop_index))
+                ; pv_type; pv_loc; pv_as_var;
+                pv_attributes;
+                pv_layout = Jkind.(Layout.of_const
+                  (Layout.Const.of_sort_const Sort.Const.for_loop_index))
+                }
             in
             (pv_id, pv_uid), add_pattern_variables ~check ~check_as:check env [pv])
 
@@ -2012,13 +2020,16 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:Val_reg
+            ~kind:(Val_reg Jkind.(Layout.of_const
+                   (Layout.Const.of_sort_const Sort.Const.for_loop_index)))
             tps
             pv_loc
             name
             pv_mode
             pv_type
-            pv_attributes)
+            pv_attributes
+            Jkind.(Layout.of_const
+                  (Layout.Const.of_sort_const Sort.Const.for_loop_index)))
 
 let check_let_mutable (mf : mutable_flag) env ?restriction vbs =
   match vbs, mf with
@@ -2876,9 +2887,15 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
+      (* CR mixed-modules: this is the wrong way to do this *)
+      let layout =
+        match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
+        | Error _ -> assert false
+        | Ok sort -> Jkind.Layout.Sort sort
+      in
       let mode, kind =
         match mutable_flag with
-        | Immutable -> alloc_mode, Val_reg
+        | Immutable -> alloc_mode, Val_reg layout
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
@@ -2900,7 +2917,7 @@ and type_pat_aux
             mode, kind
       in
       let id, uid =
-        enter_variable tps loc name mode ~kind ty sp.ppat_attributes
+        enter_variable tps loc name mode ~kind ty sp.ppat_attributes layout
       in
       rvp {
         pat_desc = Tpat_var (id, name, uid, alloc_mode);
@@ -2927,7 +2944,12 @@ and type_pat_aux
              [Ppat_unpack] is a case identified by [may_contain_modules]. See
              the comment on [may_contain_modules]. *)
           let id, uid = enter_variable tps loc v alloc_mode.mode
-                          t ~is_module:true ~kind:Val_reg sp.ppat_attributes in
+                          t ~is_module:true ~kind:(Val_reg
+                          Jkind.(Layout.of_const (Layout.Const.of_sort_const
+                            Sort.Const.for_module))) sp.ppat_attributes
+                          Jkind.(Layout.of_const (Layout.Const.of_sort_const
+                            Sort.Const.for_module))
+          in
           rvp {
             pat_desc = Tpat_var (id, v, uid, alloc_mode.mode);
             pat_loc = sp.ppat_loc;
@@ -2941,9 +2963,15 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
+      (* CR mixed-modules: this is the wrong way to do this *)
+      let layout =
+        match Ctype.type_sort !!penv ty_var ~why:Let_binding ~fixed:false with
+        | Error _ -> assert false
+        | Ok sort -> Jkind.Layout.Sort sort
+      in
       let id, uid =
-        enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
-          ty_var sp.ppat_attributes
+        enter_variable ~is_as_variable:true ~kind:(Val_reg layout) tps name.loc
+          name mode ty_var sp.ppat_attributes layout
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, mode, ty_var);
             pat_loc = loc; pat_extra=[];
@@ -3296,7 +3324,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
   in
   let (pv, val_env, met_env) =
     List.fold_right
-      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes}
+      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes; pv_layout}
         (pv, val_env, met_env) ->
          let check s =
            if pv_as_var then Warnings.Unused_var { name = s; mutated = false }
@@ -3305,7 +3333,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg
+            ; val_kind = Val_reg pv_layout
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.Value.id
@@ -7267,7 +7295,9 @@ and type_constraint_expect
 and type_ident env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
-  let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
+  let path, desc, (mode, locks) =
+    Env.lookup_value ~loc:lid.loc lid.txt env
+  in
   (* We cross modes when typing [Ppat_ident], before adding new variables into
   the environment. Therefore, one might think all values in the environment are
   already mode-crossed. That is not true for several reasons:
@@ -8222,10 +8252,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       submode ~loc:sarg.pexp_loc ~env ~reason:Other
         exp_mode mode_subcomponent;
       (* eta-expand to avoid side effects *)
-      let var_pair ~(mode : Value.lr) name ty =
+      let var_pair ~(mode : Value.lr) name ty layout =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg;
+          { val_type = ty; val_kind = Val_reg layout;
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.Value.id;
@@ -8250,7 +8280,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let eta_mode, _ = Value.newvar_below (alloc_as_value marg) in
       Regionality.submode_exn
         (Value.proj_comonadic Areality eta_mode) Regionality.regional;
-      let eta_pat, eta_var = var_pair ~mode:eta_mode "eta" ty_arg in
       (* CR layouts v10: When we add abstract jkinds, the eta expansion here
          becomes impossible in some cases - we'll need better errors.  For test
          cases, look toward the end of
@@ -8263,6 +8292,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let ret_sort = type_sort ~why:Function_result ty_res in
+      let arg_layout = Jkind.Layout.Sort arg_sort in
+      let eta_pat, eta_var =
+        var_pair ~mode:eta_mode "eta" ty_arg arg_layout
+      in
       let func texp =
         let ret_mode = alloc_as_value mret in
         let e =
@@ -8305,7 +8338,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       if warn then Location.prerr_warning texp.exp_loc
           (Warnings.Non_principal_labels "eliminated omittable argument");
       (* let-expand to have side effects *)
-      let let_pat, let_var = var_pair ~mode:exp_mode "arg" texp.exp_type in
+      let let_pat, let_var =
+        var_pair ~mode:exp_mode "arg" texp.exp_type arg_layout
+      in
       let let_pat_sort =
         (* The sort of the let-bound variable, which here is always a function
            (observe it is passed to [func], which builds an application of
@@ -9573,7 +9608,7 @@ and type_let_def_wrap_warnings
                 let mutable_ =
                   (match vd.val_kind with
                    | Val_mut _ -> true
-                   | Val_reg | Val_prim _ | Val_ivar _
+                   | Val_reg _ | Val_prim _ | Val_ivar _
                    | Val_self _ | Val_anc _ -> false)
                 in
                 let mutated = ref false in
@@ -9607,7 +9642,7 @@ and type_let_def_wrap_warnings
                 | Val_mut _->
                   Env.set_value_mutated_callback
                     vd (fun () -> mutated := true)
-                | Val_reg | Val_prim _ | Val_ivar _
+                | Val_reg _ | Val_prim _ | Val_ivar _
                 | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);

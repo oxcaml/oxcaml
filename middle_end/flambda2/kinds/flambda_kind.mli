@@ -124,6 +124,7 @@ module Scannable_block_shape : sig
   type t =
     | Value_only
     | Mixed_record of Mixed_block_shape.t
+  (* CR jrayman: should this be renamed to [Mixed]? *)
 
   (** For now if two block shapes do not compare as equal they will be
       incompatible. If that changes, a [compatible] function will be
@@ -135,6 +136,8 @@ module Scannable_block_shape : sig
   val print : Format.formatter -> t -> unit
 
   val element_kind : t -> int -> kind
+
+  val of_module_representation : Lambda.module_representation -> t
 end
 
 module Block_shape : sig

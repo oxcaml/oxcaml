@@ -292,7 +292,7 @@ let transl_ident loc env ty path desc kind =
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
-  | (Val_reg | Val_self _), Id_value ->
+  | (Val_reg _ | Val_self _), Id_value ->
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
@@ -1102,9 +1102,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
           let body, _ =
-            (* CR layouts v5: Currently we only allow values at the top of a
-               module.  When that changes, some adjustments may be needed
-               here. *)
+            (* CR mixed-modules: Currently we only allow values at the top of a
+               module.  When that changes, some adjustments may be
+               needed here. *)
             List.fold_left (fun (body, pos) id ->
               Llet(Alias, Lambda.layout_module_field, id,
                    Lambda.debug_uid_none,

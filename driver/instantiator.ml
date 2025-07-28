@@ -140,14 +140,14 @@ let instantiate
     |> List.map (fun ({ param; value } : Global_module.argument) -> param, value)
     |> Global_module.Parameter_name.Map.of_list
   in
-  let runtime_params, main_module_block_size =
+  let runtime_params, _main_module_repr =
     match base_unit_info.ui_format with
     | Mb_struct _ ->
       (* Should have raised [Not_parameterised] above *)
       Misc.fatal_errorf "No runtime parameters for %a"
         CU.print base_compilation_unit
-    | Mb_instantiating_functor { mb_runtime_params; mb_returned_size } ->
-      mb_runtime_params, mb_returned_size
+    | Mb_instantiating_functor { mb_runtime_params; mb_returned_repr } ->
+      mb_runtime_params, mb_returned_repr
   in
   let runtime_args =
     runtime_params
@@ -178,6 +178,7 @@ let instantiate
   in
   let output_prefix = output_filename_without_extension in
   let arg_descr = base_unit_info.ui_arg_descr in
+  let main_module_block_size = failwith "TODO" in
   compile
     ~source_file:src ~output_prefix ~compilation_unit ~runtime_args
     ~main_module_block_size ~arg_descr;

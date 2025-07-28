@@ -133,7 +133,7 @@ let rec eval_address = function
       global_symbol cu
   | Env.Alocal id ->
       toplevel_value id
-  | Env.Adot(a, pos) ->
+  | Env.Adot(a, _, pos) -> (* CR jrayman: fix *)
       Obj.field (eval_address a) pos
 
 let eval_path find env path =
@@ -289,7 +289,8 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_format = Mb_struct { mb_size = size };
+      main_module_block_format =
+        Mb_struct { mb_repr = Module_value_only size };
       arg_block_idx = None;
       compilation_unit;
       required_globals;
@@ -304,7 +305,7 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg; val_type; _}, _) ->
+       | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
           Some (outval_of_value env (toplevel_value id) val_type)
       | _ -> None
     )
@@ -343,7 +344,8 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg;
+      val_kind = Val_reg Jkind.(Layout.of_const (Layout.Const.of_sort_const
+        Sort.Const.for_module_field));
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -435,7 +437,10 @@ let execute_phrase print_outcome ppf phr =
         remember compilation_unit sg';
         let size =
           match main_module_block_format with
-          | Mb_struct { mb_size } -> mb_size;
+          | Mb_struct { mb_repr = Module_value_only size } -> size
+          | Mb_struct _ ->
+            Misc.fatal_error "Unsupported module format in toplevel"
+            (* CR jrayman: add support *)
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
