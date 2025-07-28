@@ -13,6 +13,19 @@
 (* We only compile for 64 bits. *)
 let bytes_per_word = 8
 
+(* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
+let unboxed_product_array_tag = 0
+let unboxed_int64_array_tag = 1
+let unboxed_int32_array_even_tag = 2
+let unboxed_int32_array_odd_tag = 3
+let unboxed_float32_array_even_tag = 4
+let unboxed_float32_array_odd_tag = 5
+let unboxed_vec128_array_tag = 6
+let unboxed_vec256_array_tag = 7
+let unboxed_vec512_array_tag = 8
+let unboxed_nativeint_array_tag = 9
+
+
 external[@layout_poly] size_in_bytes : ('a : any_non_null). 'a array -> int
   = "%array_element_size_in_bytes"
 
@@ -50,7 +63,11 @@ let _ = check_value ~init:42l ~element_size:int_array_element_size
 let check_floatu ~init ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    (* float# arrays use Double_array_tag (254) when non-empty, tag 0 when empty *)
+    let tag = Obj.tag (Obj.repr x) in
+    let expected_tag = if n = 0 then 0 else 254 in
+    assert (tag = expected_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -62,7 +79,15 @@ let _ = check_floatu ~init:#42.0 ~element_size:floatu_array_element_size
 let check_int64u ~(init : int64#) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    let tag = Obj.tag (Obj.repr x) in
+    (* Bytecode always uses tag 0, Native always uses unboxed_int64_array_tag *)
+    let expected_tag = 
+      match Sys.backend_type with
+      | Native -> unboxed_int64_array_tag
+      | Bytecode | Other _ -> 0
+    in
+    assert (tag = expected_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -74,7 +99,15 @@ let _ = check_int64u ~init:#42L ~element_size:int64u_array_element_size
 let check_nativeintu ~(init : nativeint#) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    let tag = Obj.tag (Obj.repr x) in
+    (* Bytecode always uses tag 0, Native always uses unboxed_nativeint_array_tag *)
+    let expected_tag = 
+      match Sys.backend_type with
+      | Native -> unboxed_nativeint_array_tag
+      | Bytecode | Other _ -> 0
+    in
+    assert (tag = expected_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -87,13 +120,23 @@ let check_float32u ~(init : float32#) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     (* These arrays are packed in native code *)
-    let n =
+    let padded_n =
       match Sys.backend_type with
       | Native -> if n mod 2 = 0 then n else n + 1
       | Bytecode -> n
       | Other _ -> failwith "Don't know what to do"
     in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    (* Check tag based on actual array length (n) not padded length *)
+    let tag = Obj.tag (Obj.repr x) in
+    match Sys.backend_type with
+    | Native ->
+      (* Tag is based on original element count, not padded count *)
+      let expected_tag = 
+        if n mod 2 = 0 then unboxed_float32_array_even_tag 
+        else unboxed_float32_array_odd_tag in
+      assert (tag = expected_tag)
+    | Bytecode | Other _ -> ()
   in
   List.iter check_one array_sizes_to_check
 
@@ -106,13 +149,23 @@ let check_int32u ~(init : int32#) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     (* These arrays are packed in native code *)
-    let n =
+    let padded_n =
       match Sys.backend_type with
       | Native -> if n mod 2 = 0 then n else n + 1
       | Bytecode -> n
       | Other _ -> failwith "Don't know what to do"
     in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    (* Check tag based on actual array length (n) not padded length *)
+    let tag = Obj.tag (Obj.repr x) in
+    match Sys.backend_type with
+    | Native ->
+      (* Tag is based on original element count, not padded count *)
+      let expected_tag = 
+        if n mod 2 = 0 then unboxed_int32_array_even_tag 
+        else unboxed_int32_array_odd_tag in
+      assert (tag = expected_tag)
+    | Bytecode | Other _ -> ()
   in
   List.iter check_one array_sizes_to_check
 
@@ -125,7 +178,10 @@ let check_scannable_product1 ~(init : #(int * string * int * float array))
       ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -142,7 +198,10 @@ let check_scannable_product2 ~(init : #(int * t_scan * string * t_scan))
       ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -163,7 +222,10 @@ let check_ignorable_product1 ~(init : #(int * float32# * int * int64#))
       ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -180,7 +242,10 @@ let check_ignorable_product2 ~(init : #(int * t_ignore * bool * t_ignore))
       ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
-    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)))
+    assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -203,7 +268,10 @@ let check_float32u_pair ~(init : #(float32# * float32#)) ~element_size =
     (* 2 because there are two components in the unboxed product *)
     match Sys.backend_type with
     | Native -> assert (n * 2 = (Obj.size (Obj.repr x)))
-    | Bytecode | Other _ -> assert (n = Obj.size (Obj.repr x))
+    | Bytecode | Other _ -> assert (n = Obj.size (Obj.repr x));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag)
   in
   List.iter check_one array_sizes_to_check
 
@@ -220,7 +288,10 @@ let check_int32u_pair ~(init : #(int32# * int32#)) ~element_size =
     (* 2 because there are two components in the unboxed product *)
     match Sys.backend_type with
     | Native -> assert (n * 2 = (Obj.size (Obj.repr x)))
-    | Bytecode | Other _ -> assert (n = Obj.size (Obj.repr x))
+    | Bytecode | Other _ -> assert (n = Obj.size (Obj.repr x));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag)
   in
   List.iter check_one array_sizes_to_check
 
