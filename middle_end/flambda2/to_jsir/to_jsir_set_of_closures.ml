@@ -17,9 +17,9 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
           (* If this function slot is used, it should've already been added when
              the code using it was defined *)
           let env, fn_var =
-            match To_jsir_env.get_function_slot_exn env slot with
-            | fn_var -> env, fn_var
-            | exception Not_found ->
+            match To_jsir_env.get_function_slot env slot with
+            | Some fn_var -> env, fn_var
+            | None ->
               (* This function slot is not used anywhere, so we are free to make
                  a new variable *)
               let var = Jsir.Var.fresh () in
@@ -31,13 +31,13 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
   in
   Value_slot.Map.fold
     (fun slot simple (env, res) ->
-      match To_jsir_env.get_value_slot_exn env slot with
-      | var ->
+      match To_jsir_env.get_value_slot env slot with
+      | Some var ->
         let simple_var, res = To_jsir_shared.simple ~env ~res simple in
         (* This value slot has been used in the function body, so we should set
            the used variable to be the appropriate [Simple.t] *)
         env, To_jsir_result.add_instr_exn res (Assign (var, simple_var))
-      | exception Not_found ->
+      | None ->
         (* This value slot is not used, so we don't need to do anything *)
         env, res)
     (Set_of_closures.value_slots soc)
@@ -55,9 +55,9 @@ let static_set_of_closures ~env ~res ~closure_symbols soc =
     (* We may have already encountered the symbol when translating the code, so
        we should check first whether a variable already exists; if so, we should
        make sure that the variable also points to the function variable *)
-    match To_jsir_env.get_symbol_exn env symbol with
-    | var -> env, To_jsir_result.add_instr_exn res (Assign (var, fn_var))
-    | exception Not_found -> To_jsir_env.add_symbol env symbol fn_var, res
+    match To_jsir_env.get_symbol env symbol with
+    | Some var -> env, To_jsir_result.add_instr_exn res (Assign (var, fn_var))
+    | None -> To_jsir_env.add_symbol env symbol fn_var, res
   in
   let symbols = Function_slot.Lmap.to_seq closure_symbols |> Seq.map snd in
   set_of_closures ~env ~res ~bindings:symbols ~add_to_env soc
