@@ -149,10 +149,7 @@ struct caml_thread_struct {
 
 typedef struct caml_thread_struct* caml_thread_t;
 
-/* Thread-local key for accessing the current thread's [caml_thread_t] */
-st_tlskey caml_thread_key;
-
-#define This_thread ((caml_thread_t) st_tls_get(caml_thread_key))
+static CAMLthread_local caml_thread_t This_thread;
 
 /* overall table for threads across domains */
 struct caml_thread_table {
@@ -690,8 +687,7 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->is_main = 1;
   new_thread->signal_stack = NULL;
 
-  st_tls_set(caml_thread_key, new_thread);
-
+  This_thread = new_thread;
   Active_thread = new_thread;
   caml_memprof_enter_thread(new_thread->memprof);
 }
@@ -732,9 +728,6 @@ CAMLprim value caml_thread_initialize(value unit)
   if (thread_table == NULL)
     caml_fatal_error("caml_thread_initialize: failed to allocate thread"
                      " table");
-
-  /* Initialize the key to the [caml_thread_t] structure */
-  st_tls_newkey(&caml_thread_key);
 
   /* First initialise the systhread chain on this domain */
   caml_thread_domain_initialize_hook();
@@ -797,7 +790,7 @@ static void thread_detach_from_runtime(void)
      again.  It also removes the thread from memprof. */
   caml_thread_remove_and_free(th);
   /* Forget the now-freed thread info */
-  st_tls_set(caml_thread_key, NULL);
+  This_thread = NULL;
   /* Release domain lock */
   thread_lock_release(Caml_state->id);
 }
@@ -805,7 +798,7 @@ static void thread_detach_from_runtime(void)
 /* Register current thread */
 static void thread_init_current(caml_thread_t th)
 {
-  st_tls_set(caml_thread_key, th);
+  This_thread = th;
   restore_runtime_state(th);
   th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
@@ -991,7 +984,7 @@ CAMLexport int caml_c_thread_unregister(void)
 
 CAMLprim value caml_thread_self(value unit)
 {
-  return Active_thread->descr;
+  return This_thread->descr;
 }
 
 /* Return the identifier of a thread */
