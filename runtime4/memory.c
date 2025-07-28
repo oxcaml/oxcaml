@@ -1189,4 +1189,42 @@ __asan_default_options(void) {
          "halt_on_error=false,"
          "detect_stack_use_after_return=false";
 }
+
+// The point of these wrappers is to spill all caller-saved registers
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexcessive-regsave"
+
+void __asan_report_load_n_noabort(const void* addr, size_t size);
+void __asan_report_store_n_noabort(const void* addr, size_t size);
+
+#define CREATE_ASAN_REPORT_WRAPPER(suffix, ext, memory_access, size) \
+CAMLexport void __attribute__((no_caller_saved_registers, target(ext))) \
+  caml_asan_report_ ## memory_access ## size ## _noabort ## suffix(const void* addr) { \
+  return __asan_report_ ## memory_access ## _n_noabort(addr, size); \
+}
+
+#define CREATE_ASAN_REPORT_WRAPPERS(memory_access, size) \
+CREATE_ASAN_REPORT_WRAPPER(, "sse2", memory_access, size) \
+CREATE_ASAN_REPORT_WRAPPER(_avx, "avx", memory_access, size) \
+CREATE_ASAN_REPORT_WRAPPER(_avx512, "avx512f", memory_access, size)
+
+CREATE_ASAN_REPORT_WRAPPERS(load, 1)
+CREATE_ASAN_REPORT_WRAPPERS(load, 2)
+CREATE_ASAN_REPORT_WRAPPERS(load, 4)
+CREATE_ASAN_REPORT_WRAPPERS(load, 8)
+CREATE_ASAN_REPORT_WRAPPERS(load, 16)
+CREATE_ASAN_REPORT_WRAPPERS(load, 32)
+CREATE_ASAN_REPORT_WRAPPERS(load, 64)
+CREATE_ASAN_REPORT_WRAPPERS(store, 1)
+CREATE_ASAN_REPORT_WRAPPERS(store, 2)
+CREATE_ASAN_REPORT_WRAPPERS(store, 4)
+CREATE_ASAN_REPORT_WRAPPERS(store, 8)
+CREATE_ASAN_REPORT_WRAPPERS(store, 16)
+CREATE_ASAN_REPORT_WRAPPERS(store, 32)
+CREATE_ASAN_REPORT_WRAPPERS(store, 64)
+
+#undef CREATE_ASAN_REPORT_WRAPPER
+
+#pragma clang diagnostic pop
+
 #endif
