@@ -1088,6 +1088,8 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
           else
             match blocks.alloc_mode with
             | Heap -> Proved ()
+            (* CR jcutler for ccasinghino: technically Proved () at the moment,
+               but probably not in the future? Thoughts? *)
             | Local | Unknown | External -> Unknown))
       | Boxed_float32 (_, alloc_mode)
       | Boxed_float (_, alloc_mode)

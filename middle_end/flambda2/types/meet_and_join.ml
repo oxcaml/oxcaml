@@ -427,8 +427,7 @@ let meet_alloc_mode env (alloc_mode1 : Alloc_mode.For_types.t)
     Ok (Both_inputs, env)
   | (Unknown | Local), _ -> Ok (Right_input, env)
   | _, (Unknown | Local) -> Ok (Left_input, env)
-  (* CR jcutler: seems wrong but ok *)
-  | Heap, External | External, Heap -> Misc.fatal_error "Problem here"
+  | Heap, External | External, Heap -> Bottom (New_result ())
 
 let join_alloc_mode (alloc_mode1 : Alloc_mode.For_types.t)
     (alloc_mode2 : Alloc_mode.For_types.t) : Alloc_mode.For_types.t =
@@ -436,10 +435,8 @@ let join_alloc_mode (alloc_mode1 : Alloc_mode.For_types.t)
   | (Unknown | Local), _ | _, (Unknown | Local) ->
     Alloc_mode.For_types.unknown ()
   | Heap, Heap -> Alloc_mode.For_types.heap
-  (* CR jcutler: no idea here *)
   | External, External -> Alloc_mode.For_types.external_
-  | (External | Heap), (External | Heap) ->
-    Misc.fatal_error "Problem is here now"
+  | (External | Heap), (External | Heap) -> Alloc_mode.For_types.unknown ()
 
 let[@inline always] meet_unknown meet_contents ~contents_is_bottom env
     (or_unknown1 : _ Or_unknown.t) (or_unknown2 : _ Or_unknown.t) :

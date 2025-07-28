@@ -1074,7 +1074,6 @@ let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
 let layout_array kind = non_null_value (Parrayval kind)
 let layout_block = non_null_value Pgenval
-
 let layout_list =
   non_null_value
     (Pvariant
