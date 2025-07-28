@@ -587,8 +587,8 @@ CAMLexport value caml_alloc_shr_no_track_noexc (mlsize_t wosize, tag_t tag)
   return caml_alloc_shr_aux(wosize, tag, 0, NO_PROFINFO);
 }
 
-CAMLexport value caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
-                                                 reserved_t reserved)
+CAMLexport intnat caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
+                                                  reserved_t reserved)
 {
   void* res = (void*) malloc(Bhsize_wosize(wosize));
   if (res == NULL) {
