@@ -484,6 +484,11 @@ type program =
     free_pc : Addr.t
   }
 
+type cmj_body =
+  { program : program;
+    last_var : Addr.t
+  }
+
 let noloc = No
 
 let location_of_pc pc = Before pc
