@@ -331,8 +331,8 @@ module Type_shape = struct
       | Tunivar { name; _ } -> Ts_var (name, Layout_to_be_determined)
       | Tof_kind _ -> Ts_other Layout_to_be_determined
       | Tquote _ | Tsplice _ ->
-        Ts_other
-          Layout_to_be_determined (* CR aivaskovic: support quotations and splices *)
+        Ts_other Layout_to_be_determined
+        (* CR aivaskovic: support quotations and splices *)
       | Tpackage _ ->
         Ts_other
           Layout_to_be_determined (* CR sspies: Support first-class modules. *)

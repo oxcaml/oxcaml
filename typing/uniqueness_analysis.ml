@@ -629,7 +629,7 @@ end = struct
     | Maybe_aliased a ->
       let occ = Maybe_aliased.extract_occurrence a in
       let access = Maybe_aliased.extract_access a in
-      aliased occ (Aliased.Lifted(access))
+      aliased occ (Aliased.Lifted access)
     | Antiquote t -> t
     | t -> t
 
@@ -1469,11 +1469,9 @@ end = struct
     Root_id.Map.mapi (fun _root tree ->
         Usage_tree.mapi (fun _projs usage -> fu usage) fl fo tree)
 
-  let quote t =
-    map Usage.quote (fun x -> x) (fun x -> x) t
+  let quote t = map Usage.quote (fun x -> x) (fun x -> x) t
 
-  let antiquote t =
-    map Usage.antiquote (fun x -> x) (fun x -> x) t
+  let antiquote t = map Usage.antiquote (fun x -> x) (fun x -> x) t
 
   let check_no_remaining_overwritten_as t =
     Root_id.Map.iter
