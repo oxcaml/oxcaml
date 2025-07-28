@@ -1135,9 +1135,9 @@ void __asan_report_load_n_noabort(const void* addr, size_t size);
 void __asan_report_store_n_noabort(const void* addr, size_t size);
 
 #define CREATE_ASAN_REPORT_WRAPPER(suffix, ext, memory_access, size) \
-CAMLexport void __attribute__((no_caller_saved_registers, target(ext))) \
+CAMLexport void __attribute__((no_caller_saved_registers, disable_tail_calls, target(ext))) \
   caml_asan_report_ ## memory_access ## size ## _noabort ## suffix(const void* addr) { \
-  return __asan_report_ ## memory_access ## _n_noabort(addr, size); \
+  __asan_report_ ## memory_access ## _n_noabort(addr, size); \
 }
 
 #define CREATE_ASAN_REPORT_WRAPPERS(memory_access, size) \
