@@ -514,58 +514,37 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_float32s ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_float32_array_even_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int32s ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_int32_array_even_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int64s ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_int64_array_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_nativeints ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_nativeint_array_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec128s ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_vec128_array_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec256s ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_vec256_array_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec512s ->
     let sym = R.symbol res s in
-    let header =
-      C.black_mixed_block_header Tags.unboxed_vec512_array_tag 0
-        ~scannable_prefix_len:0
-    in
+    let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Mutable_string { initial_value = str }
