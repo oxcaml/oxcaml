@@ -2194,6 +2194,9 @@ module Monadic = struct
 
   let join_with ax c m = join_const (Const.min_with ax c) m
 
+  let min_with ax m =
+    Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
+
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
     let visibility = proj Visibility m |> Visibility.zap_to_legacy in
