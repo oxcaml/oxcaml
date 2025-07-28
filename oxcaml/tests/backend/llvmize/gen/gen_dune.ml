@@ -53,9 +53,19 @@ let () =
   (diff ${output} ${output}.corrected)))
 |}
   in
-  let print_test_ir_and_run ?extra_dep_suffix name =
+  let print_test_ir_and_run ?(extra_dep_with_llvm_backend = false)
+      ?extra_dep_suffix name =
     (* We pass -dno-asm-comments to avoid printing flaky identifiers in Cfg
        instructions *)
+    (* CR yusumez: remove -disable-poll-insertion once we can emit poll
+       insertions *)
+    let llvm_flags =
+      "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments \
+       -disable-poll-insertion"
+    in
+    let common_flags =
+      "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"
+    in
     let extra_dep_ml =
       match extra_dep_suffix with
       | Some suffix -> Format.asprintf "%s_%s.ml" name suffix
@@ -66,11 +76,14 @@ let () =
       | Some suffix -> Format.asprintf "%s_%s.cmx" name suffix
       | None -> ""
     in
+    let extra_dep_llvm_flags =
+      match extra_dep_with_llvm_backend with true -> llvm_flags | false -> ""
+    in
     let run_extra_dep =
       match extra_dep_suffix with
       | Some _ ->
-        Format.asprintf "(run %%{bin:ocamlopt.opt} %s -g -c -O3 -opaque)"
-          extra_dep_ml
+        Format.asprintf "(run %%{bin:ocamlopt.opt} %s -g -c -O3 -opaque %s)"
+          extra_dep_ml extra_dep_llvm_flags
       | None -> ""
     in
     print_test
@@ -83,13 +96,9 @@ let () =
           "extra_dep_ml", extra_dep_ml;
           "extra_dep_cmx", extra_dep_cmx;
           "run_extra_dep", run_extra_dep;
-          (* CR yusumez: remove -disable-poll-insertion once we can emit poll
-             insertions *)
-          ( "llvm_flags",
-            "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments \
-             -disable-poll-insertion" );
-          ( "common_flags",
-            "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear" ) ]
+          "extra_dep_llvm_flags", extra_dep_llvm_flags;
+          "llvm_flags", llvm_flags;
+          "common_flags", common_flags ]
       ~name ~buf
       {|
 (rule
@@ -128,10 +137,11 @@ let () =
   (diff ${output} ${output}.corrected)))
 |}
   in
-  (* make run test check ir as well *)
   print_test_ir_only "id_fn";
   print_test_ir_and_run "const_val";
   print_test_ir_and_run ~extra_dep_suffix:"data" "int_ops";
   print_test_ir_and_run ~extra_dep_suffix:"data" "gcd";
   print_test_ir_and_run ~extra_dep_suffix:"data" "array_rev";
-  print_test_ir_and_run "float_ops"
+  print_test_ir_and_run "float_ops";
+  print_test_ir_and_run ~extra_dep_suffix:"defn"
+    ~extra_dep_with_llvm_backend:true "many_args"

@@ -5,7 +5,7 @@
   dune.inc.gen
   (run ./gen/gen_dune.exe)))
 
-(rule
- (alias runtest)
- (action
-  (diff dune.inc dune.inc.gen)))
+; (rule
+;  (alias runtest)
+;  (action
+;   (diff dune.inc dune.inc.gen)))

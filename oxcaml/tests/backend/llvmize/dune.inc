@@ -25,7 +25,7 @@
  (deps  const_val_main.ml const_val.ml)
  (action
   (progn
-   
+
    (run %{bin:ocamlopt.opt} const_val.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt}  const_val.cmx const_val_main.cmx -opaque -o const_val.output.exe)
@@ -60,7 +60,7 @@
  (deps int_ops_data.ml int_ops_main.ml int_ops.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} int_ops_data.ml -g -c -O3 -opaque)
+   (run %{bin:ocamlopt.opt} int_ops_data.ml -g -c -O3 -opaque )
    (run %{bin:ocamlopt.opt} int_ops.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} int_ops_data.cmx int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe)
@@ -95,7 +95,7 @@
  (deps gcd_data.ml gcd_main.ml gcd.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} gcd_data.ml -g -c -O3 -opaque)
+   (run %{bin:ocamlopt.opt} gcd_data.ml -g -c -O3 -opaque )
    (run %{bin:ocamlopt.opt} gcd.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} gcd_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} gcd_data.cmx gcd.cmx gcd_main.cmx -opaque -o gcd.output.exe)
@@ -130,7 +130,7 @@
  (deps array_rev_data.ml array_rev_main.ml array_rev.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} array_rev_data.ml -g -c -O3 -opaque)
+   (run %{bin:ocamlopt.opt} array_rev_data.ml -g -c -O3 -opaque )
    (run %{bin:ocamlopt.opt} array_rev.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} array_rev_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} array_rev_data.cmx array_rev.cmx array_rev_main.cmx -opaque -o array_rev.output.exe)
@@ -165,7 +165,7 @@
  (deps  float_ops_main.ml float_ops.ml)
  (action
   (progn
-   
+
    (run %{bin:ocamlopt.opt} float_ops.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} float_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt}  float_ops.cmx float_ops_main.cmx -opaque -o float_ops.output.exe)
