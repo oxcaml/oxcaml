@@ -10,21 +10,8 @@ let block_like' ~env ~res (const : Static_const.t) :
        Set_of_closures"
       Static_const.print const
   | Block (tag, mut, _shape, fields) ->
-    (* CR selee: is it ok to ignore shape? *)
-    let tag = Tag.Scannable.to_int tag in
-    let mutability : Jsir.mutability =
-      match mut with
-      | Mutable -> Maybe_mutable
-      | Immutable -> Immutable
-      | Immutable_unique ->
-        (* CR selee: check *)
-        Immutable
-    in
-    let fields, res =
-      To_jsir_shared.simples ~env ~res
-        (List.map Simple.With_debuginfo.simple fields)
-    in
-    Block (tag, Array.of_list fields, NotArray, mutability), env, res
+    To_jsir_shared.block ~env ~res ~tag ~mut
+      ~fields:(List.map Simple.With_debuginfo.simple fields)
   | Boxed_float32 value ->
     ignore value;
     static_const_not_supported ()

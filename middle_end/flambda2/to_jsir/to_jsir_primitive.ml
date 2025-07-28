@@ -242,9 +242,15 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   | Begin_try_region { ghost } ->
     ignore ghost;
     primitive_not_supported ()
-  | Make_block (kind, mut, mode) ->
-    ignore (kind, mut, mode);
-    primitive_not_supported ()
+  | Make_block (kind, mut, _alloc_mode) ->
+    let tag =
+      match kind with
+      | Values (tag, _with_subkind) -> tag
+      | Naked_floats | Mixed _ -> failwith "unimplemented block kind"
+    in
+    let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields:xs in
+    let var = Jsir.Var.fresh () in
+    var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Make_array (kind, mut, mode) ->
     ignore (kind, mut, mode);
     primitive_not_supported ()
@@ -256,4 +262,4 @@ let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   | Binary (f, x, y) -> binary ~env ~res f (prim_arg ~env x) (prim_arg ~env y)
   | Ternary (f, x, y, z) ->
     ternary ~env ~res f (prim_arg ~env x) (prim_arg ~env y) (prim_arg ~env z)
-  | Variadic (f, xs) -> variadic ~env ~res f (List.map (prim_arg ~env) xs)
+  | Variadic (f, xs) -> variadic ~env ~res f xs

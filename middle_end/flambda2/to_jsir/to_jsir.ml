@@ -250,8 +250,9 @@ and apply_cont0 ~env ~res apply_cont : Jsir.last * To_jsir_result.t =
         in
         Stop, res
       | Return ->
+        (* CR selee: fix *)
         if List.length args <> 1
-        then Misc.fatal_error "Currently only one return argument is supported";
+        then failwith "Currently only one return argument is supported";
         Jsir.Return (List.hd args), res
       | Normal_or_exn | Define_root_symbol ->
         (* CR selee: seems odd, review later *)
@@ -262,9 +263,27 @@ and apply_cont0 ~env ~res apply_cont : Jsir.last * To_jsir_result.t =
   | Some (Push { exn_handler }) ->
     ignore exn_handler;
     failwith "unimplemented"
-  | Some (Pop { exn_handler; raise_kind }) ->
-    ignore (exn_handler, raise_kind);
-    failwith "unimplemented"
+  | Some (Pop { exn_handler; raise_kind }) -> (
+    match To_jsir_env.get_continuation_exn env exn_handler with
+    | Return ->
+      Misc.fatal_errorf
+        "Found a return continuation %a in place of an exception handler"
+        Continuation.print exn_handler
+    | Exception ->
+      let raise_kind =
+        match raise_kind with
+        | Some Regular -> `Normal
+        | Some Reraise -> `Reraise
+        | Some No_trace -> `Notrace
+        | None ->
+          (* CR selee: check *)
+          failwith "???"
+      in
+      (* CR selee: fix *)
+      if List.length args <> 1
+      then failwith "Currently only one return argument is supported";
+      Jsir.Raise (List.hd args, raise_kind), res
+    | Block _ -> failwith "unimplemented")
 
 and apply_cont ~env ~res apply_cont =
   let last, res = apply_cont0 ~env ~res apply_cont in
