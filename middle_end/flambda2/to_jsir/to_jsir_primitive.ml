@@ -252,13 +252,7 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
 let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   match prim with
   | Nullary f -> nullary ~env ~res f
-  | Unary (f, x) ->
-    Simple.pattern_match x
-      ~name:(fun name ~coercion:_ ->
-        print_endline "name: ==";
-        Name.print Format.std_formatter name)
-      ~const:ignore;
-    unary ~env ~res f (prim_arg ~env x)
+  | Unary (f, x) -> unary ~env ~res f (prim_arg ~env x)
   | Binary (f, x, y) -> binary ~env ~res f (prim_arg ~env x) (prim_arg ~env y)
   | Ternary (f, x, y, z) ->
     ternary ~env ~res f (prim_arg ~env x) (prim_arg ~env y) (prim_arg ~env z)
