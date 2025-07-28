@@ -89,14 +89,3 @@ let () = is_a_malloc "gadt_char" ~num_fields:#1L (fun () -> malloc_ (UnboxPack #
 let () = is_a_malloc "apple" ~num_fields:#2L (fun () -> malloc_ (`Apple 7))
 let () = is_a_malloc "apple2" ~num_fields:#2L (fun () -> malloc_ (`Apple 42))
 let () = is_a_malloc "pear" ~num_fields:#2L (fun () -> malloc_ (`Pear 42))
-
-(* let f x y =
-  let dst = Obj.magic (ref None) in
-  let r = malloc_ (x,y) in
-  write r dst;
-  let (a,b) = !dst in
-  print_endline (Int.to_string a);
-  print_endline (Int.to_string b)
-[@@inline never]
-
-let () = f 1 2 *)
