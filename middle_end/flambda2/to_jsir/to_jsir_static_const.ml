@@ -134,15 +134,17 @@ let code ~env ~res ~translate_body ~code_id code =
          [my_closure] is actually used for *)
       let var = Jsir.Var.fresh () in
       let env = To_jsir_env.add_var env my_closure var in
-      let fn_params, env = To_jsir_shared.bound_parameters ~env bound_params in
+      let fn_params, env_with_params =
+        To_jsir_shared.bound_parameters ~env bound_params
+      in
       let res, addr = To_jsir_result.new_block res ~params:[] in
-      let env = To_jsir_env.add_code_id env code_id ~addr ~params:fn_params in
-      let _env, res =
+      let _env_with_params, res =
         (* Throw away the environment after translating the body *)
         translate_body
           ~env:
-            (To_jsir_env.enter_function_body env ~return_continuation
-               ~exn_continuation)
+            (To_jsir_env.enter_function_body env_with_params
+               ~return_continuation ~exn_continuation)
           ~res body
       in
+      let env = To_jsir_env.add_code_id env code_id ~addr ~params:fn_params in
       env, res)

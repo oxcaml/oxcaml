@@ -54,20 +54,27 @@ type continuation =
   | Block of Jsir.Addr.t
 
 let get_continuation_exn t cont =
-  if cont = t.return_continuation
+  if Continuation.equal cont t.return_continuation
   then Return
-  else if cont = t.exn_continuation
+  else if Continuation.equal cont t.exn_continuation
   then Exception
   else Block (Continuation.Map.find cont t.continuations)
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
+let get_symbol t symbol = Symbol.Map.find_opt symbol t.symbols
+
 let get_symbol_exn t symbol = Symbol.Map.find symbol t.symbols
 
 let get_code_id_exn t code_id = Code_id.Map.find code_id t.code_ids
 
+let get_function_slot t fslot =
+  Function_slot.Map.find_opt fslot t.function_slots
+
 let get_function_slot_exn t fslot =
   Function_slot.Map.find fslot t.function_slots
+
+let get_value_slot t vslot = Value_slot.Map.find_opt vslot t.value_slots
 
 let get_value_slot_exn t vslot = Value_slot.Map.find vslot t.value_slots
 
@@ -76,21 +83,38 @@ let add_alias_of_var_exn t ~var ~alias_of =
   { t with vars = Variable.Map.add var jvar t.vars }
 
 let add_alias_of_symbol_exn t ~var ~alias_of =
-  let jvar = get_symbol_exn t alias_of in
+  let jvar =
+    match get_symbol t alias_of with
+    | None ->
+      Misc.fatal_errorf "Symbol %a not found in the environment" Symbol.print
+        alias_of
+    | Some v -> v
+  in
   { t with vars = Variable.Map.add var jvar t.vars }
 
-let add_if_not_found t item ~get ~add =
-  match get t item with
-  | _var -> t
-  | exception Not_found ->
+let add_if_not_found map item ~mem ~add =
+  if mem item map
+  then map
+  else
     let var = Jsir.Var.fresh () in
-    add t item var
+    add item var map
 
-let add_symbol_if_not_found =
-  add_if_not_found ~get:get_symbol_exn ~add:add_symbol
+let add_symbol_if_not_found t symbol =
+  { t with
+    symbols =
+      add_if_not_found t.symbols symbol ~mem:Symbol.Map.mem ~add:Symbol.Map.add
+  }
 
-let add_function_slot_if_not_found =
-  add_if_not_found ~get:get_function_slot_exn ~add:add_function_slot
+let add_function_slot_if_not_found t slot =
+  { t with
+    function_slots =
+      add_if_not_found t.function_slots slot ~mem:Function_slot.Map.mem
+        ~add:Function_slot.Map.add
+  }
 
-let add_value_slot_if_not_found =
-  add_if_not_found ~get:get_value_slot_exn ~add:add_value_slot
+let add_value_slot_if_not_found t slot =
+  { t with
+    value_slots =
+      add_if_not_found t.value_slots slot ~mem:Value_slot.Map.mem
+        ~add:Value_slot.Map.add
+  }

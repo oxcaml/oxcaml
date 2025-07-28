@@ -231,6 +231,14 @@ type program =
     free_pc : Addr.t
   }
 
+type cmj_body =
+  { program : program;
+    last_var : Addr.t
+        (** Highest used variable in the translation, since it is kept track by a
+        mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
+        need to have these in sync *)
+  }
+
 module Print : sig
   type xinstr =
     | Instr of instr

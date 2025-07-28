@@ -97,6 +97,8 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Project_function_slot { move_from = _; move_to } ->
     To_jsir_env.get_function_slot_exn env move_to, env, res
   | Project_value_slot { project_from = _; value_slot } ->
+    (* CR selee: This is also used to call external functions, will need to
+       handle that *)
     To_jsir_env.get_value_slot_exn env value_slot, env, res
   | Is_boxed_float -> primitive_not_supported ()
   | Is_flat_float_array -> primitive_not_supported ()
