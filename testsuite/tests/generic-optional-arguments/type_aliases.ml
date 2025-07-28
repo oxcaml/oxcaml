@@ -4,6 +4,17 @@ flags = "-extension-universe alpha ";
  expect;
 *)
 
+
+module type T = sig
+  val g : (?x): int -> unit -> int
+end
+[%%expect {|
+Line 2, characters 16-19:
+2 |   val g : (?x): int -> unit -> int
+                    ^^^
+Error: Unknown generic optional argument type
+|}]
+
 (* CR: generic-optional: This should succeed *)
 type int_option = int option
 type int_or_null = int option
