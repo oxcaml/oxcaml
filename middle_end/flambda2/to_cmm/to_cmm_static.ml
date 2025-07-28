@@ -175,7 +175,9 @@ let immutable_unboxed_int_array env res updates maybe_int32 ~symbol ~elts
     | Int32 ->
       let fields = (1 + num_elts) / 2 in
       let tag =
-        Tags.unboxed_int32_array_even_tag + if num_elts mod 2 = 0 then 0 else 1
+        if num_elts mod 2 = 0
+        then Tags.unboxed_int32_array_even_tag
+        else Tags.unboxed_int32_array_odd_tag
       in
       fields, UK.naked_int32s, tag
     | Int64 -> num_elts, UK.naked_int64s, Tags.unboxed_int64_array_tag
@@ -198,7 +200,9 @@ let immutable_unboxed_float32_array env res updates ~symbol ~elts =
   let num_elts = List.length elts in
   let num_fields = (1 + num_elts) / 2 in
   let tag =
-    Tags.unboxed_float32_array_even_tag + if num_elts mod 2 = 0 then 0 else 1
+    if num_elts mod 2 = 0
+    then Tags.unboxed_float32_array_even_tag
+    else Tags.unboxed_float32_array_odd_tag
   in
   let header =
     C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0
