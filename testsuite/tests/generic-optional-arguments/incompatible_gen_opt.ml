@@ -9,11 +9,11 @@
 
 (* Module interface vs implementation mismatch *)
 module type S = sig
-  val f : Stdlib.Option.?'x:int -> unit -> int
+  val f : (?x):int option -> unit -> int
 end
 
 module M : S = struct
-  (* This should fail - implementation uses Stdlib.Or_null.?' but interface
-     declares Stdlib.Option.?' *)
-  let f Stdlib.Or_null.?'(x : int = 42) () = x
+  (* This should fail - implementation uses or_null but interface declares
+     option *)
+  let f (?(x = 42) : int or_null) () = x
 end

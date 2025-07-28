@@ -3312,19 +3312,11 @@ let rec expands_to_datatype env ty =
       end
   | _ -> false
 
-(* The reason we need this equality function is that [Generic_optional] contains
- [Location.loc], which needs to be ignored. *)
-let arg_label_equal l1 l2 =
-  match l1, l2 with
-  | Generic_optional(path1, str1), Generic_optional(path2, str2) ->
-      str1 = str2 &&
-        classify_module_path path1.txt = classify_module_path path2.txt
-  | Optional str1, Optional str2
-  | Position str1, Position str2
-  | Labelled str1, Labelled str2 -> str1 = str2
-  | Nolabel, Nolabel -> true
-  | (Generic_optional _ | Optional _ | Position _ | Labelled _ | Nolabel), _
-      -> false
+(* CR generic-optional: This function was needed because [Generic_optional]
+   contained [Location.loc], which needs to be ignored. But now it no longer
+   contains it. *)
+(* CR generic-optional: Investigate whether this is needed to handle aliases *)
+let arg_label_equal l1 l2 = l1 = l2
 
 let equivalent_with_nolabels l1 l2 =
   arg_label_equal l1 l2 || (match l1, l2 with

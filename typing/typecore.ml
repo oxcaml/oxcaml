@@ -7477,13 +7477,15 @@ and type_function
          optional arguments with defaults, where the external [ty_arg_mono]
          is optional and the internal view is not optional.
       *)
-      let ty_arg_internal, default_arg =
+      let ty_arg_internal, default_arg, pat =
         match default_arg with
-        | None -> ty_arg_mono, None
+        | None -> ty_arg_mono, None, pat
         | Some default ->
+            let arg_label' = arg_label in
             let arg_label, mpath =
-              match arg_label, classify_optionality_parsetree arg_label with
-              | (Optional arg_label | Generic_optional (_, arg_label)),
+              match arg_label,
+                    classify_optionality_parsetree arg_label pat with
+              | (Optional arg_label | Generic_optional (arg_label)),
                  Optional_arg mpath -> arg_label, mpath
               | (Optional _ | Generic_optional _), Required_or_position_arg
               | (Labelled _ | Nolabel), _ ->
@@ -7500,12 +7502,23 @@ and type_function
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
             *)
-            let default =
-              match pat.ppat_desc with
-              | Ppat_constraint (_, Some sty, _) ->
+            let default, pat =
+              match arg_label' with
+              | Optional _ ->
+                  (match pat.ppat_desc with
+                  | Ppat_constraint (_, Some sty, _) ->
+                      let gloc = { default.pexp_loc with loc_ghost = true } in
+                      Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc []
+                      , pat
+                  | _ -> default, pat)
+              | Generic_optional _ ->
+                  let _, underlying_typ, new_pat =
+                    extract_optional_tp_from_pattern_constraint_exn pat
+                  in
                   let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc []
-              | _ -> default
+                  Ast_helper.Exp.constraint_ default (Some underlying_typ)
+                    ~loc:gloc [], new_pat
+              | _ -> assert false
             in
             (* Defaults are always global. They can be moved out of the
                function's region by Simplf.split_default_wrapper. *)
@@ -7513,7 +7526,7 @@ and type_function
               type_expect env mode_legacy default (mk_expected ty_default_arg)
             in
             ty_default_arg,
-            Some (default_arg, arg_label, default_arg_sort, mpath)
+            Some (default_arg, arg_label, default_arg_sort, mpath), pat
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
