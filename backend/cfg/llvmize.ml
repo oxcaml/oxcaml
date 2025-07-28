@@ -461,13 +461,15 @@ module F = struct
       (pp_print_list ~pp_sep:pp_print_space pp_print_string)
       attrs
 
-  let define t ?(private_ = false) ~cc ~fun_name ~fun_args ~fun_ret_type
+  let define t ?(private_ = false) ~gc ~cc ~fun_name ~fun_args ~fun_ret_type
       ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
     let cc_str = Calling_conventions.to_llvmir_string cc in
     let private_str = if private_ then "private " else " " in
-    line t.ppf "define %s%s %a %a(%a) %a {" private_str cc_str Llvm_typ.pp_t
-      fun_ret_type pp_global fun_name pp_fun_args fun_args pp_attrs fun_attrs;
+    let gc_str = if gc then "gc \"ocaml\"" else "" in
+    line t.ppf "define %s%s %a %a(%a) %a %s {" private_str cc_str Llvm_typ.pp_t
+      fun_ret_type pp_global fun_name pp_fun_args fun_args pp_attrs fun_attrs
+      gc_str;
     pp_body ();
     line t.ppf "}";
     line t.ppf ""
@@ -505,12 +507,13 @@ module F = struct
 
   let ins_branch_ident t label = ins t "br label %a" pp_ident label
 
-  let ins_alloca ?comment t ident typ =
+  let ins_alloca ?comment ?(is_gcroot = false) t ident typ =
     let pp_regname ppf () =
       match comment with
       | None -> ()
       | Some comment -> pp_dbg_comment ~newline:false ppf comment Debuginfo.none
     in
+    let typ = if is_gcroot then Llvm_typ.ptr else typ in
     ins t "%a = alloca %a %a" pp_ident ident Llvm_typ.pp_t typ pp_regname ()
 
   let ins_branch_cond t cond ifso ifnot =
@@ -1851,7 +1854,7 @@ module F = struct
 
   let empty_symbol_decl t sym = data_decl t (Cmm_helpers.make_symbol sym) []
 
-  let zero_symbol_decl t sym =
+  let _zero_symbol_decl t sym =
     data_decl t (Cmm_helpers.make_symbol sym) [Cint 0n]
 
   let empty_fun_decl t sym =
@@ -1863,9 +1866,12 @@ module F = struct
       match res with Some res -> Llvm_typ.to_string res | None -> "void"
     in
     let cc_str = Calling_conventions.to_llvmir_string cc in
-    line t.ppf "declare %s %s %a(%a)" cc_str res_str pp_global sym
+    let gc_str =
+      if Calling_conventions.equal cc Ocaml then "gc \"ocaml\"" else ""
+    in
+    line t.ppf "declare %s %s %a(%a) %s" cc_str res_str pp_global sym
       (pp_print_list ~pp_sep:pp_comma Llvm_typ.pp_t)
-      args
+      args gc_str
 end
 
 let current_compilation_unit = ref None
@@ -1945,8 +1951,16 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
       F.ins_alloca t new_ident Llvm_typ.ptr;
       F.ins_store t ~src:old_ident ~dst:new_ident Llvm_typ.ptr)
     runtime_arg_idents runtime_regs;
+  let mark_gcroot (reg : Reg.t) =
+    match reg.typ with
+    | Val ->
+      F.ins t "call void @llvm.gcroot(ptr %a, ptr null)" (F.pp_reg_ident t) reg;
+      F.ins t "store i64 1, ptr %a" (F.pp_reg_ident t) reg
+    | Valx2 -> Misc.fatal_error "Llvmize.mark_gcroot: Valx2 not implemented"
+    | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ()
+  in
   let make_temp (reg : Reg.t) ident_opt =
-    match reg.loc with
+    (match reg.loc with
     (* [Outgoing] is for extcalls only - these will get put on the stack by
        LLVM, so we treat them as normal temporaries. We don't expect OCaml calls
        to use the stack for us... *)
@@ -1966,7 +1980,8 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
       (* Create entry in the [reg2ident] table *)
       Reg.Tbl.add t.current_fun_info.reg2ident reg res
     | Stack (Local _) | Stack (Incoming _) ->
-      Misc.fatal_error "Llvmize: unexpected register location"
+      Misc.fatal_error "Llvmize: unexpected register location");
+    mark_gcroot reg
   in
   let arg_regs = List.map fst args_and_signature_idents |> Reg.Set.of_list in
   let body_regs = collect_body_regs cfg in
@@ -2068,8 +2083,8 @@ let cfg (cl : CL.t) =
         fun_args_with_idents
   in
   let fun_ret_type = make_ret_type (Array.to_list fun_ret_type) in
-  F.define t ~cc:Ocaml ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs
-    pp_body
+  F.define t ~cc:Ocaml ~gc:true ~fun_name ~fun_args ~fun_ret_type ~fun_dbg
+    ~fun_attrs pp_body
 
 (* CR yusumez: We make some assumptions about the structure of the data items we
    receive and decode it manually here. Ideally, [data_item]s would be
@@ -2238,7 +2253,7 @@ let declare_c_call_wrappers t =
         let res_ident = F.assemble_struct t wrapper_res_type get_ident in
         F.ins_ret t res_ident wrapper_res_type
       in
-      F.define t ~private_:true ~cc:Ocaml ~fun_name:wrapper_name
+      F.define t ~private_:true ~gc:false ~cc:Ocaml ~fun_name:wrapper_name
         ~fun_args:wrapper_args ~fun_ret_type:wrapper_res_type
         ~fun_dbg:Debuginfo.none ~fun_attrs:["noinline"] pp_body)
     t.c_call_wrappers
@@ -2252,7 +2267,9 @@ let declare_functions t =
       t.defined_symbols <- String.Set.add sym t.defined_symbols)
     t.called_functions;
   declare_stack_intrinsics t;
-  declare_exn_intrinsics t
+  declare_exn_intrinsics t;
+  Format.fprintf t.ppf
+    "declare void @llvm.gcroot(ptr %%ptrloc, ptr %%metadata)\n"
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
@@ -2312,6 +2329,7 @@ let assemble_file ~asm_filename ~obj_filename =
     (String.concat " "
        [ cmd;
          "-c";
+         "-g";
          "-o";
          Filename.quote obj_filename;
          Filename.quote asm_filename ])
@@ -2343,7 +2361,8 @@ let end_assembly () =
   Format.pp_print_newline t.ppf ();
   F.empty_symbol_decl t "data_end";
   F.empty_fun_decl t "code_end";
-  F.zero_symbol_decl t "frametable";
+  (* Frametables are emitted by LLVM *)
+  (* F.zero_symbol_decl t "frametable"; *)
   (* Close channel to .ll file *)
   Out_channel.close t.oc;
   (* Dump if -dllvmir passed *)
