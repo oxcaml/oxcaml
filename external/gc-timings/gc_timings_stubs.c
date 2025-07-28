@@ -62,19 +62,19 @@ int64_t time_counter(void)
 int64_t caml_timing_major_gc = 0.;
 int64_t caml_timing_minor_gc = 0.;
 
-void caml_timing_collect_gc_minor_begin_hook() {
+void caml_timing_collect_gc_minor_begin_hook(void) {
   caml_timing_minor_gc -= time_counter();
 }
 
-void caml_timing_collect_gc_minor_end_hook() {
+void caml_timing_collect_gc_minor_end_hook(void) {
   caml_timing_minor_gc += time_counter();
 }
 
-void caml_timing_collect_gc_major_begin_hook() {
+void caml_timing_collect_gc_major_begin_hook(void) {
   caml_timing_major_gc -= time_counter();
 }
 
-void caml_timing_collect_gc_major_end_hook() {
+void caml_timing_collect_gc_major_end_hook(void) {
   caml_timing_major_gc += time_counter();
 }
 
