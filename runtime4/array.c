@@ -622,13 +622,17 @@ static value caml_make_unboxed_int32_vect0(value len, int local)
 
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
   
-  /* Use Double_array_tag for even length, Abstract_tag for odd length */
-  tag_t tag = (num_elements % 2 == 0) ? Double_array_tag : Abstract_tag;
+  /* Use appropriate unboxed array tag based on even/odd length */
+  tag_t tag = (num_elements % 2 == 0) 
+    ? Unboxed_int32_array_even_tag : Unboxed_int32_array_odd_tag;
+  
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_local(num_fields, tag);
+    return caml_alloc_local_reserved(num_fields, tag, reserved);
   else
-    return caml_alloc(num_fields, tag);
+    return caml_alloc_with_reserved(num_fields, tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_int32_vect(value len)
@@ -652,10 +656,13 @@ static value caml_make_unboxed_int64_vect0(value len, int local)
   if (num_elements > Max_unboxed_int64_array_wosize)
     caml_invalid_argument("Array.make");
 
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+
   if (local)
-    return caml_alloc_local(num_elements, Abstract_tag);
+    return caml_alloc_local_reserved(num_elements, Unboxed_int64_array_tag, reserved);
   else
-    return caml_alloc(num_elements, Abstract_tag);
+    return caml_alloc_with_reserved(num_elements, Unboxed_int64_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_int64_vect(value len)
@@ -681,10 +688,13 @@ static value caml_make_unboxed_nativeint_vect0(value len, int local)
   if (num_elements > Max_unboxed_nativeint_array_wosize)
     caml_invalid_argument("Array.make");
 
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
+
   if (local)
-    return caml_alloc_local(num_elements, Abstract_tag);
+    return caml_alloc_local_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
   else
-    return caml_alloc(num_elements, Abstract_tag);
+    return caml_alloc_with_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_nativeint_vect(value len)

@@ -53,11 +53,14 @@ static value caml_make_unboxed_vec128_vect0(value len, int local)
     caml_invalid_argument("Array.make");
 
   mlsize_t num_fields = num_elements * Words_per_vec128;
+  
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_local(num_fields, Abstract_tag);
+    return caml_alloc_local_reserved(num_fields, Unboxed_vec128_array_tag, reserved);
   else
-    return caml_alloc(num_fields, Abstract_tag);
+    return caml_alloc_with_reserved(num_fields, Unboxed_vec128_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_vec128_vect(value len)
@@ -90,11 +93,14 @@ static value caml_make_unboxed_vec256_vect0(value len, int local)
     caml_invalid_argument("Array.make");
 
   mlsize_t num_fields = num_elements * Words_per_vec256;
+  
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_local(num_fields, Abstract_tag);
+    return caml_alloc_local_reserved(num_fields, Unboxed_vec256_array_tag, reserved);
   else
-    return caml_alloc(num_fields, Abstract_tag);
+    return caml_alloc_with_reserved(num_fields, Unboxed_vec256_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_vec256_vect(value len)
