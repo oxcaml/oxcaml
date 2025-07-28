@@ -421,7 +421,7 @@ let match_guard r =
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let (y/388 =o? (field_mut 1 r/387))
-         (if (apply (field_imm 8 (global Stdlib__String!)) y/388 "")
+         (if (caml_string_equal y/388 "")
            (let
              (r/459 =[value<(consts ()) (non_consts ([0: *, *]))>]
                 (apply aliased_use/289 r/387))

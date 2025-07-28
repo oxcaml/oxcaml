@@ -80,9 +80,12 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
         ~extra_lifted_consts_in_use_envs
     in
     let new_joined_level = TE.cut new_joined_env ~cut_after:scope in
-    (let distinct_names =
+    (let config =
+       Equal_types_for_debug.create_config ~ignore_alloc_mode:true ()
+     in
+     let distinct_names =
        Equal_types_for_debug.names_with_non_equal_types_level_ignoring_name_mode
-         ~meet_type:(Meet.meet_type ()) typing_env old_joined_level
+         ~config ~meet_type:(Meet.meet_type ()) typing_env old_joined_level
          new_joined_level
      in
      let distinct_names =

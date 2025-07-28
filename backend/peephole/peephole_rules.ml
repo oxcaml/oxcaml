@@ -29,8 +29,12 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     let fst_val = DLL.value fst in
     let snd_val = DLL.value snd in
     match fst_val.desc, snd_val.desc with
-    | ( Op (Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _),
-        Op (Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _) ) ->
+    | ( Op
+          ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ ),
+        Op
+          ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ ) ) ->
       (* Removing the second instruction is okay here since it doesn't change
          the set of addresses we touch. *)
       delete_snd_if_redundant ~fst ~fst_val ~snd_val

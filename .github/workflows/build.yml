@@ -102,29 +102,22 @@ jobs:
             check_arch: true
             run_regalloc_tool: true
 
-          - name: irc_polling
-            config: --enable-middle-end=flambda2 --enable-poll-insertion
-            os: ubuntu-latest
-            build_ocamlparam: '_,w=-46,regalloc=irc'
-            ocamlparam: '_,w=-46,regalloc=irc'
-            check_arch: true
-
           - name: irc_frame_pointers
-            config: --enable-middle-end=flambda2 --enable-frame-pointers
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
           - name: cfg-invariants
-            config: --enable-middle-end=flambda2
+            config: --enable-middle-end=flambda2 --enable-runtime5
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
           - name: vectorizer
-            config: --enable-middle-end=flambda2
+            config: --enable-middle-end=flambda2 --enable-runtime5
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
