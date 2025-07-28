@@ -1,0 +1,14 @@
+(library 
+  (name ocaml_ir_comp_lib)
+  (libraries 
+    str
+    unix
+    ocamlcommon
+    ocamloptcomp
+    ocamlopttoplevel
+    ocaml_ir_common
+    ocaml_ir_fiber
+    compiler_owee
+    sexplib)
+  )
+
