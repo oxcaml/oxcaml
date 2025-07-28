@@ -190,74 +190,110 @@ and apply_expr ~env ~res e =
     | Block addr ->
       env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var])))
 
-and apply_cont ~env ~res apply_cont =
+and apply_cont0 ~env ~res apply_cont : Jsir.last * To_jsir_result.t =
   let args, res =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
-  let res =
-    match Apply_cont.trap_action apply_cont with
-    | None -> (
-      let continuation = Apply_cont.continuation apply_cont in
-      let res_cont = To_jsir_env.get_continuation_exn env continuation in
-      match (res_cont : To_jsir_env.continuation) with
-      | Return -> (
-        match Continuation.sort continuation with
-        | Toplevel_return ->
-          assert (List.length args = 1);
-          (* CR selee: This is a hack, but I can't find a way to trigger any
-             behaviour that isn't calling [caml_register_global] on the toplevel
-             module. I suspect for single-file compilation this is always fine.
-             Will come back and review later. *)
-          let compilation_unit =
-            To_jsir_env.module_symbol env |> Symbol.compilation_unit
-          in
-          let module_name =
-            Compilation_unit.name compilation_unit
-            |> Compilation_unit.Name.to_string
-          in
-          let var = Jsir.Var.fresh () in
-          let res =
-            To_jsir_result.add_instr_exn res
-              (Jsir.Let
-                 ( var,
-                   Prim
-                     ( Extern "caml_register_global",
-                       [ Pc (Int (Targetint.of_int_exn 0));
-                         Pv (List.hd args);
-                         Pc
-                           (* CR selee: this assumes javascript, WASM needs just
-                              String *)
-                           (NativeString
-                              (Jsir.Native_string.of_string module_name)) ] ) ))
-          in
-          To_jsir_result.end_block_with_last_exn res Jsir.Stop
-        | Return ->
-          if List.length args <> 1
-          then
-            Misc.fatal_error "Currently only one return argument is supported";
-          To_jsir_result.end_block_with_last_exn res
-            (Jsir.Return (List.hd args))
-        | Normal_or_exn | Define_root_symbol ->
-          (* CR selee: seems odd, review later *)
-          Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
-            Continuation.print continuation)
-      | Exception -> failwith "unimplemented"
-      | Block addr ->
-        To_jsir_result.end_block_with_last_exn res (Jsir.Branch (addr, args)))
-    | Some (Push { exn_handler }) ->
-      ignore exn_handler;
-      failwith "unimplemented"
-    | Some (Pop { exn_handler; raise_kind }) ->
-      ignore (exn_handler, raise_kind);
-      failwith "unimplemented"
-  in
-  env, res
+  match Apply_cont.trap_action apply_cont with
+  | None -> (
+    let continuation = Apply_cont.continuation apply_cont in
+    let res_cont = To_jsir_env.get_continuation_exn env continuation in
+    match (res_cont : To_jsir_env.continuation) with
+    | Return -> (
+      match Continuation.sort continuation with
+      | Toplevel_return ->
+        assert (List.length args = 1);
+        (* CR selee: This is a hack, but I can't find a way to trigger any
+           behaviour that isn't calling [caml_register_global] on the toplevel
+           module. I suspect for single-file compilation this is always fine.
+           Will come back and review later. *)
+        let compilation_unit =
+          To_jsir_env.module_symbol env |> Symbol.compilation_unit
+        in
+        let module_name =
+          Compilation_unit.name compilation_unit
+          |> Compilation_unit.Name.to_string
+        in
+        let var = Jsir.Var.fresh () in
+        let res =
+          To_jsir_result.add_instr_exn res
+            (Jsir.Let
+               ( var,
+                 Prim
+                   ( Extern "caml_register_global",
+                     [ Pc (Int (Targetint.of_int_exn 0));
+                       Pv (List.hd args);
+                       Pc
+                         (* CR selee: this assumes javascript, WASM needs just
+                            String *)
+                         (NativeString
+                            (Jsir.Native_string.of_string module_name)) ] ) ))
+        in
+        Stop, res
+      | Return ->
+        if List.length args <> 1
+        then Misc.fatal_error "Currently only one return argument is supported";
+        Jsir.Return (List.hd args), res
+      | Normal_or_exn | Define_root_symbol ->
+        (* CR selee: seems odd, review later *)
+        Misc.fatal_errorf "Unexpected continuation sort for continuation %a"
+          Continuation.print continuation)
+    | Exception -> failwith "unimplemented"
+    | Block addr -> Jsir.Branch (addr, args), res)
+  | Some (Push { exn_handler }) ->
+    ignore exn_handler;
+    failwith "unimplemented"
+  | Some (Pop { exn_handler; raise_kind }) ->
+    ignore (exn_handler, raise_kind);
+    failwith "unimplemented"
+
+and apply_cont ~env ~res apply_cont =
+  let last, res = apply_cont0 ~env ~res apply_cont in
+  env, To_jsir_result.end_block_with_last_exn res last
 
 and switch ~env ~res e =
-  (* CR selee: translate to [Switch], but beware that flambda allows arbitrary
-     arms whereas Jsir requires 0..n (double check) *)
-  ignore (env, res, e);
-  failwith "unimplemented"
+  let scrutinee, res =
+    To_jsir_shared.simple ~env ~res (Switch_expr.scrutinee e)
+  in
+  let arms = Switch_expr.arms e in
+  let domain = Targetint_31_63.Map.keys arms in
+  let min = Targetint_31_63.Set.min_elt domain |> Targetint_31_63.to_int in
+  let max = Targetint_31_63.Set.max_elt domain |> Targetint_31_63.to_int in
+  (* Flambda2 allows the domain to be arbitrary non-negative subsets of
+     targetint, whereas JSIR requires [0..n].
+
+     We assume that the max value isn't too high, and just pad the out-of-domain
+     cases to invalid blocks. *)
+  assert (min >= 0);
+  let res, arms =
+    Array.fold_left_map
+      (fun res i ->
+        let apply_cont = Targetint_31_63.Map.find_opt i arms in
+        let last, res =
+          match apply_cont with
+          | Some apply_cont -> apply_cont0 ~env ~res apply_cont
+          | None ->
+            let res, addr = To_jsir_result.invalid_switch_block res in
+            (Branch (addr, []) : Jsir.last), res
+        in
+        match last with
+        | Branch cont -> res, cont
+        | Return _ | Raise _ | Stop | Cond _ | Switch _ | Pushtrap _ | Poptrap _
+          ->
+          let res, addr = To_jsir_result.new_block res ~params:[] in
+          let res = To_jsir_result.end_block_with_last_exn res last in
+          res, (addr, []))
+      res
+      (Array.init (max + 1) Targetint_31_63.of_int)
+  in
+  let last : Jsir.last =
+    match Array.length arms with
+    | 2 ->
+      (* Special case: turn it into if/then/else *)
+      Cond (scrutinee, arms.(1), arms.(0))
+    | _ -> Switch (scrutinee, arms)
+  in
+  env, To_jsir_result.end_block_with_last_exn res last
 
 and invalid ~env ~res _msg = env, res
 
