@@ -533,8 +533,8 @@ CAMLextern void caml_Store_double_val (value,double);
 
 /* Unboxed array tags (for mixed blocks) 
    These must stay in sync with Cmm_helpers.Unboxed_array_tags */
-#define Unboxed_int64_array_tag 0
-#define Unboxed_nativeint_array_tag 1
+#define Unboxed_product_array_tag 0
+#define Unboxed_int64_array_tag 1
 #define Unboxed_int32_array_even_tag 2
 #define Unboxed_int32_array_odd_tag 3
 #define Unboxed_float32_array_even_tag 4
@@ -542,6 +542,7 @@ CAMLextern void caml_Store_double_val (value,double);
 #define Unboxed_vec128_array_tag 6
 #define Unboxed_vec256_array_tag 7
 #define Unboxed_vec512_array_tag 8
+#define Unboxed_nativeint_array_tag 9
 
 /* The [_flat_field] macros are for [floatarray] values and float-only records.
 */

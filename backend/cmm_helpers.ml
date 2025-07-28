@@ -25,9 +25,9 @@ open Arch
 (* Tags for unboxed arrays using mixed block headers with scannable_prefix =
    0 *)
 module Unboxed_array_tags = struct
-  let unboxed_int64_array_tag = 0
+  let _unboxed_product_array_tag = 0
 
-  let unboxed_nativeint_array_tag = 1
+  let unboxed_int64_array_tag = 1
 
   let unboxed_int32_array_even_tag = 2
 
@@ -42,6 +42,8 @@ module Unboxed_array_tags = struct
   let unboxed_vec256_array_tag = 7
 
   let unboxed_vec512_array_tag = 8
+
+  let unboxed_nativeint_array_tag = 9
 end
 
 let arch_bits = Arch.size_int * 8
