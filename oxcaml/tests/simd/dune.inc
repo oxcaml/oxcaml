@@ -9,7 +9,21 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops.ml")))))
+
+(rule
+ (targets ops256_u.ml)
+ (deps ops256.ml)
+ (action
+  (with-stdout-to
+   ops256_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
+   (cat "ops256.ml")))))
 
 (rule
  (targets ops_float32x4_u.ml)
@@ -21,6 +35,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_float32x4.ml")))))
 
 (rule
@@ -33,6 +48,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_float64x2.ml")))))
 
 (rule
@@ -45,6 +61,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int64x2.ml")))))
 
 (rule
@@ -57,6 +74,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int32x4.ml")))))
 
 (rule
@@ -69,6 +87,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int16x8.ml")))))
 
 (rule
@@ -81,6 +100,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int8x16.ml")))))
 
 (rule
@@ -93,6 +113,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_float32x8.ml")))))
 
 (rule
@@ -105,6 +126,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_float64x4.ml")))))
 
 (rule
@@ -117,6 +139,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int32x8.ml")))))
 
 (rule
@@ -129,6 +152,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int64x4.ml")))))
 
 (rule
@@ -141,6 +165,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int16x16.ml")))))
 
 (rule
@@ -153,6 +178,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "ops_int8x32.ml")))))
 
 (rule
@@ -165,7 +191,21 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "sse_other_ops.ml")))))
+
+(rule
+ (targets avx_test_ops_u.ml)
+ (deps avx_test_ops.ml)
+ (action
+  (with-stdout-to
+   avx_test_ops_u.ml
+   (progn
+   (echo "[@@@ocaml.warning \"-unused-module\"]")
+   (echo "module Builtins = Builtins_u\n\n")
+   (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
+   (cat "avx_test_ops.ml")))))
 
 (rule
  (targets sse41_test_ops_u.ml)
@@ -177,6 +217,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "sse41_test_ops.ml")))))
 
 (rule
@@ -189,6 +230,7 @@
    (echo "[@@@ocaml.warning \"-unused-module\"]")
    (echo "module Builtins = Builtins_u\n\n")
    (echo "module Utils = Utils_u\n\n")
+   (echo "module Utils256 = Utils256_u\n\n")
    (cat "sse42_string_ops.ml")))))
 
 (executable
@@ -670,6 +712,70 @@
    (diff empty.expected ops_u.out)))
 
 (executable
+ (name ops256)
+ (modules ops256)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops256.out
+   (run ./ops256.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops256.out)))
+
+(executable
+ (name ops256_u)
+ (modules ops256_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops256_u.out
+   (run ./ops256_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops256_u.out)))
+
+(executable
  (name sse_other_ops)
  (modules sse_other_ops)
  (enabled_if
@@ -796,6 +902,70 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected sse41_test_ops_u.out)))
+
+(executable
+ (name avx_test_ops)
+ (modules avx_test_ops)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_test_ops.out
+   (run ./avx_test_ops.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_test_ops.out)))
+
+(executable
+ (name avx_test_ops_u)
+ (modules avx_test_ops_u)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_test_ops_u.out
+   (run ./avx_test_ops_u.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_test_ops_u.out)))
 
 (executable
  (name sse42_string_ops)
@@ -1245,38 +1415,6 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected probes256.out)))
-
-(executable
- (name utils256)
- (modules utils256)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_beta ))
- (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
-
-(rule
- (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   utils256.out
-   (run ./utils256.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-   (diff empty.expected utils256.out)))
 
 (executable
  (name ops_float32x8)
@@ -2273,6 +2411,88 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
+  (copy ops256.ml ops256_nodynlink.ml)))
+
+(executable
+ (name ops256_nodynlink)
+ (modules ops256_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops256_nodynlink.out
+   (run ./ops256_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops256_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops256_u.ml ops256_u_nodynlink.ml)))
+
+(executable
+ (name ops256_u_nodynlink)
+ (modules ops256_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops256_u_nodynlink.out
+   (run ./ops256_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops256_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
   (copy sse_other_ops.ml sse_other_ops_nodynlink.ml)))
 
 (executable
@@ -2429,6 +2649,88 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected sse41_test_ops_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy avx_test_ops.ml avx_test_ops_nodynlink.ml)))
+
+(executable
+ (name avx_test_ops_nodynlink)
+ (modules avx_test_ops_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_test_ops_nodynlink.out
+   (run ./avx_test_ops_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_test_ops_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy avx_test_ops_u.ml avx_test_ops_u_nodynlink.ml)))
+
+(executable
+ (name avx_test_ops_u_nodynlink)
+ (modules avx_test_ops_u_nodynlink)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_test_ops_u_nodynlink.out
+   (run ./avx_test_ops_u_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_test_ops_u_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -3001,47 +3303,6 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected probes256_nodynlink.out)))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (copy utils256.ml utils256_nodynlink.ml)))
-
-(executable
- (name utils256_nodynlink)
- (modules utils256_nodynlink)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
-
-(rule
- (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   utils256_nodynlink.out
-   (run ./utils256_nodynlink.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-   (diff empty.expected utils256_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -4362,6 +4623,88 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
+  (copy ops256.ml ops256_internal_assembler.ml)))
+
+(executable
+ (name ops256_internal_assembler)
+ (modules ops256_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops256_internal_assembler.out
+   (run ./ops256_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops256_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy ops256_u.ml ops256_u_internal_assembler.ml)))
+
+(executable
+ (name ops256_u_internal_assembler)
+ (modules ops256_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops256_u_internal_assembler.out
+   (run ./ops256_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected ops256_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
   (copy sse_other_ops.ml sse_other_ops_internal_assembler.ml)))
 
 (executable
@@ -4518,6 +4861,88 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected sse41_test_ops_u_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy avx_test_ops.ml avx_test_ops_internal_assembler.ml)))
+
+(executable
+ (name avx_test_ops_internal_assembler)
+ (modules avx_test_ops_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_test_ops_internal_assembler.out
+   (run ./avx_test_ops_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_test_ops_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy avx_test_ops_u.ml avx_test_ops_u_internal_assembler.ml)))
+
+(executable
+ (name avx_test_ops_u_internal_assembler)
+ (modules avx_test_ops_u_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_test_ops_u_internal_assembler.out
+   (run ./avx_test_ops_u_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_test_ops_u_internal_assembler.out)))
 
 (rule
  (alias runtest)
@@ -5174,47 +5599,6 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected probes256_internal_assembler.out)))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (copy utils256.ml utils256_internal_assembler.ml)))
-
-(executable
- (name utils256_internal_assembler)
- (modules utils256_internal_assembler)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
-
-(rule
- (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   utils256_internal_assembler.out
-   (run ./utils256_internal_assembler.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-   (diff empty.expected utils256_internal_assembler.out)))
 
 (rule
  (alias runtest)

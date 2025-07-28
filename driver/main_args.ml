@@ -334,6 +334,9 @@ let mk_linkall f =
 let mk_linscan f =
   "-linscan", Arg.Unit f, " Use the linear scan register allocator"
 
+let mk_llvm_backend f =
+  "-llvm-backend", Arg.Unit f, " Enable LLVM backend (experimental)"
+
 let mk_make_runtime f =
   "-make-runtime", Arg.Unit f,
   " Build a runtime system with given C objects and libraries"
@@ -1026,6 +1029,7 @@ module type Compiler_options = sig
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit
+  val _llvm_backend : unit -> unit
   val _no_keep_docs : unit -> unit
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
@@ -1247,6 +1251,7 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_llvm_backend F._llvm_backend;
     mk_make_runtime F._make_runtime;
     mk_make_runtime_2 F._make_runtime;
     mk_modern F._labels;
@@ -1494,6 +1499,7 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
+    mk_llvm_backend F._llvm_backend;
     mk_inline_max_depth F._inline_max_depth;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -2041,6 +2047,7 @@ module Default = struct
     let _keep_docs = set keep_docs
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
+    let _llvm_backend = set llvm_backend
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
     let _no_keep_locs = clear keep_locs
