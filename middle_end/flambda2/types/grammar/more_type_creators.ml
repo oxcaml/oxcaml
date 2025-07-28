@@ -212,13 +212,16 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
   | None ->
     (* CR-someday mshinwell: This should be a special kind of error. *)
     Misc.fatal_error "Block too long for target"
-  | Some _size ->
-    TG.create_variant ~is_unique ~immediates:(Known TG.bottom_naked_immediate)
-      ~blocks:
-        (Known
-           (TG.Row_like_for_blocks.create ~shape ~field_tys:fields (Closed tag)
-              alloc_mode))
-      ~extensions:No_extensions
+  | Some _size -> (
+    match (alloc_mode : Alloc_mode.For_types.t) with
+    | External -> TG.any_naked_nativeint
+    | Heap | Local | Unknown ->
+      TG.create_variant ~is_unique ~immediates:(Known TG.bottom_naked_immediate)
+        ~blocks:
+          (Known
+             (TG.Row_like_for_blocks.create ~shape ~field_tys:fields
+                (Closed tag) alloc_mode))
+        ~extensions:No_extensions)
 
 let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
   match Targetint_31_63.of_int_option (List.length fields) with
@@ -252,18 +255,21 @@ let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
     ~extensions:No_extensions
 
 let variant ~const_ctors ~non_const_ctors alloc_mode =
-  let blocks =
-    let shape_and_field_tys_by_tag =
-      Tag.Scannable.Map.fold
-        (fun tag ty non_const_ctors ->
-          Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
-        non_const_ctors Tag.Map.empty
+  match (alloc_mode : Alloc_mode.For_types.t) with
+  | External -> TG.any_naked_nativeint
+  | Local | Heap | Unknown ->
+    let blocks =
+      let shape_and_field_tys_by_tag =
+        Tag.Scannable.Map.fold
+          (fun tag ty non_const_ctors ->
+            Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
+          non_const_ctors Tag.Map.empty
+      in
+      TG.Row_like_for_blocks.create_exactly_multiple ~shape_and_field_tys_by_tag
+        alloc_mode
     in
-    TG.Row_like_for_blocks.create_exactly_multiple ~shape_and_field_tys_by_tag
-      alloc_mode
-  in
-  TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
-    ~blocks:(Known blocks) ~extensions:No_extensions
+    TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
+      ~blocks:(Known blocks) ~extensions:No_extensions
 
 let variant_non_null ~const_ctors ~non_const_ctors alloc_mode =
   let blocks =

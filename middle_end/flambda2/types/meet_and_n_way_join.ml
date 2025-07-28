@@ -431,17 +431,20 @@ let meet_alloc_mode env (alloc_mode1 : Alloc_mode.For_types.t)
     (alloc_mode2 : Alloc_mode.For_types.t) : Alloc_mode.For_types.t meet_result
     =
   match alloc_mode1, alloc_mode2 with
-  | (Heap_or_local | Local), (Heap_or_local | Local) | Heap, Heap ->
+  | (Unknown | Local), (Unknown | Local) | Heap, Heap | External, External ->
     Ok (Both_inputs, env)
-  | (Heap_or_local | Local), _ -> Ok (Right_input, env)
-  | _, (Heap_or_local | Local) -> Ok (Left_input, env)
+  | (Unknown | Local), _ -> Ok (Right_input, env)
+  | _, (Unknown | Local) -> Ok (Left_input, env)
+  | Heap, External | External, Heap -> Misc.fatal_error "This case"
 
 let join_alloc_mode (alloc_mode1 : Alloc_mode.For_types.t)
     (alloc_mode2 : Alloc_mode.For_types.t) : Alloc_mode.For_types.t =
   match alloc_mode1, alloc_mode2 with
-  | (Heap_or_local | Local), _ | _, (Heap_or_local | Local) ->
+  | (Unknown | Local), _ | _, (Unknown | Local) ->
     Alloc_mode.For_types.unknown ()
+  | External, External -> Alloc_mode.For_types.external_
   | Heap, Heap -> Alloc_mode.For_types.heap
+  | (External | Heap), (External | Heap) -> Misc.fatal_error "That case"
 
 let[@inline always] meet_unknown meet_contents ~contents_is_bottom env
     (or_unknown1 : _ Or_unknown.t) (or_unknown2 : _ Or_unknown.t) :

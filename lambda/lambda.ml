@@ -1074,6 +1074,7 @@ let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
 let layout_array kind = non_null_value (Parrayval kind)
 let layout_block = non_null_value Pgenval
+
 let layout_list =
   non_null_value
     (Pvariant
@@ -2432,9 +2433,20 @@ let primitive_result_layout (p : primitive) =
   | Parrayblit _
     -> layout_unit
   | Pgetglobal _ | Psetglobal _ | Pgetpredef _ -> layout_module_field
-  | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
-  | Pduprecord _ | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
+  | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
+  | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
+
+  (* CR jcutler for ccasinghino: in cases like these where you know there's a
+     potential here bug when (say) adding externally allocated arrays,
+     it it best to add explicit matches on the allocators of primitives like
+     Pmakearray, with fatal_errors on the external case?
+  *)
+  | Pmakeblock (_,_,_,(Alloc_heap | Alloc_local)) -> layout_block
+  | Pmakeblock (_,_,_,Alloc_external) -> layout_unboxed_nativeint
+  | Pmakemixedblock (_,_,_,(Alloc_heap | Alloc_local)) -> layout_block
+  | Pmakemixedblock (_,_,_,Alloc_external) -> layout_unboxed_nativeint
+
   | Pfield _ | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts

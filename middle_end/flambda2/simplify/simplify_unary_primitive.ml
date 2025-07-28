@@ -144,7 +144,9 @@ let simplify_unbox_number (boxable_number_kind : K.Boxable_number.t) dacc
        certain and it is [Heap]. (As per [Flambda_primitive] we don't currently
        CSE local allocations.) *)
     match alloc_mode with
-    | Unknown | Proved (Local | Heap_or_local) -> dacc
+    | Unknown | Proved (Local | Unknown) -> dacc
+    | Proved External ->
+      Misc.fatal_error "Externally allocated numbers are not supported"
     | Proved Heap ->
       DA.map_denv dacc ~f:(fun denv ->
           DE.add_cse denv
@@ -710,7 +712,9 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
      addition to boxed numbers. *)
   match T.prove_is_a_boxed_or_tagged_number typing_env arg_ty with
   | Proved (Tagged_immediate | Boxed (Heap, _, _)) -> elide_primitive ()
-  | Proved (Boxed ((Heap_or_local | Local), boxable_number, contents_ty)) ->
+  | Proved (Boxed (External, _, _)) ->
+    Misc.fatal_error "Boxed numbers are not implemented"
+  | Proved (Boxed ((Unknown | Local), boxable_number, contents_ty)) ->
     let extra_bindings, contents, contents_ty, dacc =
       match
         TE.get_alias_then_canonical_simple_exn ~min_name_mode:NM.normal

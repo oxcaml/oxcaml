@@ -16,36 +16,38 @@ module For_types = struct
   type t =
     | Heap
     | Local
-    | Heap_or_local
+    | Unknown
+    | External
   [@@warning "-37"]
 
   let print ppf t =
     match t with
     | Heap -> Format.pp_print_string ppf "Heap"
     | Local -> Format.pp_print_string ppf "Local"
-    | Heap_or_local -> Format.pp_print_string ppf "Heap_or_local"
+    | Unknown -> Format.pp_print_string ppf "Unknown"
+    | External -> Format.pp_print_string ppf "External"
 
   let compare t1 t2 =
     match t1, t2 with
-    | Heap, Heap | Local, Local | Heap_or_local, Heap_or_local -> 0
-    | Heap, (Local | Heap_or_local) -> -1
-    | (Local | Heap_or_local), Heap -> 1
-    | Local, Heap_or_local -> -1
-    | Heap_or_local, Local -> 1
+    | Heap, Heap | Local, Local | Unknown, Unknown | External, External -> 0
+    | Heap, (Local | Unknown | External) -> -1
+    | (Local | Unknown | External), Heap -> 1
+    | Local, (Unknown | External) -> -1
+    | (Unknown | External), Local -> 1
+    | Unknown, External -> -1
+    | External, Unknown -> 1
 
   let equal t1 t2 = compare t1 t2 = 0
 
   let heap = Heap
 
   let local () =
-    if not (Flambda_features.stack_allocation_enabled ())
-    then Heap
-    else Heap_or_local
+    if not (Flambda_features.stack_allocation_enabled ()) then Heap else Unknown
 
   let unknown () =
-    if not (Flambda_features.stack_allocation_enabled ())
-    then Heap
-    else Heap_or_local
+    if not (Flambda_features.stack_allocation_enabled ()) then Heap else Unknown
+
+  let external_ = External
 
   let from_lambda (mode : Lambda.allocation_mode) =
     if not (Flambda_features.stack_allocation_enabled ())
@@ -53,14 +55,16 @@ module For_types = struct
     else
       match mode with
       | Alloc_heap -> Heap
-      | Alloc_local | Alloc_external -> Heap_or_local
+      | Alloc_local -> Unknown
+      | Alloc_external -> External
 
   let to_lambda t =
     match t with
     | Heap -> Lambda.alloc_heap
-    | Local | Heap_or_local ->
+    | Local | Unknown ->
       assert (Flambda_features.stack_allocation_enabled ());
       Lambda.alloc_local
+    | External -> Lambda.alloc_external
 end
 
 module For_applications = struct
@@ -95,8 +99,7 @@ module For_applications = struct
     then Local { region; ghost_region }
     else Heap
 
-  let as_type t : For_types.t =
-    match t with Heap -> Heap | Local _ -> Heap_or_local
+  let as_type t : For_types.t = match t with Heap -> Heap | Local _ -> Unknown
 
   let from_lambda (mode : Lambda.allocation_mode) ~current_region
       ~current_ghost_region =
@@ -176,7 +179,7 @@ module For_allocations = struct
     else Heap
 
   let as_type t : For_types.t =
-    match t with Heap -> Heap | Local _ | External -> Heap_or_local
+    match t with Heap -> Heap | Local _ -> Unknown | External -> External
 
   let from_lambda (mode : Lambda.allocation_mode) ~current_region =
     if not (Flambda_features.stack_allocation_enabled ())

@@ -1150,8 +1150,7 @@ let unary_primitive_eligible_for_cse p ~arg =
     match m with
     | Heap -> true
     | Local _ -> false
-    | External ->
-      Misc.fatal_error "External Int_as_pointer not supported")
+    | External -> Misc.fatal_error "External Int_as_pointer not supported")
   | Opaque_identity _ -> false
   | Int_arith _ -> true
   | Float_arith _ ->
@@ -2283,10 +2282,8 @@ let result_kind_of_variadic_primitive p : result_kind =
   match p with
   | Begin_region _ | Begin_try_region _ -> Singleton K.region
   | Make_array _ -> Singleton K.value
-  | Make_block (_,_,(Heap | Local _)) -> Singleton K.value
-  (* CR jcutler for ccasinghino: I believe this is where the new kind needs to
-  go, right? *)
-  | Make_block (_,_,External) -> Singleton K.value
+  | Make_block (_, _, (Heap | Local _)) -> Singleton K.value
+  | Make_block (_, _, External) -> Singleton K.naked_nativeint
 
 let effects_and_coeffects_of_begin_region : Effects_and_coeffects.t =
   (* Ensure these don't get moved, but allow them to be deleted. *)

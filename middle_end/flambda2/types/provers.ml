@@ -628,7 +628,7 @@ let prove_unique_tag_and_size env t :
 let prove_unique_fully_constructed_immutable_heap_block env t :
     _ proof_of_property =
   match gen_value_to_proof prove_unique_tag_and_size_value env t with
-  | Unknown | Proved (_, _, _, _, (Heap_or_local | Local)) -> Unknown
+  | Unknown | Proved (_, _, _, _, (Unknown | Local | External)) -> Unknown
   | Proved (tag, shape, size, product, Heap) -> (
     let result =
       List.fold_left
@@ -1088,7 +1088,7 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
           else
             match blocks.alloc_mode with
             | Heap -> Proved ()
-            | Local | Heap_or_local -> Unknown))
+            | Local | Unknown | External -> Unknown))
       | Boxed_float32 (_, alloc_mode)
       | Boxed_float (_, alloc_mode)
       | Boxed_int32 (_, alloc_mode)
@@ -1102,7 +1102,9 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
       | Array { alloc_mode; _ } -> (
         match alloc_mode with
         | Heap -> Proved ()
-        | Local | Heap_or_local -> Unknown)
+        | External ->
+          Misc.fatal_error "Externally allocated arrays are not supported"
+        | Local | Unknown -> Unknown)
       | String _ -> Proved ())
     | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int32 _
     | Naked_int64 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
