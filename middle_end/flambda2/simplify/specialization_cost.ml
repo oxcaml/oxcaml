@@ -80,14 +80,14 @@ let add_prim bound_var prim t =
 
 let rec repeat n acc ~f = if n <= 0 then acc else repeat (n - 1) (f acc) ~f
 
-let cost_metrics typing_env ~switch ~join_info ~specialized ~generic
+let cost_metrics typing_env ~switch ~join_analysis ~specialized ~generic
     (cost : cost) =
   let machine_width = Typing_env.machine_width typing_env in
   (* If there is exactly 1 "generic" call site, then that call site is the same
      as a specialized one. *)
-  let n = Apply_cont_rewrite_id.Map.cardinal specialized in
+  let n = Apply_cont_rewrite_id.Set.cardinal specialized in
   let num_specialized_call_sites, zero_generic_call_sites =
-    match Apply_cont_rewrite_id.Map.cardinal generic with
+    match Apply_cont_rewrite_id.Set.cardinal generic with
     | 0 -> n, true
     | 1 -> n + 1, true
     | _ -> n, false
@@ -124,22 +124,25 @@ let cost_metrics typing_env ~switch ~join_info ~specialized ~generic
   List.fold_left
     (fun metrics (bound_var, prim) ->
       let simple = Simple.var (Bound_var.var bound_var) in
-      let canonical_simple =
-        Typing_env.get_canonical_simple_exn typing_env
-          ~min_name_mode:Name_mode.in_types simple
-      in
       let disappears, stays =
-        Simple.pattern_match canonical_simple
-          ~name:(fun name ~coercion:_ ->
-            match Join_info.known_values_at_uses name join_info with
-            | Unknown -> 0, num_specialized_call_sites
-            | Known { known_at_uses; unknown_at_uses } ->
-              ( Apply_cont_rewrite_id.Map.cardinal known_at_uses,
-                Apply_cont_rewrite_id.Map.cardinal unknown_at_uses ))
-          ~const:(fun _ ->
-            (* if the canonical is a simple already, then specialization does
-               not change much *)
-            0, 0)
+        match
+          Join_analysis.simple_refined_at_join join_analysis typing_env simple
+        with
+        | Not_refined_at_join -> 0, num_specialized_call_sites
+        | Invariant_in_all_uses _ ->
+          (* if the canonical is a simple already, then specialization does not
+             change much *)
+          0, 0
+        | Variable_refined_at_these_uses var_analysis ->
+          Join_analysis.Variable_refined_at_join.fold_values_at_uses
+            (fun id value (disappears, stays) ->
+              if Apply_cont_rewrite_id.Set.mem id specialized
+              then
+                match value with
+                | Known _ -> disappears + 1, stays
+                | Unknown -> disappears, stays + 1
+              else disappears, stays + 1)
+            var_analysis (0, 0)
       in
       let metrics =
         repeat disappears metrics
