@@ -2102,10 +2102,14 @@ let rec quote_splice_cancel ty =
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
 let rec try_expand_once env ty =
+  let expand_and_cancel t =
+    match try_expand_once env t with
+    | _ | exception Cannot_expand -> quote_splice_cancel ty
+  in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
-  | Tsplice t -> ignore (try_expand_once env t); quote_splice_cancel ty
-  | Tquote t -> ignore (try_expand_once env t); quote_splice_cancel ty
+  | Tsplice t -> expand_and_cancel t
+  | Tquote t -> expand_and_cancel t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)

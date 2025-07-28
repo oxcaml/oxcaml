@@ -197,74 +197,48 @@ val mk_pair : <[ $ ('a) ]> expr -> <[ $ ('a) * $ ('a) ]> expr = <fun>
 
 mk_pair <[123]>;;
 [%%expect {|
-- : <[ int * int ]> expr = <[ (123, 123) ]>
-|}, Principal{|
 - : <[ $ (<[ int ]>) * $ (<[ int ]>) ]> expr = <[ (123, 123) ]>
 |}];;
 
 mk_pair <[[]]>;;
 [%%expect {|
-- : <[ $ ('a) list * $ ('a) list ]> expr = <[ ([], []) ]>
-|}, Principal{|
 - : <[ $ (<[ $ ('a) list ]>) * $ (<[ $ ('a) list ]>) ]> expr = <[ ([], []) ]>
 |}];;
 
 mk_pair <[None]>;;
 [%%expect {|
-- : <[ $ ('a) option * $ ('a) option ]> expr = <[ (None, None) ]>
-|}, Principal{|
 - : <[ $ (<[ $ ('a) option ]>) * $ (<[ $ ('a) option ]>) ]> expr =
 <[ (None, None) ]>
 |}];;
 
 mk_pair <[Some 123]>;;
 [%%expect {|
-- : <[ int option * int option ]> expr = <[ ((Some 123), (Some 123)) ]>
-|}, Principal{|
 - : <[ $ (<[ int option ]>) * $ (<[ int option ]>) ]> expr =
 <[ ((Some 123), (Some 123)) ]>
 |}];;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-Line 1, characters 10-22:
-1 | mk_pair <[fun () -> 42]>;;
-              ^^^^^^^^^^^^
-Error: This expression has type "unit -> int"
-       but an expression was expected of type "unit -> int"
-       Type "unit -> int" is not compatible with type "<[ unit -> int ]>"
+- : <[ $ (<[ unit -> int ]>) * $ (<[ unit -> int ]>) ]> expr =
+<[ ((fun () -> 42), (fun () -> 42)) ]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-Line 1, characters 10-20:
-1 | mk_pair <[fun x -> x]>;;
-              ^^^^^^^^^^
-Error: This expression has type "'a -> 'a"
-       but an expression was expected of type "'a -> 'a"
-       Type "'a -> 'a" is not compatible with type "<[ 'a -> 'a ]>"
+- : <[ $ (<[ '_weak1 -> '_weak1 ]>) * $ (<[ '_weak1 -> '_weak1 ]>) ]> expr =
+<[ ((fun x -> x), (fun x -> x)) ]>
 |}];;
 
 (* Type algebra checks. *)
 
 fun (x: 'a) -> (x: <[<[<[$($($'a))]>]>]>);;
 [%%expect {|
-Line 1, characters 16-17:
-1 | fun (x: 'a) -> (x: <[<[<[$($($'a))]>]>]>);;
-                    ^
-Error: This expression has type "'a" but an expression was expected of type
-         "<[ <[ <[ $ ($ ($ ('a))) ]> ]> ]>"
-       The type variable "'a" occurs inside "<[ <[ <[ $ ($ ($ ('a))) ]> ]> ]>"
+- : 'a -> <[ <[ <[ $ ($ ($ ('a))) ]> ]> ]> = <fun>
 |}];;
 
 fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
 [%%expect {|
-Line 1, characters 35-36:
-1 | fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
-                                       ^
-Error: This expression has type "<[ <[ <[ $ ($ ($ ('a))) ]> ]> ]>"
-       but an expression was expected of type "'a"
-       The type variable "'a" occurs inside "<[ <[ <[ $ ($ ($ ('a))) ]> ]> ]>"
+- : <[ <[ <[ $ ($ ($ ('a))) ]> ]> ]> -> 'a = <fun>
 |}];;
 
 fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
@@ -272,7 +246,7 @@ fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
 Line 1, characters 32-33:
 1 | fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
                                     ^
-Error: This expression has type "<[ <[ <[ $ ($ ('a)) ]> ]> ]>"
+Error: This expression has type "<[ 'a ]>"
        but an expression was expected of type "'a"
-       The type variable "'a" occurs inside "<[ <[ <[ $ ($ ('a)) ]> ]> ]>"
+       The type variable "'a" occurs inside "<[ 'a ]>"
 |}];;
