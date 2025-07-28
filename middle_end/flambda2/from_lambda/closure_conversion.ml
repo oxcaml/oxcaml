@@ -3634,9 +3634,6 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
 
 let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
     ~return_cont ~module_symbol =
-  (* CR jrayman: remove these comments *)
-  (* let a : unit K.Mixed_block_lambda_shape.t = failwith "a" in *)
-  (* let shape = K.Mixed_block_shape.from_mixed_block_shape a in *)
   let module_block_var = Variable.create "module_block" in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
@@ -3653,7 +3650,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       | _ -> simple_var
     in
     let field_vars =
-      List.init module_block_size_in_words (fun pos ->
+      List.init (Lambda.module_field_count module_repr) (fun pos ->
           let pos_str = string_of_int pos in
           pos, Variable.create ("field_" ^ pos_str), Flambda_debug_uid.none)
     in
@@ -3665,9 +3662,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        (* CR jrayman: allow for Value_only as well *)
         Static_const.block module_block_tag Immutable
-          (Mixed_record module_shape) field_vars
+          (K.Scannable_block_shape.of_module_representation module_repr)
+          field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of
@@ -3690,17 +3687,31 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
         (Bound_pattern.static bound_static)
         named ~body:return
     in
-    (* CR jrayman allow for Values as well *)
+    (* CR jrayman: should vary with [pos] *)
     let block_access : P.Block_access_kind.t =
-      Mixed
-        { tag = Known Tag.Scannable.zero;
-          (* CR jrayman: Is this the right tag? *)
-          size = Unknown;
-          (* CR jrayman: Is this size in words or number of fields? *)
-          field_kind = Value_prefix Any_value;
-          (* CR jrayman: is field_kind correct? *)
-          shape = module_shape
-        }
+      match module_repr with
+      | Lambda.Module_value_only size ->
+        Values
+          { tag = Known Tag.Scannable.zero;
+            size = Known (Targetint_31_63.of_int size);
+            field_kind = Any_value
+          }
+      | Lambda.Module_mixed shape ->
+        let shape =
+          shape
+          |> Mixed_block_shape.of_mixed_block_elements
+               ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+          |> K.Mixed_block_shape.from_mixed_block_shape
+        in
+        Mixed
+          { tag = Known Tag.Scannable.zero;
+            (* CR jrayman: Is this the right tag? *)
+            size = Unknown;
+            (* CR jrayman: Is this size in words or number of fields? *)
+            field_kind = Value_prefix Any_value;
+            (* CR jrayman: is field_kind correct? *)
+            shape
+          }
     in
     List.fold_left
       (fun (acc, body) (pos, var, var_duid) ->

@@ -962,29 +962,35 @@ type runtime_param =
   | Rp_unit                               (* The unit value (only used when
                                              there are no other parameters) *)
 
+(* The structure of a module block. This is distinct from
+   [Types.record_representation] since, e.g., modules don't support the float
+   block optimization. *)
 type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
   | Module_mixed of mixed_block_shape
   (* The module contains both values and unboxed elements *)
 
+val module_field_count : module_representation -> int
+
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
    compiled to an [Mb_instantiating_functor]. *)
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
-                                          (* A block with
-                                             representation [mb_repr] *)
+                                         (* A block with
+                                            representation [mb_repr] *)
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
-        mb_returned_size : int;
+        mb_returned_repr : module_representation;
       }
-                                          (* A block with exactly one field: a
-                                             function taking [mb_runtime_params]
-                                             and returning a block with
-                                             [mb_returned_size] fields *)
-    (* CR jrayman: add Mb_instantiating_functor test
-       (should error on non-value) *)
+                                         (* A block with exactly one field: a
+                                            function taking [mb_runtime_params]
+                                            and returning a block with
+                                            representation [mb_returned_repr] *)
+
+val main_module_representation :
+  main_module_block_format -> module_representation
 
 type program =
   { compilation_unit : Compilation_unit.t;
