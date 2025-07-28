@@ -136,9 +136,9 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
               env, res)
             (env, res) domain
         in
-        let env, res =
+        let res =
           Continuation.Lmap.fold
-            (fun k handler (env, res) ->
+            (fun k handler res ->
               Continuation_handler.pattern_match handler
                 ~f:(fun params ~handler:cont_body ->
                   let params, env =
@@ -158,9 +158,9 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                     To_jsir_result.new_block_with_addr_exn res ~params ~addr
                   in
                   let _env, res = expr ~env ~res cont_body in
-                  env, res))
+                  res))
             (Flambda.Continuation_handlers.to_map conts)
-            (env, res)
+            res
         in
         expr ~env ~res body)
 

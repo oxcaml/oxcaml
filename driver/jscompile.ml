@@ -82,9 +82,13 @@ let emit_jsir i jsir_program =
       output_string oc Config.cmj_magic_number;
       (* We include the highest used variable in the translation, so that Js_of_ocaml
          can read this number and update its own state accordingly. *)
-      output_binary_int oc
-        (Flambda2_to_jsir.Jsir.Var.idx (Flambda2_to_jsir.Jsir.Var.last ()));
-      output_value oc jsir_program)
+      let cmj_body : Flambda2_to_jsir.Jsir.cmj_body =
+        { program = jsir_program;
+          last_var =
+            Flambda2_to_jsir.Jsir.Var.idx (Flambda2_to_jsir.Jsir.Var.last ())
+        }
+      in
+      output_value oc cmj_body)
 
 let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ } =
   let argument_coercion =
