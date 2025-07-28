@@ -794,6 +794,11 @@ val zap_modalities_to_floor_if_at_least :
   Mode.Modality.Value.t ->
   Mode.Modality.Value.Const.t
 
-val check_constructor_crossing : Env.t ->
-  tag -> res:type_expr -> args:constructor_argument list ->
-  Env.held_locks -> (unit, Mode.Value.error) result
+type 'res constructor_crossing_kind =
+  | Creation : Mode.Value.r constructor_crossing_kind
+  | Destruction : Mode.Value.l constructor_crossing_kind
+  | Rebinding : unit constructor_crossing_kind
+
+val check_constructor_crossing : 'ok constructor_crossing_kind
+  -> Env.t -> tag -> res:type_expr -> args:constructor_argument list ->
+  Env.held_locks -> ('ok, Mode.Value.error) result

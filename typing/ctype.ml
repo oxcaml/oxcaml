@@ -7350,32 +7350,81 @@ let constrain_decl_jkind env decl jkind =
         | None -> err
         | Some ty -> constrain_type_jkind env ty jkind
 
-let check_constructor_crossing env tag ~res ~args held_locks =
+type 'res constructor_crossing_kind =
+  | Creation : Mode.Value.r constructor_crossing_kind
+  | Destruction : Mode.Value.l constructor_crossing_kind
+  | Rebinding : unit constructor_crossing_kind
+
+let check_exn_constructor_crossing (type res)
+   (kind : res constructor_crossing_kind)
+   env ~args held_locks : (res, Mode.Value.error) result =
+  let vmode =
+    Env.walk_locks ~env ~item:Constructor
+      (Mode.Value.(disallow_right min)) None held_locks
+  in
+  (* Exceptions cross portability and contention, so we project those axes. *)
+  let monadic =
+    vmode.mode.monadic
+    |> Mode.Value.Monadic.proj Contention
+    |> Mode.Value.Monadic.min_with Contention
+  in
+  let comonadic =
+    Mode.Value.monadic_to_comonadic_max vmode.mode.monadic
+    |> Mode.Value.Comonadic.proj Portability
+    |> Mode.Value.Comonadic.max_with Portability
+  in
+  let min_bound =
+    { monadic;
+      comonadic = Mode.Value.Comonadic.(disallow_right min) }
+  in
+  let max_bound =
+    { comonadic;
+      monadic = Mode.Value.Monadic.(disallow_left max)}
+  in
+  let mode_crossing =
+    List.map (
+      fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
+        crossing_of_ty env ~modalities:ca_modalities ca_type
+    ) args
+    |> List.fold_left Mode.Crossing.join Mode.Crossing.bot
+  in
+  let check_comonadic_crossing () =
+    Mode.Value.submode
+      Mode.Value.(disallow_right max)
+      (Mode.Crossing.apply_right mode_crossing max_bound)
+  in
+  let check_monadic_crossing () =
+      Mode.Value.submode
+        (Mode.Crossing.apply_left mode_crossing min_bound)
+        Mode.Value.(disallow_left min)
+  in
+  match kind with
+  | Creation ->
+    (* Creating a constructor under a lock is safe if the arguments
+       submode on the comonadic axis and cross the monadic axis. *)
+    Result.map (fun () -> max_bound) (check_monadic_crossing ())
+  | Destruction ->
+    (* Destroying a constructor under a lock is safe if the arguments
+       submode on the monadic axis and cross the comonadic axis. *)
+    Result.map (fun () -> min_bound) (check_comonadic_crossing ())
+  | Rebinding ->
+    (* Rebinding is only safe if constructor arguments mode-cross both way. *)
+    Result.bind (check_comonadic_crossing ()) check_monadic_crossing
+
+let check_constructor_crossing (type res)
+   (kind : res constructor_crossing_kind)
+    env tag ~res ~args held_locks =
+  let no_check : res =
+    match kind with
+    | Creation -> Mode.Value.(disallow_left max)
+    | Destruction -> Mode.Value.(disallow_right min)
+    | Rebinding -> ()
+  in
   match tag with
-  | Ordinary _ | Null -> Ok ()
+  | Ordinary _ | Null -> Ok no_check
   | Extension _ ->
       match get_desc (expand_head env res) with
       | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
-          (* Currently only [exn] is treated specially *)
-          let mode_crossings =
-            List.map (
-              fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
-              crossing_of_ty env ~modalities:ca_modalities ca_type
-            ) args
-          in
-          let mode_crossing =
-            List.fold_left Mode.Crossing.join Mode.Crossing.bot mode_crossings
-          in
-          (* We only check portability and contention, since [exn] doesn't
-               cross other axes anyway. *)
-          let mode =
-            Mode.Value.min_with (Comonadic Portability) Mode.Portability.max
-            |> Mode.Crossing.apply_left mode_crossing
-          in
-          let vmode =
-            Env.walk_locks ~env ~item:Constructor mode None held_locks
-          in
-          let mode = vmode.mode |> Mode.Crossing.apply_left mode_crossing in
-          Mode.Value.submode mode
-            (Mode.Value.max_with (Monadic Contention) (Mode.Contention.min))
-      | _ -> Ok ()
+          (* Currently, only [exn] is treated specially. *)
+          check_exn_constructor_crossing kind env ~args held_locks
+      | _ -> Ok no_check

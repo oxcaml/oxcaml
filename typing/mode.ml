@@ -2725,6 +2725,10 @@ module Value_with (Areality : Areality) = struct
   let monadic_to_comonadic_min m =
     S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
 
+  let monadic_to_comonadic_max m =
+    S.apply Comonadic.Obj.obj Monadic_to_comonadic_max
+      (Monadic.disallow_right m)
+
   let meet_const c { comonadic; monadic } =
     let comonadic = Comonadic.meet_const c comonadic in
     { monadic; comonadic }
