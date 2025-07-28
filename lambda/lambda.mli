@@ -228,8 +228,10 @@ type primitive =
   | Paddbint of boxed_integer * allocation_mode
   | Psubbint of boxed_integer * allocation_mode
   | Pmulbint of boxed_integer * allocation_mode
-  | Pdivbint of { size : boxed_integer; is_safe : is_safe; mode: allocation_mode }
-  | Pmodbint of { size : boxed_integer; is_safe : is_safe; mode: allocation_mode }
+  | Pdivbint of { size : boxed_integer; is_safe : is_safe;
+                  mode: allocation_mode }
+  | Pmodbint of { size : boxed_integer; is_safe : is_safe;
+                  mode: allocation_mode }
   | Pandbint of boxed_integer * allocation_mode
   | Porbint of boxed_integer * allocation_mode
   | Pxorbint of boxed_integer * allocation_mode
@@ -317,7 +319,8 @@ type primitive =
                                        mode : allocation_mode; boxed : bool }
   | Punboxed_nativeint_array_load_vec of { size : boxed_vector; unsafe : bool;
                                            index_kind : array_index_kind;
-                                           mode : allocation_mode; boxed : bool }
+                                           mode : allocation_mode;
+                                           boxed : bool }
   | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
   | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;

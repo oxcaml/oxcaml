@@ -323,7 +323,8 @@ let print_boxed_integer name ppf bi m =
 
 let unboxed_integer_mark name bi m =
   match bi with
-  | Unboxed_nativeint -> Printf.sprintf "Nativeint_u.%s%s" name (allocation_kind m)
+  | Unboxed_nativeint -> Printf.sprintf "Nativeint_u.%s%s" name
+                         (allocation_kind m)
   | Unboxed_int32 -> Printf.sprintf "Int32_u.%s%s" name (allocation_kind m)
   | Unboxed_int64 -> Printf.sprintf "Int64_u.%s%s" name (allocation_kind m)
 
@@ -653,9 +654,11 @@ let primitive ppf = function
 
   | Parraylength k -> fprintf ppf "array.length[%s]" (array_kind k)
   | Pmakearray (k, Mutable, mode) ->
-     fprintf ppf "make%sarray[%s]" (allocation_mode_if_nonheap mode) (array_kind k)
+     fprintf ppf "make%sarray[%s]" (allocation_mode_if_nonheap mode)
+     (array_kind k)
   | Pmakearray (k, Immutable, mode) ->
-     fprintf ppf "make%sarray_imm[%s]" (allocation_mode_if_nonheap mode) (array_kind k)
+     fprintf ppf "make%sarray_imm[%s]" (allocation_mode_if_nonheap mode)
+     (array_kind k)
   | Pmakearray (k, Immutable_unique, mode) ->
       fprintf ppf "make%sarray_unique[%s]" (allocation_mode_if_nonheap mode)
         (array_kind k)
@@ -820,7 +823,8 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
-       (if boxed then "" else "#") (allocation_kind mode) array_index_kind index_kind
+       (if boxed then "" else "#") (allocation_kind mode) array_index_kind
+       index_kind
   | Pbigstring_set_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind

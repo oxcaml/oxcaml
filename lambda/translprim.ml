@@ -2134,7 +2134,8 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         | Some Alloc_heap ->
             raise (Error (to_location loc, Invalid_stack_primitive Allocating_on_heap))
         | Some Alloc_external ->
-            raise (Error (to_location loc, Invalid_stack_primitive Allocating_externally))
+            raise (Error (to_location loc,
+                          Invalid_stack_primitive Allocating_externally))
         | None -> raise (Error (to_location loc, Invalid_stack_primitive Not_allocating))
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))

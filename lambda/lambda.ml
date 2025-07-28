@@ -102,7 +102,8 @@ end : sig
 
   val modify_maybe_stack : modify_mode
 
-  val join_allocation_mode : allocation_mode -> allocation_mode -> allocation_mode
+  val join_allocation_mode : allocation_mode ->
+                             allocation_mode -> allocation_mode
 end)
 
 let is_local_mode = function
@@ -113,8 +114,8 @@ let is_heap_mode = function
   | Alloc_heap -> true
   | Alloc_local | Alloc_external -> false
 
- (* Alloc_heap < Alloc_local and Alloc_heap < Alloc_external. No relation between
-    external and local. *)
+ (* Alloc_heap < Alloc_local and Alloc_heap < Alloc_external.
+    No relation between external and local. *)
 let sub_allocation_mode a b =
   match a, b with
   | Alloc_heap, _ -> true
@@ -248,8 +249,10 @@ type primitive =
   | Paddbint of boxed_integer * allocation_mode
   | Psubbint of boxed_integer * allocation_mode
   | Pmulbint of boxed_integer * allocation_mode
-  | Pdivbint of { size : boxed_integer; is_safe : is_safe; mode: allocation_mode }
-  | Pmodbint of { size : boxed_integer; is_safe : is_safe; mode: allocation_mode }
+  | Pdivbint of { size : boxed_integer; is_safe : is_safe;
+                  mode: allocation_mode }
+  | Pmodbint of { size : boxed_integer; is_safe : is_safe;
+                  mode: allocation_mode }
   | Pandbint of boxed_integer * allocation_mode
   | Porbint of boxed_integer * allocation_mode
   | Pxorbint of boxed_integer * allocation_mode
@@ -337,7 +340,8 @@ type primitive =
                                        mode : allocation_mode; boxed : bool }
   | Punboxed_nativeint_array_load_vec of { size : boxed_vector; unsafe : bool;
                                            index_kind : array_index_kind;
-                                           mode : allocation_mode; boxed : bool }
+                                           mode : allocation_mode;
+                                           boxed : bool }
   | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
   | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;

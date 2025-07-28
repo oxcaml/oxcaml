@@ -7174,7 +7174,8 @@ and type_expect_
       let exp_desc = match exp.exp_desc with
       | Texp_record r -> Texp_record {r with alloc_mode = Some External}
       | Texp_tuple(el,_) -> Texp_tuple(el,External)
-      | Texp_construct(loc,cstr,args,_) -> Texp_construct(loc,cstr,args,Some External)
+      | Texp_construct(loc,cstr,args,_) ->
+        Texp_construct(loc,cstr,args,Some External)
       | Texp_variant(l, Some (arg,_)) -> Texp_variant(l,Some(arg,External))
       | Texp_variant(_, None)
       | Texp_unreachable | Texp_src_pos
