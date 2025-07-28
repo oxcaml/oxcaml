@@ -1090,10 +1090,17 @@ and meet_relation env var1 var2 =
           Simple.pattern_match simple2
             ~const:(fun _ : _ meet_result -> Ok (Left_input, env))
             ~name:(fun _ ~coercion:_ ->
-              (* CR bclement: We want to add an equality here, but it can
-                 currently cause loops due to the reductions that could be
-                 stored on the relation variables. *)
-              Ok (Both_inputs, env)))
+              (* Note: This equality can (rarely?) cause loops due to reductions
+                 that could be stored on the relation variables (if the relation
+                 variable has a [Is_int] / [Get_tag] / [Is_null] type). This is
+                 caught by the safeguard in [Meet_env]. *)
+              match
+                add_equation simple1
+                  (TG.alias_type_of K.naked_immediate simple2)
+                  env ~meet_type
+              with
+              | Ok (_, env) -> Ok (Both_inputs, env)
+              | Bottom r -> Bottom r))
 
 and meet_variant env ~(is_int1 : Variable.t option)
     ~(get_tag1 : Variable.t option)
