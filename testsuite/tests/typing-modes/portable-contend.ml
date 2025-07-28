@@ -331,7 +331,8 @@ Line 1, characters 105-115:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontended portable = fun a b -> best_bytes ()
                                                                                                              ^^^^^^^^^^
 Error: The value "best_bytes" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is "portable".
+       because it is used inside a function which is has an allocation
+       which is "portable".
 |}]
 
 (* immediates crosses portability and contention *)

@@ -38,10 +38,7 @@ let apply3_wrapped x = (g x x) x
 Line 1, characters 23-32:
 1 | let apply3_wrapped x = (g x x) x
                            ^^^^^^^^^
-Error: This value is "local" because it crosses with something which is "local"
-       because it crosses with something
-       which is "local".
-       However, it is expected to be local to the parent region
+Error: This value is "local" but expected to be local to the parent region
        because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
@@ -279,7 +276,8 @@ Line 3, characters 63-64:
 3 |     fun ~a -> fun[@curry] ~b -> fun[@curry] ~c -> print_string a
                                                                    ^
 Error: The value "a" is local to the parent region but expected to be "global"
-       because it is used inside a function which is "global".
+       because it is used inside a function which is has an allocation
+       which is "global".
 |}]
 let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 
@@ -335,9 +333,7 @@ let bug4 : local_ (string -> foo:string -> unit) -> (string -> unit) =
 Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
-Error: This value is "local" because it crosses with something
-       which is "local".
-       However, it is expected to be "global".
+Error: This value is "local" but expected to be "global".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -360,9 +356,7 @@ let bug4' () =
 Line 3, characters 25-31:
 3 |   let local_ perm ~foo = f ~foo in
                              ^^^^^^
-Error: This value is "local" because it crosses with something
-       which is "local".
-       However, it is expected to be local to the parent region
+Error: This value is "local" but expected to be local to the parent region
        because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument may make the value non-local
