@@ -4740,10 +4740,13 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   in
   aux [] unboxed_int32_list
 
-let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~base_tag ~elements
-    mode dbg =
+let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~even_tag ~odd_tag
+    ~elements mode dbg =
   let num_elts, payload = make_payload dbg elements in
-  let tag = base_tag + match num_elts with Even -> 0 | Odd -> 1 in
+  let tag = match num_elts with 
+    | Even -> even_tag 
+    | Odd -> odd_tag 
+  in
   let header =
     let size = List.length payload in
     match mode with
@@ -4758,7 +4761,8 @@ let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~base_tag ~elements
 let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   allocate_unboxed_packed_array ~make_payload:make_unboxed_int32_array_payload
     ~alloc_kind:Alloc_block_kind_int32_u_array
-    ~base_tag:Unboxed_array_tags.unboxed_int32_array_even_tag ~elements mode dbg
+    ~even_tag:Unboxed_array_tags.unboxed_int32_array_even_tag 
+    ~odd_tag:Unboxed_array_tags.unboxed_int32_array_odd_tag ~elements mode dbg
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   if Sys.big_endian
@@ -4782,7 +4786,8 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   allocate_unboxed_packed_array ~make_payload:make_unboxed_float32_array_payload
     ~alloc_kind:Alloc_block_kind_float32_u_array
-    ~base_tag:Unboxed_array_tags.unboxed_float32_array_even_tag ~elements mode
+    ~even_tag:Unboxed_array_tags.unboxed_float32_array_even_tag 
+    ~odd_tag:Unboxed_array_tags.unboxed_float32_array_odd_tag ~elements mode
     dbg
 
 let allocate_unboxed_int64_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
