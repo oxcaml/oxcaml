@@ -83,8 +83,8 @@ val add_lifted_set_of_closures : Set_of_closures.t -> t -> t
 val cost_metrics :
   Typing_env.t ->
   switch:Switch_expr.t ->
-  join_info:Apply_cont_rewrite_id.t Flambda2_types.Join_analysis.t ->
-  specialized:Reg_width_const.t Apply_cont_rewrite_id.Map.t ->
-  generic:Simple.t Apply_cont_rewrite_id.Map.t ->
+  join_analysis:Apply_cont_rewrite_id.t Join_analysis.t ->
+  specialized:Apply_cont_rewrite_id.Set.t ->
+  generic:Apply_cont_rewrite_id.Set.t ->
   cost ->
   Cost_metrics.t

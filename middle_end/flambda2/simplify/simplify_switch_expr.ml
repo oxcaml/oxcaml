@@ -754,59 +754,45 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
              determine the value of the scrutinee (and therefore the specialized
              versions will eliminate the switch in favor of an apply_cont
              directly). *)
-          let join_info =
-            match DA.get_join_id_for_continuation dacc continuation with
-            | Some join_id -> DE.get_join_info denv join_id
-            | None -> None
-          in
-          let join_info =
-            match join_info with
-            | None -> None
-            | Some join_info ->
-              Some
-                (Flambda2_types.Join_info.reduce join_info (DE.typing_env denv))
-          in
-          if Flambda_features.debug_flambda2 ()
-          then
-            Option.iter
-              (fun join_info ->
-                Format.eprintf "Scrutinee: %a@." Simple.print scrutinee;
-                Format.eprintf "%a@." Join_info.print join_info)
-              join_info;
           let join_analysis_result =
-            match join_info with
+            match DE.join_analysis denv with
             | None -> `Not_enough_join_info
-            | Some join_info ->
-              let scrutinee =
-                TE.get_canonical_simple_exn (DE.typing_env denv)
-                  ~min_name_mode:Name_mode.in_types scrutinee
-              in
-              if Flambda_features.debug_flambda2 ()
-              then Format.eprintf "Real scrutinee: %a@." Simple.print scrutinee;
-              Simple.pattern_match scrutinee
-                ~name:(fun name ~coercion:_ ->
-                  match Join_info.known_values_at_uses name join_info with
-                  | Unknown -> `Not_enough_join_info
-                  | Known { unknown_at_uses; known_at_uses } -> (
-                    match
-                      Apply_cont_rewrite_id.Map.cardinal unknown_at_uses
-                    with
-                    | 0 | 1 -> `Spec (join_info, known_at_uses, unknown_at_uses)
-                    | _ ->
-                      if Apply_cont_rewrite_id.Map.is_empty known_at_uses
-                      then `All_unknown
-                      else `Too_many_unknown_uses))
-                ~const:(fun _ ->
-                  (* in this case, we don't need to specialize to know the
-                     scrutinee, or to simplify the switch, it will hapen without
-                     specialization. *)
-                  `No_reason_to_spec)
+            | Some join_analysis -> (
+              match
+                Join_analysis.simple_refined_at_join join_analysis
+                  (DE.typing_env denv) scrutinee
+              with
+              | Not_refined_at_join -> `Not_enough_join_info
+              | Invariant_in_all_uses _ ->
+                (* in this case, we don't need to specialize to know the
+                   scrutinee, or to simplify the switch, it will hapen without
+                   specialization. *)
+                `No_reason_to_spec
+              | Variable_refined_at_these_uses var_analysis -> (
+                let specialized, generic =
+                  Join_analysis.Variable_refined_at_join.fold_values_at_uses
+                    (fun id value (specialized, generic) ->
+                      match value with
+                      | Known _ ->
+                        Apply_cont_rewrite_id.Set.add id specialized, generic
+                      | Unknown ->
+                        specialized, Apply_cont_rewrite_id.Set.add id generic)
+                    var_analysis
+                    ( Apply_cont_rewrite_id.Set.empty,
+                      Apply_cont_rewrite_id.Set.empty )
+                in
+                match Apply_cont_rewrite_id.Set.cardinal generic with
+                | 0 | 1 -> `Spec (join_analysis, specialized, generic)
+                | _ ->
+                  if Apply_cont_rewrite_id.Set.is_empty specialized
+                  then `All_unknown
+                  else `Too_many_unknown_uses))
           in
           match join_analysis_result with
           | ( `No_reason_to_spec | `Too_many_unknown_uses | `All_unknown
             | `Not_enough_join_info ) as res ->
             dacc, res
-          | `Spec (join_info, known_at_use, unknown_at_use) ->
+          | `Spec (join_analysis, specialized, generic) ->
             (* Specialization benefit estimation: we use heuristics similar to
                that of inlining to estimate the benefit based on code size and
                removed operations.
@@ -820,8 +806,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
                thus will disappear from the specialized versions). *)
             let cost_metrics =
               Specialization_cost.cost_metrics (DE.typing_env denv) spec_cost
-                ~switch ~join_info ~specialized:known_at_use
-                ~generic:unknown_at_use
+                ~switch ~join_analysis ~specialized ~generic
             in
             let final_cost =
               Cost_metrics.evaluate
@@ -839,10 +824,9 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
                  spec cost: %a@\n\
                  %a@."
                 Continuation.print continuation final_cost threshold
-                (Apply_cont_rewrite_id.Map.print Reg_width_const.print)
-                known_at_use
-                (Apply_cont_rewrite_id.Map.print Simple.print)
-                unknown_at_use Specialization_cost.print spec_cost'
+                Apply_cont_rewrite_id.Set.print specialized
+                Apply_cont_rewrite_id.Set.print generic
+                Specialization_cost.print spec_cost'
                 Inlining_report.Context.print_cost_metrics cost_metrics;
             if Float.compare threshold 0. < 0
                || Float.compare final_cost threshold > 0
