@@ -3312,9 +3312,10 @@ let rec expands_to_datatype env ty =
       end
   | _ -> false
 
-(* CR generic-optinoal: This function was needed because [Generic_optional]
+(* CR generic-optional: This function was needed because [Generic_optional]
    contained [Location.loc], which needs to be ignored. But now it no longer
    contains it. *)
+(* CR generic-optional: Investigate whether this is needed to handle aliases *)
 let arg_label_equal l1 l2 = l1 = l2
 
 let equivalent_with_nolabels l1 l2 =

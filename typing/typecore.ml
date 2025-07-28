@@ -7512,15 +7512,12 @@ and type_function
                       , pat
                   | _ -> default, pat)
               | Generic_optional _ ->
-                  (match extract_optional_tp_from_pattern_constraint pat with
-                  | None ->
-                      failwith
-                        "Cannot extract optional type from pattern constraint"
-                  | Some (_, underlying_typ, new_pat) ->
-                      let gloc = { default.pexp_loc with loc_ghost = true } in
-                      Ast_helper.Exp.constraint_ default (Some underlying_typ)
-                        ~loc:gloc [], new_pat
-                  )
+                  let _, underlying_typ, new_pat =
+                    extract_optional_tp_from_pattern_constraint_exn pat
+                  in
+                  let gloc = { default.pexp_loc with loc_ghost = true } in
+                  Ast_helper.Exp.constraint_ default (Some underlying_typ)
+                    ~loc:gloc [], new_pat
               | _ -> assert false
             in
             (* Defaults are always global. They can be moved out of the

@@ -640,15 +640,20 @@ let classify_optionality (lbl: Types.arg_label) = match lbl with
   | Generic_optional(path, _) -> Optional_arg (classify_module_path path)
   | Labelled _ | Position _ | Nolabel -> Required_or_position_arg
 
-let extract_optional_tp_from_pattern_constraint pat = match pat with
+let extract_optional_tp_from_pattern_constraint_exn pat = match pat with
   | {Parsetree.ppat_desc = Ppat_constraint (under_pat, ty, modes); _} ->
     (match ty with
+    (* CR generic-optional:  convert the identifier into a proper path to
+       handle code like type 'a option = 'a not_option *)
     | Some {ptyp_desc = Ptyp_constr ({ txt = Lident ident_name}, [arg]); _} ->
-        Some (ident_name, arg,
+        (ident_name, arg,
         {pat with
           Parsetree.ppat_desc = Ppat_constraint (under_pat, Some arg, modes)})
-    | _ -> None)
-  | _ -> None
+    (* CR generic-optional: handle the case for type int_option = int option *)
+    | Some _  -> failwith "Expected optional type"
+    | None  -> failwith "Missing type annotation"
+    )
+  | _ -> failwith "Missing type annotation"
 
 let classify_optionality_parsetree (lbl : Parsetree.arg_label)
   (pat : Parsetree.pattern) =
@@ -656,12 +661,10 @@ let classify_optionality_parsetree (lbl : Parsetree.arg_label)
   | Optional _ -> Optional_arg Stdlib_option
   | Labelled _ | Nolabel -> Required_or_position_arg
   | Generic_optional(_) ->
-    match extract_optional_tp_from_pattern_constraint pat with
-    | Some ("option", _, _) -> Optional_arg Stdlib_option
-    | Some ("or_null", _, _) -> Optional_arg Stdlib_or_null
-    | Some (name, _, _) ->
-        failwith ("Unrecognized generic optional type: " ^ name)
-    | None  -> failwith "Missing type annotation"
+    match extract_optional_tp_from_pattern_constraint_exn pat with
+    | "option", _, _ -> Optional_arg Stdlib_option
+    | "or_null", _, _ -> Optional_arg Stdlib_or_null
+    | name, _, _ -> failwith ("Unrecognized generic optional type: " ^ name)
 
 let get_optional_module_path_exn lbl =
   match classify_optionality lbl with
