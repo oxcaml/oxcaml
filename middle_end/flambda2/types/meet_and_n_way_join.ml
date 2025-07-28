@@ -41,7 +41,7 @@ let map_return_value f (x : _ meet_return_value) =
 
 type 'a meet_result =
   | Bottom of unit meet_return_value
-  | Ok of 'a meet_return_value * TE.t
+  | Ok of 'a meet_return_value * ME.t
 
 type 'a n_way_join_result = 'a Or_unknown.t * Join_env.t
 
@@ -128,7 +128,7 @@ type ('key, 'data, 'mapping) fold2 =
   }
 
 let meet_mapping (type key data mapping)
-    ~(meet_data : TE.t -> data -> data -> data meet_result)
+    ~(meet_data : ME.t -> data -> data -> data meet_result)
     ~(fold2 : (key, data, mapping) fold2) ~env ~(left : mapping)
     ~(right : mapping) ~(rebuild : (key * data) list -> mapping) :
     mapping meet_result =
@@ -138,7 +138,7 @@ let meet_mapping (type key data mapping)
       { all_left : bool;
         all_right : bool;
         mapping : (key * data) list;
-        env : TE.t
+        env : ME.t
       }
 
     exception Bottom_result
@@ -189,7 +189,7 @@ let meet_mapping (type key data mapping)
   with Bottom_result -> Bottom (New_result ())
 
 module Map_meet (M : Container_types_intf.Map) = struct
-  let meet ~(meet_data : TE.t -> 'a -> 'a -> 'a meet_result) env (left : 'a M.t)
+  let meet ~(meet_data : ME.t -> 'a -> 'a -> 'a meet_result) env (left : 'a M.t)
       (right : 'a M.t) : 'a M.t meet_result =
     let fold2 f m1 m2 init =
       let r = ref init in
@@ -215,7 +215,7 @@ module Value_slot_map_meet = Map_meet (Value_slot.Map)
 module Combine_results_meet_ops = struct
   type _ t =
     | [] : unit t
-    | ( :: ) : ((TE.t -> 'a -> 'a -> 'a meet_result) * 'b t) -> ('a * 'b) t
+    | ( :: ) : ((ME.t -> 'a -> 'a -> 'a meet_result) * 'b t) -> ('a * 'b) t
 end
 
 module Combine_results_inputs = struct
@@ -241,7 +241,7 @@ let combine_results env ~(meet_ops : 'a Combine_results_meet_ops.t)
     'b meet_result =
   let rec do_meets :
       type a.
-      TE.t ->
+      ME.t ->
       a Combine_results_meet_ops.t ->
       a Combine_results_inputs.t ->
       a Combine_results_inputs.t ->
@@ -295,13 +295,18 @@ let add_defined_vars env level =
 
 let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     initial_env val_a1 val_b1 extensions1 val_a2 val_b2 extensions2 =
-  let join_scope = TE.current_scope initial_env in
-  let env = TE.increment_scope initial_env in
+  let initial_tenv = ME.typing_env initial_env in
+  let join_scope = TE.current_scope initial_tenv in
+  let env = ME.map_typing_env initial_env ~f:TE.increment_scope in
   let direct_return r =
     map_env r ~f:(fun scoped_env ->
         (* Need to cut as a level because we could have added new variables. *)
-        let level = TE.cut scoped_env ~cut_after:join_scope in
-        let initial_env = add_defined_vars initial_env level in
+        let scoped_tenv = ME.typing_env scoped_env in
+        let level = TE.cut scoped_tenv ~cut_after:join_scope in
+        let initial_env =
+          ME.map_typing_env initial_env ~f:(fun initial_tenv ->
+              add_defined_vars initial_tenv level)
+        in
         let ext = TEE.from_map (TEL.equations level) in
         ME.add_env_extension_strict initial_env ext ~meet_type)
   in
@@ -358,16 +363,23 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
       (* Not strict, as we don't expect to be able to get bottom equations from
          joining non-bottom ones *)
       Join_env.cut_and_n_way_join ~meet_type ~n_way_join_type:n_way_join
-        ~cut_after:join_scope initial_env [env_a; env_b]
+        ~cut_after:join_scope initial_env
+        [ME.typing_env env_a; ME.typing_env env_b]
     in
-    let when_a_level = TE.cut env_a ~cut_after:join_scope in
-    let when_b_level = TE.cut env_b ~cut_after:join_scope in
+    let when_a_level = TE.cut (ME.typing_env env_a) ~cut_after:join_scope in
+    let when_b_level = TE.cut (ME.typing_env env_b) ~cut_after:join_scope in
     (* New variables introduced by either [meet_a] or [meet_b] are not
        guaranteed to end up in the [result_env] (in fact, they will probably get
        renamed), but they can still appear in [a_result] and [b_result], so we
        need to add them back. *)
-    let result_env = add_defined_vars result_env when_a_level in
-    let result_env = add_defined_vars result_env when_b_level in
+    let result_env =
+      ME.map_typing_env result_env ~f:(fun result_env ->
+          add_defined_vars result_env when_a_level)
+    in
+    let result_env =
+      ME.map_typing_env result_env ~f:(fun result_env ->
+          add_defined_vars result_env when_b_level)
+    in
     let extensions =
       if TEL.is_empty when_a_level && TEL.is_empty when_b_level
       then
@@ -403,14 +415,15 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     in
     Ok (result, result_env)
 
-let meet_code_id (env : TE.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
+let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
     Code_id.t meet_result =
   if Code_id.equal code_id1 code_id2
   then Ok (Both_inputs, env)
   else
     match
-      Code_age_relation.meet (TE.code_age_relation env)
-        ~resolver:(TE.code_age_relation_resolver env)
+      Code_age_relation.meet
+        (TE.code_age_relation (ME.typing_env env))
+        ~resolver:(TE.code_age_relation_resolver (ME.typing_env env))
         code_id1 code_id2
     with
     | Bottom -> Bottom (New_result ())
@@ -420,15 +433,6 @@ let meet_code_id (env : TE.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
       else if Code_id.equal code_id code_id2
       then Ok (Right_input, env)
       else Ok (New_result code_id, env)
-
-type meet_keep_side =
-  | Left
-  | Right
-
-(* type meet_expanded_head_result =
- *   | Left_head_unchanged
- *   | Right_head_unchanged
- *   | New_head of ET.t * TEE.t *)
 
 let meet_alloc_mode env (alloc_mode1 : Alloc_mode.For_types.t)
     (alloc_mode2 : Alloc_mode.For_types.t) : Alloc_mode.For_types.t meet_result
@@ -627,6 +631,104 @@ let join_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
     then Ok element_kind1
     else Unknown
 
+let reduce_head_of_kind_naked_immediate env head : _ Or_bottom.t =
+  let descr = TG.Head_of_kind_naked_immediate.descr head in
+  let changed = ref false in
+  let exception Bottom_result in
+  match
+    TG.Relation.Map.fold
+      (fun relation names (imms, inverse_relations) ->
+        let imms, names' =
+          Name.Set.fold
+            (fun name (imms, names) ->
+              Simple.pattern_match
+                (TE.get_canonical_simple_ignoring_name_mode env
+                   (Simple.name name))
+                ~const:(fun const : (_ Or_unknown.t * Name.Set.t) ->
+                  match TG.Relation.of_const relation const with
+                  | Bottom ->
+                    (* CR bclement: we need to ignore [Bottom] here because
+                       unboxing can create inverse relations that wouldn't be
+                       valid e.g. for [get_tag] of something that we don't know
+                       is a block. *)
+                    changed := true;
+                    imms, names
+                  | Ok imm -> (
+                    let imms' = Targetint_31_63.Set.singleton imm in
+                    match (imms : _ Or_unknown.t) with
+                    | Known imms ->
+                      if Targetint_31_63.Set.equal imms' imms
+                      then Known imms, names
+                      else (
+                        if not (Targetint_31_63.Set.mem imm imms)
+                        then raise Bottom_result;
+                        changed := true;
+                        Known imms', names)
+                    | Unknown ->
+                      changed := true;
+                      Known imms', names))
+                ~name:(fun name' ~coercion:_ ->
+                  if name' != name then changed := true;
+                  imms, Name.Set.add name' names))
+            names (imms, Name.Set.empty)
+        in
+        imms, TG.Relation.Map.add relation names' inverse_relations)
+      descr.inverse_relations
+      (descr.naked_immediates, TG.Relation.Map.empty)
+  with
+  | exception Bottom_result -> Bottom
+  | naked_immediates, inverse_relations ->
+    if not !changed
+    then Ok head
+    else
+      TG.Head_of_kind_naked_immediate.from_descr
+        { naked_immediates; inverse_relations }
+
+type 'a reverse_mapping_meet_return_value =
+  { left_inputs : 'a;
+    any_input : 'a meet_return_value;
+    right_inputs : 'a
+  }
+
+let meet_inverse_relations inverse_relations1 inverse_relations2 =
+  if inverse_relations1 == inverse_relations2
+  then
+    { left_inputs = TG.Relation.Map.empty;
+      any_input = Both_inputs;
+      right_inputs = TG.Relation.Map.empty
+    }
+  else
+    let left_inputs = ref TG.Relation.Map.empty in
+    let right_inputs = ref TG.Relation.Map.empty in
+    let inverse_relations =
+      TG.Relation.Map.merge
+        (fun relation names1 names2 ->
+          let names1 = Option.value ~default:Name.Set.empty names1 in
+          let names2 = Option.value ~default:Name.Set.empty names2 in
+          let left_input = Name.Set.diff names1 names2 in
+          let right_input = Name.Set.diff names2 names1 in
+          if not (Name.Set.is_empty left_input)
+          then
+            left_inputs := TG.Relation.Map.add relation left_input !left_inputs;
+          if not (Name.Set.is_empty right_input)
+          then
+            right_inputs
+              := TG.Relation.Map.add relation right_input !right_inputs;
+          Some (Name.Set.union names1 names2))
+        inverse_relations1 inverse_relations2
+    in
+    let any_input =
+      match
+        ( TG.Relation.Map.is_empty !left_inputs,
+          TG.Relation.Map.is_empty !right_inputs )
+      with
+      | true, true -> Both_inputs
+      | true, false -> Left_input
+      | false, true -> Right_input
+      | false, false -> New_result inverse_relations
+    in
+    { left_inputs = !left_inputs; any_input; right_inputs = !right_inputs }
+
 let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   (* Kind mismatches should have been caught (either turned into Invalid or a
      fatal error) before we get here. *)
@@ -637,7 +739,7 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   let kind = TG.kind t1 in
   let simple1 =
     match
-      TE.get_alias_then_canonical_simple_exn env t1
+      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t1
         ~min_name_mode:Name_mode.in_types
     with
     | exception Not_found -> None
@@ -645,7 +747,7 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   in
   let simple2 =
     match
-      TE.get_alias_then_canonical_simple_exn env t2
+      TE.get_alias_then_canonical_simple_exn (ME.typing_env env) t2
         ~min_name_mode:Name_mode.in_types
     with
     | exception Not_found -> None
@@ -654,13 +756,13 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
   match simple1 with
   | None -> (
     let expanded1 =
-      Expand_head.expand_head0 env t1
+      Expand_head.expand_head0 (ME.typing_env env) t1
         ~known_canonical_simple_at_in_types_mode:simple1
     in
     match simple2 with
     | None ->
       let expanded2 =
-        Expand_head.expand_head0 env t2
+        Expand_head.expand_head0 (ME.typing_env env) t2
           ~known_canonical_simple_at_in_types_mode:simple2
       in
       map_result ~f:ET.to_type (meet_expanded_head env expanded1 expanded2)
@@ -681,7 +783,7 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
     match simple2 with
     | None -> (
       let expanded2 =
-        Expand_head.expand_head0 env t2
+        Expand_head.expand_head0 (ME.typing_env env) t2
           ~known_canonical_simple_at_in_types_mode:simple2
       in
       (* We always return [Left_input] (see comment above) *)
@@ -728,8 +830,8 @@ let rec meet env (t1 : TG.t) (t2 : TG.t) : TG.t meet_result =
 
 and meet_or_unknown_or_bottom :
     type a b.
-    (TE.t -> a -> a -> b meet_result) ->
-    TE.t ->
+    (ME.t -> a -> a -> b meet_result) ->
+    ME.t ->
     a Or_unknown_or_bottom.t ->
     a Or_unknown_or_bottom.t ->
     b meet_result =
@@ -1157,100 +1259,122 @@ and meet_variant env ~(get_tag1 : Variable.t option)
        env imms1 (get_tag1, blocks1) extensions1 imms2 (get_tag2, blocks2)
        extensions2)
 
+and reduce_inverse_relations env naked_immediates inverse_relations :
+    _ Or_bottom.t =
+  let module I = Targetint_31_63 in
+  match (naked_immediates : _ Or_unknown.t) with
+  | Unknown -> Ok env
+  | Known imms -> (
+    let exception Bottom_result in
+    match
+      TG.Relation.Map.fold
+        (fun relation names env ->
+          Name.Set.fold
+            (fun name env ->
+              let add_equation ty =
+                match add_equation (Simple.name name) ty env ~meet_type with
+                | Ok (_, env) -> env
+                | Bottom _ -> raise Bottom_result
+              in
+              match TG.Relation.descr relation with
+              | Is_null -> (
+                match I.Set.mem I.zero imms, I.Set.mem I.one imms with
+                | false, false -> raise Bottom_result
+                | true, true -> env
+                | true, false -> add_equation TG.any_non_null_value
+                | false, true -> add_equation TG.null)
+              | Is_int -> (
+                match I.Set.mem I.zero imms, I.Set.mem I.one imms with
+                | false, false -> raise Bottom_result
+                | true, true -> env
+                | true, false -> add_equation MTC.any_block
+                | false, true -> add_equation MTC.any_tagged_immediate)
+              | Get_tag -> (
+                let tags =
+                  I.Set.fold
+                    (fun tag tags ->
+                      match Tag.create_from_targetint tag with
+                      | Some tag -> Tag.Set.add tag tags
+                      | None -> tags (* No blocks exist with this tag *))
+                    imms Tag.Set.empty
+                in
+                match
+                  MTC.blocks_with_these_tags tags
+                    (Alloc_mode.For_types.unknown ())
+                with
+                | Known shape -> add_equation shape
+                | Unknown -> env))
+            names env)
+        inverse_relations env
+    with
+    | exception Bottom_result -> Bottom
+    | env -> Ok env)
+
 and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) :
     TG.head_of_kind_naked_immediate meet_result =
   let module I = Targetint_31_63 in
-  let keep_side side : _ meet_result =
-    match side with
-    | Left -> Ok (Left_input, env)
-    | Right -> Ok (Right_input, env)
-  in
-  let bottom_other_side side : _ meet_result =
-    match side with Left -> Bottom Right_input | Right -> Bottom Left_input
-  in
-  let meet_with_shape ~rebuild ty shape side =
-    map_result ~f:rebuild
-      (match side with Left -> meet env ty shape | Right -> meet env shape ty)
-  in
-  let is_int_immediate ~is_int_ty ~immediates ~is_int_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side is_int_side
-    else
-      let rebuild = TG.Head_of_kind_naked_immediate.create_is_int in
-      match I.Set.mem I.zero immediates, I.Set.mem I.one immediates with
-      | false, false -> Bottom (New_result ())
-      | true, true -> keep_side is_int_side
-      | true, false ->
-        meet_with_shape ~rebuild is_int_ty MTC.any_block is_int_side
-      | false, true ->
-        meet_with_shape ~rebuild is_int_ty MTC.any_tagged_immediate is_int_side
-  in
-  let is_null_immediate ~is_null_ty ~immediates ~is_null_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side is_null_side
-    else
-      let rebuild = TG.Head_of_kind_naked_immediate.create_is_null in
-      match I.Set.mem I.zero immediates, I.Set.mem I.one immediates with
-      | false, false -> Bottom (New_result ())
-      | true, true -> keep_side is_null_side
-      | true, false ->
-        meet_with_shape ~rebuild is_null_ty TG.any_non_null_value is_null_side
-      | false, true -> meet_with_shape ~rebuild is_null_ty TG.null is_null_side
-  in
-  let get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side get_tag_side
-    else
-      let tags =
-        I.Set.fold
-          (fun tag tags ->
-            match Tag.create_from_targetint tag with
-            | Some tag -> Tag.Set.add tag tags
-            | None -> tags (* No blocks exist with this tag *))
-          immediates Tag.Set.empty
+  match
+    ( reduce_head_of_kind_naked_immediate env t1,
+      reduce_head_of_kind_naked_immediate env t2 )
+  with
+  | Bottom, Bottom -> Bottom Both_inputs
+  | Bottom, Ok _ -> Bottom Left_input
+  | Ok _, Bottom -> Bottom Right_input
+  | Ok t1, Ok t2 -> (
+    let descr1 = TG.Head_of_kind_naked_immediate.descr t1 in
+    let descr2 = TG.Head_of_kind_naked_immediate.descr t2 in
+    let naked_immediates =
+      meet_unknown
+        (set_meet (module I.Set) ~of_set:Fun.id)
+        ~contents_is_bottom:I.Set.is_empty env descr1.naked_immediates
+        descr2.naked_immediates
+    in
+    match naked_immediates with
+    | Bottom r -> Bottom r
+    | Ok (naked_immediates, env) -> (
+      let inverse_relations =
+        meet_inverse_relations descr1.inverse_relations descr2.inverse_relations
       in
-      if Tag.Set.is_empty tags
-      then Bottom (New_result ())
-      else
-        match
-          MTC.blocks_with_these_tags tags (Alloc_mode.For_types.unknown ())
-        with
-        | Known shape ->
-          meet_with_shape
-            ~rebuild:TG.Head_of_kind_naked_immediate.create_get_tag get_tag_ty
-            shape get_tag_side
-        | Unknown -> keep_side get_tag_side
-  in
-  match t1, t2 with
-  | Naked_immediates is1, Naked_immediates is2 ->
-    map_result
-      ~f:TG.Head_of_kind_naked_immediate.create_naked_immediates_non_empty
-      (set_meet (module I.Set) env is1 is2 ~of_set:Fun.id)
-  | Is_int is_int_ty, Naked_immediates immediates ->
-    is_int_immediate ~is_int_ty ~immediates ~is_int_side:Left
-  | Naked_immediates immediates, Is_int is_int_ty ->
-    is_int_immediate ~is_int_ty ~immediates ~is_int_side:Right
-  | Get_tag get_tag_ty, Naked_immediates immediates ->
-    get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side:Left
-  | Naked_immediates immediates, Get_tag get_tag_ty ->
-    get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side:Right
-  | Is_null is_null_ty, Naked_immediates immediates ->
-    is_null_immediate ~is_null_ty ~immediates ~is_null_side:Left
-  | Naked_immediates immediates, Is_null is_null_ty ->
-    is_null_immediate ~is_null_ty ~immediates ~is_null_side:Right
-  | (Is_int _ | Get_tag _ | Is_null _), (Is_int _ | Get_tag _ | Is_null _) ->
-    (* CR mshinwell: introduce improved handling for
-     *   Is_int meet Is_int
-     *   Get_tag meet Get_tag
-     * i.e. a better fix for PR1515, at which point we might also be able
-     * to consider improving:
-     *   Is_int meet Get_tag
-     * and vice-versa. *)
-    (* We can't return Bottom, as it would be unsound, so we need to either do
-       the actual meet with Naked_immediates, or just give up and return one of
-       the arguments. *)
-    Ok (Left_input, env)
+      let head =
+        combine_meet_return_values naked_immediates inverse_relations.any_input
+          (fun () ->
+            let naked_immediates =
+              extract_value naked_immediates descr1.naked_immediates
+                descr2.naked_immediates
+            in
+            let inverse_relations =
+              extract_value inverse_relations.any_input descr1.inverse_relations
+                descr2.inverse_relations
+            in
+            TG.Head_of_kind_naked_immediate.from_descr_non_empty
+              { naked_immediates; inverse_relations })
+      in
+      let[@local] head_in_env_or_bottom (env_ob : _ Or_bottom.t) =
+        match env_ob with
+        | Bottom -> Bottom (New_result ())
+        | Ok env -> Ok (head, env)
+      in
+      (* Only perform reverse reductions for relations that were not already
+         known in the corresponding side, e.g. if we meet [(Naked_immediate (0 1
+         2) (%get_tag x)] and [(Naked_immediate T (%get_tag y))] we only update
+         the tag of [y], but not of [x] (which we assume to already have been
+         reduced). *)
+      match naked_immediates with
+      | Both_inputs -> Ok (head, env)
+      | Left_input ->
+        head_in_env_or_bottom
+          (reduce_inverse_relations env descr1.naked_immediates
+             inverse_relations.right_inputs)
+      | Right_input ->
+        head_in_env_or_bottom
+          (reduce_inverse_relations env descr2.naked_immediates
+             inverse_relations.left_inputs)
+      | New_result naked_immediates ->
+        head_in_env_or_bottom
+          (reduce_inverse_relations env naked_immediates
+             (extract_value inverse_relations.any_input descr1.inverse_relations
+                descr2.inverse_relations))))
 
 and meet_head_of_kind_naked_float32 env t1 t2 =
   set_meet
@@ -1352,7 +1476,7 @@ and meet_head_of_kind_region env () () : _ meet_result = Ok (Both_inputs, env)
 
 and meet_row_like :
       'lattice 'shape 'maps_to 'row_tag 'known.
-      meet_maps_to:(TE.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
+      meet_maps_to:(ME.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
       equal_index:('lattice -> 'lattice -> bool) ->
       subset_index:('lattice -> 'lattice -> bool) ->
       union_index:('lattice -> 'lattice -> 'lattice) ->
@@ -1369,7 +1493,7 @@ and meet_row_like :
         'known ->
         'known ->
         'known) ->
-      TE.t ->
+      ME.t ->
       known1:'known ->
       known2:'known ->
       other1:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
@@ -1379,11 +1503,12 @@ and meet_row_like :
  fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
      ~is_empty_map_known ~get_singleton_map_known ~merge_map_known initial_env
      ~known1 ~known2 ~other1 ~other2 ->
-  let common_scope = TE.current_scope initial_env in
+  let initial_tenv = ME.typing_env initial_env in
+  let common_scope = TE.current_scope initial_tenv in
   (* Keep track of the variables used by all extensions and lift them to the
      result env in [extract_and_join_extensions]. *)
   let extra_variables = ref Variable.Map.empty in
-  let base_env = TE.increment_scope initial_env in
+  let base_env = ME.map_typing_env initial_env ~f:TE.increment_scope in
   let add_extra_variables_and_extract_extension scoped_env =
     let level = TE.cut scoped_env ~cut_after:common_scope in
     extra_variables
@@ -1405,17 +1530,17 @@ and meet_row_like :
       Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join ~meet_type
         ~cut_after:common_scope initial_env scoped_envs
     in
-    Variable.Map.fold
-      (fun var kind env ->
-        TE.add_definition env
-          (Bound_name.create_var
-             (Bound_var.create var Flambda_debug_uid.none
-                (* Variables with [Name_mode.in_types] do not exist at runtime,
-                   so we do not equip them with a [Flambda_debug_uid.t]. See
-                   #3967. *)
-                Name_mode.in_types))
-          kind)
-      !extra_variables result_env
+    ME.map_typing_env result_env ~f:(fun result_env ->
+        Variable.Map.fold
+          (fun var kind env ->
+            TE.add_definition env
+              (Bound_name.create_var
+                 (* Variables with [Name_mode.in_types] do not exist at runtime,
+                    so we do not equip them with a [Flambda_debug_uid.t]. See
+                    #3967. *)
+                 (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
+              kind)
+          !extra_variables result_env)
   in
   let open struct
     type result_env =
@@ -1533,7 +1658,7 @@ and meet_row_like :
         match env with
         | Bottom -> bottom_case (New_result ())
         | Ok env ->
-          join_result_env env;
+          join_result_env (ME.typing_env env);
           update_refs index_result;
           update_refs maps_to_result;
           let index = extract_value index_result case1.index case2.index in
@@ -1542,7 +1667,7 @@ and meet_row_like :
           in
           let env_extension =
             if need_join
-            then add_extra_variables_and_extract_extension env
+            then add_extra_variables_and_extract_extension (ME.typing_env env)
             else TEE.empty
           in
           if TEE.is_empty env_extension
@@ -1584,7 +1709,7 @@ and meet_row_like :
           with
           | Bottom -> None
           | Ok env ->
-            join_result_env env;
+            join_result_env (ME.typing_env env);
             result_is_t1 := false;
             result_is_t2 := false;
             Some (Known other_case))
@@ -1603,7 +1728,7 @@ and meet_row_like :
           with
           | Bottom -> None
           | Ok env ->
-            join_result_env env;
+            join_result_env (ME.typing_env env);
             result_is_t1 := false;
             result_is_t2 := false;
             Some (Known other_case))
@@ -1611,7 +1736,7 @@ and meet_row_like :
     | Some case1, Some case2 -> (
       match case1, case2 with
       | Unknown, Unknown ->
-        join_result_env base_env;
+        join_result_env (ME.typing_env base_env);
         Some Unknown
       | Known case, Unknown -> (
         match
@@ -1619,7 +1744,7 @@ and meet_row_like :
         with
         | Bottom -> None
         | Ok env ->
-          join_result_env env;
+          join_result_env (ME.typing_env env);
           result_is_t2 := false;
           Some (Known case))
       | Unknown, Known case -> (
@@ -1628,7 +1753,7 @@ and meet_row_like :
         with
         | Bottom -> None
         | Ok env ->
-          join_result_env env;
+          join_result_env (ME.typing_env env);
           result_is_t1 := false;
           Some (Known case))
       | Known case1, Known case2 -> meet_case base_env case1 case2)
@@ -1663,7 +1788,7 @@ and meet_row_like :
       | Extension scoped_envs ->
         (* We used add_env_extension_strict here before, but we don't expect to
            get bottom equations from joining non-bottom ones. *)
-        Or_bottom.Ok (extract_and_join_extensions scoped_envs)
+        Ok (extract_and_join_extensions scoped_envs)
     in
     let match_with_input v =
       match !result_is_t1, !result_is_t2 with
@@ -1730,7 +1855,7 @@ and meet_row_like_for_closures env
        ~get_singleton_map_known:Function_slot.Map.get_singleton ~merge_map_known
        env ~known1 ~known2 ~other1 ~other2)
 
-and meet_closures_entry (env : TE.t)
+and meet_closures_entry (env : ME.t)
     ({ function_types = function_types1;
        closure_types = closure_types1;
        value_slot_types = value_slot_types1
@@ -1800,7 +1925,7 @@ and meet_array_of_types env fields1 fields2 ~length =
   let fold2 = { fold2 } in
   meet_mapping ~meet_data:meet ~fold2 ~env ~left:fields1 ~right:fields2 ~rebuild
 
-and meet_function_type (env : TE.t)
+and meet_function_type (env : ME.t)
     (func_type1 : TG.Function_type.t Or_unknown_or_bottom.t)
     (func_type2 : TG.Function_type.t Or_unknown_or_bottom.t) :
     TG.Function_type.t Or_unknown_or_bottom.t meet_result =
@@ -1821,7 +1946,7 @@ and meet_function_type (env : TE.t)
       ~right_a:code_id2 ~meet_b:meet ~left_b:rec_info1 ~right_b:rec_info2
 
 and meet_type env t1 t2 : _ Or_bottom.t =
-  if TE.is_bottom env
+  if TE.is_bottom (ME.typing_env env)
   then Bottom
   else
     match meet env t1 t2 with
@@ -2481,51 +2606,46 @@ and n_way_join_head_of_kind_naked_immediate env
     (heads : TG.Head_of_kind_naked_immediate.t Join_env.join_arg list) :
     TG.Head_of_kind_naked_immediate.t n_way_join_result =
   let module I = Targetint_31_63 in
-  let immediates, is_int, get_tag, is_null =
+  let immediates, _relations (* TODO *) =
     List.fold_left
-      (fun (immediates, is_int, get_tag, is_null) (id2, head2) ->
-        match (head2 : TG.head_of_kind_naked_immediate) with
-        | Is_int ty -> immediates, (id2, ty) :: is_int, get_tag, is_null
-        | Get_tag ty -> immediates, is_int, (id2, ty) :: get_tag, is_null
-        | Is_null ty -> immediates, is_int, get_tag, (id2, ty) :: is_null
-        | Naked_immediates is ->
-          I.Set.union is immediates, is_int, get_tag, is_null)
-      (I.Set.empty, [], [], []) heads
+      (fun ((immediates : _ Or_unknown.t), relations) (id2, head2) ->
+        match
+          reduce_head_of_kind_naked_immediate
+            (Join_env.joined_env env id2)
+            head2
+        with
+        | Bottom -> immediates, relations
+        | Ok head2 ->
+          let descr2 = TG.Head_of_kind_naked_immediate.descr head2 in
+          let immediates : _ Or_unknown.t =
+            match immediates, descr2.naked_immediates with
+            | Unknown, _ | _, Unknown -> Unknown
+            | Known imms, Known imms2 -> Known (I.Set.union imms imms2)
+          in
+          let relations =
+            (* CR bclement: The inverse relations should be rebuilt from the
+               direct relations during join. *)
+            TG.Relation.Map.update_many
+              (fun _relation names names2 ->
+                match Name.Set.get_singleton names2 with
+                | None -> Some Or_unknown.Unknown
+                | Some name2 -> (
+                  match (names : _ Or_unknown.t option) with
+                  | None -> Some (Or_unknown.Known [id2, name2])
+                  | Some Unknown -> Some Or_unknown.Unknown
+                  | Some (Known names) ->
+                    Some (Or_unknown.Known ((id2, name2) :: names))))
+              relations descr2.inverse_relations
+          in
+          immediates, relations)
+      (Or_unknown.Known I.Set.empty, TG.Relation.Map.empty)
+      heads
   in
-  match is_int, get_tag, is_null with
-  | [], [], [] -> (
-    let head =
-      TG.Head_of_kind_naked_immediate.create_naked_immediates immediates
-    in
-    match head with
-    | Ok head -> Known head, env
-    | Bottom ->
-      Misc.fatal_error "Did not expect [Bottom] from [create_naked_immediates]")
-  | _ :: _, [], [] when I.Set.is_empty immediates ->
-    let>>+ ty = n_way_join env is_int in
-    TG.Head_of_kind_naked_immediate.create_is_int ty
-  | [], _ :: _, [] when I.Set.is_empty immediates ->
-    let>>+ ty = n_way_join env get_tag in
-    TG.Head_of_kind_naked_immediate.create_get_tag ty
-  | [], [], _ :: _ when I.Set.is_empty immediates ->
-    let>>+ ty = n_way_join env is_null in
-    TG.Head_of_kind_naked_immediate.create_is_null ty
-  (* From now on: Irregular cases *)
-  (* CR vlaviron: There could be improvements based on reduction (trying to
-     reduce the is_int and get_tag cases to naked_immediate sets, then joining
-     those) but this looks unlikely to be useful and could end up begin quite
-     expensive. *)
-  | _, _ :: _, _ -> Unknown, env
-  | _ :: _, [], _ | _, [], _ :: _ -> (
-    (* Slightly better than Unknown *)
-    let head =
-      TG.Head_of_kind_naked_immediate.create_naked_immediates
-        (I.Set.add I.zero (I.Set.add I.one immediates))
-    in
-    match head with
-    | Ok head -> Known head, env
-    | Bottom ->
-      Misc.fatal_error "Did not expect [Bottom] from [create_naked_immediates]")
+  let head =
+    Or_unknown.map immediates
+      ~f:TG.Head_of_kind_naked_immediate.create_naked_immediates_non_empty
+  in
+  head, env
 
 and n_way_join_head_of_kind_naked_float32 env t1 ts : _ n_way_join_result =
   n_way_join_head_of_kind_naked_number
@@ -3040,8 +3160,9 @@ let meet env ty1 ty2 : _ Or_bottom.t =
   if TE.is_bottom env
   then Bottom
   else
-    match meet env ty1 ty2 with
+    match meet (ME.create env) ty1 ty2 with
     | Bottom _ -> Bottom
     | Ok (r, env) ->
+      let env = ME.typing_env env in
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
