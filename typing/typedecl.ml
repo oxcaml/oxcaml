@@ -124,6 +124,7 @@ type error =
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
+  | Bad_option_like_attribute of string
   | Boxed_and_unboxed
   | Nonrec_gadt
   | Invalid_private_row_declaration of type_expr
@@ -677,6 +678,53 @@ let verify_unboxed_attr unboxed_attr sdecl =
       end
   end
 
+let verify_option_like_attr sdecl =
+  let bad msg = raise(Error(sdecl.ptype_loc, Bad_option_like_attribute msg)) in
+  match sdecl.ptype_kind with
+  | Ptype_abstract    -> bad "it is abstract"
+  | Ptype_open        -> bad "extensible variant types cannot be option-like"
+  | Ptype_record _    -> bad "it is a record type"
+  | Ptype_record_unboxed_product _ -> bad "it is an unboxed record type"
+  | Ptype_variant constructors -> begin match constructors with
+      | [c1; c2] ->
+          (* Check that exactly one constructor has no arguments and one has
+             one argument *)
+          let check_arg_is_bound_type_param arg_type =
+            (* Check if the argument is a type variable from the parameters *)
+            let bad msg = raise(Error(arg_type.ptyp_loc,
+                                        Bad_option_like_attribute msg)) in
+            match arg_type.ptyp_desc with
+            | Ptyp_var (var_name, _) ->
+                (* Check if this variable is in the type parameters *)
+                (match List.exists (fun (param_type, _) ->
+                  match param_type.ptyp_desc with
+                  | Ptyp_var (param_name, _) -> param_name = var_name
+                  | _ -> false
+                ) sdecl.ptype_params with
+                | false ->
+                  bad "the constructor argument must be a type parameter"
+                | true -> ())
+            | _ -> bad
+                "the constructor argument must be a type parameter (e.g. 'a)"
+          in
+          begin match c1.pcd_args, c2.pcd_args with
+          | Pcstr_tuple [], Pcstr_tuple [arg]
+          | Pcstr_tuple [arg], Pcstr_tuple [] ->
+              check_arg_is_bound_type_param arg.pca_type
+          | Pcstr_tuple [], Pcstr_tuple (_::_::_)
+          | Pcstr_tuple (_::_::_), Pcstr_tuple [] ->
+              bad "the constructor with arguments has more than one argument"
+          | Pcstr_tuple _, Pcstr_tuple _ ->
+              bad "it should have exactly one constructor with no arguments\
+                    and one with one argument"
+          | Pcstr_record _, _ | _, Pcstr_record _ ->
+              bad "Inline records are not supported yet"
+          end
+      | [] -> bad "it has no constructors"
+      | [_] -> bad "it has only one constructor"
+      | _ -> bad "it has more than two constructors"
+    end
+
 (* Note [Default jkinds in transl_declaration]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    For every type declaration we create in transl_declaration, we must
@@ -815,6 +863,8 @@ let transl_declaration env sdecl (id, uid) =
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
   verify_unboxed_attr unboxed_attr sdecl;
+  if Builtin_attributes.has_option_like sdecl.ptype_attributes then
+    verify_option_like_attr sdecl;
   (* CR layouts v2.8: This next call to [transl_simple_type] probably can loop
      because it will do perhaps-circular jkind checks. But actually I think the
      same problem exists in e.g. record fields. We should probably look into this. *)
@@ -4636,6 +4686,9 @@ let report_error ppf = function
     end
   | Bad_unboxed_attribute msg ->
       fprintf ppf "@[This type cannot be unboxed because@ %s.@]" msg
+  | Bad_option_like_attribute msg ->
+      fprintf ppf "@[This type cannot be marked as option-like because@ %s.@]"
+        msg
   | Separability (Typedecl_separability.Non_separable_evar evar) ->
       let pp_evar ppf = function
         | None ->
