@@ -18,14 +18,31 @@ let get (r : 'a atomic) : 'a =
 let set (r : 'a atomic) v =
   r.x <- v
 
+(* check immediates too *)
+
+let get_imm (r : int atomic) : int =
+  r.x
+
+let set_imm (r : int atomic) v =
+  r.x <- v
+
 (* TEST
    arch_amd64;
    flambda;
    no-tsan;
    no-frame_pointers;
 
-   setup-ocamlopt.byte-build-env;
    flags = "-c -dcmm -dno-locations -dno-unique-ids";
-   ocamlopt.byte;
-   check-ocamlopt.byte-output;
+
+   {
+    setup-ocamlopt.byte-build-env;
+    ocamlopt.byte;
+    check-ocamlopt.byte-output;
+   }
+   {
+    setup-ocamlopt.byte-build-env;
+    flags += " -O3";
+    ocamlopt.byte;
+    check-ocamlopt.byte-output;
+   }
 *)
