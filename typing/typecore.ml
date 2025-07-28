@@ -300,15 +300,6 @@ type error =
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
-(* CR mixed-modules: move somewhere else *)
-(* let rec to_sort : Jkind.Sort.t Jkind.Layout.t -> Jkind.Sort.t option = function *)
-(*   | Any -> None *)
-(*   | Sort b -> Some b *)
-(*   | Product ts -> *)
-(*     Option.map *)
-(*       (fun x -> Jkind_types.Sort.Product x) *)
-(*       (Misc.Stdlib.List.map_option to_sort ts) *)
-
 let error_of_filter_arrow_failure ~explanation ~first ty_fun
   : filter_arrow_failure -> _ = function
   | Unification_error unif_err ->
