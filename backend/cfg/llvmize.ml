@@ -120,6 +120,14 @@ module Llvm_typ = struct
   let to_string t = Format.asprintf "%a" pp_t t
 end
 
+(* LLVM-level represetnation of a function signature. Used to collect and
+   declare called functions. *)
+type fun_sig =
+  { cc : bool;
+    args : Llvm_typ.t list;
+    res : Llvm_typ.t option
+  }
+
 type fun_info =
   { ident_gen : Ident.Gen.t;
     reg2ident : Ident.t Reg.Tbl.t;  (** Map register's stamp to identifier  *)
@@ -143,8 +151,7 @@ type t =
         (* Function symbols defined so far *)
     mutable referenced_symbols : String.Set.t;
         (* Global symbols referenced so far *)
-    mutable called_functions :
-      (Llvm_typ.t list * Llvm_typ.t option) String.Map.t
+    mutable called_functions : fun_sig String.Map.t
         (* Names + signatures (args, ret) of functions called so far *)
   }
 
@@ -199,6 +206,9 @@ let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
    passed *)
 let _get_ppf_dump t = t.ppf_dump
 
+let add_called_fun t name ~cc ~args ~res =
+  t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
+
 (* Runtime registers are passed explicitly as arguments to and returned from all
    OCaml functions. They have LLVM type ptr. *)
 let domainstate_ident = Ident.named "ds"
@@ -213,6 +223,8 @@ let make_ret_type ret_types =
 (*= let make_arg_types arg_types =
   let runtime_reg_types = List.map (fun _ -> Llvm_typ.ptr) runtime_regs in
   runtime_reg_types @ arg_types *)
+
+let calling_conv = "cc 104"
 
 module F = struct
   open Format
@@ -314,8 +326,8 @@ module F = struct
 
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
-    line t.ppf "define cc 104 %a @%s(%a) %a {" Llvm_typ.pp_t fun_ret_type
-      fun_name pp_fun_args fun_args pp_attrs fun_attrs;
+    line t.ppf "define %s %a @%s(%a) %a {" calling_conv Llvm_typ.pp_t
+      fun_ret_type fun_name pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}";
     line t.ppf ""
@@ -398,9 +410,10 @@ module F = struct
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
-  let ins_call ~pp_name t name args res =
+  let ins_call ?(cc = true) ~pp_name t name args res =
     let pp_call res_typ ppf () =
-      fprintf ppf "call cc 104 %s %a(%a)" res_typ pp_name name
+      let cc_str = match cc with false -> "" | true -> calling_conv in
+      fprintf ppf "call %s %s %a(%a)" cc_str res_typ pp_name name
         (pp_print_list ~pp_sep:pp_comma (fun ppf (arg, typ) ->
              fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_ident arg))
         args
@@ -527,8 +540,7 @@ module F = struct
     (* Do the call *)
     (match op with
     | Direct { sym_name; sym_global = _ } ->
-      t.called_functions
-        <- String.Map.add sym_name (arg_types, Some res_type) t.called_functions;
+      add_called_fun t sym_name ~cc:true ~args:arg_types ~res:(Some res_type);
       ins_call t ~pp_name:pp_global sym_name args res
     | Indirect ->
       let fun_temp = load_reg_to_temp t i.arg.(0) in
@@ -622,7 +634,8 @@ module F = struct
       ins_branch_cond t is_gt gt eq
     | Raise _ ->
       (* CR yusumez: Implement this *)
-      ins t "call void @llvm.trap()";
+      add_called_fun t "llvm.trap" ~cc:false ~args:[] ~res:None;
+      ins_call ~cc:false ~pp_name:pp_global t "llvm.trap" [] None;
       ins t "unreachable"
     | Float_test { width; lt; eq; gt; uo } ->
       let typ =
@@ -713,10 +726,13 @@ module F = struct
       | Iabsf ->
         let arg = load_reg_to_temp t i.arg.(0) in
         let res = fresh_ident t in
-        let suffix = match width with Float32 -> "f32" | Float64 -> "f64" in
-        (* CR yusumez: Do this properly when we have [ins_call] *)
-        ins t "%a = call %a @llvm.fabs.%s(%a %a)" pp_ident res Llvm_typ.pp_t typ
-          suffix Llvm_typ.pp_t typ pp_ident arg;
+        let fabs_name =
+          "llvm.fabs." ^ match width with Float32 -> "f32" | Float64 -> "f64"
+        in
+        add_called_fun t fabs_name ~cc:false ~args:[typ] ~res:(Some typ);
+        ins_call ~cc:false ~pp_name:pp_global t fabs_name
+          [arg, typ]
+          (Some (res, typ));
         res
       | Icompf comp ->
         let bool_res = float_comp t comp i typ in
@@ -855,11 +871,12 @@ module F = struct
     line t.ppf "define void %a() { ret void }" pp_global
       (Cmm_helpers.make_symbol sym)
 
-  let fun_decl t sym args ret =
-    let ret_str =
-      match ret with Some ret -> Llvm_typ.to_string ret | None -> "void"
+  let fun_decl t sym { cc; args; res } =
+    let res_str =
+      match res with Some res -> Llvm_typ.to_string res | None -> "void"
     in
-    line t.ppf "declare cc 104 %s %a(%a)" ret_str pp_global sym
+    let cc_str = match cc with true -> calling_conv | false -> "" in
+    line t.ppf "declare %s %s %a(%a)" cc_str res_str pp_global sym
       (pp_print_list ~pp_sep:pp_comma Llvm_typ.pp_t)
       args
 end
@@ -1086,9 +1103,9 @@ let emit_data t =
 
 let declare_functions t =
   String.Map.iter
-    (fun sym (args, res) ->
+    (fun sym fun_sig ->
       if not (String.Set.mem sym t.defined_symbols)
-      then F.fun_decl t sym args res)
+      then F.fun_decl t sym fun_sig)
     t.called_functions
 
 let remove_file filename =

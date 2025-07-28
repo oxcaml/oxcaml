@@ -59,9 +59,10 @@ let () =
        instructions *)
     (* CR yusumez: remove -disable-poll-insertion once we can emit poll
        insertions *)
+    (* CR yusumez: find a better way to detect LLVM_PATH *)
     let llvm_flags =
-      "-llvm-backend -llvm-path clang -keep-llvmir -dno-asm-comments \
-       -disable-poll-insertion"
+      "-llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir \
+       -dno-asm-comments -disable-poll-insertion"
     in
     let common_flags =
       "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"

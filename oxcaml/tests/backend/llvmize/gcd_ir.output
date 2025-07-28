@@ -166,7 +166,7 @@ L135:                                                ; preds = %L114
   store ptr @caml_exn_Division_by_zero, ptr %30
   %111 = load i64, ptr %30
   store i64 %111, ptr %3
-  call void @llvm.trap()
+  call  void @llvm.trap()
   unreachable
 L142:                                                ; preds = %L109
   store ptr @camlGcd_data, ptr %31
@@ -238,6 +238,7 @@ L154:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare  void @llvm.trap()
 @camlGcd__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlGcd = global { ptr, i64 } { ptr @camlGcd__gcd_1, i64 3063 }
 @camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_0_1_code, i64 108086391056891909 }

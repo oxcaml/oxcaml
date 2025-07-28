@@ -175,7 +175,7 @@ L121:                                                ; preds = %L1
   %7 = load double, ptr %4
   store double %7, ptr %5
   %8 = load double, ptr %5
-  %9 = call double @llvm.fabs.f64(double %8)
+  %9 = call  double @llvm.fabs.f64(double %8)
   store double %9, ptr %5
   %10 = load double, ptr %5
   store double %10, ptr %3
@@ -304,6 +304,7 @@ L140:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare  double @llvm.fabs.f64(double)
 @camlFloat_ops__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlFloat_ops = global { ptr, i64 } { ptr @camlFloat_ops__Pmakeblock253, i64 7936 }
 @camlFloat_ops__Pmakeblock253 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64 } { ptr @camlFloat_ops__add_7, ptr @camlFloat_ops__sub_8, ptr @camlFloat_ops__mul_9, ptr @camlFloat_ops__div_10, ptr @camlFloat_ops__neg_11, ptr @camlFloat_ops__abs_12, ptr @camlFloat_ops__compare_13, i64 4087 }
