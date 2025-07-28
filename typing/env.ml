@@ -780,6 +780,7 @@ and module_data =
     mda_components : module_components;
     mda_address : address_lazy;
     mda_mode : Mode.Value.l;
+    mda_shape: Shape.t;
     mda_block_sorts: Jkind.Sort.t array }
 
 and module_alias_locks = locks
@@ -2206,7 +2207,7 @@ let rec components_of_module_maker
             let addr =
               match decl.val_kind with
               | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
-              | _ -> next_address ()
+              | _ -> next_address (failwith "admitted")
             in
             let vda_shape = Shape.proj cm_shape (Shape.Item.value id) in
             let vda =
@@ -4258,10 +4259,10 @@ let lookup_module ?(use=true) ~loc lid env =
   lookup_module ~errors:true ~use ~loc lid env
 
 let lookup_value ?(use=true) ~loc lid env =
-  let p, bsorts, vd, mode, locks =
+  let p, bsorts, vd, (mode, locks) =
     lookup_value ~errors:true ~use ~loc lid env
   in
-  p, bsorts, vd, mode, locks
+  p, bsorts, vd, (mode, locks)
 
 let lookup_type ?(use=true) ~loc lid env =
   (* CR mixed-modules: should [bsorts] be returned?
@@ -4338,7 +4339,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
       | Val_mut _, _ -> assert false
       (* Unreachable because only [type_pat] creates mutable variables
          and it checks that they are simple identifiers. *)
-      | ((Val_reg | Val_prim _ | Val_self _ | Val_anc _), _) ->
+      | ((Val_reg _ | Val_prim _ | Val_self _ | Val_anc _), _) ->
           lookup_error loc env (Not_a_settable_variable name)
     end
   | Ok (_, _, _, Val_unbound Val_unbound_instance_variable) ->
