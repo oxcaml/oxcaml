@@ -22,7 +22,8 @@ type result = private
   { handler_env : Downwards_env.t;
     extra_params_and_args : Continuation_extra_params_and_args.t;
     is_single_inlinable_use : bool;
-    escapes : bool
+    escapes : bool;
+    analysis : Apply_cont_rewrite_id.t Join_analysis.t option
   }
 
 val compute_handler_env :
