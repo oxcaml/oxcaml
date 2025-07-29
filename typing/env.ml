@@ -2995,7 +2995,10 @@ let initial =
       (shape_of_path_opt ~namespace:Type env path)
   in
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
-    let shape = Type_shape.Type_decl_shape.of_type_declarations [type_ident, decl] (shape_of_path env) in
+    let shape =
+      Type_shape.Type_decl_shape.of_type_declarations
+        [type_ident, decl] (shape_of_path env)
+    in
     let shape = match shape with [shape] -> shape | _ -> assert false in
     Uid.Tbl.add Type_shape.all_type_decls decl.type_uid shape;
     (* CR sspies: Adding it to [all_type_decls] is not needed at this point. The

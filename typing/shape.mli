@@ -303,7 +303,7 @@ val equal : t -> t -> bool
 
 val equal_record_kind : record_kind -> record_kind -> bool
 
-val equal_complex_constructor : 
+val equal_complex_constructor :
   ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
 
 (* Smart constructors *)
@@ -328,8 +328,10 @@ val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> t -> t -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
 
-val variant : ?uid:Uid.t -> string list -> (t * Layout.t) complex_constructors -> t
-val variant_unboxed : ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
+val variant :
+  ?uid:Uid.t -> string list -> (t * Layout.t) complex_constructors -> t
+val variant_unboxed :
+  ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
 val record : ?uid:Uid.t -> record_kind -> (string * t * Layout.t) list -> t
 
 (* recursive binder, recursive occurrences should be leaves with the same uid *)

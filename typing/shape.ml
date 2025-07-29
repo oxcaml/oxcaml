@@ -562,8 +562,12 @@ let rec equal_desc d1 d2 =
     List.equal equal_poly_variant_constructor pvs1 pvs2
 
   | Variant c1, Variant c2 ->
-    List.equal equal_simple_constructor c1.simple_constructors c2.simple_constructors
-    && List.equal (equal_complex_constructor (fun (t1, l1) (t2, l2) -> equal t1 t2 && Layout.equal l1 l2)) c1.complex_constructors c2.complex_constructors
+    List.equal equal_simple_constructor c1.simple_constructors
+      c2.simple_constructors
+    && List.equal
+         (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
+           equal t1 t2 && Layout.equal l1 l2))
+         c1.complex_constructors c2.complex_constructors
   | Variant_unboxed c1, Variant_unboxed c2 ->
     String.equal c1.name c2.name
     && Option.equal String.equal c1.arg_name c2.arg_name
@@ -573,28 +577,117 @@ let rec equal_desc d1 d2 =
     equal_record_kind r1.kind r2.kind
     && List.equal equal_field r1.fields r2.fields
 
-  | Var _, (Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Abs _, (Var _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | App _, (Var _ | Abs _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Struct _, (Var _ | Abs _ | App _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Leaf, (Var _ | Abs _ | App _ | Struct _ | Proj _ | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Mu _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Rec_var _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Mutrec _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Proj _ | Comp_unit _ | Alias _ | Error _| Proj_decl _ | Rec_var _)
-  | Proj_decl _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Rec_var _)
-  | Proj _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Comp_unit _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Alias _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Error _| Mutrec _ | Proj_decl _)
-  | Error _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _| Mutrec _ | Proj_decl _)
-  | Variant _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Variant_unboxed _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Variant _ | Poly_variant _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Record _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Predef _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Arrow _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Poly_variant _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Tuple _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Unboxed_tuple _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
-  | Constr _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _ | Proj_decl _)
+  | Var _, (Abs _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _
+          | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+          | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _
+          | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _
+          | Proj_decl _)
+  | Abs _, (Var _ | App _ | Struct _ | Leaf  | Constr _ | Tuple _
+          | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+          | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _
+          | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _
+          | Proj_decl _)
+  | App _, (Var _ | Abs _ | Struct _ | Leaf  | Constr _ | Tuple _
+          | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+          | Variant _ | Variant_unboxed _ | Record _ | Mu _ | Rec_var _
+          | Proj _ | Comp_unit _ | Alias _ | Error _| Mutrec _
+          | Proj_decl _)
+  | Struct _, (Var _ | Abs _ | App _ | Leaf  | Constr _ | Tuple _
+            | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+            | Variant _ | Variant_unboxed _ | Record _ | Mu _
+            | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+            | Mutrec _ | Proj_decl _)
+  | Leaf, (Var _ | Abs _ | App _ | Struct _ | Proj _ | Constr _
+         | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+         | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
+         | Mu _ | Rec_var _ | Comp_unit _ | Alias _ | Error _
+         | Mutrec _ | Proj_decl _)
+  | Mu _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+         | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+         | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
+         | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+         | Mutrec _ | Proj_decl _)
+  | Rec_var _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+             | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+             | Poly_variant _ | Variant _ | Variant_unboxed _
+             | Record _ | Mu _ | Proj _ | Comp_unit _ | Alias _
+             | Error _| Mutrec _ | Proj_decl _)
+  | Mutrec _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+            | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+            | Poly_variant _ | Variant _ | Variant_unboxed _
+            | Record _ | Mu _ | Proj _ | Comp_unit _ | Alias _
+            | Error _| Proj_decl _ | Rec_var _)
+  | Proj_decl _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+               | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+               | Poly_variant _ | Variant _ | Variant_unboxed _
+               | Record _ | Mu _ | Proj _ | Comp_unit _ | Alias _
+               | Error _| Mutrec _ | Rec_var _)
+  | Proj _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+          | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+          | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
+          | Mu _ | Rec_var _ | Comp_unit _ | Alias _ | Error _
+          | Mutrec _ | Proj_decl _)
+  | Comp_unit _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+               | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+               | Poly_variant _ | Variant _ | Variant_unboxed _
+               | Record _ | Mu _ | Rec_var _ | Proj _ | Alias _
+               | Error _| Mutrec _ | Proj_decl _)
+  | Alias _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+           | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+           | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
+           | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Error _
+           | Mutrec _ | Proj_decl _)
+  | Error _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+           | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+           | Poly_variant _ | Variant _ | Variant_unboxed _ | Record _
+           | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _
+           | Mutrec _ | Proj_decl _)
+  | Variant _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+             | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+             | Poly_variant _ | Variant_unboxed _ | Record _ | Mu _
+             | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+             | Mutrec _ | Proj_decl _)
+  | Variant_unboxed _, (Var _ | Abs _ | App _ | Struct _ | Leaf
+                     | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _
+                     | Arrow _ | Variant _ | Poly_variant _ | Record _
+                     | Mu _ | Rec_var _ | Proj _ | Comp_unit _
+                     | Alias _ | Error _| Mutrec _ | Proj_decl _)
+  | Record _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+            | Tuple _ | Unboxed_tuple _ | Predef _ | Arrow _
+            | Poly_variant _ | Variant _ | Variant_unboxed _ | Mu _
+            | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+            | Mutrec _ | Proj_decl _)
+  | Predef _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+            | Tuple _ | Unboxed_tuple _ | Arrow _ | Poly_variant _
+            | Variant _ | Variant_unboxed _ | Record _ | Mu _
+            | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+            | Mutrec _ | Proj_decl _)
+  | Arrow _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+           | Tuple _ | Unboxed_tuple _ | Predef _ | Poly_variant _
+           | Variant _ | Variant_unboxed _ | Record _ | Mu _
+           | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+           | Mutrec _ | Proj_decl _)
+  | Poly_variant _, (Var _ | Abs _ | App _ | Struct _ | Leaf
+                   | Constr _ | Tuple _ | Unboxed_tuple _ | Predef _
+                   | Arrow _ | Variant _ | Variant_unboxed _ | Record _
+                   | Mu _ | Rec_var _ | Proj _ | Comp_unit _ | Alias _
+                   | Error _| Mutrec _ | Proj_decl _)
+  | Tuple _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Constr _
+           | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+           | Variant _ | Variant_unboxed _ | Record _ | Mu _
+           | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+           | Mutrec _ | Proj_decl _)
+  | Unboxed_tuple _, (Var _ | Abs _ | App _ | Struct _ | Leaf
+                    | Constr _ | Tuple _ | Predef _ | Arrow _
+                    | Poly_variant _ | Variant _ | Variant_unboxed _
+                    | Record _ | Mu _ | Rec_var _ | Proj _
+                    | Comp_unit _ | Alias _ | Error _| Mutrec _
+                    | Proj_decl _)
+  | Constr _, (Var _ | Abs _ | App _ | Struct _ | Leaf  | Tuple _
+            | Unboxed_tuple _ | Predef _ | Arrow _ | Poly_variant _
+            | Variant _ | Variant_unboxed _ | Record _ | Mu _
+            | Rec_var _ | Proj _ | Comp_unit _ | Alias _ | Error _
+            | Mutrec _ | Proj_decl _)
     -> false
 
 and equal t1 t2 =
@@ -873,10 +966,14 @@ let str ?uid map =
     approximated = false }
 
 let alias ?uid t =
-  { uid; desc = Alias t; hash = Hashtbl.hash (hash_alias, uid, t.hash); approximated = false}
+  { uid; desc = Alias t;
+    hash = Hashtbl.hash (hash_alias, uid, t.hash);
+    approximated = false }
 
 let error ?uid s =
-  { uid; desc = Error s; hash = Hashtbl.hash (hash_error, uid, s); approximated = false}
+  { uid; desc = Error s;
+    hash = Hashtbl.hash (hash_error, uid, s);
+    approximated = false }
 
 let leaf' uid =
   { uid; desc = Leaf; hash = Hashtbl.hash (hash_leaf, uid);
@@ -903,37 +1000,58 @@ let proj ?uid t item =
         hash = Hashtbl.hash (hash_proj, t.hash, item); approximated = false }
 
 let app ?uid f ~arg =
-      { uid; desc = App (f, arg); hash = Hashtbl.hash (hash_app, f.hash, uid, arg.hash)
-        ; approximated = false }
+  { uid; desc = App (f, arg);
+    hash = Hashtbl.hash (hash_app, f.hash, uid, arg.hash);
+    approximated = false }
 
 let comp_unit ?uid s =
-      { uid; desc = Comp_unit s; hash = Hashtbl.hash (hash_comp_unit, uid, s);
-        approximated = false }
+  { uid; desc = Comp_unit s;
+    hash = Hashtbl.hash (hash_comp_unit, uid, s);
+    approximated = false }
 
 let mu ?uid t_body =
-  { uid; desc = Mu (t_body); hash = Hashtbl.hash (hash_mu, uid, t_body.hash);
+  { uid; desc = Mu (t_body);
+    hash = Hashtbl.hash (hash_mu, uid, t_body.hash);
     approximated = false }
 
 let rec_var ?uid n =
-  { uid; desc = Rec_var n; hash = Hashtbl.hash (hash_rec_var, uid, n);
+  { uid; desc = Rec_var n;
+    hash = Hashtbl.hash (hash_rec_var, uid, n);
     approximated = false }
 
 let app_list (base_shape : t) (args : t list) : t =
   List.fold_left (fun shape arg -> app shape ~arg) base_shape args
-  (* CR sspies: Double check whether this should be fold_left or fold_right. *)
 
 let abs_list (base_shape : t) (binders : Ident.t list) : t =
   List.fold_right (fun shape id -> abs shape id) binders base_shape
 
-let tuple ?uid (ts : t list) = { uid; desc = Tuple ts; hash = Hashtbl.hash (hash_tuple, uid, List.map (fun t -> t.hash) ts); approximated = false }
+let tuple ?uid (ts : t list) =
+  { uid; desc = Tuple ts;
+    hash = Hashtbl.hash (hash_tuple, uid, List.map (fun t -> t.hash) ts);
+    approximated = false }
 
-let unboxed_tuple ?uid (ts : t list) = { uid; desc = Unboxed_tuple ts; hash = Hashtbl.hash (hash_unboxed_tuple, uid, List.map (fun t -> t.hash) ts); approximated = false }
+let unboxed_tuple ?uid (ts : t list) =
+  { uid; desc = Unboxed_tuple ts;
+    hash = Hashtbl.hash (hash_unboxed_tuple, uid,
+      List.map (fun t -> t.hash) ts);
+    approximated = false }
 
-let predef ?uid (p : Predef.t) (ts : t list) = { uid; desc = Predef (p, ts); hash = Hashtbl.hash (hash_predef, uid, p, List.map (fun t -> t.hash) ts); approximated = false }
+let predef ?uid (p : Predef.t) (ts : t list) =
+  { uid; desc = Predef (p, ts);
+    hash = Hashtbl.hash (hash_predef, uid, p,
+      List.map (fun t -> t.hash) ts);
+    approximated = false }
 
-let arrow ?uid t1 t2 = { uid; desc = Arrow (t1, t2); hash = Hashtbl.hash (hash_arrow, uid, t1.hash, t2.hash); approximated = false }
+let arrow ?uid t1 t2 =
+  { uid; desc = Arrow (t1, t2);
+    hash = Hashtbl.hash (hash_arrow, uid, t1.hash, t2.hash);
+    approximated = false }
 
-let poly_variant ?uid t = { uid; desc = Poly_variant t; hash = Hashtbl.hash (hash_poly_variant, uid, poly_variant_constructors_map (fun t -> t.hash) t); approximated = false }
+let poly_variant ?uid t =
+  { uid; desc = Poly_variant t;
+    hash = Hashtbl.hash (hash_poly_variant, uid,
+      poly_variant_constructors_map (fun t -> t.hash) t);
+    approximated = false }
 
 let variant ?uid simple_constructors complex_constructors =
   { uid; desc = Variant { simple_constructors; complex_constructors };
@@ -943,7 +1061,8 @@ let variant ?uid simple_constructors complex_constructors =
 
 let variant_unboxed ?uid name arg_name arg_shape arg_layout =
   { uid; desc = Variant_unboxed { name; arg_name; arg_shape; arg_layout };
-    hash = Hashtbl.hash (hash_variant_unboxed, uid, name, arg_name, arg_shape.hash, arg_layout);
+    hash = Hashtbl.hash (hash_variant_unboxed, uid, name, arg_name,
+      arg_shape.hash, arg_layout);
     approximated = false }
 
 let record ?uid kind fields =
@@ -954,12 +1073,20 @@ let record ?uid kind fields =
 
 let constr ?uid constr_uid args =
   { uid; desc = Constr (constr_uid, args);
-    hash = Hashtbl.hash (hash_constr, uid, constr_uid, List.map (fun t -> t.hash) args);
+    hash = Hashtbl.hash (hash_constr, uid, constr_uid,
+      List.map (fun t -> t.hash) args);
     approximated = false }
 
-let mutrec ?uid t = { uid; desc = Mutrec t; hash = Hashtbl.hash (hash_mutrec, uid, Ident.Map.map (fun t -> t.hash) t); approximated = false }
+let mutrec ?uid t =
+  { uid; desc = Mutrec t;
+    hash = Hashtbl.hash (hash_mutrec, uid,
+      Ident.Map.map (fun t -> t.hash) t);
+    approximated = false }
 
-let proj_decl ?uid t id = { uid; desc = Proj_decl (t, id); hash = Hashtbl.hash (hash_proj_decl, uid, t.hash, id); approximated = false }
+let proj_decl ?uid t id =
+  { uid; desc = Proj_decl (t, id);
+    hash = Hashtbl.hash (hash_proj_decl, uid, t.hash, id);
+    approximated = false }
 
 let no_fuel_left ?uid s = { s with uid }
 

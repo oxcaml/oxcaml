@@ -2989,7 +2989,10 @@ let transl_type_decl env rec_flag sdecl_list =
     | Some sh -> Some (Shape.app_list sh args)
     | None -> None
   in
-  let shapes = Type_shape.Type_decl_shape.of_type_declarations decls (env_shape_of_path env) in
+  let shapes =
+    Type_shape.Type_decl_shape.of_type_declarations
+      decls (env_shape_of_path env)
+  in
   List.iter (fun (sh, (_, decl)) ->
     let uid = decl.type_uid in
     Uid.Tbl.add Type_shape.all_type_decls uid sh;
