@@ -203,7 +203,6 @@ let map_summary f = function
 
 (* CR mixed-modules: Rebase onto https://u/github/y1psLg *)
 
-(* CR mixed-modules: Put [block_sort] information here *)
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
@@ -722,10 +721,10 @@ and functor_components = {
 and address_unforced =
   | Projection of
     { parent : address_lazy;
-      field_layouts: Jkind.Sort.t Jkind.Layout.t list ref;
+      field_layouts: Jkind.Sort.t Jkind.Layout.t list;
       pos : int }
     (* [field_layouts] is a [list] here because it is constructed with iterative
-       appending *)
+       prepending *)
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -904,11 +903,6 @@ let same_constr = ref (fun _ _ _ -> assert false)
 let constrain_type_jkind = ref (fun _ _ _ -> assert false)
 
 let check_well_formed_module = ref (fun _ -> assert false)
-
-(* CR jrayman: make sure not unused *)
-let block_sorts_of_signature =
-  ref ((fun _ _ -> assert false):
-    t -> Types.module_type -> Jkind.Sort.t Jkind.Layout.t array)
 
 (* Helper to decide whether to report an identifier shadowing
    by some 'open'. For labels and constructors, we do not report
@@ -1619,7 +1613,7 @@ and find_ident_module_address id env =
 
 and force_address = function
   | Projection { parent; field_layouts; pos } ->
-    Adot(get_address parent, Array.of_list !field_layouts, pos)
+    Adot(get_address parent, Array.of_list field_layouts, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2173,9 +2167,39 @@ let rec components_of_module_maker
       in
       let env = ref cm_env in
       let pos = ref 0 in
-      let field_layouts = ref [] in
-      let next_address layout =
-        field_layouts := layout :: !field_layouts;
+      let field_layouts =
+        List.fold_left (fun layouts ((item : Subst.Lazy.signature_item), _) ->
+          match item with
+          | Sig_value(_, decl, _) ->
+            begin match decl.val_kind with
+            | Val_reg layout -> layout :: layouts
+            | Val_ivar _ | Val_self _ | Val_anc _ ->
+              (Jkind.Layout.Sort Jkind.Sort.value) :: layouts
+            | Val_prim _ | Val_mut _ -> layouts (* will throw error later *)
+            end
+          | Sig_typext _ -> (Jkind.Layout.Sort Jkind.Sort.value) :: layouts
+          | Sig_module(_, pres, _, _, _) ->
+            begin match pres with
+            | Mp_present ->
+              let layout =
+                Jkind.(Layout.of_const
+                        (Layout.Const.of_sort_const Sort.Const.for_module))
+              in
+              layout :: layouts
+            | Mp_absent -> layouts
+            end
+          | Sig_class _ ->
+              let layout =
+                Jkind.(Layout.of_const
+                        (Layout.Const.of_sort_const Sort.Const.for_object))
+                  (* CR jrayman: is [for_object] correct? *)
+              in
+              layout :: layouts
+          | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> layouts)
+          [] items_and_paths
+        |> List.rev
+      in
+      let next_address () =
         let addr : address_unforced =
           Projection
             { parent = cm_addr; field_layouts; pos = !pos }
@@ -2190,9 +2214,9 @@ let rec components_of_module_maker
             let addr =
               match decl.val_kind with
               | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
-              | Val_reg layout -> next_address layout
+              | Val_reg _ -> next_address ()
               | Val_ivar _ | Val_self _ | Val_anc _ ->
-                next_address (Jkind.Layout.Sort Jkind.Sort.value)
+                next_address ()
               | Val_mut _ ->
                 Misc.fatal_error "Mutable variable found at the structure level"
             in
@@ -2268,7 +2292,7 @@ let rec components_of_module_maker
               Datarepr.extension_descr ~current_unit:(get_unit_name ()) path
                 ext'
             in
-            let addr = next_address (Jkind.Layout.Sort Jkind.Sort.value) in
+            let addr = next_address () in
             let cda_shape =
               Shape.proj cm_shape (Shape.Item.extension_constructor id)
             in
@@ -2292,7 +2316,7 @@ let rec components_of_module_maker
                       Lazy_backtrack.create (ModAlias {env = !env; path})
                   | _ -> assert false
                 end
-              | Mp_present -> next_address (Jkind.Layout.Sort Jkind.Sort.value)
+              | Mp_present -> next_address ()
             in
             let alerts =
               Builtin_attributes.alerts_of_attrs md.md_attributes
@@ -2331,7 +2355,7 @@ let rec components_of_module_maker
             env := store_modtype ~update_summary:false id decl shape !env
         | Sig_class(id, decl, _, _) ->
             let decl' = Subst.class_declaration sub decl in
-            let addr = next_address (Jkind.Layout.Sort Jkind.Sort.value) in
+            let addr = next_address () in
             let shape = Shape.proj cm_shape (Shape.Item.class_ id) in
             let clda =
               { clda_declaration = decl';
