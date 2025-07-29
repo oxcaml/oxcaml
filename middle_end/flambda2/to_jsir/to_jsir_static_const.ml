@@ -110,17 +110,13 @@ let code ~env ~res ~translate_body ~code_id code =
          ~exn_continuation
          bound_params
          ~body
-         ~my_closure
+         ~my_closure:_
          ~is_my_closure_used:_
          ~my_region:_
          ~my_ghost_region:_
          ~my_depth:_
          ~free_names_of_body:_
        ->
-      (* CR selee: A hack to get things to work, should figure out what
-         [my_closure] is actually used for *)
-      let var = Jsir.Var.fresh () in
-      let env = To_jsir_env.add_var env my_closure var in
       let fn_params, env_with_params =
         To_jsir_shared.bound_parameters ~env bound_params
       in
