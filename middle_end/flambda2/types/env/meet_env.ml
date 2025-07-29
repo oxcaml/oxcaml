@@ -68,7 +68,7 @@ let adding_equation_for_name t name ~f =
   (* CR bclement: Implement support for recursive extensions (i.e. extensions
      stored on [x] that can contain equations on [x]), then get rid of this. *)
   if Name.Set.mem name t.adding_equations_for_names
-  then Misc.fatal_error "Looping!"
+  then t
   else
     let adding_equations_for_names =
       Name.Set.add name t.adding_equations_for_names
