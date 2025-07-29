@@ -452,10 +452,10 @@ val glorb2 : unit -> int t mallocd = <fun>
 (* Can allocate variants with record arguments *)
 
 type 'a t = FooBar of {x : 'a; y : 'a}
-let f x y = FooBar {x;y}
+let f x y = malloc_ (FooBar {x;y})
 [%%expect{|
 type 'a t = FooBar of { x : 'a; y : 'a; }
-val f : 'a -> 'a -> 'a t = <fun>
+val f : 'a @ external_ -> 'a @ external_ -> 'a t mallocd = <fun>
 |}]
 
 type r = {x : int; y : int}
