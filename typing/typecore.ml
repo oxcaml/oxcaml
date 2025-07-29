@@ -247,7 +247,7 @@ type error =
   | Atomic_in_pattern of Longident.t
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
-  | Modalities_on_atomic_field of Longident.t
+  | Modalities_on_atomic_field
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -7042,7 +7042,7 @@ and type_expect_
           with
           | Ok () -> ()
           | Error _ ->
-            raise (Error (loc, env, Modalities_on_atomic_field lid.txt))
+            raise (Error (loc, env, Modalities_on_atomic_field))
           end;
           submode ~loc ~env rmode argument_mode;
           rue {
@@ -11148,11 +11148,10 @@ let report_error ~loc env =
   | Label_not_atomic lid ->
       Location.errorf ~loc "The record field %a is not atomic"
         (Style.as_inline_code longident) lid
-  | Modalities_on_atomic_field lid ->
+  | Modalities_on_atomic_field ->
     Location.errorf ~loc
-      "Modalities are not allowed on fields given to %a (here, %a)"
-      Style.inline_code  "[%atomic.loc]"
-      (Style.as_inline_code longident) lid
+      "Fields with modalities are not allowed in %a"
+      Style.inline_code "[%atomic.loc]"
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
