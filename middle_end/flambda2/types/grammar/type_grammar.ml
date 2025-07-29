@@ -929,10 +929,15 @@ and apply_renaming_variant_extensions extensions renaming =
 
 let rec print ppf t =
   match t with
-  | Value ty ->
-    Format.fprintf ppf "@[<hov 1>(Val@ %a)@]"
-      (TD.print ~print_head:print_head_of_kind_value)
-      ty
+  | Value ty -> (
+    (* Bypass [TD.print] in order to display [is_null] annotation in-line with
+       the [Val] annotation. *)
+    match TD.descr ty with
+    | Ok (No_alias head) -> print_head_of_kind_value ppf head
+    | Unknown | Bottom | Ok (Equals _) ->
+      Format.fprintf ppf "@[<hov 1>(Val@ %a)@]"
+        (TD.print ~print_head:print_head_of_kind_value)
+        ty)
   | Naked_immediate ty ->
     Format.fprintf ppf "@[<hov 1>(Naked_immediate@ %a)@]"
       (TD.print ~print_head:print_head_of_kind_naked_immediate)
@@ -988,9 +993,9 @@ let rec print ppf t =
 
 and print_head_of_kind_value ppf { non_null; is_null } =
   let null_string = match is_null with Maybe_null -> "?" | Not_null -> "!" in
-  Format.fprintf ppf "@[<hov 1> %a%s@]"
+  Format.fprintf ppf "@[<hov 1>(Val%s@ %a)@]" null_string
     (Or_unknown_or_bottom.print print_head_of_kind_value_non_null)
-    non_null null_string
+    non_null
 
 and print_head_of_kind_value_non_null ppf head =
   match head with

@@ -30,7 +30,7 @@ let print f ppf t =
     if Flambda_features.unicode ()
     then Format.fprintf ppf "%t@<1>\u{22a5}%t" colour Flambda_colours.pop
     else Format.fprintf ppf "%t_|_%t" colour Flambda_colours.pop
-  | Ok contents -> Format.fprintf ppf "@[(%a)@]" f contents
+  | Ok contents -> f ppf contents
 
 let equal eq_contents t1 t2 =
   match t1, t2 with
