@@ -1,4 +1,5 @@
 (* TEST
+ modules = "block_checks.ml";
  flambda2;
  stack-allocation;
  {
@@ -25,34 +26,6 @@ let unboxed_vec256_array_tag = 7
 let unboxed_vec512_array_tag = 8
 let unboxed_nativeint_array_tag = 9
 
-(* Check if a block is a mixed block with given scannable prefix length *)
-let check_mixed_block_scannable_size ~array_type obj expected_scannable_size =
-  match Sys.backend_type with
-  | Native ->
-    let mixed_info = Obj.Uniform_or_mixed.of_block obj in
-    begin match Obj.Uniform_or_mixed.repr mixed_info with
-    | Uniform -> 
-      Printf.printf "%s: Expected mixed block, but got uniform block\n" array_type;
-      assert false  (* Should be a mixed block *)
-    | Mixed { scannable_prefix_len } -> 
-      assert (scannable_prefix_len = expected_scannable_size)
-    end
-  | Bytecode | Other _ -> ()  (* Mixed blocks work differently in bytecode *)
-
-(* Check that empty arrays have tag 0 and are not mixed blocks *)
-let check_empty_array_is_uniform ~array_type obj =
-  let tag = Obj.tag obj in
-  if tag <> 0 then
-    Printf.printf "Empty %s array has tag %d, expected 0\n" array_type tag;
-  assert (tag = 0);
-  match Sys.backend_type with
-  | Native ->
-    let mixed_info = Obj.Uniform_or_mixed.of_block obj in
-    begin match Obj.Uniform_or_mixed.repr mixed_info with
-    | Uniform -> ()  (* Expected - empty arrays are uniform *)
-    | Mixed _ -> assert false  (* Empty arrays should not be mixed *)
-    end
-  | Bytecode | Other _ -> ()
 
 
 external[@layout_poly] size_in_bytes : ('a : any_non_null). 'a array -> int
@@ -110,7 +83,7 @@ let check_int64u ~(init : int64#) ~element_size =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"int64#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"int64#" (Obj.repr x)
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
@@ -122,7 +95,7 @@ let check_int64u ~(init : int64#) ~element_size =
       assert (tag = expected_tag);
       (* Check mixed block has zero scannable fields *)
       match Sys.backend_type with
-      | Native -> check_mixed_block_scannable_size ~array_type:"int64#" (Obj.repr x) 0
+      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"int64#" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
@@ -138,7 +111,7 @@ let check_nativeintu ~(init : nativeint#) ~element_size =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"nativeint#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"nativeint#" (Obj.repr x)
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
@@ -150,7 +123,7 @@ let check_nativeintu ~(init : nativeint#) ~element_size =
       assert (tag = expected_tag);
       (* Check mixed block has zero scannable fields *)
       match Sys.backend_type with
-      | Native -> check_mixed_block_scannable_size ~array_type:"nativeint#" (Obj.repr x) 0
+      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"nativeint#" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
@@ -173,7 +146,7 @@ let check_float32u ~(init : float32#) ~element_size =
     in
     assert ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"float32#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"float32#" (Obj.repr x)
     else begin
       (* Check tag based on actual array length (n) not padded length *)
       let tag = Obj.tag (Obj.repr x) in
@@ -185,7 +158,7 @@ let check_float32u ~(init : float32#) ~element_size =
           else unboxed_float32_array_odd_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
-        check_mixed_block_scannable_size ~array_type:"float32#" (Obj.repr x) 0
+        Block_checks.check_mixed_block_scannable_size ~array_type:"float32#" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
@@ -208,7 +181,7 @@ let check_int32u ~(init : int32#) ~element_size =
     in
     assert ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"int32#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"int32#" (Obj.repr x)
     else begin
       (* Check tag based on actual array length (n) not padded length *)
       let tag = Obj.tag (Obj.repr x) in
@@ -220,7 +193,7 @@ let check_int32u ~(init : int32#) ~element_size =
           else unboxed_int32_array_odd_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
-        check_mixed_block_scannable_size ~array_type:"int32#" (Obj.repr x) 0
+        Block_checks.check_mixed_block_scannable_size ~array_type:"int32#" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
@@ -302,13 +275,13 @@ let check_ignorable_product1 ~(init : #(int * float32# * int * int64#))
     (* All unboxed product arrays use tag 0, which matches empty array tag *)
     assert (tag = unboxed_product_array_tag);
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"ignorable_product1" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"ignorable_product1" (Obj.repr x)
     else begin
       (* Non-empty ignorable products are mixed blocks with no scannable fields *)
       match Sys.backend_type with
       | Native ->
         (* This product has mixed fields but is allocated as fully non-scannable *)
-        check_mixed_block_scannable_size ~array_type:"ignorable_product1" (Obj.repr x) 0
+        Block_checks.check_mixed_block_scannable_size ~array_type:"ignorable_product1" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
@@ -332,13 +305,13 @@ let check_ignorable_product2 ~(init : #(int * t_ignore * bool * t_ignore))
     (* All unboxed product arrays use tag 0, which matches empty array tag *)
     assert (tag = unboxed_product_array_tag);
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"ignorable_product2" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"ignorable_product2" (Obj.repr x)
     else begin
       (* Non-empty ignorable products are mixed blocks with no scannable fields *)
       match Sys.backend_type with
       | Native ->
         (* Product has mixed fields but is allocated as fully non-scannable *)
-        check_mixed_block_scannable_size ~array_type:"ignorable_product2" (Obj.repr x) 0
+        Block_checks.check_mixed_block_scannable_size ~array_type:"ignorable_product2" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
@@ -368,10 +341,10 @@ let check_float32u_pair ~(init : #(float32# * float32#)) ~element_size =
     (* All unboxed product arrays use tag 0, which matches empty array tag *)
     assert (tag = unboxed_product_array_tag);
     if n = 0 then
-      check_empty_array_is_uniform ~array_type:"float32#_pair" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"float32#_pair" (Obj.repr x)
     else
       (* Non-empty arrays with no scannable fields are mixed blocks *)
-      check_mixed_block_scannable_size ~array_type:"float32#_pair" (Obj.repr x) 0
+      Block_checks.check_mixed_block_scannable_size ~array_type:"float32#_pair" (Obj.repr x) 0
   in
   List.iter check_one array_sizes_to_check
 
@@ -393,7 +366,7 @@ let check_int32u_pair ~(init : #(int32# * int32#)) ~element_size =
     (* All unboxed product arrays use tag 0, which matches empty array tag *)
     assert (tag = unboxed_product_array_tag);
     (* This product has no scannable fields (only check non-empty arrays) *)
-    if n > 0 then check_mixed_block_scannable_size ~array_type:"int32#_pair" (Obj.repr x) 0
+    if n > 0 then Block_checks.check_mixed_block_scannable_size ~array_type:"int32#_pair" (Obj.repr x) 0
   in
   List.iter check_one array_sizes_to_check
 

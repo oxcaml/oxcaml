@@ -1,0 +1,39 @@
+Testing statically-allocated unboxed arrays
+============================================
+
+Testing empty arrays:
+empty int64#: OK - no allocation
+empty int32#: OK - no allocation
+empty float32#: OK - no allocation
+empty nativeint#: OK - no allocation
+empty float#: OK - no allocation
+Empty array tests passed
+
+Testing int64# arrays:
+int64# [42L]: OK - no allocation
+int64# [1L; 2L; 3L]: OK - no allocation
+int64# array tests passed
+
+Testing int32# arrays:
+int32# [42l]: OK - no allocation
+int32# [1l; 2l]: OK - no allocation
+int32# [1l; 2l; 3l]: OK - no allocation
+int32# array tests passed
+
+Testing float32# arrays:
+float32# [42.0s]: OK - no allocation
+float32# [1.0s; 2.0s]: OK - no allocation
+float32# [1.0s; 2.0s; 3.0s]: OK - no allocation
+float32# array tests passed
+
+Testing nativeint# arrays:
+nativeint# [42n]: OK - no allocation
+nativeint# [1n; 2n; 3n]: OK - no allocation
+nativeint# array tests passed
+
+Testing float# arrays:
+float# [42.0]: OK - no allocation
+float# [1.0; 2.0; 3.0]: OK - no allocation
+float# array tests passed
+
+All tests passed!
