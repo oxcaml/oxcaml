@@ -2789,7 +2789,9 @@ let add_share_lock shared_context env =
   add_lock lock env
 
 let add_closure_lock closure_context comonadic env =
-  let lock = Closure_lock (closure_context, Mode.Value.Comonadic.disallow_left comonadic)
+  let lock = Closure_lock
+    (closure_context,
+     Mode.Value.Comonadic.disallow_left comonadic)
   in
   add_lock lock env
 
@@ -3282,7 +3284,7 @@ let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
       may_lookup_error errors loc env
         (Local_value_escaping (item, lid, escaping_context))
   end;
-    vmode
+  vmode
 
 let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
   match

@@ -699,7 +699,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the maximum element, and we can use [a_hint]
            as the output's hint *)
-        Amode (C.max obj, a_hint)
+        Amode (a, a_hint)
       else
         match rest with
         | [] -> Amodejoin (a, a_hint, mvs)
@@ -735,7 +735,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the minimum element, and we can use [a_hint]
            as the output's hint *)
-        Amode (C.min obj, a_hint)
+        Amode (a, a_hint)
       else
         match rest with
         | [] -> Amodemeet (a, a_hint, mvs)
@@ -804,8 +804,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (mv : (a, allowed * r) morphvar) =
     let rec loop lower =
       let log = ref empty_changes in
-      (* Since this call to [submode_mvc] should always succeed,
-         we provide a throwaway, arbitrary hint *)
+      (* We provide an arbitrary, throwaway hint to this call to [submode_mvc]
+         as it will either succeed or we will undo the change and not use the hint *)
       let r = submode_mvc ~log:(Some log) obj mv lower (Const H.const_none) in
       match r with
       | Ok () -> !log, lower
@@ -876,7 +876,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     match disallow_right m with
     | Amode (a, a_hint) ->
       if C.le obj (C.max obj) a
-      then Amode (a, Const H.const_none), false
+      then Amode (a, a_hint), false
       else
         ( Amodevar
             (Amorphvar
@@ -906,7 +906,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     match disallow_left m with
     | Amode (a, a_hint) ->
       if C.le obj a (C.min obj)
-      then Amode (a, Const H.const_none), false
+      then Amode (a, a_hint), false
       else
         ( Amodevar
             (Amorphvar
