@@ -1484,9 +1484,9 @@ let rec transl_address loc = function
           | Vec128 | Vec256 | Vec512 | Word | Product _ -> false)
         mixed_blocks
       then
-      Lprim(Pfield(pos, Pointer, Reads_agree), [transl_address loc addr], loc)
+        Lprim(Pfield(pos, Pointer, Reads_agree), [transl_address loc addr], loc)
       else
-      Lprim(Pmixedfield([pos], mixed_blocks, Reads_agree),
+        Lprim(Pmixedfield([pos], mixed_blocks, Reads_agree),
                    [transl_address loc addr], loc)
 
 let transl_path find loc env path =

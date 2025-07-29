@@ -662,9 +662,6 @@ val print_longident: (Format.formatter -> Longident.t -> unit) ref
 val print_path: (Format.formatter -> Path.t -> unit) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
-(* Forward declaration to break mutual recursion with Ctype. *)
-val block_sorts_of_signature:
-  (t -> Types.module_type -> Jkind.Sort.t Jkind.Layout.t array) ref
 
 
 (** Folds *)
