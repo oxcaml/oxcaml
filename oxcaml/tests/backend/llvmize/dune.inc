@@ -29,7 +29,11 @@
    (run %{bin:ocamlopt.opt} const_val.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt}  const_val.cmx const_val_main.cmx -opaque -o const_val.output.exe)
-   (run mv const_val.ll const_val_ir.output.corrected))))
+   (with-outputs-to
+    const_val_ir.output.corrected
+    (pipe-outputs
+      (run cat const_val.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
@@ -64,7 +68,11 @@
    (run %{bin:ocamlopt.opt} int_ops.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} int_ops_data.cmx int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe)
-   (run mv int_ops.ll int_ops_ir.output.corrected))))
+   (with-outputs-to
+    int_ops_ir.output.corrected
+    (pipe-outputs
+      (run cat int_ops.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
@@ -99,7 +107,11 @@
    (run %{bin:ocamlopt.opt} gcd.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} gcd_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} gcd_data.cmx gcd.cmx gcd_main.cmx -opaque -o gcd.output.exe)
-   (run mv gcd.ll gcd_ir.output.corrected))))
+   (with-outputs-to
+    gcd_ir.output.corrected
+    (pipe-outputs
+      (run cat gcd.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
@@ -134,7 +146,11 @@
    (run %{bin:ocamlopt.opt} array_rev.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} array_rev_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} array_rev_data.cmx array_rev.cmx array_rev_main.cmx -opaque -o array_rev.output.exe)
-   (run mv array_rev.ll array_rev_ir.output.corrected))))
+   (with-outputs-to
+    array_rev_ir.output.corrected
+    (pipe-outputs
+      (run cat array_rev.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
@@ -169,7 +185,11 @@
    (run %{bin:ocamlopt.opt} float_ops.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} float_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt}  float_ops.cmx float_ops_main.cmx -opaque -o float_ops.output.exe)
-   (run mv float_ops.ll float_ops_ir.output.corrected))))
+   (with-outputs-to
+    float_ops_ir.output.corrected
+    (pipe-outputs
+      (run cat float_ops.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
@@ -204,7 +224,11 @@
    (run %{bin:ocamlopt.opt} many_args.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} many_args_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} many_args_defn.cmx many_args.cmx many_args_main.cmx -opaque -o many_args.output.exe)
-   (run mv many_args.ll many_args_ir.output.corrected))))
+   (with-outputs-to
+    many_args_ir.output.corrected
+    (pipe-outputs
+      (run cat many_args.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
@@ -239,7 +263,11 @@
    (run %{bin:ocamlopt.opt} multi_ret.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
    (run %{bin:ocamlopt.opt} multi_ret_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt}  multi_ret.cmx multi_ret_main.cmx -opaque -o multi_ret.output.exe)
-   (run mv multi_ret.ll multi_ret_ir.output.corrected))))
+   (with-outputs-to
+    multi_ret_ir.output.corrected
+    (pipe-outputs
+      (run cat multi_ret.ll)
+      (run ./filter.sh))))))
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))

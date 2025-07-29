@@ -3,26 +3,26 @@ source_filename = "many_args.ml"
 @camlMany_args__data_begin = global i64 0
 define void @camlMany_args__code_begin() { ret void }
 
-define cc 104 { { ptr }, { i64 } } @camlMany_args__call_with_0_1_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
-  %17 = alloca i64 
-  %18 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
   %19 = load i64, ptr %ds
   %20 = add i64 %19, 568
   %21 = inttoptr i64 %20 to ptr
@@ -35,8 +35,8 @@ define cc 104 { { ptr }, { i64 } } @camlMany_args__call_with_0_1_code(ptr %0, i6
   %28 = load i64, ptr %ds
   %29 = add i64 %28, 592
   %30 = inttoptr i64 %29 to ptr
-  %31 = alloca i64 
-  %32 = alloca i64 
+  %31 = alloca i64
+  %32 = alloca i64
   br label %L1
 L1:
   br label %L101
@@ -139,13 +139,13 @@ L103:                                                ; preds = %L101
 }
 
 define cc 104 { { ptr }, { i64 } } @camlMany_args__entry(ptr %0)  {
-  %ds = alloca ptr 
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
   br label %L1
 L1:
   br label %L111
@@ -169,7 +169,7 @@ L111:                                                ; preds = %L1
 declare cc 104 { { ptr }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } } @caml_apply13(ptr, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64)
 @camlMany_args__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlMany_args = global { ptr, i64 } { ptr @camlMany_args__call_with_1, i64 3063 }
-@camlMany_args__call_with_1 = global { ptr, i64 } { ptr @camlMany_args__call_with_0_1_code, i64 108086391056891909 }
+@camlMany_args__call_with_1 = global { ptr, i64 } { ptr @camlMany_args__call_with_HIDE_STAMP, i64 108086391056891909 }
 @camlMany_args_defn = external global ptr
 
 @camlMany_args__data_end = global i64 0

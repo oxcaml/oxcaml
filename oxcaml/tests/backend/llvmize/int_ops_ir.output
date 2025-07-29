@@ -3,19 +3,19 @@ source_filename = "int_ops.ml"
 @camlInt_ops__data_begin = global i64 0
 define void @camlInt_ops__code_begin() { ret void }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__add_0_23_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__add_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
   br label %L1
 L1:
   br label %L101
@@ -60,19 +60,19 @@ L101:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %36
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__sub_1_24_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__sub_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
   br label %L1
 L1:
   br label %L109
@@ -117,21 +117,21 @@ L109:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %36
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__mul_2_25_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__mul_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
   br label %L1
 L1:
   br label %L117
@@ -186,26 +186,26 @@ L117:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %44
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__div_3_26_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__div_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
-  %17 = alloca i64 
-  %18 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
   br label %L1
 L1:
   br label %L127
@@ -303,26 +303,26 @@ L149:                                                ; preds = %L136
   unreachable
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__mod__4_27_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__mod__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
-  %17 = alloca i64 
-  %18 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
   br label %L1
 L1:
   br label %L154
@@ -402,18 +402,18 @@ L172:                                                ; preds = %L154
   unreachable
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__land__5_28_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__land__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
   br label %L1
 L1:
   br label %L176
@@ -453,18 +453,18 @@ L176:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %32
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lor__6_29_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lor__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
   br label %L1
 L1:
   br label %L183
@@ -504,19 +504,19 @@ L183:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %32
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lxor__7_30_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lxor__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
   br label %L1
 L1:
   br label %L190
@@ -561,16 +561,16 @@ L190:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %36
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lnot__8_31_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lnot__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
   br label %L1
 L1:
   br label %L198
@@ -603,22 +603,22 @@ L198:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %25
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsl__9_32_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsl__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
   br label %L1
 L1:
   br label %L204
@@ -675,21 +675,21 @@ L204:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %46
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsr__10_33_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsr__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
   br label %L1
 L1:
   br label %L214
@@ -741,21 +741,21 @@ L214:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %42
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__asr__11_34_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__asr__HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
   br label %L1
 L1:
   br label %L223
@@ -807,15 +807,15 @@ L223:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %42
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__add_imm_12_35_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__add_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L232
@@ -843,15 +843,15 @@ L232:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %21
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__sub_imm_13_36_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__sub_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L237
@@ -879,16 +879,16 @@ L237:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %21
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__mul_imm_14_37_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__mul_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
   br label %L1
 L1:
   br label %L242
@@ -921,22 +921,22 @@ L242:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %25
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__div_imm_15_38_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__div_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
   br label %L1
 L1:
   br label %L248
@@ -997,24 +997,24 @@ L248:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %48
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__mod_imm_16_39_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__mod_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
-  %9 = alloca i64 
-  %10 = alloca i64 
-  %11 = alloca i64 
-  %12 = alloca i64 
-  %13 = alloca i64 
-  %14 = alloca i64 
-  %15 = alloca i64 
-  %16 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
   br label %L1
 L1:
   br label %L259
@@ -1083,15 +1083,15 @@ L259:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %55
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__land_imm_17_40_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__land_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L271
@@ -1119,15 +1119,15 @@ L271:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %21
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lor_imm_18_41_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lor_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
   br label %L1
 L1:
   br label %L276
@@ -1155,16 +1155,16 @@ L276:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %21
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lxor_imm_19_42_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lxor_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
   br label %L1
 L1:
   br label %L281
@@ -1197,16 +1197,16 @@ L281:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %25
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsl_imm_20_43_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsl_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
   br label %L1
 L1:
   br label %L287
@@ -1239,16 +1239,16 @@ L287:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %25
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsr_imm_21_44_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__lsr_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
   br label %L1
 L1:
   br label %L293
@@ -1281,16 +1281,16 @@ L293:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %25
 }
 
-define cc 104 { { ptr }, { i64 } } @camlInt_ops__asr_imm_22_45_code(ptr %0, i64 %1)  {
-  %ds = alloca ptr 
+define cc 104 { { ptr }, { i64 } } @camlInt_ops__asr_imm_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %3 = alloca i64 
+  %3 = alloca i64
   store i64 %1, ptr %3
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
-  %7 = alloca i64 
-  %8 = alloca i64 
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
   br label %L1
 L1:
   br label %L299
@@ -1324,13 +1324,13 @@ L299:                                                ; preds = %L1
 }
 
 define cc 104 { { ptr }, { i64 } } @camlInt_ops__entry(ptr %0)  {
-  %ds = alloca ptr 
+  %ds = alloca ptr
   store ptr %0, ptr %ds
-  %2 = alloca i64 
-  %3 = alloca i64 
-  %4 = alloca i64 
-  %5 = alloca i64 
-  %6 = alloca i64 
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
   br label %L1
 L1:
   br label %L308
@@ -1354,29 +1354,29 @@ L308:                                                ; preds = %L1
 declare  void @llvm.trap()
 @camlInt_ops__gc_roots = global { i64, i64 } { i64 0, i64 25344 }
 @camlInt_ops = global { i64, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64 } { i64 9, ptr @camlInt_ops__add_23, ptr @camlInt_ops__sub_24, ptr @camlInt_ops__mul_25, ptr @camlInt_ops__div_26, ptr @camlInt_ops__mod__27, ptr @camlInt_ops__land__28, ptr @camlInt_ops__lor__29, ptr @camlInt_ops__lxor__30, ptr @camlInt_ops__lnot__31, ptr @camlInt_ops__lsl__32, ptr @camlInt_ops__lsr__33, ptr @camlInt_ops__asr__34, ptr @camlInt_ops__add_imm_35, ptr @camlInt_ops__sub_imm_36, ptr @camlInt_ops__mul_imm_37, ptr @camlInt_ops__div_imm_38, ptr @camlInt_ops__mod_imm_39, ptr @camlInt_ops__land_imm_40, ptr @camlInt_ops__lor_imm_41, ptr @camlInt_ops__lxor_imm_42, ptr @camlInt_ops__lsl_imm_43, ptr @camlInt_ops__lsr_imm_44, ptr @camlInt_ops__asr_imm_45, i64 3063 }
-@camlInt_ops__asr_imm_45 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr_imm_22_45_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lsr_imm_44 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsr_imm_21_44_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lsl_imm_43 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsl_imm_20_43_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lxor_imm_42 = global { ptr, i64, i64 } { ptr @camlInt_ops__lxor_imm_19_42_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lor_imm_41 = global { ptr, i64, i64 } { ptr @camlInt_ops__lor_imm_18_41_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__land_imm_40 = global { ptr, i64, i64 } { ptr @camlInt_ops__land_imm_17_40_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__mod_imm_39 = global { ptr, i64, i64 } { ptr @camlInt_ops__mod_imm_16_39_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__div_imm_38 = global { ptr, i64, i64 } { ptr @camlInt_ops__div_imm_15_38_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__mul_imm_37 = global { ptr, i64, i64 } { ptr @camlInt_ops__mul_imm_14_37_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__sub_imm_36 = global { ptr, i64, i64 } { ptr @camlInt_ops__sub_imm_13_36_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__add_imm_35 = global { ptr, i64, i64 } { ptr @camlInt_ops__add_imm_12_35_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__asr__34 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr__11_34_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lsr__33 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsr__10_33_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lsl__32 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsl__9_32_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lnot__31 = global { ptr, i64, i64 } { ptr @camlInt_ops__lnot__8_31_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lxor__30 = global { ptr, i64, i64 } { ptr @camlInt_ops__lxor__7_30_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__lor__29 = global { ptr, i64, i64 } { ptr @camlInt_ops__lor__6_29_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__land__28 = global { ptr, i64, i64 } { ptr @camlInt_ops__land__5_28_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__mod__27 = global { ptr, i64, i64 } { ptr @camlInt_ops__mod__4_27_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__div_26 = global { ptr, i64, i64 } { ptr @camlInt_ops__div_3_26_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__mul_25 = global { ptr, i64, i64 } { ptr @camlInt_ops__mul_2_25_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__sub_24 = global { ptr, i64, i64 } { ptr @camlInt_ops__sub_1_24_code, i64 108086391056891909, i64 3063 }
-@camlInt_ops__add_23 = global { ptr, i64 } { ptr @camlInt_ops__add_0_23_code, i64 108086391056891909 }
+@camlInt_ops__asr_imm_45 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsr_imm_44 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsr_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsl_imm_43 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsl_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lxor_imm_42 = global { ptr, i64, i64 } { ptr @camlInt_ops__lxor_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lor_imm_41 = global { ptr, i64, i64 } { ptr @camlInt_ops__lor_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__land_imm_40 = global { ptr, i64, i64 } { ptr @camlInt_ops__land_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mod_imm_39 = global { ptr, i64, i64 } { ptr @camlInt_ops__mod_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__div_imm_38 = global { ptr, i64, i64 } { ptr @camlInt_ops__div_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mul_imm_37 = global { ptr, i64, i64 } { ptr @camlInt_ops__mul_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__sub_imm_36 = global { ptr, i64, i64 } { ptr @camlInt_ops__sub_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__add_imm_35 = global { ptr, i64, i64 } { ptr @camlInt_ops__add_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__asr__34 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsr__33 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsr__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lsl__32 = global { ptr, i64, i64 } { ptr @camlInt_ops__lsl__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lnot__31 = global { ptr, i64, i64 } { ptr @camlInt_ops__lnot__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lxor__30 = global { ptr, i64, i64 } { ptr @camlInt_ops__lxor__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__lor__29 = global { ptr, i64, i64 } { ptr @camlInt_ops__lor__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__land__28 = global { ptr, i64, i64 } { ptr @camlInt_ops__land__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mod__27 = global { ptr, i64, i64 } { ptr @camlInt_ops__mod__HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__div_26 = global { ptr, i64, i64 } { ptr @camlInt_ops__div_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__mul_25 = global { ptr, i64, i64 } { ptr @camlInt_ops__mul_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__sub_24 = global { ptr, i64, i64 } { ptr @camlInt_ops__sub_HIDE_STAMP, i64 108086391056891909, i64 3063 }
+@camlInt_ops__add_23 = global { ptr, i64 } { ptr @camlInt_ops__add_HIDE_STAMP, i64 108086391056891909 }
 @camlInt_ops_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr
 

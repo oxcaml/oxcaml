@@ -113,12 +113,11 @@ let () =
    (run ${ocamlopt} ${name}.ml -c ${common_flags} ${llvm_flags})
    (run ${ocamlopt} ${main}.ml -c ${common_flags})
    (run ${ocamlopt} ${extra_dep_cmx} ${name}.cmx ${main}.cmx -opaque -o ${output}.exe)
-   (run mv ${name}.ll ${ir_output}.corrected))
    (with-outputs-to
     ${ir_output}.corrected
     (pipe-outputs
       (run cat ${name}.ll)
-      (run ./${filter})))))
+      (run ./${filter}))))))
 
 (rule
  ${enabled_if}
