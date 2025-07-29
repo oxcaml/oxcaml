@@ -293,7 +293,7 @@ jobs:
       run: |
         for allocator in irc ls gi; do \
           ./_build/main/tools/regalloc/regalloc.exe _build \
-            -validate -regalloc $allocator || exit 1; \
+            -validate -summary -regalloc $allocator || exit 1; \
         done
 
     - uses: actions/upload-artifact@v4
