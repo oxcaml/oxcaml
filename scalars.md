@@ -49,7 +49,7 @@ To illustrate: the OCaml integer 5 is represented as a tagged integer with:
 
 In reality, integer bit representations don't exist in a vacuum, they exist inside of their "containers". A "container" refers to the physical storage location (register or memory word) that holds a value.
 
-Currently, all containers are assumed to be machine-width sized, and integral values must fill their entire container depending on their signedness:
+Currently, all containers are assumed to be `Sys.word_size` bits, and integral values must fill their entire container in a manner determined by their signedness:
 - **Signed**: Sign-extended (sign bit replicated to fill high bits)
 - **Unsigned**: Zero-extended (high bits filled with zeros)
 
