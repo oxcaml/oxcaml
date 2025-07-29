@@ -46,8 +46,6 @@ module Make(_ : sig
 
     val read_unit_shape : unit_name:string -> Shape.t option
 
-    val remove_uids : bool
-
   end) : sig
   val reduce : Env.t -> Shape.t -> Shape.t
 

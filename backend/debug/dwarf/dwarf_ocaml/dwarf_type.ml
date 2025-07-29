@@ -1403,13 +1403,9 @@ module With_cms_reduce = Shape_reduce.Make (struct
            since it's only debugging information, we fail silently. *)
         None
       | cms_infos -> cms_infos.cms_impl_shape)
-
-  let remove_uids = true
-
-  let unfold_recursive_types = true
 end)
 
-let debug_print_reduction_before_and_after = true
+let debug_print_reduction_before_and_after = false
 
 let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
   let fallback_value_die =

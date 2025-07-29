@@ -48,7 +48,6 @@ let find_shape env id =
 module Make(Params : sig
   val fuel : int
   val read_unit_shape : unit_name:string -> t option
-  val remove_uids : bool
 end) = struct
   (* We implement a strong call-by-need reduction, following an
      evaluator from Nathanaelle Courant. *)
@@ -559,7 +558,6 @@ end) = struct
   and read_back_desc ~uid env desc =
     let read_back nf = read_back env nf in
     let read_back_force dnf = read_back (force env dnf) in
-    let uid = if Params.remove_uids then None else uid in
     match desc with
     | NVar v ->
       var' uid v
@@ -693,7 +691,6 @@ module Local_reduce =
   Make(struct
     let fuel = 10
     let read_unit_shape ~unit_name:_ = None
-    let remove_uids = false
   end)
 
 let local_reduce = Local_reduce.reduce
