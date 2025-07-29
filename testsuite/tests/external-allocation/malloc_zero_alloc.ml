@@ -27,11 +27,25 @@ val mixed_record_alloc : int -> int64# -> mixed_record mallocd [@@zero_alloc] =
 |}]
 
 (* Variant allocation *)
-type variant_t = Foo | Bar of int
+type variant_t = Foo | Bar of int | Baz of int * int | FooBar of {x : int; y : int}
 let [@zero_alloc] variant_alloc x = malloc_ (Bar x)
 [%%expect{|
-type variant_t = Foo | Bar of int
+type variant_t =
+    Foo
+  | Bar of int
+  | Baz of int * int
+  | FooBar of { x : int; y : int; }
 val variant_alloc : int -> variant_t mallocd [@@zero_alloc] = <fun>
+|}]
+
+let [@zero_alloc] variant_alloc2 x y = malloc_ (Baz (x,y))
+[%%expect{|
+val variant_alloc2 : int -> int -> variant_t mallocd [@@zero_alloc] = <fun>
+|}]
+
+let [@zero_alloc] variant_alloc3 x y = malloc_ (FooBar {x;y})
+[%%expect{|
+val variant_alloc3 : int -> int -> variant_t mallocd [@@zero_alloc] = <fun>
 |}]
 
 (* Option allocation *)
