@@ -66,6 +66,8 @@ uintnat caml_init_main_stack_wsz = 0;   /* -Xmain_stack_size= */
 uintnat caml_init_thread_stack_wsz = 0; /* -Xthread_stack_size= */
 uintnat caml_init_fiber_stack_wsz = 0;  /* -Xfiber_stack_size= */
 
+uintnat caml_nohugepage_stacks = 1;
+
 uintnat caml_get_init_stack_wsize (int context)
 {
   uintnat init_stack_wsize = 0;
@@ -142,6 +144,19 @@ struct stack_info** caml_alloc_stack_cache (void)
   return stack_cache;
 }
 
+static void free_stack_memory(struct stack_info*);
+void caml_free_stack_cache(struct stack_info** cache)
+{
+  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    while (cache[i] != NULL) {
+      struct stack_info* stk = cache[i];
+      cache[i] = (struct stack_info*)stk->exception_ptr;
+      free_stack_memory(stk);
+    }
+  }
+  caml_stat_free(cache);
+}
+
 /* Round up to a power of 2 */
 static uintnat round_up_p2(uintnat x, uintnat p2)
 {
@@ -152,7 +167,7 @@ static uintnat round_up_p2(uintnat x, uintnat p2)
 /* Allocate a stack with at least the specified number of words.
    The [handler] field of the result is initialised (so Stack_high(...)) is
    well-defined), but other fields are uninitialised */
-Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize)
+Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
 {
   /* Ensure 16-byte alignment of the [struct stack_handler*]. */
   const int stack_alignment = 16;
@@ -216,19 +231,17 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize)
   // struct stack_info
   // -------------------- <- [stack], page/hugepage-aligned (by caml_mem_map)
   struct stack_info* stack;
-#ifdef __linux__
-  /* On Linux, record the current TID in the mapping name */
-  char mapping_name[64];
-  snprintf(mapping_name, sizeof mapping_name,
-           "stack (tid %ld)", (long)syscall(SYS_gettid));
-#else
-  const char* mapping_name = "stack";
-#endif
   /* These mappings should never use HugeTLB pages, due to the guard page */
-  stack = caml_mem_map(len, CAML_MAP_NO_HUGETLB, mapping_name);
+  stack = caml_mem_map(len, CAML_MAP_NO_HUGETLB, NULL);
   if (stack == NULL) {
     return NULL;
   }
+#ifdef __linux__
+  /* On Linux, (optionally) disable *any* hugepage usage for stacks.
+     (Huge pages are not as beneficial for stacks, because you use the same few
+     kb over and over again, but can have a significant RAM cost) */
+  if (caml_nohugepage_stacks) madvise(stack, len, MADV_NOHUGEPAGE);
+#endif
   // mmap is always expected to return a page-aligned value.
   CAMLassert((uintnat)stack % page_size == 0);
 
@@ -236,6 +249,21 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize)
     caml_mem_unmap(stack, len);
     return NULL;
   }
+
+#ifdef __linux__
+  /* On Linux, give names to the various mappings */
+  caml_mem_name_map(stack, page_size,
+                    "stack info (original fiber id %ld, tid %ld)",
+                    id, (long)syscall(SYS_gettid));
+
+  caml_mem_name_map(Protected_stack_page(stack), page_size,
+                    "guard page for stack (original fiber id %ld, tid %ld)",
+                    id, (long)syscall(SYS_gettid));
+
+  caml_mem_name_map(Stack_base(stack), len - 2*page_size,
+                    "stack (original fiber id %ld, tid %ld)",
+                    id, (long)syscall(SYS_gettid));
+#endif
 
   // Assert that the guard page does not impinge on the actual stack area.
   CAMLassert((char*) stack + len - (trailer_size + Bsize_wsize(wosize))
@@ -300,7 +328,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
     CAMLassert(stack->cache_bucket == stack_cache_bucket(wosize));
   } else {
     /* couldn't get a cached stack, so have to create one */
-    stack = alloc_for_stack(wosize);
+    stack = alloc_for_stack(wosize, id);
     if (stack == NULL) {
       return NULL;
     }
@@ -927,6 +955,20 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
   return stk;
 }
 
+static void free_stack_memory(struct stack_info* stack)
+{
+#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+  memset(stack, 0x42, (char*)stack->handler - (char*)stack);
+#endif
+#if defined(USE_MMAP_MAP_STACK)
+  munmap(stack, stack->size);
+#elif defined(STACK_GUARD_PAGES)
+  caml_mem_unmap(stack, stack->size);
+#else
+  caml_stat_free(stack);
+#endif
+}
+
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
@@ -947,16 +989,7 @@ void caml_free_stack (struct stack_info* stack)
            (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
   } else {
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-    memset(stack, 0x42, (char*)stack->handler - (char*)stack);
-#endif
-#ifdef USE_MMAP_MAP_STACK
-    munmap(stack, stack->size);
-#elif defined(STACK_GUARD_PAGES)
-    caml_mem_unmap(stack, stack->size);
-#else
-    caml_stat_free(stack);
-#endif
+    free_stack_memory(stack);
   }
 }
 

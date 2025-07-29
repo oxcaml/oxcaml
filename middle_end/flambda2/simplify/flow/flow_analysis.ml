@@ -52,13 +52,16 @@ let print_graph ~print ~print_name ~lazy_ppf ~graph =
 
 let analyze ?(speculative = false) ?print_name ~return_continuation
     ~exn_continuation ~code_age_relation ~used_value_slots
-    ~code_ids_to_never_delete t : T.Flow_result.t =
+    ~code_ids_to_never_delete ~specialization_map t : T.Flow_result.t =
   Profile.record_call ~accumulate:true "data_flow" (fun () ->
       if Flambda_features.dump_flow ()
-      then Format.eprintf "PRESOURCE:@\n%a@\n@." T.Acc.print t;
+      then
+        Format.eprintf "PRESOURCE:@\nspec:%a@\n%a@\n@."
+          (Continuation_callsite_map.print Continuation.print)
+          specialization_map T.Acc.print t;
       (* Accumulator normalization *)
       let ({ T.Acc.stack; map; extra = _; dummy_toplevel_cont } as t) =
-        Flow_acc.extend_args_with_extra_args t
+        Flow_acc.normalize_acc ~specialization_map t
       in
       assert (match stack with [] -> true | _ :: _ -> false);
       assert (
@@ -122,7 +125,7 @@ let analyze ?(speculative = false) ?print_name ~return_continuation
                 (Continuation_extra_params_and_args.extra_params epa)
             in
             Name.Set.union required_names (Name.set_of_var_set params))
-          reference_result.T.Mutable_unboxing_result.additionnal_epa
+          reference_result.T.Mutable_unboxing_result.additional_epa
           dead_variable_result.required_names
       in
       let result =
@@ -172,3 +175,32 @@ let did_perform_mutable_unboxing (result : T.Flow_result.t) =
          | Prim_rewrite Remove_prim -> false
          | Prim_rewrite (Invalid _ | Replace_by_binding _) -> true)
        result.mutable_unboxing_result.let_rewrites
+
+let added_useful_alias_in_loop typing_env (acc : T.Acc.t)
+    (result : T.Flow_result.t) =
+  Seq.exists2
+    (fun (k, (continuation_info : T.Continuation_info.t))
+         (k', (continuation_param_aliases : T.Continuation_param_aliases.t)) ->
+      if not (Continuation.equal k k')
+      then
+        Misc.fatal_errorf
+          "[Flow Analysis]: Mismatch beetween continuation maps for source \
+           info and continuation params alias result";
+      continuation_info.recursive
+      && Variable.Lmap.exists
+           (fun _var bound_to ->
+             Simple.pattern_match' bound_to
+               ~const:(fun _ -> true)
+               ~var:(fun _ ~coercion:_ ->
+                 (* variables may not be bound in the typing env at this
+                    point *)
+                 false)
+               ~symbol:(fun sym ~coercion:_ ->
+                 match
+                   Typing_env.find_or_missing typing_env (Name.symbol sym)
+                 with
+                 | None -> false
+                 | Some ty -> not (Flambda2_types.is_unknown typing_env ty)))
+           continuation_param_aliases.lets_to_introduce)
+    (Continuation.Map.to_seq acc.map)
+    (Continuation.Map.to_seq result.aliases_result.continuation_parameters)

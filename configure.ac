@@ -17,11 +17,11 @@
 
 # Require Autoconf 2.71 for repeatability in CI
 AC_PREREQ([2.71])
-AC_INIT([The Flambda backend for OCaml],
-        5.2.0+jst,
-        [mshinwell@janestreet.com],
-        [flambda_backend],
-        [http://github.com/ocaml-flambda/flambda_backend])
+AC_INIT([OxCaml],
+        5.2.0+ox,
+        [opensource@janestreet.com],
+        [oxcaml],
+        [http://github.com/oxcaml/oxcaml])
 
 
 ## Command-line arguments passed to configure
@@ -31,7 +31,7 @@ CONFIGURE_ARGS="$*"
 
 DUNE_MAX_VERSION=[3.15]
 
-AC_MSG_NOTICE([Configuring Flambda backend version AC_PACKAGE_VERSION])
+AC_MSG_NOTICE([Configuring OxCaml version AC_PACKAGE_VERSION])
 
 m4_include([build-aux/ax_compare_version.m4])
 
@@ -61,11 +61,10 @@ AC_MSG_NOTICE([Using dune executable: $dune])
 
 AC_ARG_ENABLE([middle-end],
   [AS_HELP_STRING([--enable-middle-end],
-    [Select which middle end to use: flambda2 (default) or upstream-closure])],
+    [Deprecated: must provide 'flambda2'])],
   [AS_CASE([$enable_middle_end],
-    [upstream-closure], [middle_end=closure],
     [flambda2], [middle_end=flambda2],
-    [*], [AC_MSG_ERROR([Invalid middle end: must be flambda2 or upstream-closure])])],
+    [*], [AC_MSG_ERROR([Invalid middle end: must be 'flambda2'])])],
   [middle_end=flambda2])
 
 AC_ARG_ENABLE([runtime5],
@@ -189,7 +188,7 @@ AS_IF([test x"$enable_runtime5" = xyes],
       [runtime_suffix=4])
 
 AC_ARG_ENABLE([stack_checks],
-  [AS_HELP_STRING([--enable-stack_checks],
+  [AS_HELP_STRING([--enable-stack-checks],
     [Enable stack checks])])
 
 ## Output variables
@@ -361,6 +360,7 @@ AC_SUBST([compute_deps])
 AC_SUBST([intel_jcc_bug_cflags])
 AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
+AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
 AC_SUBST([ocaml_bindir])
 AC_SUBST([ocaml_libdir])
@@ -700,6 +700,10 @@ AC_ARG_ENABLE([stack-allocation],
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
     [enable insertion of poll points])])
+
+AC_ARG_ENABLE([multidomain],
+  [AS_HELP_STRING([--enable-multidomain],
+    [allow the creation of multiple domains])])
 
 AC_ARG_WITH([flexdll],
   [AS_HELP_STRING([--with-flexdll],
@@ -2834,6 +2838,147 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
   [AC_DEFINE([POLL_INSERTION])
    poll_insertion=true],
   [poll_insertion=false])
+
+# Multidomain is permitted without stack checks, you'll just get large
+# non-resizeable fiber stacks.
+AS_IF([test x"$enable_multidomain" = "xyes"],
+  [AS_IF([test x"$enable_runtime5" = "xyes" &&
+          test x"$enable_poll_insertion" = "xyes"],
+    [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=yes],
+    [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
+poll insertion enabled.])])], [])
+
+AC_SUBST([has_popcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("popcnt")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_POPCNT]) has_popcnt=yes, [])
+
+AC_SUBST([has_pclmul])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("pclmul")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
+
+AC_SUBST([has_lzcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("lzcnt")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_LZCNT]) has_lzcnt=yes, [])
+
+AC_SUBST([has_sse3])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse3")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE3]) has_sse3=yes, [])
+
+AC_SUBST([has_ssse3])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("ssse3")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSSE3]) has_ssse3=yes, [])
+
+AC_SUBST([has_sse4_1])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse4.1")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE4_1]) has_sse4_1=yes, [])
+
+AC_SUBST([has_sse4_2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("sse4.2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_SSE4_2]) has_sse4_2=yes, [])
+
+AC_SUBST([has_bmi])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("bmi")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_BMI]) has_bmi=yes, [])
+
+AC_SUBST([has_bmi2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("bmi2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_BMI2]) has_bmi2=yes, [])
+
+AC_SUBST([has_avx])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX]) has_avx=yes, [])
+
+AC_SUBST([has_avx2])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx2")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX2]) has_avx2=yes, [])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"

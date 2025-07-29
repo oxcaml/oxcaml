@@ -45,7 +45,15 @@ val these_naked_nativeints : Targetint_32_64.Set.t -> Type_grammar.t
 val these_naked_vec128s :
   Vector_types.Vec128.Bit_pattern.Set.t -> Type_grammar.t
 
+val these_naked_vec256s :
+  Vector_types.Vec256.Bit_pattern.Set.t -> Type_grammar.t
+
+val these_naked_vec512s :
+  Vector_types.Vec512.Bit_pattern.Set.t -> Type_grammar.t
+
 val any_tagged_immediate : Type_grammar.t
+
+val any_tagged_immediate_or_null : Type_grammar.t
 
 val these_tagged_immediates0 : Targetint_31_63.Set.t -> Type_grammar.t
 
@@ -74,6 +82,12 @@ val this_boxed_nativeint :
 
 val this_boxed_vec128 :
   Vector_types.Vec128.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
+
+val this_boxed_vec256 :
+  Vector_types.Vec256.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
+
+val this_boxed_vec512 :
+  Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
 
 val these_boxed_float32s :
   Numeric_types.Float32_by_bit_pattern.Set.t ->
@@ -154,14 +168,14 @@ val static_closure_with_this_code :
 
 val closure_with_at_least_these_value_slots :
   this_function_slot:Function_slot.t ->
-  (Variable.t * Flambda_kind.With_subkind.t) Value_slot.Map.t ->
+  (Variable.t * Flambda_kind.t) Value_slot.Map.t ->
   Type_grammar.t
 
 val closure_with_at_least_this_value_slot :
   this_function_slot:Function_slot.t ->
   Value_slot.t ->
   value_slot_var:Variable.t ->
-  value_slot_kind:Flambda_kind.With_subkind.t ->
+  value_slot_kind:Flambda_kind.t ->
   Type_grammar.t
 
 val type_for_const : Reg_width_const.t -> Type_grammar.t

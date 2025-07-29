@@ -213,9 +213,15 @@ val instance_class:
         type_expr list -> class_type -> type_expr list * class_type
 
 val instance_poly:
-        ?keep_names:bool -> fixed:bool ->
-        type_expr list -> type_expr -> type_expr list * type_expr
+        ?keep_names:bool ->
+        type_expr list -> type_expr -> type_expr
         (* Take an instance of a type scheme containing free univars *)
+val instance_poly_fixed:
+        ?keep_names:bool ->
+        type_expr list -> type_expr -> type_expr list * type_expr
+        (* Take an instance of a type scheme containing free univars for
+           checking that an expression matches this scheme. *)
+
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 val instance_label:
         fixed:bool ->
@@ -535,6 +541,8 @@ val free_variables: ?env:Env.t -> type_expr -> type_expr list
            returns both normal variables and row variables*)
 val free_non_row_variables_of_list: type_expr list -> type_expr list
         (* gets only non-row variables *)
+val free_variable_set_of_list: Env.t -> type_expr list -> Btype.TypeSet.t
+        (* post-condition: all elements in the set are Tvars *)
 
 val exists_free_variable : (type_expr -> jkind_lr -> bool) -> type_expr -> bool
         (* Check if there exists a free variable that satisfies the
@@ -598,10 +606,6 @@ val contained_without_boxing : Env.t -> type_expr -> type_expr list
        (or "without indirection" or "flatly"); in the case of [@@unboxed]
        existentials, these types might have free variables*)
 
-(* Given the row from a variant type, determine if it is immediate.  Currently
-   just checks that all constructors have no arguments, doesn't consider
-   void. *)
-val tvariant_not_immediate : row_desc -> bool
 
 (* Cheap upper bound on jkind.  Will not expand unboxed types - call
    [type_jkind] if that's needed. *)
@@ -666,6 +670,12 @@ val check_type_externality :
    if all with-bounds are irrelevant. *)
 val check_type_nullability :
   Env.t -> type_expr -> Jkind_axis.Nullability.t -> bool
+
+(* Check whether a type's separability is less than some target.
+   Potentially cheaper than just calling [type_jkind], because this can stop
+   expansion once it succeeds. *)
+val check_type_separability :
+  Env.t -> type_expr -> Jkind_axis.Separability.t -> bool
 
 (* This function should get called after a type is generalized.
 
@@ -766,3 +776,25 @@ val cross_left_alloc :
   Types.type_expr ->
   Mode.Alloc.l ->
   Mode.Alloc.l
+
+(** Zap a modality to floor if the [modes] extension is enabled at a level more
+    immature than the given one. Zap to id otherwise. *)
+val zap_modalities_to_floor_if_modes_enabled_at :
+  Language_extension.maturity ->
+  Mode.Modality.Value.t ->
+  Mode.Modality.Value.Const.t
+
+(** The mode crossing of the memory block of a structure. *)
+val mode_crossing_structure_memaddr : Mode.Crossing.t
+
+(** The mode crossing of a functor. *)
+val mode_crossing_functor : Mode.Crossing.t
+
+(** The mode crossing of any module. *)
+val mode_crossing_module : Mode.Crossing.t
+
+(** Zap a modality to floor if maturity allows, zap to id otherwise. *)
+val zap_modalities_to_floor_if_at_least :
+  Language_extension.maturity ->
+  Mode.Modality.Value.t ->
+  Mode.Modality.Value.Const.t

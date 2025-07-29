@@ -155,6 +155,8 @@ module T = struct
     | Ptyp_open (mod_ident, t) ->
         iter_loc sub mod_ident;
         sub.typ sub t
+    | Ptyp_of_kind jkind ->
+        sub.jkind_annotation sub jkind
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub
@@ -460,7 +462,7 @@ module E = struct
     match desc with
     | Pexp_ident x -> iter_loc sub x
     | Pexp_constant _ -> ()
-    | Pexp_let (_r, vbs, e) ->
+    | Pexp_let (_m, _r, vbs, e) ->
         List.iter (sub.value_binding sub) vbs;
         sub.expr sub e
     | Pexp_function (params, constraint_, body) ->
@@ -508,7 +510,7 @@ module E = struct
       sub.modes sub m
     | Pexp_send (e, _s) -> sub.expr sub e
     | Pexp_new lid -> iter_loc sub lid
-    | Pexp_setinstvar (s, e) ->
+    | Pexp_setvar (s, e) ->
         iter_loc sub s; sub.expr sub e
     | Pexp_override sel ->
         List.iter (iter_tuple (iter_loc sub) (sub.expr sub)) sel

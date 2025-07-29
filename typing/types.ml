@@ -20,11 +20,18 @@ open Asttypes
 
 type mutability =
   | Immutable
-  | Mutable of Mode.Alloc.Comonadic.Const.t
+  | Mutable of Mode.Value.Comonadic.lr
 
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
+
+(** Takes [m0] which is the parameter of [let mutable], returns the
+    mode of new values in future writes. *)
+let mutable_mode m0 : _ Mode.Value.t =
+  { comonadic = m0
+  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  }
 
 (* Type expressions for the core language *)
 
@@ -39,6 +46,7 @@ module Jkind_mod_bounds = struct
   module Visibility = Mode.Visibility.Const_op
   module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
+  module Separability = Jkind_axis.Separability
 
   type t = {
     locality: Locality.t;
@@ -51,6 +59,7 @@ module Jkind_mod_bounds = struct
     visibility: Visibility.t;
     externality: Externality.t;
     nullability: Nullability.t;
+    separability: Separability.t;
   }
 
   let[@inline] locality t = t.locality
@@ -63,6 +72,7 @@ module Jkind_mod_bounds = struct
   let[@inline] visibility t = t.visibility
   let[@inline] externality t = t.externality
   let[@inline] nullability t = t.nullability
+  let[@inline] separability t = t.separability
 
   let[@inline] create
       ~locality
@@ -74,7 +84,8 @@ module Jkind_mod_bounds = struct
       ~statefulness
       ~visibility
       ~externality
-      ~nullability =
+      ~nullability
+      ~separability =
     {
       locality;
       linearity;
@@ -86,6 +97,7 @@ module Jkind_mod_bounds = struct
       visibility;
       externality;
       nullability;
+      separability;
     }
 
   let[@inline] set_locality locality t = { t with locality }
@@ -98,6 +110,7 @@ module Jkind_mod_bounds = struct
   let[@inline] set_visibility visibility t = { t with visibility }
   let[@inline] set_externality externality t = { t with externality }
   let[@inline] set_nullability nullability t = { t with nullability }
+  let[@inline] set_separability separability t = { t with separability }
 
   let[@inline] set_max_in_set t max_axes =
     let open Jkind_axis.Axis_set in
@@ -153,6 +166,11 @@ module Jkind_mod_bounds = struct
       then Nullability.max
       else t.nullability
     in
+    let separability =
+      if mem max_axes (Nonmodal Separability)
+      then Separability.max
+      else t.separability
+    in
     {
       locality;
       linearity;
@@ -164,6 +182,7 @@ module Jkind_mod_bounds = struct
       visibility;
       externality;
       nullability;
+      separability;
     }
 
   let[@inline] set_min_in_set t min_axes =
@@ -220,6 +239,11 @@ module Jkind_mod_bounds = struct
       then Nullability.min
       else t.nullability
     in
+    let separability =
+      if mem min_axes (Nonmodal Separability)
+      then Separability.min
+      else t.separability
+    in
     {
       locality;
       linearity;
@@ -231,6 +255,7 @@ module Jkind_mod_bounds = struct
       yielding;
       externality;
       nullability;
+      separability;
     }
 
   let[@inline] is_max_within_set t axes =
@@ -254,20 +279,25 @@ module Jkind_mod_bounds = struct
     (not (mem axes (Nonmodal Externality)) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
-     Nullability.(le max (nullability t)))
+     Nullability.(le max (nullability t))) &&
+    (not (mem axes (Nonmodal Separability)) ||
+     Separability.(le max (separability t)))
 
-  let[@inline] is_max = function
-    | { locality = Local;
-        linearity = Once;
-        uniqueness = Unique;
-        portability = Portable;
-        contention = Uncontended;
-        yielding = Yielding;
-        statefulness = Stateful;
-        visibility = Read_write;
-        externality = External;
-        nullability = Maybe_null } -> true
-    | _ -> false
+  let max =
+      { locality = Locality.max;
+        linearity = Linearity.max;
+        uniqueness = Uniqueness.max;
+        portability = Portability.max;
+        contention = Contention.max;
+        yielding = Yielding.max;
+        statefulness = Statefulness.max;
+        visibility = Visibility.max;
+        externality = Externality.max;
+        nullability = Nullability.max;
+        separability = Separability.max}
+
+  let[@inline] is_max m = m = max
+
 
   let debug_print ppf
         { locality;
@@ -279,10 +309,12 @@ module Jkind_mod_bounds = struct
           statefulness;
           visibility;
           externality;
-          nullability } =
+          nullability;
+          separability } =
     Format.fprintf ppf "@[{ locality = %a;@ linearity = %a;@ uniqueness = %a;@ \
       portability = %a;@ contention = %a;@ yielding = %a;@ statefulness = %a;@ \
-      visibility = %a;@ externality = %a;@ nullability = %a }@]"
+      visibility = %a;@ externality = %a;@ \
+      nullability = %a;@ separability = %a }@]"
       Locality.print locality
       Linearity.print linearity
       Uniqueness.print uniqueness
@@ -293,6 +325,7 @@ module Jkind_mod_bounds = struct
       Visibility.print visibility
       Externality.print externality
       Nullability.print nullability
+      Separability.print separability
 end
 
 
@@ -323,6 +356,7 @@ and type_desc =
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
   | Tpackage of Path.t * (Longident.t * type_expr) list
+  | Tof_kind of jkind_lr
 
 and arg_label =
   | Nolabel
@@ -340,7 +374,11 @@ and row_desc =
       row_fixed: fixed_explanation option;
       row_name: (Path.t * type_expr list) option }
 and fixed_explanation =
-  | Univar of type_expr | Fixed_private | Reified of Path.t | Rigid
+  | Univar of type_expr
+  | Fixed_private
+  | Reified of Path.t
+  | Rigid
+  | Fixed_existential
 and row_field = [`some] row_field_gen
 and _ row_field_gen =
     RFpresent : type_expr option -> [> `some] row_field_gen
@@ -445,6 +483,8 @@ module Vars = Misc.Stdlib.String.Map
 
 type value_kind =
     Val_reg                             (* Regular value *)
+  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+                                        (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
   | Val_self of
@@ -619,7 +659,10 @@ and mixed_block_element =
   | Bits32
   | Bits64
   | Vec128
+  | Vec256
+  | Vec512
   | Word
+  | Product of mixed_product_shape
 
 and mixed_product_shape = mixed_block_element array
 
@@ -804,6 +847,7 @@ module type Wrapped = sig
   and module_declaration =
   {
     md_type: module_type;
+    md_modalities: Mode.Modality.Value.t;
     md_attributes: Parsetree.attributes;
     md_loc: Location.t;
     md_uid: Uid.t;
@@ -859,9 +903,11 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       val_uid
     }
 
-  let module_declaration m {md_type; md_attributes; md_loc; md_uid} =
+  let module_declaration m {md_type; md_modalities; md_attributes;
+    md_loc; md_uid} =
     To.{
       md_type = module_type m md_type;
+      md_modalities;
       md_attributes;
       md_loc;
       md_uid;
@@ -936,19 +982,29 @@ let compare_tag t1 t2 =
   | Extension _, Null -> -1
   | Null, Extension _ -> 1
 
-let equal_mixed_block_element e1 e2 =
+let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
-  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64 | Vec128, Vec128
+  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
     -> true
-  | (Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32 | Bits64 | Vec128), _
+  | Product es1, Product es2
+    -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
+  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Product _ ), _
     -> false
 
-let compare_mixed_block_element e1 e2 =
+let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float_boxed, Float_boxed | Float64, Float64 | Float32, Float32
-  | Word, Word | Bits8, Bits8| Bits16, Bits16 |Bits32, Bits32 | Bits64, Bits64 | Vec128, Vec128
+  | Value, Value | Float_boxed, Float_boxed
+  | Float64, Float64 | Float32, Float32
+  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
     -> 0
+  | Product es1, Product es2
+    -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
+  | Value, _ -> -1
+  | _, Value -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -967,6 +1023,10 @@ let compare_mixed_block_element e1 e2 =
   | _, Bits64 -> 1
   | Vec128, _ -> -1
   | _, Vec128 -> 1
+  | Vec256, _ -> -1
+  | _, Vec256 -> 1
+  | Vec512, _ -> -1
+  | _, Vec512 -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
@@ -1032,8 +1092,7 @@ type 'a gen_label_description =
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Value.Const.t;(* Modalities on the field *)
     lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_num: int;                       (* Position in type *)
+    lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;                     (* Representation for outer record *)
     lbl_private: private_flag;          (* Read-only field? *)
@@ -1087,8 +1146,6 @@ let item_visibility = function
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis) -> vis
 
-let lbl_pos_void = -1
-
 let rec bound_value_identifiers = function
     [] -> []
   | Sig_value(id, {val_kind = Val_reg}, _) :: rem ->
@@ -1109,7 +1166,7 @@ let signature_item_id = function
   | Sig_class_type (id, _, _, _)
     -> id
 
-let mixed_block_element_to_string = function
+let rec mixed_block_element_to_string = function
   | Value -> "Value"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
@@ -1119,7 +1176,14 @@ let mixed_block_element_to_string = function
   | Bits32 -> "Bits32"
   | Bits64 -> "Bits64"
   | Vec128 -> "Vec128"
+  | Vec256 -> "Vec256"
+  | Vec512 -> "Vec512"
   | Word -> "Word"
+  | Product es ->
+    "Product ["
+    ^ (String.concat ", "
+         (Array.to_list (Array.map mixed_block_element_to_string es)))
+    ^ "]"
 
 let mixed_block_element_to_lowercase_string = function
   | Value -> "value"
@@ -1131,7 +1195,14 @@ let mixed_block_element_to_lowercase_string = function
   | Bits32 -> "bits32"
   | Bits64 -> "bits64"
   | Vec128 -> "vec128"
+  | Vec256 -> "vec256"
+  | Vec512 -> "vec512"
   | Word -> "word"
+  | Product es ->
+    "product ["
+    ^ (String.concat ", "
+         (Array.to_list (Array.map mixed_block_element_to_string es)))
+    ^ "]"
 
 (**** Definitions for backtracking ****)
 
@@ -1252,7 +1323,7 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
-    | _ -> assert false
+    | _ -> Misc.fatal_error "set_var_jkind called on non-var"
   let coerce ty = ty
   let repr = repr
   let type_expr ty = ty
@@ -1317,6 +1388,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tunboxed_tuple _ -> 3
         | Tconstr (_, _, _) -> 5
         | Tpoly (_, _) -> 6
+        | Tof_kind _ -> 7
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1748,3 +1820,6 @@ let undo_compress (changes, _old) =
             Transient_expr.set_desc ty desc; r := !next
         | _ -> ())
         log
+
+let functor_param_mode = Mode.Alloc.legacy
+let functor_res_mode = Mode.Alloc.legacy

@@ -1,7 +1,8 @@
 (* TEST
- flags += "-alert -unsafe_parallelism -alert -unsafe_multidomain";
+ flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  modules = "test_c_thread_register_cstubs.c";
  runtime5;
+ multidomain;
  include systhreads;
  hassysthreads;
  {

@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Substitution = Regalloc_substitution
 
 module type State = sig
@@ -87,9 +87,10 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
       | Some block_temp -> replace temp block_temp)
     | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get | Poll
+        ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
         | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Stackoffset _ | Load _
+        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+        | Load _
         | Store (_, _, _)
         | Intop _
         | Intop_imm (_, _)

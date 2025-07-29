@@ -18,6 +18,8 @@
 
 #include "caml/domain_state.h"
 #include "caml/memory.h"
+#include "caml/fail.h"
+#include "caml/signals.h"
 
 CAMLexport caml_domain_state* Caml_state;
 
@@ -100,90 +102,14 @@ void caml_init_domain (void)
   #endif
 }
 
-/* OCaml 5 stdlib compatibility hooks */
-value (*caml_hook_mutex_new)(value unit) = NULL;
-value (*caml_hook_mutex_lock)(value wrapper) = NULL;
-value (*caml_hook_mutex_unlock)(value wrapper) = NULL;
-value (*caml_hook_mutex_try_lock)(value wrapper) = NULL;
-value (*caml_hook_condition_new)(value unit) = NULL;
-value (*caml_hook_condition_wait)(value wcond, value wmut) = NULL;
-value (*caml_hook_condition_signal)(value wrapper) = NULL;
-value (*caml_hook_condition_broadcast)(value wrapper) = NULL;
-
-#include "caml/fail.h"
-
-CAMLprim value caml_ml_mutex_new(value unit)
+CAMLprim value caml_ml_domain_cpu_relax(value unit)
 {
-  if (caml_hook_mutex_new == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_new)(unit);
-}
-
-CAMLprim value caml_ml_mutex_lock(value wrapper)
-{
-  if (caml_hook_mutex_lock == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_lock)(wrapper);
-}
-
-CAMLprim value caml_ml_mutex_unlock(value wrapper)
-{
-  if (caml_hook_mutex_unlock == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_unlock)(wrapper);
-}
-
-CAMLprim value caml_ml_mutex_try_lock(value wrapper)
-{
-  if (caml_hook_mutex_try_lock == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_try_lock)(wrapper);
-}
-
-CAMLprim value caml_ml_condition_new(value unit)
-{
-  if (caml_hook_condition_new == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_new)(unit);
-}
-
-CAMLprim value caml_ml_condition_wait(value wcond, value wmut)
-{
-  if (caml_hook_condition_wait == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_wait)(wcond, wmut);
-}
-
-CAMLprim value caml_ml_condition_signal(value wrapper)
-{
-  if (caml_hook_condition_signal == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_signal)(wrapper);
-}
-
-CAMLprim value caml_ml_condition_broadcast(value wrapper)
-{
-  if (caml_hook_condition_broadcast == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_broadcast)(wrapper);
+  return caml_process_pending_actions_with_root(unit);
 }
 
 /* Dummy implementations to enable [Stdlib.Domain] to link. */
 
 CAMLprim value caml_recommended_domain_count(void)
-{
-  caml_failwith("Domains not supported on runtime4");
-}
-
-CAMLprim value caml_ml_domain_cpu_relax(void)
 {
   caml_failwith("Domains not supported on runtime4");
 }

@@ -27,7 +27,7 @@ let add_equation_on_var denv var shape =
 
 let denv_of_number_decision naked_kind shape param_var naked_var denv : DE.t =
   let naked_name = VB.create naked_var Name_mode.normal in
-  let denv = DE.define_variable denv naked_name naked_kind in
+  let denv = DE.define_extra_variable denv naked_name naked_kind in
   add_equation_on_var denv param_var shape
 
 let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
@@ -38,7 +38,8 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       Misc.Stdlib.List.fold_lefti
         (fun index denv ({ epa = { param = var; _ }; _ } : U.field_decision) ->
           let v = VB.create var Name_mode.normal in
-          DE.define_variable denv v (K.Block_shape.element_kind shape index))
+          DE.define_extra_variable denv v
+            (K.Block_shape.element_kind shape index))
         denv fields
     in
     let type_of_var index (field : U.field_decision) =
@@ -61,13 +62,13 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       Value_slot.Map.fold
         (fun _ ({ epa = { param = var; _ }; kind; _ } : U.field_decision) denv ->
           let v = VB.create var Name_mode.normal in
-          DE.define_variable denv v (K.With_subkind.kind kind))
+          DE.define_extra_variable denv v (K.With_subkind.kind kind))
         vars_within_closure denv
     in
     let map =
       Value_slot.Map.map
         (fun ({ epa = { param = var; _ }; kind; _ } : U.field_decision) ->
-          var, kind)
+          var, K.With_subkind.kind kind)
         vars_within_closure
     in
     let shape =
@@ -82,7 +83,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
   | Unbox (Variant { tag; const_ctors; fields_by_tag }) ->
     (* Adapt the denv for the tag *)
     let tag_v = VB.create tag.param Name_mode.normal in
-    let denv = DE.define_variable denv tag_v K.naked_immediate in
+    let denv = DE.define_extra_variable denv tag_v K.naked_immediate in
     let denv =
       DE.map_typing_env denv ~f:(fun tenv ->
           TE.add_get_tag_relation tenv (Name.var tag.param)
@@ -98,7 +99,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       | Zero -> denv
       | At_least_one { is_int; _ } ->
         let is_int_v = VB.create is_int.param Name_mode.normal in
-        let denv = DE.define_variable denv is_int_v K.naked_immediate in
+        let denv = DE.define_extra_variable denv is_int_v K.naked_immediate in
         let denv =
           DE.map_typing_env denv ~f:(fun tenv ->
               TE.add_is_int_relation tenv (Name.var is_int.param)
@@ -120,7 +121,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         denv, T.unknown K.naked_immediate
       | At_least_one { ctor = Unbox (Number (Naked_immediate, ctor_epa)); _ } ->
         let v = VB.create ctor_epa.param Name_mode.normal in
-        let denv = DE.define_variable denv v K.naked_immediate in
+        let denv = DE.define_extra_variable denv v K.naked_immediate in
         let ty =
           T.alias_type_of K.naked_immediate (Simple.var ctor_epa.param)
         in
@@ -132,7 +133,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
                 | Number
                     ( ( Naked_float | Naked_float32 | Naked_int8 | Naked_int16
                       | Naked_int32 | Naked_int64 | Naked_nativeint
-                      | Naked_vec128 ),
+                      | Naked_vec128 | Naked_vec256 | Naked_vec512 ),
                       _ ) );
             is_int = _
           } ->
@@ -146,7 +147,8 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
           Misc.Stdlib.List.fold_lefti
             (fun index denv ({ epa = { param = var; _ }; _ } : U.field_decision) ->
               let v = VB.create var Name_mode.normal in
-              DE.define_variable denv v (K.Block_shape.element_kind shape index))
+              DE.define_extra_variable denv v
+                (K.Block_shape.element_kind shape index))
             denv block_fields)
         fields_by_tag denv
     in
@@ -189,10 +191,10 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
     in
     denv_of_number_decision K.naked_float shape param_var naked_float denv
   | Unbox (Number (Naked_int8, { param = naked_int8; args = _ })) ->
-    let shape = T.tagged_int8_alias_to ~naked_int8 in
+    let shape = T.any_naked_int8 in
     denv_of_number_decision K.naked_int8 shape param_var naked_int8 denv
   | Unbox (Number (Naked_int16, { param = naked_int16; args = _ })) ->
-    let shape = T.tagged_int16_alias_to ~naked_int16 in
+    let shape = T.any_naked_int16 in
     denv_of_number_decision K.naked_int16 shape param_var naked_int16 denv
   | Unbox (Number (Naked_int32, { param = naked_int32; args = _ })) ->
     let shape =
@@ -216,3 +218,13 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       T.boxed_vec128_alias_to ~naked_vec128 (Alloc_mode.For_types.unknown ())
     in
     denv_of_number_decision K.naked_vec128 shape param_var naked_vec128 denv
+  | Unbox (Number (Naked_vec256, { param = naked_vec256; args = _ })) ->
+    let shape =
+      T.boxed_vec256_alias_to ~naked_vec256 (Alloc_mode.For_types.unknown ())
+    in
+    denv_of_number_decision K.naked_vec256 shape param_var naked_vec256 denv
+  | Unbox (Number (Naked_vec512, { param = naked_vec512; args = _ })) ->
+    let shape =
+      T.boxed_vec512_alias_to ~naked_vec512 (Alloc_mode.For_types.unknown ())
+    in
+    denv_of_number_decision K.naked_vec512 shape param_var naked_vec512 denv

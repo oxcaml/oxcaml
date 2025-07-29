@@ -114,11 +114,16 @@ let max_rounds = 32
 
 let max_temp_multiplier = 10
 
+module For_testing = struct
+  let rounds = ref (-1)
+end
+
 (* CR xclerc for xclerc: the `round` parameter is temporary; this is an hybrid
    version of "greedy" using the `rewrite` function from IRC when it needs to
    spill. *)
 let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
  fun ~round ~flat state cfg_with_infos ->
+  For_testing.rounds := round;
   if round > max_rounds
   then
     fatal "register allocation was not succesful after %d rounds (%s)"

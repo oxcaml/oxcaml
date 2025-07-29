@@ -270,16 +270,19 @@ module Const : sig
     (** This is the jkind of normal ocaml values or null pointers *)
     val value_or_null : t
 
+    (** Same kind mod everything. *)
+    val value_or_null_mod_everything : t
+
     (** This is the jkind of normal ocaml values *)
     val value : t
 
-    (** Immutable values that don't contain functions. *)
+    (** Immutable non-float values that don't contain functions. *)
     val immutable_data : t
 
-    (** Atomically mutable values that don't contain functions. *)
+    (** Atomically mutable non-float values that don't contain functions. *)
     val sync_data : t
 
-    (** Mutable values that don't contain functions. *)
+    (** Mutable non-float values that don't contain functions. *)
     val mutable_data : t
 
     (** Values of types of this jkind are immediate on 64-bit platforms; on other
@@ -337,8 +340,20 @@ module Const : sig
     (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
     val vec128 : t
 
+    (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
+    val vec256 : t
+
+    (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
+    val vec512 : t
+
     (** The jkind of unboxed 128-bit vectors with mode crossing. *)
     val kind_of_unboxed_128bit_vectors : t
+
+    (** The jkind of unboxed 256-bit vectors with mode crossing. *)
+    val kind_of_unboxed_256bit_vectors : t
+
+    (** The jkind of unboxed 512-bit vectors with mode crossing. *)
+    val kind_of_unboxed_512bit_vectors : t
 
     (** A list of all Builtin jkinds *)
     val all : t list
@@ -350,6 +365,11 @@ module Builtin : sig
     But we cannot compile run-time manipulations of values of types with jkind
     [any]. *)
   val any : why:History.any_creation_reason -> 'd Types.jkind
+
+  (* CR layouts v3: change to [any_separable]. *)
+
+  (** Jkind of array elements. *)
+  val any_non_null : why:History.any_creation_reason -> 'd Types.jkind
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
@@ -399,9 +419,6 @@ module Builtin : sig
   val product_of_sorts :
     why:History.product_creation_reason -> int -> Types.jkind_l
 end
-
-(** Take an existing [t] and add an ability to cross across the nullability axis. *)
-val add_nullability_crossing : 'd Types.jkind -> 'd Types.jkind
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and with-bounds of [from]. *)
 val unsafely_set_bounds :
@@ -513,11 +530,47 @@ val for_boxed_variant : Types.constructor_declaration list -> Types.jkind_l
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
 
+(** Choose an appropriate jkind for a row type. *)
+val for_boxed_row : Types.row_desc -> Types.jkind_l
+
 (** The jkind of an arrow type. *)
 val for_arrow : Types.jkind_l
 
 (** The jkind of an object type.  *)
 val for_object : Types.jkind_l
+
+(** The jkind of a float. *)
+val for_float : Ident.t -> Types.jkind_l
+
+(** The jkind for values that are not floats. *)
+val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
+
+(** The jkind for [or_null] type arguments. *)
+val for_or_null_argument : Ident.t -> 'd Types.jkind
+
+(** The jkind for an abbreviation declaration. This implements the design
+    in rule FIND_ABBREV in kind-inference.md, where we consider a definition
+
+    {[
+      type ... = rhs
+    ]}
+
+    to have the kind [<<layout of rhs>> mod everything with rhs]. This is
+    important to allow code like this to type-check:
+
+    {[
+      module M : sig
+        type 'a t : value mod portable with 'a
+      end = struct
+        type 'a t = 'a
+      end
+    ]}
+*)
+val for_abbreviation :
+  type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
+  modality:Mode.Modality.Value.Const.t ->
+  Types.type_expr ->
+  Types.jkind_l
 
 (******************************)
 (* elimination and defaulting *)
@@ -588,13 +641,18 @@ val set_externality_upper_bound :
 (** Gets the nullability from a jkind. *)
 val get_nullability :
   jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
-  'd Types.jkind ->
+  Types.jkind_l ->
   Jkind_axis.Nullability.t
 
 (** Computes a jkind that is the same as the input but with an updated maximum
-    mode for the externality axis *)
+    mode for the nullability axis *)
 val set_nullability_upper_bound :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
+
+(** Computes a jkind that is the same as the input but with an updated maximum
+    mode for the separability axis *)
+val set_separability_upper_bound :
+  Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
@@ -611,6 +669,12 @@ val apply_modality_l :
     will all be top. The with-bounds are left unchanged. *)
 val apply_modality_r :
   Mode.Modality.Value.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
+
+(** Change a jkind to be appropriate for an expectation of a type passed to
+    the [or_null] constructor. Adjusts nullability to be [Non_null], and
+    separability to be [Non_float] if it is demanded to be [Separable].
+    If the jkind is already [Non_null], fails. *)
+val apply_or_null : Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just
@@ -649,7 +713,6 @@ val set_outcometree_of_type : (Types.type_expr -> Outcometree.out_type) -> unit
 
 val set_outcometree_of_modalities_new :
   (Types.mutability ->
-  Parsetree.attributes ->
   Mode.Modality.Value.Const.t ->
   Outcometree.out_mode_new list) ->
   unit

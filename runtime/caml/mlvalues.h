@@ -69,12 +69,17 @@ typedef opcode_t * code_t;
 
 #include "domain_state.h"
 
-/* The null pointer value. */
+/* Or_null constructors. */
+
 #define Val_null ((value) 0)
+#define Val_this(v) (v)
+#define This_val(v) (v)
+#define Is_null(v) ((v) == Val_null)
+#define Is_this(v) ((v) != Val_null)
 
 /* Longs vs blocks. */
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(HAS_BMI)
 // Specialize the implementation of Is_block and Is_long on x86-64.
 //
 // Is_block(x) returns 1 if the least significant bit of x is 0, and x != 0.
@@ -161,7 +166,7 @@ For 64-bit architectures:
 bits  63    64-R 63-R  10 9     8 7   0
 
 where 0 <= R <= 31 is HEADER_RESERVED_BITS. R is always
-set to 8 for the flambda-backend compiler in order to support
+set to 8 for the OxCaml compiler in order to support
 mixed blocks. In the upstream compiler, R is set with the
 --enable-reserved-header-bits=R argument.
 
@@ -324,7 +329,7 @@ CAMLno_tsan_for_perf Caml_inline header_t Hd_val(value val)
    in a for-loop.
 */
 
-/* flambda-backend: We rename the size macros to [Allocated_...] so that we're
+/* oxcaml: We rename the size macros to [Allocated_...] so that we're
    forced to think about whether C code needs to updated for mixed blocks, which
    have separate notions of scannable size and total size of an object, even for
    scannable tags. We call an object's size (including possibly non-scannable
@@ -642,7 +647,8 @@ CAMLextern value caml_set_oo_id(value obj);
    better by C formatters.)
  */
 #define Assert_mixed_block_layout_v1 _Static_assert(0, "")
-#define Assert_mixed_block_layout_v2 _Static_assert(1, "")
+#define Assert_mixed_block_layout_v2 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v3 _Static_assert(1, "")
 
 /* Header for out-of-heap blocks. */
 

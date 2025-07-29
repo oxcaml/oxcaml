@@ -28,11 +28,33 @@ type get_imported_names = unit -> Name.Set.t
 
 type get_imported_code = unit -> Exported_code.t
 
+module Disable_inlining_reason = struct
+  type t =
+    | Stub
+    | Speculative_inlining
+
+  let print ppf = function
+    | Stub -> Format.fprintf ppf "Stub"
+    | Speculative_inlining -> Format.fprintf ppf "Speculative_inlining"
+end
+
+module Disable_inlining = struct
+  type t =
+    | Disable_inlining of Disable_inlining_reason.t
+    | Do_not_disable_inlining
+
+  let print ppf = function
+    | Disable_inlining reason ->
+      Format.fprintf ppf "@[<hov 1>(Disable_inlining %a)@]"
+        Disable_inlining_reason.print reason
+    | Do_not_disable_inlining -> Format.fprintf ppf "Do_not_disable_inlining"
+end
+
 type t =
   { round : int;
     typing_env : TE.t;
     inlined_debuginfo : Inlined_debuginfo.t;
-    can_inline : bool;
+    disable_inlining : Disable_inlining.t;
     inlining_state : Inlining_state.t;
     propagating_float_consts : bool;
     at_unit_toplevel : bool;
@@ -49,6 +71,10 @@ type t =
     loopify_state : Loopify_state.t;
     replay_history : Replay_history.t;
         (* Replay history for the current continuation handler (or toplevel) *)
+    specialization_cost : Specialization_cost.t;
+        (* Accumulator to record whether the handler of the current continuation
+           can be specialized, or whether there are reasons why it could not (or
+           rather why it would not be beneficial) *)
     defined_variables_by_scope : Lifted_cont_params.t list;
         (* Stack of variables defined. The first element of the list refers to
            variables defined by the current continuation, and the last element
@@ -69,21 +95,21 @@ type t =
   }
 
 let [@ocamlformat "disable"] print ppf { round; typing_env;
-                inlined_debuginfo; can_inline;
+                inlined_debuginfo; disable_inlining;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; cse; comparison_results;
                 are_rebuilding_terms; closure_info;
                 unit_toplevel_return_continuation; all_code;
                 get_imported_code = _; inlining_history_tracker = _;
-                loopify_state; replay_history; defined_variables_by_scope;
+                loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
       @[<hov 1>(typing_env@ %a)@]@ \
       @[<hov 1>(inlined_debuginfo@ %a)@]@ \
-      @[<hov 1>(can_inline@ %b)@]@ \
+      @[<hov 1>(disable_inlining@ %a)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
       @[<hov 1>(propagating_float_consts@ %b)@]@ \
       @[<hov 1>(at_unit_toplevel@ %b)@]@ \
@@ -97,13 +123,14 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
       @[<hov 1>(all_code@ %a)@]@ \
       @[<hov 1>(loopify_state@ %a)@]@ \
       @[<hov 1>(binding_histories@ %a)@]@ \
+      @[<hov 1>(specialization_cost@ %a)@]@ \
       @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
       @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]\
       )@]"
     round
     TE.print typing_env
     Inlined_debuginfo.print inlined_debuginfo
-    can_inline
+    Disable_inlining.print disable_inlining
     Inlining_state.print inlining_state
     propagating_float_consts
     at_unit_toplevel
@@ -117,6 +144,7 @@ let [@ocamlformat "disable"] print ppf { round; typing_env;
     (Code_id.Map.print Code.print) all_code
     Loopify_state.print loopify_state
     Replay_history.print replay_history
+    Specialization_cost.print specialization_cost
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
     cost_of_lifting_continuations_out_of_current_one
 
@@ -179,7 +207,7 @@ let create ~round ~(resolver : resolver)
     { round;
       typing_env;
       inlined_debuginfo = Inlined_debuginfo.none;
-      can_inline = true;
+      disable_inlining = Do_not_disable_inlining;
       inlining_state = Inlining_state.default ~round;
       propagating_float_consts;
       at_unit_toplevel = true;
@@ -196,6 +224,7 @@ let create ~round ~(resolver : resolver)
         Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
+      specialization_cost = Specialization_cost.can_specialize;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
       cost_of_lifting_continuations_out_of_current_one = 0
@@ -218,7 +247,7 @@ let round t = t.round
 
 let get_continuation_scope t = TE.current_scope t.typing_env
 
-let can_inline t = t.can_inline
+let disable_inlining t = t.disable_inlining
 
 let propagating_float_consts t = t.propagating_float_consts
 
@@ -257,7 +286,7 @@ let enter_set_of_closures
     { round;
       typing_env;
       inlined_debuginfo = _;
-      can_inline;
+      disable_inlining = _;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
@@ -273,14 +302,15 @@ let enter_set_of_closures
       inlining_history_tracker;
       loopify_state = _;
       replay_history = _;
+      specialization_cost = _;
       defined_variables_by_scope = _;
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _
-    } =
+    } disable_inlining =
   { round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
-    can_inline;
+    disable_inlining;
     inlining_state;
     propagating_float_consts;
     at_unit_toplevel = false;
@@ -296,6 +326,7 @@ let enter_set_of_closures
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
+    specialization_cost = Specialization_cost.can_specialize;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0
@@ -502,13 +533,14 @@ let find_comparison_result t var =
 
 let with_cse t cse = { t with cse }
 
-let set_do_not_rebuild_terms_and_disable_inlining t =
+let set_do_not_rebuild_terms_and_disable_inlining t disable_inlining_reason =
   { t with
     are_rebuilding_terms = Are_rebuilding_terms.are_not_rebuilding;
-    can_inline = false
+    disable_inlining = Disable_inlining disable_inlining_reason
   }
 
-let disable_inlining t = { t with can_inline = false }
+let set_disable_inlining t reason =
+  { t with disable_inlining = Disable_inlining reason }
 
 let set_rebuild_terms t =
   { t with are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding }
@@ -646,19 +678,24 @@ let must_inline t = Replay_history.must_inline t.replay_history
 
 let replay_history t = t.replay_history
 
+let map_specialization_cost ~f t =
+  { t with specialization_cost = f t.specialization_cost }
+
+let specialization_cost t = t.specialization_cost
+
 let denv_for_lifted_continuation ~denv_for_join ~denv =
-  (* At this point, we are lifting a continuation k' with handler [handlers],
-     out of a continuation k, and:
+  (* At this point, we are lifting a continuation k' with handler [handler], out
+     of a continuation k, and:
 
      - [denv_for_join] is the denv just before the let_cont for k
 
      - [denv] is the denv just before the let_cont for k'
 
-     And we need to decide which parts of denv to use to simplify the handlers
-     of k' after there are lifted out from the handler of k. *)
+     And we need to decide which parts of denv to use to simplify the handler of
+     k' after they are lifted out from the handler of k. *)
   { (* denv *)
     inlined_debuginfo = denv.inlined_debuginfo;
-    can_inline = denv.can_inline;
+    disable_inlining = denv.disable_inlining;
     inlining_state = denv.inlining_state;
     all_code = denv.all_code;
     inlining_history_tracker = denv.inlining_history_tracker;
@@ -669,6 +706,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     cse = denv_for_join.cse;
     comparison_results = denv_for_join.comparison_results;
     replay_history = denv_for_join.replay_history;
+    specialization_cost = denv_for_join.specialization_cost;
     defined_variables_by_scope = denv_for_join.defined_variables_by_scope;
     lifted = denv_for_join.lifted;
     cost_of_lifting_continuations_out_of_current_one =

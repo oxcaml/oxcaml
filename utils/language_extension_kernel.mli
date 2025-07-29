@@ -29,6 +29,8 @@ type _ t =
   | Labeled_tuples : unit t
   | Small_numbers : maturity t
   | Instances : unit t
+  | Separability : unit t
+  | Let_mutable : unit t
 
 (** Print and parse language extensions; parsing is case-insensitive *)
 val to_string : _ t -> string

@@ -425,7 +425,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   let compilation_unit = Compilation_unit.get_current_exn () in
   let wrapper_function_slot =
     Function_slot.create compilation_unit ~name:"partial_app_closure"
-      K.With_subkind.any_value
+      ~is_always_immediate:false K.value
   in
   (* The allocation mode of the closure is directly determined by the alloc_mode
      of the application. We check here that it is consistent with
@@ -456,7 +456,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   let expr, dacc =
     match new_closure_alloc_mode_and_first_complex_local_param with
     | Bottom ->
-      Expr.create_invalid (Partial_application_mode_mismatch apply), dacc
+      ( Expr.create_invalid
+          (Partial_application_mode_mismatch (apply, callee's_code_metadata)),
+        dacc )
     | Ok (new_closure_alloc_mode, first_complex_local_param) ->
       (match closure_alloc_mode_from_type with
       | Heap_or_local -> ()
@@ -507,7 +509,15 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                 }
         end in
         let mk_value_slot kind =
-          Value_slot.create compilation_unit ~name:"arg" kind
+          let is_always_immediate =
+            match[@ocaml.warning "-4"]
+              K.With_subkind.non_null_value_subkind kind
+            with
+            | Tagged_immediate -> true
+            | _ -> false
+          in
+          Value_slot.create compilation_unit ~name:"arg" ~is_always_immediate
+            (K.With_subkind.kind kind)
         in
         let applied_value (value, kind) =
           Simple.pattern_match' value
@@ -674,7 +684,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let function_decls =
           Function_declarations.create
             (Function_slot.Lmap.singleton wrapper_function_slot
-               (Code_id code_id
+               (Code_id { code_id; only_full_applications = false }
                  : Function_declarations.code_id_in_function_declaration))
         in
         let value_slots =
@@ -776,6 +786,28 @@ let replace_apply_by_invalid dacc ~down_to_up reason =
       let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
       EB.rebuild_invalid uacc reason ~after_rebuild)
 
+let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
+    ~(args_arity : [`Complex] Flambda_arity.t) =
+  (* This checks the shortest of the two arities against the prefix of the same
+     size of the other. *)
+  let rec has_mismatch params args =
+    match params, args with
+    | [], _ | _, [] -> false
+    | param :: params, arg :: args ->
+      let c = List.compare_lengths param arg in
+      if c = 0
+      then
+        List.exists2
+          (fun param_component arg_component ->
+            not (K.equal (KS.kind param_component) (KS.kind arg_component)))
+          param arg
+        || has_mismatch params args
+      else true
+  in
+  let params = Flambda_arity.unarize_per_parameter params_arity in
+  let args = Flambda_arity.unarize_per_parameter args_arity in
+  has_mismatch params args
+
 let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_id_from_call_kind
     ~callee's_function_slot ~result_arity ~result_types ~recursive
@@ -821,10 +853,24 @@ let simplify_direct_function_call ~simplify_expr dacc apply
 
        - Indirect calls adopt the calling convention consisting of a single
        tuple argument, irrespective of what [Code.params_arity] says. *)
+    let args_arity = Apply.args_arity apply in
     if must_be_detupled
     then
       simplify_direct_tuple_application ~simplify_expr dacc apply
         ~apply_alloc_mode ~callee's_code_id ~callee's_code_metadata ~down_to_up
+    else if arity_mismatch ~params_arity ~args_arity
+    then
+      if Flambda_features.kind_checks ()
+      then
+        Misc.fatal_errorf
+          "Mismatched arities for arguments to direct OCaml function call@ \
+           (expected %a, found %a):@ %a"
+          Flambda_arity.print params_arity Flambda_arity.print args_arity
+          Apply.print apply
+      else
+        replace_apply_by_invalid dacc ~down_to_up
+          (Direct_application_parameter_kind_mismatch
+             { params_arity; args_arity; apply })
     else
       let args_arity = Apply.args_arity apply in
       let provided_num_args = Flambda_arity.num_params args_arity in
@@ -863,7 +909,8 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       else if provided_num_args > num_params
       then (
         (* See comment above. *)
-        if not (Flambda_arity.is_one_param_of_kind_value result_arity)
+        if Flambda_features.kind_checks ()
+           && not (Flambda_arity.is_one_param_of_kind_value result_arity)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for overapplied OCaml function:@ \
@@ -875,9 +922,10 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       else if provided_num_args > 0 && provided_num_args < num_params
       then (
         (* See comment above. *)
-        if not
-             (Flambda_arity.is_one_param_of_kind_value
-                result_arity_of_application)
+        if Flambda_features.kind_checks ()
+           && not
+                (Flambda_arity.is_one_param_of_kind_value
+                   result_arity_of_application)
         then
           Misc.fatal_errorf
             "Non-singleton-value return arity for partially-applied OCaml \

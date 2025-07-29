@@ -355,8 +355,7 @@ end
 module B :
   sig
     type 'a t_reexported
-      : immutable_data
-      with 'a =
+      : immutable_data with 'a =
       'a t =
         P : ('a, 'k) imm -> 'a t_reexported
     [@@unsafe_allow_any_mode_crossing]
@@ -385,10 +384,10 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod many portable unyielding stateless contended
-         immutable with 'a
-         but this has: mod many portable unyielding stateless contended
-         immutable
+         the original has: mod unyielding many stateless portable immutable
+         contended with 'a
+         but this has: mod unyielding many stateless portable immutable
+         contended
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -406,10 +405,10 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod many portable unyielding stateless contended
-         immutable with 'b
-         but this has: mod many portable unyielding stateless contended
-         immutable with 'a
+         the original has: mod unyielding many stateless portable immutable
+         contended with 'b
+         but this has: mod unyielding many stateless portable immutable
+         contended with 'a
 |}]
 
 (* mcomp *)

@@ -265,7 +265,10 @@ let string_of_reg32 = function
   | R14 -> "r14d"
   | R15 -> "r15d"
 
-let string_of_regf = function XMM n -> Printf.sprintf "xmm%d" n
+let string_of_regf = function
+  | XMM n -> Printf.sprintf "xmm%d" n
+  | YMM n -> Printf.sprintf "ymm%d" n
+  | ZMM n -> Printf.sprintf "zmm%d" n
 
 let string_of_condition = function
   | E -> "e"
@@ -284,6 +287,16 @@ let string_of_condition = function
   | S -> "s"
   | NO -> "no"
   | O -> "o"
+
+let imm_of_float_condition = function
+  | EQf -> Imm 0L
+  | LTf -> Imm 1L
+  | LEf -> Imm 2L
+  | UNORDf -> Imm 3L
+  | NEQf -> Imm 4L
+  | NLTf -> Imm 5L
+  | NLEf -> Imm 6L
+  | ORDf -> Imm 7L
 
 let string_of_float_condition = function
   | EQf -> "eq"
@@ -384,7 +397,9 @@ let create_asm_file = ref true
 let directive dir =
   if !create_asm_file then asm_code := dir :: !asm_code;
   match[@warning "-4"] dir with
-  | Section (name, flags, args, is_delayed) -> (
+  | Directive
+      (Asm_targets.Asm_directives.Directive.Section
+        { names = name; flags; args; is_delayed }) -> (
     let name = Section_name.make name flags args in
     let where = if is_delayed then delayed_sections else asm_code_by_section in
     match Section_name.Tbl.find_opt where name with

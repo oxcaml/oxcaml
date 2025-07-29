@@ -188,7 +188,8 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
               | Tagged_immediate _ | Null -> ()
               | Naked_immediate _ | Naked_float32 _ | Naked_float _
               | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
-              | Naked_nativeint _ | Naked_vec128 _ ->
+              | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
+              | Naked_vec512 _ ->
                 Misc.fatal_errorf
                   "Unboxed constants are not allowed inside of Const_block: %a"
                   Printlambda.structured_constant const);
@@ -199,9 +200,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       SC.block (Tag.Scannable.create_exn tag) Immutable Value_only fields
     in
     register_const acc dbg const "const_block"
-  | Const_mixed_block (tag, shape, consts) ->
-    let shape = Mixed_block_shape.of_mixed_block_elements shape in
-    (* CR mshinwell: why do we need these "const" block cases? *)
+  | Const_mixed_block (tag, shape, args) ->
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        shape
+    in
     let unbox_float_constant (c : Lambda.structured_constant) :
         Lambda.structured_constant =
       match c with
@@ -219,31 +223,44 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           \       Float_boxed contained the  constant %a"
           Printlambda.structured_constant c
     in
-    let consts =
-      consts |> Array.of_list
-      |> Mixed_block_shape.reorder_array shape
-      |> Array.mapi (fun i c ->
-             match Mixed_block_shape.get_reordered shape i with
-             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-             | Vec128 | Word ->
-               c
-             | Float_boxed _ -> unbox_float_constant c)
+    (* CR mshinwell: factor out, this is also in the Pmakemixedblock case. Or
+       even better, add support for lifting mixed blocks, then remove this
+       special handling for Const_block and Const_mixed_block and use that
+       (mshinwell has a partial patch for this). *)
+    let args =
+      let new_indexes_to_old_indexes =
+        Mixed_block_shape.new_indexes_to_old_indexes shape
+      in
+      let args = Array.of_list args in
+      Array.init (Array.length args) (fun new_index ->
+          args.(new_indexes_to_old_indexes.(new_index)))
       |> Array.to_list
     in
-    let shape =
-      K.Mixed_block_shape.from_lambda (Mixed_block_shape.reordered_shape shape)
+    let args =
+      let flattened_reordered_shape =
+        Mixed_block_shape.flattened_reordered_shape shape
+      in
+      List.mapi
+        (fun new_index arg ->
+          match flattened_reordered_shape.(new_index) with
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Word ->
+            arg
+          | Float_boxed _ -> unbox_float_constant arg)
+        args
     in
+    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
     let acc, fields =
       List.fold_left_map
         (fun acc c ->
           let acc, field, _name = declare_const acc dbg c in
           acc, field)
-        acc consts
+        acc args
     in
     let const : SC.t =
       SC.block
         (Tag.Scannable.create_exn tag)
-        Immutable (Mixed_record shape) fields
+        Immutable (Mixed_record kind_shape) fields
     in
     register_const acc dbg const "const_mixed_block"
   | Const_null -> acc, reg_width RWC.const_null, "null"
@@ -533,6 +550,16 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
       [ { kind = K.naked_vec128;
           arg_transformer = None;
           return_transformer = None
+        } ]
+    | Vec256 ->
+      [ { kind = K.naked_vec256;
+          arg_transformer = None;
+          return_transformer = None
+        } ]
+    | Vec512 ->
+      [ { kind = K.naked_vec512;
+          arg_transformer = None;
+          return_transformer = None
         } ])
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
@@ -590,6 +617,16 @@ let unarize_extern_repr alloc_mode (extern_repr : Lambda.extern_repr) =
     [ { kind = K.naked_vec128;
         arg_transformer = Some (P.Unbox_number Naked_vec128);
         return_transformer = Some (P.Box_number (Naked_vec128, alloc_mode))
+      } ]
+  | Unboxed_vector Boxed_vec256 ->
+    [ { kind = K.naked_vec256;
+        arg_transformer = Some (P.Unbox_number Naked_vec256);
+        return_transformer = Some (P.Box_number (Naked_vec256, alloc_mode))
+      } ]
+  | Unboxed_vector Boxed_vec512 ->
+    [ { kind = K.naked_vec512;
+        arg_transformer = Some (P.Unbox_number Naked_vec512);
+        return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
       } ]
   | Unboxed_integer Unboxed_int ->
     [ { kind = K.naked_immediate;
@@ -1045,33 +1082,34 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
       | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
       | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-      | Pstring_load_64 _ | Pstring_load_128 _ | Pbytes_load_16 _
+      | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_16 _
       | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
-      | Pbytes_load_128 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
-      | Pbytes_set_64 _ | Pbytes_set_128 _ | Pbigstring_load_16 _
+      | Pbytes_load_vec _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+      | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_128 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
-      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_128 _
-      | Pfloatarray_load_128 _ | Pfloat_array_load_128 _ | Pint_array_load_128 _
-      | Punboxed_float_array_load_128 _ | Punboxed_float32_array_load_128 _
-      | Punboxed_int32_array_load_128 _ | Punboxed_int64_array_load_128 _
-      | Punboxed_nativeint_array_load_128 _ | Pfloatarray_set_128 _
-      | Pfloat_array_set_128 _ | Pint_array_set_128 _
-      | Punboxed_float_array_set_128 _ | Punboxed_float32_array_set_128 _
-      | Punboxed_int32_array_set_128 _ | Punboxed_int64_array_set_128 _
-      | Punboxed_nativeint_array_set_128 _ | Pctconst _ | Pint_as_pointer _
+      | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+      | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+      | Pfloat_array_set_vec _ | Pint_array_set_vec _
+      | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+      | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+      | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
       | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
-      | Pmakelazyblock _ | Punbox_vector _
+      | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Pmake_unboxed_product _ | Punboxed_product_field _
       | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
-      | Presume | Preperform | Patomic_exchange _ | Patomic_compare_exchange _
-      | Patomic_compare_set _ | Patomic_fetch_add | Patomic_add | Patomic_sub
-      | Patomic_land | Patomic_lor | Patomic_lxor | Pdls_get | Ppoll
-      | Patomic_load _ | Patomic_set _
+      | Presume | Preperform | Patomic_exchange_field _
+      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Ppoll | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-      | Pscalar _ | Pphys_equal _ ->
+      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
         assert false
     in
@@ -1318,9 +1356,10 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                           match Reg_width_const.descr cst with
                           | Naked_float f -> Or_variable.Const f
                           | Tagged_immediate _ | Naked_immediate _
-                          | Naked_float32 _ | Naked_int32 _ | Naked_int64 _
-                          | Naked_int8 _ | Naked_int16 _ | Naked_nativeint _
-                          | Naked_vec128 _ | Null ->
+                          | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
+                          | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+                          | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+                          | Null ->
                             Misc.fatal_errorf
                               "Binding of %a to %a contains the constant %a \
                                inside a float record, whereas only naked \
@@ -1434,11 +1473,11 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           match simplify_block_load acc body_env ~block ~field with
           | Unknown -> bind acc body_env
           | Not_a_block ->
-            if Flambda_features.check_invariants ()
+            if Flambda_features.kind_checks ()
             then
-              (* CR keryan: This is hidden behind invariants check because it
-                 can appear on correct code using Lazy or GADT. It might warrant
-                 a proper warning at some point. *)
+              (* CR keryan: This is hidden behind kind checks because it can
+                 appear on correct code using Lazy or GADT. It might warrant a
+                 proper warning at some point. *)
               Misc.fatal_errorf
                 "Unexpected approximation found when block approximation was \
                  expected in [Closure_conversion]: %a"
@@ -1561,9 +1600,10 @@ let close_exact_or_unknown_apply acc env
           let result_arity_from_code = Code_metadata.result_arity meta in
           if (* See comment about when this check can be done, in
                 simplify_apply_expr.ml *)
-             not
-               (Flambda_arity.equal_ignoring_subkinds return_arity
-                  result_arity_from_code)
+             Flambda_features.kind_checks ()
+             && not
+                  (Flambda_arity.equal_ignoring_subkinds return_arity
+                     result_arity_from_code)
           then
             Misc.fatal_errorf
               "Wrong return arity for direct OCaml function call to %a@ \
@@ -2645,7 +2685,17 @@ let close_functions acc external_env ~current_region function_declarations =
             | None -> Ident.name id
             | Some var -> Variable.name var
           in
-          Ident.Map.add id (Value_slot.create compilation_unit ~name kind) map)
+          let is_always_immediate =
+            match[@ocaml.warning "-4"]
+              Flambda_kind.With_subkind.non_null_value_subkind kind
+            with
+            | Tagged_immediate -> true
+            | _ -> false
+          in
+          Ident.Map.add id
+            (Value_slot.create compilation_unit ~name ~is_always_immediate
+               (Flambda_kind.With_subkind.kind kind))
+            map)
       (Function_decls.all_free_idents function_declarations)
       Ident.Map.empty
   in
@@ -2782,7 +2832,7 @@ let close_functions acc external_env ~current_region function_declarations =
     function_code_ids_in_order |> List.rev |> Function_slot.Lmap.of_list
     |> Function_slot.Lmap.map
          (fun code_id : Function_declarations.code_id_in_function_declaration ->
-           Code_id code_id)
+           Code_id { code_id; only_full_applications = false })
   in
   let function_decls = Function_declarations.create funs in
   let value_slots =
@@ -2792,10 +2842,11 @@ let close_functions acc external_env ~current_region function_declarations =
         let external_simple, kind' =
           find_simple_from_id_with_kind external_env id
         in
-        if not (K.With_subkind.equal kind kind')
+        if not (K.equal kind (K.With_subkind.kind kind'))
         then
           Misc.fatal_errorf "Value slot kinds %a and %a don't match for slot %a"
-            K.With_subkind.print kind K.With_subkind.print kind'
+            K.print kind K.print
+            (K.With_subkind.kind kind')
             Value_slot.print value_slot;
         (* We're sure [external_simple] is a variable since
            [value_slot_from_idents] has already filtered constants and symbols
@@ -2964,7 +3015,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let function_slot =
     Function_slot.create
       (Compilation_unit.get_current_exn ())
-      ~name:(Ident.name wrapper_id) K.With_subkind.any_value
+      ~name:(Ident.name wrapper_id) ~is_always_immediate:false K.value
   in
   let num_provided = Flambda_arity.num_params provided_arity in
   let missing_arity_and_param_modes =

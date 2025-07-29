@@ -42,25 +42,48 @@ module Witness = struct
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
-    | Arch_specific
+    | Arch_specific of Arch.specific_operation
     | Probe of
         { name : string;
           handler_code_sym : string
         }
     | Widen
 
+  type hint =
+    | No_hint
+    | Missing_summary
+    | Conservative
+
   type t =
     { dbg : Debuginfo.t;
-      kind : kind
+      kind : kind;
+      hint : hint
     }
 
-  let create dbg kind = { dbg; kind }
+  let create ?(hint = No_hint) dbg kind = { dbg; kind; hint }
 
-  let compare { dbg = dbg1; kind = kind1 } { dbg = dbg2; kind = kind2 } =
+  let compare { dbg = dbg1; kind = kind1; hint = h1 }
+      { dbg = dbg2; kind = kind2; hint = h2 } =
     (* compare by [dbg] first to print the errors in the order they appear in
        the source file. *)
     let c = Debuginfo.compare dbg1 dbg2 in
-    if c <> 0 then c else Stdlib.compare kind1 kind2
+    if c <> 0
+    then c
+    else
+      let c = Stdlib.compare kind1 kind2 in
+      if c <> 0 then c else Stdlib.compare h1 h2
+
+  let print_hint ppf hint =
+    match hint with
+    | No_hint -> ()
+    | Missing_summary ->
+      Format.fprintf ppf
+        "@.Hint: Build artifacts for the library containing the callee are not \
+         available.@.Try adding the library as an explicit dependency.@."
+    | Conservative ->
+      Format.fprintf ppf
+        "@.Hint: Recompile without -disable-precise-zero-alloc-checker for \
+         more precise results.@."
 
   let print_kind ppf kind =
     let open Format in
@@ -72,13 +95,16 @@ module Witness = struct
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
     | Extcall { callee } -> fprintf ppf "external call to %s" callee
-    | Arch_specific -> fprintf ppf "arch specific operation"
+    | Arch_specific op ->
+      fprintf ppf "architecture specific operation: %s"
+        (Arch.specific_operation_name op)
     | Probe { name; handler_code_sym } ->
       fprintf ppf "probe \"%s\" handler %s" name handler_code_sym
     | Widen -> fprintf ppf "widen"
 
-  let print ppf { kind; dbg } =
-    Format.fprintf ppf "%a {%a}@," print_kind kind Debuginfo.print_compact dbg
+  let print ppf { kind; dbg; hint } =
+    Format.fprintf ppf "%a {%a}%a@," print_kind kind Debuginfo.print_compact dbg
+      print_hint hint
 end
 
 let take_first_n t n ~to_seq ~of_seq ~cardinal =
@@ -102,7 +128,7 @@ module Witnesses : sig
 
   val lessequal : t -> t -> bool
 
-  val create : Witness.kind -> Debuginfo.t -> t
+  val create : ?hint:Witness.hint -> Witness.kind -> Debuginfo.t -> t
 
   val print : Format.formatter -> t -> unit
 
@@ -132,7 +158,7 @@ end = struct
 
   let join t1 t2 =
     let res = union t1 t2 in
-    match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+    match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
     | Keep_all -> res
     | No_details ->
       if not (is_empty res)
@@ -150,7 +176,7 @@ end = struct
 
   let lessequal = subset
 
-  let create kind dbg = singleton (Witness.create dbg kind)
+  let create ?hint kind dbg = singleton (Witness.create ?hint dbg kind)
 
   let widen = singleton (Witness.create Debuginfo.none Witness.Widen)
 
@@ -539,7 +565,7 @@ end = struct
     exception Widen of Witnesses.t
 
     let maybe_widen t =
-      match !Flambda_backend_flags.zero_alloc_checker_join with
+      match !Oxcaml_flags.zero_alloc_checker_join with
       | Keep_all -> t
       | Widen n ->
         if M.cardinal t > n
@@ -827,7 +853,7 @@ end = struct
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
           args;
-      match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+      match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
       | Keep_all -> Args_with_top { w; args }
       | No_details ->
         Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
@@ -1640,6 +1666,8 @@ end = struct
       | Alloc_block_kind_float -> pp "float"
       | Alloc_block_kind_float32 -> pp "float32"
       | Alloc_block_kind_vec128 -> pp "vec128"
+      | Alloc_block_kind_vec256 -> pp "vec256"
+      | Alloc_block_kind_vec512 -> pp "vec512"
       | Alloc_block_kind_boxed_int bi ->
         pp
           (match bi with
@@ -1651,6 +1679,8 @@ end = struct
       | Alloc_block_kind_int32_u_array -> pp "unboxed_int32_array"
       | Alloc_block_kind_int64_u_array -> pp "unboxed_int64_array"
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
+      | Alloc_block_kind_vec256_u_array -> pp "unboxed_vec256_array"
+      | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let pp_alloc ppf =
@@ -1708,7 +1738,7 @@ end = struct
           ( Format.dprintf "called function may allocate%s (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
-        | Arch_specific | Probe _ ->
+        | Arch_specific _ | Probe _ ->
           ( Format.dprintf "expression may allocate%s@ (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
@@ -1717,7 +1747,8 @@ end = struct
       let loc = Debuginfo.to_location dbg in
       let pp ppf () =
         print_main_msg ppf;
-        pp_inlined_dbg ppf dbg
+        pp_inlined_dbg ppf dbg;
+        Witness.print_hint ppf w.hint
       in
       Location.error_of_printer ~loc ~sub pp ()
     in
@@ -1729,7 +1760,7 @@ end = struct
       List.concat [f div "diverge"; f nor ""; f exn "exceptional return"]
     in
     let details =
-      match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+      match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
       | No_details ->
         (* do not print witnesses. *)
         []
@@ -1974,14 +2005,14 @@ end = struct
     let c = (encode v.div lsl 4) lor (encode v.exn lsl 2) lor encode v.nor in
     if c = 0 then None else Some c
 
-  let decode : Zero_alloc_info.value option -> Value.t = function
-    | None -> Value.top decoded_witness
+  let decode : Zero_alloc_info.value option -> Value.t option = function
+    | None -> None
     | Some d ->
       if d = 0 then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding";
       let nor = decode (d land 3) in
       let exn = decode ((d lsr 2) land 3) in
       let div = decode ((d lsr 4) land 3) in
-      { nor; exn; div }
+      Some { nor; exn; div }
 
   let set_value s (v : Value.t) =
     let info = (Compilenv.current_unit_infos ()).ui_zero_alloc_info in
@@ -1991,7 +2022,7 @@ end = struct
 
   let get_value_opt s =
     let info = Compilenv.cached_zero_alloc_info in
-    Some (decode (Zero_alloc_info.get_value info s))
+    decode (Zero_alloc_info.get_value info s)
 end
 
 (** The analysis involved some fixed point computations.
@@ -2023,7 +2054,7 @@ end = struct
     }
 
   let should_keep_witnesses keep =
-    match !Flambda_backend_flags.zero_alloc_checker_details_cutoff with
+    match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
     | Keep_all -> true
     | No_details -> false
     | At_most _ -> keep
@@ -2045,7 +2076,7 @@ end = struct
     | Check_opt_only -> true
 
   let report' ppf v ~current_fun_name ~msg ~desc dbg =
-    if !Flambda_backend_flags.dump_zero_alloc
+    if !Oxcaml_flags.dump_zero_alloc
     then
       Format.fprintf ppf "*** check %s %s in %s: %s with %a (%a)\n"
         analysis_name msg current_fun_name desc
@@ -2058,13 +2089,13 @@ end = struct
   let is_future_funcname t callee = String.Set.mem callee t.future_funcnames
 
   let report_unit_info ppf unit_info ~msg =
-    if !Flambda_backend_flags.dump_zero_alloc
+    if !Oxcaml_flags.dump_zero_alloc
     then
       let msg = Printf.sprintf "%s %s:" analysis_name msg in
       Unit_info.iter unit_info ~f:(Func_info.print ~witnesses:true ppf ~msg)
 
   let report_func_info ~msg ppf func_info =
-    if !Flambda_backend_flags.dump_zero_alloc
+    if !Oxcaml_flags.dump_zero_alloc
     then
       let msg = Printf.sprintf "%s %s:" analysis_name msg in
       Func_info.print ~witnesses:true ppf ~msg func_info
@@ -2104,42 +2135,56 @@ end = struct
     Unit_info.iter unit_info ~f:record;
     match !errors with [] -> () | errors -> raise (Report.Fail errors)
 
-  let[@inline always] create_witnesses t kind dbg =
-    if t.keep_witnesses then Witnesses.create kind dbg else Witnesses.empty
+  let[@inline always] create_witnesses t ?hint kind dbg =
+    if t.keep_witnesses
+    then Witnesses.create ?hint kind dbg
+    else Witnesses.empty
+
+  let is_caml_internal s =
+    String.starts_with s ~prefix:"caml_apply"
+    || String.starts_with s ~prefix:"camlCamlinternal"
 
   (* [find_callee] returns the value associated with the callee. *)
-  let find_callee t callee ~desc dbg w =
-    let return ~msg v =
+  let find_callee t callee ~desc dbg (k : Witness.kind) =
+    let unresolved reason =
+      let w = create_witnesses t k dbg in
+      let v = Value.unresolved callee w in
+      let msg = Printf.sprintf "unresolved %s (%s)" callee reason in
+      report t v ~msg ~desc dbg;
+      v
+    in
+    let resolved v =
+      assert (Value.is_resolved v);
+      let msg = Printf.sprintf "resolved %s" callee in
       report t v ~msg ~desc dbg;
       (* Abstract witnesses of a call to the single witness for the callee name.
          Summary of tailcall self won't be affected because it is not set to Top
          by [find_callee]. *)
+      let w = create_witnesses t k dbg in
       Value.replace_witnesses w v
     in
-    let unresolved v reason =
-      let msg = Printf.sprintf "unresolved %s (%s)" callee reason in
-      return ~msg v
-    in
-    let resolved v =
-      assert (Value.is_resolved v);
-      let msg = Printf.sprintf "resolved  %s" callee in
-      return ~msg v
+    let return_top hint reason =
+      let w = create_witnesses t ~hint k dbg in
+      let v = Value.top w in
+      let msg = Printf.sprintf "conservative %s (%s)" callee reason in
+      report t v ~msg ~desc dbg;
+      v
     in
     if is_future_funcname t callee
     then
-      if !Flambda_backend_flags.disable_precise_zero_alloc_checker
+      if !Oxcaml_flags.disable_precise_zero_alloc_checker
       then
         (* Conservatively return Top. Won't be able to prove any recursive
            functions as non-allocating. *)
-        unresolved (Value.top w)
+        return_top Conservative
           "conservative handling of forward or recursive call\nor tailcall"
       else if String.equal callee t.current_fun_name
       then (* Self call. *)
-        unresolved (Value.unresolved callee w) "self call"
+        unresolved "self call"
       else
         (* Call is defined later in the current compilation unit. Summary of
            this callee is not yet computed. *)
-        unresolved (Value.unresolved callee w) "foward call"
+        unresolved "foward call"
     else
       (* CR gyorsh: unresolved case here is impossible in the conservative
          analysis because all previous functions have been conservatively
@@ -2149,18 +2194,18 @@ end = struct
         (* Callee is not defined in the current compilation unit. *)
         match Compilenv_utils.get_value_opt callee with
         | None ->
-          unresolved (Value.top w)
-            "missing summary: callee compiled without checks"
+          if is_caml_internal callee
+          then return_top No_hint "missing summary: callee is caml internal"
+          else
+            return_top Missing_summary
+              "missing summary: callee compiled without checks"
         | Some v -> resolved v)
       | Some callee_info ->
         (* Callee defined earlier in the same compilation unit. May have
            unresolved dependencies. *)
         if Value.is_resolved callee_info.value
         then resolved callee_info.value
-        else
-          unresolved
-            (Value.unresolved callee w)
-            "defined earlier with unresolved dependencies"
+        else unresolved "defined earlier with unresolved dependencies"
 
   let transform_return ~(effect : V.t) dst =
     (* Instead of calling [Value.transform] directly, first check for trivial
@@ -2193,11 +2238,12 @@ end = struct
     in
     transform t ~next ~exn ~effect desc dbg
 
-  let transform_call t ~next ~exn callee w ~desc dbg =
+  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg =
     report t next ~msg:"transform_call next" ~desc dbg;
     report t exn ~msg:"transform_call exn" ~desc dbg;
-    let v = find_callee t callee ~desc dbg w in
+    let v = find_callee t callee ~desc dbg k in
     let effect =
+      let w = create_witnesses t k dbg in
       match Metadata.assume_value dbg ~can_raise:true w with
       | Some v' ->
         assert (Value.is_resolved v');
@@ -2212,7 +2258,7 @@ end = struct
     report t next ~msg:"transform_specific next" ~desc dbg;
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect =
-      let w = create_witnesses t Arch_specific dbg in
+      let w = create_witnesses t (Arch_specific s) dbg in
       match Metadata.assume_value dbg ~can_raise:false w with
       | Some v -> v
       | None ->
@@ -2278,7 +2324,7 @@ end = struct
     let iter t ~f = String.Map.iter (fun _name d -> f d.func_info d.approx) t
 
     let print ~msg ppf t =
-      if !Flambda_backend_flags.dump_zero_alloc
+      if !Oxcaml_flags.dump_zero_alloc
       then
         iter t ~f:(fun func_info approx ->
             Format.fprintf ppf "Env %s: %s: %a@." msg func_info.name
@@ -2303,7 +2349,7 @@ end = struct
         Env.map
           ~f:(fun func_info v ->
             let v' = Value.apply func_info.value (lookup env) in
-            if !Flambda_backend_flags.dump_zero_alloc
+            if !Oxcaml_flags.dump_zero_alloc
             then
               Format.fprintf ppf "fixpoint after apply: %s %a@." func_info.name
                 (Value.print ~witnesses:true)
@@ -2312,7 +2358,7 @@ end = struct
             if not (Value.lessequal v' v)
             then (
               changed := true;
-              if !Flambda_backend_flags.dump_zero_alloc
+              if !Oxcaml_flags.dump_zero_alloc
               then
                 Format.fprintf ppf "fixpoint update: %s %a@." func_info.name
                   (Value.print ~witnesses:true)
@@ -2428,7 +2474,7 @@ end = struct
         report_unit_info ppf unit_info ~msg:"after record"
       in
       let really_check () =
-        if !Flambda_backend_flags.disable_zero_alloc_checker
+        if !Oxcaml_flags.disable_zero_alloc_checker
         then
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
@@ -2467,15 +2513,16 @@ end = struct
 
       let transform_tailcall_imm t func dbg =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
-        let w = create_witnesses t (Direct_tailcall { callee = func }) dbg in
-        transform_call t ~next:Value.normal_return ~exn:Value.exn_escape func w
+        let k = Witness.Direct_tailcall { callee = func } in
+        transform_call t ~next:Value.normal_return ~exn:Value.exn_escape func k
           ~desc:("direct tailcall to " ^ func)
           dbg
 
       let operation t ~next (op : Operation.t) dbg =
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Load _ | Floatop _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Load _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
               | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ ),
@@ -2486,7 +2533,7 @@ end = struct
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
-            | V128_of_v128 )
+            | V128_of_v128 | V256_of_v256 | V512_of_v512 )
         | Static_cast _ | Csel _ ->
           if not (Operation.is_pure op)
           then
@@ -2495,7 +2542,7 @@ end = struct
           next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Intop_atomic _ | Store _ ->
+        | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->
           next
         | Poll ->
           (* Ignore poll points even though they may trigger an allocations,
@@ -2574,14 +2621,14 @@ end = struct
           let desc =
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
-          let w = create_witnesses t (Probe { name; handler_code_sym }) dbg in
-          transform_call t ~next ~exn handler_code_sym w ~desc dbg
+          let k = Witness.Probe { name; handler_code_sym } in
+          transform_call t ~next ~exn handler_code_sym k ~desc dbg
         | Call { op = Indirect; _ } ->
           let w = create_witnesses t Indirect_call dbg in
           transform_top t ~next ~exn w "indirect call" dbg
         | Call { op = Direct { sym_name = func; _ }; _ } ->
-          let w = create_witnesses t (Direct_call { callee = func }) dbg in
-          transform_call t ~next ~exn func w ~desc:("direct call to " ^ func)
+          let k = Witness.Direct_call { callee = func } in
+          transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =

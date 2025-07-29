@@ -70,6 +70,10 @@ module Const : sig
 
   val naked_vec128 : Vector_types.Vec128.Bit_pattern.t -> t
 
+  val naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
+
+  val naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
+
   module Descr : sig
     type t = private
       | Naked_immediate of Targetint_31_63.t
@@ -82,6 +86,8 @@ module Const : sig
       | Naked_int64 of Int64.t
       | Naked_nativeint of Targetint_32_64.t
       | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
+      | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
+      | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
       | Null
 
     include Container_types.S with type t := t
@@ -100,6 +106,8 @@ module Variable : sig
   type exported
 
   include Container_types.S with type t := t
+
+  module Lmap : Lmap.S with type key := t
 
   val create : ?user_visible:unit -> string -> t
 
@@ -151,6 +159,10 @@ module Name : sig
   include Container_types.S_plus_iterator with type t := t
 
   val var : Variable.t -> t
+
+  val var_set : Variable.Set.t -> Set.t
+
+  val var_map : 'a Variable.Map.t -> 'a Map.t
 
   val symbol : Symbol.t -> t
 

@@ -182,7 +182,8 @@ let x () = #( M.Null, M.This "hi" )
 
 [%%expect{|
 module M :
-  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
+  stateless
 val x : unit -> #('a M.t * string M.t) = <fun>
 |}]
 
@@ -223,6 +224,13 @@ type packed2 = T2 : 'a * 'b -> packed2
 val f2 : packed2 -> unit = <fun>
 val f3 : packed2 -> unit = <fun>
 val f4 : packed2 -> unit = <fun>
+|}]
+
+(* This needs to be printed with a space after "float#" because of how
+   identifiers ending in "#" are parsed. *)
+let f () = fun () : float# -> #0.
+[%%expect{|
+val f : unit -> unit -> float# = <fun>
 |}]
 
 (******************)
@@ -587,7 +595,7 @@ module type S =
 external x4 : string -> string @@ portable many = "%identity"
 
 [%%expect{|
-external x4 : string -> string @@ many portable = "%identity"
+external x4 : string -> string @@ portable = "%identity"
 |}]
 
 type t =
@@ -601,8 +609,8 @@ type t = { x : string @@ global
 type t1 = { mutable x : float
           ; mutable f : float -> float }
 
-type t2 = { mutable x : float [@no_mutable_implied_modalities]
-          ; mutable f : float -> float [@no_mutable_implied_modalities] }
+type t2 = { mutable x : float @@ local once
+          ; mutable f : float -> float @@ local once }
 
 [%%expect{|
 type t =
@@ -614,7 +622,10 @@ type t = {
   z : string @@ global many;
 }
 type t1 = { mutable x : float; mutable f : float -> float; }
-type t2 = { mutable x : float; mutable f : float -> float; }
+type t2 = {
+  mutable x : float @@ local once;
+  mutable f : float -> float @@ local once;
+}
 |}]
 
 let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
@@ -641,7 +652,7 @@ module type S = sig
 end
 
 module type S' = sig
-  include [@no_recursive_modalities] S @@ portable
+  include S @@ portable
 end
 
 [%%expect{|
@@ -650,7 +661,7 @@ module type S =
 module type S' =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a end
+    module M : sig val foo : 'a -> 'a @@ portable end
   end
 |}]
 
@@ -660,7 +671,7 @@ module type S = sig end
 module M = struct end
 [%%expect{|
 module type S = sig end
-module M : sig end
+module M : sig end @@ stateless
 |}]
 
 module F (X : S @ portable) = struct
@@ -669,7 +680,7 @@ end
 Line 1, characters 18-26:
 1 | module F (X : S @ portable) = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (_ : S @ portable) = struct
@@ -678,15 +689,12 @@ end
 Line 1, characters 18-26:
 1 | module F (_ : S @ portable) = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-Line 1, characters 21-29:
-1 | module M' = (M : S @ portable)
-                         ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' : S @@ stateless
 |}]
 
 module F (M : S @ portable) : S @ portable = struct
@@ -695,7 +703,7 @@ end
 Line 1, characters 18-26:
 1 | module F (M : S @ portable) : S @ portable = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (M : S @ portable) @ portable = struct
@@ -704,43 +712,31 @@ end
 Line 1, characters 18-26:
 1 | module F (M : S @ portable) @ portable = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
 
-(* CR zqian: the similar syntax for expressions are not allowed because @ might
+(* the similar syntax for expressions are not allowed because @ might
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-Line 1, characters 17-25:
-1 | module M' = (M @ portable)
-                     ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' = M @@ stateless
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-Line 1, characters 21-29:
-1 | module M' = (M : S @ portable)
-                         ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' : S @@ stateless
 |}]
 
 module M @ portable = struct end
 [%%expect{|
-Line 1, characters 11-19:
-1 | module M @ portable = struct end
-               ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M : sig end @@ stateless
 |}]
 
 module M : S @ portable = struct end
 [%%expect{|
-Line 1, characters 15-23:
-1 | module M : S @ portable = struct end
-                   ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M : S @@ stateless
 |}]
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
@@ -748,7 +744,7 @@ module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portabl
 Line 1, characters 37-45:
 1 | module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
                                          ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
@@ -757,41 +753,33 @@ module type S' = () -> S @ portable -> S @ portable -> S @ portable
 Line 1, characters 27-35:
 1 | module type S' = () -> S @ portable -> S @ portable -> S @ portable
                                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module (F @ portable) () = struct end
 [%%expect{|
-Line 1, characters 12-20:
-1 | module (F @ portable) () = struct end
-                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module F : functor () -> sig end @@ stateless
 |}]
 
 module (G @ portable) () = F
 
 [%%expect{|
-Line 1, characters 12-20:
+Line 1, characters 27-28:
 1 | module (G @ portable) () = F
-                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+                               ^
+Error: This is "contended", but expected to be "uncontended" because it is a functor body.
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-Line 1, characters 13-21:
-1 | module (G' @ portable) = F
-                 ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module G' = F @@ stateless
 |}]
 
 module rec (F @ portable) () = struct end
 and (G @ portable) () = struct end
 [%%expect{|
-Line 1, characters 16-24:
-1 | module rec (F @ portable) () = struct end
-                    ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+File "_none_", line 1:
+Error: Recursive modules require an explicit module type.
 |}]
 
 module type T = sig
@@ -821,10 +809,7 @@ let foo () =
   let module (F @ portable) () = struct end in
   ()
 [%%expect{|
-Line 2, characters 18-26:
-2 |   let module (F @ portable) () = struct end in
-                      ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+val foo : unit -> unit = <fun>
 |}]
 
 (**********)
@@ -924,9 +909,9 @@ module type S = sig
 end;;
 
 [%%expect{|
-module F_struct : sig end -> sig end
+module F_struct : sig end -> sig end @@ stateless
 module type F_sig = sig end -> sig end
-module T : sig end
+module T : sig end @@ stateless
 module type S = sig end
 |}]
 
@@ -965,17 +950,17 @@ exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
-val x : x:int * y:int = (~x:1, ~y:2)
-val x : x:int * y:int = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
    (~x: 1, ~s: "a", ~y: 2, "ignore me")
 
 [%%expect{|
-val x0 : int = 1
-val s : string = "a"
-val y : int = 2
+val x0 : int @@ stateless = 1
+val s : string @@ stateless = "a"
+val y : int @@ stateless = 2
 |}]
 
 module M : sig
@@ -995,8 +980,8 @@ module M :
   sig
     val f : (x:int * string) -> x:int * string
     val mk : unit -> x:bool * y:string
-  end
-module X_int_int : sig type t = x:int * int end
+  end @@ stateless
+module X_int_int : sig type t = x:int * int end @@ stateless
 |}]
 
 let foo xy k_good k_bad =
@@ -1011,9 +996,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
-val x : int = 1
+val x : int @@ stateless = 1
 val y : int = 2
-val x : int = 1
+val x : int @@ stateless = 1
 val y : int = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
@@ -1252,6 +1237,22 @@ type 'a contended : immutable_data with 'a @@ contended
 type 'a contended_with_int : immutable_data with 'a @@ contended
 |}]
 
+type 'a abstract
+type existential_abstract : immutable_data with (type : value mod portable) abstract =
+  | Mk : ('a : value mod portable) abstract -> existential_abstract
+(* CR layouts v2.8: This should be accepted *)
+[%%expect{|
+type 'a abstract
+Lines 2-3, characters 0-67:
+2 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
+3 |   | Mk : ('a : value mod portable) abstract -> existential_abstract
+Error: The kind of type "existential_abstract" is value mod non_float
+         because it's a boxed variant type.
+       But the kind of type "existential_abstract" must be a subkind of
+           immutable_data with (type : value mod portable) abstract
+         because of the annotation on the declaration of the type existential_abstract.
+|}]
+
 (* not yet supported *)
 module _ : sig
   type 'a gel : kind_of_ 'a mod global
@@ -1310,7 +1311,7 @@ module type S2 = S with M
 
 [%%expect{|
 module type S = sig type t1 type t2 type t3 end
-module M : sig type t1 = int type t2 = K of string type t3 end
+module M : sig type t1 = int type t2 = K of string type t3 end @@ stateless
 module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 |}]
 
@@ -1400,13 +1401,14 @@ module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_eras
 
 
 [%%expect{|
-module Base : sig end -> sig end -> sig end -> sig end -> sig end
-module Name1 : sig end
-module Name2 : sig end
-module Value1 : sig end
-module Value2 : sig end -> sig end -> sig end
-module Name2_1 : sig end
-module Name2_1 : sig end
+module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
+  stateless
+module Name1 : sig end @@ stateless
+module Name2 : sig end @@ stateless
+module Value1 : sig end @@ stateless
+module Value2 : sig end -> sig end -> sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+module Name2_1 : sig end @@ stateless
 Line 9, characters 11-95:
 9 | module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_erasable.instances]
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1468,4 +1470,18 @@ let f g here = g ~(here : [%call_pos])
 
 [%%expect{|
 val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
+|}]
+
+(***************)
+(* let mutable *)
+
+let triangle_10 = let mutable x = 0 in
+  for i = 1 to 10 do
+    x <- x + i
+  done;
+  (x : int)
+;;
+
+[%%expect{|
+val triangle_10 : int = 55
 |}]

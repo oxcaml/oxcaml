@@ -32,7 +32,7 @@ include module type of struct
 end
 
 type basic_instruction_list =
-  basic instruction Flambda_backend_utils.Doubly_linked_list.t
+  basic instruction Oxcaml_utils.Doubly_linked_list.t
 
 type basic_block =
   { mutable start : Label.t;
@@ -104,7 +104,10 @@ type t =
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
-    next_instruction_id : InstructionId.sequence (* Next instruction id. *)
+    next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
+    fun_ret_type : Cmm.machtype
+        (** Function return type. As in [fun_args], this value is not used when starting
+            from Linear. *)
   }
 
 val create :
@@ -116,6 +119,7 @@ val create :
   fun_num_stack_slots:int Stack_class.Tbl.t ->
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
+  fun_ret_type:Cmm.machtype ->
   t
 
 val fun_name : t -> string

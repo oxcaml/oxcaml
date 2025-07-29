@@ -229,8 +229,8 @@ val flambda : bool
 val flambda2 : bool
 (** Whether the compiler was configured for Flambda 2 *)
 
-val flambda_backend : bool
-(** [true] if the compiler was built in a Flambda backend repo, [false] if
+val oxcaml : bool
+(** [true] if the compiler was built in a OxCaml repo, [false] if
     the compiler was built as per upstream. *)
 
 val with_flambda_invariants : bool
@@ -300,8 +300,15 @@ val runtime5 : bool
 val no_stack_checks : bool
 (** [true] if stack checks are disabled; used only if [runtime5] is [true]. *)
 
+val multidomain : bool
+(** Whether creating multiple domains is allowed.
+    Requires stack checks and poll insertion. *)
+
 val tsan : bool
 (** Whether ThreadSanitizer instrumentation is enabled *)
+
+val parameterised_modules : bool
+(** Whether parameterised modules are supported *)
 
 (** Access to configuration values *)
 val print_config : out_channel -> unit
@@ -314,3 +321,36 @@ val config_var : string -> string option
 val merlin : bool
 
 (**/**)
+
+val has_pclmul : bool
+(* Whether the compiler was configured on a machine with PCLMUL *)
+
+val has_popcnt : bool
+(* Whether the compiler was configured on a machine with POPCNT *)
+
+val has_lzcnt : bool
+(* Whether the compiler was configured on a machine with LZCNT *)
+
+val has_sse3 : bool
+(* Whether the compiler was configured on a machine with SSE3 *)
+
+val has_ssse3 : bool
+(* Whether the compiler was configured on a machine with SSSE3 *)
+
+val has_sse4_1 : bool
+(* Whether the compiler was configured on a machine with SSE4.1 *)
+
+val has_sse4_2 : bool
+(* Whether the compiler was configured on a machine with SSE4.2 *)
+
+val has_bmi : bool
+(* Whether the compiler was configured on a machine with BMI *)
+
+val has_bmi2 : bool
+(* Whether the compiler was configured on a machine with BMI2 *)
+
+val has_avx : bool
+(* Whether the compiler was configured on a machine with AVX *)
+
+val has_avx2 : bool
+(* Whether the compiler was configured on a machine with AVX2 *)

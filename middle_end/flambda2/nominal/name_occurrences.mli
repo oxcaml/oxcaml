@@ -148,6 +148,8 @@ val without_code_ids : t -> t
 
 val with_only_variables : t -> t
 
+val with_only_names : t -> t
+
 (** The value returned by this function only records occurrences in two fields:
 
     - names, as per the input
@@ -168,6 +170,8 @@ val mem_symbol : t -> Symbol.t -> bool
 val mem_name : t -> Name.t -> bool
 
 val mem_code_id : t -> Code_id.t -> bool
+
+val mem_continuation : t -> Continuation.t -> bool
 
 val value_slot_is_used_or_imported : t -> Value_slot.t -> bool
 

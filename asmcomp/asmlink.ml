@@ -364,7 +364,10 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
   let startup_comp_unit =
     CU.create CU.Prefix.empty (CU.Name.of_string "_startup")
   in
-  Compilenv.reset startup_comp_unit;
+  let startup_unit_info =
+    Unit_info.make_dummy ~input_name:"caml_startup" startup_comp_unit
+  in
+  Compilenv.reset startup_unit_info;
   Emitaux.Dwarf_helpers.init ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
   Emit.begin_assembly unix;
@@ -376,7 +379,7 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
-      (Generic_fns.compile ~shared:false genfns));
+      (Generic_fns.compile ~cache:false ~shared:false genfns));
   Array.iteri
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
@@ -398,14 +401,14 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
       startup_comp_unit :: name_list
   in
   let code_comp_units =
-    if !Flambda_backend_flags.use_cached_generic_functions then
+    if !Oxcaml_flags.use_cached_generic_functions then
       Generic_fns.imported_units cached_gen @ code_comp_units
     else code_comp_units
   in
   compile_phrase (Cmm_helpers.code_segment_table code_comp_units);
   let all_comp_units = startup_comp_unit :: system_comp_unit :: name_list in
   let all_comp_units =
-    if !Flambda_backend_flags.use_cached_generic_functions then
+    if !Oxcaml_flags.use_cached_generic_functions then
       Generic_fns.imported_units cached_gen @ all_comp_units
     else
       all_comp_units
@@ -421,14 +424,17 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   let shared_startup_comp_unit =
     CU.create CU.Prefix.empty (CU.Name.of_string "_shared_startup")
   in
-  Compilenv.reset shared_startup_comp_unit;
+  let shared_startup_unit_info =
+    Unit_info.make_dummy ~input_name:"caml_startup" shared_startup_comp_unit
+  in
+  Compilenv.reset shared_startup_unit_info;
   Emitaux.Dwarf_helpers.init ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
   Emit.begin_assembly unix;
   emit_ocamlrunparam ~ppf_dump;
   List.iter compile_phrase
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
-      (Generic_fns.compile ~shared:true genfns));
+      (Generic_fns.compile ~cache:false ~shared:true genfns));
   let dynunits = List.map (fun u -> Option.get u.dynunit) units in
   compile_phrase (Cmm_helpers.plugin_header dynunits);
   compile_phrase
@@ -448,13 +454,13 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
 
 let link_shared unix ~ppf_dump objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
-    if !Flambda_backend_flags.use_cached_generic_functions then
+    if !Oxcaml_flags.use_cached_generic_functions then
       (* When doing shared linking do not use the shared generated startup file.
          Frametables for the imported functions needs to be initialized, which is a bit
          tricky to do in the context of shared libraries as the frametables are
          initialized at runtime. *)
-      Flambda_backend_flags.use_cached_generic_functions := false;
-    if !Flambda_backend_flags.internal_assembler then
+      Oxcaml_flags.use_cached_generic_functions := false;
+    if !Oxcaml_flags.internal_assembler then
       (* CR-soon gyorsh: workaround to turn off internal assembler temporarily,
          until it is properly tested for shared library linking. *)
       Emitaux.binary_backend_available := false;
@@ -486,7 +492,7 @@ let link_shared unix ~ppf_dump objfiles output_name =
            genfns units_tolink
       );
     call_linker_shared (startup_obj :: objfiles) output_name;
-    if !Flambda_backend_flags.internal_assembler then
+    if !Oxcaml_flags.internal_assembler then
       (* CR gyorsh: restore after workaround. *)
       Emitaux.binary_backend_available := true;
     remove_file startup_obj
@@ -498,8 +504,8 @@ let call_linker file_list_rev startup_file output_name =
   and main_obj_runtime = !Clflags.output_complete_object
   in
   let file_list_rev =
-    if !Flambda_backend_flags.use_cached_generic_functions then
-      !Flambda_backend_flags.cached_generic_functions_path :: file_list_rev
+    if !Oxcaml_flags.use_cached_generic_functions then
+      !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
     else file_list_rev
   in
   let files = startup_file :: (List.rev file_list_rev) in
@@ -533,7 +539,7 @@ let reset () =
 (* Main entry point *)
 
 let link unix ~ppf_dump objfiles output_name =
-  if !Flambda_backend_flags.internal_assembler then
+  if !Oxcaml_flags.internal_assembler then
       Emitaux.binary_backend_available := true;
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
     let stdlib = "stdlib.cmxa" in

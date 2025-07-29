@@ -260,7 +260,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-55.
 |}]
 
@@ -294,7 +295,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-50.
 |}]
 
@@ -312,7 +314,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-70.
 |}]
 
@@ -330,7 +333,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because of the definition of s at line 2, characters 2-65.
 |}]
 
@@ -732,7 +736,8 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of value
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+         value
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -1886,7 +1891,7 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable
+       The kind of 'a -> 'b is value mod aliased immutable non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of immediate
          because of the definition of t35 at line 1, characters 0-30.
@@ -2871,23 +2876,25 @@ Error: This expression has type "float#" but an expression was expected of type
 let f (x : ('a : bits64)) = x ()
 
 [%%expect{|
-Line 1, characters 28-29:
+Line 1, characters 28-32:
 1 | let f (x : ('a : bits64)) = x ()
-                                ^
-Error: This expression is used as a function, but its type "'a"
-       has kind "bits64", which cannot be the kind of a function.
-       (Functions always have kind "value mod aliased immutable".)
+                                ^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "bits64", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
 |}]
 
 let f (x : ('a : value mod portable)) = x ()
 
 [%%expect{|
-Line 1, characters 40-41:
+Line 1, characters 40-44:
 1 | let f (x : ('a : value mod portable)) = x ()
-                                            ^
-Error: This expression is used as a function, but its type "'a"
-       has kind "value mod portable", which cannot be the kind of a function.
-       (Functions always have kind "value mod aliased immutable".)
+                                            ^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "value mod portable", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
 |}]
 
 let f (x : ('a : value)) = x ()
@@ -2896,4 +2903,45 @@ let f (x : ('a : value mod uncontended)) = x ()
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>
 val f : (unit -> 'a) -> 'a = <fun>
+|}]
+
+(***************************************)
+(* Test 47: Error message on bad label *)
+
+(* reduced from a test case in the wild *)
+
+type ('v : immediate) t
+
+module M : sig
+  val f : 'v t -> int -> 'v
+end = struct
+  let f _ _ = assert false
+end
+
+let g t = M.f t ~key:0
+
+[%%expect{|
+type ('v : immediate) t
+module M : sig val f : ('v : immediate). 'v t -> int -> 'v end
+Line 9, characters 10-22:
+9 | let g t = M.f t ~key:0
+              ^^^^^^^^^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "immediate", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
+       Hint: Perhaps you have over-applied the function or used an incorrect label.
+|}]
+
+let h t = M.f ~key:0 t
+
+[%%expect{|
+Line 1, characters 10-22:
+1 | let h t = M.f ~key:0 t
+              ^^^^^^^^^^^^
+Error: This function application uses an expression with type "'a"
+       as a function, but that type has kind "immediate", which cannot
+       be the kind of a function.
+       (Functions always have kind "value mod aliased immutable non_float".)
+       Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]

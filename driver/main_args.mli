@@ -22,7 +22,8 @@ module type Common_options = sig
   val _alert : string -> unit
   val _I : string -> unit
   val _H : string -> unit
-  val _libloc : string -> unit
+  val _I_paths : string -> unit
+  val _H_paths : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -253,6 +254,7 @@ module type Optcomp_options = sig
   val _afl_inst_ratio : int -> unit
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
+  val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
 end

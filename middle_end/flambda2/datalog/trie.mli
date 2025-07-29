@@ -49,6 +49,8 @@ val find_opt : ('t, 'k, 'v) is_trie -> 'k Constant.hlist -> 't -> 'v option
 module Iterator : sig
   include Leapfrog.Iterator
 
+  include Heterogenous_list.S with type 'a t := 'a t
+
   (** [create is_trie name input output] creates a trie iterator.
 
       The [input] reference is used to initialize the first iterator when [init]
@@ -57,5 +59,6 @@ module Iterator : sig
       The [output] reference is set to the corresponding value when [accept] is
       called on the last iterator.
   *)
-  val create : ('m, 'k, 'v) is_trie -> 'm ref -> 'v ref -> 'k hlist
+  val create :
+    ('m, 'k, 'v) is_trie -> 'm Channel.receiver -> 'v Channel.sender -> 'k hlist
 end

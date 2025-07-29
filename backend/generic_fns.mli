@@ -63,6 +63,6 @@ module Cache : sig
   val all : unit -> (Partition.t, Tbl.t) Hashtbl.t
 end
 
-val compile : shared:bool -> Tbl.t -> Cmm.phrase list
+val compile : cache:bool -> shared:bool -> Tbl.t -> Cmm.phrase list
 
 val imported_units : Partition.Set.t -> Compilation_unit.t list

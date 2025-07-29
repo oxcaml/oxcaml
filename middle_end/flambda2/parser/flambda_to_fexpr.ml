@@ -358,6 +358,10 @@ let float f = f |> Numeric_types.Float_by_bit_pattern.to_float
 
 let vec128 v = v |> Vector_types.Vec128.Bit_pattern.to_bits
 
+let vec256 v = v |> Vector_types.Vec256.Bit_pattern.to_bits
+
+let vec512 v = v |> Vector_types.Vec512.Bit_pattern.to_bits
+
 let targetint i = i |> Targetint_32_64.to_int64
 
 let const c : Fexpr.const =
@@ -374,6 +378,10 @@ let const c : Fexpr.const =
   | Naked_int64 i -> Naked_int64 i
   | Naked_vec128 bits ->
     Naked_vec128 (Vector_types.Vec128.Bit_pattern.to_bits bits)
+  | Naked_vec256 bits ->
+    Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
+  | Naked_vec512 bits ->
+    Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
   | Naked_int8 _ | Naked_int16 _ ->
     Misc.fatal_error "small integers not supported in fexpr"
@@ -434,6 +442,8 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Boxed_int64 -> Boxed_int64
   | Boxed_nativeint -> Boxed_nativeint
   | Boxed_vec128 -> Boxed_vec128
+  | Boxed_vec256 -> Boxed_vec256
+  | Boxed_vec512 -> Boxed_vec512
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } -> variant_subkind consts non_consts
   | Float_array -> Float_array
@@ -442,10 +452,10 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Generic_array -> Generic_array
   | Float_block { num_fields } -> Float_block { num_fields }
   | Unboxed_float32_array | Unboxed_int32_array | Unboxed_int64_array
-  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_product_array ->
+  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
+  | Unboxed_vec512_array | Unboxed_product_array ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/intN/nativeint/vec128/unboxed product \
-       arrays not yet implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 and variant_subkind consts non_consts : Fexpr.subkind =
   let consts =
@@ -529,7 +539,7 @@ let init_or_assign env (ia : Flambda_primitive.Init_or_assign.t) :
 let nullop _env (op : Flambda_primitive.nullary_primitive) : _ =
   match op with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Poll ->
+  | Dls_get | Poll | Cpu_relax ->
     Misc.fatal_errorf "TODO: Nullary primitive: %a" Flambda_primitive.print
       (Flambda_primitive.Nullary op)
 
@@ -584,7 +594,7 @@ let unop env (op : Flambda_primitive.unary_primitive) : Fexpr.unop =
   | Boolean_not -> Boolean_not
   | Int_as_pointer _ | Duplicate_block _ | Duplicate_array _ | Bigarray_length _
   | Float_arith _ | Reinterpret_64_bit_word _ | Is_boxed_float | Obj_dup
-  | Get_header | Atomic_load _ | Peek _ | Make_lazy _ ->
+  | Get_header | Peek _ | Make_lazy _ ->
     Misc.fatal_errorf "TODO: Unary primitive: %a"
       Flambda_primitive.Without_args.print
       (Flambda_primitive.Without_args.Unary op)
@@ -610,8 +620,7 @@ let binop env (op : Flambda_primitive.binary_primitive) : Fexpr.binop =
   | Float_comp (w, c) -> Infix (Float_comp (w, c))
   | String_or_bigstring_load (slv, saw) -> String_or_bigstring_load (slv, saw)
   | Bigarray_get_alignment align -> Bigarray_get_alignment align
-  | Bigarray_load _ | Atomic_exchange _ | Atomic_set _ | Atomic_int_arith _
-  | Poke _ ->
+  | Bigarray_load _ | Atomic_load_field _ | Poke _ ->
     Misc.fatal_errorf "TODO: Binary primitive: %a"
       Flambda_primitive.Without_args.print
       (Flambda_primitive.Without_args.Binary op)
@@ -622,10 +631,9 @@ let fexpr_of_array_kind : Flambda_primitive.Array_kind.t -> Fexpr.array_kind =
   | Naked_floats -> Naked_floats
   | Values -> Values
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Unboxed_product _ ->
+  | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int/unboxed product arrays not yet \
-       implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 let fexpr_of_array_set_kind env
     (array_set_kind : Flambda_primitive.Array_set_kind.t) : Fexpr.array_set_kind
@@ -635,10 +643,9 @@ let fexpr_of_array_set_kind env
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s ->
+  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int32/64/nativeint/vec128 arrays not \
-       yet implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
 
 let ternop env (op : Flambda_primitive.ternary_primitive) : Fexpr.ternop =
   match op with
@@ -647,7 +654,8 @@ let ternop env (op : Flambda_primitive.ternary_primitive) : Fexpr.ternop =
     let ask = fexpr_of_array_set_kind env ask in
     Array_set (ak, ask)
   | Bytes_or_bigstring_set (blv, saw) -> Bytes_or_bigstring_set (blv, saw)
-  | Bigarray_set _ | Atomic_compare_and_set _ | Atomic_compare_exchange _ ->
+  | Bigarray_set _ | Atomic_field_int_arith _ | Atomic_set_field _
+  | Atomic_exchange_field _ ->
     Misc.fatal_errorf "TODO: Ternary primitive: %a"
       Flambda_primitive.Without_args.print
       (Flambda_primitive.Without_args.Ternary op)
@@ -673,16 +681,17 @@ let prim env (p : Flambda_primitive.t) : Fexpr.prim =
     Binary (binop env op, simple env arg1, simple env arg2)
   | Ternary (op, arg1, arg2, arg3) ->
     Ternary (ternop env op, simple env arg1, simple env arg2, simple env arg3)
+  | Quaternary (op, _arg1, _arg2, _arg3, _arg4) ->
+    Misc.fatal_errorf "TODO: Quaternary primitive: %a"
+      Flambda_primitive.Without_args.print
+      (Flambda_primitive.Without_args.Quaternary op)
   | Variadic (op, args) -> Variadic (varop env op, List.map (simple env) args)
 
 let value_slots env map =
   List.map
     (fun (var, value) ->
       let kind = Value_slot.kind var in
-      if not
-           (Flambda_kind.equal
-              (Flambda_kind.With_subkind.kind kind)
-              Flambda_kind.value)
+      if not (Flambda_kind.equal kind Flambda_kind.value)
       then
         Misc.fatal_errorf "Value slot %a not of kind Value" Simple.print value;
       let var = Env.translate_value_slot env var in
@@ -712,7 +721,9 @@ let set_of_closures env sc =
       |> Function_declarations.funs_in_order
       |> Function_slot.Lmap.map (function
            | Function_declarations.Deleted _ -> Misc.fatal_error "todo"
-           | Function_declarations.Code_id code_id -> code_id)
+           | Function_declarations.Code_id
+               { code_id; only_full_applications = _ } ->
+             code_id)
       |> Function_slot.Lmap.bindings)
   in
   let elts = value_slots env (Set_of_closures.value_slots sc) in
@@ -751,6 +762,8 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
   | Boxed_int64 i -> Boxed_int64 (or_variable Fun.id env i)
   | Boxed_nativeint i -> Boxed_nativeint (or_variable targetint env i)
   | Boxed_vec128 i -> Boxed_vec128 (or_variable vec128 env i)
+  | Boxed_vec256 i -> Boxed_vec256 (or_variable vec256 env i)
+  | Boxed_vec512 i -> Boxed_vec512 (or_variable vec512 env i)
   | Immutable_float_block elements ->
     Immutable_float_block (List.map (or_variable float env) elements)
   | Immutable_float_array elements ->
@@ -759,10 +772,10 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
     Immutable_value_array (List.map (field_of_block env) elements)
   | Immutable_float32_array _ | Immutable_int32_array _
   | Immutable_int64_array _ | Immutable_nativeint_array _
-  | Immutable_vec128_array _ ->
+  | Immutable_vec128_array _ | Immutable_vec256_array _
+  | Immutable_vec512_array _ ->
     Misc.fatal_error
-      "fexpr support for unboxed float32/int/nativeint/vec128 arrays not yet \
-       implemented"
+      "fexpr support for arrays of unboxed elements not yet implemented"
   | Empty_array array_kind -> Empty_array array_kind
   | Mutable_string { initial_value } -> Mutable_string { initial_value }
   | Immutable_string s -> Immutable_string s
@@ -1015,8 +1028,11 @@ and let_cont_expr env (lc : Flambda.Let_cont_expr.t) =
         Fexpr.Let_cont { recursive = Nonrecursive; bindings = [binding]; body })
   | Recursive handlers ->
     Flambda.Recursive_let_cont_handlers.pattern_match handlers
-      ~f:(fun ~invariant_params:_ ~body handlers ->
-        (* TODO support them *)
+      ~f:(fun ~invariant_params ~body handlers ->
+        let params, env =
+          map_accum_left kinded_parameter env
+            (Bound_parameters.to_list invariant_params)
+        in
         let env =
           List.fold_right
             (fun c env ->
@@ -1039,7 +1055,7 @@ and let_cont_expr env (lc : Flambda.Let_cont_expr.t) =
            |> Continuation.Lmap.bindings)
         in
         let body = expr env body in
-        Fexpr.Let_cont { recursive = Recursive; bindings; body })
+        Fexpr.Let_cont { recursive = Recursive params; bindings; body })
 
 and cont_handler env cont_id (sort : Continuation.Sort.t) h =
   let is_exn_handler = Flambda.Continuation_handler.is_exn_handler h in

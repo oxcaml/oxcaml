@@ -94,6 +94,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             ~print_name:"speculative" ~code_age_relation:Code_age_relation.empty
             ~used_value_slots:Unknown
             ~code_ids_to_never_delete:Code_id.Set.empty
+            ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation:function_return_cont
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
         in
@@ -141,12 +142,20 @@ let argument_types_useful dacc apply =
 let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
   let denv = DA.denv dacc in
-  let env_prohibits_inlining = not (DE.can_inline denv) in
+  let disable_inlining = DE.disable_inlining denv in
   let decision =
     Code_or_metadata.code_metadata code_or_metadata
     |> Code_metadata.inlining_decision
   in
-  if Function_decl_inlining_decision_type.must_be_inlined decision
+  let in_a_stub, doing_speculative_inlining =
+    match disable_inlining with
+    | Disable_inlining Stub -> true, false
+    | Disable_inlining Speculative_inlining -> false, true
+    | Do_not_disable_inlining -> false, false
+  in
+  if in_a_stub
+  then In_a_stub
+  else if Function_decl_inlining_decision_type.must_be_inlined decision
   then
     Definition_says_inline
       { was_inline_always =
@@ -154,8 +163,8 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
       }
   else if Function_decl_inlining_decision_type.cannot_be_inlined decision
   then Definition_says_not_to_inline
-  else if env_prohibits_inlining
-  then Environment_says_never_inline
+  else if doing_speculative_inlining
+  then Doing_speculative_inlining
   else if not (argument_types_useful dacc apply)
   then Argument_types_not_useful
   else

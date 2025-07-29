@@ -27,6 +27,8 @@ module Naked_number_kind : sig
     | Naked_int64
     | Naked_nativeint
     | Naked_vec128
+    | Naked_vec256
+    | Naked_vec512
 
   val print : Format.formatter -> t -> unit
 
@@ -70,6 +72,10 @@ val naked_nativeint : t
 
 val naked_vec128 : t
 
+val naked_vec256 : t
+
+val naked_vec512 : t
+
 val region : t
 
 val rec_info : t
@@ -77,8 +83,6 @@ val rec_info : t
 val is_value : t -> bool
 
 val is_naked_float : t -> bool
-
-val to_lambda : t -> Lambda.layout
 
 include Container_types.S with type t := t
 
@@ -91,11 +95,15 @@ type flat_suffix_element = private
   | Naked_int64
   | Naked_nativeint
   | Naked_vec128
+  | Naked_vec256
+  | Naked_vec512
+
+module Mixed_block_lambda_shape = Mixed_block_shape
 
 module Mixed_block_shape : sig
   type t
 
-  val from_lambda : Lambda.mixed_block_shape -> t
+  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
 
   val field_kinds : t -> kind array
 
@@ -174,6 +182,8 @@ module Boxable_number : sig
     | Naked_int64
     | Naked_nativeint
     | Naked_vec128
+    | Naked_vec256
+    | Naked_vec512
 
   val unboxed_kind : t -> kind
 
@@ -205,6 +215,8 @@ module With_subkind : sig
       | Boxed_int64
       | Boxed_nativeint
       | Boxed_vec128
+      | Boxed_vec256
+      | Boxed_vec512
       | Tagged_immediate
       | Variant of
           { consts : Targetint_31_63.Set.t;
@@ -220,6 +232,8 @@ module With_subkind : sig
       | Unboxed_int64_array
       | Unboxed_nativeint_array
       | Unboxed_vec128_array
+      | Unboxed_vec256_array
+      | Unboxed_vec512_array
       | Unboxed_product_array
 
     include Container_types.S with type t := t
@@ -262,6 +276,10 @@ module With_subkind : sig
 
   val naked_vec128 : t
 
+  val naked_vec256 : t
+
+  val naked_vec512 : t
+
   val region : t
 
   val boxed_float : t
@@ -287,6 +305,10 @@ module With_subkind : sig
   val generic_array : t
 
   val unboxed_vec128_array : t
+
+  val unboxed_vec256_array : t
+
+  val unboxed_vec512_array : t
 
   val unboxed_product_array : t
 
@@ -326,7 +348,8 @@ module Flat_suffix_element : sig
 
   val kind : t -> kind
 
-  val from_lambda : _ Lambda.mixed_block_element -> t
+  val from_singleton_mixed_block_element :
+    _ Mixed_block_lambda_shape.Singleton_mixed_block_element.t -> t
 
   val print : Format.formatter -> t -> unit
 

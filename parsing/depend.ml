@@ -123,6 +123,7 @@ let rec add_type bv ty =
   | Ptyp_open (mod_ident, t) ->
     let bv = open_module bv mod_ident.txt in
     add_type bv t
+  | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_extension e -> handle_extension e
 
 and add_type_labeled_tuple bv tl =
@@ -239,7 +240,7 @@ let rec add_expr bv exp =
   match exp.pexp_desc with
     Pexp_ident l -> add bv l
   | Pexp_constant _ -> ()
-  | Pexp_let(rf, pel, e) ->
+  | Pexp_let(_mf, rf, pel, e) ->
       let bv = add_bindings rf bv pel in add_expr bv e
   | Pexp_function (params, constraint_, body) ->
       let bv = List.fold_left add_function_param bv params in
@@ -275,7 +276,7 @@ let rec add_expr bv exp =
       Option.iter (add_type bv) ty2
   | Pexp_send(e, _m) -> add_expr bv e
   | Pexp_new li -> add bv li
-  | Pexp_setinstvar(_v, e) -> add_expr bv e
+  | Pexp_setvar(_v, e) -> add_expr bv e
   | Pexp_override sel -> List.iter (fun (_s, e) -> add_expr bv e) sel
   | Pexp_letmodule(id, m, e) ->
       let b = add_module_binding bv m in

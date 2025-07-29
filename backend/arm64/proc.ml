@@ -44,6 +44,7 @@ let word_addressed = false
     d0 - d7               general purpose (caller-save)
     d8 - d15              general purpose (callee-save)
     d16 - d31             general purpose (caller-save)
+   Vector register map:   general purpose (caller-save)
 *)
 
 let types_are_compatible left right =
@@ -53,6 +54,8 @@ let types_are_compatible left right =
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
+  | (Vec256 | Vec512), _ | _, (Vec256 | Vec512) ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
   | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
@@ -86,6 +89,7 @@ let phys_reg ty n =
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
+  | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 let reg_x8 = phys_reg Int 8
 
 let stack_slot slot ty =
@@ -144,6 +148,8 @@ let calling_conventions
         loc.(i) <- loc_float last_float make_stack float ofs
     | Vec128 ->
         loc.(i) <- loc_vec128 last_float make_stack float ofs
+    | Vec256 | Vec512 ->
+        Misc.fatal_error "arm64: got 256/512 bit vector"
     | Float32 ->
         loc.(i) <- loc_float32 last_float make_stack float ofs
     | Valx2 ->
@@ -213,11 +219,13 @@ let external_calling_conventions
         loc.(i) <- [| loc_float last_float make_stack float ofs |]
     | XVec128 ->
         loc.(i) <- [| loc_vec128 last_float make_stack float ofs |]
+    | XVec256 | XVec512 ->
+        Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
     | XFloat32 ->
         loc.(i) <- [| loc_float32 last_float make_stack float ofs |]
     end)
     ty_args;
-  (loc, Misc.align !ofs 16)  (* keep stack 16-aligned *)
+  (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 
 let loc_external_arguments ty_args =
   external_calling_conventions 0 7 100 107 outgoing ty_args
@@ -243,16 +251,31 @@ let destroyed_at_c_noalloc_call =
       116;117;118;119;120;121;122;123;
       124;125;126;127;128;129;130;131|]
   in
+  let vec128_regs_destroyed_at_c_noalloc_call =
+    (* Registers v8-v15 must be preserved by a callee across
+       subroutine calls; the remaining registers (v0-v7, v16-v31) do
+       not need to be preserved (or should be preserved by the
+       caller). Additionally, only the bottom 64 bits of each value
+       stored in v8-v15 need to be preserved [8]; it is the
+       responsibility of the caller to preserve larger values.
+
+       https://github.com/ARM-software/abi-aa/blob/
+       3952cfbfd2404c442bb6bb6f59ff7b923ab0c148/
+       aapcs64/aapcs64.rst?plain=1#L837
+    *)
+    hard_vec128_reg
+  in
   Array.concat [
     Array.map (phys_reg Int) int_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float) float_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float32) float_regs_destroyed_at_c_noalloc_call;
-    Array.map (phys_reg Vec128) float_regs_destroyed_at_c_noalloc_call;
+    vec128_regs_destroyed_at_c_noalloc_call;
   ]
 
 (* CSE needs to know that all versions of neon are destroyed. *)
 let destroy_neon_reg n =
-  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n); phys_reg Vec128 (100 + n); |]
+  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n);
+     phys_reg Vec128 (100 + n); |]
 
 let destroy_neon_reg7 = destroy_neon_reg 7
 
@@ -296,20 +319,43 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     -> [||]
   | Op (Static_cast
           (V128_of_scalar _|Scalar_of_v128 _))
+  | Op (Intop Ipopcnt) ->
+      if !Arch.feat_cssc then
+        [||]
+      else
+        destroy_neon_reg7
+  | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
+              |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
   | Op (Specific _
         | Move | Spill | Reload
         | Floatop _
         | Csel _
-        | Reinterpret_cast _ | Const_int _
+        | Const_int _
         | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _
         | Stackoffset _
-        | Intop _ | Intop_imm _ | Intop_atomic _
-        | Name_for_debugger _ | Probe_is_enabled _ | Opaque
+        | Intop_imm _ | Intop_atomic _
+        | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Dls_get)
   | Poptrap _ | Prologue
+  | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
+                          Float32_of_float | Float_of_int64 | Int64_of_float |
+                          Float32_of_int32 | Int32_of_float32 | V128_of_v128))
     -> [||]
   | Stack_check _ -> assert false (* not supported *)
+  | Op (Const_vec256 _ | Const_vec512 _)
+  | Op (Load
+          {memory_chunk=(Twofiftysix_aligned|Twofiftysix_unaligned|
+                         Fivetwelve_aligned|Fivetwelve_unaligned);
+           _ })
+  | Op (Store
+          ((Twofiftysix_aligned|Twofiftysix_unaligned|
+            Fivetwelve_aligned|Fivetwelve_unaligned),
+            _, _))
+  | Op (Reinterpret_cast (V256_of_v256 | V512_of_v512))
+  | Op (Static_cast (V256_of_scalar _ | Scalar_of_v256 _ |
+                     V512_of_scalar _ | Scalar_of_v512 _))
+    -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
@@ -401,18 +447,18 @@ let assemble_file infile outfile =
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
+let has_three_operand_float_ops () = false
+
 let operation_supported : Cmm.operation -> bool = function
-  | Cprefetch _ | Catomic _ -> false
+  | Cprefetch _ | Catomic _
+  | Creinterpret_cast (V256_of_v256 | V512_of_v512)
+  | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _ |
+                  V512_of_scalar _ | Scalar_of_v512 _) ->
+    false
   | Cpopcnt
   | Cnegf Float32 | Cabsf Float32 | Caddf Float32
   | Csubf Float32 | Cmulf Float32 | Cdivf Float32
   | Cpackf32
-  | Creinterpret_cast (Float32_of_float | Float_of_float32 |
-                       Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128)
-  | Cstatic_cast (Float_of_float32 | Float32_of_float |
-                  Int_of_float Float32 | Float_of_int Float32 |
-                  V128_of_scalar _ | Scalar_of_v128 _)
   | Cclz _ | Cctz _ | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -420,16 +466,29 @@ let operation_supported : Cmm.operation -> bool = function
   | Ccmpi _ | Caddv | Cadda | Ccmpa _
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
-  | Creinterpret_cast (Int_of_value | Value_of_int |
-                       Int64_of_float | Float_of_int64)
-  | Cstatic_cast (Float_of_int Float64 | Int_of_float Float64)
   | Ccmpf _
   | Ccsel _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
   | Cpoll
-    -> true
+  | Creinterpret_cast (Int_of_value | Value_of_int |
+                       Int64_of_float | Float_of_int64 |
+                       Float32_of_float | Float_of_float32 |
+                       Float32_of_int32 | Int32_of_float32 |
+                       V128_of_v128)
+  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+                  Int_of_float Float32 | Float_of_int Float32 |
+                  Float_of_int Float64 | Int_of_float Float64 |
+                  V128_of_scalar _ | Scalar_of_v128 _) ->
+    true
+
+let expression_supported : Cmm.expression -> bool = function
+  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+  | Cexit _ -> true
+  | Cconst_vec256 _ | Cconst_vec512 _ -> false
 
 let trap_size_in_bytes = 16
