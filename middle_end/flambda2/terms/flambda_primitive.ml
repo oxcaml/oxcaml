@@ -2285,7 +2285,7 @@ let result_kind_of_variadic_primitive p : result_kind =
   | Begin_region _ | Begin_try_region _ -> Singleton K.region
   | Make_array (_, _, (Heap | Local _)) -> Singleton K.value
   | Make_array (_, _, External) ->
-    Misc.fatal_error "Externally allocated arrays are not supported"
+    Misc.fatal_error "Externally arrays are not supported"
   | Make_block (_, _, (Heap | Local _)) -> Singleton K.value
   | Make_block (_, _, External) -> Singleton K.naked_nativeint
 
@@ -2299,10 +2299,15 @@ let effects_and_coeffects_of_variadic_primitive p =
   | Make_block (_, mut, alloc_mode) | Make_array (_, mut, alloc_mode) ->
     let coeffects : Coeffects.t =
       match alloc_mode with
-      | Heap | External -> Coeffects.No_coeffects
-      | Local _ -> Coeffects.Has_coeffects
+      | Heap -> Coeffects.No_coeffects
+      | Local _ | External -> Coeffects.Has_coeffects
     in
-    Effects.Only_generative_effects mut, coeffects, Placement.Strict
+    let effects : Effects.t =
+      match alloc_mode with
+      | External -> Effects.Arbitrary_effects
+      | Heap | Local _ -> Effects.Only_generative_effects mut
+    in
+    effects, coeffects, Placement.Strict
 
 let variadic_classify_for_printing p =
   match p with
