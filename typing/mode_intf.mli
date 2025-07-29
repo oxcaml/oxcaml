@@ -229,7 +229,10 @@ module type S = sig
 
     type 'd morph =
       | Debug : string -> (_ * _) morph
-      | Skip : ('l * 'r) morph  (** TODO *)
+      | Skip : ('l * 'r) morph
+          (** The skip morphism hint. This should be used when we know that the morphism
+            will not change any values in any user-relevant way (e.g. if it changes from
+            "global" in regionality to "global" in locality, it can still use this hint) *)
       | Close_over : closure_details -> ('l * disallowed) morph
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Captured_by_partial_application : (disallowed * 'r) morph

@@ -1615,6 +1615,8 @@ module Hint = struct
 
   type 'd neg_morph = 'd neg morph constraint 'd = _ * _
 
+  let morph_skip = Skip
+
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Debug _ -> true
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
@@ -1774,8 +1776,9 @@ module Axerror = struct
         | Debug s -> fprintf ppf "DEBUG[%s]" s
         | Skip ->
           (* [Skip] should never be printed as it should only be used with morphisms
-             that don't change the mode value (modulo equating equivalent regionality and locality
-             values), and [Skip] should be a non-rigid hint *)
+             that don't change the mode value (modulo equating equivalent regionality
+             and locality values), and [Skip] should be a non-rigid hint, which should
+             mean this case never happens *)
           assert false
         | Close_over closure ->
           (* CR pdsouza: in the future, we should print out the code at the mentioned location, instead of just the location *)
@@ -1923,12 +1926,12 @@ module Axerror = struct
         unit =
      fun ?target ~left_obj ~right_obj err ppf ->
       let open Format in
-      (* ignore debug_print_axhint_chain; *)
-      fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
-        (debug_print_axhint_chain err.left left_obj)
-        err.left_hint
-        (debug_print_axhint_chain err.right right_obj)
-        err.right_hint;
+      ignore debug_print_axhint_chain;
+      (* fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
+         (debug_print_axhint_chain err.left left_obj)
+         err.left_hint
+         (debug_print_axhint_chain err.right right_obj)
+         err.right_hint; *)
       (match target with
       | None -> fprintf ppf "This value is "
       | Some (target_item, target_lid) ->

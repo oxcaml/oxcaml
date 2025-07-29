@@ -318,6 +318,10 @@ module type Hint = sig
       to the allowance of the morphism. *)
   type 'd morph constraint 'd = 'l * 'r
 
+  (** See comment on [Skip] constructor for ['d morph] in Mode.Hint for details
+    about this. *)
+  val morph_skip : 'd morph
+
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
 
