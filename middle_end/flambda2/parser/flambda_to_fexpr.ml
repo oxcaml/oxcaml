@@ -964,9 +964,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         | Alloc_heap -> Heap
         | Alloc_local -> Local
         (* CR jcutler for ccasinghino: I've done my best to understand the
-        surrounding code and I've managed to convince myself that Heap should be
-        fine here, maybe up to some [caml_modify]s. But we should talk about
-        this case *)
+           surrounding code and I've managed to convince myself that Heap should
+           be fine here, maybe up to some [caml_modify]s. But we should talk
+           about this case *)
         | Alloc_external -> Heap
       in
       Code

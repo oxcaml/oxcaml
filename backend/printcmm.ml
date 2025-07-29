@@ -253,7 +253,7 @@ let operation d = function
   | Calloc (Alloc_mode.Heap, _) -> "alloc" ^ location d
   | Calloc (Alloc_mode.Local, _) -> "alloc_local" ^ location d
   | Calloc (Alloc_mode.External, _) ->
-      Misc.fatal_error "External allocations are Cextcall"
+    Misc.fatal_error "External allocations are Cextcall"
   | Cstore (c, init) ->
     let init =
       match init with Initialization -> "(init)" | Assignment -> ""

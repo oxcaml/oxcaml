@@ -79,8 +79,7 @@ let find_compatible_allocations :
       | Op (Begin_region | End_region) -> (
         match curr_mode with
         | Local -> return ()
-        | Heap ->
-          loop allocations (DLL.next cell) ~curr_mode ~curr_size
+        | Heap -> loop allocations (DLL.next cell) ~curr_mode ~curr_size
         | External ->
           Misc.fatal_error
             "Impossible: external allocs are generated as Cextcall.")

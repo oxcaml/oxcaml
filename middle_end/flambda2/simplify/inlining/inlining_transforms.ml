@@ -127,7 +127,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
         (Flambda.Invalid.Calling_local_returning_closure_with_normal_apply apply)
     )
     (* CR jcutler for ccasinghino: I'm only ~50% confident this is correct --
-    let's talk about it? *)
+       let's talk about it? *)
   | Local _, (Alloc_heap | Alloc_external) (* This is allowed by subtyping *)
   | Local _, Alloc_local
   | Heap, (Alloc_heap | Alloc_external) ->

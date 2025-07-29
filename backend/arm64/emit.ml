@@ -1049,9 +1049,8 @@ let num_call_gc_points instr =
   let rec loop instr call_gc =
     match instr.desc with
     | Lend -> call_gc
-    | Lop (Alloc { mode = External ; _ }) ->
-      Misc.fatal_error
-        "Impossible: external allocs are generated as Cextcall"
+    | Lop (Alloc { mode = External; _ }) ->
+      Misc.fatal_error "Impossible: external allocs are generated as Cextcall"
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag ->
       loop instr.next (call_gc + 1)
     | Lop Poll -> loop instr.next (call_gc + 1)
@@ -1226,9 +1225,8 @@ module BR = Branch_relaxation.Make (struct
           Misc.fatal_error "arm64: got 256/512 bit vector"
       and single = memory_access_size memory_chunk in
       based + barrier + single
-    | Lop (Alloc { mode = External ; _ }) ->
-      Misc.fatal_error
-        "Impossible: external allocs are generated as Cextcall."
+    | Lop (Alloc { mode = External; _ }) ->
+      Misc.fatal_error "Impossible: external allocs are generated as Cextcall."
     | Lop (Alloc { mode = Local; _ }) -> 9
     | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> 5
     | Lop (Specific (Ifar_alloc _)) when !fastcode_flag -> 6
@@ -1914,9 +1912,8 @@ let emit_instr i =
     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
     | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector")
-  | Lop (Alloc { mode = External ; _ }) ->
-    Misc.fatal_error
-      "Impossible: external allocs are generated as Cextcall."
+  | Lop (Alloc { mode = External; _ }) ->
+    Misc.fatal_error "Impossible: external allocs are generated as Cextcall."
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->
