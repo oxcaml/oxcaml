@@ -238,6 +238,42 @@ and variant_extensions =
 
 type flambda_type = t
 
+(* Accessors useful to have handy *)
+
+let is_obviously_bottom t =
+  match t with
+  | Value ty -> TD.is_obviously_bottom ty
+  | Naked_immediate ty -> TD.is_obviously_bottom ty
+  | Naked_float32 ty -> TD.is_obviously_bottom ty
+  | Naked_float ty -> TD.is_obviously_bottom ty
+  | Naked_int8 ty -> TD.is_obviously_bottom ty
+  | Naked_int16 ty -> TD.is_obviously_bottom ty
+  | Naked_int32 ty -> TD.is_obviously_bottom ty
+  | Naked_int64 ty -> TD.is_obviously_bottom ty
+  | Naked_nativeint ty -> TD.is_obviously_bottom ty
+  | Naked_vec128 ty -> TD.is_obviously_bottom ty
+  | Naked_vec256 ty -> TD.is_obviously_bottom ty
+  | Naked_vec512 ty -> TD.is_obviously_bottom ty
+  | Rec_info ty -> TD.is_obviously_bottom ty
+  | Region ty -> TD.is_obviously_bottom ty
+
+let is_obviously_unknown t =
+  match t with
+  | Value ty -> TD.is_obviously_unknown ty
+  | Naked_immediate ty -> TD.is_obviously_unknown ty
+  | Naked_float32 ty -> TD.is_obviously_unknown ty
+  | Naked_float ty -> TD.is_obviously_unknown ty
+  | Naked_int8 ty -> TD.is_obviously_unknown ty
+  | Naked_int16 ty -> TD.is_obviously_unknown ty
+  | Naked_int32 ty -> TD.is_obviously_unknown ty
+  | Naked_int64 ty -> TD.is_obviously_unknown ty
+  | Naked_nativeint ty -> TD.is_obviously_unknown ty
+  | Naked_vec128 ty -> TD.is_obviously_unknown ty
+  | Naked_vec256 ty -> TD.is_obviously_unknown ty
+  | Naked_vec512 ty -> TD.is_obviously_unknown ty
+  | Rec_info ty -> TD.is_obviously_unknown ty
+  | Region ty -> TD.is_obviously_unknown ty
+
 let get_alias_exn t =
   match t with
   | Value ty -> TD.get_alias_exn ty
@@ -258,8 +294,19 @@ let get_alias_exn t =
 let get_alias_opt t =
   match get_alias_exn t with s -> Some s | exception Not_found -> None
 
+let empty_env_extension = { equations = Name.Map.empty }
+
+let is_empty_env_extension { equations } = Name.Map.is_empty equations
+
 let row_like_is_bottom ~known ~(other : _ Or_bottom.t) ~is_empty_map_known =
   is_empty_map_known known && match other with Bottom -> true | Ok _ -> false
+
+let row_like_for_blocks_is_bottom { known_tags; other_tags; alloc_mode = _ } =
+  row_like_is_bottom ~known:known_tags ~other:other_tags
+    ~is_empty_map_known:Tag.Map.is_empty
+
+let or_unknown_is_bottom is_bottom (or_unknown : _ Or_unknown.t) =
+  match or_unknown with Known x -> is_bottom x | Unknown -> false
 
 let rec free_names0 ~follow_value_slots t =
   let[@inline] type_descr_free_names ~free_names_head ty =
@@ -927,6 +974,24 @@ and apply_renaming_variant_extensions extensions renaming =
     then extensions
     else Ext { when_immediate = when_immediate'; when_block = when_block' }
 
+let print_field ?prefix:(print_prefix = Format.pp_print_space)
+    ?(is_default = fun _ -> false) ?label:(print_label = Format.pp_print_string)
+    ?sep:(print_sep = Format.pp_print_space) label prj print ppf r =
+  let f = prj r in
+  if not (is_default f)
+  then
+    Format.fprintf ppf "%a@[<hov 1>(%a%a%a)@]" print_prefix () print_label label
+      print_sep () print f
+
+let print_fields fields ppf r =
+  (Format.pp_print_list ~pp_sep:(fun _ppf () -> ()) (fun ppf fmt -> fmt ppf r))
+    ppf fields
+
+let print_record ?label:(print_label = Format.pp_print_string) label fields ppf
+    r =
+  Format.fprintf ppf "@[<hv 1>(%a%a)@]" print_label label (print_fields fields)
+    r
+
 let rec print ppf t =
   match t with
   | Value ty -> (
@@ -1000,15 +1065,35 @@ and print_head_of_kind_value ppf { non_null; is_null } =
 and print_head_of_kind_value_non_null ppf head =
   match head with
   | Variant { blocks; immediates; extensions; is_unique } ->
-    (* CR-someday mshinwell: Improve so that we elide blocks and/or immediates
-       when they're empty. *)
-    Format.fprintf ppf
-      "@[<hov 1>(Variant%s@ @[<hov 1>(blocks@ %a)@]@ @[<hov 1>(tagged_imms@ \
-       %a)@]%a)@]"
-      (if is_unique then " unique" else "")
-      (Or_unknown.print print_row_like_for_blocks)
-      blocks (Or_unknown.print print) immediates print_variant_extensions
-      extensions
+    print_record
+      ~label:(fun ppf name ->
+        Format.fprintf ppf "%s%s" name (if is_unique then " unique" else ""))
+      "Variant"
+      [ print_field
+          ~is_default:(or_unknown_is_bottom is_obviously_bottom)
+          "tagged_imms"
+          (fun (_, immediates, _) -> immediates)
+          (Or_unknown.print print);
+        print_field
+          ~sep:(fun _ppf () -> ())
+          ~is_default:(or_unknown_is_bottom row_like_for_blocks_is_bottom)
+          "blocks"
+          (fun (blocks, _, _) -> blocks)
+          (Or_unknown.print print_row_like_for_blocks);
+        print_field ~is_default:is_empty_env_extension "when_immediate"
+          (fun (_, _, extensions) ->
+            match extensions with
+            | No_extensions -> empty_env_extension
+            | Ext { when_immediate; _ } -> when_immediate)
+          print_env_extension;
+        print_field ~is_default:is_empty_env_extension "when_block"
+          (fun (_, _, extensions) ->
+            match extensions with
+            | No_extensions -> empty_env_extension
+            | Ext { when_block; _ } -> when_block)
+          print_env_extension ]
+      ppf
+      (blocks, immediates, extensions)
   | Mutable_block { alloc_mode } ->
     Format.fprintf ppf "@[<hov 1>(Mutable_block@ %a)@]"
       Alloc_mode.For_types.print alloc_mode
@@ -1144,11 +1229,17 @@ and print_row_like :
       Format.fprintf ppf "=> %a,@ %a%a" print_index index print_maps_to maps_to
         pp_env_extension env_extension
     in
-    Format.fprintf ppf
-      "@[<hov 1>(@[<hov 1>(alloc_mode@ %a)@ (known@ %a)@]@ @[<hov 1>(other@ \
-       %a)@])@]"
-      Alloc_mode.For_types.print alloc_mode (print_known_map print) known
-      (Or_bottom.print print) other
+    print_fields
+      [ print_field "alloc_mode"
+          (fun (alloc_mode, _, _) -> alloc_mode)
+          Alloc_mode.For_types.print;
+        print_field "known" (fun (_, known, _) -> known) (print_known_map print);
+        print_field "other"
+          ~is_default:(fun (other : _ Or_bottom.t) ->
+            match other with Bottom -> true | Ok _ -> false)
+          (fun (_, _, other) -> other)
+          (Or_bottom.print print) ]
+      ppf (alloc_mode, known, other)
 
 and print_row_like_for_blocks ppf { known_tags; other_tags; alloc_mode } =
   let print_index ppf { domain; shape = _ } =
@@ -1235,14 +1326,6 @@ and print_env_extension ppf { equations } =
   in
   Format.fprintf ppf "@[<hov 1>(equations@ @[<v 1>%a@])@]" print_equations
     equations
-
-and print_variant_extensions ppf (extensions : variant_extensions) =
-  match extensions with
-  | No_extensions -> ()
-  | Ext { when_immediate; when_block } ->
-    Format.fprintf ppf
-      "@ @[<hov 1>(when_immediate@ %a)@]@ @[<hov 1>(when_block@ %a)@]"
-      print_env_extension when_immediate print_env_extension when_block
 
 let rec ids_for_export t =
   match t with
@@ -3158,9 +3241,7 @@ module Row_like_for_blocks = struct
       alloc_mode = Alloc_mode.For_types.unknown ()
     }
 
-  let is_bottom { known_tags; other_tags; alloc_mode = _ } =
-    Tag.Map.is_empty known_tags
-    && match other_tags with Bottom -> true | Ok _ -> false
+  let is_bottom = row_like_for_blocks_is_bottom
 
   let all_tags { known_tags; other_tags; alloc_mode = _ } :
       Tag.Set.t Or_unknown.t =
@@ -3462,40 +3543,6 @@ module Env_extension = struct
 
   let to_map t = t.equations
 end
-
-let is_obviously_bottom t =
-  match t with
-  | Value ty -> TD.is_obviously_bottom ty
-  | Naked_immediate ty -> TD.is_obviously_bottom ty
-  | Naked_float32 ty -> TD.is_obviously_bottom ty
-  | Naked_float ty -> TD.is_obviously_bottom ty
-  | Naked_int8 ty -> TD.is_obviously_bottom ty
-  | Naked_int16 ty -> TD.is_obviously_bottom ty
-  | Naked_int32 ty -> TD.is_obviously_bottom ty
-  | Naked_int64 ty -> TD.is_obviously_bottom ty
-  | Naked_nativeint ty -> TD.is_obviously_bottom ty
-  | Naked_vec128 ty -> TD.is_obviously_bottom ty
-  | Naked_vec256 ty -> TD.is_obviously_bottom ty
-  | Naked_vec512 ty -> TD.is_obviously_bottom ty
-  | Rec_info ty -> TD.is_obviously_bottom ty
-  | Region ty -> TD.is_obviously_bottom ty
-
-let is_obviously_unknown t =
-  match t with
-  | Value ty -> TD.is_obviously_unknown ty
-  | Naked_immediate ty -> TD.is_obviously_unknown ty
-  | Naked_float32 ty -> TD.is_obviously_unknown ty
-  | Naked_float ty -> TD.is_obviously_unknown ty
-  | Naked_int8 ty -> TD.is_obviously_unknown ty
-  | Naked_int16 ty -> TD.is_obviously_unknown ty
-  | Naked_int32 ty -> TD.is_obviously_unknown ty
-  | Naked_int64 ty -> TD.is_obviously_unknown ty
-  | Naked_nativeint ty -> TD.is_obviously_unknown ty
-  | Naked_vec128 ty -> TD.is_obviously_unknown ty
-  | Naked_vec256 ty -> TD.is_obviously_unknown ty
-  | Naked_vec512 ty -> TD.is_obviously_unknown ty
-  | Rec_info ty -> TD.is_obviously_unknown ty
-  | Region ty -> TD.is_obviously_unknown ty
 
 let alias_type_of (kind : K.t) name : t =
   match kind with
