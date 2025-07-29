@@ -137,7 +137,7 @@ module Scannable_block_shape : sig
 
   val element_kind : t -> int -> kind
 
-  val of_module_representation : Lambda.module_representation -> t
+  (*_ val of_module_representation : Lambda.module_representation -> t *)
 end
 
 module Block_shape : sig
