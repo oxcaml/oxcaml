@@ -440,7 +440,6 @@ Line 7, characters 20-23:
 7 |     uncontended_use M.r
                         ^^^
 Error: This value is "contended" because it is used inside a function
-       which is has an allocation
        which is "portable".
        However, it is expected to be "uncontended".
 |}]
@@ -458,8 +457,7 @@ Line 6, characters 12-15:
 6 |     let _ = M.x in
                 ^^^
 Error: The value "M.x" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* Modalities on primitives are supported, but are interpreted differently in
@@ -1046,8 +1044,7 @@ Line 3, characters 12-13:
 3 |     let _ = f in
                 ^
 Error: The value "f" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 let (_foo @ portable) () =
@@ -1071,8 +1068,7 @@ Line 4, characters 12-13:
 4 |     let _ = f in
                 ^
 Error: The value "f" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 let () =
@@ -1209,8 +1205,7 @@ Line 2, characters 18-19:
 2 |   let k = (module M : Func_nonportable) in
                       ^
 Error: The value "M.baz" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* global function can't close over a local module, even though it's coerced
@@ -1226,8 +1221,7 @@ Line 4, characters 12-13:
 4 |     (module M : Empty)
                 ^
 Error: The module "M" is "local" but expected to be "global"
-       because it is used inside a function which is has an allocation
-       which is "global".
+       because it is used inside a function which is "global".
 |}]
 
 (* similar test to above but checks that a mode error is given even when
@@ -1243,8 +1237,7 @@ Line 4, characters 12-13:
 4 |     (module M : Empty)
                 ^
 Error: The module "M" is "local" but expected to be "global"
-       because it is used inside a function which is has an allocation
-       which is "global".
+       because it is used inside a function which is "global".
 |}]
 
 (* Empty signature crosses linearity and portability *)
@@ -1302,8 +1295,7 @@ Line 3, characters 18-34:
 3 |   let k = (module M_Func_portable' : Func_portable) in
                       ^^^^^^^^^^^^^^^^
 Error: The module "M_Func_portable'" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* Moreover, note that modules don't cross locality *)
@@ -1319,8 +1311,7 @@ Line 4, characters 20-36:
 4 |     let k = (module M_Func_portable' : Func_portable) in
                         ^^^^^^^^^^^^^^^^
 Error: The module "M_Func_portable'" is "local" but expected to be "global"
-       because it is used inside a function which is has an allocation
-       which is "global".
+       because it is used inside a function which is "global".
 |}]
 
 (* Closing over a module in a module. *)
@@ -1332,8 +1323,7 @@ Line 2, characters 18-20:
 2 |   let k = (module M' : Module) in
                       ^^
 Error: The value "M'.M.baz" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 module type S'_Func_portable = sig module M : Func_portable end
@@ -1359,8 +1349,7 @@ Line 4, characters 18-19:
 4 |   let k = (module F : F) in
                       ^
 Error: The module "F" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* closing over a portable functor is fine *)
@@ -1386,8 +1375,7 @@ Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
                       ^
 Error: The class "M.cla" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* Pmod_unpack requires type equality instead of inclusion, so for a closing-over
@@ -1407,8 +1395,7 @@ Line 2, characters 25-26:
 2 |     let module M' = (val m : Func_portable) in
                              ^
 Error: The value "m" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* closing over values from modules crosses modes *)

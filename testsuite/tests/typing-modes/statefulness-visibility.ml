@@ -436,8 +436,7 @@ Line 1, characters 73-74:
 1 | let foo (f : (unit -> unit) @ stateful portable) @ stateless = fun () -> f ()
                                                                              ^
 Error: The value "f" is "stateful" but expected to be "stateless"
-       because it is used inside a function which is has an allocation
-       which is "stateless".
+       because it is used inside a function which is "stateless".
 |}]
 
 (* The error for [portable] is displayed first. *)
@@ -448,8 +447,7 @@ Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ stateless = fun () -> f ()
                                                                     ^
 Error: The value "f" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
@@ -458,8 +456,7 @@ Line 1, characters 74-75:
 1 | let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
                                                                               ^
 Error: The value "f" is "observing" but expected to be "stateless"
-       because it is used inside a function which is has an allocation
-       which is "stateless".
+       because it is used inside a function which is "stateless".
 |}]
 
 (* Closing over use of read gives observing *)
@@ -503,8 +500,7 @@ Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
                                                                     ^
 Error: The value "f" is "stateful" but expected to be "observing"
-       because it is used inside a function which is has an allocation
-       which is "observing".
+       because it is used inside a function which is "observing".
 |}]
 
 (* Testing defaulting  *)

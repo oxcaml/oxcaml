@@ -36,8 +36,7 @@ Line 3, characters 12-13:
 3 |         bar x y
                 ^
 Error: The value "x" is local to the parent region but expected to be "global"
-       because it is used inside a function which is has an allocation
-       which is "global".
+       because it is used inside a function which is "global".
 |}]
 
 (* for mixed definitions, the other axes are not constrained. *)

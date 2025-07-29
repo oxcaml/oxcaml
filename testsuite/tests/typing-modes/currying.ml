@@ -276,8 +276,7 @@ Line 3, characters 63-64:
 3 |     fun ~a -> fun[@curry] ~b -> fun[@curry] ~c -> print_string a
                                                                    ^
 Error: The value "a" is local to the parent region but expected to be "global"
-       because it is used inside a function which is has an allocation
-       which is "global".
+       because it is used inside a function which is "global".
 |}]
 let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 

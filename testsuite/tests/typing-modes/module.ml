@@ -176,8 +176,7 @@ Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
 Error: The value "N.foo" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 let (bar @ portable) () =
@@ -188,8 +187,7 @@ Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
 Error: The value "M.foo" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -213,8 +211,7 @@ Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
 Error: The value "N'.foo" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -228,8 +225,7 @@ Line 3, characters 19-20:
 3 |         module L = M
                        ^
 Error: The module "M" is "nonportable" but expected to be "portable"
-       because it is used inside a function which is has an allocation
-       which is "portable".
+       because it is used inside a function which is "portable".
 |}]
 
 module F (X : S @ portable) = struct
