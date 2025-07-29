@@ -1720,7 +1720,7 @@ of the values in a single axis from an error. *)
 type axhint =
   | Apply : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
   | Const : Hint.const -> axhint
-  | Empty : axhint
+  | Nil : axhint
 [@@ocaml.warning "-62"]
 
 (** Provides errors for the mode solvers. These are axis-specific processed versions of
@@ -1869,7 +1869,7 @@ module Axerror = struct
         fprintf ppf "%a%a" (print_mode a_obj) a (print_const_hint a_obj a)
           const_hint;
         HintPrinted
-      | Empty ->
+      | Nil ->
         print_mode a_obj ppf a;
         NothingPrinted
 
@@ -1908,7 +1908,7 @@ module Axerror = struct
         | Register_alloc_mode -> fprintf ppf "Register_alloc_mode"
       in
       match hint with
-      | Empty -> fprintf ppf "[empty hint]"
+      | Nil -> fprintf ppf "[empty hint]"
       | Const const_hint ->
         fprintf ppf "[Const (%a)]" debug_print_const_hint const_hint
       | Apply (morph_hint, b, b_obj, b_hint, _) ->
@@ -2114,7 +2114,7 @@ module Axerror = struct
           let morph_inv = conv_side_adj side r_obj morph in
           let rb = apply rb_obj morph_inv r in
           match find_responsible_axis_prod morph ax with
-          | NoneResponsible -> a, Empty
+          | NoneResponsible -> a, Nil
           | SourceIsSingle ->
             (* Note that unlike below, the returned [_b] value will be the same as
                the current [b], so we can discard it. *)
@@ -2139,7 +2139,7 @@ module Axerror = struct
               assert false
           in
           shint_to_axhint_prod r_obj chosen chosen_hint ax side
-        | Nil -> a, Empty
+        | Nil -> a, Nil
 
     and shint_to_axhint_single :
         type a left1 right1 left2 right2.
@@ -2159,7 +2159,7 @@ module Axerror = struct
           let morph_inv = conv_side_adj side a_obj morph in
           let rb = apply rb_obj morph_inv a in
           match find_responsible_axis_single morph with
-          | NoneResponsible -> a, Empty
+          | NoneResponsible -> a, Nil
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
             let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
@@ -2181,7 +2181,7 @@ module Axerror = struct
               assert false
           in
           shint_to_axhint_single a_obj chosen chosen_hint side
-        | Nil -> a, Empty
+        | Nil -> a, Nil
 
     let flip_axerror { left; left_hint; right; right_hint } =
       { left = right;
@@ -3686,9 +3686,9 @@ module Modality = struct
               (Error
                  ( ax,
                    { left = Join_with left;
-                     left_hint = Empty;
+                     left_hint = Nil;
                      right = Join_with right;
-                     right_hint = Empty
+                     right_hint = Nil
                    } ))
 
       let concat ~then_ t =
@@ -3728,9 +3728,9 @@ module Modality = struct
             (Error
                ( ax,
                  { left = Join_with left;
-                   left_hint = Empty;
+                   left_hint = Nil;
                    right = Join_with (Axis.proj ax c);
-                   right_hint = Empty
+                   right_hint = Nil
                  } )))
       | Diff (_, _m0), Diff (_, _m1) ->
         (* [m1] is a left mode so it cannot appear on the right. So we can't do
@@ -3827,9 +3827,9 @@ module Modality = struct
               (Error
                  ( ax,
                    { left = Meet_with left;
-                     left_hint = Empty;
+                     left_hint = Nil;
                      right = Meet_with right;
-                     right_hint = Empty
+                     right_hint = Nil
                    } ))
 
       let concat ~then_ t =
@@ -3873,9 +3873,9 @@ module Modality = struct
             (Error
                ( ax,
                  { left = Meet_with left;
-                   left_hint = Empty;
+                   left_hint = Nil;
                    right = Meet_with (Axis.proj ax c);
-                   right_hint = Empty
+                   right_hint = Nil
                  } )))
       | Exactly (_, _m0), Exactly (_, _m1) ->
         (* [m1] is a left mode, so there is no good way to check.
