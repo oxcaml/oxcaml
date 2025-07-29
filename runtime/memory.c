@@ -763,18 +763,13 @@ CAMLexport value caml_alloc_shr_noexc(mlsize_t wosize, tag_t tag) {
   return alloc_shr(wosize, tag, 0, 1);
 }
 
-//CR jcutler for ccasinghino: I believe this works on single-threaded mode.
-//I do not know the invariants of the multicore GC, and have no idea how to reason about
-//if this might break them.
 CAMLexport intnat caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
-                                                 reserved_t reserved)
+                                                  reserved_t reserved)
 {
   void* res = (void*) malloc(Bhsize_wosize(wosize));
   if (res == NULL) {
     caml_fatal_out_of_memory();
   }
-  // CR jcutler for ccasinghino: I think this is the tag we want,
-  // as described in the comment at the top of address_class.h.
   uintnat color = NOT_MARKABLE;
   Hd_hp(res) = Make_header_with_reserved(wosize, tag, color, reserved);
   intnat v = (intnat) Val_hp(res);
