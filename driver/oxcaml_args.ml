@@ -1609,7 +1609,8 @@ module Extra_params = struct
     | "flambda2-expert-cont-spec-threshold" ->
       begin match Compenv.check_int ppf name v with
       | Some i ->
-         Flambda2.Expert.cont_spec_threshold := Oxcaml_flags.Set (Float.of_int i)
+         Flambda2.Expert.cont_spec_threshold :=
+             Oxcaml_flags.Set (Float.of_int i)
       | None -> ()
       end;
       true
