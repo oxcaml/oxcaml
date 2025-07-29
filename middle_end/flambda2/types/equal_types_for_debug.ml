@@ -67,12 +67,16 @@ let extension_env env left_env right_env = { env with left_env; right_env }
 
 let add_env_extension env ext1 ext2 =
   extension_env env
-    (ME.add_env_extension ~meet_type:env.meet_type env.left_env ext1)
-    (ME.add_env_extension ~meet_type:env.meet_type env.right_env ext2)
+    (ME.use_meet_env env.left_env ~f:(fun left_env ->
+         ME.add_env_extension ~meet_type:env.meet_type left_env ext1))
+    (ME.use_meet_env env.right_env ~f:(fun right_env ->
+         ME.add_env_extension ~meet_type:env.meet_type right_env ext2))
 
 let add_env_extension_strict env ext1 ext2 =
-  ( ME.add_env_extension_strict ~meet_type:env.meet_type env.left_env ext1,
-    ME.add_env_extension_strict ~meet_type:env.meet_type env.right_env ext2 )
+  ( ME.use_meet_env_strict env.left_env ~f:(fun left_env ->
+        ME.add_env_extension ~meet_type:env.meet_type left_env ext1),
+    ME.use_meet_env_strict env.right_env ~f:(fun right_env ->
+        ME.add_env_extension ~meet_type:env.meet_type right_env ext2) )
 
 let exists_in_parent_env env name =
   TE.mem ~min_name_mode:Name_mode.in_types env.parent_env name
@@ -143,12 +147,7 @@ let equal_env_extension ~equal_type env ext1 ext2 =
 
 let equal_row_like_case ~equal_type ~equal_maps_to ~equal_lattice ~equal_shape
     env (t1 : (_, _, _) TG.row_like_case) (t2 : (_, _, _) TG.row_like_case) =
-  match
-    ( ME.add_env_extension_strict env.left_env t1.env_extension
-        ~meet_type:env.meet_type,
-      ME.add_env_extension_strict env.right_env t2.env_extension
-        ~meet_type:env.meet_type )
-  with
+  match add_env_extension_strict env t1.env_extension t2.env_extension with
   | Or_bottom.Bottom, Or_bottom.Bottom -> true
   | Or_bottom.Ok _, Or_bottom.Bottom | Or_bottom.Bottom, Or_bottom.Ok _ -> false
   | Or_bottom.Ok left_env, Or_bottom.Ok right_env ->
@@ -302,23 +301,27 @@ let equal_head_of_kind_value_non_null ~equal_type env
 
 let equal_head_of_kind_value ~equal_type env (t1 : TG.head_of_kind_value)
     (t2 : TG.head_of_kind_value) =
+  (* CR bclement: consider [Is_null] vars *)
   match t1.is_null, t2.is_null with
-  | Not_null, Maybe_null | Maybe_null, Not_null -> false
-  | Not_null, Not_null | Maybe_null, Maybe_null ->
+  | Not_null, (Maybe_null | Is_null _) | (Maybe_null | Is_null _), Not_null ->
+    false
+  | Not_null, Not_null | (Maybe_null | Is_null _), (Maybe_null | Is_null _) ->
     Or_unknown_or_bottom.equal
       (equal_head_of_kind_value_non_null ~equal_type env)
       t1.non_null t2.non_null
 
-let equal_head_of_kind_naked_immediate ~equal_type env
+let equal_head_of_kind_naked_immediate ~equal_type:_ _env
     (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) =
-  match t1, t2 with
-  | Naked_immediates is1, Naked_immediates is2 ->
-    Targetint_31_63.Set.equal is1 is2
-  | Is_int t1, Is_int t2 -> equal_type env t1 t2
-  | Get_tag t1, Get_tag t2 -> equal_type env t1 t2
-  | Is_null t1, Is_null t2 -> equal_type env t1 t2
-  | (Naked_immediates _ | Is_int _ | Get_tag _ | Is_null _), _ -> false
+  match
+    ( TG.Head_of_kind_naked_immediate.descr t1,
+      TG.Head_of_kind_naked_immediate.descr t2 )
+  with
+  | ( { naked_immediates = is1; inverse_relations = rs1 },
+      { naked_immediates = is2; inverse_relations = rs2 } ) ->
+    (* CR bclement: reduce names to their canonicals *)
+    Or_unknown.equal Targetint_31_63.Set.equal is1 is2
+    && TG.Relation.Map.equal Name.Set.equal rs1 rs2
 
 let equal_head_of_kind_naked_float32 (t1 : TG.head_of_kind_naked_float32)
     (t2 : TG.head_of_kind_naked_float32) =
@@ -390,8 +393,8 @@ let equal_head_of_kind_region (() : TG.head_of_kind_region)
 
 let is_unknown_head_of_kind_value (t : TG.head_of_kind_value) =
   match t.is_null, t.non_null with
-  | Maybe_null, Unknown -> true
-  | (Not_null | Maybe_null), (Unknown | Bottom | Ok _) -> false
+  | (Maybe_null | Is_null _), Unknown -> true
+  | (Not_null | Maybe_null | Is_null _), (Unknown | Bottom | Ok _) -> false
 
 let is_non_obviously_unknown (t : ET.descr) =
   match t with
@@ -404,7 +407,7 @@ let is_non_obviously_unknown (t : ET.descr) =
 let is_bottom_head_of_kind_value (t : TG.head_of_kind_value) =
   match t.is_null, t.non_null with
   | Not_null, Bottom -> true
-  | (Not_null | Maybe_null), (Unknown | Bottom | Ok _) -> false
+  | (Not_null | Maybe_null | Is_null _), (Unknown | Bottom | Ok _) -> false
 
 let is_non_obviously_bottom (t : ET.descr) =
   match t with

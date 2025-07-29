@@ -65,7 +65,7 @@ let gen_value_to_gen prove_gen env t : _ generic_proof =
   match expand_head env t with
   | Value Unknown -> Unknown
   | Value Bottom -> Invalid
-  | Value (Ok { is_null = Maybe_null; non_null = _ })
+  | Value (Ok { is_null = Maybe_null | Is_null _; non_null = _ })
   | Value (Ok { is_null = Not_null; non_null = Unknown }) ->
     Unknown
   | Value (Ok { is_null = Not_null; non_null = Bottom }) -> Invalid
@@ -78,7 +78,7 @@ let gen_value_to_gen prove_gen env t : _ generic_proof =
 let gen_value_to_proof prove_gen env t : _ proof_of_property =
   match expand_head env t with
   | Value (Unknown | Bottom)
-  | Value (Ok { is_null = Maybe_null; non_null = _ })
+  | Value (Ok { is_null = Maybe_null | Is_null _; non_null = _ })
   | Value (Ok { is_null = Not_null; non_null = Unknown | Bottom }) ->
     Unknown
   | Value (Ok { is_null = Not_null; non_null = Ok head }) ->
@@ -160,14 +160,18 @@ let prove_is_not_a_pointer_generic_value env t =
   match expand_head env t with
   | Value Unknown -> Unknown
   | Value Bottom -> Invalid
-  | Value (Ok { is_null = Maybe_null; non_null = Bottom }) -> Proved true
+  | Value (Ok { is_null = Maybe_null | Is_null _; non_null = Bottom }) ->
+    Proved true
   | Value (Ok { is_null = Not_null; non_null = Bottom }) -> Invalid
-  | Value (Ok { is_null = Maybe_null | Not_null; non_null = Unknown }) ->
+  | Value
+      (Ok { is_null = Maybe_null | Is_null _ | Not_null; non_null = Unknown })
+    ->
     Unknown
   | Value (Ok { is_null; non_null = Ok head }) -> (
     match prove_is_int_generic_value ~variant_only:false env head, is_null with
-    | Proved true, (Maybe_null | Not_null) -> Proved true
-    | (Proved false | Unknown), Maybe_null | Unknown, Not_null -> Unknown
+    | Proved true, (Maybe_null | Is_null _ | Not_null) -> Proved true
+    | (Proved false | Unknown), (Maybe_null | Is_null _) | Unknown, Not_null ->
+      Unknown
     | Proved false, Not_null -> Proved false
     | Invalid, _ -> Invalid (* Ought to be impossible. *))
   | _ -> wrong_kind "Value" t Invalid
@@ -219,7 +223,9 @@ let prove_is_null_generic env t : _ generic_proof =
   | Value (Ok { non_null = Bottom; is_null = Not_null }) -> Invalid
   | Value (Ok { non_null = _; is_null = Not_null }) -> Proved false
   | Value (Ok { non_null = Bottom; is_null = _ }) -> Proved true
-  | Value (Ok { non_null = Unknown | Ok _; is_null = Maybe_null }) -> Unknown
+  | Value (Ok { non_null = Unknown | Ok _; is_null = Maybe_null | Is_null _ })
+    ->
+    Unknown
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
@@ -229,36 +235,58 @@ let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
 
 let prove_naked_immediates_generic env t : Targetint_31_63.Set.t generic_proof =
   match expand_head env t with
-  | Naked_immediate (Ok (Naked_immediates is)) ->
-    if Targetint_31_63.Set.is_empty is then Invalid else Proved is
-  | Naked_immediate (Ok (Is_int scrutinee_ty)) -> (
-    match prove_is_int_generic ~variant_only:true env scrutinee_ty with
-    | Proved true ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_true)
-    | Proved false ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_false)
-    | Unknown -> Unknown
-    | Invalid -> Invalid)
-  | Naked_immediate (Ok (Is_null scrutinee_ty)) -> (
-    match prove_is_null_generic env scrutinee_ty with
-    | Proved true ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_true)
-    | Proved false ->
-      Proved (Targetint_31_63.Set.singleton Targetint_31_63.bool_false)
-    | Unknown -> Unknown
-    | Invalid -> Invalid)
-  | Naked_immediate (Ok (Get_tag block_ty)) -> (
-    match prove_get_tag_generic env block_ty with
-    | Proved tags ->
-      let is =
-        Tag.Set.fold
-          (fun tag is ->
-            Targetint_31_63.Set.add (Tag.to_targetint_31_63 tag) is)
-          tags Targetint_31_63.Set.empty
-      in
-      Proved is
-    | Unknown -> Unknown
-    | Invalid -> Invalid)
+  | Naked_immediate (Ok head) ->
+    let these_immediates imms =
+      if Targetint_31_63.Set.is_empty imms then Invalid else Proved imms
+    in
+    let meet_these_immediates imms (proof : _ generic_proof) =
+      match proof with
+      | Proved imms' -> these_immediates (Targetint_31_63.Set.inter imms imms')
+      | Unknown -> these_immediates imms
+      | Invalid -> Invalid
+    in
+    let meet_this_immediate imm proof =
+      meet_these_immediates (Targetint_31_63.Set.singleton imm) proof
+    in
+    let { TG.Head_of_kind_naked_immediate.naked_immediates; inverse_relations }
+        =
+      TG.Head_of_kind_naked_immediate.descr head
+    in
+    let proof : _ generic_proof =
+      match naked_immediates with
+      | Known imms -> these_immediates imms
+      | Unknown -> Unknown
+    in
+    TG.Relation.Map.fold
+      (fun relation names imms ->
+        Name.Set.fold
+          (fun name imms ->
+            let ty = TG.alias_type_of K.value (Simple.name name) in
+            match TG.Relation.descr relation with
+            | Is_null -> (
+              match prove_is_null_generic env ty with
+              | Proved b -> meet_this_immediate (Targetint_31_63.bool b) imms
+              | Unknown -> imms
+              | Invalid -> Invalid)
+            | Is_int -> (
+              match prove_is_int_generic ~variant_only:true env ty with
+              | Proved b -> meet_this_immediate (Targetint_31_63.bool b) imms
+              | Unknown -> imms
+              | Invalid -> Invalid)
+            | Get_tag -> (
+              match prove_get_tag_generic env ty with
+              | Proved tags ->
+                let is =
+                  Tag.Set.fold
+                    (fun tag is ->
+                      Targetint_31_63.Set.add (Tag.to_targetint_31_63 tag) is)
+                    tags Targetint_31_63.Set.empty
+                in
+                meet_these_immediates is imms
+              | Unknown -> imms
+              | Invalid -> Invalid))
+          names imms)
+      inverse_relations proof
   | Naked_immediate Unknown -> Unknown
   | Naked_immediate Bottom -> Invalid
   | Value _ | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
@@ -275,7 +303,14 @@ let meet_naked_immediates env t =
 let prove_equals_tagged_immediates_value env
     (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
   match value_head with
-  | Variant { immediates; blocks; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates;
+        blocks;
+        extensions = _;
+        is_unique = _;
+        is_int = _;
+        get_tag = _
+      } -> (
     match blocks with
     | Unknown -> Unknown
     | Known blocks ->
@@ -300,7 +335,14 @@ let prove_equals_tagged_immediates env t =
 let meet_equals_tagged_immediates_value env
     (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
   match value_head with
-  | Variant { immediates; blocks = _; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates;
+        blocks = _;
+        extensions = _;
+        is_unique = _;
+        is_int = _;
+        get_tag = _
+      } -> (
     match immediates with
     | Unknown -> Unknown
     | Known imms -> prove_naked_immediates_generic env imms)
@@ -526,7 +568,14 @@ let prove_is_a_boxed_or_tagged_number_value _env
     (value_head : TG.head_of_kind_value_non_null) :
     boxed_or_tagged_number generic_proof =
   match value_head with
-  | Variant { blocks; immediates = _; extensions = _; is_unique = _ } -> (
+  | Variant
+      { blocks;
+        immediates = _;
+        extensions = _;
+        is_unique = _;
+        is_int = _;
+        get_tag = _
+      } -> (
     match blocks with
     | Unknown -> Unknown
     | Known blocks ->
@@ -822,7 +871,14 @@ type tagging_proof_kind =
 let[@inline always] inspect_tagging_of_simple_value proof_kind ~min_name_mode
     env (value_head : TG.head_of_kind_value_non_null) : Simple.t generic_proof =
   match value_head with
-  | Variant { immediates; blocks; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates;
+        blocks;
+        extensions = _;
+        is_unique = _;
+        is_int = _;
+        get_tag = _
+      } -> (
     let inspect_immediates () =
       match immediates with
       | Unknown -> Unknown
@@ -977,7 +1033,14 @@ let meet_boxed_vec512_containing_simple =
 let meet_block_field_simple_value ~min_name_mode ~field_kind field_index env
     (value_head : TG.head_of_kind_value_non_null) : Simple.t generic_proof =
   match value_head with
-  | Variant { immediates = _; blocks; extensions = _; is_unique = _ } -> (
+  | Variant
+      { immediates = _;
+        blocks;
+        extensions = _;
+        is_unique = _;
+        is_int = _;
+        get_tag = _
+      } -> (
     match blocks with
     | Unknown -> Unknown
     | Known blocks -> (
@@ -1192,11 +1255,12 @@ let prove_physical_equality env t1 t2 =
     | Value (Unknown | Bottom), _ | _, Value (Unknown | Bottom) -> Unknown
     | Value (Ok head1), Value (Ok head2) -> (
       match head1, head2 with
-      | ( { is_null = Maybe_null; non_null = Bottom },
-          { is_null = Maybe_null; non_null = Bottom } ) ->
+      | ( { is_null = Maybe_null | Is_null _; non_null = Bottom },
+          { is_null = Maybe_null | Is_null _; non_null = Bottom } ) ->
         (* Null is physically equal to Null *)
         Proved true
-      | { is_null = Maybe_null; _ }, _ | _, { is_null = Maybe_null; _ } ->
+      | { is_null = Maybe_null | Is_null _; _ }, _
+      | _, { is_null = Maybe_null | Is_null _; _ } ->
         Unknown
       | { is_null = Not_null; non_null = Unknown | Bottom }, _
       | _, { is_null = Not_null; non_null = Unknown | Bottom } ->
@@ -1233,7 +1297,9 @@ let prove_physical_equality env t1 t2 =
               { immediates = _;
                 blocks = Known blocks;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               },
             ( Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
             | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
@@ -1245,7 +1311,9 @@ let prove_physical_equality env t1 t2 =
               { immediates = _;
                 blocks = Known blocks;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } )
           when TG.Row_like_for_blocks.is_bottom blocks ->
           Proved false
@@ -1257,13 +1325,17 @@ let prove_physical_equality env t1 t2 =
               { immediates = immediates1;
                 blocks = blocks1;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               },
             Variant
               { immediates = immediates2;
                 blocks = blocks2;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ) -> (
           match immediates1, immediates2, blocks1, blocks2 with
           | Known imms, _, _, Known blocks
