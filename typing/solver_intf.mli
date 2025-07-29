@@ -189,13 +189,14 @@ module type Solver_mono = sig
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
         -> ('a, 'l * 'r) hint
         (** [Branch a0 a0_hint a1 a1_hint] says the current bound is jointly explained by either [a0] (explained by [a0_hint]) or [a1] (explaiend by [a1_hint]) (or both) *)
+    | Nil : ('a, 'l * 'r) hint
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
   (** Error returned by failed [submode a b]. [left] will be the lowest mode [a]
-   can be, and [right] will be the highest mode [b] can be. And [left <= right]
-   will be false, which is why the submode failed.  [left_hint] explains
-   [left] and [right_hint] explains [right] *)
+      can be, and [right] will be the highest mode [b] can be. And [left <= right]
+      will be false, which is why the submode failed.  [left_hint] explains
+      [left] and [right_hint] explains [right] *)
   type 'a error =
     { left : 'a;
       left_hint : ('a, left_only) hint;
@@ -312,39 +313,16 @@ module type Hint = sig
   (** Hints describing the reasons for constants *)
   type const
 
-  (** The empty mode constant hint *)
-  val const_none : const
-
-  (** The skip constant hint. This means that this hint should never be reported,
-    usually because it is the minimum element that is only allowed on the
-    left, or the maximum only allowed on the right *)
-  val const_skip : const
-
   (** Hints describing the reasons for morphisms applied to modes.
       The type parameter gives the allowance of the hint, which should correspond
       to the allowance of the morphism. *)
   type 'd morph constraint 'd = 'l * 'r
-
-  (** The empty mode morphism hint. The error reporter should terminate
-      the trace on seeing this. *)
-  val morph_none : 'd morph
-
-  (** The skip mode morphism hint. No output is printed for this but it tells the
-      error reporter to continue the trace, instead of terminating it there, as
-      it would for [morph_none]. *)
-  val morph_skip : 'd morph
 
   (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
   val left_adjoint : (_ * allowed) morph -> (allowed * disallowed) morph
 
   (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
   val right_adjoint : (allowed * _) morph -> (disallowed * allowed) morph
-
-  (** Given hints for two mode morphisms, return a hint for their composition.
-    If [h1] is a hint for [f1] and [h2] is a hint for [f2] then
-    [compose h2 h1] refers the hint for the composition [f2 . f1]
-    (i.e. first applying [f1] then applying [f2]) *)
-  val compose : 'd morph -> 'd morph -> 'd morph
 
   module Allow_disallow : Allow_disallow with type (_, _, 'd) sided = 'd morph
 end

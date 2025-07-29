@@ -191,8 +191,6 @@ module type S = sig
 
   module Hint : sig
     type const =
-      | None
-      | Skip
       | Result_of_lazy
       | Lazy_closure
       | Class
@@ -231,21 +229,7 @@ module type S = sig
 
     type 'd morph =
       | Debug : string -> (_ * _) morph
-      | None : ('l * 'r) morph
-          (** An empty morphism hint. The error reporter should terminate the
-            trace on seeing this. *)
-      | Skip : ('l * 'r) morph
-          (** An empty morphism hint, but telling the error reporter to continue the trace,
-            instead of terminating it there, as it would for [None].
-
-            This hint must only be used when it is known that the source and result
-            of the morphism are the same, and the value is left unchanged *)
-      | Wait_compose : ('l * 'r) morph
-          (** An empty morphism hint, that is used for when we know we will later
-            compose it with a descriptive morphism hint. This should never be left
-            on its own. *)
-      | Compose : ('l * 'r) morph * ('l * 'r) morph -> ('l * 'r) morph
-          (** A composition of morphism hints. The *)
+      | Skip : ('l * 'r) morph  (** TODO *)
       | Close_over : closure_details -> ('l * disallowed) morph
       | Is_closed_by : closure_details -> (disallowed * 'r) morph
       | Captured_by_partial_application : (disallowed * 'r) morph
@@ -730,8 +714,8 @@ module type S = sig
     val partial_apply : (allowed * 'r) t -> l
 
     val apply_hint :
-      comonadic:('l * 'r) Hint.morph ->
-      monadic:('r * 'l) Hint.morph ->
+      ?comonadic:('l * 'r) Hint.morph ->
+      ?monadic:('r * 'l) Hint.morph ->
       ('l * 'r) t ->
       ('l * 'r) t
   end
@@ -757,31 +741,35 @@ module type S = sig
 
   (** Converts regional to local, identity otherwise *)
   val regional_to_local :
-    hint:('l * 'r) Hint.morph -> ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
+    ?hint:('l * 'r) Hint.morph ->
+    ('l * 'r) Regionality.t ->
+    ('l * 'r) Locality.t
 
   (** Inject locality into regionality *)
   val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
 
   (** Converts regional to global, identity otherwise *)
   val regional_to_global :
-    hint:('l * 'r) Hint.morph -> ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
+    ?hint:('l * 'r) Hint.morph ->
+    ('l * 'r) Regionality.t ->
+    ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r :
-    hint:('l * disallowed) Hint.morph ->
+    ?hint:('l * disallowed) Hint.morph ->
     ('l * 'r) Alloc.t ->
     ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val value_to_alloc_r2l :
-    hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
-    hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   module Modality : sig
     type 'a raw =

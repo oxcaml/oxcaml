@@ -35,6 +35,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Branch :
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
         -> ('a, 'l * 'r) hint
+    | Nil : ('a, 'l * 'r) hint
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -44,6 +45,117 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       right : 'a;
       right_hint : ('a, right_only) hint
     }
+
+  (* CR pdsouza: rename "big hints" to better name *)
+
+  (** This is a more general form of morphism hint that allows for special constructs,
+    like composition ([Compose (a, b)]), skipping ([Skip]), and empty ([None]) hints.
+
+    It is used internally in the solver but will be converted to the normal kind variety
+    before returning it.
+
+    A value of type [('a, 'b, 'd) big_morph_hint] is a hint for a morphism from type
+    ['a] to type ['b] with allowance ['d] *)
+  type ('a, 'b, 'd) big_morph_hint =
+    | Base : 'd H.morph -> ('a, 'b, 'd) big_morph_hint
+    | Skip : ('a, 'a, 'l * 'r) big_morph_hint
+    | None : ('a, 'b, 'l * 'r) big_morph_hint
+    | Compose :
+        ('b, 'c, 'd) big_morph_hint
+        * ('b, 'c, 'd) C.morph
+        * ('a, 'b, 'd) big_morph_hint
+        * ('a, 'b, 'd) C.morph
+        -> ('a, 'c, 'd) big_morph_hint
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
+
+  type big_const_hint =
+    | Base of H.const
+    | Skip
+        (** The [Skip] const hint is for a constant that should never produce an error *)
+
+  type ('a, 'd) big_hint =
+    | Apply :
+        ('b, 'a, 'd) big_morph_hint * ('b, 'a, 'd) C.morph * ('b, 'd) big_hint
+        -> ('a, 'd) big_hint
+    | Const : big_const_hint -> ('a, 'l * 'r) big_hint
+    | Branch :
+        'a * ('a, 'l * 'r) big_hint * 'a * ('a, 'l * 'r) big_hint
+        -> ('a, 'l * 'r) big_hint
+    | Nil
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
+
+  let rec big_morph_hint_left_adjoint :
+      type a b l.
+      b C.obj ->
+      (a, b, l * allowed) big_morph_hint ->
+      (b, a, allowed * disallowed) big_morph_hint =
+   fun b_obj -> function
+    | Base small_morph_hint -> Base (H.left_adjoint small_morph_hint)
+    | Skip -> Skip
+    | None -> None
+    | Compose (f_big_morph_hint, f_morph, g_big_morph_hint, g_morph) ->
+      let mid = C.src b_obj f_morph in
+      Compose
+        ( big_morph_hint_left_adjoint mid g_big_morph_hint,
+          C.left_adjoint mid g_morph,
+          big_morph_hint_left_adjoint b_obj f_big_morph_hint,
+          C.left_adjoint b_obj f_morph )
+
+  let rec big_morph_hint_right_adjoint :
+      type a b r.
+      b C.obj ->
+      (a, b, allowed * r) big_morph_hint ->
+      (b, a, disallowed * allowed) big_morph_hint =
+   fun b_obj -> function
+    | Base small_morph_hint -> Base (H.right_adjoint small_morph_hint)
+    | Skip -> Skip
+    | None -> None
+    | Compose (f_big_morph_hint, f_morph, g_big_morph_hint, g_morph) ->
+      let mid = C.src b_obj f_morph in
+      Compose
+        ( big_morph_hint_right_adjoint mid g_big_morph_hint,
+          C.right_adjoint mid g_morph,
+          big_morph_hint_right_adjoint b_obj f_big_morph_hint,
+          C.right_adjoint b_obj f_morph )
+
+  let rec small_hint_of_big_hint :
+      type a l r. (a, l * r) big_hint -> (a, l * r) hint = function
+    | Apply (big_morph_hint, morph, big_h') ->
+      let rec small_apply_hint_of_big_apply_hint :
+          type b a l r.
+          (b, a, l * r) big_morph_hint ->
+          (b, a, l * r) C.morph ->
+          (unit -> (b, l * r) hint) ->
+          (a, l * r) hint =
+       fun big_morph_hint morph get_small_h' ->
+        (* This helper function converts a big [Apply] hint's components with
+           an already-converted subhint to a small hint [Apply] hint.
+
+           The [get_small_h'] is done as a function so that it isn't computed if
+           it isn't needed, as in the [None] case. *)
+        match big_morph_hint with
+        | Base morph_hint -> Apply (morph_hint, morph, get_small_h' ())
+        | Skip -> get_small_h' ()
+        | None -> Nil
+        | Compose (a_big_morph_hint, a_morph, b_big_morph_hint, b_morph) ->
+          let get_small_b_hint () =
+            small_apply_hint_of_big_apply_hint b_big_morph_hint b_morph
+              get_small_h'
+          in
+          small_apply_hint_of_big_apply_hint a_big_morph_hint a_morph
+            get_small_b_hint
+      in
+      let get_small_h' () = small_hint_of_big_hint big_h' in
+      small_apply_hint_of_big_apply_hint big_morph_hint morph get_small_h'
+    | Const const_hint -> (
+      match const_hint with
+      | Base const_hint -> Const const_hint
+      | Skip -> assert false)
+    | Branch (x, x_hint, y, y_hint) ->
+      Branch (x, small_hint_of_big_hint x_hint, y, small_hint_of_big_hint y_hint)
+    | Nil -> Nil
 
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
 
@@ -80,7 +192,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         variable.
         TODO: consider using hashset for quicker deduplication *)
       mutable upper : 'a;  (** The precise upper bound of the variable *)
-      mutable upper_hint : ('a, right_only) hint;  (** Hints for [upper] *)
+      mutable upper_hint : ('a, right_only) big_hint;  (** Hints for [upper] *)
       mutable lower : 'a;
           (** The *conservative* lower bound of the variable.
        Why conservative: if a user calls [submode c u] where [c] is
@@ -103,7 +215,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          won't help much.
          - For any [v] and [f u \in v.vlower], we have [f u.upper <= v.upper], but not
          necessarily [f u.lower <= v.lower]. *)
-      mutable lower_hint : ('a, left_only) hint;  (** Hints for [lower] *)
+      mutable lower_hint : ('a, left_only) big_hint;  (** Hints for [lower] *)
       id : int  (** For identification/printing *)
     }
 
@@ -111,7 +223,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   and ('b, 'd) morphvar =
     | Amorphvar :
-        'a var * ('a, 'b, 'd) C.morph * 'd H.morph
+        'a var * ('a, 'b, 'd) C.morph * ('a, 'b, 'd) big_morph_hint
         -> ('b, 'd) morphvar
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
@@ -121,8 +233,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   module VarSet = Set.Make (Int)
 
   type change =
-    | Cupper : 'a var * 'a * ('a, right_only) hint -> change
-    | Clower : 'a var * 'a * ('a, left_only) hint -> change
+    | Cupper : 'a var * 'a * ('a, right_only) big_hint -> change
+    | Clower : 'a var * 'a * ('a, left_only) big_hint -> change
     | Cvlower : 'a var * 'a lmorphvar VarMap.t -> change
 
   type changes = change list
@@ -146,19 +258,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   type ('a, 'd) mode =
     | Amode :
-        'a * ('a, 'l * 'r_) hint * ('a, 'l_ * 'r) hint
+        'a * ('a, 'l * 'r_) big_hint * ('a, 'l_ * 'r) big_hint
         -> ('a, 'l * 'r) mode
     | Amodevar : ('a, 'd) morphvar -> ('a, 'd) mode
     | Amodejoin :
         'a
-        * ('a, 'l * disallowed) hint
+        * ('a, 'l * disallowed) big_hint
         * ('a, 'l * disallowed) morphvar VarMap.t
         -> ('a, 'l * disallowed) mode
         (** [Amodejoin a c [mv0, mv1, ..]] represents [a join mv0 join mv1 join ..]
           with the hint [c] for [a] (the morphvars have their own hints). *)
     | Amodemeet :
         'a
-        * ('a, disallowed * 'r) hint
+        * ('a, disallowed * 'r) big_hint
         * ('a, disallowed * 'r) morphvar VarMap.t
         -> ('a, disallowed * 'r) mode
         (** [Amodemeet a c [mv0, mv1, ..]] represents [a meet mv0 meet mv1 meet ..]
@@ -211,7 +323,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       type a l r.
       ?verbose:bool -> a C.obj -> Format.formatter -> (a, l * r) mode -> unit =
    fun ?(verbose = false) (obj : a C.obj) ppf m ->
-    let traversed = if verbose then Some VarSet.empty else None in
+    let traversed = if verbose then Some VarSet.empty else Option.None in
     match m with
     | Amode (a, _, _) -> C.print obj ppf a
     | Amodevar mv -> print_morphvar ?traversed obj ppf mv
@@ -228,47 +340,117 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
            (print_morphvar ?traversed obj))
         (var_map_to_list mvs)
 
-  module Hint = Magic_allow_disallow (struct
-    type ('a, _, 'd) sided = ('a, 'd) hint constraint 'd = 'l * 'r
+  module Big_morph_hint = Magic_allow_disallow (struct
+    type ('a, 'b, 'd) sided = ('a, 'b, 'd) big_morph_hint
+      constraint 'd = 'l * 'r
 
-    let rec allow_left : type a l r. (a, allowed * r) hint -> (a, l * r) hint =
-      function
+    let rec allow_left :
+        type l a b r.
+        (a, b, allowed * r) big_morph_hint -> (a, b, l * r) big_morph_hint =
+     fun h ->
+      match h with
+      | Base m -> Base (H.Allow_disallow.allow_left m)
+      | None -> None
+      | Skip -> Skip
+      | Compose (a_morph_hint, a_morph, b_morph_hint, b_morph) ->
+        Compose
+          ( allow_left a_morph_hint,
+            C.allow_left a_morph,
+            allow_left b_morph_hint,
+            C.allow_left b_morph )
+
+    let rec allow_right :
+        type a b l r.
+        (a, b, l * allowed) big_morph_hint -> (a, b, l * r) big_morph_hint =
+     fun h ->
+      match h with
+      | Base m -> Base (H.Allow_disallow.allow_right m)
+      | None -> None
+      | Skip -> Skip
+      | Compose (a_morph_hint, a_morph, b_morph_hint, b_morph) ->
+        Compose
+          ( allow_right a_morph_hint,
+            C.allow_right a_morph,
+            allow_right b_morph_hint,
+            C.allow_right b_morph )
+
+    let rec disallow_left :
+        type a b l r.
+        (a, b, l * r) big_morph_hint -> (a, b, disallowed * r) big_morph_hint =
+     fun h ->
+      match h with
+      | Base m -> Base (H.Allow_disallow.disallow_left m)
+      | None -> None
+      | Skip -> Skip
+      | Compose (a_morph_hint, a_morph, b_morph_hint, b_morph) ->
+        Compose
+          ( disallow_left a_morph_hint,
+            C.disallow_left a_morph,
+            disallow_left b_morph_hint,
+            C.disallow_left b_morph )
+
+    let rec disallow_right :
+        type a b l r.
+        (a, b, l * r) big_morph_hint -> (a, b, l * disallowed) big_morph_hint =
+     fun h ->
+      match h with
+      | Base m -> Base (H.Allow_disallow.disallow_right m)
+      | None -> None
+      | Skip -> Skip
+      | Compose (a_morph_hint, a_morph, b_morph_hint, b_morph) ->
+        Compose
+          ( disallow_right a_morph_hint,
+            C.disallow_right a_morph,
+            disallow_right b_morph_hint,
+            C.disallow_right b_morph )
+  end)
+
+  module Big_hint = Magic_allow_disallow (struct
+    type ('a, _, 'd) sided = ('a, 'd) big_hint constraint 'd = 'l * 'r
+
+    let rec allow_left :
+        type a l r. (a, allowed * r) big_hint -> (a, l * r) big_hint = function
       | Apply (f_hint, f, h) ->
-        Apply (H.Allow_disallow.allow_left f_hint, C.allow_left f, allow_left h)
+        Apply (Big_morph_hint.allow_left f_hint, C.allow_left f, allow_left h)
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, allow_left a_hint, b, allow_left b_hint)
+      | Nil -> Nil
 
-    let rec allow_right : type a l r. (a, l * allowed) hint -> (a, l * r) hint =
-      function
+    let rec allow_right :
+        type a l r. (a, l * allowed) big_hint -> (a, l * r) big_hint = function
       | Apply (f_hint, f, h) ->
-        Apply
-          (H.Allow_disallow.allow_right f_hint, C.allow_right f, allow_right h)
+        Apply (Big_morph_hint.allow_right f_hint, C.allow_right f, allow_right h)
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, allow_right a_hint, b, allow_right b_hint)
+      | Nil -> Nil
 
     let rec disallow_left :
-        type a l r. (a, l * r) hint -> (a, disallowed * r) hint = function
+        type a l r. (a, l * r) big_hint -> (a, disallowed * r) big_hint =
+      function
       | Apply (f_hint, f, h) ->
         Apply
-          ( H.Allow_disallow.disallow_left f_hint,
+          ( Big_morph_hint.disallow_left f_hint,
             C.disallow_left f,
             disallow_left h )
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, disallow_left a_hint, b, disallow_left b_hint)
+      | Nil -> Nil
 
     let rec disallow_right :
-        type a l r. (a, l * r) hint -> (a, l * disallowed) hint = function
+        type a l r. (a, l * r) big_hint -> (a, l * disallowed) big_hint =
+      function
       | Apply (f_hint, f, h) ->
         Apply
-          ( H.Allow_disallow.disallow_right f_hint,
+          ( Big_morph_hint.disallow_right f_hint,
             C.disallow_right f,
             disallow_right h )
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, disallow_right a_hint, b, disallow_right b_hint)
+      | Nil -> Nil
   end)
 
   module Morphvar = Magic_allow_disallow (struct
@@ -277,24 +459,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let allow_left :
         type a l r. (a, allowed * r) morphvar -> (a, l * r) morphvar = function
       | Amorphvar (v, m, h) ->
-        Amorphvar (v, C.allow_left m, H.Allow_disallow.allow_left h)
+        Amorphvar (v, C.allow_left m, Big_morph_hint.allow_left h)
 
     let allow_right :
         type a l r. (a, l * allowed) morphvar -> (a, l * r) morphvar = function
       | Amorphvar (v, m, h) ->
-        Amorphvar (v, C.allow_right m, H.Allow_disallow.allow_right h)
+        Amorphvar (v, C.allow_right m, Big_morph_hint.allow_right h)
 
     let disallow_left :
         type a l r. (a, l * r) morphvar -> (a, disallowed * r) morphvar =
       function
       | Amorphvar (v, m, h) ->
-        Amorphvar (v, C.disallow_left m, H.Allow_disallow.disallow_left h)
+        Amorphvar (v, C.disallow_left m, Big_morph_hint.disallow_left h)
 
     let disallow_right :
         type a l r. (a, l * r) morphvar -> (a, l * disallowed) morphvar =
       function
       | Amorphvar (v, m, h) ->
-        Amorphvar (v, C.disallow_right m, H.Allow_disallow.disallow_right h)
+        Amorphvar (v, C.disallow_right m, Big_morph_hint.disallow_right h)
   end)
 
   include Magic_allow_disallow (struct
@@ -303,69 +485,75 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let allow_left : type a l r. (a, allowed * r) mode -> (a, l * r) mode =
       function
       | Amode (c, h_lower, h_upper) ->
-        Amode (c, Hint.allow_left h_lower, h_upper)
+        Amode (c, Big_hint.allow_left h_lower, h_upper)
       | Amodevar mv -> Amodevar (Morphvar.allow_left mv)
       | Amodejoin (c, h, mvs) ->
-        Amodejoin (c, Hint.allow_left h, VarMap.map Morphvar.allow_left mvs)
+        Amodejoin (c, Big_hint.allow_left h, VarMap.map Morphvar.allow_left mvs)
 
     let allow_right : type a l r. (a, l * allowed) mode -> (a, l * r) mode =
       function
       | Amode (c, h_lower, h_upper) ->
-        Amode (c, h_lower, Hint.allow_right h_upper)
+        Amode (c, h_lower, Big_hint.allow_right h_upper)
       | Amodevar mv -> Amodevar (Morphvar.allow_right mv)
       | Amodemeet (c, h, mvs) ->
-        Amodemeet (c, Hint.allow_right h, VarMap.map Morphvar.allow_right mvs)
+        Amodemeet
+          (c, Big_hint.allow_right h, VarMap.map Morphvar.allow_right mvs)
 
     let disallow_left : type a l r. (a, l * r) mode -> (a, disallowed * r) mode
         = function
       | Amode (c, h_lower, h_upper) ->
-        Amode (c, Hint.disallow_left h_lower, h_upper)
+        Amode (c, Big_hint.disallow_left h_lower, h_upper)
       | Amodevar mv -> Amodevar (Morphvar.disallow_left mv)
       | Amodejoin (c, h, mvs) ->
         Amodejoin
-          (c, Hint.disallow_left h, VarMap.map Morphvar.disallow_left mvs)
+          (c, Big_hint.disallow_left h, VarMap.map Morphvar.disallow_left mvs)
       | Amodemeet (c, h, mvs) ->
         Amodemeet (c, h, VarMap.map Morphvar.disallow_left mvs)
 
     let disallow_right : type a l r. (a, l * r) mode -> (a, l * disallowed) mode
         = function
       | Amode (c, h_lower, h_upper) ->
-        Amode (c, h_lower, Hint.disallow_right h_upper)
+        Amode (c, h_lower, Big_hint.disallow_right h_upper)
       | Amodevar mv -> Amodevar (Morphvar.disallow_right mv)
       | Amodejoin (c, h, mvs) ->
         Amodejoin (c, h, VarMap.map Morphvar.disallow_right mvs)
       | Amodemeet (c, h, mvs) ->
         Amodemeet
-          (c, Hint.disallow_right h, VarMap.map Morphvar.disallow_right mvs)
+          (c, Big_hint.disallow_right h, VarMap.map Morphvar.disallow_right mvs)
   end)
 
   let mlower dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.lower
 
   let mlower_hint (Amorphvar (var, morph, hint)) =
     Apply
-      ( H.Allow_disallow.disallow_right hint,
+      ( Big_morph_hint.disallow_right hint,
         C.disallow_right morph,
-        Hint.disallow_right var.lower_hint )
+        Big_hint.disallow_right var.lower_hint )
 
   let mupper dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.upper
 
   let mupper_hint (Amorphvar (var, morph, hint)) =
     Apply
-      ( H.Allow_disallow.disallow_left hint,
+      ( Big_morph_hint.disallow_left hint,
         C.disallow_left morph,
-        Hint.disallow_left var.upper_hint )
+        Big_hint.disallow_left var.upper_hint )
 
-  let min (type a) (obj : a C.obj) =
-    Amode (C.min obj, Const H.const_skip, Const H.const_none)
+  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const Skip, Nil)
 
-  let max (type a) (obj : a C.obj) =
-    Amode (C.max obj, Const H.const_none, Const H.const_skip)
+  let max (type a) (obj : a C.obj) = Amode (C.max obj, Nil, Const Skip)
 
-  let of_const _obj ?(hint = H.const_none) a = Amode (a, Const hint, Const hint)
+  let of_const _obj ?hint a =
+    let hint =
+      match hint with Option.None -> Nil | Some h -> Const (Base h)
+    in
+    Amode (a, hint, hint)
 
   let apply_morphvar dst morph morph_hint (Amorphvar (var, morph', morph'_hint))
       =
-    Amorphvar (var, C.compose dst morph morph', H.compose morph_hint morph'_hint)
+    Amorphvar
+      ( var,
+        C.compose dst morph morph',
+        Compose (morph_hint, morph, morph'_hint, morph') )
 
   let apply :
       type a b l r.
@@ -374,19 +562,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, l * r) C.morph ->
       (a, l * r) mode ->
       (b, l * r) mode =
-   fun dst ?(hint : (l * r) H.morph = H.morph_none) morph m ->
+   fun dst ?(hint : (l * r) H.morph option) morph m ->
+    let hint : _ big_morph_hint =
+      match hint with
+      | None -> None
+      | Some small_morph_hint -> Base small_morph_hint
+    in
     match m with
     | Amode (a, a_hint_lower, a_hint_upper) ->
       Amode
         ( C.apply dst morph a,
           Apply
-            ( H.Allow_disallow.disallow_right hint,
+            ( Big_morph_hint.disallow_right hint,
               C.disallow_right morph,
-              Hint.disallow_right a_hint_lower ),
+              Big_hint.disallow_right a_hint_lower ),
           Apply
-            ( H.Allow_disallow.disallow_left hint,
+            ( Big_morph_hint.disallow_left hint,
               C.disallow_left morph,
-              Hint.disallow_left a_hint_upper ) )
+              Big_hint.disallow_left a_hint_upper ) )
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)
     | Amodejoin (a, a_hint, vs) ->
       Amodejoin
@@ -426,7 +619,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         INVARIANT listed above. *)
   let update_lower (type a) ~log (obj : a C.obj) v a a_hint =
     (match log with
-    | None -> ()
+    | Option.None -> ()
     | Some log -> log := Clower (v, v.lower, v.lower_hint) :: !log);
     let new_lower = C.join obj v.lower a in
     let new_lower_hint = hint_biased_join obj a a_hint v.lower v.lower_hint in
@@ -438,7 +631,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         INVARIANT listed above. *)
   let update_upper (type a) ~log (obj : a C.obj) v a a_hint =
     (match log with
-    | None -> ()
+    | Option.None -> ()
     | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
     let new_upper = C.meet obj v.upper a in
     let new_upper_hint = hint_biased_meet obj v.upper v.upper_hint a a_hint in
@@ -449,7 +642,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       INVARIANT listed above. *)
   let set_vlower ~log v vlower =
     (match log with
-    | None -> ()
+    | Option.None -> ()
     | Some log -> log := Cvlower (v, v.vlower) :: !log);
     v.vlower <- vlower
 
@@ -458,9 +651,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       log:_ ->
       a C.obj ->
       a ->
-      (a, left_only) hint ->
+      (a, left_only) big_hint ->
       a var ->
-      (unit, a * (a, right_only) hint) Result.t =
+      (unit, a * (a, right_only) big_hint) Result.t =
     fun (type a) ~log (obj : a C.obj) a' a'_hint v ->
      if C.le obj a' v.lower
      then Ok ()
@@ -476,9 +669,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       log:_ ->
       a C.obj ->
       a ->
-      (a, left_only) hint ->
+      (a, left_only) big_hint ->
       (a, l * allowed) morphvar ->
-      (unit, a * (a, right_only) hint) Result.t =
+      (unit, a * (a, right_only) big_hint) Result.t =
    fun ~log obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
     let mlower = mlower obj mv in
     let mupper = mupper obj mv in
@@ -492,7 +685,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          closure of [f]'s image. Therefore, asking [a <= f v] is equivalent to
          asking [f' a <= v]. *)
       let f' = C.left_adjoint obj f in
-      let f'_hint = H.left_adjoint f_hint in
+      let f'_hint = big_morph_hint_left_adjoint obj f_hint in
       let src = C.src obj f in
       let a' = C.apply src f' a in
       let a'_hint = Apply (f'_hint, f', a_hint) in
@@ -508,8 +701,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       a C.obj ->
       a var ->
       a ->
-      (a, right_only) hint ->
-      (unit, a * (a, left_only) hint) Result.t =
+      (a, right_only) big_hint ->
+      (unit, a * (a, left_only) big_hint) Result.t =
     fun (type a) ~log (obj : a C.obj) v a' a'_hint ->
      if C.le obj v.upper a'
      then Ok ()
@@ -539,8 +732,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         'a C.obj ->
         ('a, allowed * 'r) morphvar ->
         'a ->
-        ('a, right_only) hint ->
-        (unit, 'a * ('a, left_only) hint) Result.t =
+        ('a, right_only) big_hint ->
+        (unit, 'a * ('a, left_only) big_hint) Result.t =
    fun ~log obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
     (* See [submode_cmv] for why we need the following seemingly redundant
        lines. *)
@@ -553,7 +746,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then Error (mlower, mlower_hint)
     else
       let f' = C.right_adjoint obj f in
-      let f'_hint = H.right_adjoint f_hint in
+      let f'_hint = big_morph_hint_right_adjoint obj f_hint in
       let src = C.src obj f in
       let a' = C.apply src f' a in
       let a'_hint = Apply (f'_hint, f', a_hint) in
@@ -567,9 +760,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         Error
           ( C.apply obj f e,
             Apply
-              ( H.Allow_disallow.disallow_right f_hint,
-                C.disallow_right f,
-                e_hint ) )
+              (Big_morph_hint.disallow_right f_hint, C.disallow_right f, e_hint)
+          )
 
   let eq_morphvar :
       type a l0 r0 l1 r1. (a, l0 * r0) morphvar -> (a, l1 * r1) morphvar -> bool
@@ -608,11 +800,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
              lies within the downward closure of [g]'s image. Therefore, asking [f
              v <= g u] is equivalent to asking [g' f v <= u] *)
           let g' = C.left_adjoint dst g in
-          let g'_hint = H.left_adjoint g_hint in
+          let g'_hint = big_morph_hint_left_adjoint dst g_hint in
           let src = C.src dst g in
           let g'f = C.compose src g' (C.disallow_right f) in
           let g'f_hint =
-            H.compose g'_hint (H.Allow_disallow.disallow_right f_hint)
+            Compose
+              ( g'_hint,
+                g',
+                Big_morph_hint.disallow_right f_hint,
+                C.disallow_right f )
           in
           let x = Amorphvar (v, g'f, g'f_hint) in
           let key = get_key x in
@@ -626,9 +822,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let id = !cnt_id in
     cnt_id := id + 1;
     let upper = Option.value upper ~default:(C.max obj) in
-    let upper_hint = Option.value upper_hint ~default:(Const H.const_none) in
+    let upper_hint = Option.value upper_hint ~default:Nil in
     let lower = Option.value lower ~default:(C.min obj) in
-    let lower_hint = Option.value lower_hint ~default:(Const H.const_none) in
+    let lower_hint = Option.value lower_hint ~default:Nil in
     let vlower = Option.value vlower ~default:VarMap.empty in
     { upper; upper_hint; lower; lower_hint; vlower; id }
 
@@ -640,59 +836,71 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         Error
           { left;
-            left_hint = left_hint_lower;
+            left_hint = small_hint_of_big_hint left_hint_lower;
             right;
-            right_hint = right_hint_upper
+            right_hint = small_hint_of_big_hint right_hint_upper
           }
     in
     let submode_mvc ~log obj v right right_hint_upper =
       Result.map_error
         (fun (left, left_hint) ->
-          { left; left_hint; right; right_hint = right_hint_upper })
+          { left;
+            left_hint = small_hint_of_big_hint left_hint;
+            right;
+            right_hint = small_hint_of_big_hint right_hint_upper
+          })
         (submode_mvc ~log obj v right right_hint_upper)
     in
     let submode_cmv ~log obj left left_hint_lower v =
       Result.map_error
         (fun (right, right_hint) ->
-          { left; left_hint = left_hint_lower; right; right_hint })
+          { left;
+            left_hint = small_hint_of_big_hint left_hint_lower;
+            right;
+            right_hint = small_hint_of_big_hint right_hint
+          })
         (submode_cmv ~log obj left left_hint_lower v)
     in
     let submode_mvmv ~log obj v u =
       Result.map_error
         (fun (left, left_hint, right, right_hint) ->
-          { left; left_hint; right; right_hint })
+          { left;
+            left_hint = small_hint_of_big_hint left_hint;
+            right;
+            right_hint = small_hint_of_big_hint right_hint
+          })
         (submode_mvmv ~log obj v u)
     in
     match a, b with
     | ( Amode (left, left_hint_lower, _left_hint_upper),
         Amode (right, _right_hint_lower, right_hint_upper) ) ->
       submode_cc ~log obj left
-        (Hint.disallow_right left_hint_lower)
+        (Big_hint.disallow_right left_hint_lower)
         right
-        (Hint.disallow_left right_hint_upper)
+        (Big_hint.disallow_left right_hint_upper)
     | Amodevar v, Amode (right, _right_hint_lower, right_hint_upper) ->
-      submode_mvc ~log obj v right (Hint.disallow_left right_hint_upper)
+      submode_mvc ~log obj v right (Big_hint.disallow_left right_hint_upper)
     | Amode (left, left_hint_lower, _left_hint_upper), Amodevar v ->
-      submode_cmv ~log obj left (Hint.disallow_right left_hint_lower) v
+      submode_cmv ~log obj left (Big_hint.disallow_right left_hint_lower) v
     | Amodevar v, Amodevar u -> submode_mvmv ~log obj v u
     | Amode (a, a_hint_lower, _a_hint_upper), Amodemeet (b, b_hint, mvs) ->
       Result.bind
-        (submode_cc ~log obj a (Hint.disallow_right a_hint_lower) b b_hint)
+        (submode_cc ~log obj a (Big_hint.disallow_right a_hint_lower) b b_hint)
         (fun () ->
           find_error
             (fun mv ->
-              submode_cmv ~log obj a (Hint.disallow_right a_hint_lower) mv)
+              submode_cmv ~log obj a (Big_hint.disallow_right a_hint_lower) mv)
             mvs)
     | Amodevar mv, Amodemeet (b, b_hint, mvs) ->
       Result.bind (submode_mvc ~log obj mv b b_hint) (fun () ->
           find_error (fun mv' -> submode_mvmv ~log obj mv mv') mvs)
     | Amodejoin (a, a_hint, mvs), Amode (b, _b_hint_lower, b_hint_upper) ->
       Result.bind
-        (submode_cc ~log obj a a_hint b (Hint.disallow_left b_hint_upper))
+        (submode_cc ~log obj a a_hint b (Big_hint.disallow_left b_hint_upper))
         (fun () ->
           find_error
             (fun mv' ->
-              submode_mvc ~log obj mv' b (Hint.disallow_left b_hint_upper))
+              submode_mvc ~log obj mv' b (Big_hint.disallow_left b_hint_upper))
             mvs)
     | Amodejoin (a, a_hint, mvs), Amodevar mv ->
       Result.bind (submode_cmv ~log obj a a_hint mv) (fun () ->
@@ -718,7 +926,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let join (type a r) obj l =
     let rec loop :
         a ->
-        (a, 'd) hint ->
+        (a, 'd) big_hint ->
         (a, allowed * disallowed) morphvar VarMap.t ->
         (a, allowed * r) mode list ->
         (a, allowed * disallowed) mode =
@@ -727,7 +935,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the maximum element, and we can use [a_hint_lower]
            as the output's lower hint *)
-        Amode (a, a_hint_lower, Const H.const_skip)
+        Amode (a, a_hint_lower, Const Skip)
       else
         match rest with
         | [] -> Amodejoin (a, a_hint_lower, mvs)
@@ -736,7 +944,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           | Amode (b, b_hint_lower, _b_hint_upper) ->
             loop (C.join obj a b)
               (hint_join obj a a_hint_lower b
-                 (Hint.disallow_right b_hint_lower))
+                 (Big_hint.disallow_right b_hint_lower))
               mvs xs
           (* some minor optimization: if [a] is lower than [mlower mv], we
               should keep the latter instead. This helps to fail early in
@@ -752,12 +960,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (union_prefer_left mvs' mvs)
               xs)
     in
-    loop (C.min obj) (Const H.const_skip) VarMap.empty l
+    loop (C.min obj) (Const Skip) VarMap.empty l
 
   let meet (type a l) obj l =
     let rec loop :
         a ->
-        (a, 'd) hint ->
+        (a, 'd) big_hint ->
         (a, disallowed * allowed) morphvar VarMap.t ->
         (a, l * allowed) mode list ->
         (a, disallowed * allowed) mode =
@@ -766,7 +974,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the minimum element, and we can use [a_hint_upper]
            as the output's upper hint *)
-        Amode (a, Const H.const_skip, a_hint_upper)
+        Amode (a, Const Skip, a_hint_upper)
       else
         match rest with
         | [] -> Amodemeet (a, a_hint_upper, mvs)
@@ -774,7 +982,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           match disallow_left mv with
           | Amode (b, _b_hint_lower, b_hint_upper) ->
             loop (C.meet obj a b)
-              (hint_meet obj a a_hint_upper b (Hint.disallow_left b_hint_upper))
+              (hint_meet obj a a_hint_upper b
+                 (Big_hint.disallow_left b_hint_upper))
               mvs xs
             (* some minor optimization: if [a] is higher than [mupper mv], we should keep the latter instead. This helps to fail early in [submode_log] *)
           | Amodevar mv ->
@@ -788,7 +997,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (union_prefer_left mvs' mvs)
               xs)
     in
-    loop (C.max obj) (Const H.const_skip) VarMap.empty l
+    loop (C.max obj) (Const Skip) VarMap.empty l
 
   let get_loose_ceil : type a l r. a C.obj -> (a, l * r) mode -> a =
    fun obj m ->
@@ -816,8 +1025,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let zap_to_ceil : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
    fun obj m ~log ->
     let ceil = get_ceil obj m in
-    submode obj (Amode (ceil, Const H.const_none, Const H.const_none)) m ~log
-    |> Result.get_ok;
+    submode obj (Amode (ceil, Nil, Nil)) m ~log |> Result.get_ok;
     ceil
 
   (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in
@@ -840,7 +1048,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let log = ref empty_changes in
       (* We provide an arbitrary, throwaway hint to this call to [submode_mvc]
          as it will either succeed or we will undo the change and not use the hint *)
-      let r = submode_mvc ~log:(Some log) obj mv lower (Const H.const_none) in
+      let r = submode_mvc ~log:(Some log) obj mv lower Nil in
       match r with
       | Ok () -> !log, lower
       | Error (a, _a_hint) ->
@@ -859,7 +1067,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let zap_to_floor_morphvar obj mv ~commit =
     let log_, lower = zap_to_floor_morphvar_aux obj mv in
     (match commit with
-    | None -> undo_changes log_
+    | Option.None -> undo_changes log_
     | Some log -> log := append_changes !log log_);
     lower
 
@@ -879,7 +1087,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv ->
           (* Since this call to [submode_mvc] should always succeed,
              we provide a throwaway, arbitrary hint *)
-          submode_mvc obj mv floor (Const H.const_none) ~log |> Result.get_ok)
+          submode_mvc obj mv floor Nil ~log |> Result.get_ok)
         mvs;
       floor
 
@@ -904,21 +1112,21 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then C.print obj ppf ceil
     else print_raw ?verbose obj ppf m
 
-  let newvar obj = Amodevar (Amorphvar (fresh obj, C.id, H.morph_skip))
+  let newvar obj = Amodevar (Amorphvar (fresh obj, C.id, Skip))
 
   let newvar_above (type a r) (obj : a C.obj) (m : (a, allowed * r) mode) =
     match disallow_right m with
     | Amode (a, a_hint_lower, _a_hint_upper) ->
       if C.le obj (C.max obj) a
-      then Amode (a, Hint.allow_left a_hint_lower, Const H.const_skip), false
+      then Amode (a, Big_hint.allow_left a_hint_lower, Const Skip), false
       else
         ( Amodevar
             (Amorphvar
                ( fresh ~lower:a
-                   ~lower_hint:(Hint.disallow_right a_hint_lower)
+                   ~lower_hint:(Big_hint.disallow_right a_hint_lower)
                    obj,
                  C.id,
-                 H.morph_skip )),
+                 Skip )),
           true )
     | Amodevar mv ->
       (* [~lower] is not precise (because [mlower mv] is not precise), but
@@ -929,37 +1137,37 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                  ~vlower:(VarMap.singleton (get_key mv) mv)
                  obj,
                C.id,
-               H.morph_skip )),
+               Skip )),
         true )
     | Amodejoin (a, a_hint, mvs) ->
       (* [~lower] is not precise here, but it doesn't need to be *)
       ( Amodevar
           (Amorphvar
-             ( fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs obj,
-               C.id,
-               H.morph_skip )),
+             (fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs obj, C.id, Skip)),
         true )
 
   let newvar_below (type a l) (obj : a C.obj) (m : (a, l * allowed) mode) =
     match disallow_left m with
     | Amode (a, _a_hint_lower, a_hint_upper) ->
       if C.le obj a (C.min obj)
-      then Amode (a, Const H.const_skip, Hint.allow_right a_hint_upper), false
+      then Amode (a, Const Skip, Big_hint.allow_right a_hint_upper), false
       else
         ( Amodevar
             (Amorphvar
-               ( fresh ~upper:a ~upper_hint:(Hint.disallow_left a_hint_upper) obj,
+               ( fresh ~upper:a
+                   ~upper_hint:(Big_hint.disallow_left a_hint_upper)
+                   obj,
                  C.id,
-                 H.morph_skip )),
+                 Skip )),
           true )
     | Amodevar mv ->
       let u = fresh obj in
-      let mu = Amorphvar (u, C.id, H.morph_skip) in
+      let mu = Amorphvar (u, C.id, Skip) in
       submode_mvmv obj ~log:None mu mv |> Result.get_ok;
       allow_left (Amodevar mu), true
     | Amodemeet (a, a_hint, mvs) ->
       let u = fresh obj in
-      let mu = Amorphvar (u, C.id, H.morph_skip) in
+      let mu = Amorphvar (u, C.id, Skip) in
       submode_mvc obj ~log:None mu a a_hint |> Result.get_ok;
       VarMap.iter
         (fun _ mv -> submode_mvmv obj ~log:None mu mv |> Result.get_ok)

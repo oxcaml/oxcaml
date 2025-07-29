@@ -460,9 +460,9 @@ let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
     end
   | None -> ()
 
-let meet_regional ~hint mode =
+let meet_regional ?hint mode =
   let mode = Value.disallow_left mode in
-  Value.meet [Value.(of_const ~hint {
+  Value.meet [Value.(of_const ?hint {
     Const.max with
     areality = Regional
   }); mode]
@@ -506,7 +506,7 @@ let mode_return mode =
 
 (* used when entering a region.*)
 let mode_region mode =
-  { (mode_default (meet_regional ~hint:None mode)) with
+  { (mode_default (meet_regional mode)) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
@@ -528,7 +528,7 @@ let mode_exclave expected_mode =
      as_single_mode expected_mode
      (* if we expect an exclave to be [regional], then inside the exclave the
         body should be [local] *)
-     |> value_to_alloc_r2l ~hint:None
+     |> value_to_alloc_r2l
      |> alloc_as_value
   in
   { (mode_default mode)
@@ -4189,7 +4189,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                  (fun (exp, marg) ->
                     submode ~loc:exp.exp_loc ~env ~reason:Other
                       marg (mode_partial_application expected_mode);
-                    value_to_alloc_r2l ~hint:None marg)
+                    value_to_alloc_r2l  marg)
                  open_args
              in
              let closed_args = new_closed_args @ closed_args in
@@ -5270,7 +5270,7 @@ let split_function_ty
       end
     end
   in
-  let arg_value_mode = alloc_to_value_l2r ~hint:None arg_mode in
+  let arg_value_mode = alloc_to_value_l2r  arg_mode in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
@@ -6286,7 +6286,7 @@ and type_expect_
       unify_exp env record ty_record;
       rue {
         exp_desc = Texp_setfield(record,
-          Locality.disallow_right (regional_to_local ~hint:None
+          Locality.disallow_right (regional_to_local
             (Value.proj_comonadic Areality rmode)),
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
@@ -8226,7 +8226,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               args @ [Nolabel, Arg (eta_var, arg_sort)], Nontail,
               ret_mode
               |> Value.proj_comonadic Areality
-              |> regional_to_global ~hint:None
+              |> regional_to_global
               |> Locality.disallow_right,
               None)}
         in
@@ -8430,7 +8430,7 @@ and type_application env app_loc expected_mode position_and_mode
           in
           let ty_ret, mode_ret, untyped_args =
             collect_apply_args env funct ignore_labels ty (instance ty)
-              (value_to_alloc_r2l ~hint:None funct_mode) sargs ret_tvar
+              (value_to_alloc_r2l  funct_mode) sargs ret_tvar
           in
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
