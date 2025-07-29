@@ -2281,7 +2281,9 @@ let args_kind_of_variadic_primitive p : arg_kinds =
 let result_kind_of_variadic_primitive p : result_kind =
   match p with
   | Begin_region _ | Begin_try_region _ -> Singleton K.region
-  | Make_array _ -> Singleton K.value
+  | Make_array (_,_,(Heap | Local _)) -> Singleton K.value
+  | Make_array (_,_,External) ->
+    Misc.fatal_error "Externally allocated arrays are not supported"
   | Make_block (_, _, (Heap | Local _)) -> Singleton K.value
   | Make_block (_, _, External) -> Singleton K.naked_nativeint
 
