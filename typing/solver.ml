@@ -30,7 +30,7 @@ end
 
 module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type ('a, 'd) hint =
-    | Morph : 'd H.morph * ('b, 'a, 'd) C.morph * ('b, 'd) hint -> ('a, 'd) hint
+    | Apply : 'd H.morph * ('b, 'a, 'd) C.morph * ('b, 'd) hint -> ('a, 'd) hint
     | Const : H.const -> ('a, 'l * 'r) hint
     | Branch :
         'a * ('a, 'l * 'r) hint * 'a * ('a, 'l * 'r) hint
@@ -231,16 +231,16 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let rec allow_left : type a l r. (a, allowed * r) hint -> (a, l * r) hint =
       function
-      | Morph (f_hint, f, h) ->
-        Morph (H.Allow_disallow.allow_left f_hint, C.allow_left f, allow_left h)
+      | Apply (f_hint, f, h) ->
+        Apply (H.Allow_disallow.allow_left f_hint, C.allow_left f, allow_left h)
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
         Branch (a, allow_left a_hint, b, allow_left b_hint)
 
     let rec allow_right : type a l r. (a, l * allowed) hint -> (a, l * r) hint =
       function
-      | Morph (f_hint, f, h) ->
-        Morph
+      | Apply (f_hint, f, h) ->
+        Apply
           (H.Allow_disallow.allow_right f_hint, C.allow_right f, allow_right h)
       | Const h -> Const h
       | Branch (a, a_hint, b, b_hint) ->
@@ -248,8 +248,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let rec disallow_left :
         type a l r. (a, l * r) hint -> (a, disallowed * r) hint = function
-      | Morph (f_hint, f, h) ->
-        Morph
+      | Apply (f_hint, f, h) ->
+        Apply
           ( H.Allow_disallow.disallow_left f_hint,
             C.disallow_left f,
             disallow_left h )
@@ -259,8 +259,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let rec disallow_right :
         type a l r. (a, l * r) hint -> (a, l * disallowed) hint = function
-      | Morph (f_hint, f, h) ->
-        Morph
+      | Apply (f_hint, f, h) ->
+        Apply
           ( H.Allow_disallow.disallow_right f_hint,
             C.disallow_right f,
             disallow_right h )
@@ -336,7 +336,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let mlower dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.lower
 
   let mlower_hint (Amorphvar (var, morph, hint)) =
-    Morph
+    Apply
       ( H.Allow_disallow.disallow_right hint,
         C.disallow_right morph,
         Hint.disallow_right var.lower_hint )
@@ -344,7 +344,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let mupper dst (Amorphvar (var, morph, _hint)) = C.apply dst morph var.upper
 
   let mupper_hint (Amorphvar (var, morph, hint)) =
-    Morph
+    Apply
       ( H.Allow_disallow.disallow_left hint,
         C.disallow_left morph,
         Hint.disallow_left var.upper_hint )
@@ -369,17 +369,17 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
    fun dst ?(hint : (l * r) H.morph = H.morph_none) morph m ->
     match m with
     | Amode (a, a_hint) ->
-      Amode (C.apply dst morph a, Morph (hint, morph, a_hint))
+      Amode (C.apply dst morph a, Apply (hint, morph, a_hint))
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)
     | Amodejoin (a, a_hint, vs) ->
       Amodejoin
         ( C.apply dst morph a,
-          Morph (hint, morph, a_hint),
+          Apply (hint, morph, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
     | Amodemeet (a, a_hint, vs) ->
       Amodemeet
         ( C.apply dst morph a,
-          Morph (hint, morph, a_hint),
+          Apply (hint, morph, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
 
   let hint_biased_join obj a a_hint b b_hint =
@@ -478,7 +478,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let f'_hint = H.left_adjoint f_hint in
       let src = C.src obj f in
       let a' = C.apply src f' a in
-      let a'_hint = Morph (f'_hint, f', a_hint) in
+      let a'_hint = Apply (f'_hint, f', a_hint) in
       submode_cv ~log src a' a'_hint v |> Result.get_ok;
       Ok ()
 
@@ -539,7 +539,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let f'_hint = H.right_adjoint f_hint in
       let src = C.src obj f in
       let a' = C.apply src f' a in
-      let a'_hint = Morph (f'_hint, f', a_hint) in
+      let a'_hint = Apply (f'_hint, f', a_hint) in
       (* If [mlower] was precise, then the check
          [not (C.le obj (mlower obj mv) a)] should guarantee the following call
          to return [Ok ()]. However, [mlower] is not precise *)
@@ -549,7 +549,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Error (e, e_hint) ->
         Error
           ( C.apply obj f e,
-            Morph
+            Apply
               ( H.Allow_disallow.disallow_right f_hint,
                 C.disallow_right f,
                 e_hint ) )

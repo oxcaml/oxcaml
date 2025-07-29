@@ -1783,7 +1783,7 @@ module Axis = C.Axis
 (** Hints for the mode solvers. These are axis-specific hints that contain a trace
 of the values in a single axis from an error. *)
 type axhint =
-  | Morph : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
+  | Apply : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
   | Const : Hint.const -> axhint
   | Empty : axhint
 [@@ocaml.warning "-62"]
@@ -1911,7 +1911,7 @@ module Axerror = struct
         | Register_alloc_mode ->
           Print_then_continue (dprintf "is has an allocation")
 
-    (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
+    (** Print a "chain" of axhints, which will consist of zero or more [Apply] axhints,
 terminated with an [Empty] or [Const] axhint *)
     let rec print_axhint_chain :
         type a.
@@ -1969,7 +1969,7 @@ terminated with an [Empty] or [Const] axhint *)
        [@@ocaml.warning "-4"]
       in
       match hint with
-      | Morph (morph_hint, b, b_obj, b_hint, _morph) -> (
+      | Apply (morph_hint, b, b_obj, b_hint, _morph) -> (
         match print_morph_hint morph_hint with
         | Skip ->
           (* This is a case where we skip a line without printing the mode first *)
@@ -2034,8 +2034,8 @@ terminated with an [Empty] or [Const] axhint *)
       | Empty -> fprintf ppf "[empty hint]"
       | Const const_hint ->
         fprintf ppf "[Const (%a)]" debug_print_const_hint const_hint
-      | Morph (morph_hint, b, b_obj, b_hint, _) ->
-        fprintf ppf "[Morph (%a)]" debug_print_morph_hint morph_hint;
+      | Apply (morph_hint, b, b_obj, b_hint, _) ->
+        fprintf ppf "[Apply (%a)]" debug_print_morph_hint morph_hint;
         debug_print_axhint_chain b b_obj ppf b_hint
 
     (** Report an axerror, printing error traces for both the left and the right sides *)
@@ -2230,7 +2230,7 @@ terminated with an [Empty] or [Const] axhint *)
         let a_obj = proj_obj ax r_obj in
         let a = Axis.proj ax r in
         match r_shint with
-        | Morph (morph_hint, morph, rb_shint) -> (
+        | Apply (morph_hint, morph, rb_shint) -> (
           (* In this branch, [rb] refers to the product (or possibly single axis)
              of the morphism's source *)
           let rb_obj = src r_obj morph in
@@ -2242,12 +2242,12 @@ terminated with an [Empty] or [Const] axhint *)
             (* Note that unlike below, the returned [_b] value will be the same as
                the current [b], so we can discard it. *)
             let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
-            a, Morph (morph_hint, rb, rb_obj, b_hint, morph)
+            a, Apply (morph_hint, rb, rb_obj, b_hint, morph)
           | Axis b_ax ->
             (* [b] refers to a value in the [b_ax] axis of [rb] *)
             let b, b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
             let b_obj = C.proj_obj b_ax rb_obj in
-            a, Morph (morph_hint, b, b_obj, b_hint, morph))
+            a, Apply (morph_hint, b, b_obj, b_hint, morph))
         | Const r_const_hint -> a, Const r_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let x_axval = Axis.proj ax x in
@@ -2276,7 +2276,7 @@ terminated with an [Empty] or [Const] axhint *)
            single axis and wish to convert it to a mode "axhint". *)
         (* See comments in [shint_to_axhint_prod] for more information *)
         match a_shint with
-        | Morph (morph_hint, morph, rb_shint) -> (
+        | Apply (morph_hint, morph, rb_shint) -> (
           let rb_obj = src a_obj morph in
           let morph_inv = conv_side_adj side a_obj morph in
           let rb = apply rb_obj morph_inv a in
@@ -2285,12 +2285,12 @@ terminated with an [Empty] or [Const] axhint *)
           | SourceIsSingle ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
             let _b, b_hint = shint_to_axhint_single rb_obj rb rb_shint side in
-            a, Morph (morph_hint, rb, rb_obj, b_hint, morph)
+            a, Apply (morph_hint, rb, rb_obj, b_hint, morph)
           | Axis b_ax ->
             (* See notes above in [shint_to_axhint] regarding returned [b] value *)
             let b, b_hint = shint_to_axhint_prod rb_obj rb rb_shint b_ax side in
             let b_obj = C.proj_obj b_ax rb_obj in
-            a, Morph (morph_hint, b, b_obj, b_hint, morph))
+            a, Apply (morph_hint, b, b_obj, b_hint, morph))
         | Const a_const_hint -> a, Const a_const_hint
         | Branch (x, x_hint, y, y_hint) ->
           let chosen, chosen_hint =
