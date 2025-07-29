@@ -159,8 +159,11 @@ type converted_array_kind =
 let convert_array_kind (kind : L.array_kind) : converted_array_kind =
   match kind with
   | Pgenarray ->
-    check_float_array_optimisation_enabled "Pgenarray";
-    Float_array_opt_dynamic
+    (* When float array optimization is disabled, Pgenarray just means a regular
+       array (Values), not a dynamically-determined float array *)
+    if Flambda_features.flat_float_array ()
+    then Float_array_opt_dynamic
+    else Array_kind Values
   | Paddrarray -> Array_kind Values
   | Pintarray -> Array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> Array_kind Naked_floats
@@ -501,8 +504,11 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
     converted_duplicate_array_kind =
   match kind with
   | Pgenarray ->
-    check_float_array_optimisation_enabled "Pgenarray";
-    Float_array_opt_dynamic
+    (* When float array optimization is disabled, Pgenarray just means a regular
+       array (Values), not a dynamically-determined float array *)
+    if Flambda_features.flat_float_array ()
+    then Float_array_opt_dynamic
+    else Duplicate_array_kind Values
   | Paddrarray -> Duplicate_array_kind Values
   | Pintarray -> Duplicate_array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
