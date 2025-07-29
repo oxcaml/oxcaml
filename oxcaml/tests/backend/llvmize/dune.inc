@@ -37,7 +37,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps const_val_ir.output const_val_ir.output.corrected)
  (action
   (diff const_val_ir.output const_val_ir.output.corrected)))
@@ -53,7 +53,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps const_val.output const_val.output.corrected)
  (action
   (diff const_val.output const_val.output.corrected)))
@@ -76,7 +76,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps int_ops_ir.output int_ops_ir.output.corrected)
  (action
   (diff int_ops_ir.output int_ops_ir.output.corrected)))
@@ -92,7 +92,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps int_ops.output int_ops.output.corrected)
  (action
   (diff int_ops.output int_ops.output.corrected)))
@@ -115,7 +115,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps gcd_ir.output gcd_ir.output.corrected)
  (action
   (diff gcd_ir.output gcd_ir.output.corrected)))
@@ -131,7 +131,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps gcd.output gcd.output.corrected)
  (action
   (diff gcd.output gcd.output.corrected)))
@@ -154,7 +154,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps array_rev_ir.output array_rev_ir.output.corrected)
  (action
   (diff array_rev_ir.output array_rev_ir.output.corrected)))
@@ -170,7 +170,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps array_rev.output array_rev.output.corrected)
  (action
   (diff array_rev.output array_rev.output.corrected)))
@@ -193,7 +193,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps float_ops_ir.output float_ops_ir.output.corrected)
  (action
   (diff float_ops_ir.output float_ops_ir.output.corrected)))
@@ -209,7 +209,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps float_ops.output float_ops.output.corrected)
  (action
   (diff float_ops.output float_ops.output.corrected)))
@@ -232,7 +232,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps many_args_ir.output many_args_ir.output.corrected)
  (action
   (diff many_args_ir.output many_args_ir.output.corrected)))
@@ -248,7 +248,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps many_args.output many_args.output.corrected)
  (action
   (diff many_args.output many_args.output.corrected)))
@@ -271,7 +271,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps multi_ret_ir.output multi_ret_ir.output.corrected)
  (action
   (diff multi_ret_ir.output multi_ret_ir.output.corrected)))
@@ -287,7 +287,7 @@
 
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
- (alias runtest)
+ (alias runtest-llvm)
  (deps multi_ret.output multi_ret.output.corrected)
  (action
   (diff multi_ret.output multi_ret.output.corrected)))

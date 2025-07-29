@@ -69,7 +69,7 @@ endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest
+.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvm
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -122,6 +122,8 @@ compiler: runtime-stdlib
 runtest: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
 
+runtest-llvm: compiler
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvm $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file

@@ -121,7 +121,7 @@ let () =
 
 (rule
  ${enabled_if}
- (alias runtest)
+ (alias runtest-llvm)
  (deps ${ir_output} ${ir_output}.corrected)
  (action
   (diff ${ir_output} ${ir_output}.corrected)))
@@ -137,7 +137,7 @@ let () =
 
 (rule
  ${enabled_if}
- (alias runtest)
+ (alias runtest-llvm)
  (deps ${output} ${output}.corrected)
  (action
   (diff ${output} ${output}.corrected)))
