@@ -528,7 +528,7 @@ let mode_exclave expected_mode =
      as_single_mode expected_mode
      (* if we expect an exclave to be [regional], then inside the exclave the
         body should be [local] *)
-     |> value_to_alloc_r2l ~hint:Exclave_body_exp
+     |> value_to_alloc_r2l ~hint:None
      |> alloc_as_value
   in
   { (mode_default mode)
@@ -4189,7 +4189,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
                  (fun (exp, marg) ->
                     submode ~loc:exp.exp_loc ~env ~reason:Other
                       marg (mode_partial_application expected_mode);
-                    value_to_alloc_r2l ~hint:Closed_omitted_parameter marg)
+                    value_to_alloc_r2l ~hint:None marg)
                  open_args
              in
              let closed_args = new_closed_args @ closed_args in
@@ -5270,7 +5270,7 @@ let split_function_ty
       end
     end
   in
-  let arg_value_mode = alloc_to_value_l2r ~hint:Function_arg_value arg_mode in
+  let arg_value_mode = alloc_to_value_l2r ~hint:None arg_mode in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
@@ -8226,7 +8226,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               args @ [Nolabel, Arg (eta_var, arg_sort)], Nontail,
               ret_mode
               |> Value.proj_comonadic Areality
-              |> regional_to_global ~hint:Argument_let_expand
+              |> regional_to_global ~hint:None
               |> Locality.disallow_right,
               None)}
         in

@@ -1554,6 +1554,8 @@ module Lattices_mono = struct
       Map_comonadic f'
 end
 
+module C = Lattices_mono
+
 module Hint = struct
   type const =
     | None
@@ -1613,14 +1615,7 @@ module Hint = struct
     | Adj_captured_by_partial_application : ('l * disallowed) morph
     | Crossing_left : ('l * disallowed) morph
     | Crossing_right : (disallowed * 'r) morph
-    | Exclave_lock : ('l * 'r) morph
-    | Exclave_body_exp : (disallowed * 'r) morph
-    | Adj_exclave_body_exp : ('l * disallowed) morph
-    | Region_lock : ('l * 'r) morph
     | Register_alloc_mode : ('l * 'r) morph
-    | Closed_omitted_parameter : ('l * 'r) morph
-    | Function_arg_value : ('l * 'r) morph
-    | Argument_let_expand : ('l * 'r) morph
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -1641,10 +1636,7 @@ module Hint = struct
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Crossing_left | Crossing_right | Exclave_lock | Exclave_body_exp
-    | Adj_exclave_body_exp | Region_lock | Register_alloc_mode
-    | Closed_omitted_parameter | Function_arg_value | Argument_let_expand ->
-      false
+    | Crossing_left | Crossing_right | Register_alloc_mode -> false
 
   let morph_none = None
 
@@ -1660,13 +1652,7 @@ module Hint = struct
     | Is_closed_by x -> Close_over x
     | Captured_by_partial_application -> Adj_captured_by_partial_application
     | Crossing_right -> Crossing_left
-    | Exclave_lock -> Exclave_lock
-    | Exclave_body_exp -> Adj_exclave_body_exp
-    | Region_lock -> Region_lock
     | Register_alloc_mode -> Register_alloc_mode
-    | Closed_omitted_parameter -> Closed_omitted_parameter
-    | Function_arg_value -> Function_arg_value
-    | Argument_let_expand -> Argument_let_expand
 
   let rec right_adjoint :
       type r. (allowed * r) morph -> (disallowed * allowed) morph = function
@@ -1678,13 +1664,7 @@ module Hint = struct
     | Close_over x -> Is_closed_by x
     | Adj_captured_by_partial_application -> Captured_by_partial_application
     | Crossing_left -> Crossing_right
-    | Exclave_lock -> Exclave_lock
-    | Adj_exclave_body_exp -> Exclave_body_exp
-    | Region_lock -> Region_lock
     | Register_alloc_mode -> Register_alloc_mode
-    | Closed_omitted_parameter -> Closed_omitted_parameter
-    | Function_arg_value -> Function_arg_value
-    | Argument_let_expand -> Argument_let_expand
 
   let rec maybe_compose :
       type l r. (l * r) morph -> (l * r) morph -> (l * r) morph option =
@@ -1730,13 +1710,7 @@ module Hint = struct
        | Adj_captured_by_partial_application ->
          Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
-       | Exclave_lock -> Exclave_lock
-       | Adj_exclave_body_exp -> Adj_exclave_body_exp
-       | Region_lock -> Region_lock
        | Register_alloc_mode -> Register_alloc_mode
-       | Closed_omitted_parameter -> Closed_omitted_parameter
-       | Function_arg_value -> Function_arg_value
-       | Argument_let_expand -> Argument_let_expand
 
     let rec allow_right : type l r. (l * allowed) morph -> (l * r) morph =
       fun (type l r) (h : (l * allowed) morph) : (l * r) morph ->
@@ -1749,13 +1723,7 @@ module Hint = struct
        | Is_closed_by x -> Is_closed_by x
        | Captured_by_partial_application -> Captured_by_partial_application
        | Crossing_right -> Crossing_right
-       | Exclave_lock -> Exclave_lock
-       | Exclave_body_exp -> Exclave_body_exp
-       | Region_lock -> Region_lock
        | Register_alloc_mode -> Register_alloc_mode
-       | Closed_omitted_parameter -> Closed_omitted_parameter
-       | Function_arg_value -> Function_arg_value
-       | Argument_let_expand -> Argument_let_expand
 
     let rec disallow_left : type l r. (l * r) morph -> (disallowed * r) morph =
       fun (type l r) (h : (l * r) morph) : (disallowed * r) morph ->
@@ -1772,14 +1740,7 @@ module Hint = struct
          Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
-       | Exclave_lock -> Exclave_lock
-       | Exclave_body_exp -> Exclave_body_exp
-       | Adj_exclave_body_exp -> Adj_exclave_body_exp
-       | Region_lock -> Region_lock
        | Register_alloc_mode -> Register_alloc_mode
-       | Closed_omitted_parameter -> Closed_omitted_parameter
-       | Function_arg_value -> Function_arg_value
-       | Argument_let_expand -> Argument_let_expand
 
     let rec disallow_right : type l r. (l * r) morph -> (l * disallowed) morph =
       fun (type l r) (h : (l * r) morph) : (l * disallowed) morph ->
@@ -1796,18 +1757,10 @@ module Hint = struct
          Adj_captured_by_partial_application
        | Crossing_left -> Crossing_left
        | Crossing_right -> Crossing_right
-       | Exclave_lock -> Exclave_lock
-       | Exclave_body_exp -> Exclave_body_exp
-       | Adj_exclave_body_exp -> Adj_exclave_body_exp
-       | Region_lock -> Region_lock
        | Register_alloc_mode -> Register_alloc_mode
-       | Closed_omitted_parameter -> Closed_omitted_parameter
-       | Function_arg_value -> Function_arg_value
-       | Argument_let_expand -> Argument_let_expand
   end)
 end
 
-module C = Lattices_mono
 module Solver = Solver_mono (Hint) (C)
 module S = Solver
 
@@ -1955,26 +1908,8 @@ module Axerror = struct
             (dprintf "has a partial application capturing a value")
         | Crossing_left | Crossing_right ->
           Print_then_continue (dprintf "crosses with something")
-        | Exclave_lock ->
-          Print_then_continue (dprintf "is regional in the function body")
-        | Exclave_body_exp ->
-          Print_then_continue (dprintf "is an exclave return of a function")
-        | Adj_exclave_body_exp ->
-          Print_then_continue (dprintf "has an exclave return")
-        | Region_lock ->
-          (* CR pdsouza: this will end up printing a strange message on the lines of,
-             "it is local because it is local to the parent region which is local to
-             the parent region".  Need to fix this. Probably is best to just have a
-             special case for it *)
-          Print_then_continue (dprintf "is local to the parent region")
         | Register_alloc_mode ->
           Print_then_continue (dprintf "is has an allocation")
-        | Closed_omitted_parameter ->
-          Print_then_continue (dprintf "MSG_FOR(Closed_omitted_parameter)")
-        | Function_arg_value ->
-          Print_then_continue (dprintf "is a function parameter")
-        | Argument_let_expand ->
-          Print_then_continue (dprintf "MSG_FOR(Argument_let_expand)")
 
     (** Print a "chain" of axhints, which will consist of zero or more [Morph] axhints,
 terminated with an [Empty] or [Const] axhint *)
@@ -2091,14 +2026,7 @@ terminated with an [Empty] or [Const] axhint *)
           fprintf ppf "Adj_captured_by_partial_application"
         | Crossing_left -> fprintf ppf "Crossing_left"
         | Crossing_right -> fprintf ppf "Crossing_right"
-        | Exclave_lock -> fprintf ppf "Exclave_lock"
-        | Exclave_body_exp -> fprintf ppf "Exclave_body_exp"
-        | Adj_exclave_body_exp -> fprintf ppf "Adj_exclave_body_exp"
-        | Region_lock -> fprintf ppf "Region_lock"
         | Register_alloc_mode -> fprintf ppf "Register_alloc_mode"
-        | Closed_omitted_parameter -> fprintf ppf "Closed_omitted_parameter"
-        | Function_arg_value -> fprintf ppf "Function_arg_value"
-        | Argument_let_expand -> fprintf ppf "Argument_let_expand"
        [@@ocaml.warning "-4"]
       in
       fprintf ppf "(%a)" (C.print a_obj) a;

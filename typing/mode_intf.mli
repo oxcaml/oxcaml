@@ -251,14 +251,7 @@ module type S = sig
       | Adj_captured_by_partial_application : ('l * disallowed) morph
       | Crossing_left : ('l * disallowed) morph
       | Crossing_right : (disallowed * 'r) morph
-      | Exclave_lock : ('l * 'r) morph
-      | Exclave_body_exp : (disallowed * 'r) morph
-      | Adj_exclave_body_exp : ('l * disallowed) morph
-      | Region_lock : ('l * 'r) morph
       | Register_alloc_mode : ('l * 'r) morph
-      | Closed_omitted_parameter : ('l * 'r) morph
-      | Function_arg_value : ('l * 'r) morph
-      | Argument_let_expand : ('l * 'r) morph
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
 
