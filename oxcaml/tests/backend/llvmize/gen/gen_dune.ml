@@ -151,4 +151,5 @@ let () =
   print_test_ir_and_run "float_ops";
   print_test_ir_and_run ~extra_dep_suffix:"defn"
     ~extra_dep_with_llvm_backend:true "many_args";
-  print_test_ir_and_run "multi_ret"
+  print_test_ir_and_run "multi_ret";
+  print_test_ir_and_run "indirect_call"

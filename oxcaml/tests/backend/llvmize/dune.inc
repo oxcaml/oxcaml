@@ -291,3 +291,42 @@
  (deps multi_ret.output multi_ret.output.corrected)
  (action
   (diff multi_ret.output multi_ret.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (targets indirect_call.output.exe indirect_call_ir.output.corrected)
+ (deps  indirect_call_main.ml indirect_call.ml)
+ (action
+  (progn
+   
+   (run %{bin:ocamlopt.opt} indirect_call.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear -llvm-backend -llvm-path ${LLVM_PATH:-clang} -keep-llvmir -dno-asm-comments -disable-poll-insertion)
+   (run %{bin:ocamlopt.opt} indirect_call_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt}  indirect_call.cmx indirect_call_main.cmx -opaque -o indirect_call.output.exe)
+   (with-outputs-to
+    indirect_call_ir.output.corrected
+    (pipe-outputs
+      (run cat indirect_call.ll)
+      (run ./filter.sh))))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest-llvm)
+ (deps indirect_call_ir.output indirect_call_ir.output.corrected)
+ (action
+  (diff indirect_call_ir.output indirect_call_ir.output.corrected)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (deps indirect_call.output.exe)
+ (targets indirect_call.output.corrected)
+ (action
+  (with-outputs-to
+   indirect_call.output.corrected
+   (run ./indirect_call.output.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")))
+ (alias runtest-llvm)
+ (deps indirect_call.output indirect_call.output.corrected)
+ (action
+  (diff indirect_call.output indirect_call.output.corrected)))

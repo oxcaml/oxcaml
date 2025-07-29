@@ -120,7 +120,7 @@ module Llvm_typ = struct
   let to_string t = Format.asprintf "%a" pp_t t
 end
 
-(* LLVM-level represetnation of a function signature. Used to collect and
+(* LLVM-level representation of a function signature. Used to collect and
    declare called functions. *)
 type fun_sig =
   { cc : bool;
@@ -278,16 +278,6 @@ module F = struct
     Llvm_typ.(of_machtyp_component m |> to_string)
 
   let pp_machtyp_component ppf c = Format.fprintf ppf "%s" (machtyp_component c)
-
-  (*= let machtyp machtyp =
-    if Array.length machtyp = 1
-    then machtyp_component machtyp.(0)
-    else
-      Llvm_typ.(
-        Struct (Array.map of_machtyp_component machtyp |> Array.to_list)
-        |> to_string)
-
-  let pp_machtyp ppf cs = Format.fprintf ppf "%s" (machtyp cs) *)
 
   let pp_global ppf s = fprintf ppf "@%s" s
 
@@ -530,21 +520,30 @@ module F = struct
     let arg_types = List.map snd args in
     (* Prepare return *)
     let res_regs =
-      Array.to_list i.arg
+      Array.to_list i.res
       (* CR yusumez: check whether registers actually get returned in ds...? *)
       |> List.filter (fun reg -> not (Reg.is_domainstate reg))
     in
     let res_type = make_ret_type (List.map (fun reg -> reg.Reg.typ) res_regs) in
-    let res_ident = fresh_ident t in
-    let res = Some (res_ident, res_type) in
     (* Do the call *)
-    (match op with
-    | Direct { sym_name; sym_global = _ } ->
-      add_called_fun t sym_name ~cc:true ~args:arg_types ~res:(Some res_type);
-      ins_call t ~pp_name:pp_global sym_name args res
-    | Indirect ->
-      let fun_temp = load_reg_to_temp t i.arg.(0) in
-      ins_call t ~pp_name:pp_ident fun_temp args res);
+    let res_ident =
+      match op with
+      | Direct { sym_name; sym_global = _ } ->
+        add_called_fun t sym_name ~cc:true ~args:arg_types ~res:(Some res_type);
+        let res_ident = fresh_ident t in
+        ins_call t ~pp_name:pp_global sym_name args (Some (res_ident, res_type));
+        res_ident
+      | Indirect ->
+        let fun_temp = load_reg_to_temp t i.arg.(0) in
+        let fun_ptr_temp = fresh_ident t in
+        let res_ident = fresh_ident t in
+        (* ...we need this since we treat OCaml values as i64 *)
+        ins_conv t "inttoptr" ~src:fun_temp ~dst:fun_ptr_temp
+          ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
+        ins_call t ~pp_name:pp_ident fun_ptr_temp args
+          (Some (res_ident, res_type));
+        res_ident
+    in
     (* Unpack return value *)
     List.iteri
       (fun idx reg ->
