@@ -37,6 +37,18 @@ let rec pp_unboxed_elt pp_unboxed ppf = function
 
 let print_unboxed_fields = pp_unboxed_elt
 
+let is_local_field (f : Field.t) =
+  match f with
+  | Value_slot vs ->
+    Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
+  | Function_slot fs ->
+    Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
+  | Block _ | Code_of_closure _ | Apply _ | Code_id_of_call_witness _ | Is_int
+  | Get_tag ->
+    false
+
+let is_not_local_field f = not (is_local_field f)
+
 (* CR-someday ncourant: track fields that are known to be constant, here and in
    changed_representation, to avoid having them be represented. This is a bit
    complex for two main reasons:
@@ -230,6 +242,10 @@ let rev_coconstructor_rel =
    used. We also perform a reverse analysis that computes where each value can
    come from: either an arbitrary source (for use and values coming from outside
    the compilation unit), or a given constructor. *)
+
+let filter_field f x =
+  let open! Syntax in
+  filter (fun [x] -> f (Field.decode x)) [x]
 
 let datalog_schedule =
   let open Global_flow_graph in
@@ -801,10 +817,6 @@ let mk_exists_query params existentials f =
 let is_function_slot : Field.t -> _ = function[@ocaml.warning "-4"]
   | Function_slot _ -> true
   | _ -> false
-
-let filter_field f x =
-  let open! Syntax in
-  filter (fun [x] -> f (Field.decode x)) [x]
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
@@ -1706,11 +1718,10 @@ let fixpoint (graph : Global_flow_graph.graph) =
       (Code_id_or_name.Map.print pp_changed_representation)
       !changed_representation;
   { db;
-    unboxed_fields = !unboxed;
-    changed_representation =
-      !changed_representation
-      (* unboxed_fields = Code_id_or_name.Map.empty; changed_representation =
-         Code_id_or_name.Map.empty *)
+    (* unboxed_fields = !unboxed; changed_representation =
+       !changed_representation *)
+    unboxed_fields = Code_id_or_name.Map.empty;
+    changed_representation = Code_id_or_name.Map.empty
   }
 
 let print_color { db; unboxed_fields; changed_representation } v =
