@@ -721,6 +721,8 @@ let mk_instantiate_opt = mk_instantiate0 ~ext:"cmx"
 let mk_use_prims f =
   "-use-prims", Arg.String f, "<file>  (undocumented)"
 
+(* CR sspies: The -use-debugging-shapes flag should be removed eventually
+   when these are the only supported shapes. *)
 let mk_use_debugging_shapes f =
   "-use-debugging-shapes", Arg.Unit f, " Use debugging shapes instead of merlin shapes"
 

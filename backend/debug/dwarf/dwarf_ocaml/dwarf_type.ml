@@ -1221,6 +1221,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Abs _ | Comp_unit _ | Struct _ | Var _ | Mutrec _ ->
       (* CR sspies: In these cases, we have generated an ill-formed term for
          shape reduction, which should result in a louder error. *)
+      (* CR sspies: Fatal errors can occur if the compiler is used with a
+         combination of -use-debugging-shapes and -use-merlin-shapes. Then it is
+         possible to run into structs here. *)
       Misc.fatal_error
         "Shape reduction should not result in any one of these normal forms");
     reference
@@ -1385,6 +1388,8 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | (Abs _ | Comp_unit _ | Struct _ | Var _ | Proj_decl _ | Mutrec _), _ ->
     (* CR sspies: In these cases, we have generated an ill-formed term for shape
        reduction, which should result in a louder error. *)
+    (* CR sspies: Fatal errors can occur if the compiler is used with a
+       combination of -use-debugging-shapes and -use-merlin-shapes. *)
     Misc.fatal_error
       "Shape reduction should not result in any one of these normal forms"
 
