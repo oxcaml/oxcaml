@@ -1,6 +1,6 @@
 # Scalar Types and Static Casting
 
-This document specifies the semantics of scalar type conversions in the OCaml compiler. It covers both the high-level OCaml value representation (front-end) and the lower-level intermediate representation used during compilation and at runtime (back-end).
+This document specifies the semantics of scalar type conversions in the OxCaml compiler. It covers both the high-level OCaml value representation (front-end) and the lower-level representation used during compilation and at runtime (back-end).
 
 ## Front-End Semantics
 
