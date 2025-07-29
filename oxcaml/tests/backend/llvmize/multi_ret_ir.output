@@ -1,0 +1,91 @@
+source_filename = "multi_ret.ml"
+
+@camlMulti_ret__data_begin = global i64 0
+define void @camlMulti_ret__code_begin() { ret void }
+
+define cc 104 { { ptr }, { double, double, double, double } } @camlMulti_ret__permute_HIDE_STAMP(ptr %0, double %1, double %2, double %3, double %4)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %6 = alloca double
+  store double %1, ptr %6
+  %7 = alloca double
+  store double %2, ptr %7
+  %8 = alloca double
+  store double %3, ptr %8
+  %9 = alloca double
+  store double %4, ptr %9
+  %10 = alloca double
+  %11 = alloca double
+  %12 = alloca double
+  %13 = alloca double
+  br label %L1
+L1:
+  br label %L101
+L101:                                                ; preds = %L1
+  %14 = load double, ptr %6
+  store double %14, ptr %10
+  %15 = load double, ptr %7
+  store double %15, ptr %11
+  %16 = load double, ptr %8
+  store double %16, ptr %12
+  %17 = load double, ptr %9
+  store double %17, ptr %13
+  %18 = load double, ptr %13
+  store double %18, ptr %6
+  %19 = load double, ptr %12
+  store double %19, ptr %7
+  %20 = load double, ptr %11
+  store double %20, ptr %8
+  %21 = load double, ptr %10
+  store double %21, ptr %9
+  %22 = extractvalue { { { ptr }, { double, double, double, double } } } poison, 0
+  %23 = load ptr, ptr %ds
+  %24 = insertvalue { { ptr }, { double, double, double, double } } %22, ptr %23, 0, 0
+  %25 = load double, ptr %6
+  %26 = insertvalue { { ptr }, { double, double, double, double } } %24, double %25, 1, 0
+  %27 = load double, ptr %7
+  %28 = insertvalue { { ptr }, { double, double, double, double } } %26, double %27, 1, 1
+  %29 = load double, ptr %8
+  %30 = insertvalue { { ptr }, { double, double, double, double } } %28, double %29, 1, 2
+  %31 = load double, ptr %9
+  %32 = insertvalue { { ptr }, { double, double, double, double } } %30, double %31, 1, 3
+  ret { { ptr }, { double, double, double, double } } %32
+}
+
+define cc 104 { { ptr }, { i64 } } @camlMulti_ret__entry(ptr %0)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  br label %L1
+L1:
+  br label %L107
+L107:                                                ; preds = %L1
+  store ptr @camlMulti_ret, ptr %4
+  %7 = load i64, ptr %4
+  store i64 %7, ptr %5
+  %8 = load i64, ptr %5
+  store i64 %8, ptr %3
+  store i64 1, ptr %6
+  %9 = load i64, ptr %6
+  store i64 %9, ptr %2
+  %10 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %11 = load ptr, ptr %ds
+  %12 = insertvalue { { ptr }, { i64 } } %10, ptr %11, 0, 0
+  %13 = load i64, ptr %2
+  %14 = insertvalue { { ptr }, { i64 } } %12, i64 %13, 1, 0
+  ret { { ptr }, { i64 } } %14
+}
+
+@camlMulti_ret__gc_roots = global { i64, i64 } { i64 0, i64 2816 }
+@camlMulti_ret = global { ptr, ptr, i64 } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_1, i64 4087 }
+@camlMulti_ret__permute_1 = global { ptr, i64, ptr, i64 } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP, i64 768 }
+@camlMulti_ret__empty_block4 = global {  } {  }
+@caml_curryF_F_F_F_RFFFF = external global ptr
+
+@camlMulti_ret__data_end = global i64 0
+define void @camlMulti_ret__code_end() { ret void }
+@camlMulti_ret__frametable = global i64 0
