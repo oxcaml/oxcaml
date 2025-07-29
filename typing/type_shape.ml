@@ -85,12 +85,12 @@ end = struct
            (fun (name, sh, layout) ->
              name, shape_subst_uid_with_rec_var ~preserve_uid uid rv sh, layout)
            fields)
-    | Variant { simple_constructors; complex_constructors } ->
-      Shape.variant ?uid:outer.uid simple_constructors
+    | Variant constructors ->
+      Shape.variant ?uid:outer.uid
         (Shape.complex_constructors_map
            (fun (sh, layout) ->
              shape_subst_uid_with_rec_var ~preserve_uid uid rv sh, layout)
-           complex_constructors)
+           constructors)
     | Variant_unboxed { name; arg_name; arg_shape; arg_layout; _ } ->
       Shape.variant_unboxed ?uid:outer.uid name arg_name
         (shape_subst_uid_with_rec_var ~preserve_uid uid rv arg_shape)
@@ -429,19 +429,15 @@ module Type_decl_shape = struct
           let cstrs_with_layouts =
             List.combine cstr_list (Array.to_list layouts)
           in
-          let simple_constructors, complex_constructors =
-            List.partition_map
+          let constructors =
+            List.map
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
-                match is_empty_constructor_list cstr with
-                | true -> Left name
-                | false ->
-                  Right
-                    (of_complex_constructor type_subst name cstr arg_layouts
-                       shape_for_constr))
+                of_complex_constructor type_subst name cstr arg_layouts
+                  shape_for_constr)
               cstrs_with_layouts
           in
-          Shape.variant simple_constructors complex_constructors
+          Shape.variant constructors
         | Type_variant ([cstr], Variant_unboxed, _unsafe_mode_crossing)
           when not (is_empty_constructor_list cstr) ->
           let name = Ident.name cstr.cd_id in
@@ -544,14 +540,14 @@ module Type_decl_shape = struct
         (fun { pv_constr_name = _; pv_constr_args = shs } ->
           List.for_all is_closed_type_shape shs)
         constrs
-    | Variant { simple_constructors = _; complex_constructors } ->
+    | Variant constructors ->
       List.for_all
         (fun { name = _; kind = _; args } ->
           List.for_all
             (fun { field_name = _; field_value = sh, _ } ->
               is_closed_type_shape sh)
             args)
-        complex_constructors
+        constructors
     | Variant_unboxed { name = _; arg_name = _; arg_shape = sh; arg_layout = _ }
       ->
       is_closed_type_shape sh
@@ -732,14 +728,14 @@ let rec unfold_and_evaluate subst_type subst_constr (t : Shape.t) =
         unfold_and_evaluate (Ident.Map.add x arg subst_type) subst_constr s'
       | _ -> Shape.app f ~arg)
     | Proj_decl _ -> assert false (* see [maybe_evaluated_shape] above *)
-    | Variant { simple_constructors; complex_constructors } ->
-      let complex_constructors =
+    | Variant constructors ->
+      let constructors =
         Shape.complex_constructors_map
           (fun ((sh, ly) : Shape.t * _) ->
             unfold_and_evaluate subst_type subst_constr sh, ly)
-          complex_constructors
+          constructors
       in
-      Shape.variant simple_constructors complex_constructors
+      Shape.variant constructors
     | Record { fields; kind } ->
       Shape.record kind
         (List.map

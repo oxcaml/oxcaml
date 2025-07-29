@@ -458,10 +458,7 @@ and desc =
   | Rec_var of int
 
   (* constructors for type declarations *)
-  | Variant of
-    { simple_constructors : string list;
-      complex_constructors : (t * Layout.t) complex_constructors
-    }
+  | Variant of (t * Layout.t) complex_constructors
   | Variant_unboxed of
     { name : string;
       arg_name : string option;
@@ -582,12 +579,10 @@ let rec equal_desc d1 d2 =
     List.equal equal_poly_variant_constructor pvs1 pvs2
 
   | Variant c1, Variant c2 ->
-    List.equal equal_simple_constructor c1.simple_constructors
-      c2.simple_constructors
-    && List.equal
+    List.equal
          (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
            equal t1 t2 && Layout.equal l1 l2))
-         c1.complex_constructors c2.complex_constructors
+         c1 c2
   | Variant_unboxed c1, Variant_unboxed c2 ->
     String.equal c1.name c2.name
     && Option.equal String.equal c1.arg_name c2.arg_name
@@ -741,8 +736,6 @@ and equal_field (s1, sh1, ly1) (s2, sh2, ly2) =
   equal sh1 sh2 &&
   Layout.equal ly1 ly2
 
-and equal_simple_constructor c1 c2 = String.equal c1 c2
-
 and equal_poly_variant_constructor
   { pv_constr_name = name1; pv_constr_args = args1 }
   { pv_constr_name = name2; pv_constr_args = args2 } =
@@ -856,13 +849,9 @@ let rec print fmt t =
                   print)
                 pv_constr_args))
         fields
-    | Variant { simple_constructors; complex_constructors } ->
-      let constructors = List.map (fun c -> `Simple c) simple_constructors @
-        List.map (fun c -> `Complex c) complex_constructors in
-      let print_constructor fmt = function
-        | `Simple s -> Format.pp_print_string fmt s
-        | `Complex c ->
-          print_complex_constructor (fun fmt (t, _) -> print_nested fmt t) fmt c
+    | Variant constructors ->
+      let print_constructor =
+        print_constructor (fun fmt (t, _) -> print_nested fmt t)
       in
       Format.fprintf fmt
         "Variant %a"
@@ -910,11 +899,14 @@ and print_one_entry print_value ppf { field_name; field_value } =
       field_value
   | None -> Format.fprintf ppf "%a" print_value field_value
 
-and print_complex_constructor print_value ppf { name; kind = _; args } =
-  Format.fprintf ppf "@[%a of @[%a@]@]" Format.pp_print_string name
-    (Format.pp_print_list ~pp_sep:(print_sep_string " * ")
-        (print_one_entry print_value))
-    args
+and print_constructor print_value ppf { name; kind = _; args } =
+  if List.length args = 0 then
+    Format.pp_print_string ppf name
+  else
+    Format.fprintf ppf "@[%a of @[%a@]@]" Format.pp_print_string name
+      (Format.pp_print_list ~pp_sep:(print_sep_string " * ")
+          (print_one_entry print_value))
+      args
 
 and print_field ppf
     ((name, shape, _) : _ * t * _) =
@@ -1075,11 +1067,11 @@ let poly_variant ?uid t =
       poly_variant_constructors_map (fun t -> t.hash) t);
     approximated = false }
 
-let variant ?uid simple_constructors complex_constructors =
-  { uid; desc = Variant { simple_constructors; complex_constructors };
-    hash = Hashtbl.hash (hash_variant, uid, simple_constructors,
+let variant ?uid constructors =
+  { uid; desc = Variant constructors;
+    hash = Hashtbl.hash (hash_variant, uid,
       complex_constructors_map
-        (fun (t, ly) -> (t.hash, ly)) complex_constructors);
+        (fun (t, ly) -> (t.hash, ly)) constructors);
     approximated = false }
 
 let variant_unboxed ?uid name arg_name arg_shape arg_layout =
@@ -1185,7 +1177,7 @@ let set_uid_if_none t uid =
   | Predef (p, ts) -> predef ~uid p ts
   | Arrow (t1, t2) -> arrow ~uid t1 t2
   | Poly_variant t -> poly_variant ~uid t
-  | Variant t -> variant ~uid t.simple_constructors t.complex_constructors
+  | Variant cs -> variant ~uid cs
   | Variant_unboxed t ->
     variant_unboxed ~uid t.name t.arg_name t.arg_shape t.arg_layout
   | Record t -> record ~uid t.kind t.fields
@@ -1214,7 +1206,7 @@ let is_mu_closed t =
     | Variant t ->
       List.for_all (fun { kind = _; name = _; args = c } ->
         List.for_all (fun { field_value = t, _; field_name = _} ->
-          debruijn_closed_shape bound t) c) t.complex_constructors
+          debruijn_closed_shape bound t) c) t
     | Record t -> List.for_all (fun (_, t, _) ->
       debruijn_closed_shape bound t) t.fields
     | Mutrec ts -> Ident.Map.for_all (fun _ -> debruijn_closed_shape bound) ts

@@ -73,10 +73,7 @@ end) = struct
     | NPredef of Predef.t * nf list
     | NArrow of nf * nf
     | NPoly_variant of delayed_nf poly_variant_constructors
-    | NVariant of {
-      simple_constructors: string list;
-      complex_constructors: (delayed_nf * Layout.t) complex_constructors
-    }
+    | NVariant of  (delayed_nf * Layout.t) complex_constructors
     | NVariant_unboxed of
       { name : string;
         arg_name : string option;
@@ -167,9 +164,7 @@ end) = struct
         List.equal equal_delayed_nf c1.pv_constr_args c2.pv_constr_args
       in
       List.equal equal_pv_constructor constrs1 constrs2
-    | NVariant { simple_constructors = sc1; complex_constructors = cc1 },
-      NVariant { simple_constructors = sc2; complex_constructors = cc2 } ->
-      List.equal String.equal sc1 sc2 &&
+    | NVariant cc1, NVariant cc2  ->
       List.equal
         (Shape.equal_complex_constructor
           (fun (dnf1, ly1) (dnf2, ly2) ->
@@ -530,12 +525,11 @@ end) = struct
           let dnf_constrs = poly_variant_constructors_map
                               (delay_reduce env) constrs in
           return (NPoly_variant dnf_constrs)
-      | Variant { simple_constructors; complex_constructors } ->
-          let dnf_complex_constructors =
+      | Variant constructors  ->
+          let dnf_constructors =
             complex_constructors_map (fun (t, ly) ->
-              (delay_reduce env t, ly)) complex_constructors in
-          return (NVariant { simple_constructors;
-                             complex_constructors = dnf_complex_constructors })
+              (delay_reduce env t, ly)) constructors in
+          return (NVariant dnf_constructors)
       | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
           let dnf_arg_shape = delay_reduce env arg_shape in
           return (NVariant_unboxed { name; arg_name;
@@ -607,12 +601,12 @@ end) = struct
     | NPoly_variant constrs ->
       let t_constrs = poly_variant_constructors_map read_back_force constrs in
       poly_variant ?uid t_constrs
-    | NVariant { simple_constructors; complex_constructors } ->
-      let t_complex_constructors =
+    | NVariant constructors ->
+      let t_constructors =
         complex_constructors_map
           (fun (dnf, ly) -> (read_back_force dnf, ly))
-          complex_constructors in
-      variant ?uid simple_constructors t_complex_constructors
+          constructors in
+      variant ?uid t_constructors
     | NVariant_unboxed { name; arg_name; arg_shape; arg_layout } ->
       let t_arg_shape = read_back_force arg_shape in
       variant_unboxed ?uid name arg_name t_arg_shape arg_layout

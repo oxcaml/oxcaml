@@ -1310,7 +1310,13 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
           fields
       in
       create_record_die ~reference ~parent_proto_die ?name ~fields ()
-    | Variant { simple_constructors; complex_constructors } -> (
+    | Variant constructors -> (
+      let simple_constructors, complex_constructors =
+        List.partition_map
+          (fun cs ->
+            if List.length cs.S.args = 0 then Left cs.S.name else Right cs)
+          constructors
+      in
       match complex_constructors with
       | [] ->
         create_simple_variant_die ~reference ~parent_proto_die ?name

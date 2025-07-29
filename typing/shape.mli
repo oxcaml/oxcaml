@@ -222,17 +222,9 @@ and desc =
   | Rec_var of int
 
   (* constructors for type declarations *)
-  | Variant of
-    { simple_constructors : string list;
-      (** The string is the name of the constructor. The runtime
-          representation of the constructor at index [i] in this list is
-          [2 * i + 1]. See [dwarf_type.ml] for more details. *)
-      complex_constructors : (t * Layout.t) complex_constructors
-      (** All constructors in this category are represented as blocks.
-          The index [i] in the list indicates the tag at runtime. The
-          length of the constructor argument list [args] determines the
-          size of the block. *)
-    }
+  | Variant of (t * Layout.t) complex_constructors
+      (* CR sspies: Rename this just to constructor now that simple constructors
+         are no longer a thing. *)
   | Variant_unboxed of
     { name : string;
       arg_name : string option;
@@ -342,7 +334,7 @@ val rec_var : ?uid:Uid.t -> int -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> string list -> (t * Layout.t) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t) complex_constructors -> t
 val variant_unboxed :
   ?uid:Uid.t -> string -> string option -> t -> Layout.t -> t
 val record : ?uid:Uid.t -> record_kind -> (string * t * Layout.t) list -> t
