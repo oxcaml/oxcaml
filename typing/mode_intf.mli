@@ -192,6 +192,7 @@ module type S = sig
   module Hint : sig
     type const =
       | None
+      | Skip
       | Result_of_lazy
       | Lazy_closure
       | Class

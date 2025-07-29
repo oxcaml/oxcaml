@@ -315,6 +315,11 @@ module type Hint = sig
   (** The empty mode constant hint *)
   val const_none : const
 
+  (** The skip constant hint. This means that this hint should never be reported,
+    usually because it is the minimum element that is only allowed on the
+    left, or the maximum only allowed on the right *)
+  val const_skip : const
+
   (** Hints describing the reasons for morphisms applied to modes.
       The type parameter gives the allowance of the hint, which should correspond
       to the allowance of the morphism. *)

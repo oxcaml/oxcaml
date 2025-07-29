@@ -1559,6 +1559,7 @@ module C = Lattices_mono
 module Hint = struct
   type const =
     | None
+    | Skip
     | Result_of_lazy
     | Lazy_closure
     | Class
@@ -1571,6 +1572,8 @@ module Hint = struct
     | Stack_expression
 
   let const_none = None
+
+  let const_skip = Skip
 
   type lock_item =
     | Value
@@ -1812,6 +1815,7 @@ module Axerror = struct
       let wrap_print_hint t = fprintf ppf "@ because %t" t in
       function
       | None -> NothingPrinted
+      | Skip -> assert false
       | Result_of_lazy ->
         wrap_print_hint (dprintf "it is the result of a lazy expression");
         HintPrinted
