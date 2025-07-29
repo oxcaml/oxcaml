@@ -692,7 +692,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           then
             Some
               (Patomic_load_field { immediate_or_pointer },
-               [targ; Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+               [targ;
+                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
           else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
@@ -712,7 +713,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           then
             Some
               (Patomic_load_field { immediate_or_pointer },
-               [targ; Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+               [targ;
+                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
           else
             Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
