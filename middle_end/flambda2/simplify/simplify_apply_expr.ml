@@ -554,7 +554,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         in
         let contains_no_escaping_local_allocs =
           match result_mode with
-          | Alloc_heap | Alloc_local | Alloc_external -> false
+          | Alloc_heap -> true
+          | Alloc_local | Alloc_external -> false
         in
         let my_closure = Variable.create "my_closure" in
         let my_region =
