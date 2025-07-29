@@ -3662,14 +3662,14 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
       in
-      let flat_shape =
+      let flattened_reordered_shape =
         K.Mixed_block_lambda_shape.flattened_reordered_shape shape
       in
       let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
-      ( Module_mixed (flat_shape, kind_shape),
+      ( Module_mixed (flattened_reordered_shape, kind_shape),
         block_shape,
-        Array.length flat_shape )
+        Array.length flattened_reordered_shape )
   in
   let load_fields_body acc =
     let env =
@@ -3732,11 +3732,11 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
               size = Known (Targetint_31_63.of_int size);
               field_kind = Any_value
             }
-      | Module_mixed (flat_shape, kind_shape) ->
+      | Module_mixed (flattened_reordered_shape, kind_shape) ->
         fun pos ->
           Format.printf "pos: %d\n" pos;
           let field_kind : P.Mixed_block_access_field_kind.t =
-            match flat_shape.(pos) with
+            match flattened_reordered_shape.(pos) with
             | Value _ -> Value_prefix Any_value
             | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
               | Vec256 | Vec512 | Word ) as mixed_block_element ->
@@ -3748,7 +3748,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
           Mixed
             { tag = Known Tag.Scannable.zero;
               (* CR jrayman: Is this the right tag? *)
-              size = Unknown;
+              size = Known (Targetint_31_63.of_int field_count);
               (* CR jrayman: Is this size in words or number of fields? *)
               field_kind;
               (* CR jrayman: is field_kind correct? *)
