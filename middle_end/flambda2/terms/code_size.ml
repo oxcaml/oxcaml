@@ -373,7 +373,7 @@ let unary_prim_size prim =
   | Block_load { kind; _ } -> block_load kind
   | Duplicate_array _ | Duplicate_block _ -> needs_caml_c_call_extcall_size + 1
   | Is_int _ | Is_null -> 1
-  | Get_tag -> 2
+  | Get_tag { variant_only = _ } -> 2
   | Array_length array_kind -> (
     match array_kind with
     | Array_kind

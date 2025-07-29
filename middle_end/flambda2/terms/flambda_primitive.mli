@@ -385,7 +385,7 @@ type unary_primitive =
       }
   | Is_int of { variant_only : bool }
   | Is_null
-  | Get_tag
+  | Get_tag of { variant_only : bool }
   | Array_length of Array_kind_for_length.t
       (** The unarized length of an array.  So for an example an array of
           kind [Unboxed_product [tagged_immediate; tagged_immediate]] always

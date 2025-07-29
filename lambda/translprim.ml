@@ -752,6 +752,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%floatarray_unsafe_set" ->
       Primitive ((Parraysetu (Pfloatarray_set, Ptagged_int_index)), 3)
     | "%obj_is_int" -> Primitive (Pisint { variant_only = false }, 1)
+    | "%get_tag" -> (* Uses atomic acquire load for Forward_tag sync *)
+                    Primitive (Pgettag { variant_only = false }, 1)
     | "%is_null" -> Primitive (Pisnull, 1)
     | "%lazy_force" -> Lazy_force pos
     | "%nativeint_of_int" -> Primitive ((Pbintofint (Boxed_nativeint, mode)), 1)
@@ -2106,7 +2108,8 @@ let lambda_primitive_needs_event_after = function
        | Punboxedintarray _ | Punboxedvectorarray _
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _
-  | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pisnull | Pisout
+  | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pgettag _
+  | Pisnull | Pisout
   | Pprobe_is_enabled _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field

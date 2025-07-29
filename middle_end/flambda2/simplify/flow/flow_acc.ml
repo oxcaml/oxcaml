@@ -358,7 +358,7 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
                ~prim:(Is_int v) t)
             Name_occurrences.empty
         | None -> record_var_bindings t free_names)
-      | Unary (Get_tag, simple) -> (
+      | Unary (Get_tag { variant_only = true }, simple) -> (
         match Simple.must_be_var simple with
         | Some (v, _) ->
           record_var_bindings

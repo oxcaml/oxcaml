@@ -1314,6 +1314,14 @@ let get_header ptr dbg =
       [Cop (Cadda, [ptr; Cconst_int (-size_int, dbg)], dbg)],
       dbg )
 
+let get_header_atomic ptr dbg =
+  (* Atomic header load for Get_tag with variant_only=false, as per obj.c
+     comment about Forward_tag synchronization needing atomic acquire loads *)
+  Cop
+    ( mk_load_atomic Word_int,
+      [Cop (Cadda, [ptr; Cconst_int (-size_int, dbg)], dbg)],
+      dbg )
+
 let get_header_masked ptr dbg =
   match Config.reserved_header_bits with
   | 0 -> get_header ptr dbg
@@ -1335,6 +1343,11 @@ let get_tag ptr dbg =
         else mk_load_mut Byte_unsigned),
         [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
         dbg )
+
+let get_tag_atomic ptr dbg =
+  (* Atomic tag load for Get_tag with variant_only=false, as per obj.c comment
+     about Forward_tag synchronization needing atomic acquire loads. *)
+  Cop (Cand, [get_header_atomic ptr dbg; Cconst_int (255, dbg)], dbg)
 
 let get_size ptr dbg = lsr_const (get_header_masked ptr dbg) 10 dbg
 
