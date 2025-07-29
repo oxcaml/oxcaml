@@ -876,7 +876,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     match disallow_right m with
     | Amode (a, a_hint) ->
       if C.le obj (C.max obj) a
-      then Amode (a, a_hint), false
+      then Amode (a, Const H.const_none), false
       else
         ( Amodevar
             (Amorphvar
@@ -906,7 +906,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     match disallow_left m with
     | Amode (a, a_hint) ->
       if C.le obj a (C.min obj)
-      then Amode (a, a_hint), false
+      then Amode (a, Const H.const_none), false
       else
         ( Amodevar
             (Amorphvar
