@@ -504,6 +504,7 @@ val immutable_block_with_size_at_least :
 
 val mutable_block : Alloc_mode.For_types.t -> t
 
+(** The type of an externally-allocated mutable block *)
 val mutable_external_block : t
 
 val variant :

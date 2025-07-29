@@ -216,8 +216,8 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
     match (alloc_mode : Alloc_mode.For_types.t) with
     | External ->
       Misc.fatal_error
-        "Immutable_blocks are always variants, but externally-allocated blocks \
-         are nativeint."
+        "Cannot create immutable_block with External alloc_mode, use \
+         immutable_external_block"
     | Heap | Local | Unknown ->
       TG.create_variant ~is_unique ~immediates:(Known TG.bottom_naked_immediate)
         ~blocks:
