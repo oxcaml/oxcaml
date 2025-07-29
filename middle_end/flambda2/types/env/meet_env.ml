@@ -295,7 +295,7 @@ let add_equation t name ty ~meet_type =
 
 let add_equation_on_simple t simple ty ~meet_type =
   try add_equation_on_simple ~raise_on_bottom:true t simple ty ~meet_type
-  with Bottom_equation -> TE.make_bottom t
+  with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
 let add_env_extension t env_extension ~meet_type =
   try add_env_extension ~raise_on_bottom:true t env_extension ~meet_type

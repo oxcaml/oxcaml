@@ -1032,10 +1032,12 @@ and meet_relation env var1 var2 =
   | None, Some _ -> Ok (Right_input, env)
   | Some var1, Some var2 ->
     let simple1 =
-      TE.get_canonical_simple_ignoring_name_mode env (Simple.var var1)
+      TE.get_canonical_simple_ignoring_name_mode (ME.typing_env env)
+        (Simple.var var1)
     in
     let simple2 =
-      TE.get_canonical_simple_ignoring_name_mode env (Simple.var var2)
+      TE.get_canonical_simple_ignoring_name_mode (ME.typing_env env)
+        (Simple.var var2)
     in
     if Simple.equal simple1 simple2
     then Ok (Both_inputs, env)
@@ -1166,8 +1168,8 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     TG.head_of_kind_naked_immediate meet_result =
   let module I = Targetint_31_63 in
   match
-    ( reduce_head_of_kind_naked_immediate env t1,
-      reduce_head_of_kind_naked_immediate env t2 )
+    ( reduce_head_of_kind_naked_immediate (ME.typing_env env) t1,
+      reduce_head_of_kind_naked_immediate (ME.typing_env env) t2 )
   with
   | Bottom, Bottom -> Bottom Both_inputs
   | Bottom, Ok _ -> Bottom Left_input
