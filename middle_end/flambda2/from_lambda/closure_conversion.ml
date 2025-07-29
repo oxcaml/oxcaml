@@ -3642,11 +3642,35 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
         defining_expr ~body)
     (acc, body) components
 
+type module_representation =
+  | Module_value_only of int
+  | Module_mixed of
+      unit K.Mixed_block_lambda_shape.Singleton_mixed_block_element.t array
+      * K.Mixed_block_shape.t
+
 let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
     ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
+  let module_repr, block_shape, field_count =
+    match module_repr with
+    | Lambda.Module_value_only size ->
+      Module_value_only size, K.Scannable_block_shape.Value_only, size
+    | Lambda.Module_mixed shape ->
+      let shape =
+        K.Mixed_block_lambda_shape.of_mixed_block_elements shape
+          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      in
+      let flat_shape =
+        K.Mixed_block_lambda_shape.flattened_reordered_shape shape
+      in
+      let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
+      let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
+      ( Module_mixed (flat_shape, kind_shape),
+        block_shape,
+        Array.length flat_shape )
+  in
   let load_fields_body acc =
     let env =
       match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
@@ -3660,7 +3684,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       | _ -> simple_var
     in
     let field_vars =
-      List.init (Lambda.module_field_count module_repr) (fun pos ->
+      List.init field_count (fun pos ->
           let pos_str = string_of_int pos in
           ( pos,
             Variable.create ("field_" ^ pos_str) K.value
@@ -3676,9 +3700,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        Static_const.block module_block_tag Immutable
-          (K.Scannable_block_shape.of_module_representation module_repr)
-          field_vars
+        Static_const.block module_block_tag Immutable block_shape field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of
@@ -3701,45 +3723,51 @@ let wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
         (Bound_pattern.static bound_static)
         named ~body:return
     in
-    (* CR jrayman: should vary with [pos] *)
-    let block_access : P.Block_access_kind.t =
+    let block_access : int -> P.Block_access_kind.t =
       match module_repr with
-      | Lambda.Module_value_only size ->
-        Values
-          { tag = Known Tag.Scannable.zero;
-            size = Known (Targetint_31_63.of_int size);
-            field_kind = Any_value
-          }
-      | Lambda.Module_mixed shape ->
-        let shape =
-          shape
-          |> Mixed_block_shape.of_mixed_block_elements
-               ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          |> K.Mixed_block_shape.from_mixed_block_shape
-        in
-        Mixed
-          { tag = Known Tag.Scannable.zero;
-            (* CR jrayman: Is this the right tag? *)
-            size = Unknown;
-            (* CR jrayman: Is this size in words or number of fields? *)
-            field_kind = Value_prefix Any_value;
-            (* CR jrayman: is field_kind correct? *)
-            shape
-          }
+      | Module_value_only size ->
+        fun _pos ->
+          Values
+            { tag = Known Tag.Scannable.zero;
+              size = Known (Targetint_31_63.of_int size);
+              field_kind = Any_value
+            }
+      | Module_mixed (flat_shape, kind_shape) ->
+        fun pos ->
+          Format.printf "pos: %d\n" pos;
+          let field_kind : P.Mixed_block_access_field_kind.t =
+            match flat_shape.(pos) with
+            | Value _ -> Value_prefix Any_value
+            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+              | Vec256 | Vec512 | Word ) as mixed_block_element ->
+              Flat_suffix
+                (K.Flat_suffix_element.from_singleton_mixed_block_element
+                   mixed_block_element)
+            | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
+          in
+          Mixed
+            { tag = Known Tag.Scannable.zero;
+              (* CR jrayman: Is this the right tag? *)
+              size = Unknown;
+              (* CR jrayman: Is this size in words or number of fields? *)
+              field_kind;
+              (* CR jrayman: is field_kind correct? *)
+              shape = kind_shape
+            }
     in
     List.fold_left
       (fun (acc, body) (pos, var, var_duid) ->
         let var = VB.create var var_duid Name_mode.normal in
         let pat = Bound_pattern.singleton var in
-        let pos = Targetint_31_63.of_int pos in
+        let pos' = Targetint_31_63.of_int pos in
         let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field:pos with
+        match simplify_block_load acc env ~block ~field:pos' with
         | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
           let named =
             Named.create_prim
               (Unary
                  ( Block_load
-                     { kind = block_access; mut = Immutable; field = pos },
+                     { kind = block_access pos; mut = Immutable; field = pos' },
                    block ))
               Debuginfo.none
           in
