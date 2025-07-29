@@ -53,14 +53,14 @@
 
     - Some primitives only take integers, some take only floats, and Three_way_compare
     takes any scalar type. This is represented using specialized operation types:
-      * [Integral.Binary.Int_op.t] for integer-only ops (Add, Sub, Mul, etc.)
-      * [Floating.Binary.Float_op.t] for float-only ops
-      * [Intrinsic.Binary.Three_way_compare of any_locality_mode t] accepts any scalar
+      - [Intrinsic.Binary.Int_op.t] for integer-only ops (Add, Sub, Mul, etc.)
+      - [Intrinsic.Binary.Float_op.t] for float-only ops
+      - [Intrinsic.Binary.Three_way_compare of any_locality_mode t] accepts any scalar
 
     - The bytecode compiler wants to easily map unboxed/untagged values to their [value]
     equivalents. This is supported by [Maybe_naked.t]:
-      * [Value of 'a] represents boxed/tagged values
-      * [Naked of 'b] represents unboxed/untagged values
+      - [Value of 'a] represents boxed/tagged values
+      - [Naked of 'b] represents unboxed/untagged values
       Example: [Scalar.Maybe_naked.Value (Integral.Width.Taggable Int)] vs
                [Scalar.Maybe_naked.Naked (Integral.Width.Taggable Int)]
 
@@ -68,6 +68,7 @@
     primitives. This is enabled by [Intrinsic.Unary.Static_cast]:
       [Static_cast { src : any_locality_mode t; dst : 'mode t }]
       which allows casting between different scalar types, e.g., from Int8 to Int32.
+      See scalar.md in the repo root for documentation on the semantics.
 *)
 
 type any_locality_mode = Any_locality_mode
@@ -242,6 +243,8 @@ module Intrinsic : sig
           { src : any_locality_mode t;
             dst : 'mode t
           }
+      (** See scalar.md in the repo root for documentation on the semantics. *)
+
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
