@@ -243,6 +243,21 @@ let rev_coconstructor_rel =
    come from: either an arbitrary source (for use and values coming from outside
    the compilation unit), or a given constructor. *)
 
+(* Local fields are value and function slots that originate from the current
+   compilation unit. As such, all sources and usages from these fields will
+   necessarily correspond to either code in the current compilation unit, or a
+   resimplified version of it.
+
+   The consequence of this is that we can consider them not to have [any_usage],
+   nor to have [any_source], even if the block containing them has [any_usage]
+   or [any_source]. Instead, we need to add an alias from [x] to [y] if [x] if
+   stored in a field of [source], [y] is read from the same field of [usage],
+   and [source] might flow to [usage]. *)
+
+let reading_field_rel = rel2 "reading_field" Cols.[f; n]
+
+let escaping_field_rel = rel2 "escaping_field" Cols.[f; n]
+
 let filter_field f x =
   let open! Syntax in
   filter (fun [x] -> f (Field.decode x)) [x]
@@ -409,8 +424,17 @@ let datalog_schedule =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
     [ not (any_usage_pred base);
       any_usage_pred to_;
-      accessor_rel to_ relation base ]
+      accessor_rel to_ relation base;
+      filter_field is_not_local_field relation ]
     ==> field_usages_top_rel base relation
+  in
+  let field_usages_from_accessor_field_usages_top_local =
+    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+    [ not (any_usage_pred base);
+      any_usage_pred to_;
+      accessor_rel to_ relation base;
+      filter_field is_local_field relation ]
+    ==> field_usages_rel base relation to_
   in
   let field_usages_from_accessor_field_usages =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
@@ -468,6 +492,16 @@ let datalog_schedule =
       field_usages_rel base_use relation to_ ]
     ==> alias_rel to_ from
   in
+  let alias_from_accessed_constructor_1_local =
+    let$ [base; base_use; relation; from; to_] =
+      ["base"; "base_use"; "relation"; "from"; "to_"]
+    in
+    [ filter_field is_local_field relation;
+      constructor_rel base relation from;
+      usages_rel base base_use;
+      field_usages_rel base_use relation to_ ]
+    ==> alias_rel to_ from
+  in
   (*
    any_usage_from_accessed_constructor
    * constructor Base Rel From
@@ -499,8 +533,17 @@ let datalog_schedule =
    *)
   let any_usage_from_constructor_any_usage =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [any_usage_pred base; constructor_rel base relation from]
+    [ any_usage_pred base;
+      constructor_rel base relation from;
+      filter_field is_not_local_field relation ]
     ==> any_usage_pred from
+  in
+  let escaping_local_field =
+    let$ [base; relation; from] = ["base"; "relation"; "from"] in
+    [ any_usage_pred base;
+      constructor_rel base relation from;
+      filter_field is_local_field relation ]
+    ==> escaping_field_rel relation from
   in
   let any_usage_from_coaccessor_any_source =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
@@ -593,8 +636,17 @@ let datalog_schedule =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
     [ not (any_source_pred base);
       any_source_pred from;
-      rev_constructor_rel from relation base ]
+      rev_constructor_rel from relation base;
+      filter_field is_not_local_field relation ]
     ==> field_sources_top_rel base relation
+  in
+  let field_sources_from_constructor_field_sources_top_local =
+    let$ [from; relation; base] = ["from"; "relation"; "base"] in
+    [ not (any_source_pred base);
+      any_source_pred from;
+      rev_constructor_rel from relation base;
+      filter_field is_local_field relation ]
+    ==> field_sources_rel base relation from
   in
   let field_sources_from_constructor_field_sources =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
@@ -688,6 +740,16 @@ let datalog_schedule =
       field_sources_rel base_source relation from ]
     ==> alias_rel to_ from
   in
+  let alias_from_accessed_constructor_2_local =
+    let$ [base; base_source; relation; to_; from] =
+      ["base"; "base_source"; "relation"; "to_"; "from"]
+    in
+    [ filter_field is_local_field relation;
+      rev_accessor_rel base relation to_;
+      sources_rel base base_source;
+      field_sources_rel base_source relation from ]
+    ==> alias_rel to_ from
+  in
   let any_source_from_accessed_constructor =
     let$ [base; base_source; relation; to_] =
       ["base"; "base_source"; "relation"; "to_"]
@@ -706,8 +768,22 @@ let datalog_schedule =
    *)
   let any_source_from_accessor_any_source =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [any_source_pred base; rev_accessor_rel base relation to_]
+    [ any_source_pred base;
+      rev_accessor_rel base relation to_;
+      filter_field is_not_local_field relation ]
     ==> any_source_pred to_
+  in
+  let reading_local_field =
+    let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+    [ any_source_pred base;
+      rev_accessor_rel base relation to_;
+      filter_field is_local_field relation ]
+    ==> reading_field_rel relation to_
+  in
+  let reading_escaping =
+    let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
+    [escaping_field_rel relation from; reading_field_rel relation to_]
+    ==> alias_rel to_ from
   in
   (* ... *)
   (*
@@ -778,18 +854,25 @@ let datalog_schedule =
             any_source_from_accessed_constructor;
             any_source_from_accessor_any_source;
             any_source_from_coconstructor_any_usage;
+            escaping_local_field;
+            reading_local_field;
+            reading_escaping;
             rev_alias ];
         saturate
           [ alias_from_accessed_constructor_1;
+            alias_from_accessed_constructor_1_local;
             alias_from_accessed_constructor_2;
+            alias_from_accessed_constructor_2_local;
             alias_from_coaccessed_coconstructor;
             alias_from_coaccessed_coconstructor_2;
             field_usages_from_accessor_field_usages;
             field_usages_from_accessor_field_usages_top;
+            field_usages_from_accessor_field_usages_top_local;
             cofield_usages_from_coaccessor1;
             cofield_usages_from_coaccessor2;
             field_sources_from_constructor_field_sources;
             field_sources_from_constructor_field_sources_top;
+            field_sources_from_constructor_field_sources_top_local;
             cofield_sources_from_coconstrucor1;
             cofield_sources_from_coconstrucor2;
             usages_accessor_1;
