@@ -11,7 +11,7 @@
 
 #ifdef HAS_MACH_ABSOLUTE_TIME
 #include <mach/mach_time.h>
-#elif HAS_POSIX_MONOTONIC_CLOCK
+#elif defined(HAS_POSIX_MONOTONIC_CLOCK)
 #include <time.h>
 #endif
 
