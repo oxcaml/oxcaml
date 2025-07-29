@@ -689,40 +689,29 @@ let verify_option_like_attr sdecl =
       | [c1; c2] ->
           (* Check that exactly one constructor has no arguments and one has
              one argument *)
-          let check_arg_is_bound_type_param arg_type =
-            (* Check if the argument is a type variable from the parameters *)
-            let bad msg = raise(Error(arg_type.ptyp_loc,
-                                        Bad_option_like_attribute msg)) in
+          let check_arg_is_type_param arg_type =
             match arg_type.ptyp_desc with
-            | Ptyp_var (var_name, _) ->
-                (* Check if this variable is in the type parameters *)
-                (match List.exists (fun (param_type, _) ->
-                  match param_type.ptyp_desc with
-                  | Ptyp_var (param_name, _) -> param_name = var_name
-                  | _ -> false
-                ) sdecl.ptype_params with
-                | false ->
-                  bad "the constructor argument must be a type parameter"
-                | true -> ())
-            | _ -> bad
-                "the constructor argument must be a type parameter (e.g. 'a)"
+            | Ptyp_var (_, _) -> ()
+            | _ -> raise(Error(arg_type.ptyp_loc,
+                               Bad_option_like_attribute
+                "the constructor argument must be a type variable (e.g. 'a)"))
           in
           begin match c1.pcd_args, c2.pcd_args with
           | Pcstr_tuple [], Pcstr_tuple [arg]
           | Pcstr_tuple [arg], Pcstr_tuple [] ->
-              check_arg_is_bound_type_param arg.pca_type
+              check_arg_is_type_param arg.pca_type
           | Pcstr_tuple [], Pcstr_tuple (_::_::_)
           | Pcstr_tuple (_::_::_), Pcstr_tuple [] ->
               bad "the constructor with arguments has more than one argument"
           | Pcstr_tuple _, Pcstr_tuple _ ->
-              bad "it should have exactly one constructor with no arguments\
-                    and one with one argument"
+              bad "it should have exactly one nullary constructor and one \
+                    unary constructor"
           | Pcstr_record _, _ | _, Pcstr_record _ ->
-              bad "Inline records are not supported yet"
+              bad "inline records are not supported"
           end
       | [] -> bad "it has no constructors"
       | [_] -> bad "it has only one constructor"
-      | _ -> bad "it has more than two constructors"
+      | _ :: _ :: _ :: _ -> bad "it has more than two constructors"
     end
 
 (* Note [Default jkinds in transl_declaration]
