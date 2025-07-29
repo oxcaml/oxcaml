@@ -1852,14 +1852,16 @@ module Axerror = struct
       in
       match hint with
       | Apply (morph_hint, b, b_obj, b_hint, _morph) ->
-        if (not (override_mode_eq a_obj b_obj a b)) || Hint.is_rigid morph_hint
+        if override_mode_eq a_obj b_obj a b && not (Hint.is_rigid morph_hint)
         then
-          (* We only print the line if the [a] and [b] modes are not equal,
-             or the hint is rigid. *)
+          (* When the [a] and [b] modes are equal, and the hint is non-rigid,
+             we can definitely skip printing this line. *)
+          print_axhint_chain side b b_obj b_hint ppf
+        else (
           fprintf ppf "%a@ because it %a@ which is " (print_mode a_obj) a
             print_morph_hint morph_hint;
-        ignore (print_axhint_chain side b b_obj b_hint ppf);
-        HintPrinted
+          ignore (print_axhint_chain side b b_obj b_hint ppf);
+          HintPrinted)
       | Const const_hint ->
         fprintf ppf "%a%a" (print_mode a_obj) a (print_const_hint a_obj a)
           const_hint;
