@@ -52,23 +52,29 @@ end
 let check_equal_1 name f1 f2 arg1 =
   let r1 = f1 arg1 in
   let r2 = f2 arg1 in
-  if r1 = r2 then r1
-  else Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a"
-      name Printcmm.expression r1 Printcmm.expression r2
+  if r1 = r2
+  then r1
+  else
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
+      Printcmm.expression r2
 
 let check_equal_3 name f1 f2 arg1 arg2 arg3 =
   let r1 = f1 arg1 arg2 arg3 in
   let r2 = f2 arg1 arg2 arg3 in
-  if r1 = r2 then r1
-  else Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a"
-      name Printcmm.expression r1 Printcmm.expression r2
+  if r1 = r2
+  then r1
+  else
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
+      Printcmm.expression r2
 
 let check_equal_int_1 name f1 f2 arg1 =
   let r1 = f1 arg1 in
   let r2 = f2 arg1 in
-  if r1 = r2 then r1
-  else Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a"
-      name r1 r2 Printcmm.expression arg1
+  if r1 = r2
+  then r1
+  else
+    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r1 r2
+      Printcmm.expression arg1
 
 let arch_bits = Arch.size_int * 8
 
@@ -395,7 +401,8 @@ let add_no_overflow n x c dbg =
   if d = 0 then c else Cop (Caddi, [c; Cconst_int (d, dbg)], dbg)
 
 let is_defined_shift n = 0 <= n && n < arch_bits
-let is_defined_shift' n = fun e -> is_defined_shift e#.n
+
+let is_defined_shift' n e = is_defined_shift e#.n
 
 (** returns true only if [e + n] is definitely the same as [e | n] *)
 let[@inline] can_interchange_add_with_or e n =
@@ -456,26 +463,30 @@ let rec add_const c n dbg =
 
 let rec add_const' arg const dbg =
   map_tail1 arg ~f:(fun arg ->
-  let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
-  let x = P.create_var Int "x" in
-  P.run res [
-    Binop (Add, Any c, Const_int_fixed 0) => (fun e -> e#.c);
-    When (Binop (Add, Const_int x, Const_int n),
-          (fun e -> Misc.no_overflow_add e#.n e#.x))
-    => (fun e -> Cconst_int (e#.x + e#.n, dbg));
-    When (Binop (Add, Binop (Add, Const_int x, Any c), Const_int n),
-          (fun e -> Misc.no_overflow_add e#.n e#.x))
-    => (fun e -> add_no_overflow e#.n e#.x e#.c dbg);
-    When (Binop (Add, Binop (Add, Any c, Const_int x), Const_int n),
-          (fun e -> Misc.no_overflow_add e#.n e#.x))
-    => (fun e -> add_no_overflow e#.n e#.x e#.c dbg);
-    When (Binop (Add, Binop (Sub, Const_int x, Any c), Const_int n),
-          (fun e -> Misc.no_overflow_add e#.n e#.x))
-    => (fun e -> Cop (Csubi, [Cconst_int (e#.n + e#.x, dbg); e#.c], dbg));
-    When (Binop (Add, Binop (Sub, Any c, Const_int x), Const_int n),
-          (fun e -> Misc.no_overflow_sub e#.n e#.x))
-    => (fun e -> add_const' e#.c (e#.n - e#.x) dbg);
-  ])
+      let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
+      let x = P.create_var Int "x" in
+      P.run res
+        [ (Binop (Add, Any c, Const_int_fixed 0) => fun e -> e#.c);
+          ( When
+              ( Binop (Add, Const_int x, Const_int n),
+                fun e -> Misc.no_overflow_add e#.n e#.x )
+          => fun e -> Cconst_int (e#.x + e#.n, dbg) );
+          ( When
+              ( Binop (Add, Binop (Add, Const_int x, Any c), Const_int n),
+                fun e -> Misc.no_overflow_add e#.n e#.x )
+          => fun e -> add_no_overflow e#.n e#.x e#.c dbg );
+          ( When
+              ( Binop (Add, Binop (Add, Any c, Const_int x), Const_int n),
+                fun e -> Misc.no_overflow_add e#.n e#.x )
+          => fun e -> add_no_overflow e#.n e#.x e#.c dbg );
+          ( When
+              ( Binop (Add, Binop (Sub, Const_int x, Any c), Const_int n),
+                fun e -> Misc.no_overflow_add e#.n e#.x )
+          => fun e -> Cop (Csubi, [Cconst_int (e#.n + e#.x, dbg); e#.c], dbg) );
+          ( When
+              ( Binop (Add, Binop (Sub, Any c, Const_int x), Const_int n),
+                fun e -> Misc.no_overflow_sub e#.n e#.x )
+          => fun e -> add_const' e#.c (e#.n - e#.x) dbg ) ])
 
 let add_const = check_equal_3 "add_const" add_const add_const'
 
@@ -495,15 +506,14 @@ let rec add_int c1 c2 dbg =
 
 let rec add_int' arg1 arg2 dbg =
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
-  let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
-  P.run res [
-    Binop (Add, Const_int n, Any c) => (fun e -> add_const e#.c e#.n dbg);
-    Binop (Add, Any c, Const_int n) => (fun e -> add_const e#.c e#.n dbg);
-    Binop (Add, Binop (Add, Any c1, Const_int n1), Any c2)
-    => (fun e -> add_const (add_int' e#.c1 e#.c2 dbg) e#.n1 dbg);
-    Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2))
-    => (fun e -> add_const (add_int' e#.c1 e#.c2 dbg) e#.n2 dbg);
-  ])
+      let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
+      P.run res
+        [ (Binop (Add, Const_int n, Any c) => fun e -> add_const e#.c e#.n dbg);
+          (Binop (Add, Any c, Const_int n) => fun e -> add_const e#.c e#.n dbg);
+          ( Binop (Add, Binop (Add, Any c1, Const_int n1), Any c2) => fun e ->
+            add_const (add_int' e#.c1 e#.c2 dbg) e#.n1 dbg );
+          ( Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2)) => fun e ->
+            add_const (add_int' e#.c1 e#.c2 dbg) e#.n2 dbg ) ])
 
 let add_int = check_equal_3 "add_int" add_int add_int'
 
@@ -519,17 +529,16 @@ let rec sub_int c1 c2 dbg =
 
 let rec sub_int' arg1 arg2 dbg =
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
-  let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
-  P.run res [
-    When (Binop (Sub, Any c1, Const_int n2),
-          (fun e -> e#.n2 <> min_int))
-    => (fun e -> add_const e#.c1 (-e#.n2) dbg);
-    When (Binop (Sub, Any c1, Binop (Add, Any c2, Const_int n2)),
-          (fun e -> e#.n2 <> min_int))
-    => (fun e -> add_const (sub_int' e#.c1 e#.c2 dbg) (-e#.n2) dbg);
-    Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2)
-    => (fun e -> add_const (sub_int' e#.c1 e#.c2 dbg) e#.n1 dbg)
-  ])
+      let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
+      P.run res
+        [ ( When (Binop (Sub, Any c1, Const_int n2), fun e -> e#.n2 <> min_int)
+          => fun e -> add_const e#.c1 (-e#.n2) dbg );
+          ( When
+              ( Binop (Sub, Any c1, Binop (Add, Any c2, Const_int n2)),
+                fun e -> e#.n2 <> min_int )
+          => fun e -> add_const (sub_int' e#.c1 e#.c2 dbg) (-e#.n2) dbg );
+          ( Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2) => fun e ->
+            add_const (sub_int' e#.c1 e#.c2 dbg) e#.n1 dbg ) ])
 
 let sub_int = check_equal_3 "sub_int" sub_int sub_int'
 
@@ -571,22 +580,25 @@ let rec max_signed_bit_length e =
   | _ -> arch_bits
 
 let rec max_signed_bit_length' e =
-  P.run_default ~default:(fun _ -> arch_bits) (prefer_or e) [
-    Binop (Comparison, Any c1, Any c2) => (fun _e -> 1);
-    When (Binop (And, Any c, Const_int n), (fun e -> e#.n > 0))
-    => (fun e -> 1 + Misc.log2 e#.n);
-    When (Binop (Lsl, Any c, Const_int n), is_defined_shift' n)
-    => (fun e -> Int.min arch_bits (max_signed_bit_length' e#.c + e#.n));
-    When (Binop (Asr, Any c, Const_int n), is_defined_shift' n)
-    => (fun e -> Int.max 0 (max_signed_bit_length' e#.c - e#.n));
-    When (Binop (Lsr, Any c, Const_int n), is_defined_shift' n)
-    => (fun e -> if e#.n = 0 then max_signed_bit_length' e#.c else arch_bits - e#.n);
-    Binop (Bitwise_op, Any c1, Any c2)
-    => (fun e -> Int.max (max_signed_bit_length' e#.c1) (max_signed_bit_length' e#.c2));
-  ]
+  P.run_default
+    ~default:(fun _ -> arch_bits)
+    (prefer_or e)
+    [ (Binop (Comparison, Any c1, Any c2) => fun _e -> 1);
+      ( When (Binop (And, Any c, Const_int n), fun e -> e#.n > 0) => fun e ->
+        1 + Misc.log2 e#.n );
+      ( When (Binop (Lsl, Any c, Const_int n), is_defined_shift' n) => fun e ->
+        Int.min arch_bits (max_signed_bit_length' e#.c + e#.n) );
+      ( When (Binop (Asr, Any c, Const_int n), is_defined_shift' n) => fun e ->
+        Int.max 0 (max_signed_bit_length' e#.c - e#.n) );
+      ( When (Binop (Lsr, Any c, Const_int n), is_defined_shift' n) => fun e ->
+        if e#.n = 0 then max_signed_bit_length' e#.c else arch_bits - e#.n );
+      ( Binop (Bitwise_op, Any c1, Any c2) => fun e ->
+        Int.max (max_signed_bit_length' e#.c1) (max_signed_bit_length' e#.c2) )
+    ]
 
 let max_signed_bit_length =
-  check_equal_int_1 "max_signed_bit_length" max_signed_bit_length max_signed_bit_length'
+  check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
+    max_signed_bit_length'
 
 let ignore_low_bit_int = function
   | Cop
@@ -599,12 +611,13 @@ let ignore_low_bit_int = function
   | c -> c
 
 let ignore_low_bit_int' arg =
-  P.run arg [
-    When (Binop (Add, As (c, Binop (Lsl, Any c1, Const_int n)), Const_int_fixed 1),
-          (fun e -> e#.n > 0 && is_defined_shift e#.n))
-    => (fun e -> e#.c);
-    Binop (Or, Any c, Const_int_fixed 1) => (fun e -> e#.c)
-  ]
+  P.run arg
+    [ ( When
+          ( Binop
+              (Add, As (c, Binop (Lsl, Any c1, Const_int n)), Const_int_fixed 1),
+            fun e -> e#.n > 0 && is_defined_shift e#.n )
+      => fun e -> e#.c );
+      (Binop (Or, Any c, Const_int_fixed 1) => fun e -> e#.c) ]
 
 let ignore_low_bit_int =
   check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
