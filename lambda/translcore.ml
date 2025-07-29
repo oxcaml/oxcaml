@@ -121,6 +121,19 @@ let extract_constant = function
     Lconst sc -> sc
   | _ -> raise Not_constant
 
+(** Extract a constant if the enclosing block's allocation mode allows
+    the block to be turned into a structured constant *)
+let extract_constant_check_alloc_mode alloc_mode lam =
+  match alloc_mode with
+  | External -> raise Not_constant
+  | Internal _ -> extract_constant lam
+
+
+let extract_constant_check_alloc_mode_opt alloc_mode_opt lam =
+  match alloc_mode_opt with
+  | None -> extract_constant lam
+  | Some alloc_mode -> extract_constant_check_alloc_mode alloc_mode lam
+
 let extract_float = function
     Const_base(Const_float f) -> f
   | _ -> fatal_error "Translcore.extract_float"
@@ -497,7 +510,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
       begin try
-        Lconst(Const_block(0, List.map extract_constant ll))
+        Lconst(Const_block(0, List.map (extract_constant_check_alloc_mode alloc_mode) ll))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable, Some shape,
                          transl_alloc_mode alloc_mode),
@@ -537,7 +550,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
           let constant =
-            match List.map extract_constant ll with
+            match List.map (extract_constant_check_alloc_mode_opt alloc_mode) ll with
             | exception Not_constant -> None
             | constants -> (
               match cstr.cstr_shape with
@@ -632,7 +645,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
             Lconst(Const_block(0, [const_int tag;
-                                   extract_constant lam]))
+                                   extract_constant_check_alloc_mode alloc_mode lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
@@ -641,7 +654,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
       transl_record ~scopes e.exp_loc e.exp_env
-        (Option.map transl_alloc_mode alloc_mode)
+        alloc_mode
         fields representation extended_expression
   | Texp_record_unboxed_product
         {fields; representation; extended_expression } ->
@@ -810,7 +823,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         end;
         (* Pduparray only works in Alloc_heap mode *)
         if is_local_mode mode then raise Not_constant;
-        begin match List.map extract_constant ll with
+        begin match List.map (extract_constant_check_alloc_mode alloc_mode) ll with
         | exception Not_constant
           when kind = Pfloatarray && Types.is_mutable amut ->
             (* We cannot currently lift mutable [Pintarray] arrays safely in
@@ -1992,9 +2005,10 @@ and transl_setinstvar ~scopes loc self var expr =
     [self; var; transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr], loc)
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
-and transl_record ~scopes loc env mode fields repres opt_init_expr =
+and transl_record ~scopes loc env alloc_mode fields repres opt_init_expr =
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
+  let mode = Option.map transl_alloc_mode alloc_mode in
   let size = Array.length fields in
   let on_heap = match mode with
     | None -> false (* unboxed is not on heap *)
@@ -2150,7 +2164,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     let lam =
       try
         if mut = Mutable then raise Not_constant;
-        let cl = List.map extract_constant ll in
+        let cl = List.map (extract_constant_check_alloc_mode_opt alloc_mode) ll in
         match repres with
         | Record_boxed _ -> Lconst(Const_block(0, cl))
         | Record_inlined (Ordinary {runtime_tag},
