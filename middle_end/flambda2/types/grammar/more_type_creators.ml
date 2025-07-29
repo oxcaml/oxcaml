@@ -214,7 +214,10 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
     Misc.fatal_error "Block too long for target"
   | Some _size -> (
     match (alloc_mode : Alloc_mode.For_types.t) with
-    | External -> TG.any_naked_nativeint
+    | External ->
+      Misc.fatal_error
+        "Immutable_blocks are always variants, but externally-allocated blocks \
+         are nativeint."
     | Heap | Local | Unknown ->
       TG.create_variant ~is_unique ~immediates:(Known TG.bottom_naked_immediate)
         ~blocks:
@@ -222,6 +225,8 @@ let immutable_block ~is_unique tag ~shape alloc_mode ~fields =
              (TG.Row_like_for_blocks.create ~shape ~field_tys:fields
                 (Closed tag) alloc_mode))
         ~extensions:No_extensions)
+
+let immutable_external_block = TG.any_naked_nativeint
 
 let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
   match Targetint_31_63.of_int_option (List.length fields) with
@@ -231,14 +236,16 @@ let immutable_block_non_null ~is_unique tag ~shape alloc_mode ~fields =
   | Some _size -> (
     match (alloc_mode : Alloc_mode.For_types.t) with
     | External ->
-      Misc.fatal_error "Cannot externally allocate non-null block, as it is expcted to have kind value"
+      Misc.fatal_error
+        "Cannot externally allocate non-null block, as it is expcted to have \
+         kind value"
     | Heap | Local | Unknown ->
       TG.Head_of_kind_value_non_null.create_variant ~is_unique
         ~immediates:(Known TG.bottom_naked_immediate)
         ~blocks:
           (Known
-            (TG.Row_like_for_blocks.create ~shape ~field_tys:fields (Closed tag)
-                alloc_mode))
+             (TG.Row_like_for_blocks.create ~shape ~field_tys:fields
+                (Closed tag) alloc_mode))
         ~extensions:No_extensions)
 
 let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
@@ -260,7 +267,9 @@ let immutable_block_with_size_at_least ~tag ~n ~shape ~field_n_minus_one =
 
 let variant ~const_ctors ~non_const_ctors alloc_mode =
   match (alloc_mode : Alloc_mode.For_types.t) with
-  | External -> TG.any_naked_nativeint
+  | External ->
+    Misc.fatal_error
+      "Externally-allocated blocks are not variants, they are nativeints"
   | Local | Heap | Unknown ->
     let blocks =
       let shape_and_field_tys_by_tag =
@@ -278,8 +287,10 @@ let variant ~const_ctors ~non_const_ctors alloc_mode =
 let variant_non_null ~const_ctors ~non_const_ctors alloc_mode =
   match (alloc_mode : Alloc_mode.For_types.t) with
   | External ->
-    Misc.fatal_error "Cannot externally allocate variant_non_null, as it is expcted to have kind value"
-  | Heap | Local | Unknown -> (
+    Misc.fatal_error
+      "Cannot externally allocate variant_non_null, as it is expcted to have \
+       kind value"
+  | Heap | Local | Unknown ->
     let blocks =
       let shape_and_field_tys_by_tag =
         Tag.Scannable.Map.fold
@@ -292,7 +303,7 @@ let variant_non_null ~const_ctors ~non_const_ctors alloc_mode =
     in
     TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
       ~immediates:(Known const_ctors) ~blocks:(Known blocks)
-      ~extensions:No_extensions)
+      ~extensions:No_extensions
 
 let exactly_this_closure function_slot ~all_function_slots_in_set:function_types
     ~all_closure_types_in_set:closure_types

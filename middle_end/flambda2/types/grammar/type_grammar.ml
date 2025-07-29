@@ -2873,6 +2873,8 @@ let create_variant ~is_unique ~(immediates : _ Or_unknown.t) ~blocks ~extensions
 
 let mutable_block alloc_mode = non_null_value (Mutable_block { alloc_mode })
 
+let mutable_external_block = Naked_nativeint TD.unknown
+
 let create_closures alloc_mode by_function_slot =
   non_null_value (Closures { by_function_slot; alloc_mode })
 
