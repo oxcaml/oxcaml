@@ -2211,7 +2211,9 @@ let variadic_primitive_eligible_for_cse p ~args =
   match p with
   | Begin_region _ | Begin_try_region _ -> false
   | Make_block (_, _, Local _) | Make_array (_, _, Local _) -> false
-  | Make_block (_, _, External) | Make_array (_, _, External) -> false
+  | Make_block (_, _, External) -> false
+  | Make_array (_, _, External) ->
+    Misc.fatal_error "External arrays are not supported"
   | Make_block (_, Mutable, _) | Make_array (_, Mutable, _) -> false
   | Make_block (_, Immutable_unique, _) | Make_array (_, Immutable_unique, _) ->
     false
