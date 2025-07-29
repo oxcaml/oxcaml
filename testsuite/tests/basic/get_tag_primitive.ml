@@ -197,12 +197,18 @@ let test_mutable_records () =
   Printf.printf "Mutable record after update tag: %d (expected 0)\n" (get_tag mr);
   ()
 
-(* Test float arrays - should have tag Obj.double_array_tag (254) *)
+(* Test float arrays - tag depends on whether flat float arrays are enabled *)
 let test_float_arrays () =
   Printf.printf "\nTesting float arrays:\n";
   let farr1 = [| 1.0; 2.0; 3.0 |] in
   let farr2 = [| |] in  (* empty float array *)
-  Printf.printf "Float array tag: %d (expected %d)\n" (get_tag farr1) Obj.double_array_tag;
+  let expected_tag = 
+    if Config.flat_float_array then
+      Obj.double_array_tag  (* 254 when float array optimization is enabled *)
+    else
+      0  (* Regular array tag when optimization is disabled *)
+  in
+  Printf.printf "Float array tag: %d (expected %d)\n" (get_tag farr1) expected_tag;
   Printf.printf "Empty float array tag: %d (expected 0)\n" (get_tag farr2);
   ()
 
