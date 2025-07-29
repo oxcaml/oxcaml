@@ -3343,9 +3343,9 @@ with
 let region_mode vmode =
   let mode =
     vmode.mode
-    |> Mode.value_to_alloc_r2l ?hint:None
-    |> Mode.alloc_to_value_l2r ?hint:None
-     in
+    |> Mode.value_to_alloc_r2l
+    |> Mode.alloc_to_value_l2r
+  in
   {vmode with mode}
 
 let unboxed_type ~errors ~env ~loc ~lid ty =

@@ -1875,12 +1875,41 @@ module Axerror = struct
      fun a a_obj ppf hint ->
       let open Format in
       fprintf ppf "(%a)" (C.print a_obj) a;
+      let debug_print_const_hint ppf : Hint.const -> _ = function
+        | Result_of_lazy -> fprintf ppf "Result_of_lazy"
+        | Lazy_closure -> fprintf ppf "Lazy_closure"
+        | Class -> fprintf ppf "Class"
+        | Tailcall_function -> fprintf ppf "Tailcall_function"
+        | Tailcall_argument -> fprintf ppf "Tailcall_argument"
+        | Mutable_read -> fprintf ppf "Mutable_read"
+        | Mutable_write -> fprintf ppf "Mutable_write"
+        | Forced_lazy_expression -> fprintf ppf "Forced_lazy_expression"
+        | Is_function_return -> fprintf ppf "Is_function_return"
+        | Stack_expression -> fprintf ppf "Stack_expression"
+      in
+      let debug_print_morph_hint :
+          type l r. Format.formatter -> (l * r) Hint.morph -> _ =
+       fun ppf ->
+        let open Hint in
+        function
+        | Debug _ -> fprintf ppf "Debug"
+        | Skip -> fprintf ppf "Skip"
+        | Close_over _ -> fprintf ppf "Close_over"
+        | Is_closed_by _ -> fprintf ppf "Is_closed_by"
+        | Captured_by_partial_application ->
+          fprintf ppf "Captured_by_partial_application"
+        | Adj_captured_by_partial_application ->
+          fprintf ppf "Adj_captured_by_partial_application"
+        | Crossing_left -> fprintf ppf "Crossing_left"
+        | Crossing_right -> fprintf ppf "Crossing_right"
+        | Register_alloc_mode -> fprintf ppf "Register_alloc_mode"
+      in
       match hint with
       | Empty -> fprintf ppf "[empty hint]"
       | Const const_hint ->
-        fprintf ppf "[Const (%a)]" (print_const_hint a_obj a) const_hint
+        fprintf ppf "[Const (%a)]" debug_print_const_hint const_hint
       | Apply (morph_hint, b, b_obj, b_hint, _) ->
-        fprintf ppf "[Apply (%a)]" print_morph_hint morph_hint;
+        fprintf ppf "[Apply (%a)]" debug_print_morph_hint morph_hint;
         debug_print_axhint_chain b b_obj ppf b_hint
 
     (** Report an axerror, printing error traces for both the left and the right sides *)
@@ -1894,12 +1923,12 @@ module Axerror = struct
         unit =
      fun ?target ~left_obj ~right_obj err ppf ->
       let open Format in
-      ignore debug_print_axhint_chain;
-      (* fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
-         (debug_print_axhint_chain err.left left_obj)
-         err.left_hint
-         (debug_print_axhint_chain err.right right_obj)
-         err.right_hint; *)
+      (* ignore debug_print_axhint_chain; *)
+      fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
+        (debug_print_axhint_chain err.left left_obj)
+        err.left_hint
+        (debug_print_axhint_chain err.right right_obj)
+        err.right_hint;
       (match target with
       | None -> fprintf ppf "This value is "
       | Some (target_item, target_lid) ->
