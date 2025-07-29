@@ -1202,39 +1202,43 @@ type block_static_kind =
   | Constant of Simple.With_debuginfo.t list
 
 let classify_fields_of_block env fields alloc_mode =
-  let is_local =
+  let is_local, is_external =
     match (alloc_mode : Alloc_mode.For_allocations.t) with
-    | Local _ -> true
-    | Heap | External -> false
+    | Local _ -> true, false
+    | Heap -> false, false
+    | External -> false, true
   in
-  let static_fields =
-    List.fold_left
-      (fun static_fields f ->
-        match static_fields with
-        | None -> None
-        | Some fields ->
-          Simple.pattern_match'
-            (Simple.With_debuginfo.simple f)
-            ~const:(fun _cst -> Some (f :: fields))
-            ~symbol:(fun _sym ~coercion:_ -> Some (f :: fields))
-            ~var:(fun _var ~coercion:_ ->
-              if Env.at_toplevel env
-                 && Flambda_features.classic_mode ()
-                 && not is_local
-              then Some (f :: fields)
-              else None))
-      (Some []) fields
-    |> Option.map List.rev
-  in
-  match static_fields with
-  | None -> Dynamic_block
-  | Some fields ->
-    if List.exists
-         (fun simple_with_dbg ->
-           Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
-         fields
-    then Computed_static fields
-    else Constant fields
+  if is_external
+  then Dynamic_block
+  else
+    let static_fields =
+      List.fold_left
+        (fun static_fields f ->
+          match static_fields with
+          | None -> None
+          | Some fields ->
+            Simple.pattern_match'
+              (Simple.With_debuginfo.simple f)
+              ~const:(fun _cst -> Some (f :: fields))
+              ~symbol:(fun _sym ~coercion:_ -> Some (f :: fields))
+              ~var:(fun _var ~coercion:_ ->
+                if Env.at_toplevel env
+                   && Flambda_features.classic_mode ()
+                   && not is_local
+                then Some (f :: fields)
+                else None))
+        (Some []) fields
+      |> Option.map List.rev
+    in
+    match static_fields with
+    | None -> Dynamic_block
+    | Some fields ->
+      if List.exists
+           (fun simple_with_dbg ->
+             Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
+           fields
+      then Computed_static fields
+      else Constant fields
 
 let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
