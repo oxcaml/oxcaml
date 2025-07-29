@@ -67,7 +67,7 @@ end) = struct
     | NMu of delayed_nf
     | NRec_var of int
     | NMutrec of delayed_nf Ident.Map.t
-    | NProjDecl of nf * Ident.t
+    | NProj_decl of nf * Ident.t
     | NConstr of Ident.t * nf list
     | NTuple of nf list
     | NUnboxed_tuple of nf list
@@ -150,7 +150,7 @@ end) = struct
     | NRec_var i1, NRec_var i2 -> Int.equal i1 i2
     | NMutrec defs1, NMutrec defs2 ->
       Ident.Map.equal equal_delayed_nf defs1 defs2
-    | NProjDecl (nf1, id1), NProjDecl (nf2, id2) ->
+    | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->
       Ident.equal id1 id2 && equal_nf nf1 nf2
     | NConstr (id1, args1), NConstr (id2, args2) ->
       Ident.equal id1 id2 && List.equal equal_nf args1 args2
@@ -195,76 +195,76 @@ end) = struct
     | ( NVar _,
         ( NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NLeaf,
         ( NVar _ | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NApp _,
         ( NVar _ | NLeaf | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NAbs _,
         ( NVar _ | NLeaf | NApp _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NStruct _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NProj _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NComp_unit _
         | NAlias _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NComp_unit _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NAlias _
-        | NError _ | NMu _ | NRec_var _ | NMutrec _ | NProjDecl _
+        | NError _ | NMu _ | NRec_var _ | NMutrec _ | NProj_decl _
         | NConstr _ | NTuple _ | NUnboxed_tuple _ | NPredef _
         | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
         | NRecord _ ) )
     | ( NAlias _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NError _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NError _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NMu _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NMu _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NRec_var _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NRec_var _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NMutrec _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NMutrec _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+        | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
-    | ( NProjDecl _,
+    | ( NProj_decl _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
         | NMutrec _ | NConstr _ | NTuple _ | NUnboxed_tuple _
@@ -273,55 +273,55 @@ end) = struct
     | ( NConstr _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NTuple _ | NUnboxed_tuple _
+        | NMutrec _ | NProj_decl _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NTuple _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NUnboxed_tuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NUnboxed_tuple _
         | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NUnboxed_tuple _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _ | NPredef _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NPredef _
         | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
         | NRecord _ ) )
     | ( NPredef _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _
         | NUnboxed_tuple _ | NArrow _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NArrow _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _
         | NUnboxed_tuple _ | NPredef _ | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NPoly_variant _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _
         | NUnboxed_tuple _ | NPredef _ | NArrow _ | NVariant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NVariant _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _
         | NUnboxed_tuple _ | NPredef _ | NArrow _ | NPoly_variant _
         | NVariant_unboxed _ | NRecord _ ) )
     | ( NVariant_unboxed _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _
         | NUnboxed_tuple _ | NPredef _ | NArrow _ | NPoly_variant _
         | NVariant _ | NRecord _ ) )
     | ( NRecord _,
         ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _
         | NComp_unit _ | NAlias _ | NError _ | NMu _ | NRec_var _
-        | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _
+        | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _
         | NUnboxed_tuple _ | NPredef _ | NArrow _ | NPoly_variant _
         | NVariant _ | NVariant_unboxed _ ) ) ->
       false
@@ -508,9 +508,9 @@ end) = struct
       | Mutrec defs ->
           let dnfs = Ident.Map.map (delay_reduce env) defs in
           return (NMutrec dnfs)
-      | ProjDecl (t, id) ->
+      | Proj_decl (t, id) ->
           let nf = reduce env t in
-          return (NProjDecl (nf, id))
+          return (NProj_decl (nf, id))
       | Constr (id, args) ->
           let nfs = List.map (reduce env) args in
           return (NConstr (id, nfs))
@@ -587,7 +587,7 @@ end) = struct
     | NMutrec defs ->
       let t_defs = Ident.Map.map read_back_force defs in
       mutrec ?uid t_defs
-    | NProjDecl (nf, id) ->
+    | NProj_decl (nf, id) ->
       let t = read_back nf in
       proj_decl ?uid t id
     | NConstr (id, args) ->
@@ -653,7 +653,7 @@ end) = struct
     | NLeaf -> false
     | NMu _ -> false
     | NRec_var _ -> false
-    | NMutrec _ | NProjDecl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
+    | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
     | NPredef _ | NArrow _ | NPoly_variant _ | NVariant _ | NVariant_unboxed _
     | NRecord _ -> false
 

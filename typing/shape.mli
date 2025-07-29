@@ -208,7 +208,7 @@ and desc =
   | Rec_var of int
 
   | Mutrec of t Ident.Map.t
-  | ProjDecl of t * Ident.t
+  | Proj_decl of t * Ident.t
 
   (* constructors for types  *)
   | Constr of Ident.t * t list

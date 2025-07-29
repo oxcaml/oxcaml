@@ -52,7 +52,7 @@ end = struct
         (Ident.Map.map
            (fun sh -> shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
            map)
-    | ProjDecl (sh, id) ->
+    | Proj_decl (sh, id) ->
       Shape.proj_decl ?uid:outer.uid
         (shape_subst_uid_with_rec_var ~preserve_uid uid rv sh)
         id
@@ -678,7 +678,7 @@ let rec unfold_and_evaluate subst_type subst_constr (t : Shape.t) =
   let head, args = decompose_application t in
   let maybe_evaluated_shape =
     match head.Shape.desc with
-    | ProjDecl (str, i) -> (
+    | Proj_decl (str, i) -> (
       let args = List.map (unfold_and_evaluate subst_type subst_constr) args in
       let str = unfold_and_evaluate subst_type subst_constr str in
       match str.Shape.desc with
@@ -723,7 +723,7 @@ let rec unfold_and_evaluate subst_type subst_constr (t : Shape.t) =
       | Abs (x, s') ->
         unfold_and_evaluate (Ident.Map.add x arg subst_type) subst_constr s'
       | _ -> Shape.app f ~arg)
-    | ProjDecl _ -> assert false (* see [maybe_evaluated_shape] above *)
+    | Proj_decl _ -> assert false (* see [maybe_evaluated_shape] above *)
     | Variant { simple_constructors; complex_constructors } ->
       let complex_constructors =
         Shape.complex_constructors_map
