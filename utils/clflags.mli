@@ -93,6 +93,7 @@ val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
 val binary_annotations_cms : bool ref
+val use_merlin_shapes : bool ref
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref

@@ -790,10 +790,7 @@ let merlin_shape_map_cstrs =
       @@ Shape.str ~uid:cd_uid cstr_shape_map)
     (Shape.Map.empty)
 
-(* CR sspies: Decide whether to turn this into a function that takes the
-   declaration shape as input and then move the code to the Merlin
-   implementation. *)
-let _merlin_shape_declaration decl =
+let merlin_shape_declaration decl =
   let uid = decl.type_uid in
   match decl.type_kind with
   | Type_variant (cstrs, _, _) -> Shape.str ~uid (merlin_shape_map_cstrs cstrs)
@@ -2990,8 +2987,11 @@ let transl_type_decl env rec_flag sdecl_list =
     | None -> None
   in
   let shapes =
-    Type_shape.Type_decl_shape.of_type_declarations
-      decls (env_shape_of_path env)
+    if !Clflags.use_merlin_shapes then
+      List.map (fun (_, decl) -> merlin_shape_declaration decl) decls
+    else
+      Type_shape.Type_decl_shape.of_type_declarations
+        decls (env_shape_of_path env)
   in
   List.iter (fun (sh, (_, decl)) ->
     let uid = decl.type_uid in
