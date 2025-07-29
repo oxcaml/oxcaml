@@ -294,6 +294,7 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
 
 let process_file (file : string) (config : config) =
   if config.debug_output then Printf.eprintf "processing file %S...\n%!" file;
+  incr num_processed_files;
   let unit_info, _digest = Cfg_format.restore file in
   List.iter unit_info.items ~f:(fun (item : Cfg_format.cfg_item_info) ->
       begin
@@ -305,7 +306,6 @@ let process_file (file : string) (config : config) =
           let cfg_with_layout, relocatable_regs =
             cfg_with_layout_and_relocatable_regs
           in
-          incr num_processed_files;
           process_function config cfg_with_layout cmm_label reg_stamp
             relocatable_regs
       end)
