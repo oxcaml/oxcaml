@@ -2,9 +2,16 @@
 #include "caml/address_class.h"
 #include "caml/memory.h"
 #include <stdio.h>
+#include <malloc.h>
 
 CAMLprim value is_young(uint64_t v){
     return Val_bool(Is_young(v));
+}
+
+// Function to get current number of malloc'd bytes
+CAMLprim value get_malloc_bytes(value unit) {
+    struct mallinfo info = mallinfo();
+    return Val_long(info.uordblks); // Total bytes in use by malloc
 }
 
 CAMLprim value is_static_alloc(uint64_t v) {

@@ -7,21 +7,31 @@ external is_young : ('a : word) -> bool = "is_young" "is_young"
 
 external is_static_alloc : ('a : word) -> bool = "is_static_alloc" "is_static_alloc"
 
+external get_malloc_bytes : unit -> int = "get_malloc_bytes" "get_malloc_bytes"
+
 external print_external_block_entries : ('a : word) -> int64# -> string -> unit = "print_block" "print_block"
 
 let is_a_malloc name ~num_fields f =
   let prebefore = Gc.allocated_bytes () in
   let before = Gc.allocated_bytes () in
+  let malloc_before = get_malloc_bytes () in
   let v = Sys.opaque_identity f () in
   let after = Gc.allocated_bytes () in
-  let delta =
+  let malloc_after = get_malloc_bytes () in
+  let gc_delta =
     int_of_float ((after -. before) -. (before -. prebefore))
       / (Sys.word_size/8)
   in
-  let msg =
-    match delta with
-    | 0 -> "No GC-visible allocation ocurred"
+  let malloc_delta = malloc_after - malloc_before in
+  let gc_msg =
+    match gc_delta with
+    | 0 -> "No GC-visible allocation occurred"
     | n -> "GC-VISIBLE ALLOCATION OCCURRED"
+  in
+  let malloc_msg =
+    match malloc_delta with
+    | 0 -> "NO MALLOC ALLOCATION"
+    | n -> Printf.sprintf "%d bytes malloc'd" n
   in
   let location =
     if is_young v then "IN MINOR HEAP"
@@ -31,10 +41,11 @@ let is_a_malloc name ~num_fields f =
     if is_static_alloc v then "COMPILE TIME"
     else "runtime"
   in
-  Format.printf "%s: %s, result value is %s, allocated at %s\n" name msg location allocation_time;
+  Format.printf "%s: %s, %s, result value is %s, allocated at %s\n" name gc_msg malloc_msg location allocation_time;
   Stdlib.flush Stdlib.stdout;
   print_external_block_entries v num_fields name;
   Format.printf "\n";
+
   ()
 
 (*
