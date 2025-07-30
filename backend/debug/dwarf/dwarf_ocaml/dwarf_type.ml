@@ -107,6 +107,14 @@ let create_unboxed_base_layout_die ~reference ~parent_proto_die ~name ~byte_size
         DAH.create_encoding ~encoding ]
     ()
 
+let create_unnamed_unboxed_base_layout_die ~reference ~parent_proto_die
+    ~byte_size ~encoding =
+  Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
+    ~tag:Dwarf_tag.Base_type
+    ~attribute_values:
+      [DAH.create_byte_size_exn ~byte_size; DAH.create_encoding ~encoding]
+    ()
+
 let create_typedef_die ~reference ~parent_proto_die ~child_die ~name =
   Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
     ~tag:Dwarf_tag.Typedef
@@ -937,7 +945,7 @@ let vec_split_to_properties (vec_split : S.Predef.simd_vec_split) =
   | Float64x8 -> { encoding = float; count = 8; size = 8 }
 
 let create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ~name
-    ~(split : S.Predef.simd_vec_split option) =
+    ~byte_size ~(split : S.Predef.simd_vec_split option) =
   let maybe_name = List.map DAH.create_name (Option.to_list name) in
   match split with
   | None ->
@@ -945,14 +953,14 @@ let create_simd_vec_split_base_layout_die ~reference ~parent_proto_die ~name
       ~tag:Dwarf_tag.Base_type
       ~attribute_values:
         ([ DAH.create_encoding ~encoding:Encoding_attribute.unsigned;
-           DAH.create_byte_size_exn ~byte_size:16 ]
+           DAH.create_byte_size_exn ~byte_size ]
         @ maybe_name)
       ()
   | Some vec_split ->
     let structure =
       Proto_die.create ~reference ~parent:(Some parent_proto_die)
         ~tag:Dwarf_tag.Structure_type
-        ~attribute_values:([DAH.create_byte_size_exn ~byte_size:16] @ maybe_name)
+        ~attribute_values:([DAH.create_byte_size_exn ~byte_size] @ maybe_name)
         ()
     in
     let { encoding; count; size } = vec_split_to_properties vec_split in
@@ -988,7 +996,68 @@ let create_base_layout_type ?(simd_vec_split = None) ~reference
       ~encoding:Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
     create_simd_vec_split_base_layout_die ~reference ~parent_proto_die
-      ~name:(Some name) ~split:simd_vec_split
+      ~name:(Some name) ~byte_size ~split:simd_vec_split
+
+(* In the rare case that we emit product layouts (e.g., inside arrays), this
+   function will create a struct die. It does not use SIMD vector splits. *)
+(* CR sspies: In the future, try to find a unifying approach for all the
+   different packing strategies. Reconsider the treatment of layouts. *)
+(* CR sspies: This code, especially for unboxed products in arrays, is still
+   untested.*)
+let rec create_packed_layout_type (layout : Layout.t) ~parent_proto_die
+    ~fallback_value_die =
+  match layout with
+  | Base Value -> fallback_value_die, Arch.size_addr
+  | Base b ->
+    let encoding =
+      match b with
+      | Value -> assert false
+      | Float32 | Float64 -> Encoding_attribute.float
+      | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word ->
+        Encoding_attribute.signed
+      | Vec128 | Vec256 | Vec512 -> Encoding_attribute.unsigned
+    in
+    let packed_byte_size = base_layout_to_byte_size_in_mixed_block b in
+    (* size when packed into a block/struct *)
+    let byte_size = base_layout_to_byte_size b in
+    (* size of the actual data *)
+    let die =
+      Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Base_type
+        ~attribute_values:
+          [DAH.create_byte_size_exn ~byte_size; DAH.create_encoding ~encoding]
+        ()
+    in
+    Proto_die.reference die, packed_byte_size
+  | Product p ->
+    let components =
+      List.map
+        (create_packed_layout_type ~parent_proto_die ~fallback_value_die)
+        p
+    in
+    let packed_byte_size =
+      List.fold_left
+        (fun acc (_, component_packed_byte_size) ->
+          acc + component_packed_byte_size)
+        0 components
+    in
+    let die =
+      Proto_die.create ~parent:(Some parent_proto_die)
+        ~tag:Dwarf_tag.Structure_type
+        ~attribute_values:[DAH.create_byte_size_exn ~byte_size:packed_byte_size]
+        ()
+    in
+    let offset = ref 0 in
+    List.iter
+      (fun (reference, component_packed_byte_size) ->
+        Proto_die.create_ignore ~parent:(Some die) ~tag:Dwarf_tag.Member
+          ~attribute_values:
+            [ DAH.create_type_from_reference ~proto_die_reference:reference;
+              DAH.create_data_member_location_offset
+                ~byte_offset:(Int64.of_int !offset) ]
+          ();
+        offset := !offset + component_packed_byte_size)
+      components;
+    Proto_die.reference die, packed_byte_size
 
 module Shape_with_layout = struct
   include Identifiable.Make (struct
@@ -1009,11 +1078,12 @@ module Shape_with_layout = struct
 end
 
 module Cache = Shape_with_layout.Tbl
+module PathSet = Set.Make (Path)
 
 let cache = Cache.create 16
 
-let rec type_shape_to_dwarf_die (type_shape : Layout.t S.ts) ~parent_proto_die
-    ~fallback_value_die =
+let rec type_shape_to_dwarf_die ~visited (type_shape : Layout.t S.ts)
+    ~parent_proto_die ~fallback_value_die =
   match Cache.find_opt cache type_shape with
   | Some reference -> reference
   | None ->
@@ -1041,55 +1111,98 @@ let rec type_shape_to_dwarf_die (type_shape : Layout.t S.ts) ~parent_proto_die
     | Ts_unboxed_tuple _ ->
       Misc.fatal_errorf "unboxed tuples cannot have base layout %s" layout_name
     | Ts_tuple fields ->
-      type_shape_to_dwarf_die_tuple ~reference ~parent_proto_die
+      type_shape_to_dwarf_die_tuple ~visited ~reference ~parent_proto_die
         ~fallback_value_die ~name fields
     | Ts_predef (predef, args) ->
-      type_shape_to_dwarf_die_predef ~reference ~name ~parent_proto_die
+      type_shape_to_dwarf_die_predef ~visited ~reference ~name ~parent_proto_die
         ~fallback_value_die predef args
     | Ts_constr ((type_uid, type_path, type_layout), shapes) -> (
-      match type_layout with
-      | Base b ->
-        type_shape_to_dwarf_die_type_constructor ~reference ~name
-          ~parent_proto_die ~fallback_value_die ~type_uid type_path b shapes
-      | Product _ ->
-        Misc.fatal_errorf
-          "only base layouts supported, but found product layout %s" layout_name
-      )
+      if (* CR sspies: We can run into infinite cycles here, because the type
+            substitution is implemented weirdly. This problem should disappear
+            for the type shapes that are merged into shapes. For now, we handle
+            cycles that are not cached by simply returning a base layout below
+            and erroring for product layouts. *)
+         PathSet.mem type_path visited
+      then
+        (* Cycle detected - use the actual type_layout *)
+        match type_layout with
+        | Base b ->
+          create_base_layout_type ~reference b ~name ~parent_proto_die
+            ~fallback_value_die
+        | Product _ ->
+          Misc.fatal_errorf "cycle detected with product layout %a"
+            S.print_type_shape type_shape
+      else
+        let visited' = PathSet.add type_path visited in
+        match type_layout with
+        | Base b ->
+          type_shape_to_dwarf_die_type_constructor ~visited:visited' ~reference
+            ~name ~parent_proto_die ~fallback_value_die ~type_uid type_path b
+            shapes
+        | Product _ ->
+          Misc.fatal_errorf
+            "only base layouts supported, but found product layout %s"
+            layout_name)
     | Ts_variant fields ->
-      type_shape_to_dwarf_die_poly_variant ~reference ~name ~parent_proto_die
-        ~fallback_value_die ~constructors:fields
+      type_shape_to_dwarf_die_poly_variant ~visited ~reference ~name
+        ~parent_proto_die ~fallback_value_die ~constructors:fields
     | Ts_arrow (arg, ret) ->
-      type_shape_to_dwarf_die_arrow ~reference ~name ~parent_proto_die
+      type_shape_to_dwarf_die_arrow ~visited ~reference ~name ~parent_proto_die
         ~fallback_value_die arg ret);
     reference
 
-and type_shape_to_dwarf_die_tuple ~name ~reference ~parent_proto_die
+and type_shape_to_dwarf_die_tuple ~visited ~name ~reference ~parent_proto_die
     ~fallback_value_die fields =
   let fields =
     List.map
-      (type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die)
+      (type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die)
       fields
   in
   create_tuple_die ~reference ~parent_proto_die ~name ~fields
 
-and type_shape_to_dwarf_die_predef ~name ~reference ~parent_proto_die
+and type_shape_to_dwarf_die_predef ~visited ~name ~reference ~parent_proto_die
     ~fallback_value_die (predef : S.Predef.t) args =
   match predef, args with
-  | Array, [element_type_shape] ->
-    let element_type_shape =
-      S.shape_with_layout ~layout:(Base Value) element_type_shape
+  | Array, [element_type_shape] -> (
+    let argument_layout =
+      Type_shape.estimate_layout_from_type_shape element_type_shape
     in
     (* CR sspies: Check whether the elements of an array are always values and,
        if not, where that information is maintained.
 
        mshinwell: we need to handle unboxed arrays. See Cmm_helpers, but let's
        wait until after we change the representation of these not to use custom
-       blocks. *)
-    let child_die =
-      type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-        element_type_shape
+       blocks.
+
+       sspies: I've introduced a type estimation. There is a problem with this
+       at the moment: The estimation can get stuck in cases where we have a type
+       variable or we simply don't know. This case shows up in the [None] case
+       below. We currently default to [Value] layout. *)
+    let argument_layout =
+      match argument_layout with
+      | None -> Layout.Base Value
+      (* CR sspies: Risky, can be false. A different default here would be
+         better. *)
+      | Some l -> l
     in
-    create_array_die ~reference ~parent_proto_die ~child_die ~name
+    match argument_layout with
+    | Base _ ->
+      let element_type_shape =
+        S.shape_with_layout ~layout:argument_layout element_type_shape
+      in
+      let child_die =
+        type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die
+          element_type_shape
+      in
+      create_array_die ~reference ~parent_proto_die ~child_die ~name
+    | Product _ ->
+      (* CR sspies: We handle products differently, because they are packed
+         specially into arrays. Try to find a unifying approach here. *)
+      let child_die, _ =
+        create_packed_layout_type ~parent_proto_die ~fallback_value_die
+          argument_layout
+      in
+      create_array_die ~reference ~parent_proto_die ~child_die ~name)
   | Array, args ->
     Misc.fatal_errorf
       "[Array] shapes must be applied to exactly one type shape (found %d)"
@@ -1105,8 +1218,9 @@ and type_shape_to_dwarf_die_predef ~name ~reference ~parent_proto_die
        because their runtime representations are blocks with tag [Abstract_tag]
        (see [Cmm_helpers]). *)
     let base_ref = Proto_die.create_reference () in
+    let byte_size = Shape.Predef.simd_vec_split_to_byte_size s in
     create_simd_vec_split_base_layout_die ~split:(Some s) ~reference:base_ref
-      ~name:None ~parent_proto_die;
+      ~name:None ~parent_proto_die ~byte_size;
     Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Reference_type
       ~attribute_values:
@@ -1122,9 +1236,9 @@ and type_shape_to_dwarf_die_predef ~name ~reference ~parent_proto_die
     create_base_layout_type ~reference Value ~name ~parent_proto_die
       ~fallback_value_die
 
-and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
-    ~fallback_value_die ~type_uid _type_path (type_layout : base_layout) shapes
-    =
+and type_shape_to_dwarf_die_type_constructor ~visited ~reference ~name
+    ~parent_proto_die ~fallback_value_die ~type_uid _type_path
+    (type_layout : base_layout) shapes =
   match
     (* CR sspies: Somewhat subtly, this case currently also handles [unit],
        [bool], [option], and [list], because they are not treated as predefined
@@ -1145,7 +1259,7 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
         S.shape_with_layout ~layout:(Base type_layout) alias_shape
       in
       let alias_die =
-        type_shape_to_dwarf_die alias_shape ~parent_proto_die
+        type_shape_to_dwarf_die ~visited alias_shape ~parent_proto_die
           ~fallback_value_die
       in
       create_typedef_die ~reference ~parent_proto_die ~child_die:alias_die ~name
@@ -1159,8 +1273,8 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
             ( name,
               Arch.size_addr,
               (* All fields here are machine word width *)
-              type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-                type_shape' ))
+              type_shape_to_dwarf_die ~visited ~parent_proto_die
+                ~fallback_value_die type_shape' ))
           fields
       in
       create_record_die ~reference ~parent_proto_die ~name ~fields
@@ -1173,7 +1287,7 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
       ->
       let field_shape = S.shape_with_layout ~layout:(Base base_layout) sh in
       let field_die =
-        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
+        type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die
           field_shape
       in
       let field_size = base_layout_to_byte_size base_layout in
@@ -1198,8 +1312,8 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
             | Some name ->
               ( name,
                 base_layout_to_byte_size_in_mixed_block base_layout,
-                type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-                  type_shape' )
+                type_shape_to_dwarf_die ~visited ~parent_proto_die
+                  ~fallback_value_die type_shape' )
             | _ -> assert false)
           fields
       in
@@ -1230,7 +1344,7 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
                   (fun (field_name, sh, ly) ->
                     let sh = S.shape_with_layout ~layout:(Layout.Base ly) sh in
                     ( field_name,
-                      type_shape_to_dwarf_die ~parent_proto_die
+                      type_shape_to_dwarf_die ~visited ~parent_proto_die
                         ~fallback_value_die sh,
                       ly ))
                   fields ))
@@ -1242,22 +1356,23 @@ and type_shape_to_dwarf_die_type_constructor ~reference ~name ~parent_proto_die
         { name = constr_name; arg_name; arg_shape; arg_layout } ->
       let arg_shape = S.shape_with_layout ~layout:arg_layout arg_shape in
       let arg_die =
-        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die arg_shape
+        type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die
+          arg_shape
       in
       create_attribute_unboxed_variant_die ~reference ~parent_proto_die ~name
         ~constr_name ~arg_name ~arg_layout ~arg_die)
 
-and type_shape_to_dwarf_die_arrow ~reference ~name ~parent_proto_die
+and type_shape_to_dwarf_die_arrow ~visited ~reference ~name ~parent_proto_die
     ~fallback_value_die _arg _ret =
   (* There is no need to inspect the argument and return value. *)
   create_typedef_die ~reference ~parent_proto_die ~name
     ~child_die:fallback_value_die
 
-and type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
+and type_shape_to_dwarf_die_poly_variant ~visited ~reference ~parent_proto_die
     ~fallback_value_die ~name ~constructors =
   let constructors_with_references =
     S.poly_variant_constructors_map
-      (type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die)
+      (type_shape_to_dwarf_die ~visited ~parent_proto_die ~fallback_value_die)
       constructors
   in
   create_type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die ~name
@@ -1401,7 +1516,8 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
     in
     match type_shape with
     | Known type_shape ->
-      type_shape_to_dwarf_die type_shape ~parent_proto_die ~fallback_value_die
+      type_shape_to_dwarf_die ~visited:PathSet.empty type_shape
+        ~parent_proto_die ~fallback_value_die
     | Unknown base_layout ->
       let reference = Proto_die.create_reference () in
       create_base_layout_type ~reference ~parent_proto_die

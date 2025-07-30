@@ -43,6 +43,11 @@ val add_to_type_shapes :
 
 val find_in_type_decls : Uid.t -> Shape.tds option
 
+val estimate_layout_from_type_shape :
+  Shape.without_layout Shape.ts -> Layout.t option
+
+val estimate_layout_from_type_decl_shape : Shape.tds -> Layout.t option
+
 val type_name : _ Shape.ts -> string
 
 val print_table_all_type_decls : Format.formatter -> unit
