@@ -41,6 +41,8 @@ let is_a_malloc name ~num_fields f =
 (*
 We test each form of allocation two ways:
 1. Where a constant value is directly [malloc_]'d to test that malloc prevents
+   blocks from being lifted to statically-allocated structured constants
+2. Where the malloc is seperatedly defined as a function, which is then called.
 *)
 
 (* Tuple allocations with different patterns *)
