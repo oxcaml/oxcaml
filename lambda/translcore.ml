@@ -2005,9 +2005,9 @@ and transl_setinstvar ~scopes loc self var expr =
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
 and transl_record ~scopes loc env alloc_mode fields repres opt_init_expr =
+  let mode = Option.map transl_alloc_mode alloc_mode in
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
-  let mode = Option.map transl_alloc_mode alloc_mode in
   let size = Array.length fields in
   let on_heap = match mode with
     | None -> false (* unboxed is not on heap *)
