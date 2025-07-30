@@ -176,11 +176,12 @@ type 'a t : mutable_data = 'a ref
 Line 1, characters 0-33:
 1 | type 'a t : mutable_data = 'a ref
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a ref" is mutable_data with 'a @@ unyielding many.
+Error: The kind of type "'a ref" is mutable_data with 'a @@ unyielding.
        But the kind of type "'a ref" must be a subkind of mutable_data
          because of the definition of t at line 1, characters 0-33.
 
        The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
          portability: mod portable with 'a ≰ mod portable
          statefulness: mod stateless with 'a ≰ mod stateless
 |}]
@@ -199,7 +200,7 @@ Line 1, characters 14-21:
                   ^^^^^^^
 Error: This type "int ref" should be an instance of type
          "('a : value mod portable)"
-       The kind of int ref is mutable_data with int @@ unyielding many.
+       The kind of int ref is mutable_data with int @@ unyielding.
        But the kind of int ref must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 
@@ -223,7 +224,7 @@ Line 1, characters 14-21:
                   ^^^^^^^
 Error: This type "int ref" should be an instance of type
          "('a : value mod contended)"
-       The kind of int ref is mutable_data with int @@ unyielding many.
+       The kind of int ref is mutable_data with int @@ unyielding.
        But the kind of int ref must be a subkind of value mod contended
          because of the definition of require_contended at line 9, characters 0-49.
 

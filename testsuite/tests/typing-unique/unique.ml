@@ -594,16 +594,16 @@ Line 2, characters 11-19:
 
 let array_pats (arr : int option array) =
   match arr with
-  | [| o |] -> let _ = unique_id arr in aliased_id o
+  | [| o |] -> let _ = unique_id arr in None
   | _ -> None
 [%%expect{|
 Line 3, characters 33-36:
-3 |   | [| o |] -> let _ = unique_id arr in aliased_id o
+3 |   | [| o |] -> let _ = unique_id arr in None
                                      ^^^
 Error: This value is used here as unique,
        but it has already been used in an array pattern:
 Line 3, characters 4-11:
-3 |   | [| o |] -> let _ = unique_id arr in aliased_id o
+3 |   | [| o |] -> let _ = unique_id arr in None
         ^^^^^^^
 
 |}]
