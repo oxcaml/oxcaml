@@ -2304,6 +2304,8 @@ let effects_and_coeffects_of_variadic_primitive p =
     in
     let effects : Effects.t =
       match alloc_mode with
+      (* We want to prevent external allocations from being lifted or reordered,
+         so we say they have arbitrary effects *)
       | External -> Effects.Arbitrary_effects
       | Heap | Local _ -> Effects.Only_generative_effects mut
     in
