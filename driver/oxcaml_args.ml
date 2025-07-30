@@ -492,6 +492,16 @@ let mk_no_flambda2_reaper f =
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
 
+let mk_flambda2_match_in_match f =
+  ( "-flambda2-match-in-match",
+    Arg.Unit f,
+    Printf.sprintf " Enable the match-in-match optimisation (Flambda2 only)" )
+
+let mk_no_flambda2_match_in_match f =
+  ( "-no-flambda2-match-in-match",
+    Arg.Unit f,
+    Printf.sprintf " Disable the match-in-match optimisation (Flambda2 only)" )
+
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
     Arg.Unit f,
@@ -1015,6 +1025,8 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
+  val flambda2_match_in_match : unit -> unit
+  val no_flambda2_match_in_match : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1147,6 +1159,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
+      mk_flambda2_match_in_match F.flambda2_match_in_match;
+      mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1385,6 +1399,8 @@ module Oxcaml_options_impl = struct
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
   let flambda2_reaper = set Flambda2.enable_reaper
   let no_flambda2_reaper = clear Flambda2.enable_reaper
+  let flambda2_match_in_match = set Flambda2.match_in_match
+  let no_flambda2_match_in_match = clear Flambda2.match_in_match
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic

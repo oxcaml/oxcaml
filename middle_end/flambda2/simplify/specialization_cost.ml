@@ -14,6 +14,7 @@
 (**************************************************************************)
 
 type reason =
+  | Specialization_disabled
   | At_toplevel
   | Contains_static_consts
   | Contains_set_of_closures
@@ -26,6 +27,8 @@ type t =
 
 let [@ocamlformat "disable"] print_reason ppf reason =
   match reason with
+  | Specialization_disabled ->
+    Format.fprintf ppf "specialization_disabled"
   | At_toplevel ->
     Format.fprintf ppf "at_top_level"
   | Contains_static_consts ->
@@ -52,9 +55,12 @@ let [@ocamlformat "disable"] print ppf t =
 
 (* Creations *)
 
-let can_specialize = Can_specialize { primitives = [] }
-
 let cannot_specialize reason = Cannot_specialize { reason }
+
+let can_specialize () =
+  if Flambda_features.match_in_match ()
+  then Can_specialize { primitives = [] }
+  else cannot_specialize Specialization_disabled
 
 (* Updating costs *)
 

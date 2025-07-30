@@ -49,6 +49,8 @@ val enable_reaper : unit -> bool
 
 val kind_checks : unit -> bool
 
+val match_in_match : unit -> bool
+
 val flat_float_array : unit -> bool
 
 val function_result_types : is_a_functor:bool -> bool

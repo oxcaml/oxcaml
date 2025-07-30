@@ -152,6 +152,7 @@ module Flambda2 = struct
     let enable_reaper = false
     let unicode = true
     let kind_checks = false
+    let match_in_match = false
   end
 
   type flags = {
@@ -166,6 +167,7 @@ module Flambda2 = struct
     enable_reaper : bool;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   let default = {
@@ -180,6 +182,7 @@ module Flambda2 = struct
     enable_reaper = Default.enable_reaper;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
+    match_in_match = Default.match_in_match;
   }
 
   let oclassic = {
@@ -194,8 +197,6 @@ module Flambda2 = struct
     join_points = true;
     unbox_along_intra_function_control_flow = true;
     backend_cse_at_toplevel = false;
-    (* required for match-in-match *)
-    join_algorithm = N_way;
   }
 
   let o3 = {
@@ -216,6 +217,7 @@ module Flambda2 = struct
   let kind_checks = ref Default
   let function_result_types = ref Default
   let enable_reaper = ref Default
+  let match_in_match = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
