@@ -37,7 +37,6 @@ let is_a_malloc name ~num_fields f =
   Format.printf "\n";
   ()
 
-
 (*
 We test each form of allocation two ways:
 1. Where a constant value is directly [malloc_]'d to test that malloc prevents

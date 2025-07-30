@@ -8,7 +8,7 @@ CAMLprim value is_young(uint64_t v){
 }
 
 CAMLprim value is_static_alloc(uint64_t v) {
-    // This is extremly hacky: detect runtime version by checking for shared_heap (runtime5+ feature)
+    // This is extremly hacky: detect runtime version by checking for shared_heap
     #if defined(CAML_INTERNALS) && __has_include("caml/shared_heap.h")
         return Val_bool(Is_in_static_data(v));
     #else
