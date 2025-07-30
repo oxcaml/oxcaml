@@ -132,6 +132,7 @@ module Flambda2 : sig
     val reaper_preserve_direct_calls : reaper_preserve_direct_calls
     val unicode : bool
     val kind_checks : bool
+    val match_in_match : bool
   end
 
   (* CR-someday lmaurer: We could eliminate most of the per-flag boilerplate using GADTs
@@ -150,6 +151,7 @@ module Flambda2 : sig
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   val default_for_opt_level : opt_level or_default -> flags
@@ -167,6 +169,7 @@ module Flambda2 : sig
   val reaper_preserve_direct_calls : reaper_preserve_direct_calls or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
+  val match_in_match : bool or_default ref
 
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
