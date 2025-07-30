@@ -97,7 +97,7 @@ let use_g () =
   then use_g1 ()
   else current_debug_settings := bytecode_g
 
-let restrict_to_upstream_dwarf = ref true
+let restrict_to_upstream_dwarf = ref (not Config.oxcaml_dwarf)
 
 (* Currently the maximum number of stack slots, see asmgen.ml *)
 let dwarf_max_function_complexity = ref 50

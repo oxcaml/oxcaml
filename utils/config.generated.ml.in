@@ -130,3 +130,5 @@ let has_bmi2 = "@has_bmi2@" = "yes"
 let has_avx = "@has_avx@" = "yes"
 
 let has_avx2 = "@has_avx2@" = "yes"
+
+let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"

@@ -354,3 +354,6 @@ val has_avx : bool
 
 val has_avx2 : bool
 (* Whether the compiler was configured on a machine with AVX2 *)
+
+val oxcaml_dwarf : bool
+(* Whether OxCaml DWARF is used by default *)

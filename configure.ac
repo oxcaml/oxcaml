@@ -196,6 +196,7 @@ AC_ARG_ENABLE([stack_checks],
 AC_SUBST([enable_runtime5])
 AC_SUBST([runtime_suffix])
 AC_SUBST([enable_stack_checks])
+AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
 AC_SUBST([default_build_target])
@@ -638,6 +639,12 @@ AC_ARG_ENABLE([flambda2],
 AC_ARG_ENABLE([cmm-invariants],
   [AS_HELP_STRING([--enable-cmm-invariants],
     [enable invariants checks in Cmm])])
+
+AC_ARG_ENABLE([oxcaml-dwarf],
+  [AS_HELP_STRING([--enable-oxcaml-dwarf],
+    [enable OxCaml DWARF by default @<:@default=no@:>@])],
+  [],
+  [enable_oxcaml_dwarf=no])
 
 AC_ARG_WITH([target-bindir],
   [AS_HELP_STRING([--with-target-bindir],
