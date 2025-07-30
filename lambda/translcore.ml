@@ -509,7 +509,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
       begin try
-        Lconst(Const_block(0, List.map (extract_constant_if_internal alloc_mode) ll))
+        Lconst(Const_block(0, List.map
+                                (extract_constant_if_internal alloc_mode) ll))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable, Some shape,
                          transl_alloc_mode alloc_mode),
@@ -643,8 +644,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
-            Lconst(Const_block(0, [const_int tag;
-                                   extract_constant_if_internal alloc_mode lam]))
+            Lconst(Const_block(0,[const_int tag;
+                                  extract_constant_if_internal alloc_mode lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
