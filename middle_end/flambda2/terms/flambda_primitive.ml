@@ -1507,7 +1507,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         (* Local allocations have coeffects, to avoid them being moved past a
            begin/end region. Hence, it is not safe to force the allocation to be
            moved, so we cannot use the `Delay` mode for those. *)
-        match alloc_mode with Heap | External -> Delay | Local _ -> Strict
+        match alloc_mode with Heap -> Delay | Local _ | External -> Strict
       else Strict
     in
     Only_generative_effects Immutable, coeffects_of_mode alloc_mode, placement
