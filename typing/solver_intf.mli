@@ -302,16 +302,7 @@ module type Solver_mono = sig
   (** Apply a monotone morphism. *)
   val apply :
     'b obj ->
-    ?hint:('l * 'r) hint_morph ->
-    ('a, 'b, 'l * 'r) morph ->
-    ('a, 'l * 'r) mode ->
-    ('b, 'l * 'r) mode
-
-  (** Apply a monotone morphism, not providing a hint yet. The caller must ensure that
-    a hint is provided soon after calling this before trying to perform any submode
-    operations *)
-  val apply_hole_hint :
-    'b obj ->
+    ?hint:[`Hint of ('l * 'r) hint_morph | `Hole] ->
     ('a, 'b, 'l * 'r) morph ->
     ('a, 'l * 'r) mode ->
     ('b, 'l * 'r) mode

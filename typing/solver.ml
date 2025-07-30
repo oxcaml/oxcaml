@@ -712,15 +712,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           Apply (hint, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
 
-  let apply dst ?hint morph m =
+  let apply dst ?hint morph =
     apply_ dst
       ~hint:
         (match hint with
         | None -> None (C.src dst morph)
-        | Some small_morph_hint -> Base (small_morph_hint, morph))
-      morph m
-
-  let apply_hole_hint dst morph = apply_ dst ~hint:(Hole_compose morph) morph
+        | Some (`Hint small_morph_hint) -> Base (small_morph_hint, morph)
+        | Some `Hole -> Hole_compose morph)
+      morph
 
   let hint_biased_join obj a a_hint b b_hint =
     (* A version of [hint_join] that assumes that a <= b is false,
