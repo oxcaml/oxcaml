@@ -37,3 +37,8 @@ val simples :
   res:To_jsir_result.t ->
   Simple.t list ->
   Jsir.Var.t list * To_jsir_result.t
+
+(** Take in [Bound_parameters.t] and bind each parameter to fresh JSIR variables in the
+    environment, and return the variables in order *)
+val bound_parameters :
+  env:To_jsir_env.t -> Bound_parameters.t -> Jsir.Var.t list * To_jsir_env.t
