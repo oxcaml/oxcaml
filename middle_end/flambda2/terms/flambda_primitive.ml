@@ -1507,7 +1507,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         (* Local allocations have coeffects, to avoid them being moved past a
            begin/end region. Hence, it is not safe to force the allocation to be
            moved, so we cannot use the `Delay` mode for those. *)
-        match alloc_mode with Heap -> Delay | Local _ | External -> Strict
+        match alloc_mode with Heap | External -> Delay | Local _ -> Strict
       else Strict
     in
     Only_generative_effects Immutable, coeffects_of_mode alloc_mode, placement
@@ -2299,8 +2299,8 @@ let effects_and_coeffects_of_variadic_primitive p =
   | Make_block (_, mut, alloc_mode) | Make_array (_, mut, alloc_mode) ->
     let coeffects : Coeffects.t =
       match alloc_mode with
-      | Heap -> Coeffects.No_coeffects
-      | Local _ | External -> Coeffects.Has_coeffects
+      | Heap | External -> Coeffects.No_coeffects
+      | Local _ -> Coeffects.Has_coeffects
     in
     let effects : Effects.t =
       match alloc_mode with
