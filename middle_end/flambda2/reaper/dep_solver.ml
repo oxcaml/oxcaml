@@ -543,7 +543,8 @@ let datalog_schedule =
     [ any_usage_pred base;
       constructor_rel base relation from;
       filter_field is_local_field relation ]
-    ==> escaping_field_rel relation from
+    ==> and_
+          [escaping_field_rel relation from; field_usages_rel base relation from]
   in
   let any_usage_from_coaccessor_any_source =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
@@ -778,7 +779,8 @@ let datalog_schedule =
     [ any_source_pred base;
       rev_accessor_rel base relation to_;
       filter_field is_local_field relation ]
-    ==> reading_field_rel relation to_
+    ==> and_
+          [reading_field_rel relation to_; field_sources_rel base relation to_]
   in
   let reading_escaping =
     let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
@@ -1066,7 +1068,7 @@ let is_top db x = exists_with_parameters any_usage_pred_query [x] db
 
 (* CR pchambart: field_used should rename to mean that this is the specific
    field of a given variable. *)
-let has_use, field_used =
+let has_use, _field_used =
   let open! Global_flow_graph in
   let usages_query =
     mk_exists_query ["X"] ["Y"] (fun [x] [y] -> [usages_rel x y])
@@ -1087,6 +1089,19 @@ let has_use, field_used =
       exists_with_parameters any_usage_pred_query [x] db
       || exists_with_parameters used_field_top_query [x; field] db
       || exists_with_parameters used_field_query [x; field] db )
+
+let field_of_constructor_is_used =
+  rel2 "field_of_constructor_is_used" Cols.[n; f]
+
+let field_used =
+  let field_of_constructor_is_used_query =
+    mk_exists_query ["X"; "F"] [] (fun [x; f] [] ->
+        [field_of_constructor_is_used x f])
+  in
+  fun db x field ->
+    exists_with_parameters field_of_constructor_is_used_query
+      [x; Field.encode field]
+      db
 
 let any_source_query =
   let open! Global_flow_graph in
@@ -1133,9 +1148,6 @@ let not_local_field_has_source =
     || exists_with_parameters field_any_source_query [x; field] db
     || exists_with_parameters field_source_query [x; field] db
 
-let field_of_constructor_is_used =
-  rel2 "field_of_constructor_is_used" Cols.[n; f]
-
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
@@ -1174,7 +1186,9 @@ let datalog_rules =
     | _ -> false
   in
   [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [constructor_rel base relation from; any_usage_pred base]
+     [ constructor_rel base relation from;
+       any_usage_pred base;
+       filter_field is_not_local_field relation ]
      ==> field_of_constructor_is_used base relation);
     (let$ [base; relation; from; usage] =
        ["base"; "relation"; "from"; "usage"]
@@ -1189,6 +1203,38 @@ let datalog_rules =
      [ constructor_rel base relation from;
        usages_rel base usage;
        field_usages_rel usage relation _v ]
+     ==> field_of_constructor_is_used base relation);
+    (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
+     [ constructor_rel base relation from;
+       any_usage_pred base;
+       reading_field_rel relation x;
+       any_usage_pred x ]
+     ==> field_of_constructor_is_used base relation);
+    (let$ [base; relation; from; x; y] =
+       ["base"; "relation"; "from"; "x"; "y"]
+     in
+     [ constructor_rel base relation from;
+       any_usage_pred base;
+       reading_field_rel relation x;
+       usages_rel x y ]
+     ==> field_of_constructor_is_used base relation);
+    (let$ [usage; base; relation; from; _v] =
+       ["usage"; "base"; "relation"; "from"; "_v"]
+     in
+     [ constructor_rel base relation from;
+       sources_rel usage base;
+       filter_field is_local_field relation;
+       any_usage_pred base;
+       field_usages_rel usage relation _v ]
+     ==> field_of_constructor_is_used base relation);
+    (let$ [usage; base; relation; from] =
+       ["usage"; "base"; "relation"; "from"]
+     in
+     [ constructor_rel base relation from;
+       sources_rel usage base;
+       filter_field is_local_field relation;
+       any_usage_pred base;
+       field_usages_top_rel usage relation ]
      ==> field_of_constructor_is_used base relation);
     (* CR ncourant: this marks any [Apply] field as
        [field_of_constructor_is_used], as long as the function is called.
@@ -1801,10 +1847,11 @@ let fixpoint (graph : Global_flow_graph.graph) =
       (Code_id_or_name.Map.print pp_changed_representation)
       !changed_representation;
   { db;
-    (* unboxed_fields = !unboxed; changed_representation =
-       !changed_representation *)
-    unboxed_fields = Code_id_or_name.Map.empty;
-    changed_representation = Code_id_or_name.Map.empty
+    unboxed_fields = !unboxed;
+    changed_representation =
+      !changed_representation
+      (* unboxed_fields = Code_id_or_name.Map.empty; changed_representation =
+         Code_id_or_name.Map.empty *)
   }
 
 let print_color { db; unboxed_fields; changed_representation } v =
