@@ -293,7 +293,6 @@ type error =
   (* CR-soon mshinwell: Use an inlined record *)
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
-  | Atomic_in_pattern of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
