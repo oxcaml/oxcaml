@@ -8,10 +8,13 @@ CAMLprim value is_young(uint64_t v){
     return Val_bool(Is_young(v));
 }
 
-// Function to get current number of malloc'd bytes
 CAMLprim value get_malloc_bytes(value unit) {
+    // The github actions complain about this occasionally, just silence this particular warning.
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     struct mallinfo info = mallinfo();
-    return Val_long(info.uordblks); // Total bytes in use by malloc
+    #pragma GCC diagnostic pop
+    return Val_long(info.uordblks);
 }
 
 CAMLprim value is_static_alloc(uint64_t v) {
