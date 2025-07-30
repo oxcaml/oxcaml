@@ -118,12 +118,32 @@ module Llvm_typ = struct
         typs
 
   let to_string t = Format.asprintf "%a" pp_t t
+
+  let rec equal t1 t2 =
+    match t1, t2 with
+    | Int { width_in_bits = x }, Int { width_in_bits = y } -> x = y
+    | Float, Float | Double, Double | Ptr, Ptr -> true
+    | Struct xs, Struct ys -> List.equal equal xs ys
+    | Int _, _ | Float, _ | Double, _ | Ptr, _ | Struct _, _ -> false
+end
+
+module Calling_conventions = struct
+  type t =
+    | Default
+    | Ocaml
+
+  let to_llvmir_string = function Default -> "" | Ocaml -> "cc 104"
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Default, Default | Ocaml, Ocaml -> true
+    | Default, _ | Ocaml, _ -> false
 end
 
 (* LLVM-level representation of a function signature. Used to collect and
    declare called functions. *)
 type fun_sig =
-  { cc : bool;
+  { cc : Calling_conventions.t;
     args : Llvm_typ.t list;
     res : Llvm_typ.t option
   }
@@ -207,6 +227,18 @@ let fresh_ident t = Ident.Gen.get_fresh t.current_fun_info.ident_gen
 let _get_ppf_dump t = t.ppf_dump
 
 let add_called_fun t name ~cc ~args ~res =
+  (match String.Map.find_opt name t.called_functions with
+  | None -> ()
+  | Some { cc = cc'; args = args'; res = res' } ->
+    let all_equal =
+      Calling_conventions.equal cc cc'
+      && List.equal Llvm_typ.equal args args'
+      && Option.equal Llvm_typ.equal res res'
+    in
+    if not all_equal
+    then
+      Misc.fatal_error
+        "Llvmize: Same function referenced with incompatible signatures");
   t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
 
 (* Runtime registers are passed explicitly as arguments to and returned from all
@@ -220,11 +252,14 @@ let make_ret_type ret_types =
   let actual_ret_types = List.map Llvm_typ.of_machtyp_component ret_types in
   Llvm_typ.(Struct [Struct runtime_reg_types; Struct actual_ret_types])
 
-(*= let make_arg_types arg_types =
-  let runtime_reg_types = List.map (fun _ -> Llvm_typ.ptr) runtime_regs in
-  runtime_reg_types @ arg_types *)
-
-let calling_conv = "cc 104"
+(* Regs in domainstate are already stored in the appropriate address as
+   arguments or when returned, so we don't touch them while doing a call /
+   return *)
+(* CR yusumez: We don't expect to get arguments from the stack, but this might
+   happen if we have too many arguments. There might be a way to limit this in
+   the frontend. *)
+let reg_list_for_call regs =
+  Array.to_list regs |> List.filter (fun reg -> not (Reg.is_domainstate reg))
 
 module F = struct
   open Format
@@ -316,8 +351,9 @@ module F = struct
 
   let define t ~fun_name ~fun_args ~fun_ret_type ~fun_dbg ~fun_attrs pp_body =
     pp_dbg_comment t.ppf fun_name fun_dbg;
-    line t.ppf "define %s %a @%s(%a) %a {" calling_conv Llvm_typ.pp_t
-      fun_ret_type fun_name pp_fun_args fun_args pp_attrs fun_attrs;
+    let cc_str = Calling_conventions.(to_llvmir_string Ocaml) in
+    line t.ppf "define %s %a @%s(%a) %a {" cc_str Llvm_typ.pp_t fun_ret_type
+      fun_name pp_fun_args fun_args pp_attrs fun_attrs;
     pp_body ();
     line t.ppf "}";
     line t.ppf ""
@@ -400,9 +436,9 @@ module F = struct
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
-  let ins_call ?(cc = true) ~pp_name t name args res =
+  let ins_call ~cc ~pp_name t name args res =
     let pp_call res_typ ppf () =
-      let cc_str = match cc with false -> "" | true -> calling_conv in
+      let cc_str = Calling_conventions.to_llvmir_string cc in
       fprintf ppf "call %s %s %a(%a)" cc_str res_typ pp_name name
         (pp_print_list ~pp_sep:pp_comma (fun ppf (arg, typ) ->
              fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_ident arg))
@@ -496,14 +532,13 @@ module F = struct
   let call t (i : Cfg.terminator Cfg.instruction) (op : Cfg.func_call_operation)
       label_after =
     (* Prepare arguments *)
-    let arg_regs =
+    let args_begin, args_end =
       (* [Indirect] has the function in i.arg.(0) *)
-      (match op with
-      | Direct _ -> Array.to_list i.arg
-      | Indirect -> Array.to_list i.arg |> List.tl)
-      (* Regs in domainstate are already stored in that address. *)
-      |> List.filter (fun reg -> not (Reg.is_domainstate reg))
+      match op with
+      | Direct _ -> 0, Array.length i.arg
+      | Indirect -> 1, Array.length i.arg - 1
     in
+    let arg_regs = Array.sub i.arg args_begin args_end |> reg_list_for_call in
     let args =
       List.map
         (fun ident ->
@@ -529,9 +564,10 @@ module F = struct
     let res_ident =
       match op with
       | Direct { sym_name; sym_global = _ } ->
-        add_called_fun t sym_name ~cc:true ~args:arg_types ~res:(Some res_type);
+        add_called_fun t sym_name ~cc:Ocaml ~args:arg_types ~res:(Some res_type);
         let res_ident = fresh_ident t in
-        ins_call t ~pp_name:pp_global sym_name args (Some (res_ident, res_type));
+        ins_call ~cc:Ocaml ~pp_name:pp_global t sym_name args
+          (Some (res_ident, res_type));
         res_ident
       | Indirect ->
         let fun_temp = load_reg_to_temp t i.arg.(0) in
@@ -540,7 +576,7 @@ module F = struct
         (* ...we need this since we treat OCaml values as i64 *)
         ins_conv t "inttoptr" ~src:fun_temp ~dst:fun_ptr_temp
           ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
-        ins_call t ~pp_name:pp_ident fun_ptr_temp args
+        ins_call ~cc:Ocaml ~pp_name:pp_ident t fun_ptr_temp args
           (Some (res_ident, res_type));
         res_ident
     in
@@ -633,8 +669,8 @@ module F = struct
       ins_branch_cond t is_gt gt eq
     | Raise _ ->
       (* CR yusumez: Implement this *)
-      add_called_fun t "llvm.trap" ~cc:false ~args:[] ~res:None;
-      ins_call ~cc:false ~pp_name:pp_global t "llvm.trap" [] None;
+      add_called_fun t "llvm.trap" ~cc:Default ~args:[] ~res:None;
+      ins_call ~cc:Default ~pp_name:pp_global t "llvm.trap" [] None;
       ins t "unreachable"
     | Float_test { width; lt; eq; gt; uo } ->
       let typ =
@@ -728,8 +764,8 @@ module F = struct
         let fabs_name =
           "llvm.fabs." ^ match width with Float32 -> "f32" | Float64 -> "f64"
         in
-        add_called_fun t fabs_name ~cc:false ~args:[typ] ~res:(Some typ);
-        ins_call ~cc:false ~pp_name:pp_global t fabs_name
+        add_called_fun t fabs_name ~cc:Default ~args:[typ] ~res:(Some typ);
+        ins_call ~cc:Default ~pp_name:pp_global t fabs_name
           [arg, typ]
           (Some (res, typ));
         res
@@ -874,7 +910,7 @@ module F = struct
     let res_str =
       match res with Some res -> Llvm_typ.to_string res | None -> "void"
     in
-    let cc_str = match cc with true -> calling_conv | false -> "" in
+    let cc_str = Calling_conventions.to_llvmir_string cc in
     line t.ppf "declare %s %s %a(%a)" cc_str res_str pp_global sym
       (pp_print_list ~pp_sep:pp_comma Llvm_typ.pp_t)
       args
@@ -932,9 +968,11 @@ let collect_body_regs cfg =
    use the alloca'd idents instead.
 
    - Arguments not passed in registers (e.g. in Domainstate) will point to that
-   block of memory instead of being allocated on the stack
+   block of memory instead of being allocated on the stack.
 
-   - Runtime registers themselves are also put on the stack.
+   - Runtime registers themselves (those being registers that contain pointers
+   to certain runtime data structures that need to be preserved) are also put on
+   the stack.
 
    - The stack allocations are only in the IR level and LLVM will (hopefully!)
    optimize most of these alloca's out to registers. *)
