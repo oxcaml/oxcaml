@@ -698,7 +698,7 @@ let enter_continuation_handler lifted_params t =
     lifted;
     defined_variables_by_scope = lifted_params :: t.defined_variables_by_scope;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    specialization_cost = Specialization_cost.can_specialize
+    specialization_cost = Specialization_cost.can_specialize ()
   }
 
 let variables_defined_in_current_continuation t =

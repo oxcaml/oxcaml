@@ -52,14 +52,24 @@ let cse_depth () =
 let join_depth () =
   !Oxcaml_flags.Flambda2.join_depth |> with_default ~f:(fun d -> d.join_depth)
 
+let match_in_match () =
+  !Oxcaml_flags.Flambda2.match_in_match
+  |> with_default ~f:(fun d -> d.match_in_match)
+
 type join_algorithm = Oxcaml_flags.join_algorithm =
   | Binary
   | N_way
   | Checked
 
 let join_algorithm () =
-  !Oxcaml_flags.Flambda2.join_algorithm
-  |> with_default ~f:(fun d -> d.join_algorithm)
+  if match_in_match ()
+  then
+    (* CR gbury: check that the join algorithm has not been explicitly set to
+       something else ? *)
+    Oxcaml_flags.N_way
+  else
+    !Oxcaml_flags.Flambda2.join_algorithm
+    |> with_default ~f:(fun d -> d.join_algorithm)
 
 let use_n_way_join () =
   match join_algorithm () with

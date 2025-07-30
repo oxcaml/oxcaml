@@ -733,11 +733,26 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
     else
       let denv = DA.denv dacc in
       match DE.specialization_cost denv with
-      | Cannot_specialize { reason = _ } ->
+      | Cannot_specialize { reason } ->
         (* CR gbury: we could try and emit something analog to the inlining
            report, but for other optimizations at one point ? *)
-        dacc, `Cannot_specialize
+        let result =
+          match reason with
+          | Specialization_disabled -> `Disabled
+          | At_toplevel -> `Toplevel
+          | Contains_static_consts | Contains_set_of_closures ->
+            `Cannot_specialize
+        in
+        dacc, result
       | Can_specialize spec_cost as spec_cost' -> (
+        (* We should never reach here if specialization is disabled, since we
+           should never have created a `Can_specialize` value for the
+           specialization_cost *)
+        if not (Flambda_features.match_in_match ())
+        then
+          Misc.fatal_errorf
+            "Cannot specialize continuations (due to command line arguments), \
+             this code path should not have been reached.";
         (* Estimate the cost of lifting: this mainly comes from adding new
            parameters, which increase the work done by the typing env, as well
            as the flow analysis. We then only do the lifting if the cost is
@@ -849,7 +864,7 @@ let decide_continuation_specialization ~dacc ~switch ~scrutinee =
     ~counter_f:(fun (_, result) ->
       let counters = Profile.Counters.create () in
       match result with
-      | `Single_use | `Exn_handler | `Toplevel | `All_unknown
+      | `Disabled | `Single_use | `Exn_handler | `Toplevel | `All_unknown
       | `No_reason_to_spec | `Not_lifting ->
         counters
       | `Cannot_specialize -> Profile.Counters.incr "cannot_spec" counters

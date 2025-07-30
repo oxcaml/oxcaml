@@ -157,6 +157,7 @@ module Flambda2 = struct
     let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Zero_alloc
     let unicode = true
     let kind_checks = false
+    let match_in_match = false
   end
 
   type flags = {
@@ -172,6 +173,7 @@ module Flambda2 = struct
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   let default = {
@@ -187,6 +189,7 @@ module Flambda2 = struct
     reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
+    match_in_match = Default.match_in_match;
   }
 
   let oclassic = {
@@ -201,8 +204,6 @@ module Flambda2 = struct
     join_points = true;
     unbox_along_intra_function_control_flow = true;
     backend_cse_at_toplevel = false;
-    (* required for match-in-match *)
-    join_algorithm = N_way;
   }
 
   let o3 = {
@@ -224,6 +225,7 @@ module Flambda2 = struct
   let function_result_types = ref Default
   let enable_reaper = ref Default
   let reaper_preserve_direct_calls = ref Default
+  let match_in_match = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath

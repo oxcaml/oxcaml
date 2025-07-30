@@ -57,6 +57,8 @@ val reaper_preserve_direct_calls : unit -> reaper_preserve_direct_calls
 
 val kind_checks : unit -> bool
 
+val match_in_match : unit -> bool
+
 val flat_float_array : unit -> bool
 
 val function_result_types : is_a_functor:bool -> bool
