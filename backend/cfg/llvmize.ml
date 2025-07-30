@@ -129,15 +129,21 @@ end
 
 module Calling_conventions = struct
   type t =
-    | Default
-    | Ocaml
+    | Default (* Default C calling convention *)
+    | Ocaml (* See backend/<arch>/proc.ml for details *)
+    | Ocaml_c_call
+  (* Same as [Default] but passes the function address and stack offset (if
+     there are stack arguments) through rax and r13. *)
 
-  let to_llvmir_string = function Default -> "" | Ocaml -> "cc 104"
+  let to_llvmir_string = function
+    | Default -> ""
+    | Ocaml -> "cc 104"
+    | Ocaml_c_call -> "cc 105"
 
   let equal t1 t2 =
     match t1, t2 with
-    | Default, Default | Ocaml, Ocaml -> true
-    | Default, _ | Ocaml, _ -> false
+    | Default, Default | Ocaml, Ocaml | Ocaml_c_call, Ocaml_c_call -> true
+    | Default, _ | Ocaml, _ | Ocaml_c_call, _ -> false
 end
 
 (* LLVM-level representation of a function signature. Used to collect and
@@ -240,6 +246,9 @@ let add_called_fun t name ~cc ~args ~res =
       Misc.fatal_error
         "Llvmize: Same function referenced with incompatible signatures");
   t.called_functions <- String.Map.add name { cc; args; res } t.called_functions
+
+let add_referenced_symbol t sym_name =
+  t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols
 
 (* Runtime registers are passed explicitly as arguments to and returned from all
    OCaml functions. They have LLVM type ptr. *)
@@ -436,18 +445,20 @@ module F = struct
       (pp_print_list ~pp_sep:pp_comma pp_print_int)
       idxs
 
-  let ins_call ~cc ~pp_name t name args res =
+  let ins_call_custom_arg ~cc ~pp_name ~pp_arg t name args res =
+    let cc_str = Calling_conventions.to_llvmir_string cc in
     let pp_call res_typ ppf () =
-      let cc_str = Calling_conventions.to_llvmir_string cc in
       fprintf ppf "call %s %s %a(%a)" cc_str res_typ pp_name name
-        (pp_print_list ~pp_sep:pp_comma (fun ppf (arg, typ) ->
-             fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_ident arg))
+        (pp_print_list ~pp_sep:pp_comma pp_arg)
         args
     in
     match res with
-    | Some (res, res_typ) ->
+    | Some (res_typ, res) ->
       ins t "%a = %a" pp_ident res (pp_call (Llvm_typ.to_string res_typ)) ()
     | None -> ins t "%a" (pp_call "void") ()
+
+  let ins_call ~cc ~pp_name t name args res =
+    ins_call_custom_arg ~cc ~pp_name ~pp_arg:pp_fun_arg t name args res
 
   let load_reg_to_temp t reg =
     let temp = fresh_ident t in
@@ -545,14 +556,14 @@ module F = struct
           let loaded = fresh_ident t in
           (* [ident] is a pointer to a pointer *)
           ins_load t ~src:ident ~dst:loaded Llvm_typ.ptr;
-          loaded, Llvm_typ.ptr)
+          Llvm_typ.ptr, loaded)
         runtime_regs
       @ List.map
           (fun reg ->
-            load_reg_to_temp t reg, Llvm_typ.of_machtyp_component reg.Reg.typ)
+            Llvm_typ.of_machtyp_component reg.Reg.typ, load_reg_to_temp t reg)
           arg_regs
     in
-    let arg_types = List.map snd args in
+    let arg_types = List.map fst args in
     (* Prepare return *)
     let res_regs =
       Array.to_list i.res
@@ -567,7 +578,7 @@ module F = struct
         add_called_fun t sym_name ~cc:Ocaml ~args:arg_types ~res:(Some res_type);
         let res_ident = fresh_ident t in
         ins_call ~cc:Ocaml ~pp_name:pp_global t sym_name args
-          (Some (res_ident, res_type));
+          (Some (res_type, res_ident));
         res_ident
       | Indirect ->
         let fun_temp = load_reg_to_temp t i.arg.(0) in
@@ -577,7 +588,7 @@ module F = struct
         ins_conv t "inttoptr" ~src:fun_temp ~dst:fun_ptr_temp
           ~src_typ:Llvm_typ.i64 ~dst_typ:Llvm_typ.ptr;
         ins_call ~cc:Ocaml ~pp_name:pp_ident t fun_ptr_temp args
-          (Some (res_ident, res_type));
+          (Some (res_type, res_ident));
         res_ident
     in
     (* Unpack return value *)
@@ -631,6 +642,115 @@ module F = struct
               res_regs)
     in
     ins t "ret %a %a" Llvm_typ.pp_t res_type pp_ident filled
+
+  let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
+      ~stack_ofs ~stack_align ~label_after =
+    let read_rsp () =
+      let ident = fresh_ident t in
+      ins t "%a = call i64 @llvm.read_register.i64(metadata !{!\"rsp\\00\"})"
+        pp_ident ident;
+      ident
+    in
+    let write_rsp ident =
+      ins t
+        "call void @llvm.write_register.i64(metadata !{!\"rsp\\00\"}, i64 %a)"
+        pp_ident ident
+    in
+    let get_c_stack () =
+      let ds_base = fresh_ident t in
+      let ds_ofs = fresh_ident t in
+      let ds_ofs_ptr = fresh_ident t in
+      let res = fresh_ident t in
+      let offset_in_bytes = Domainstate.(idx_of_field Domain_c_stack) * 8 in
+      ins_load t ~src:domainstate_ident ~dst:ds_base Llvm_typ.i64;
+      ins_binop_imm t "add" ds_base
+        (Int.to_string offset_in_bytes)
+        ds_ofs Llvm_typ.i64;
+      ins_conv t "inttoptr" ~src:ds_ofs ~dst:ds_ofs_ptr ~src_typ:Llvm_typ.i64
+        ~dst_typ:Llvm_typ.ptr;
+      ins_load t ~src:ds_ofs_ptr ~dst:res Llvm_typ.i64;
+      res
+    in
+    (* Auxiliary function to print arguments. This is necessary since we are
+       passing non-local-identifier arguments (like poison or global idents). *)
+    let pp_arg ppf (typ, arg) =
+      match arg with
+      | `String str -> fprintf ppf "%a %s" Llvm_typ.pp_t typ str
+      | `Global symbol -> fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_global symbol
+      | `Ident ident -> pp_fun_arg ppf (typ, ident)
+    in
+    let call_with_caml_c_call caml_c_call_symbol args res_type =
+      let res_ident = fresh_ident t in
+      add_referenced_symbol t caml_c_call_symbol;
+      ins_call_custom_arg ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg t
+        caml_c_call_symbol args
+        (Some (res_type, res_ident));
+      (* CR yusumez: Insert safepoint here once we have GC support *)
+      res_ident
+    in
+    let call_func args res_type =
+      if stack_ofs > 0
+      then (
+        let stack_begin = read_rsp () (* r13 *) in
+        let stack_end = fresh_ident t (* r12 *) in
+        ins_binop_imm t "add" stack_begin (Int.to_string stack_ofs) stack_end
+          Llvm_typ.i64;
+        let args =
+          [ Llvm_typ.ptr, `Global func_symbol;
+            Llvm_typ.i64, `Ident stack_begin;
+            Llvm_typ.i64, `Ident stack_end ]
+          @ List.map (fun (typ, ident) -> typ, `Ident ident) args
+        in
+        let caml_c_call_stack_args =
+          match (stack_align : Cmm.stack_align) with
+          | Align_16 -> "caml_c_call_stack_args"
+          | Align_32 -> "caml_c_call_stack_args_avx"
+          | Align_64 -> "caml_c_call_stack_args_avx512"
+        in
+        call_with_caml_c_call caml_c_call_stack_args args res_type)
+      else if alloc
+      then
+        let args =
+          [ Llvm_typ.ptr, `Global func_symbol;
+            Llvm_typ.i64, `String "poison";
+            Llvm_typ.i64, `String "poison" ]
+          @ List.map (fun (typ, ident) -> typ, `Ident ident) args
+        in
+        call_with_caml_c_call "caml_c_call" args res_type
+      else
+        (* Prepare stack pointer *)
+        let c_sp = get_c_stack () in
+        let ocaml_sp = read_rsp () in
+        write_rsp c_sp;
+        (* Do the thing (omitting cc defaults to C calling convention) *)
+        let res_ident = fresh_ident t in
+        ins_call ~cc:Default ~pp_name:pp_global t func_symbol args
+          (Some (res_type, res_ident));
+        (* Recover stack pointer *)
+        write_rsp ocaml_sp;
+        res_ident
+    in
+    (* Prepare arguments + return type *)
+    let args =
+      Array.to_list i.arg
+      |> List.map (fun reg ->
+             Llvm_typ.of_machtyp_component reg.Reg.typ, load_reg_to_temp t reg)
+    in
+    let res_type =
+      Llvm_typ.Struct
+        (Array.to_list i.res
+        |> List.map (fun reg -> Llvm_typ.of_machtyp_component reg.Reg.typ))
+    in
+    let res_ident = call_func args res_type in
+    (* Unpack return values (is it possible to have multiple?) *)
+    Array.iteri
+      (fun idx reg ->
+        let temp = fresh_ident t in
+        ins_extractvalue t ~arg:res_ident ~res:temp res_type [idx];
+        ins_store_into_reg t temp reg)
+      i.res;
+    (* ...and branch away! *)
+    ins_branch t label_after
 
   let terminator t (i : Cfg.terminator Cfg.instruction) =
     pp_dbg_instr_terminator t.ppf i;
@@ -689,8 +809,12 @@ module F = struct
       let is_eq = float_comp t Cmm.CFeq i typ in
       ins_branch_cond t is_eq eq uo
     | Call { op; label_after } -> call t i op label_after
-    | Prim _ | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-      ->
+    | Prim { op; label_after } -> (
+      match op with
+      | Probe _ -> not_implemented_terminator ~msg:"probe" i
+      | External { func_symbol; alloc; stack_ofs; stack_align; _ } ->
+        extcall t i ~func_symbol ~alloc ~stack_ofs ~stack_align ~label_after)
+    | Switch _ | Tailcall_self _ | Tailcall_func _ | Call_no_return _ ->
       not_implemented_terminator i
 
   let int_op t (i : Cfg.basic Cfg.instruction)
@@ -766,8 +890,8 @@ module F = struct
         in
         add_called_fun t fabs_name ~cc:Default ~args:[typ] ~res:(Some typ);
         ins_call ~cc:Default ~pp_name:pp_global t fabs_name
-          [arg, typ]
-          (Some (res, typ));
+          [typ, arg]
+          (Some (typ, res));
         res
       | Icompf comp ->
         let bool_res = float_comp t comp i typ in
@@ -786,7 +910,7 @@ module F = struct
       ins_store_into_reg t temp i.res.(0)
     | Const_int n -> ins_store_nativeint t n i.res.(0)
     | Const_symbol { sym_name; sym_global = _ } ->
-      t.referenced_symbols <- String.Set.add sym_name t.referenced_symbols;
+      add_referenced_symbol t sym_name;
       ins_store_global t sym_name i.res.(0)
     | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } -> (
       (* Q: what do we do with mutability / is_atomic / is_modify? *)
@@ -1143,7 +1267,11 @@ let declare_functions t =
     (fun sym fun_sig ->
       if not (String.Set.mem sym t.defined_symbols)
       then F.fun_decl t sym fun_sig)
-    t.called_functions
+    t.called_functions;
+  (* Declare these intrinsics manually since we don't have metadata support
+     yet *)
+  F.line t.ppf "declare i64 @llvm.read_register.i64(metadata)";
+  F.line t.ppf "declare void @llvm.write_register.i64(metadata, i64)"
 
 let remove_file filename =
   try if Sys.file_exists filename then Sys.remove filename
@@ -1201,6 +1329,7 @@ let end_assembly () =
   let t = get_current_compilation_unit "end_asm" in
   (* Declare functions not already defined *)
   declare_functions t;
+  Format.pp_print_newline t.ppf ();
   (* Emit data declarations *)
   emit_data t;
   Format.pp_print_newline t.ppf ();
