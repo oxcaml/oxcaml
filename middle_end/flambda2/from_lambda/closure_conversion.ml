@@ -3049,8 +3049,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   in
   let contains_no_escaping_local_allocs =
     match (result_mode : Lambda.allocation_mode) with
-    | Alloc_heap | Alloc_external -> true
-    | Alloc_local -> false
+    | Alloc_heap -> true
+    | Alloc_local | Alloc_external -> false
   in
   let my_region =
     if contains_no_escaping_local_allocs
