@@ -123,16 +123,16 @@ let extract_constant = function
 
 (** Extract a constant if the enclosing block's allocation mode allows
     the block to be turned into a structured constant *)
-let extract_constant_check_alloc_mode alloc_mode lam =
+let extract_constant_if_internal alloc_mode lam =
   match alloc_mode with
   | External -> raise Not_constant
   | Internal _ -> extract_constant lam
 
 
-let extract_constant_check_alloc_mode_opt alloc_mode_opt lam =
+let extract_constant_if_internal_opt alloc_mode_opt lam =
   match alloc_mode_opt with
   | None -> extract_constant lam
-  | Some alloc_mode -> extract_constant_check_alloc_mode alloc_mode lam
+  | Some alloc_mode -> extract_constant_if_internal alloc_mode lam
 
 let extract_float = function
     Const_base(Const_float f) -> f
@@ -510,7 +510,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
       begin try
-        Lconst(Const_block(0, List.map (extract_constant_check_alloc_mode alloc_mode) ll))
+        Lconst(Const_block(0, List.map (extract_constant_if_internal alloc_mode) ll))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable, Some shape,
                          transl_alloc_mode alloc_mode),
@@ -550,7 +550,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
           let constant =
-            match List.map (extract_constant_check_alloc_mode_opt alloc_mode) ll with
+            match List.map (extract_constant_if_internal_opt alloc_mode) ll with
             | exception Not_constant -> None
             | constants -> (
               match cstr.cstr_shape with
@@ -645,7 +645,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
             Lconst(Const_block(0, [const_int tag;
-                                   extract_constant_check_alloc_mode alloc_mode lam]))
+                                   extract_constant_if_internal alloc_mode lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
@@ -823,7 +823,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         end;
         (* Pduparray only works in Alloc_heap mode *)
         if is_local_mode mode then raise Not_constant;
-        begin match List.map (extract_constant_check_alloc_mode alloc_mode) ll with
+        begin match List.map (extract_constant_if_internal alloc_mode) ll with
         | exception Not_constant
           when kind = Pfloatarray && Types.is_mutable amut ->
             (* We cannot currently lift mutable [Pintarray] arrays safely in
@@ -2164,7 +2164,7 @@ and transl_record ~scopes loc env alloc_mode fields repres opt_init_expr =
     let lam =
       try
         if mut = Mutable then raise Not_constant;
-        let cl = List.map (extract_constant_check_alloc_mode_opt alloc_mode) ll in
+        let cl = List.map (extract_constant_if_internal_opt alloc_mode) ll in
         match repres with
         | Record_boxed _ -> Lconst(Const_block(0, cl))
         | Record_inlined (Ordinary {runtime_tag},

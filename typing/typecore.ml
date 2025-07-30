@@ -761,8 +761,11 @@ let register_allocation ~loc ~env (expected_mode : expected_mode) =
       expected_mode.allocator
   in
   let alloc_mode : alloc_mode =
-    Internal { mode = alloc_mode;
-      locality_context = expected_mode.locality_context }
+    match expected_mode.allocator with
+    | Allocator_malloc -> External
+    | Allocator_stack | Allocator_heap ->
+      Internal { mode = alloc_mode;
+        locality_context = expected_mode.locality_context }
   in
   (* Since malloc_ is shallow, the subcomponents of this allocation should
      use the default allocator *)
