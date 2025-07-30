@@ -698,10 +698,8 @@ module Debugging = Dwarf_flags
 let mk_restrict_to_upstream_dwarf f =
   "-gupstream-dwarf", Arg.Unit f, " Only emit the same DWARF information as the upstream compiler"
 
-(* CR sspies: This helper text must be updated when -use-debugging-shapes
-   is eventually removed. *)
 let mk_no_restrict_to_upstream_dwarf f =
-  "-gno-upstream-dwarf", Arg.Unit f, " Emit potentially more DWARF information than the upstream compiler (implies -use-debugging-shapes)"
+  "-gno-upstream-dwarf", Arg.Unit f, " Emit potentially more DWARF information than the upstream compiler"
 
 let mk_dwarf_inlined_frames f =
   "-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information"
@@ -1402,8 +1400,7 @@ module Debugging_options_impl = struct
   let restrict_to_upstream_dwarf () =
     Debugging.restrict_to_upstream_dwarf := true
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false;
-    Clflags.use_merlin_shapes := false
+    Debugging.restrict_to_upstream_dwarf := false
   let dwarf_inlined_frames () =
     Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () =
