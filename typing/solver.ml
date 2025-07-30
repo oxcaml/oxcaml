@@ -160,14 +160,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       end)
     end
 
-    type big_const_hint =
+    type const_hint =
       | Base of H.const
       | Skip
           (** The [Skip] const hint is for a constant that should never produce an error *)
 
     type ('a, 'd) t =
       | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
-      | Const : big_const_hint -> ('a, 'l * 'r) t
+      | Const : const_hint -> ('a, 'l * 'r) t
       | Branch : 'a * ('a, 'l * 'r) t * 'a * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
       | Nil
       constraint 'd = _ * _
@@ -215,42 +215,168 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     end)
   end
 
-  let rec hint_of_comp_hint :
-      type a l r. (a, l * r) Comp_hint.t -> (a, l * r) hint = function
-    | Apply (morph_hint, big_h') ->
-      let rec hint_of_comp_apply_hint :
-          type b a l r.
-          (b, a, l * r) Comp_hint.Morph_hint.t ->
-          (unit -> (b, l * r) hint) ->
-          (a, l * r) hint =
-       fun morph_hint get_small_h' ->
-        (* This helper function converts a big [Apply] hint's components with
-           an already-converted subhint to a small hint [Apply] hint.
+  (** An intermediate representation for converting from [Comp_hint.t] to [hint] *)
+  module Holed_hint = struct
+    module Morph_hint = struct
+      type ('a, 'b, 'd) t =
+        | Base : 'd H.morph * ('a, 'b, 'd) C.morph -> ('a, 'b, 'd) t
+        | None : 'a C.obj -> ('a, 'b, 'l * 'r) t
+        | Hole_compose : ('a, 'b, 'l * 'r) C.morph -> ('a, 'b, 'l * 'r) t
+        constraint 'd = _ * _
+      [@@ocaml.warning "-62"]
+    end
 
-           The [get_small_h'] is done as a function so that it isn't computed if
-           it isn't needed, as in the [None] case. *)
+    type ('a, 'd) t =
+      | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
+      | Const : Comp_hint.const_hint -> ('a, 'l * 'r) t
+      | Branch : 'a * ('a, 'l * 'r) t * 'a * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
+      | Nil
+      constraint 'd = _ * _
+    [@@ocaml.warning "-62"]
+  end
+
+  (** This is for resolving holes (i.e. [Hole_compose] values) after the composition
+    morph hints have already been flattened. This contains mentions of [assert false]
+    for cases that shouldn't be allowed.  *)
+  let hint_of_holed_hint =
+    (* The auxiliary function will take an accumulator, [acc], which is the most-recent
+        base hint, as well as the morphisms encountered since then. When considering a
+        hole hint, we will add to this morphism, and otherwise the accumulator will not
+        be used, and the auxiliary function returns that the value has not been used.
+
+        The interesting cases are:
+
+        - [Apply (morph_hint, subhint)], where we should consider possiblilities for what
+          [morph_hint] is:
+          - [None], we can simply return an empty hint, and we have not used the
+            accumulator.
+          - [Base (morph_hint, morph)], we don't have to use the accumulator, and we
+            recurse into the subhint, using these new details, [morph_hint] and [morph],
+            as the new accumulator.
+          - [Hole_compose morph], this is the only case where we will use the accumulator.
+            We add [morph] to the accumulator and recurse into the subhint.
+
+       - [Branch (x, x_hint, y, y_hint)], we will recurse into both hints, passing the
+         same accumulator to the recursive calls. We have a special case here for if
+         neither of them used the accumulator, in which case the entire call can avoid
+         using the accumulator. Otherwise, we manually apply the accumulator to one that
+         didn't use it (if both used the accumulator, we don't need to do anything here),
+         and return a new branch construct with the subhints with the accumulator applied
+         to each. *)
+    let rec aux :
+        type a b l r.
+        acc:((l * r) H.morph * (a, b, l * r) C.morph) option ->
+        (* TODO - decide if need both of these objects or if either can always be derived *)
+        b C.obj ->
+        a C.obj ->
+        (a, l * r) Holed_hint.t ->
+        [ `Acc_has_been_used of (b, l * r) hint
+        | `Acc_was_not_used of (a, l * r) hint ] =
+     fun ~acc b_obj a_obj -> function
+      | Const const_hint -> (
+        match const_hint with
+        | Base const_hint -> `Acc_was_not_used (Const const_hint)
+        | Skip -> assert false)
+      | Nil -> `Acc_was_not_used Nil
+      | Apply (morph_hint, subhint) -> (
+        let recurse_and_apply new_acc b_obj a_obj subhint =
+          (* This helper function will recurse into the subhint with the given
+             new accumulator and, if the recursive call doesn't use the accumulator, will apply it to the output *)
+          match aux ~acc:(Some new_acc) b_obj a_obj subhint with
+          | `Acc_has_been_used subhint' -> subhint'
+          | `Acc_was_not_used subhint'_without_acc ->
+            Apply (fst new_acc, snd new_acc, subhint'_without_acc)
+        in
         match morph_hint with
-        | Base (morph_hint, morph) -> Apply (morph_hint, morph, get_small_h' ())
-        | None _a_obj -> Nil
-        | Compose (a_morph_hint, b_morph_hint) ->
-          let get_small_b_hint () =
-            hint_of_comp_apply_hint b_morph_hint get_small_h'
+        | None _ -> `Acc_was_not_used Nil
+        | Base (morph_hint, morph) ->
+          `Acc_was_not_used
+            (recurse_and_apply (morph_hint, morph) a_obj (C.src a_obj morph)
+               subhint)
+        | Hole_compose morph ->
+          let new_acc =
+            match acc with
+            | None ->
+              (* This is the case where we've reached a [Hole_compose] as our first
+                 morph hint, but this isn't allowed so we don't consider this case *)
+              assert false
+            | Some (acc_morph_hint, acc_morph) ->
+              acc_morph_hint, C.compose b_obj acc_morph morph
           in
-          hint_of_comp_apply_hint a_morph_hint get_small_b_hint
-        | Hole_compose _ ->
-          (* We require that the user always provides morph hints such that a
-             [Hole_compose] is always replaced by other constructs before being converted to a normal hint *)
-          assert false
-      in
-      let get_small_h' () = hint_of_comp_hint big_h' in
-      hint_of_comp_apply_hint morph_hint get_small_h'
-    | Const const_hint -> (
-      match const_hint with
-      | Base const_hint -> Const const_hint
-      | Skip -> assert false)
+          `Acc_has_been_used
+            (recurse_and_apply new_acc b_obj (C.src a_obj morph) subhint))
+      | Branch (x, x_hint, y, y_hint) -> (
+        let get_acc_and_prev_x_y () =
+          (* This function assumes that one or both of the recursive calls returns
+             that it used the accumulator, and so the accumulator must not be a [None] *)
+          let acc_morph_hint, acc_morph =
+            (* For the recursive call to claim to have used [acc], it must not be [None] *)
+            Option.get acc
+          in
+          let x' = C.apply b_obj acc_morph x in
+          let y' = C.apply b_obj acc_morph y in
+          acc_morph_hint, acc_morph, x', y'
+        in
+        let apply_acc_hint acc_morph_hint acc_morph hint =
+          Apply (acc_morph_hint, acc_morph, hint)
+        in
+        match aux ~acc b_obj a_obj x_hint, aux ~acc b_obj a_obj y_hint with
+        | ( `Acc_was_not_used x_hint'_without_acc,
+            `Acc_was_not_used y_hint'_without_acc ) ->
+          `Acc_was_not_used
+            (Branch (x, x_hint'_without_acc, y, y_hint'_without_acc))
+        | `Acc_was_not_used x_hint'_without_acc, `Acc_has_been_used y_hint' ->
+          let acc_morph_hint, acc_morph, x', y' = get_acc_and_prev_x_y () in
+          let x_hint' =
+            apply_acc_hint acc_morph_hint acc_morph x_hint'_without_acc
+          in
+          `Acc_has_been_used (Branch (x', x_hint', y', y_hint'))
+        | `Acc_has_been_used x_hint', `Acc_was_not_used y_hint'_without_acc ->
+          let acc_morph_hint, acc_morph, x', y' = get_acc_and_prev_x_y () in
+          let y_hint' =
+            apply_acc_hint acc_morph_hint acc_morph y_hint'_without_acc
+          in
+          `Acc_has_been_used (Branch (x', x_hint', y', y_hint'))
+        | `Acc_has_been_used x_hint', `Acc_has_been_used y_hint' ->
+          let _acc_morph_hint, _acc_morph, x', y' = get_acc_and_prev_x_y () in
+          `Acc_has_been_used (Branch (x', x_hint', y', y_hint')))
+    in
+    fun a_obj h ->
+      match aux ~acc:None a_obj a_obj h with
+      | `Acc_has_been_used _ ->
+        (* Since we didn't pass [acc] in, it is impossible for it to have used it *)
+        assert false
+      | `Acc_was_not_used h' -> h'
+
+  (** This is for removing compositions. This function doesn't contain any [assert false]
+  as it is just for a straightforward transformation *)
+  let rec holed_hint_of_comp_hint :
+      type a l r. (a, l * r) Comp_hint.t -> (a, l * r) Holed_hint.t = function
+    | Const const_hint -> Const const_hint
     | Branch (x, x_hint, y, y_hint) ->
-      Branch (x, hint_of_comp_hint x_hint, y, hint_of_comp_hint y_hint)
+      Branch
+        (x, holed_hint_of_comp_hint x_hint, y, holed_hint_of_comp_hint y_hint)
     | Nil -> Nil
+    | Apply (morph_hint, subhint) ->
+      let rec holed_hint_of_apply_comp_hint :
+          type b a l r.
+          (b, l * r) Holed_hint.t ->
+          (b, a, l * r) Comp_hint.Morph_hint.t ->
+          (a, l * r) Holed_hint.t =
+       fun subhint -> function
+        | Base (morph_hint, morph) -> Apply (Base (morph_hint, morph), subhint)
+        | None a_obj -> Apply (None a_obj, subhint)
+        | Hole_compose morph -> Apply (Hole_compose morph, subhint)
+        | Compose (h1, h2) ->
+          holed_hint_of_apply_comp_hint
+            (holed_hint_of_apply_comp_hint subhint h2)
+            h1
+      in
+      let subhint' = holed_hint_of_comp_hint subhint in
+      holed_hint_of_apply_comp_hint subhint' morph_hint
+
+  let hint_of_comp_hint a_obj x =
+    hint_of_holed_hint a_obj (holed_hint_of_comp_hint x)
 
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
 
@@ -838,18 +964,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         Error
           { left;
-            left_hint = hint_of_comp_hint left_hint_lower;
+            left_hint = hint_of_comp_hint obj left_hint_lower;
             right;
-            right_hint = hint_of_comp_hint right_hint_upper
+            right_hint = hint_of_comp_hint obj right_hint_upper
           }
     in
     let submode_mvc ~log obj v right right_hint_upper =
       Result.map_error
         (fun (left, left_hint) ->
           { left;
-            left_hint = hint_of_comp_hint left_hint;
+            left_hint = hint_of_comp_hint obj left_hint;
             right;
-            right_hint = hint_of_comp_hint right_hint_upper
+            right_hint = hint_of_comp_hint obj right_hint_upper
           })
         (submode_mvc ~log obj v right right_hint_upper)
     in
@@ -857,9 +983,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       Result.map_error
         (fun (right, right_hint) ->
           { left;
-            left_hint = hint_of_comp_hint left_hint_lower;
+            left_hint = hint_of_comp_hint obj left_hint_lower;
             right;
-            right_hint = hint_of_comp_hint right_hint
+            right_hint = hint_of_comp_hint obj right_hint
           })
         (submode_cmv ~log obj left left_hint_lower v)
     in
@@ -867,9 +993,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       Result.map_error
         (fun (left, left_hint, right, right_hint) ->
           { left;
-            left_hint = hint_of_comp_hint left_hint;
+            left_hint = hint_of_comp_hint obj left_hint;
             right;
-            right_hint = hint_of_comp_hint right_hint
+            right_hint = hint_of_comp_hint obj right_hint
           })
         (submode_mvmv ~log obj v u)
     in
