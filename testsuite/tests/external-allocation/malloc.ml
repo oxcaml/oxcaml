@@ -5,6 +5,8 @@
 
 external is_young : ('a : word) -> bool = "is_young" "is_young"
 
+external is_static_alloc : ('a : word) -> bool = "is_static_alloc" "is_static_alloc"
+
 external print_external_block_entries : ('a : word) -> int64# -> string -> unit = "print_block" "print_block"
 
 let is_a_malloc name ~num_fields f =
@@ -18,18 +20,28 @@ let is_a_malloc name ~num_fields f =
   in
   let msg =
     match delta with
-    | 0 -> "No GC-visible Allocation"
-    | n -> "GC-visible Allocation ocurred"
+    | 0 -> "No GC-visible allocation ocurred"
+    | n -> "GC-VISIBLE ALLOCATION OCCURRED"
   in
   let location =
-    if is_young v then "in minor heap"
+    if is_young v then "IN MINOR HEAP"
     else "outside minor heap"
   in
-  Format.printf "%s: %s, result value is %s\n" name msg location;
+  let allocation_time =
+    if is_static_alloc v then "COMPILE TIME"
+    else "runtime"
+  in
+  Format.printf "%s: %s, result value is %s, allocated at %s\n" name msg location allocation_time;
   Stdlib.flush Stdlib.stdout;
   print_external_block_entries v num_fields name;
   Format.printf "\n";
   ()
+
+
+(*
+We test each form of allocation two ways:
+1. Where a constant value is directly [malloc_]'d to test that malloc prevents
+*)
 
 (* Tuple allocations with different patterns *)
 let () = is_a_malloc "tuple" ~num_fields:#2L (fun () -> malloc_ (1,3))

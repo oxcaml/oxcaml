@@ -7,6 +7,15 @@ CAMLprim value is_young(uint64_t v){
     return Val_bool(Is_young(v));
 }
 
+CAMLprim value is_static_alloc(uint64_t v) {
+    // This is extremly hacky: detect runtime version by checking for shared_heap (runtime5+ feature)
+    #if defined(CAML_INTERNALS) && __has_include("caml/shared_heap.h")
+        return Val_bool(Is_in_static_data(v));
+    #else
+        return Val_bool(Classify_addr(v) & In_static_data);
+    #endif
+}
+
 CAMLprim value print_block(uint64_t v, uint64_t fields, value name){
     CAMLparam1(name);
     printf("Test %s:\n", String_val(name));
