@@ -31,6 +31,8 @@ let is_a_malloc name ~num_fields f =
   let malloc_msg =
     match malloc_delta with
     | 0 -> "NO MALLOC ALLOCATION"
+    (* This number is always a little larger than the block we asked for, since
+       malloc needs to allocate some bookkeeping space *)
     | n -> Printf.sprintf "%d bytes malloc'd" n
   in
   let location =
