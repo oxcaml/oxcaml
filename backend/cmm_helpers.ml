@@ -22,6 +22,30 @@ module VP = Backend_var.With_provenance
 open Cmm
 open Arch
 
+(* Tags for unboxed arrays using mixed block headers with scannable_prefix =
+   0 *)
+module Unboxed_array_tags = struct
+  let _unboxed_product_array_tag = 0
+
+  let unboxed_int64_array_tag = 1
+
+  let unboxed_int32_array_even_tag = 2
+
+  let unboxed_int32_array_odd_tag = 3
+
+  let unboxed_float32_array_even_tag = 4
+
+  let unboxed_float32_array_odd_tag = 5
+
+  let unboxed_vec128_array_tag = 6
+
+  let unboxed_vec256_array_tag = 7
+
+  let unboxed_vec512_array_tag = 8
+
+  let unboxed_nativeint_array_tag = 9
+end
+
 let arch_bits = Arch.size_int * 8
 
 type arity =
@@ -161,11 +185,19 @@ let block_header ?(block_kind = Regular_block) tag sz =
    structured constants and static module definitions. *)
 let black_block_header tag sz = Nativeint.logor (block_header tag sz) caml_black
 
+(* Generic mixed block header creation *)
+let mixed_block_header tag sz ~scannable_prefix_len ~color =
+  let header =
+    block_header tag sz
+      ~block_kind:(Mixed_block { scannable_prefix = scannable_prefix_len })
+  in
+  Nativeint.logor header color
+
 let black_mixed_block_header tag sz ~scannable_prefix_len =
-  Nativeint.logor
-    (block_header tag sz
-       ~block_kind:(Mixed_block { scannable_prefix = scannable_prefix_len }))
-    caml_black
+  mixed_block_header tag sz ~scannable_prefix_len ~color:caml_black
+
+let white_mixed_block_header tag sz ~scannable_prefix_len =
+  mixed_block_header tag sz ~scannable_prefix_len ~color:0n
 
 let local_block_header ?block_kind tag sz =
   Nativeint.logor (block_header ?block_kind tag sz) caml_local
@@ -227,10 +259,6 @@ let boxedint64_local_header =
 let boxedintnat_local_header = local_block_header Obj.custom_tag 2
 
 let black_custom_header ~size = black_block_header Obj.custom_tag size
-
-let custom_header ~size = block_header Obj.custom_tag size
-
-let custom_local_header ~size = local_block_header Obj.custom_tag size
 
 let caml_float32_ops = "caml_float32_ops"
 
@@ -1373,127 +1401,34 @@ let array_indexing ?typ log2size ptr ofs dbg =
    cross-compiling for 64-bit on a 32-bit host *)
 let int ~dbg i = natint_const_untagged dbg (Nativeint.of_int i)
 
-let custom_ops_size_log2 =
-  let lg = Misc.log2 Config.custom_ops_struct_size in
-  assert (1 lsl lg = Config.custom_ops_struct_size);
-  lg
+let unboxed_packed_array_length arr dbg =
+  bind "arr" arr (fun arr ->
+      let size_in_words = get_size arr dbg in
+      let tag = get_tag arr dbg in
+      (* Calculate: (size_in_words * 2) - (tag & 1) *)
+      let total_slots = lsl_int size_in_words (int ~dbg 1) dbg in
+      let adjustment = Cop (Cand, [tag; int ~dbg 1], dbg) in
+      tag_int (sub_int total_slots adjustment dbg) dbg)
 
-(* caml_unboxed_int32_array_ops refers to the first element of an array of two
-   custom ops. The array index indicates the number of (invalid) tailing int32s
-   (0 or 1). *)
-let custom_ops_unboxed_int32_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_int32_array_ops", Debuginfo.none)
+let unboxed_int32_array_length = unboxed_packed_array_length
 
-let custom_ops_unboxed_int32_even_array = custom_ops_unboxed_int32_array
-
-let custom_ops_unboxed_int32_odd_array =
-  Cop
-    ( Caddi,
-      [ custom_ops_unboxed_int32_array;
-        Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
-      Debuginfo.none )
-
-(* caml_unboxed_float32_array_ops refers to the first element of an array of two
-   custom ops. The array index indicates the number of (invalid) tailing
-   float32s (0 or 1). *)
-let custom_ops_unboxed_float32_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_float32_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_float32_even_array = custom_ops_unboxed_float32_array
-
-let custom_ops_unboxed_float32_odd_array =
-  Cop
-    ( Caddi,
-      [ custom_ops_unboxed_float32_array;
-        Cconst_int (Config.custom_ops_struct_size, Debuginfo.none) ],
-      Debuginfo.none )
-
-let custom_ops_unboxed_int64_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_int64_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_nativeint_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_nativeint_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_vec128_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_vec128_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_vec256_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_vec256_array_ops", Debuginfo.none)
-
-let custom_ops_unboxed_vec512_array =
-  Cconst_symbol
-    (Cmm.global_symbol "caml_unboxed_vec512_array_ops", Debuginfo.none)
-
-let unboxed_packed_array_length arr dbg ~custom_ops_base_symbol
-    ~elements_per_word =
-  (* Checking custom_ops is needed to determine if the array contains an odd or
-     even number of elements *)
-  let res =
-    bind "arr" arr (fun arr ->
-        let custom_ops_var = Backend_var.create_local "custom_ops" in
-        let custom_ops_index_var =
-          Backend_var.create_local "custom_ops_index"
-        in
-        let num_words_var = Backend_var.create_local "num_words" in
-        Clet
-          ( VP.create num_words_var,
-            (* subtract custom_operations word *)
-            sub_int (get_size arr dbg) (int ~dbg 1) dbg,
-            Clet
-              ( VP.create custom_ops_var,
-                Cop (mk_load_immut Word_int, [arr], dbg),
-                Clet
-                  ( VP.create custom_ops_index_var,
-                    (* compute index into custom ops array *)
-                    lsr_int
-                      (sub_int (Cvar custom_ops_var) custom_ops_base_symbol dbg)
-                      (int ~dbg custom_ops_size_log2)
-                      dbg,
-                    (* subtract index from length in elements *)
-                    sub_int
-                      (mul_int (Cvar num_words_var)
-                         (int ~dbg elements_per_word)
-                         dbg)
-                      (Cvar custom_ops_index_var) dbg ) ) ))
-  in
-  tag_int res dbg
-
-let unboxed_int32_array_length =
-  unboxed_packed_array_length
-    ~custom_ops_base_symbol:custom_ops_unboxed_int32_array ~elements_per_word:2
-
-let unboxed_float32_array_length =
-  unboxed_packed_array_length
-    ~custom_ops_base_symbol:custom_ops_unboxed_float32_array
-    ~elements_per_word:2
-
-let unboxed_custom_array_length ~log2_element_words arr dbg =
-  let res =
-    bind "arr" arr (fun arr ->
-        (* need to subtract so as not to count the custom_operations field *)
-        sub_int (get_size arr dbg) (int ~dbg 1) dbg)
-  in
-  if log2_element_words = 0
-  then tag_int res dbg
-  else tag_int (lsr_int res (int ~dbg log2_element_words) dbg) dbg
+let unboxed_float32_array_length = unboxed_packed_array_length
 
 let unboxed_int64_or_nativeint_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:0 arr dbg
+  bind "arr" arr (fun arr -> tag_int (get_size arr dbg) dbg)
+
+let unboxed_vector_array_length ~log2_ints_per_vec arr dbg =
+  bind "arr" arr (fun arr ->
+      tag_int (lsr_int (get_size arr dbg) (int ~dbg log2_ints_per_vec) dbg) dbg)
 
 let unboxed_vec128_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:1 arr dbg
+  unboxed_vector_array_length ~log2_ints_per_vec:1 arr dbg
 
 let unboxed_vec256_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:2 arr dbg
+  unboxed_vector_array_length ~log2_ints_per_vec:2 arr dbg
 
 let unboxed_vec512_array_length arr dbg =
-  unboxed_custom_array_length ~log2_element_words:3 arr dbg
+  unboxed_vector_array_length ~log2_ints_per_vec:3 arr dbg
 
 let field_address_computed ptr ofs dbg =
   array_indexing log2_size_addr ptr ofs dbg
@@ -1726,17 +1661,9 @@ let rec sign_extend ~bits ~dbg e =
         | e -> sign_extend_via_shift e)
       (low_bits ~bits e ~dbg)
 
-let unboxed_packed_array_ref arr index dbg ~memory_chunk ~elements_per_word =
+let unboxed_packed_array_ref arr index dbg ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
-          let index =
-            (* Need to skip the custom_operations field. We add
-               elements_per_word offsets not 1 since the call to
-               [array_indexing], below, is in terms of elements. Then we
-               multiply the offset by 2 since we are manipulating a tagged
-               int. *)
-            add_int index (int ~dbg (elements_per_word * 2)) dbg
-          in
           let log2_size_addr = 2 in
           Cop
             ( mk_load_mut memory_chunk,
@@ -1746,7 +1673,7 @@ let unboxed_packed_array_ref arr index dbg ~memory_chunk ~elements_per_word =
 let unboxed_int32_array_ref =
   (* N.B. The resulting value will be sign extended by the code generated for a
      [Thirtytwo_signed] load. *)
-  unboxed_packed_array_ref ~memory_chunk:Thirtytwo_signed ~elements_per_word:2
+  unboxed_packed_array_ref ~memory_chunk:Thirtytwo_signed
 
 let unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
@@ -1770,32 +1697,16 @@ let unboxed_mutable_int32_unboxed_product_array_set arr ~array_index ~new_value
                   dbg ))))
 
 let unboxed_float32_array_ref =
-  unboxed_packed_array_ref
-    ~memory_chunk:(Single { reg = Float32 })
-    ~elements_per_word:2
+  unboxed_packed_array_ref ~memory_chunk:(Single { reg = Float32 })
 
-let unboxed_int64_or_nativeint_array_ref ~has_custom_ops arr ~array_index dbg =
+let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index ->
-          let index =
-            if has_custom_ops
-            then
-              (* Need to skip the custom_operations field. 2 not 1 since we are
-                 manipulating a tagged int. *)
-              add_int index (int ~dbg 2) dbg
-            else index
-          in
-          int_array_ref arr index dbg))
+      bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
-let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk
-    ~elements_per_word =
+let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
-              let index =
-                (* See comment in [unboxed_packed_array_ref]. *)
-                add_int index (int ~dbg (elements_per_word * 2)) dbg
-              in
               let log2_size_addr = 2 in
               Cop
                 ( Cstore (memory_chunk, Assignment),
@@ -1803,25 +1714,15 @@ let unboxed_packed_array_set arr ~index ~new_value dbg ~memory_chunk
                   dbg ))))
 
 let unboxed_int32_array_set =
-  unboxed_packed_array_set ~memory_chunk:Thirtytwo_signed ~elements_per_word:2
+  unboxed_packed_array_set ~memory_chunk:Thirtytwo_signed
 
 let unboxed_float32_array_set =
-  unboxed_packed_array_set
-    ~memory_chunk:(Single { reg = Float32 })
-    ~elements_per_word:2
+  unboxed_packed_array_set ~memory_chunk:(Single { reg = Float32 })
 
-let unboxed_int64_or_nativeint_array_set ~has_custom_ops arr ~index ~new_value
-    dbg =
+let unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
-              let index =
-                if has_custom_ops
-                then
-                  (* See comment in [unboxed_int64_or_nativeint_array_ref]. *)
-                  add_int index (int ~dbg 2) dbg
-                else index
-              in
               int_array_set arr index new_value dbg)))
 
 let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
@@ -4839,26 +4740,26 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   in
   aux [] unboxed_int32_list
 
-let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let num_elts, payload = make_unboxed_int32_array_payload dbg elements in
+let allocate_unboxed_packed_array ~make_payload ~alloc_kind ~even_tag ~odd_tag
+    ~elements mode dbg =
+  let num_elts, payload = make_payload dbg elements in
+  let tag = match num_elts with Even -> even_tag | Odd -> odd_tag in
   let header =
-    let size = 1 (* custom_ops field *) + List.length payload in
+    let size = List.length payload in
     match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+    | Cmm.Alloc_mode.Heap ->
+      white_mixed_block_header tag size ~scannable_prefix_len:0
+    | Cmm.Alloc_mode.Local ->
+      local_block_header tag size
+        ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
-  let custom_ops =
-    (* For odd-length unboxed int32 arrays there are 32 bits spare at the end of
-       the block, which are never read. They are initialized to the sign
-       extension of the last element. *)
-    match num_elts with
-    | Even -> custom_ops_unboxed_int32_even_array
-    | Odd -> custom_ops_unboxed_int32_odd_array
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_int32_u_array),
-      Cconst_natint (header, dbg) :: custom_ops :: payload,
-      dbg )
+  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
+
+let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
+  allocate_unboxed_packed_array ~make_payload:make_unboxed_int32_array_payload
+    ~alloc_kind:Alloc_block_kind_int32_u_array
+    ~even_tag:Unboxed_array_tags.unboxed_int32_array_even_tag
+    ~odd_tag:Unboxed_array_tags.unboxed_int32_array_odd_tag ~elements mode dbg
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   if Sys.big_endian
@@ -4880,73 +4781,69 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   aux [] unboxed_float32_list
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let num_elts, payload = make_unboxed_float32_array_payload dbg elements in
-  let header =
-    let size = 1 (* custom_ops field *) + List.length payload in
-    match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
-  in
-  let custom_ops =
-    (* For odd-length unboxed float32 arrays there are 32 bits spare at the end
-       of the block, which are never read. They are *not* initialized. *)
-    match num_elts with
-    | Even -> custom_ops_unboxed_float32_even_array
-    | Odd -> custom_ops_unboxed_float32_odd_array
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_float32_u_array),
-      Cconst_natint (header, dbg) :: custom_ops :: payload,
-      dbg )
+  allocate_unboxed_packed_array ~make_payload:make_unboxed_float32_array_payload
+    ~alloc_kind:Alloc_block_kind_float32_u_array
+    ~even_tag:Unboxed_array_tags.unboxed_float32_array_even_tag
+    ~odd_tag:Unboxed_array_tags.unboxed_float32_array_odd_tag ~elements mode dbg
 
-let allocate_unboxed_int64_or_nativeint_array custom_ops ~elements
-    (mode : Cmm.Alloc_mode.t) dbg =
+let allocate_unboxed_int64_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let header =
-    let size = 1 (* custom_ops field *) + List.length elements in
+    let size = List.length elements in
     match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+    | Heap ->
+      white_mixed_block_header Unboxed_array_tags.unboxed_int64_array_tag size
+        ~scannable_prefix_len:0
+    | Local ->
+      local_block_header Unboxed_array_tags.unboxed_int64_array_tag size
+        ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_int64_u_array),
-      Cconst_natint (header, dbg) :: custom_ops :: elements,
+      Cconst_natint (header, dbg) :: elements,
       dbg )
 
-let allocate_unboxed_int64_array =
-  allocate_unboxed_int64_or_nativeint_array custom_ops_unboxed_int64_array
-
-let allocate_unboxed_nativeint_array =
-  allocate_unboxed_int64_or_nativeint_array custom_ops_unboxed_nativeint_array
-
-let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~custom_ops
-    ~elements (mode : Cmm.Alloc_mode.t) dbg =
+let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
   let header =
-    let size =
-      1 (* custom_ops field *) + (ints_per_vec * List.length elements)
-    in
+    let size = List.length elements in
     match mode with
-    | Heap -> custom_header ~size
-    | Local -> custom_local_header ~size
+    | Heap ->
+      white_mixed_block_header Unboxed_array_tags.unboxed_nativeint_array_tag
+        size ~scannable_prefix_len:0
+    | Local ->
+      local_block_header Unboxed_array_tags.unboxed_nativeint_array_tag size
+        ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
   Cop
-    ( Calloc (mode, alloc_kind),
-      Cconst_natint (header, dbg) :: custom_ops :: elements,
+    ( Calloc (mode, Alloc_block_kind_int64_u_array),
+      Cconst_natint (header, dbg) :: elements,
       dbg )
+
+let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
+    (mode : Cmm.Alloc_mode.t) dbg =
+  let header =
+    let size = ints_per_vec * List.length elements in
+    match mode with
+    | Heap -> white_mixed_block_header tag size ~scannable_prefix_len:0
+    | Local ->
+      local_block_header tag size
+        ~block_kind:(Mixed_block { scannable_prefix = 0 })
+  in
+  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: elements, dbg)
 
 let allocate_unboxed_vec128_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec128
     ~alloc_kind:Alloc_block_kind_vec128_u_array
-    ~custom_ops:custom_ops_unboxed_vec128_array ~elements mode dbg
+    ~tag:Unboxed_array_tags.unboxed_vec128_array_tag ~elements mode dbg
 
 let allocate_unboxed_vec256_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec256
     ~alloc_kind:Alloc_block_kind_vec256_u_array
-    ~custom_ops:custom_ops_unboxed_vec256_array ~elements mode dbg
+    ~tag:Unboxed_array_tags.unboxed_vec256_array_tag ~elements mode dbg
 
 let allocate_unboxed_vec512_array ~elements mode dbg =
   allocate_unboxed_vector_array ~ints_per_vec:ints_per_vec512
     ~alloc_kind:Alloc_block_kind_vec512_u_array
-    ~custom_ops:custom_ops_unboxed_vec512_array ~elements mode dbg
+    ~tag:Unboxed_array_tags.unboxed_vec512_array_tag ~elements mode dbg
 
 (* Drop internal optional arguments from exported interface *)
 let block_header x y = block_header x y

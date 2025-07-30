@@ -376,6 +376,36 @@ let add_to_type_shapes var_uid type_expr type_layout uid_of_path =
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_layout }
 
+let find_in_type_decls (type_uid : Uid.t) =
+  Uid.Tbl.find_opt all_type_decls type_uid
+
+let rec estimate_layout_from_type_shape (t : Shape.without_layout Shape.ts) :
+    Layout.t option =
+  match t with
+  | Ts_predef (t, _) -> Some (Shape.Predef.to_layout t)
+  | Ts_constr ((uid, _, _), _) ->
+    find_in_type_decls uid
+    |> Option.map estimate_layout_from_type_decl_shape
+    |> Option.join
+  | Ts_tuple _ -> Some (Layout.Base Value)
+  | Ts_unboxed_tuple fields ->
+    let field_layouts = List.map estimate_layout_from_type_shape fields in
+    if List.for_all Option.is_some field_layouts
+    then Some (Layout.Product (List.map Option.get field_layouts))
+    else None
+  | Ts_var _ -> None
+  | Ts_arrow (_, _) -> Some (Layout.Base Value)
+  | Ts_variant _ -> Some (Layout.Base Value)
+  | Ts_other _ -> None
+
+and estimate_layout_from_type_decl_shape (tds : Shape.tds) : Layout.t option =
+  match tds.definition with
+  | Tds_variant_unboxed _ -> Some (Layout.Base Value)
+  | Tds_variant _ -> Some (Layout.Base Value)
+  | Tds_record _ -> Some (Layout.Base Value)
+  | Tds_alias t -> estimate_layout_from_type_shape t
+  | Tds_other -> None
+
 let tuple_to_string (strings : string list) =
   match strings with
   | [] -> ""
@@ -393,9 +423,6 @@ let type_arg_list_to_string (strings : string list) =
   | [] -> ""
   | hd :: [] -> hd ^ " "
   | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ") "
-
-let find_in_type_decls (type_uid : Uid.t) =
-  Uid.Tbl.find_opt all_type_decls type_uid
 
 let rec type_name : 'a. 'a Shape.ts -> _ =
  fun type_shape ->

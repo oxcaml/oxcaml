@@ -82,6 +82,100 @@ type i32 = int32#
 type f64 = float#
 type f32 = float32#
 
+module Bigstring = struct
+  type t = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
+  let create len : t = Bigarray.Array1.create Char C_layout len
+end
+
+module Vec128_bigarray = struct
+  type t = Bigstring.t
+  type elem = int64x2#
+
+  external create_elem
+    :  i64
+    -> i64
+    -> elem
+    = "caml_no_bytecode_impl" "ocaml_address_sanitizer_test_vec128_of_int64s"
+  [@@noalloc]
+
+  external unsafe_aligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_geta128u#"
+
+  external unsafe_aligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_seta128u#"
+
+  external unsafe_unaligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_getu128u#"
+
+  external unsafe_unaligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_setu128u#"
+end
+
+module Vec256_bigarray = struct
+  type t = Bigstring.t
+  type elem = int64x4#
+
+  external create_elem
+    :  i64
+    -> i64
+    -> i64
+    -> i64
+    -> elem
+    = "caml_no_bytecode_impl" "ocaml_address_sanitizer_test_vec256_of_int64s"
+  [@@noalloc]
+
+  external unsafe_aligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_geta256u#"
+
+  external unsafe_aligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_seta256u#"
+
+  external unsafe_unaligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_getu256u#"
+
+  external unsafe_unaligned_set
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    -> unit
+    = "%caml_bigstring_setu256u#"
+
+  external safe_aligned_get
+    :  (t[@local_opt])
+    -> byte:int
+    -> elem
+    = "%caml_bigstring_geta256#"
+
+  let find_alignment t =
+    try let _ : _ = safe_aligned_get t ~byte:0 in 0
+    with Invalid_argument _ -> 16
+end
+
 module Test_use_after_free = struct
   type t0 = { mutable x : int }
 
@@ -366,6 +460,27 @@ module Test_use_after_free = struct
       free t5;
       free t6;
       free t7;
+      ()
+    in
+    run_test __FUNCTION__ ~test ~validate:(fun test_output ->
+      if test_output <> "" then failwith ("Failed: " ^ test_output))
+  ;;
+
+  let valid_vector_accesses_are_unaffected () =
+    let test () =
+      let bigstring = Bigstring.create 48 in
+      let x = Vec128_bigarray.create_elem #0L #1L in
+      Vec128_bigarray.unsafe_unaligned_set bigstring ~byte:8 x;
+      let _x = Sys.opaque_identity (Vec128_bigarray.unsafe_unaligned_get bigstring ~byte:8) in
+      Vec128_bigarray.unsafe_aligned_set bigstring ~byte:0 x;
+      let _x = Sys.opaque_identity (Vec128_bigarray.unsafe_aligned_get bigstring ~byte:0) in
+      let x = Vec256_bigarray.create_elem #0L #1L #2L #3L in
+      Vec256_bigarray.unsafe_unaligned_set bigstring ~byte:8 x;
+      let _x = Sys.opaque_identity (Vec256_bigarray.unsafe_unaligned_get bigstring ~byte:8) in
+      (* Requires 32-byte alignment, which is true at either byte 0 or 16. *)
+      let byte = Vec256_bigarray.find_alignment bigstring in
+      Vec256_bigarray.unsafe_aligned_set bigstring ~byte x;
+      let _x = Sys.opaque_identity (Vec256_bigarray.unsafe_aligned_get bigstring ~byte) in
       ()
     in
     run_test __FUNCTION__ ~test ~validate:(fun test_output ->
@@ -688,38 +803,7 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:1)
   ;;
 
-  module Bigstring = struct
-    type t = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
-
-    let create len : t = Bigarray.Array1.create Char C_layout len
-  end
-
-  module Vec128_bigarray = struct
-    type t = Bigstring.t
-    type elem = int64x2#
-
-    external create_elem
-      :  i64
-      -> i64
-      -> elem
-      = "caml_no_bytecode_impl" "ocaml_address_sanitizer_test_vec128_of_int64s"
-    [@@noalloc]
-
-    external unsafe_aligned_get
-      :  (t[@local_opt])
-      -> byte:int
-      -> elem
-      = "%caml_bigstring_geta128u#"
-
-    external unsafe_aligned_set
-      :  (t[@local_opt])
-      -> byte:int
-      -> elem
-      -> unit
-      = "%caml_bigstring_seta128u#"
-  end
-
-  let read_vec128_bigarray () =
+  let read_vec128_bigarray_aligned () =
     let test () =
       let len = 2 in
       let elem_size = 16 in
@@ -734,7 +818,7 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
   ;;
 
-  let write_vec128_bigarray () =
+  let write_vec128_bigarray_aligned () =
     let test () =
       let len = 2 in
       let elem_size = 16 in
@@ -751,6 +835,101 @@ module Test_out_of_bounds_accesses = struct
       ~test
       ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
   ;;
+
+  let read_vec128_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 16 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      let x =
+        Vec128_bigarray.unsafe_unaligned_get t
+          ~byte:((len * elem_size) - offset)
+      in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+
+  let write_vec128_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 16 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec128_bigarray.unsafe_unaligned_set t
+        ~byte:((len * elem_size) - offset)
+        (Vec128_bigarray.create_elem #0L #1L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+
+  let read_vec256_bigarray_aligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let t = Bigstring.create (len * elem_size) in
+      let x = Vec256_bigarray.unsafe_aligned_get t ~byte:(len * elem_size) in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let write_vec256_bigarray_aligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec256_bigarray.unsafe_aligned_set
+        t
+        ~byte:(len * elem_size)
+        (Vec256_bigarray.create_elem #0L #1L #2L #3L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let read_vec256_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      let x =
+        Vec256_bigarray.unsafe_unaligned_get t
+          ~byte:((len * elem_size) - offset)
+      in
+      let _ = Sys.opaque_identity x in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+
+  let write_vec256_bigarray_unaligned () =
+    let test () =
+      let len = 2 in
+      let elem_size = 32 in
+      let offset = 4 in
+      let t = Bigstring.create (len * elem_size) in
+      Vec256_bigarray.unsafe_unaligned_set t
+        ~byte:((len * elem_size) - offset)
+        (Vec256_bigarray.create_elem #0L #1L #2L #3L);
+      let _ = Sys.opaque_identity t in
+      ()
+    in
+    run_test __FUNCTION__ ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
 
   external bigstring_fetch_and_add_int
     :  Bigstring.t
@@ -791,6 +970,7 @@ let () =
       let open Test_use_after_free in
       (* Ensure that we aren't producing false-positives *)
       valid_accesses_are_unaffected ();
+      valid_vector_accesses_are_unaffected ();
       (* Record use-after-free tests *)
       field_get_immediate ();
       field_set_immediate ();
@@ -840,8 +1020,14 @@ let () =
       write_int8_signed_bigarray ();
       read_int8_unsigned_bigarray ();
       write_int8_unsigned_bigarray ();
-      read_vec128_bigarray ();
-      write_vec128_bigarray ();
+      read_vec128_bigarray_aligned ();
+      write_vec128_bigarray_aligned ();
+      read_vec128_bigarray_unaligned ();
+      write_vec128_bigarray_unaligned ();
+      read_vec256_bigarray_aligned ();
+      write_vec256_bigarray_aligned ();
+      read_vec256_bigarray_unaligned ();
+      write_vec256_bigarray_unaligned ();
       atomic_fetch_and_add_bigstring ()
     in
     ())

@@ -11,6 +11,10 @@ let fatal : ('a, Format.formatter, unit, unit, unit, _) format6 -> 'a =
     Format.err_formatter
     ("*** error: " ^^ fmt ^^ "\n%!")
 
+let num_processed_files = ref 0
+
+let num_processed_functions = ref 0
+
 type register_allocator =
   | GI
   | IRC
@@ -39,6 +43,7 @@ type config =
     linscan_threshold : int;
     debug_output : bool;
     csv_output : bool;
+    print_summary : bool;
     paths : string list
   }
 
@@ -238,6 +243,7 @@ let select_allocator config cfg_with_layout =
 
 let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     (cmm_label : Label.t) (reg_stamp : int) (relocatable_regs : Reg.t list) =
+  incr num_processed_functions;
   if config.debug_output
   then
     Printf.eprintf "  processing function %S...\n%!"
@@ -288,6 +294,7 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
 
 let process_file (file : string) (config : config) =
   if config.debug_output then Printf.eprintf "processing file %S...\n%!" file;
+  incr num_processed_files;
   let unit_info, _digest = Cfg_format.restore file in
   List.iter unit_info.items ~f:(fun (item : Cfg_format.cfg_item_info) ->
       begin
@@ -338,6 +345,7 @@ let parse_command_line () =
   let linscan_threshold = ref !Oxcaml_flags.regalloc_linscan_threshold in
   let csv_output = ref false in
   let debug_output = ref false in
+  let print_summary = ref false in
   let paths = ref [] in
   let args : (Arg.key * Arg.spec * Arg.doc) list =
     [ ( "-regalloc",
@@ -353,7 +361,8 @@ let parse_command_line () =
         "Select linscan if the number of registers is above the threshold" );
       "-validate", Arg.Set validate, "Enable validation";
       "-csv-output", Arg.Set csv_output, "Enable CSV output";
-      "-debug-output", Arg.Set debug_output, "Enable debug output" ]
+      "-debug-output", Arg.Set debug_output, "Enable debug output";
+      "-summary", Arg.Set print_summary, "Print summary" ]
   in
   let anonymous path = paths := path :: !paths in
   Arg.parse args anonymous "run register allocation on .cmir-cfg-regalloc files";
@@ -365,6 +374,7 @@ let parse_command_line () =
       linscan_threshold = !linscan_threshold;
       csv_output = !csv_output;
       debug_output = !debug_output;
+      print_summary = !print_summary;
       paths = !paths
     }
 
@@ -375,4 +385,9 @@ let () =
     Printf.printf "%s\n%!" row_header
   end;
   let files = collect_files config.paths in
-  List.iter files ~f:(fun file -> process_file file config)
+  List.iter files ~f:(fun file -> process_file file config);
+  if config.print_summary
+  then begin
+    Printf.printf "processed %d files(s) / %d function(s)\n%!"
+      !num_processed_files !num_processed_functions
+  end

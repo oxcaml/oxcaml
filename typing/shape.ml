@@ -280,6 +280,27 @@ module Predef = struct
       | Float32x16 -> "float32x16"
       | Float64x8 -> "float64x8"
 
+    let simd_vec_split_to_byte_size : simd_vec_split -> int = function
+      | Int8x16
+      | Int16x8
+      | Int32x4
+      | Int64x2
+      | Float32x4
+      | Float64x2 -> 16
+      | Int8x32
+      | Int16x16
+      | Int32x8
+      | Int64x4
+      | Float32x8
+      | Float64x4 -> 32
+      | Int8x64
+      | Int16x32
+      | Int32x16
+      | Int64x8
+      | Float32x16
+      | Float64x8 -> 64
+
+
     (* name of the type without the hash *)
     let unboxed_to_string (u : unboxed) =
       match u with

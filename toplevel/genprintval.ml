@@ -697,7 +697,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       tree_list start ty_list
 
       and tree_of_generic_array am depth obj ty_arg =
-        if O.tag obj = Obj.custom_tag then
+        let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
+        if Obj.Uniform_or_mixed.is_mixed obj_block then
           Oval_stuff "<abstr array>"
         else
           let oval elts = Oval_array (elts, am) in

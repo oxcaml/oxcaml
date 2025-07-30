@@ -80,6 +80,7 @@ caml_unix_mapped_alloc(int flags, int num_dims, void * data, intnat * dim)
 #ifdef CAML_RUNTIME_5
   caml_memprof_sample_block(res, mem_words, mem_words, CAML_MEMPROF_SRC_CUSTOM);
 #else
+  (void)mem_words; /* unused in runtime4 */
   caml_memprof_track_custom(res, mem_bytes);
 #endif
   b = Caml_ba_array_val(res);

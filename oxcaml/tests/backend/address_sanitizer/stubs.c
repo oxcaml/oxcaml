@@ -34,6 +34,13 @@ CAMLprim __m128i ocaml_address_sanitizer_test_vec128_of_int64s(int64_t low,
   return _mm_set_epi64x(high, low);
 }
 
+CAMLprim __m256i ocaml_address_sanitizer_test_vec256_of_int64s(int64_t w0,
+                                                               int64_t w1,
+                                                               int64_t w2,
+                                                               int64_t w3) {
+  return _mm256_set_epi64x(w3, w2, w1, w0);
+}
+
 CAMLprim value DO_NOT_SANITIZE caml_prefetch_read_low(const void *ptr) {
   __builtin_prefetch(ptr, /*is_write=*/0, /*locality=*/1);
   return Val_unit;

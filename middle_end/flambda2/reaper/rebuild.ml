@@ -929,7 +929,8 @@ let rebuild_apply env apply =
     in
     let func_decisions =
       List.map
-        (fun kind -> Keep (Variable.create "function_return", kind))
+        (fun kind ->
+          Keep (Variable.create "function_return" (KS.kind kind), kind))
         (Flambda_arity.unarized_components return_arity)
     in
     make_apply_wrapper env make_apply (Apply.continuation apply) func_decisions

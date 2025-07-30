@@ -1403,7 +1403,7 @@ end = struct
      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
      I'd recommend reading that first for reference before touching this
      function. *)
-  let emit_sanitize ?(dependencies = [||]) ?(offset = 0) ~address ~report
+  let emit_shadow_check ?(dependencies = [||]) ?(offset = 0) ~address ~report
       (memory_chunk : Cmm.memory_chunk) =
     let[@inline always] need_to_save_register register =
       uses_register register address
@@ -1506,16 +1506,19 @@ end = struct
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
         | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
         | Double | Onetwentyeight_aligned ->
-          emit_sanitize ?dependencies ~address ~report memory_chunk
+          emit_shadow_check ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
-          emit_sanitize ?dependencies ~address ~report Byte_unsigned;
-          emit_sanitize ?dependencies ~offset:15 ~address ~report Byte_unsigned
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:15 ~address ~report
+            Byte_unsigned
         | Twofiftysix_unaligned | Twofiftysix_aligned ->
-          emit_sanitize ?dependencies ~address ~report Byte_unsigned;
-          emit_sanitize ?dependencies ~offset:31 ~address ~report Byte_unsigned
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:31 ~address ~report
+            Byte_unsigned
         | Fivetwelve_unaligned | Fivetwelve_aligned ->
-          emit_sanitize ?dependencies ~address ~report Byte_unsigned;
-          emit_sanitize ?dependencies ~offset:63 ~address ~report Byte_unsigned)
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:63 ~address ~report
+            Byte_unsigned)
 end
 
 let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =

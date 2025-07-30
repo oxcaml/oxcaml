@@ -54,36 +54,35 @@ let max_string_length = word_size / 8 * max_array_length - 1
    Using [max_floatarray_length] assumes flat float arrays are enabled. *)
 let max_unboxed_float_array_length = max_floatarray_length
 
-let max_custom_array_length = max_array_length - 1
 
 let max_unboxed_float32_array_length =
   match backend_type with
-  | Native -> max_custom_array_length * (word_size / 32)
+  | Native -> max_array_length * (word_size / 32)
   | Bytecode | Other _ -> max_array_length
 
 let max_unboxed_int64_array_length =
   match backend_type with
-  | Native -> max_custom_array_length / (64 / word_size)
+  | Native -> max_array_length / (64 / word_size)
   | Bytecode | Other _ -> max_array_length
 
 let max_unboxed_int32_array_length =
   match backend_type with
-  | Native -> max_custom_array_length * (word_size / 32)
+  | Native -> max_array_length * (word_size / 32)
   | Bytecode | Other _ -> max_array_length
 
 let max_unboxed_nativeint_array_length =
   match backend_type with
-  | Native -> max_custom_array_length
+  | Native -> max_array_length
   | Bytecode | Other _ -> max_array_length
 
 let max_unboxed_vec128_array_length =
   match backend_type with
-  | Native -> max_custom_array_length / 2
+  | Native -> max_array_length / (128 / word_size)
   | Bytecode | Other _ -> max_array_length
 
 let max_unboxed_vec256_array_length =
   match backend_type with
-  | Native -> max_custom_array_length / 4
+  | Native -> max_array_length / (256 / word_size)
   | Bytecode | Other _ -> max_array_length
 
 external runtime_variant : unit -> string @@ portable = "caml_runtime_variant"

@@ -456,6 +456,8 @@ static intnat ephe_mark (intnat budget, uintnat for_cycle, int force_alive);
 
 void caml_orphan_ephemerons (caml_domain_state* domain_state)
 {
+  CAMLassert (caml_gc_phase != Phase_sweep_main);
+
   struct caml_ephe_info* ephe_info = domain_state->ephe_info;
   if (ephe_info->todo == 0 &&
       ephe_info->live == 0 &&
@@ -1552,10 +1554,16 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
   Caml_global_barrier_if_final(participant_count) {
     caml_gc_phase = Phase_sweep_and_mark_main;
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
+
     /* Adopt orphaned work from domains that were spawned and
-       terminated in the previous cycle. */
-    /* There must be no orphaned work remaining when this phase change
-       takes place because orphaned work contains roots. */
+       terminated in the previous cycle. There must be no orphaned
+       work remaining when this phase change takes place because
+       orphaned work contains roots.
+
+       This also checks that the ephemerons being adopted all have
+       status UNMARKED in this cycle (because ephemerons are not
+       orphaned in [Phase_sweep_main], so they must come from last
+       cycle, so will have status [UNMARKED] now). */
     adopt_orphaned_work (caml_global_heap_state.UNMARKED);
   }
 

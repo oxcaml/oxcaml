@@ -1428,6 +1428,14 @@ module Named = struct
     in
     Simple simple
 
+  let kind t =
+    match t with
+    | Simple s -> Simple.kind s
+    | Prim (p, _dbg) -> Flambda_primitive.result_kind' p
+    | Rec_info _ -> K.rec_info
+    | Set_of_closures _ | Static_consts _ ->
+      Misc.fatal_errorf "No valid kind for non-singleton named %a" print t
+
   let is_dynamically_allocated_set_of_closures t =
     match t with
     | Set_of_closures _ -> true

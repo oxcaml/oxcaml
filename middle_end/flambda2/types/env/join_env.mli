@@ -43,6 +43,6 @@ val cut_and_n_way_join :
   n_way_join_type:n_way_join_type ->
   meet_type:Meet_env.meet_type ->
   cut_after:Scope.t ->
-  Typing_env.t ->
+  Meet_env.t ->
   Typing_env.t list ->
-  Typing_env.t
+  Meet_env.t

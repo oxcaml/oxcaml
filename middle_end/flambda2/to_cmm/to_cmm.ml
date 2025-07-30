@@ -75,7 +75,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       ~return_continuation_arity:[] ~trans_prim:To_cmm_primitive.trans_prim
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
-  let ret_var = Variable.create "*ret*" in
+  let ret_var = Variable.create "*ret*" Flambda_kind.value in
   let ret_var_duid = Flambda_debug_uid.none in
   let _env, return_cont_params =
     (* The environment is dropped because the handler for the dummy continuation

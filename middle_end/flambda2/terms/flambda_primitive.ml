@@ -178,13 +178,6 @@ module Array_kind = struct
          scannable and that cannot be scanned:@ %a"
         print t
 
-  let has_custom_ops t =
-    match t with
-    | Immediates | Values | Naked_floats | Unboxed_product _ -> false
-    | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-    | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
-      true
-
   let rec width_in_scalars t =
     match t with
     | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s

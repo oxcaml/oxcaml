@@ -187,6 +187,8 @@ module Predef : sig
   val unboxed_type_to_layout : unboxed -> Jkind_types.Sort.base
 
   val to_layout : t -> Layout.t
+
+  val simd_vec_split_to_byte_size : simd_vec_split -> int
 end
 
 type var = Ident.t

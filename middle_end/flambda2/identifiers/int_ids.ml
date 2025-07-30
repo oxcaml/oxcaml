@@ -228,25 +228,29 @@ module Variable_data = struct
     { compilation_unit : Compilation_unit.t;
       name : string;
       name_stamp : int;
+      kind : Flambda_kind.t;
       user_visible : bool
     }
 
   let flags = var_flags
 
   let [@ocamlformat "disable"] print ppf { compilation_unit; name; name_stamp;
-                                           user_visible; } =
+                                           kind; user_visible; } =
     Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(name@ %s)@]@ \
         @[<hov 1>(name_stamp@ %d)@]@ \
+        @[<hov 1>(kind@ %a)@]@ \
         @[<hov 1>(user_visible@ %b)@]\
         )@]"
       Compilation_unit.print_debug compilation_unit
       name
       name_stamp
+      Flambda_kind.print kind
       user_visible
 
-  let hash { compilation_unit; name = _; name_stamp; user_visible = _ } =
+  let hash
+      { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
     hash2 (Compilation_unit.hash compilation_unit) (Hashtbl.hash name_stamp)
 
   let equal t1 t2 =
@@ -256,6 +260,7 @@ module Variable_data = struct
       let { compilation_unit = compilation_unit1;
             name = _;
             name_stamp = name_stamp1;
+            kind = _;
             user_visible = _
           } =
         t1
@@ -263,6 +268,7 @@ module Variable_data = struct
       let { compilation_unit = compilation_unit2;
             name = _;
             name_stamp = name_stamp2;
+            kind = _;
             user_visible = _
           } =
         t2
@@ -435,11 +441,13 @@ module Variable = struct
 
   let name_stamp t = (find_data t).name_stamp
 
+  let kind t = (find_data t).kind
+
   let user_visible t = (find_data t).user_visible
 
   let previous_name_stamp = ref (-1)
 
-  let create ?user_visible name =
+  let create ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
@@ -449,6 +457,7 @@ module Variable = struct
       { compilation_unit = Compilation_unit.get_current_exn ();
         name;
         name_stamp;
+        kind;
         user_visible = Option.is_some user_visible
       }
     in
