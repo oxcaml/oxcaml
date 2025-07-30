@@ -179,7 +179,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_nativeint (O.obj x : nativeint))) );
       ( Pident(Ident.create_local "print_int64"),
         Simple (Predef.type_int64,
-                (fun x -> Oval_int64 (O.obj x : int64)) ))
+                (fun x -> Oval_int64 (O.obj x : int64))) );
+      ( Pident(Ident.create_local "print_float_u"),
+        Simple (Predef.type_unboxed_float,
+                (fun _x -> Oval_stuff "<float#>")) )
     ] : (Path.t * printer) list)
 
     let exn_printer ppf path exn =
