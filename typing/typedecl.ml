@@ -2092,14 +2092,17 @@ let update_decls_jkind env decls =
   List.map
     (fun (id, decl) ->
        let allow_any_crossing =
-         Builtin_attributes.has_unsafe_allow_any_mode_crossing decl.type_attributes
+         Builtin_attributes.has_unsafe_allow_any_mode_crossing
+           decl.type_attributes
        in
 
-       (* Check that the attribute is valid, if set (unconditionally, for consistency). *)
+       (* Check that the attribute is valid, if set (unconditionally, for
+          consistency). *)
        if allow_any_crossing then begin
          match decl.type_kind with
          | Type_abstract _ | Type_open ->
-           raise(Error(decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
+           raise(
+             Error(decl.type_loc, Unsafe_mode_crossing_on_invalid_type_kind))
          | _ -> ()
        end;
 
