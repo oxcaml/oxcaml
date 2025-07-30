@@ -704,7 +704,7 @@ AC_ARG_ENABLE([poll-insertion],
 
 AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
   [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
-    [emit DWARF debugging flags for oxcaml compiler])],
+    [Compile the compiler and standard library with OxCaml DWARF])],
   [],
   [enable_oxcaml_dwarf_on_compiler=no])
 
