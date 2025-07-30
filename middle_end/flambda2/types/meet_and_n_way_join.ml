@@ -283,7 +283,7 @@ type ext =
 let add_defined_vars env level =
   TEL.fold_on_defined_vars
     (fun var kind env ->
-      TE.add_definition env
+      ME.add_definition env
         (Bound_name.create_var
            (Bound_var.create var Flambda_debug_uid.none
               (* Variables with [Name_mode.in_types] do not exist at runtime, so
@@ -295,18 +295,13 @@ let add_defined_vars env level =
 
 let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     initial_env val_a1 val_b1 extensions1 val_a2 val_b2 extensions2 =
-  let initial_tenv = ME.typing_env initial_env in
-  let join_scope = TE.current_scope initial_tenv in
-  let env = ME.map_typing_env initial_env ~f:TE.increment_scope in
+  let join_scope = ME.current_scope initial_env in
+  let env = ME.increment_scope initial_env in
   let direct_return r =
     map_env r ~f:(fun scoped_env ->
         (* Need to cut as a level because we could have added new variables. *)
-        let scoped_tenv = ME.typing_env scoped_env in
-        let level = TE.cut scoped_tenv ~cut_after:join_scope in
-        let initial_env =
-          ME.map_typing_env initial_env ~f:(fun initial_tenv ->
-              add_defined_vars initial_tenv level)
-        in
+        let level = ME.cut scoped_env ~cut_after:join_scope in
+        let initial_env = add_defined_vars initial_env level in
         let ext = TEE.from_map (TEL.equations level) in
         ME.add_env_extension_strict initial_env ext ~meet_type)
   in
@@ -366,20 +361,14 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
         ~cut_after:join_scope initial_env
         [ME.typing_env env_a; ME.typing_env env_b]
     in
-    let when_a_level = TE.cut (ME.typing_env env_a) ~cut_after:join_scope in
-    let when_b_level = TE.cut (ME.typing_env env_b) ~cut_after:join_scope in
+    let when_a_level = ME.cut env_a ~cut_after:join_scope in
+    let when_b_level = ME.cut env_b ~cut_after:join_scope in
     (* New variables introduced by either [meet_a] or [meet_b] are not
        guaranteed to end up in the [result_env] (in fact, they will probably get
        renamed), but they can still appear in [a_result] and [b_result], so we
        need to add them back. *)
-    let result_env =
-      ME.map_typing_env result_env ~f:(fun result_env ->
-          add_defined_vars result_env when_a_level)
-    in
-    let result_env =
-      ME.map_typing_env result_env ~f:(fun result_env ->
-          add_defined_vars result_env when_b_level)
-    in
+    let result_env = add_defined_vars result_env when_a_level in
+    let result_env = add_defined_vars result_env when_b_level in
     let extensions =
       if TEL.is_empty when_a_level && TEL.is_empty when_b_level
       then
@@ -1268,14 +1257,13 @@ and meet_row_like :
  fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
      ~is_empty_map_known ~get_singleton_map_known ~merge_map_known initial_env
      ~known1 ~known2 ~other1 ~other2 ->
-  let initial_tenv = ME.typing_env initial_env in
-  let common_scope = TE.current_scope initial_tenv in
+  let common_scope = ME.current_scope initial_env in
   (* Keep track of the variables used by all extensions and lift them to the
      result env in [extract_and_join_extensions]. *)
   let extra_variables = ref Variable.Map.empty in
-  let base_env = ME.map_typing_env initial_env ~f:TE.increment_scope in
+  let base_env = ME.increment_scope initial_env in
   let add_extra_variables_and_extract_extension scoped_env =
-    let level = TE.cut scoped_env ~cut_after:common_scope in
+    let level = ME.cut scoped_env ~cut_after:common_scope in
     extra_variables
       := Variable.Map.union
            (fun var k1 k2 ->
@@ -1295,17 +1283,15 @@ and meet_row_like :
       Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join ~meet_type
         ~cut_after:common_scope initial_env scoped_envs
     in
-    ME.map_typing_env result_env ~f:(fun result_env ->
-        Variable.Map.fold
-          (fun var kind env ->
-            TE.add_definition env
-              (Bound_name.create_var
-                 (* Variables with [Name_mode.in_types] do not exist at runtime,
-                    so we do not equip them with a [Flambda_debug_uid.t]. See
-                    #3967. *)
-                 (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
-              kind)
-          !extra_variables result_env)
+    Variable.Map.fold
+      (fun var kind env ->
+        ME.add_definition env
+          (Bound_name.create_var
+             (* Variables with [Name_mode.in_types] do not exist at runtime, so
+                we do not equip them with a [Flambda_debug_uid.t]. See #3967. *)
+             (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
+          kind)
+      !extra_variables result_env
   in
   let open struct
     type result_env =
@@ -1354,6 +1340,7 @@ and meet_row_like :
       result_is_t2 := false
   in
   let join_result_env scoped_env =
+    let scoped_env = ME.typing_env scoped_env in
     let new_result_env =
       match !result_env with
       | No_result -> Extension [scoped_env]
@@ -1423,7 +1410,7 @@ and meet_row_like :
         match env with
         | Bottom -> bottom_case (New_result ())
         | Ok env ->
-          join_result_env (ME.typing_env env);
+          join_result_env env;
           update_refs index_result;
           update_refs maps_to_result;
           let index = extract_value index_result case1.index case2.index in
@@ -1432,7 +1419,7 @@ and meet_row_like :
           in
           let env_extension =
             if need_join
-            then add_extra_variables_and_extract_extension (ME.typing_env env)
+            then add_extra_variables_and_extract_extension env
             else TEE.empty
           in
           if TEE.is_empty env_extension
@@ -1474,7 +1461,7 @@ and meet_row_like :
           with
           | Bottom -> None
           | Ok env ->
-            join_result_env (ME.typing_env env);
+            join_result_env env;
             result_is_t1 := false;
             result_is_t2 := false;
             Some (Known other_case))
@@ -1493,7 +1480,7 @@ and meet_row_like :
           with
           | Bottom -> None
           | Ok env ->
-            join_result_env (ME.typing_env env);
+            join_result_env env;
             result_is_t1 := false;
             result_is_t2 := false;
             Some (Known other_case))
@@ -1501,7 +1488,7 @@ and meet_row_like :
     | Some case1, Some case2 -> (
       match case1, case2 with
       | Unknown, Unknown ->
-        join_result_env (ME.typing_env base_env);
+        join_result_env base_env;
         Some Unknown
       | Known case, Unknown -> (
         match
@@ -1509,7 +1496,7 @@ and meet_row_like :
         with
         | Bottom -> None
         | Ok env ->
-          join_result_env (ME.typing_env env);
+          join_result_env env;
           result_is_t2 := false;
           Some (Known case))
       | Unknown, Known case -> (
@@ -1518,7 +1505,7 @@ and meet_row_like :
         with
         | Bottom -> None
         | Ok env ->
-          join_result_env (ME.typing_env env);
+          join_result_env env;
           result_is_t1 := false;
           Some (Known case))
       | Known case1, Known case2 -> meet_case base_env case1 case2)

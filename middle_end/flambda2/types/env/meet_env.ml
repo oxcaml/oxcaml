@@ -287,3 +287,19 @@ let add_equations_on_params t ~params ~param_types ~meet_type =
     t
     (Bound_parameters.to_list params)
     param_types
+
+let current_scope env = TE.current_scope (typing_env env)
+
+let increment_scope env = map_typing_env env ~f:TE.increment_scope
+
+let add_definition env bound_name kind =
+  map_typing_env env ~f:(fun env -> TE.add_definition env bound_name kind)
+
+let add_symbol_projection env var symbol_projection =
+  map_typing_env env ~f:(fun env ->
+      TE.add_symbol_projection env var symbol_projection)
+
+let cut env ~cut_after = TE.cut (typing_env env) ~cut_after
+
+let cut_as_extension env ~cut_after =
+  TE.cut_as_extension (typing_env env) ~cut_after

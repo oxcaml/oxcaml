@@ -46,8 +46,6 @@ val typing_env : t -> Typing_env.t
 
 val with_typing_env : t -> Typing_env.t -> t
 
-val map_typing_env : t -> f:(Typing_env.t -> Typing_env.t) -> t
-
 val add_equation : t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t
 
 val add_equation_strict :
@@ -77,3 +75,15 @@ val add_env_extension_with_extra_variables :
    then adding equations in the wrong order can make equations disappear. *)
 val add_env_extension_from_level :
   t -> Typing_env_level.t -> meet_type:meet_type -> t
+
+val current_scope : t -> Scope.t
+
+val increment_scope : t -> t
+
+val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
+
+val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
+
+val cut : t -> cut_after:Scope.t -> Typing_env_level.t
+
+val cut_as_extension : t -> cut_after:Scope.t -> Typing_env_extension.t

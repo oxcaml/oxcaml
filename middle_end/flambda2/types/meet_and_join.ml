@@ -287,12 +287,10 @@ type ext =
 let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type
     ~join_env_extension initial_env val_a1 val_b1 extensions1 val_a2 val_b2
     extensions2 =
-  let initial_typing_env = ME.typing_env initial_env in
-  let join_scope = TE.current_scope initial_typing_env in
-  let env = ME.map_typing_env initial_env ~f:TE.increment_scope in
+  let join_scope = ME.current_scope initial_env in
+  let env = ME.increment_scope initial_env in
   let to_extension scoped_env =
-    let scoped_env = ME.typing_env scoped_env in
-    TE.cut scoped_env ~cut_after:join_scope
+    ME.cut scoped_env ~cut_after:join_scope
     |> Typing_env_level.as_extension_without_bindings
   in
   let direct_return r =
@@ -382,8 +380,9 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type
           val_a, val_b, extensions)
     in
     let join_env =
-      Join_env.create initial_typing_env ~left_env:(ME.typing_env env_a)
-        ~right_env:(ME.typing_env env_b)
+      Join_env.create
+        (ME.typing_env initial_env)
+        ~left_env:(ME.typing_env env_a) ~right_env:(ME.typing_env env_b)
     in
     let result_extension = join_env_extension join_env when_a when_b in
     let result_env =
@@ -1178,12 +1177,10 @@ and meet_row_like :
  fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
      ~is_empty_map_known ~get_singleton_map_known ~merge_map_known initial_env
      ~known1 ~known2 ~other1 ~other2 ->
-  let initial_typing_env = ME.typing_env initial_env in
-  let common_scope = TE.current_scope initial_typing_env in
-  let base_env = ME.map_typing_env initial_env ~f:TE.increment_scope in
+  let common_scope = ME.current_scope initial_env in
+  let base_env = ME.increment_scope initial_env in
   let extract_extension scoped_env =
-    let scoped_env = ME.typing_env scoped_env in
-    TE.cut_as_extension scoped_env ~cut_after:common_scope
+    ME.cut_as_extension scoped_env ~cut_after:common_scope
   in
   let open struct
     type result_env =

@@ -1238,18 +1238,16 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
   | Ok { demoted_in_target_env; extra_variables; equations; symbol_projections }
     ->
     let target_env =
-      ME.map_typing_env target_env ~f:(fun target_env ->
-          Variable.Map.fold
-            (fun var kind target_env ->
-              TE.add_definition target_env
-                (Bound_name.create_var
-                   (* Variables with [Name_mode.in_types] do not exist at
-                      runtime, so we do not equip them with a
-                      [Flambda_debug_uid.t]. See #3967. *)
-                   (Bound_var.create var Flambda_debug_uid.none
-                      Name_mode.in_types))
-                kind)
-            extra_variables target_env)
+      Variable.Map.fold
+        (fun var kind target_env ->
+          ME.add_definition target_env
+            (Bound_name.create_var
+               (* Variables with [Name_mode.in_types] do not exist at runtime,
+                  so we do not equip them with a [Flambda_debug_uid.t]. See
+                  #3967. *)
+               (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
+            kind)
+        extra_variables target_env
     in
     let target_env =
       Name_in_target_env.Map.fold
@@ -1270,11 +1268,10 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
         equations target_env
     in
     let target_env =
-      ME.map_typing_env target_env ~f:(fun target_env ->
-          Variable.Map.fold
-            (fun var symbol_projection target_env ->
-              TE.add_symbol_projection target_env var symbol_projection)
-            symbol_projections target_env)
+      Variable.Map.fold
+        (fun var symbol_projection target_env ->
+          ME.add_symbol_projection target_env var symbol_projection)
+        symbol_projections target_env
     in
     target_env
 
