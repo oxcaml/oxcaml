@@ -128,7 +128,6 @@ let extract_constant_if_internal alloc_mode lam =
   | External -> raise Not_constant
   | Internal _ -> extract_constant lam
 
-
 let extract_constant_if_internal_opt alloc_mode_opt lam =
   match alloc_mode_opt with
   | None -> extract_constant lam
