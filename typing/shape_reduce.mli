@@ -45,6 +45,7 @@ module Make(_ : sig
     val fuel : int
 
     val read_unit_shape : unit_name:string -> Shape.t option
+
   end) : sig
   val reduce : Env.t -> Shape.t -> Shape.t
 

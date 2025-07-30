@@ -1592,6 +1592,11 @@ and transl_tupled_function
       end
   | _ -> None
 
+and env_shape_of_path env path ~args =
+  match Env.shape_of_path_opt ~namespace:Type env path with
+  | None -> None
+  | Some sh -> Some (Shape.app_list sh args)
+
 (* For the functions [add_type_shape_of_cases], [add_type_shapes_of_params], and
    [add_type_shapes_of_patterns] to be correct, we must ensure that at the type
    tree level, a [debug_uid] is never associated with more than one type
@@ -1610,7 +1615,7 @@ and add_type_shapes_of_pattern ~env sort pattern =
   let var_list = Typedtree.pat_bound_idents_full sort pattern in
   List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
     Type_shape.add_to_type_shapes var_uid type_expr var_sort
-      (Env.find_uid_of_path env))
+      (env_shape_of_path env))
   var_list
 
 (** [add_type_shapes_of_cases] iterates through a given list of cases and
