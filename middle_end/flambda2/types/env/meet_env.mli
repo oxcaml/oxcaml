@@ -44,8 +44,6 @@ val use_meet_env_strict : Typing_env.t -> f:(t -> t) -> Typing_env.t Or_bottom.t
 
 val typing_env : t -> Typing_env.t
 
-val with_typing_env : t -> Typing_env.t -> t
-
 val add_equation : t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t
 
 val add_equation_strict :
@@ -75,6 +73,9 @@ val add_env_extension_with_extra_variables :
    then adding equations in the wrong order can make equations disappear. *)
 val add_env_extension_from_level :
   t -> Typing_env_level.t -> meet_type:meet_type -> t
+
+(* The functions below only manipulate the underlying typing env and are
+   provided for convenience. *)
 
 val current_scope : t -> Scope.t
 
