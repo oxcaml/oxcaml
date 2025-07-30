@@ -3050,7 +3050,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let contains_no_escaping_local_allocs =
     match (result_mode : Lambda.allocation_mode) with
     | Alloc_heap -> true
-    | Alloc_local | Alloc_external -> false
+    | Alloc_local -> false
+    | Alloc_external -> Misc.fatal_error "Result mode cannot be external"
   in
   let my_region =
     if contains_no_escaping_local_allocs
