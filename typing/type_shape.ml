@@ -194,7 +194,7 @@ module Type_shape = struct
           | Some u -> Some (Unboxed u)
           | None -> None))
 
-    let add_predefs_to_lookup f path ~args =
+    let shape_for_constr_with_predefs f path ~args =
       match of_path path with
       | Some predef -> Some (Shape.predef predef args)
       | None -> f path ~args
@@ -207,7 +207,7 @@ module Type_shape = struct
      Also consider reverting to the original value kind depth limit (although 2
      seems low). *)
   let rec of_type_expr_go ~visited ~depth (expr : Types.type_expr)
-      (subst : (Types.type_expr * Shape.t) list) shape_of_path : Shape.t =
+      (subst : (Types.type_expr * Shape.t) list) shape_for_constr : Shape.t =
     let open Shape in
     let unknown_shape = Shape.leaf' None in
     (* Leaves indicate we do not know. *)
@@ -237,14 +237,14 @@ module Type_shape = struct
         let map_expr_list (exprs : Types.type_expr list) =
           List.map
             (fun expr ->
-              of_type_expr_go ~depth ~visited expr subst shape_of_path)
+              of_type_expr_go ~depth ~visited expr subst shape_for_constr)
             exprs
         in
         let type_shape =
           match desc with
           | Tconstr (path, constrs, _) ->
             let args = map_expr_list constrs in
-            let shape = shape_of_path path ~args in
+            let shape = shape_for_constr path ~args in
             Option.value shape ~default:unknown_shape
           | Ttuple exprs -> Shape.tuple (map_expr_list (List.map snd exprs))
           | Tvar _ -> unknown_shape
@@ -252,7 +252,7 @@ module Type_shape = struct
             (* CR sspies: At the moment, we simply ignore the polymorphic variables.
                This code used to only work for [_type_vars = []]. Consider
                alternatively introducing abstractions here? *)
-            of_type_expr_go ~depth ~visited type_expr subst shape_of_path
+            of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Tunboxed_tuple exprs ->
             Shape.unboxed_tuple (map_expr_list (List.map snd exprs))
           | Tobject _ | Tnil | Tfield _ ->
@@ -271,7 +271,7 @@ module Type_shape = struct
                     [ { pv_constr_name = name;
                         pv_constr_args =
                           [ of_type_expr_go ~depth ~visited ty subst
-                              shape_of_path ]
+                              shape_for_constr ]
                       } ]
                   | Types.Rpresent None ->
                     [{ pv_constr_name = name; pv_constr_args = [] }]
@@ -285,8 +285,8 @@ module Type_shape = struct
             Shape.poly_variant row_fields
           | Tarrow (_, arg, ret, _) ->
             Shape.arrow
-              (of_type_expr_go ~depth ~visited arg subst shape_of_path)
-              (of_type_expr_go ~depth ~visited ret subst shape_of_path)
+              (of_type_expr_go ~depth ~visited arg subst shape_for_constr)
+              (of_type_expr_go ~depth ~visited ret subst shape_for_constr)
           | Tunivar _ -> unknown_shape
           | Tof_kind _ -> unknown_shape
           | Tpackage _ -> unknown_shape
@@ -295,14 +295,14 @@ module Type_shape = struct
         Recursive_binder.bind_recursive_binder ~preserve_uid:false rec_binder
           type_shape
 
-  let of_type_expr (expr : Types.type_expr) shape_of_path =
+  let of_type_expr (expr : Types.type_expr) shape_for_constr =
     of_type_expr_go ~visited:Numbers.Int.Map.empty ~depth:0 expr []
-      (Predef.add_predefs_to_lookup shape_of_path)
+      (Predef.shape_for_constr_with_predefs shape_for_constr)
 
-  let of_type_expr_with_type_subst (expr : Types.type_expr) shape_of_path subst
+  let of_type_expr_with_type_subst (expr : Types.type_expr) shape_for_constr subst
       =
     of_type_expr_go ~visited:Numbers.Int.Map.empty ~depth:0 expr subst
-      (Predef.add_predefs_to_lookup shape_of_path)
+      (Predef.shape_for_constr_with_predefs shape_for_constr)
 end
 
 module Type_decl_shape = struct
@@ -330,7 +330,7 @@ module Type_decl_shape = struct
   let of_complex_constructor type_subst name
       (cstr_args : Types.constructor_declaration)
       ((constructor_repr, _) : Types.constructor_representation * _)
-      shape_of_path =
+      shape_for_constr =
     let open Shape in
     let args =
       match cstr_args.cd_args with
@@ -341,7 +341,7 @@ module Type_decl_shape = struct
             { Shape.field_name = None;
               field_value =
                 ( Type_shape.of_type_expr_with_type_subst type_expr
-                    shape_of_path type_subst,
+                    shape_for_constr type_subst,
                   type_layout )
             })
           list
@@ -351,7 +351,7 @@ module Type_decl_shape = struct
             { Shape.field_name = Some (Ident.name lbl.ld_id);
               field_value =
                 ( Type_shape.of_type_expr_with_type_subst lbl.ld_type
-                    shape_of_path type_subst,
+                    shape_for_constr type_subst,
                   lbl.ld_sort )
             })
           list
@@ -397,12 +397,12 @@ module Type_decl_shape = struct
     (* Records are not allowed to have an empty list of fields.*) ->
       false
 
-  let record_of_labels ~shape_of_path ~type_subst kind labels =
+  let record_of_labels ~shape_for_constr ~type_subst kind labels =
     Shape.record kind
       (List.map
          (fun (lbl : Types.label_declaration) ->
            ( Ident.name lbl.ld_id,
-             Type_shape.of_type_expr_with_type_subst lbl.ld_type shape_of_path
+             Type_shape.of_type_expr_with_type_subst lbl.ld_type shape_for_constr
                type_subst,
              lbl.ld_sort ))
          labels)
@@ -410,7 +410,7 @@ module Type_decl_shape = struct
   let type_var_count = ref 0
 
   let of_type_declaration_go (type_declaration : Types.type_declaration)
-      type_param_shapes shape_of_path =
+      type_param_shapes shape_for_constr =
     let module Types_predef = Predef in
     let open Shape in
     let unknown_shape = Shape.leaf' None in
@@ -421,7 +421,7 @@ module Type_decl_shape = struct
     let definition =
       match type_declaration.type_manifest with
       | Some type_expr ->
-        Type_shape.of_type_expr_with_type_subst type_expr shape_of_path
+        Type_shape.of_type_expr_with_type_subst type_expr shape_for_constr
           type_subst
       | None -> (
         match type_declaration.type_kind with
@@ -439,7 +439,7 @@ module Type_decl_shape = struct
                 | false ->
                   Right
                     (of_complex_constructor type_subst name cstr arg_layouts
-                       shape_of_path))
+                       shape_for_constr))
               cstrs_with_layouts
           in
           Shape.variant simple_constructors complex_constructors
@@ -455,7 +455,7 @@ module Type_decl_shape = struct
               Misc.fatal_error "Unboxed variant must have exactly one argument."
           in
           Shape.variant_unboxed name field_name
-            (Type_shape.of_type_expr_with_type_subst type_expr shape_of_path
+            (Type_shape.of_type_expr_with_type_subst type_expr shape_for_constr
                type_subst)
             layout
         | Type_variant ([_], Variant_unboxed, _unsafe_mode_crossing) ->
@@ -469,13 +469,13 @@ module Type_decl_shape = struct
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
           | Record_boxed _ ->
-            record_of_labels ~shape_of_path ~type_subst Record_boxed lbl_list
+            record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
           | Record_mixed fields ->
-            record_of_labels ~shape_of_path ~type_subst
+            record_of_labels ~shape_for_constr ~type_subst
               (Record_mixed (Array.map mixed_block_shape_to_layout fields))
               lbl_list
           | Record_unboxed ->
-            record_of_labels ~shape_of_path ~type_subst Record_unboxed lbl_list
+            record_of_labels ~shape_for_constr ~type_subst Record_unboxed lbl_list
           | Record_float | Record_ufloat ->
             let lbl_list =
               List.map
@@ -489,7 +489,7 @@ module Type_decl_shape = struct
                      of replacing it with [float#]. *)
                 lbl_list
             in
-            record_of_labels ~shape_of_path ~type_subst Record_floats lbl_list
+            record_of_labels ~shape_for_constr ~type_subst Record_floats lbl_list
           | Record_inlined _ ->
             Misc.fatal_error "inlined records not allowed here"
             (* Inline records of this form should not occur as part of type declarations.
@@ -499,7 +499,7 @@ module Type_decl_shape = struct
         | Type_abstract _ -> unknown_shape
         | Type_open -> unknown_shape
         | Type_record_unboxed_product (lbl_list, _, _) ->
-          record_of_labels ~shape_of_path ~type_subst Record_unboxed_product
+          record_of_labels ~shape_for_constr ~type_subst Record_unboxed_product
             lbl_list)
     in
     definition
@@ -558,10 +558,10 @@ module Type_decl_shape = struct
       List.for_all (fun (_, sh, _) -> is_closed_type_shape sh) fields
     | _ -> false
 
-  let shape_of_path_with_declarations
-      (decl_lookup_map : Types.type_declaration Ident.Map.t) shape_of_path
+  let shape_for_constr_with_declarations
+      (decl_lookup_map : Types.type_declaration Ident.Map.t) shape_for_constr
       ~recursive ~id:_ ~decl_args path ~args:inner_args =
-    match shape_of_path path ~args:inner_args with
+    match shape_for_constr path ~args:inner_args with
     | Some s -> Some s
     | None -> (
       match path with
@@ -585,7 +585,7 @@ module Type_decl_shape = struct
       | _ -> None)
 
   let of_type_declaration_with_variables (id : Ident.t)
-      (type_declaration : Types.type_declaration) shape_of_path =
+      (type_declaration : Types.type_declaration) shape_for_constr =
     let type_param_idents =
       List.map
         (fun _ ->
@@ -597,35 +597,35 @@ module Type_decl_shape = struct
     let type_param_shapes =
       List.map (fun id -> Shape.var' None id) type_param_idents
     in
-    let shape_of_path = shape_of_path ~id ~decl_args:type_param_shapes in
+    let shape_for_constr = shape_for_constr ~id ~decl_args:type_param_shapes in
     let definition =
-      of_type_declaration_go type_declaration type_param_shapes shape_of_path
+      of_type_declaration_go type_declaration type_param_shapes shape_for_constr
     in
     let decl_shape = Shape.abs_list definition type_param_idents in
     Shape.set_uid_if_none decl_shape type_declaration.type_uid
 
   let of_type_declarations
       (type_declarations : (Ident.t * Types.type_declaration) list)
-      shape_of_path =
+      shape_for_constr =
     let decl_lookup_map = Ident.Map.of_list type_declarations in
     (* We unbind all declarations, to avoid accidental recursive cycles. *)
-    let shape_of_path path ~args =
+    let shape_for_constr path ~args =
       match path with
       | Path.Pident id when Ident.Map.mem id decl_lookup_map -> None
-      | _ -> shape_of_path path ~args
+      | _ -> shape_for_constr path ~args
     in
-    let shape_of_path = Type_shape.Predef.add_predefs_to_lookup shape_of_path in
+    let shape_for_constr = Type_shape.Predef.shape_for_constr_with_predefs shape_for_constr in
     let recursive = ref false in
     (* We add a small optimization: For the block of declarations, we track via
        this reference whether there are any recursive occurrenes. If not, we do
        not have to add a mutually recursive binder for the declarations. *)
-    let shape_of_path =
-      shape_of_path_with_declarations ~recursive decl_lookup_map shape_of_path
+    let shape_for_constr =
+      shape_for_constr_with_declarations ~recursive decl_lookup_map shape_for_constr
     in
     let individual_declarations =
       Ident.Map.mapi
         (fun id decl ->
-          of_type_declaration_with_variables id decl shape_of_path)
+          of_type_declaration_with_variables id decl shape_for_constr)
         decl_lookup_map
     in
     if !recursive
@@ -797,9 +797,9 @@ let (all_type_decls : Shape.t Uid.Tbl.t) = Uid.Tbl.create 16
 let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
 
 let add_to_type_decls (decls : (Ident.t * Types.type_declaration) list)
-    shape_of_path =
+    shape_for_constr =
   let type_decl_shapes =
-    Type_decl_shape.of_type_declarations decls shape_of_path
+    Type_decl_shape.of_type_declarations decls shape_for_constr
   in
   List.iter
     (fun ((_, decl), sh) -> Uid.Tbl.add all_type_decls decl.Types.type_uid sh)
