@@ -691,9 +691,13 @@ module F = struct
     let call_func args res_type =
       if stack_ofs > 0
       then (
-        let stack_begin = read_rsp () (* r13 *) in
-        let stack_end = fresh_ident t (* r12 *) in
-        ins_binop_imm t "add" stack_begin (Int.to_string stack_ofs) stack_end
+        (* CR yusumez: We assume this is done before arguments are pushed on the
+           stack. This won't necessarily be the case. We should make our own
+           wrapper in runtime/amd64.s that only takes the stack offset and
+           calculates [stack_begin] and [stack_end] itself. *)
+        let stack_end = read_rsp () (* r12 *) in
+        let stack_begin = fresh_ident t (* r13 *) in
+        ins_binop_imm t "sub" stack_end (Int.to_string stack_ofs) stack_begin
           Llvm_typ.i64;
         let args =
           [ Llvm_typ.ptr, `Global func_symbol;
@@ -972,8 +976,9 @@ module F = struct
     | Intop op -> int_op t i op ~imm:None
     | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
     | Floatop (width, op) -> float_op t i width op
+    | Stackoffset _ -> () (* We leave stack handling to LLVM *)
     | Spill | Reload | Const_float32 _ | Const_float _ | Const_vec128 _
-    | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Csel _
+    | Const_vec256 _ | Const_vec512 _ | Intop_atomic _ | Csel _
     | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Begin_region
     | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll | Pause
     | Alloc _ ->
@@ -1109,7 +1114,10 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
     runtime_arg_idents runtime_regs;
   let make_temp (reg : Reg.t) ident_opt =
     match reg.loc with
-    | Unknown | Reg _ -> (
+    (* [Outgoing] is for extcalls only - these will get put on the stack by
+       LLVM, so we treat them as normal temporaries. We don't expect OCaml calls
+       to use the stack for us... *)
+    | Unknown | Reg _ | Stack (Outgoing _) -> (
       (* This will reserve a fresh ident *)
       F.ins_alloca
         ~comment:(Format.asprintf "%a" Printreg.reg reg)
@@ -1131,7 +1139,7 @@ let make_temps_for_regs t cfg args_and_signature_idents runtime_arg_idents =
         ~dst_typ:Llvm_typ.ptr;
       (* Create entry in the [reg2ident] table *)
       Reg.Tbl.add t.current_fun_info.reg2ident reg res
-    | Stack (Local _) | Stack (Incoming _) | Stack (Outgoing _) ->
+    | Stack (Local _) | Stack (Incoming _) ->
       Misc.fatal_error "Llvmize: unexpected register location"
   in
   let arg_regs = List.map fst args_and_signature_idents |> Reg.Set.of_list in
