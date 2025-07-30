@@ -1838,17 +1838,12 @@ let param_jkind ty =
 let tree_of_label l =
   let mut =
     match l.ld_mutable with
-    | Mutable { mode; atomic } ->
-        let atomic =
-          match atomic with
-          | Atomic -> Atomic
-          | Nonatomic -> Nonatomic
-        in
+    | Mutable m ->
         let mut =
           let open Value.Comonadic in
-          match equate mode legacy with
-          | Ok () -> Om_mutable (None, atomic)
-          | Error _ -> Om_mutable (Some "<non-legacy>", atomic)
+          match equate m legacy with
+          | Ok () -> Om_mutable None
+          | Error _ -> Om_mutable (Some "<non-legacy>")
         in
         mut
     | Immutable -> Om_immutable

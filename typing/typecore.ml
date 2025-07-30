@@ -1021,7 +1021,7 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
 let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
-  | Mutable { mode = m0; _ } ->
+  | Mutable m0 ->
       let m0 = m0 |> mutable_mode |> Value.disallow_right in
       let m0 = match ty with
       | Some ty -> cross_left env ty ?modalities m0
@@ -1037,8 +1037,7 @@ let mutvar_mode ~loc ~env m0 exp_mode =
   let mode = mode_default m in
   let modalities = Typemode.let_mutable_modalities m0 in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
-  check_construct_mutability ~loc ~env
-    (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
+  check_construct_mutability ~loc ~env (Mutable m0) ~modalities mode;
   m |> Value.disallow_right
 
 (** The [expected_mode] of the record when projecting a mutable field. *)
@@ -3111,11 +3110,7 @@ and type_pat_aux
   | Ppat_array (mut, spl) ->
       let mut =
         match mut with
-        | Mutable  -> Mutable {
-          mode = Value.Comonadic.legacy;
-          (* CR aspsmith: Revisit once we support atomic arrays *)
-          atomic = Nonatomic
-        }
+        | Mutable -> Mutable Value.Comonadic.legacy
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -6327,8 +6322,7 @@ and type_expect_
       in
       let (label_loc, label, newval) =
         match label.lbl_mut with
-        | Mutable { mode = m0; atomic } ->
-          ignore atomic;  (* CR aspsmith: TODO *)
+        | Mutable m0 ->
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
@@ -6350,11 +6344,7 @@ and type_expect_
   | Pexp_array(mut, sargl) ->
       let mutability =
         match mut with
-        | Mutable -> Mutable {
-          mode = Value.Comonadic.legacy;
-          (* CR aspsmith: Revisit once we support atomic arrays *)
-          atomic = Nonatomic;
-        }
+        | Mutable -> Mutable Value.Comonadic.legacy
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -9981,15 +9971,10 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.list_argument_jkind
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
-        | Mutable   ->
-          Predef.type_array, Mutable {
-            mode = Value.Comonadic.legacy;
-            (* CR aspsmith: Revisit once we support atomic arrays *)
-            atomic = Nonatomic
-          }
-        | Immutable ->
-          Language_extension.assert_enabled ~loc Immutable_arrays ();
-          Predef.type_iarray, Immutable
+          | Mutable   -> Predef.type_array, Mutable Value.Comonadic.legacy
+          | Immutable ->
+              Language_extension.assert_enabled ~loc Immutable_arrays ();
+              Predef.type_iarray, Immutable
         in
         (Array_comprehension mut : comprehension_type),
         container_type,

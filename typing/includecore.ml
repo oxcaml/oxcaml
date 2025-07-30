@@ -265,7 +265,6 @@ type kind_mismatch = type_kind * type_kind
 type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
-  | Atomicity of position
   | Modality of Modality.Value.equate_error
 
 type record_change =
@@ -433,10 +432,6 @@ let report_label_mismatch first second env ppf err =
       report_type_inequality env ppf err
   | Mutability ord ->
       Format.fprintf ppf "%s is mutable and %s is not."
-        (String.capitalize_ascii (choose ord first second))
-        (choose_other ord first second)
-  | Atomicity ord ->
-      Format.fprintf ppf "%s is atomic and %s is not."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Modality err_ -> report_modality_equate_error first second ppf err_
@@ -723,25 +718,19 @@ module Record_diffing = struct
   let compare_labels env params1 params2
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
-        let err =
+        let mut =
           match ld1.ld_mutable, ld2.ld_mutable with
           | Immutable, Immutable -> None
-          | Mutable _, Immutable -> Some (Mutability First)
-          | Immutable, Mutable _ -> Some (Mutability Second)
-          | Mutable { mode = m1; atomic = atomic1 },
-            Mutable { mode = m2; atomic = atomic2 } ->
-            begin match atomic1, atomic2 with
-            | Atomic, Nonatomic -> Some (Atomicity First)
-            | Nonatomic, Atomic -> Some (Atomicity Second)
-            | Atomic, Atomic | Nonatomic, Nonatomic ->
-                let open Mode.Value.Comonadic in
-                equate_exn m1 legacy;
-                equate_exn m2 legacy;
-                None
-            end
+          | Mutable _, Immutable -> Some First
+          | Immutable, Mutable _ -> Some Second
+          | Mutable m1, Mutable m2 ->
+            let open Mode.Value.Comonadic in
+            equate_exn m1 legacy;
+            equate_exn m2 legacy;
+            None
         in
-        begin match err with
-        | Some err -> Some err
+        begin match mut with
+        | Some mut -> Some (Mutability mut)
         | None ->
           match
             Modality.Value.Const.equate ld1.ld_modalities ld2.ld_modalities

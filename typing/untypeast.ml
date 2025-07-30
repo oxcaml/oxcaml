@@ -273,9 +273,9 @@ let constructor_declaration sub cd =
 let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
-  | Mutable { mode; atomic = _ } ->
+  | Mutable m ->
       let open Mode.Value.Comonadic in
-      equate_exn mode legacy;
+      equate_exn m legacy;
       Mutable
 
 let label_declaration sub ld =

@@ -68,13 +68,9 @@ type out_modality =
   | Ogf_legacy of out_modality_legacy
   | Ogf_new of out_modality_new
 
-type out_atomicity =
-  | Atomic
-  | Nonatomic
-
 type out_mutability =
   | Om_immutable
-  | Om_mutable of string option * out_atomicity
+  | Om_mutable of string option
 
 
 
