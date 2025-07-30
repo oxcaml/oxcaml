@@ -45,6 +45,7 @@
     [k] regardless of the cost *)
 
 type reason =
+  | Specialization_disabled
   | At_toplevel
   | Contains_static_consts
   | Contains_set_of_closures
@@ -63,7 +64,7 @@ val print : Format.formatter -> t -> unit
 (** {2 Creation} *)
 
 (** Create a [Can_specialize] value with zero intial cost. *)
-val can_specialize : t
+val can_specialize : unit -> t
 
 (** Create a value preventing any specialization of the current continuation. *)
 val cannot_specialize : reason -> t
