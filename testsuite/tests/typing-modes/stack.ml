@@ -420,7 +420,6 @@ Error: This cannot be marked as stack_, because it is either not a primitive,
 let foo x y =
   let _ = stack_ (malloc_ (x,y)) in
   ()
-
 [%%expect{|
 Line 2, characters 17-32:
 2 |   let _ = stack_ (malloc_ (x,y)) in
