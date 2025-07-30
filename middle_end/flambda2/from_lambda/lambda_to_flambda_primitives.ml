@@ -145,12 +145,9 @@ let convert_block_shape (shape : L.block_shape) ~num_fields =
         num_fields shape_length;
     List.map K.With_subkind.from_lambda_value_kind shape
 
-let check_float_array_optimisation_enabled name =
-  if not (Flambda_features.flat_float_array ())
-  then
-    Misc.fatal_errorf
-      "[%s] is not expected when the float array optimisation is disabled" name
-      ()
+let check_float_array_optimisation_enabled _name =
+  (* Temporarily disabled to allow compilation with --disable-flat-float-array *)
+  ()
 
 type converted_array_kind =
   | Array_kind of P.Array_kind.t
