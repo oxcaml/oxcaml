@@ -1743,6 +1743,8 @@ and Exp_desc : sig
   val antiquote : Location.t -> Exp.t -> t'
 
   val splice : Location.t -> Code.t -> t'
+
+  val eval_quote : Location.t -> Type.t -> t'
 end = struct
   type s = lambda
 
@@ -1882,6 +1884,8 @@ end = struct
   let antiquote loc a1 = apply1 "Exp_desc" "antiquote" loc (extract a1)
 
   let splice loc a1 = apply1 "Exp_desc" "splice" loc (extract a1)
+
+  let eval_quote loc a1 = apply1 "Exp_desc" "eval_quote" loc (extract a1)
 end
 
 and Exp : sig
@@ -3037,6 +3041,8 @@ and quote_expression_desc transl stage e =
       fatal_error "Cannot quote probing constructs."
     | Texp_mutvar _ | Texp_letmutable _ | Texp_setmutvar _ ->
       fatal_error "Cannot quote constructs related to mutable variables."
+    | Texp_eval_quotation typ ->
+      Exp_desc.eval_quote loc (quote_core_type ~in_constraint:true typ)
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right

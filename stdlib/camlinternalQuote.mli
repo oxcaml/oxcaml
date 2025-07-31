@@ -595,6 +595,8 @@ and Exp_desc : sig
 
   val splice : Code.t -> t
 
+  val eval_quote : Type.t -> t
+
   val print : Format.formatter -> t -> unit
 end
 
