@@ -1107,3 +1107,8 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
+
+  let get_eval_quote_payload payload =
+    match payload with
+    | PTyp typ -> Ok typ
+    | _ -> Error ()
