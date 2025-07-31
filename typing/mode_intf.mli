@@ -252,6 +252,21 @@ module type S = sig
     type 'd neg_morph = 'd neg morph constraint 'd = _ * _
   end
 
+  (** Hints for the mode solvers. These are axis-specific hints that contain a trace
+      of the values in a single axis from an error. *)
+  type axhint
+
+  (** Errors for the mode solvers. These are axis-specific processed versions of
+      the errors returned by the solver, as the solver errors consider axis products.
+      The hints in this error type are [axhint] values. *)
+  type 'a axerror =
+    { left : 'a;
+      left_hint : axhint;
+      right : 'a;
+      right_hint : axhint
+    }
+
+  (** See [solver.mli] for description of this type *)
   type 'd morph_hint =
     | No_hint
     | Hint of 'd Hint.morph
