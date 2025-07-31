@@ -2165,7 +2165,7 @@ let emit_instr ~first ~fallthrough i =
        to do this earlier, based on previous experience with similar things, but
        maybe the change should be left for later. mshinwell: The current
        situation is fine for now. *)
-    if Arch.Extension.enabled LZCNT
+    if Arch.Extension.enabled BMI
     then I.lzcnt (arg i 0) (res i 0)
     else if arg_is_non_zero
     then (

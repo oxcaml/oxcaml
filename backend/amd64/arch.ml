@@ -27,7 +27,6 @@ module Extension = struct
       | SSE4_1
       | SSE4_2
       | CLMUL
-      | LZCNT
       | BMI
       | BMI2
       | AVX
@@ -43,12 +42,11 @@ module Extension = struct
       | SSE4_1 -> 5
       | SSE4_2 -> 6
       | CLMUL -> 7
-      | LZCNT -> 8
-      | BMI -> 9
-      | BMI2 -> 10
-      | AVX -> 11
-      | AVX2 -> 12
-      | AVX512F -> 13
+      | BMI -> 8
+      | BMI2 -> 9
+      | AVX -> 10
+      | AVX2 -> 11
+      | AVX512F -> 12
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -65,7 +63,6 @@ module Extension = struct
     | SSE4_1 -> "SSE41"
     | SSE4_2 -> "SSE42"
     | CLMUL -> "CLMUL"
-    | LZCNT -> "LZCNT"
     | BMI -> "BMI"
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
@@ -81,7 +78,6 @@ module Extension = struct
     | SSE4_1 -> "Penryn+"
     | SSE4_2 -> "Nehalem+"
     | CLMUL -> "Westmere+"
-    | LZCNT -> "Haswell+"
     | BMI -> "Haswell+"
     | BMI2 -> "Haswell+"
     | AVX -> "Sandybridge+"
@@ -94,7 +90,6 @@ module Extension = struct
        disabled as they are included in baseline x86_64. *)
     | POPCNT -> Config.has_popcnt
     | CLMUL -> Config.has_pclmul
-    | LZCNT -> Config.has_lzcnt
     | SSE3 -> Config.has_sse3
     | SSSE3 -> Config.has_ssse3
     | SSE4_1 -> Config.has_sse4_1
@@ -108,7 +103,7 @@ module Extension = struct
   let all =
     Set.of_list
       [ POPCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2; CLMUL;
-        LZCNT; BMI; BMI2; AVX; AVX2; AVX512F ]
+        BMI; BMI2; AVX; AVX2; AVX512F ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -120,7 +115,7 @@ module Extension = struct
     | AVX2, AVX512F
     | BMI, BMI2 -> true
     | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
-      | SSE4_2 | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
+      | SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
 
   let rec fix set less =
     let closure =

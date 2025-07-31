@@ -328,9 +328,6 @@ val has_pclmul : bool
 val has_popcnt : bool
 (* Whether the compiler was configured on a machine with POPCNT *)
 
-val has_lzcnt : bool
-(* Whether the compiler was configured on a machine with LZCNT *)
-
 val has_sse3 : bool
 (* Whether the compiler was configured on a machine with SSE3 *)
 

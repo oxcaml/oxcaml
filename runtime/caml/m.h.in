@@ -112,8 +112,6 @@
 
 #undef HAS_PCLMUL
 
-#undef HAS_LZCNT
-
 #undef HAS_SSE3
 
 #undef HAS_SSSE3
