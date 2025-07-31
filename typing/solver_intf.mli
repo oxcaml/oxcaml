@@ -332,13 +332,14 @@ module type Hint = sig
   (** Hints describing the reasons for constants *)
   type const
 
+  val const_debug_print : Format.formatter -> const -> unit
+
   (** Hints describing the reasons for morphisms applied to modes.
       The type parameter gives the allowance of the hint, which should correspond
       to the allowance of the morphism. *)
   type 'd morph constraint 'd = 'l * 'r
 
-  (* TEMPORARY FOR DEBUGGING. DELETE ME *)
-  val morph_none : 'd morph
+  val morph_debug_print : Format.formatter -> _ morph -> unit
 
   (** See comment on [Skip] constructor for ['d morph] in Mode.Hint for details
     about this. *)

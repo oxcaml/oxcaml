@@ -1236,26 +1236,27 @@ module Lattices_mono = struct
   let rec print_morph :
       type a b l r. b obj -> Format.formatter -> (a, b, l * r) morph -> unit =
    fun dst ppf -> function
-    | Id -> Format.fprintf ppf "id"
-    | Meet_with c -> Format.fprintf ppf "meet(%a)" (print dst) c
-    | Imply c -> Format.fprintf ppf "imply(%a)" (print dst) c
-    | Proj (_, ax) -> Format.fprintf ppf "proj_%a" Axis.print ax
-    | Max_with ax -> Format.fprintf ppf "max_with_%a" Axis.print ax
-    | Min_with ax -> Format.fprintf ppf "min_with_%a" Axis.print ax
+    | Id -> Format.fprintf ppf "Id"
+    | Meet_with c -> Format.fprintf ppf "Meet (%a)" (print dst) c
+    | Imply c -> Format.fprintf ppf "Imply (%a)" (print dst) c
+    | Proj (_, ax) -> Format.fprintf ppf "Proj (%a)" Axis.print ax
+    | Max_with ax -> Format.fprintf ppf "Max_with (%a)" Axis.print ax
+    | Min_with ax -> Format.fprintf ppf "Min_with (%a)" Axis.print ax
     | Map_comonadic f ->
       let dst0 = proj_obj Areality dst in
-      Format.fprintf ppf "map_comonadic(%a)" (print_morph dst0) f
-    | Monadic_to_comonadic_min -> Format.fprintf ppf "monadic_to_comonadic_min"
-    | Comonadic_to_monadic _ -> Format.fprintf ppf "comonadic_to_monadic"
-    | Monadic_to_comonadic_max -> Format.fprintf ppf "monadic_to_comonadic_max"
-    | Local_to_regional -> Format.fprintf ppf "local_to_regional"
-    | Regional_to_local -> Format.fprintf ppf "regional_to_local"
-    | Locality_as_regionality -> Format.fprintf ppf "locality_as_regionality"
-    | Regional_to_global -> Format.fprintf ppf "regional_to_global"
-    | Global_to_regional -> Format.fprintf ppf "global_to_regional"
+      Format.fprintf ppf "Map_comonadic (%a)" (print_morph dst0) f
+    | Monadic_to_comonadic_min -> Format.fprintf ppf "Monadic_to_comonadic_min"
+    | Comonadic_to_monadic _ -> Format.fprintf ppf "Comonadic_to_monadic"
+    | Monadic_to_comonadic_max -> Format.fprintf ppf "Monadic_to_comonadic_max"
+    | Local_to_regional -> Format.fprintf ppf "Local_to_regional"
+    | Regional_to_local -> Format.fprintf ppf "Regional_to_local"
+    | Locality_as_regionality -> Format.fprintf ppf "Locality_as_regionality"
+    | Regional_to_global -> Format.fprintf ppf "Regional_to_global"
+    | Global_to_regional -> Format.fprintf ppf "Global_to_regional"
     | Compose (f0, f1) ->
       let mid = src dst f0 in
-      Format.fprintf ppf "%a ∘ %a" (print_morph dst) f0 (print_morph mid) f1
+      Format.fprintf ppf "Compose (%a, %a)" (print_morph dst) f0
+        (print_morph mid) f1
 
   let id = Id
 
@@ -1569,6 +1570,18 @@ module Hint = struct
     | Is_function_return
     | Stack_expression
 
+  let const_debug_print ppf = function
+    | Result_of_lazy -> Format.fprintf ppf "Result_of_lazy"
+    | Lazy_closure -> Format.fprintf ppf "Lazy_closure"
+    | Class -> Format.fprintf ppf "Class"
+    | Tailcall_function -> Format.fprintf ppf "Tailcall_function"
+    | Tailcall_argument -> Format.fprintf ppf "Tailcall_argument"
+    | Mutable_read -> Format.fprintf ppf "Mutable_read"
+    | Mutable_write -> Format.fprintf ppf "Mutable_write"
+    | Forced_lazy_expression -> Format.fprintf ppf "Forced_lazy_expression"
+    | Is_function_return -> Format.fprintf ppf "Is_function_return"
+    | Stack_expression -> Format.fprintf ppf "Stack_expression"
+
   type lock_item =
     | Value
     | Module
@@ -1600,6 +1613,15 @@ module Hint = struct
       value_item : lock_item
     }
 
+  let closure_details_debug_print ppf
+      { closure_context; value_loc; value_lid; value_item } =
+    Format.fprintf ppf
+      "{ closure_context = %a; value_loc = %a; value_lid = %a; value_item = %a \
+       }"
+      print_closure_context closure_context Location.print_loc value_loc
+      (Misc.Style.as_inline_code !print_longident)
+      value_lid print_lock_item value_item
+
   type 'd morph =
     (* CR pdsouza: TEMP FOR DEBUGGING *)
     | Debug : string -> (_ * _) morph
@@ -1616,7 +1638,21 @@ module Hint = struct
 
   type 'd neg_morph = 'd neg morph constraint 'd = _ * _
 
-  let morph_none = Debug "NONE"
+  let morph_debug_print : type l r. Format.formatter -> (l * r) morph -> unit =
+   fun ppf -> function
+    | Debug s -> Format.fprintf ppf "Debug %s" s
+    | Skip -> Format.fprintf ppf "Skip"
+    | Close_over x ->
+      Format.fprintf ppf "Close_over(%a)" closure_details_debug_print x
+    | Is_closed_by x ->
+      Format.fprintf ppf "Is_closed_by(%a)" closure_details_debug_print x
+    | Captured_by_partial_application ->
+      Format.fprintf ppf "Captured_by_partial_application"
+    | Adj_captured_by_partial_application ->
+      Format.fprintf ppf "Adj_captured_by_partial_application"
+    | Crossing_left -> Format.fprintf ppf "Crossing_left"
+    | Crossing_right -> Format.fprintf ppf "Crossing_right"
+    | Register_alloc_mode -> Format.fprintf ppf "Register_alloc_mode"
 
   let morph_skip = Skip
 

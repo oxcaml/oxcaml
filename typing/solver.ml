@@ -57,14 +57,38 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       from ['a] to ['b] with allowance ['d] *)
       type ('a, 'b, 'd) t =
         | Base : 'd H.morph * ('a, 'b, 'd) C.morph -> ('a, 'b, 'd) t
-        (* CR pdsouza: TEMP FOR DEBUGGING. Remove the [_ C.morph] argument from this *)
-        | None : 'a C.obj * ('a, 'b, 'l * 'r) C.morph -> ('a, 'b, 'l * 'r) t
+        | None : 'a C.obj -> ('a, 'b, 'l * 'r) t
         | Compose :
             ('b, 'c, 'l * 'r) t * ('a, 'b, 'l * 'r) t
             -> ('a, 'c, 'l * 'r) t
         | Wait_compose : ('a, 'b, 'l * 'r) C.morph -> ('a, 'b, 'l * 'r) t
         constraint 'd = _ * _
       [@@ocaml.warning "-62"]
+
+      (** Get the source object for the morphism hint. Note that this function
+        doesn't often need to be used because most operations on morph hints are
+        recursive and can derive this themselves, and calling this function on
+        each recursive call would be very inefficient *)
+      let rec src : type a b l r. b C.obj -> (a, b, l * r) t -> a C.obj =
+       fun b_obj -> function
+        | Base (_, morph) -> C.src b_obj morph
+        | None a_obj -> a_obj
+        | Compose (h1, h2) -> src (src b_obj h1) h2
+        | Wait_compose morph -> C.src b_obj morph
+
+      let rec debug_print :
+          type a b l r. b C.obj -> Format.formatter -> (a, b, l * r) t -> unit =
+       fun b_obj ppf -> function
+        | Base (small_morph_hint, morph) ->
+          Format.fprintf ppf "Base (%a, %a)" H.morph_debug_print
+            small_morph_hint (C.print_morph b_obj) morph
+        | None _ -> Format.fprintf ppf "None"
+        | Compose (h1, h2) ->
+          Format.fprintf ppf "Compose (%a, %a)" (debug_print b_obj) h1
+            (debug_print (src b_obj h1))
+            h2
+        | Wait_compose morph ->
+          Format.fprintf ppf "Wait_compose (%a)" (C.print_morph b_obj) morph
 
       let left_adjoint =
         let rec aux :
@@ -77,8 +101,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             ( C.src b_obj morph,
               Base (H.left_adjoint small_morph_hint, C.left_adjoint b_obj morph)
             )
-          | None (a_obj, morph) ->
-            a_obj, None (b_obj, C.left_adjoint b_obj morph)
+          | None a_obj -> a_obj, None b_obj
           | Compose (f_morph_hint, g_morph_hint) ->
             let mid, f_morph_hint_adj = aux b_obj f_morph_hint in
             let src, g_morph_hint_adj = aux mid g_morph_hint in
@@ -100,8 +123,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               Base
                 (H.right_adjoint small_morph_hint, C.right_adjoint b_obj morph)
             )
-          | None (a_obj, morph) ->
-            a_obj, None (b_obj, C.right_adjoint b_obj morph)
+          | None a_obj -> a_obj, None b_obj
           | Compose (f_morph_hint, g_morph_hint) ->
             let mid, f_morph_hint_adj = aux b_obj f_morph_hint in
             let src, g_morph_hint_adj = aux mid g_morph_hint in
@@ -120,7 +142,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           match h with
           | Base (morph_hint, morph) ->
             Base (H.Allow_disallow.allow_left morph_hint, C.allow_left morph)
-          | None (x, y) -> None (x, C.allow_left y)
+          | None x -> None x
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_left a_morph_hint, allow_left b_morph_hint)
           | Wait_compose morph -> Wait_compose (C.allow_left morph)
@@ -131,7 +153,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           match h with
           | Base (morph_hint, morph) ->
             Base (H.Allow_disallow.allow_right morph_hint, C.allow_right morph)
-          | None (x, y) -> None (x, C.allow_right y)
+          | None x -> None x
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_right a_morph_hint, allow_right b_morph_hint)
           | Wait_compose morph -> Wait_compose (C.allow_right morph)
@@ -143,7 +165,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           | Base (morph_hint, morph) ->
             Base
               (H.Allow_disallow.disallow_left morph_hint, C.disallow_left morph)
-          | None (x, y) -> None (x, C.disallow_left y)
+          | None x -> None x
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_left a_morph_hint, disallow_left b_morph_hint)
           | Wait_compose morph -> Wait_compose (C.disallow_left morph)
@@ -156,7 +178,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base
               ( H.Allow_disallow.disallow_right morph_hint,
                 C.disallow_right morph )
-          | None (x, y) -> None (x, C.disallow_right y)
+          | None x -> None x
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_right a_morph_hint, disallow_right b_morph_hint)
           | Wait_compose morph -> Wait_compose (C.disallow_right morph)
@@ -168,6 +190,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Skip
           (** The [Skip] const hint is for a constant that should never produce an error *)
 
+    let const_hint_debug_print : Format.formatter -> const_hint -> unit =
+      let open Format in
+      fun ppf -> function
+        | Base h -> fprintf ppf "Base (%a)" H.const_debug_print h
+        | Skip -> fprintf ppf "Skip"
+
     type ('a, 'd) t =
       | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
       | Const : const_hint -> ('a, 'l * 'r) t
@@ -175,6 +203,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Nil
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
+
+    let rec debug_print :
+        type a l r. a C.obj -> Format.formatter -> (a, l * r) t -> unit =
+      let open Format in
+      fun a_obj ppf -> function
+        | Apply (morph_hint, subhint) ->
+          fprintf ppf "Apply(%a, %a)"
+            (Morph_hint.debug_print a_obj)
+            morph_hint
+            (debug_print (Morph_hint.src a_obj morph_hint))
+            subhint
+        | Const const_hint ->
+          fprintf ppf "Const(%a)" const_hint_debug_print const_hint
+        | Branch (x, x_hint, y, y_hint) ->
+          fprintf ppf "Branch(%a, %a, %a, %a)" (C.print a_obj) x
+            (debug_print a_obj) x_hint (C.print a_obj) y (debug_print a_obj)
+            y_hint
+        | Nil -> fprintf ppf "Nil"
 
     module Allow_disallow = Magic_allow_disallow (struct
       type ('a, _, 'd) sided = ('a, 'd) t constraint 'd = 'l * 'r
@@ -223,7 +269,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     module Morph_hint = struct
       type ('a, 'b, 'd) t =
         | Base : 'd H.morph * ('a, 'b, 'd) C.morph -> ('a, 'b, 'd) t
-        | None : 'a C.obj * ('a, 'b, 'l * 'r) C.morph -> ('a, 'b, 'l * 'r) t
+        | None : 'a C.obj -> ('a, 'b, 'l * 'r) t
         | Wait_compose : ('a, 'b, 'l * 'r) C.morph -> ('a, 'b, 'l * 'r) t
         constraint 'd = _ * _
       [@@ocaml.warning "-62"]
@@ -291,12 +337,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Apply (fst new_acc, snd new_acc, subhint'_without_acc)
         in
         match morph_hint with
-        | None (_, morph) ->
-          (* CR pdsouza: TEMP FOR DEBUGGING. DELETE ME *)
-          `Acc_was_not_used
-            (recurse_and_apply (H.morph_none, morph) a_obj (C.src a_obj morph)
-               subhint)
-          (* `Acc_was_not_used Nil *)
+        | None _ -> `Acc_was_not_used Nil
         | Base (morph_hint, morph) ->
           `Acc_was_not_used
             (recurse_and_apply (morph_hint, morph) a_obj (C.src a_obj morph)
@@ -373,7 +414,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           (a, l * r) Holed_hint.t =
        fun subhint -> function
         | Base (morph_hint, morph) -> Apply (Base (morph_hint, morph), subhint)
-        | None (a_obj, morph) -> Apply (None (a_obj, morph), subhint)
+        | None a_obj -> Apply (None a_obj, subhint)
         | Wait_compose morph -> Apply (Wait_compose morph, subhint)
         | Compose (h1, h2) ->
           holed_hint_of_apply_comp_hint
@@ -384,6 +425,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       holed_hint_of_apply_comp_hint subhint' morph_hint
 
   let hint_of_comp_hint a_obj x =
+    Format.(fprintf err_formatter "%a\n" (Comp_hint.debug_print a_obj) x);
     hint_of_holed_hint a_obj (holed_hint_of_comp_hint x)
 
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
@@ -726,7 +768,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     apply_ dst
       ~hint:
         (match hint with
-        | No_hint -> None (C.src dst morph, morph)
+        | No_hint -> None (C.src dst morph)
         | Hint small_morph_hint -> Base (small_morph_hint, morph)
         | Wait -> Wait_compose morph)
       morph
