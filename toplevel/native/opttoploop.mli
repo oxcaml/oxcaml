@@ -81,9 +81,7 @@ val eval_class_path: Env.t -> Path.t -> Obj.t
 
 (* Printing of values *)
 
-val print_value:
-  Env.t -> Obj.t -> formatter ->
-  (Types.type_expr * Jkind_types.Sort.t Jkind_types.Layout.t) -> unit
+val print_value: Env.t -> Obj.t -> formatter -> Types.type_expr -> unit
 val print_untyped_exception: formatter -> Obj.t -> unit
 
 type ('a, 'b) gen_printer =

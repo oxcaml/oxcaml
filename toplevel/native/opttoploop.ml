@@ -183,8 +183,8 @@ let print_untyped_exception ppf obj =
 let outval_of_value env obj ty =
   Printer.outval_of_value !max_printer_steps !max_printer_depth
     (fun _ _ _ -> None) env obj ty
-let print_value env obj ppf (ty, kind) =
-  !print_out_value ppf (outval_of_value env obj ty kind)
+let print_value env obj ppf ty =
+  !print_out_value ppf (outval_of_value env obj ty)
 
 type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
   | Zero of 'b
@@ -304,8 +304,8 @@ let load_lambda ppf ~compilation_unit ~required_globals lam repr =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg layout; val_type; _}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type layout)
+       | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
+          Some (outval_of_value env (toplevel_value id) val_type)
       | _ -> None
     )
 
@@ -321,10 +321,7 @@ let print_out_exception ppf exn outv =
 
 let print_exception_outcome ppf exn =
   if exn = Out_of_memory then Gc.full_major ();
-  let outv =
-    outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
-      (failwith "CR jrayman")
-  in
+  let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
   print_out_exception ppf exn outv
 
 (* The table of toplevel directives.
@@ -465,15 +462,12 @@ let execute_phrase print_outcome ppf phr =
                 | _ ->
                     if rewritten then
                       match sg' with
-                      | [Sig_value
-                          (* CR jrayman: is [val_kind] ever not [Val_reg]? *)
-                          (id, { val_type; val_kind = Val_reg layout; _ }, _)]
-                          ->
+                      | [ Sig_value (id, vd, _) ] ->
                           let outv =
                             outval_of_value newenv (toplevel_value id)
-                              val_type layout
+                              vd.val_type
                           in
-                          let ty = Printtyp.tree_of_type_scheme val_type in
+                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
                     else
@@ -485,7 +479,6 @@ let execute_phrase print_outcome ppf phr =
               if exn = Out_of_memory then Gc.full_major();
               let outv =
                 outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
-                  (failwith "CR jrayman")
               in
               Ophr_exception (exn, outv)
         in
