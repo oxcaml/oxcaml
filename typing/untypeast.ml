@@ -758,6 +758,8 @@ let expression sub exp =
     | Texp_hole _ -> Pexp_hole
     | Texp_quotation exp -> Pexp_quotation (sub.expr sub exp)
     | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_eval_quotation typ ->
+        Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)

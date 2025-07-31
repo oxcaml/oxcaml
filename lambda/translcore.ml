@@ -1335,6 +1335,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   (* TODO: update scopes *)
   | Texp_antiquotation _ ->
       failwith "Cannot unqoute outside of a quotation context."
+  | Texp_eval_quotation _ -> failwith "[%eval] is unimplemented"
 
 and pure_module m =
   match m.mod_desc with

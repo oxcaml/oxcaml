@@ -1280,6 +1280,7 @@ module Ast = struct
     | Array_comprehension of comprehension
     | Quote of expression
     | Antiquote of expression
+    | Eval_quote of core_type
 
   and case =
     { lhs : pattern;
@@ -1860,6 +1861,7 @@ module Ast = struct
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension _ | Array_comprehension _ ->
       pp fmt "(* comprehension *)"
+    | Eval_quote typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
   and print_exp env fmt exp =
@@ -2749,6 +2751,10 @@ module Exp_desc = struct
   let splice code =
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
+
+  let eval_quote typ =
+    let+ typ = typ in
+    Ast.Eval_quote typ
 end
 
 module Exp = struct

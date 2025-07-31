@@ -720,6 +720,9 @@ and expression i ppf x =
   | Texp_antiquotation e ->
     line i ppf "Texp_antiquotation";
     expression i ppf e
+  | Texp_eval_quotation typ ->
+    line i ppf "Texp_eval_quotation ";
+    core_type i ppf typ;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

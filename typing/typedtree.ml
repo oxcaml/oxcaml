@@ -320,6 +320,7 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quotation of expression
   | Texp_antiquotation of expression
+  | Texp_eval_quotation of core_type
 
 and ident_kind =
   | Id_value
@@ -1473,6 +1474,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_quotation exp ->
       fold_antiquote_exp (fold_antiquote_exp f) acc exp
   | Texp_antiquotation exp -> f acc exp
+  | Texp_eval_quotation _ -> acc
 
 and fold_antiquote_exp_opt f acc = function
   | None -> acc
