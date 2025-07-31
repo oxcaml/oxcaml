@@ -68,8 +68,7 @@ module type S =
     val outval_of_value :
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
-          Env.t -> t -> type_expr ->
-          Jkind_types.Sort.t Jkind_types.Layout.t -> Outcometree.out_value
+          Env.t -> t -> type_expr -> Outcometree.out_value
   end
 
 module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
@@ -301,8 +300,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Vec128 | Vec256 | Vec512 | Word) -> Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
 
-    (* Should layout be passed here? *)
-    let outval_of_value max_steps max_depth check_depth env obj ty _layout =
+    let outval_of_value max_steps max_depth check_depth env obj ty =
 
       let printer_steps = ref max_steps in
 
