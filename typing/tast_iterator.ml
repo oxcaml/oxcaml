@@ -475,6 +475,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_hole _ -> ()
   | Texp_quotation exp -> sub.expr sub exp
   | Texp_antiquotation exp -> sub.expr sub exp
+  | Texp_eval_quotation typ -> sub.typ sub typ
 
 let package_type sub {pack_fields; pack_txt; _} =
   List.iter (fun (lid, p) -> iter_loc sub lid; sub.typ sub p) pack_fields;

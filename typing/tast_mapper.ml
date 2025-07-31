@@ -664,6 +664,8 @@ let expr sub x =
         Texp_quotation (sub.expr sub exp)
     | Texp_antiquotation exp ->
         Texp_antiquotation (sub.expr sub exp)
+    | Texp_eval_quotation typ ->
+      Texp_eval_quotation (sub.typ sub typ)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}

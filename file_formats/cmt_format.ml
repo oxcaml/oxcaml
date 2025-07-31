@@ -264,7 +264,8 @@ let iter_on_occurrences
       | Texp_probe_is_enabled _ | Texp_exclave _
       | Texp_mutvar _ | Texp_setmutvar _
       | Texp_open _ | Texp_src_pos | Texp_overwrite _
-      | Texp_hole _ | Texp_quotation _ | Texp_antiquotation _ -> ());
+      | Texp_hole _ | Texp_quotation _ | Texp_antiquotation _
+      | Texp_eval_quotation _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are
