@@ -1601,6 +1601,7 @@ module Hint = struct
     }
 
   type 'd morph =
+    (* CR pdsouza: TEMP FOR DEBUGGING *)
     | Debug : string -> (_ * _) morph
     | Skip : ('l * 'r) morph
     | Close_over : closure_details -> ('l * disallowed) morph

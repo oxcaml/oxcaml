@@ -57,7 +57,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       from ['a] to ['b] with allowance ['d] *)
       type ('a, 'b, 'd) t =
         | Base : 'd H.morph * ('a, 'b, 'd) C.morph -> ('a, 'b, 'd) t
-        (* TEMP FOR DEBUGGING. DELETE ME *)
+        (* CR pdsouza: TEMP FOR DEBUGGING. Remove the [_ C.morph] argument from this *)
         | None : 'a C.obj * ('a, 'b, 'l * 'r) C.morph -> ('a, 'b, 'l * 'r) t
         | Compose :
             ('b, 'c, 'l * 'r) t * ('a, 'b, 'l * 'r) t
@@ -292,9 +292,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         in
         match morph_hint with
         | None (_, morph) ->
+          (* CR pdsouza: TEMP FOR DEBUGGING. DELETE ME *)
           `Acc_was_not_used
             (recurse_and_apply (H.morph_none, morph) a_obj (C.src a_obj morph)
                subhint)
+          (* `Acc_was_not_used Nil *)
         | Base (morph_hint, morph) ->
           `Acc_was_not_used
             (recurse_and_apply (morph_hint, morph) a_obj (C.src a_obj morph)
