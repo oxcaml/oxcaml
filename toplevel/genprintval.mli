@@ -66,8 +66,7 @@ module type S =
     val outval_of_value :
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
-          Env.t -> t -> type_expr ->
-          Jkind_types.Sort.t Jkind_types.Layout.t -> Outcometree.out_value
+          Env.t -> t -> type_expr -> Outcometree.out_value
   end
 
 module Make(O : OBJ)(_ : EVALPATH with type valu = O.t) :
