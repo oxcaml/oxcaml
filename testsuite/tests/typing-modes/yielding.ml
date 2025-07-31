@@ -204,9 +204,7 @@ let f2 (x @ local) = exclave_ requires_unyielding x
 Line 1, characters 50-51:
 1 | let f2 (x @ local) = exclave_ requires_unyielding x
                                                       ^
-Error: This value is "yielding" because it DEBUG[exclave_mode v_to_a_r2l]
-       which is "yielding".
-       However, it is expected to be "unyielding".
+Error: This value is "yielding" but expected to be "unyielding".
 |}]
 
 let f3 (x @ yielding) = requires_unyielding x
