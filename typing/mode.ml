@@ -4134,17 +4134,24 @@ module Crossing = struct
 
     let modality m t = Modality.concat ~then_:t m
 
-    let apply_left : t -> _ -> _ = function
+    (* CR pdsouza: need to have a look into whether we're using [Crossing_right] and
+       [Crossing_left] the right way round here, and if not why it doesn't type check the other way round *)
+
+    let apply_left ~use_hint : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
-          Mode.subtract ~hint:(Hint Crossing_right) c
+          Mode.subtract
+            ~hint:(if use_hint then Hint Crossing_right else Wait)
+            c
             (Mode.join_const ~hint:Wait c m)
 
-    let apply_right : t -> _ -> _ = function
+    let apply_right ~use_hint : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
           (* The right adjoint of join is a restriction of identity *)
-          Mode.join_const ~hint:(Hint Crossing_left) c m
+          Mode.join_const
+            ~hint:(if use_hint then Hint Crossing_left else Wait)
+            c m
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
@@ -4166,16 +4173,20 @@ module Crossing = struct
 
     let modality m t = Modality.concat ~then_:t m
 
-    let apply_left : t -> _ -> _ = function
+    let apply_left ~use_hint : t -> _ -> _ = function
       | Meet_const c ->
         fun m ->
           (* The left adjoint of meet is a restriction of identity *)
-          Mode.meet_const ~hint:(Hint Crossing_left) c m
+          Mode.meet_const
+            ~hint:(if use_hint then Hint Crossing_left else Wait)
+            c m
 
-    let apply_right : t -> _ -> _ = function
+    let apply_right ~use_hint : t -> _ -> _ = function
       | Meet_const c ->
         fun m ->
-          Mode.imply ~hint:(Hint Crossing_right) c
+          Mode.imply
+            ~hint:(if use_hint then Hint Crossing_right else Wait)
+            c
             (Mode.meet_const ~hint:Wait c m)
 
     let le (t0 : t) (t1 : t) =
@@ -4198,15 +4209,19 @@ module Crossing = struct
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_left t { monadic; comonadic } =
-    let monadic = Monadic.apply_left t.monadic monadic in
-    let comonadic = Comonadic.apply_left t.comonadic comonadic in
+  let apply_left_aux ~use_hint t { monadic; comonadic } =
+    let monadic = Monadic.apply_left ~use_hint t.monadic monadic in
+    let comonadic = Comonadic.apply_left ~use_hint t.comonadic comonadic in
     { monadic; comonadic }
 
-  let apply_right t { monadic; comonadic } =
-    let monadic = Monadic.apply_right t.monadic monadic in
-    let comonadic = Comonadic.apply_right t.comonadic comonadic in
+  let apply_left = apply_left_aux ~use_hint:true
+
+  let apply_right_aux ~use_hint t { monadic; comonadic } =
+    let monadic = Monadic.apply_right ~use_hint t.monadic monadic in
+    let comonadic = Comonadic.apply_right ~use_hint t.comonadic comonadic in
     { monadic; comonadic }
+
+  let apply_right = apply_right_aux ~use_hint:true
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
      modes via [alloc_as_value], defined as follows:
@@ -4222,17 +4237,21 @@ module Crossing = struct
      [regional_to_local] the left adjoint. *)
 
   let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left t |> value_to_alloc_r2l ?hint:None
+    m |> alloc_as_value
+    |> apply_left_aux ~use_hint:false t
+    |> value_to_alloc_r2l ~hint:(Hint Crossing_left)
 
   let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right t |> value_to_alloc_r2g ?hint:None
+    m |> alloc_as_value
+    |> apply_right_aux ~use_hint:false t
+    |> value_to_alloc_r2g ~hint:(Hint Crossing_right)
 
   let apply_left_right_alloc t { monadic; comonadic } =
-    let monadic = Monadic.apply_right t.monadic monadic in
+    let monadic = Monadic.apply_right ~use_hint:true t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
-      |> Comonadic.apply_left t.comonadic
-      |> comonadic_regional_to_local ?hint:None
+      |> Comonadic.apply_left ~use_hint:false t.comonadic
+      |> comonadic_regional_to_local ~hint:(Hint Crossing_left)
       (* the left adjoint of [locality_as_regionality]*)
     in
     { monadic; comonadic }
