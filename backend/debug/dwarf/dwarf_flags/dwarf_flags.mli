@@ -80,12 +80,14 @@ val default_gdwarf_compression : string
 val gdwarf_compression : string ref
 
 (** Get the DWARF compression flag to pass to the C toolchain.
-    Returns a flag of the form "-gz=<compression>".
+    Returns a flag of the form " -gz=<compression>" (note the leading space).
+    Returns an empty string if compression is not enabled.
     Note: The -gz= option is common between GCC and Clang, unlike
     --compress-debug-sections.
     See: https://maskray.me/blog/2022-01-23-compressed-debug-sections *)
 val get_dwarf_c_toolchain_flag : unit -> string
 
 (** Get the DWARF compression flag to pass to the assembler.
-    Similar to get_dwarf_c_toolchain_flag but uses the assembler-specific flag. *)
+    Similar to get_dwarf_c_toolchain_flag but uses the assembler-specific flag.
+    Returns a string with a leading space if not empty. *)
 val get_dwarf_as_toolchain_flag : unit -> string
