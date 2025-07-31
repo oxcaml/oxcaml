@@ -6,4 +6,5 @@ test_null_array_accessors: passed
 test_nested_patterns: passed
 test_or_null_vs_option_arrays: passed
 test_or_null_immutable_arrays: passed
+test_unboxed_products_or_null: passed
 All tests passed!
