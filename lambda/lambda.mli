@@ -880,7 +880,15 @@ and lfunction = private
     mode : allocation_mode;     (* alloc mode of the closure itself *)
     ret_mode: allocation_mode;
     (** Indicates if the function might allocate in the caller's region.
-        Cannot be external. *)
+        This determines the calling convention downstream in flambda.
+        - If [ret_mode] is [Local], then the function may allocate in the
+          caller's region, and so it does take a region parameter.
+        - If the [ret_mode] is [Heap], then the function may *not* allocate
+          in the caller's region, and so it does not take a region parameter.
+        - [ret_mode] cannot be [External]. It is actually a conflation of
+          concepts that this type is an [allocation_mode]: it should probably
+          be [Global | Local], instead of [Heap | Local | External].
+    *)
   }
 
 and lambda_while =
