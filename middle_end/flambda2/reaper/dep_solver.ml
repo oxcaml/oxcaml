@@ -544,7 +544,8 @@ let datalog_schedule =
       constructor_rel base relation from;
       filter_field is_local_field relation ]
     ==> and_
-          [escaping_field_rel relation from; field_usages_rel base relation from]
+          [ escaping_field_rel relation
+              from (*; field_usages_rel base relation from *) ]
   in
   let any_usage_from_coaccessor_any_source =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
@@ -780,7 +781,8 @@ let datalog_schedule =
       rev_accessor_rel base relation to_;
       filter_field is_local_field relation ]
     ==> and_
-          [reading_field_rel relation to_; field_sources_rel base relation to_]
+          [ reading_field_rel relation
+              to_ (*; field_sources_rel base relation to_*) ]
   in
   let reading_escaping =
     let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
@@ -1032,6 +1034,57 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
          (Datalog.get_table out_tbl1 db)
          (Datalog.get_table out_tbl2 db))
 
+let field_of_constructor_is_used =
+  rel2 "field_of_constructor_is_used" Cols.[n; f]
+
+let field_of_constructor_is_used_top =
+  rel2 "field_of_constructor_is_used_top" Cols.[n; f]
+
+let field_of_constructor_is_used_as =
+  rel3 "field_of_constructor_is_used" Cols.[n; f; n]
+
+let get_fields_usage_of_constructors :
+    Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t =
+  (* CR-someday ncourant: likewise here; I find this function particulartly
+     ugly. *)
+  let out_tbl1, out1 = rel1_r "out1" Cols.[f] in
+  let out_tbl2, out2 = rel2_r "out2" Cols.[f; n] in
+  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
+  let open! Syntax in
+  let open! Global_flow_graph in
+  let rs =
+    [ (let$ [x; field] = ["x"; "field"] in
+       [ in_ x;
+         field_of_constructor_is_used_top x field;
+         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
+       ==> out1 field);
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ in_ x;
+         field_of_constructor_is_used_as x field y;
+         not (out1 field);
+         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
+       ==> out2 field y) ]
+  in
+  fun db s ->
+    let db = Datalog.set_table in_tbl s db in
+    let db =
+      List.fold_left
+        (fun db r -> Datalog.Schedule.(run (saturate [r])) db)
+        db rs
+    in
+    fieldc_map_to_field_map
+      (FieldC.Map.merge
+         (fun k x y ->
+           match x, y with
+           | None, None -> assert false
+           | Some _, Some _ ->
+             Misc.fatal_errorf "Got two results for field %a" Field.print
+               (Field.decode k)
+           | Some (), None -> Some Used_as_top
+           | None, Some m -> Some (Used_as_vars m))
+         (Datalog.get_table out_tbl1 db)
+         (Datalog.get_table out_tbl2 db))
+
 type set_of_closures_def =
   | Not_a_set_of_closures
   | Set_of_closures of (Function_slot.t * Code_id_or_name.t) list
@@ -1089,9 +1142,6 @@ let has_use, _field_used =
       exists_with_parameters any_usage_pred_query [x] db
       || exists_with_parameters used_field_top_query [x; field] db
       || exists_with_parameters used_field_query [x; field] db )
-
-let field_of_constructor_is_used =
-  rel2 "field_of_constructor_is_used" Cols.[n; f]
 
 let field_used =
   let field_of_constructor_is_used_query =
@@ -1189,27 +1239,35 @@ let datalog_rules =
      [ constructor_rel base relation from;
        any_usage_pred base;
        filter_field is_not_local_field relation ]
-     ==> field_of_constructor_is_used base relation);
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_top base relation ]);
     (let$ [base; relation; from; usage] =
        ["base"; "relation"; "from"; "usage"]
      in
      [ constructor_rel base relation from;
        usages_rel base usage;
        field_usages_top_rel usage relation ]
-     ==> field_of_constructor_is_used base relation);
-    (let$ [base; relation; from; usage; _v] =
-       ["base"; "relation"; "from"; "usage"; "_v"]
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_top base relation ]);
+    (let$ [base; relation; from; usage; v] =
+       ["base"; "relation"; "from"; "usage"; "v"]
      in
      [ constructor_rel base relation from;
        usages_rel base usage;
-       field_usages_rel usage relation _v ]
-     ==> field_of_constructor_is_used base relation);
+       field_usages_rel usage relation v ]
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_as base relation v ]);
     (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
      [ constructor_rel base relation from;
        any_usage_pred base;
        reading_field_rel relation x;
        any_usage_pred x ]
-     ==> field_of_constructor_is_used base relation);
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_top base relation ]);
     (let$ [base; relation; from; x; y] =
        ["base"; "relation"; "from"; "x"; "y"]
      in
@@ -1217,25 +1275,34 @@ let datalog_rules =
        any_usage_pred base;
        reading_field_rel relation x;
        usages_rel x y ]
-     ==> field_of_constructor_is_used base relation);
-    (let$ [usage; base; relation; from; _v] =
-       ["usage"; "base"; "relation"; "from"; "_v"]
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_as base relation x ]);
+    (let$ [usage; base; relation; from; v; u] =
+       ["usage"; "base"; "relation"; "from"; "v"; "u"]
      in
      [ constructor_rel base relation from;
        sources_rel usage base;
        filter_field is_local_field relation;
        any_usage_pred base;
-       field_usages_rel usage relation _v ]
-     ==> field_of_constructor_is_used base relation);
-    (let$ [usage; base; relation; from] =
-       ["usage"; "base"; "relation"; "from"]
+       rev_accessor_rel usage relation v;
+       usages_rel v u ]
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_as base relation v ]);
+    (let$ [usage; base; relation; from; v] =
+       ["usage"; "base"; "relation"; "from"; "v"]
      in
      [ constructor_rel base relation from;
        sources_rel usage base;
        filter_field is_local_field relation;
        any_usage_pred base;
-       field_usages_top_rel usage relation ]
-     ==> field_of_constructor_is_used base relation);
+       (* field_usages_top_rel usage relation *)
+       rev_accessor_rel usage relation v;
+       any_usage_pred v ]
+     ==> and_
+           [ field_of_constructor_is_used base relation;
+             field_of_constructor_is_used_top base relation ]);
     (* CR ncourant: this marks any [Apply] field as
        [field_of_constructor_is_used], as long as the function is called.
        Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
@@ -1254,6 +1321,12 @@ let datalog_rules =
        still be able to have its representation changed. *)
     (let$ [x] = ["x"] in
      [any_usage_pred x] ==> cannot_change_representation0 x);
+    (let$ [x; field; y] = ["x"; "field"; "y"] in
+     [ any_usage_pred x;
+       filter_field is_not_local_field field;
+       filter_field real_field field;
+       constructor_rel x field y ]
+     ==> cannot_change_representation0 x);
     (* If there exists an alias which has another source, and which uses any
        real field of our allocation, we cannot change the representation. This
        currently requires 4 rules due to the absence of disjunction in the
@@ -1650,8 +1723,7 @@ let rewrite_kind_with_subkind uses var kind =
       (Code_id_or_name.Map.singleton var ())
       kind
 
-let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
-  let fields = get_fields db usages in
+let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db fields name_prefix =
   Field.Map.filter_map
     (fun field field_use ->
       match field with
@@ -1677,7 +1749,8 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
             Some
               (Unboxed
                  (mk_unboxed_fields ~has_to_be_unboxed ~mk db
-                    (get_all_usages ~follow_known_arity_calls:true db flow_to)
+                    (get_fields db
+                       (get_all_usages ~follow_known_arity_calls:true db flow_to))
                     new_name))
           else if Code_id_or_name.Map.exists
                     (fun k () -> has_to_be_unboxed k)
@@ -1759,8 +1832,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
             mk_unboxed_fields ~has_to_be_unboxed
               ~mk:(fun kind name -> Variable.create name kind)
               db
-              (get_all_usages ~follow_known_arity_calls:true db
-                 (Code_id_or_name.Map.singleton to_patch ()))
+              (get_fields db
+                 (get_all_usages ~follow_known_arity_calls:true db
+                    (Code_id_or_name.Map.singleton to_patch ())))
               new_name
           in
           unboxed := Code_id_or_name.Map.add to_patch fields !unboxed)
@@ -1809,7 +1883,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
             get_all_usages ~follow_known_arity_calls:false db
               (Code_id_or_name.Map.singleton code_id_or_name ())
           in
-          let repr = mk_unboxed_fields ~has_to_be_unboxed ~mk db uses "" in
+          let repr =
+            mk_unboxed_fields ~has_to_be_unboxed ~mk db (get_fields db uses) ""
+          in
           add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
         | Set_of_closures l ->
           let mk kind name =
@@ -1817,14 +1893,14 @@ let fixpoint (graph : Global_flow_graph.graph) =
               (Compilation_unit.get_current_exn ())
               ~name ~is_always_immediate:false kind
           in
-          let uses =
-            get_all_usages ~follow_known_arity_calls:false db
+          let fields =
+            get_fields_usage_of_constructors db
               (List.fold_left
                  (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
                  Code_id_or_name.Map.empty l)
           in
           let repr =
-            mk_unboxed_fields ~has_to_be_unboxed ~mk db uses "unboxed"
+            mk_unboxed_fields ~has_to_be_unboxed ~mk db fields "unboxed"
           in
           let fss =
             List.fold_left
@@ -1846,12 +1922,11 @@ let fixpoint (graph : Global_flow_graph.graph) =
     Format.eprintf "@.TO_CHG: %a@."
       (Code_id_or_name.Map.print pp_changed_representation)
       !changed_representation;
+  let no_unbox = Sys.getenv_opt "NOUNBOX" <> None in
   { db;
-    unboxed_fields = !unboxed;
+    unboxed_fields = (if no_unbox then Code_id_or_name.Map.empty else !unboxed);
     changed_representation =
-      !changed_representation
-      (* unboxed_fields = Code_id_or_name.Map.empty; changed_representation =
-         Code_id_or_name.Map.empty *)
+      (if no_unbox then Code_id_or_name.Map.empty else !changed_representation)
   }
 
 let print_color { db; unboxed_fields; changed_representation } v =
