@@ -1559,6 +1559,7 @@ module C = Lattices_mono
 
 module Hint = struct
   type const =
+    | Debug of string
     | Result_of_lazy
     | Lazy_closure
     | Class
@@ -1570,7 +1571,10 @@ module Hint = struct
     | Is_function_return
     | Stack_expression
 
+  let const_debug s = Debug s
+
   let const_debug_print ppf = function
+    | Debug s -> Format.fprintf ppf "Debug (%s)" s
     | Result_of_lazy -> Format.fprintf ppf "Result_of_lazy"
     | Lazy_closure -> Format.fprintf ppf "Lazy_closure"
     | Class -> Format.fprintf ppf "Class"
@@ -1791,6 +1795,7 @@ module Axerror = struct
       let open Format in
       let wrap_print_hint t = fprintf ppf "@ because %t" t in
       function
+      | Debug s -> wrap_print_hint (dprintf "DEBUG[%s]" s)
       | Result_of_lazy ->
         wrap_print_hint (dprintf "it is the result of a lazy expression")
       | Lazy_closure ->
@@ -1924,6 +1929,7 @@ module Axerror = struct
       let open Format in
       fprintf ppf "(%a)" (C.print a_obj) a;
       let debug_print_const_hint ppf : Hint.const -> _ = function
+        | Debug s -> fprintf ppf "Debug (%s)" s
         | Result_of_lazy -> fprintf ppf "Result_of_lazy"
         | Lazy_closure -> fprintf ppf "Lazy_closure"
         | Class -> fprintf ppf "Class"
@@ -1971,12 +1977,12 @@ module Axerror = struct
         unit =
      fun ?target ~left_obj ~right_obj err ppf ->
       let open Format in
-      (* ignore debug_print_axhint_chain; *)
-      fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
-        (debug_print_axhint_chain err.left left_obj)
-        err.left_hint
-        (debug_print_axhint_chain err.right right_obj)
-        err.right_hint;
+      ignore debug_print_axhint_chain;
+      (* fprintf ppf "Actual DEBUG: %a@\nExpected DEBUG: %a@\n"
+         (debug_print_axhint_chain err.left left_obj)
+         err.left_hint
+         (debug_print_axhint_chain err.right right_obj)
+         err.right_hint; *)
       (match target with
       | None -> fprintf ppf "This value is "
       | Some (target_item, target_lid) ->

@@ -332,6 +332,8 @@ module type Hint = sig
   (** Hints describing the reasons for constants *)
   type const
 
+  val const_debug : string -> const
+
   val const_debug_print : Format.formatter -> const -> unit
 
   (** Hints describing the reasons for morphisms applied to modes.

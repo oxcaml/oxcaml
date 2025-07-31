@@ -191,6 +191,7 @@ module type S = sig
 
   module Hint : sig
     type const =
+      | Debug of string
       | Result_of_lazy
       | Lazy_closure
       | Class
