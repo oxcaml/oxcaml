@@ -91,3 +91,8 @@ val get_dwarf_c_toolchain_flag : unit -> string
     Similar to get_dwarf_c_toolchain_flag but uses the assembler-specific flag.
     Returns a string with a leading space if not empty. *)
 val get_dwarf_as_toolchain_flag : unit -> string
+
+(** Get the DWARF compression format to use.
+    Returns Some compression if compression is enabled and not "none" or empty.
+    Returns None otherwise. *)
+val get_dwarf_compression_format : unit -> string option

@@ -47,6 +47,7 @@ let cmi_file = ref None
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
+type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -61,6 +62,7 @@ and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_full = ref false              (* For full DWARF support *)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
+and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)

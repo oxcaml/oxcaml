@@ -182,6 +182,14 @@ let get_dwarf_compression_flag () =
   then Some !gdwarf_compression
   else None
 
+let get_dwarf_compression_format () =
+  match get_dwarf_compression_flag () with
+  | Some compression
+    when (not (String.equal compression ""))
+         && not (String.equal compression "none") ->
+    Some compression
+  | _ -> None
+
 let get_dwarf_c_toolchain_flag () =
   match get_dwarf_compression_flag () with
   | Some compression ->

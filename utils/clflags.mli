@@ -54,6 +54,7 @@ val set_float_arg :
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
+type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 val objfiles : string list ref
 val ccobjs : string list ref
@@ -72,6 +73,7 @@ val make_archive : bool ref
 val debug : bool ref
 val debug_full : bool ref
 val dwarf_c_toolchain_flag : string ref
+val dwarf_fission : dwarf_fission ref
 val unsafe : bool ref
 val use_linscan : bool ref
 val link_everything : bool ref
