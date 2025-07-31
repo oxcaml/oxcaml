@@ -4282,12 +4282,14 @@ module Crossing = struct
   let apply_left_alloc t m =
     m |> alloc_as_value
     |> apply_left_aux ~use_hint:false t
-    |> value_to_alloc_r2l ~hint:(Hint Crossing_left)
+    |> value_to_alloc_r2l ~hint:Wait
+    |> Alloc.apply_hint ~comonadic:Crossing_left ~monadic:Crossing_right
 
   let apply_right_alloc t m =
     m |> alloc_as_value
     |> apply_right_aux ~use_hint:false t
-    |> value_to_alloc_r2g ~hint:(Hint Crossing_right)
+    |> value_to_alloc_r2g ~hint:Wait
+    |> Alloc.apply_hint ~comonadic:Crossing_right ~monadic:Crossing_left
 
   let apply_left_right_alloc t { monadic; comonadic } =
     let monadic = Monadic.apply_right ~use_hint:true t.monadic monadic in
