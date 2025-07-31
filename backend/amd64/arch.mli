@@ -26,9 +26,10 @@ module Extension : sig
     | SSE4_1
     | SSE4_2
     | CLMUL
-    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures prior
-             to Haswell (i.e. without BMI), and do not cause an illegal instruction fault.
-             That means code using LZCNT/TZCNT will silently produce wrong results. *)
+    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures
+             prior to Haswell (i.e. without BMI), and do not cause an illegal
+             instruction fault. That means code using LZCNT/TZCNT will silently
+             produce wrong results. *)
     | BMI2
     | AVX
     | AVX2
