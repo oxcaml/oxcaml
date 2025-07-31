@@ -1319,8 +1319,8 @@ let datalog_rules =
        this rule will change in the future, when local value slots are properly
        tracked: a closure will only local value slots that has any_use will
        still be able to have its representation changed. *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x] ==> cannot_change_representation0 x);
+    (* (let$ [x] = ["x"] in [any_usage_pred x] ==> cannot_change_representation0
+       x); *)
     (let$ [x; field; y] = ["x"; "field"; "y"] in
      [ any_usage_pred x;
        filter_field is_not_local_field field;
