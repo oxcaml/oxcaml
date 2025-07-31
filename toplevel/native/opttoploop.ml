@@ -183,8 +183,8 @@ let print_untyped_exception ppf obj =
 let outval_of_value env obj ty =
   Printer.outval_of_value !max_printer_steps !max_printer_depth
     (fun _ _ _ -> None) env obj ty
-let print_value env obj ppf ty =
-  !print_out_value ppf (outval_of_value env obj ty)
+let print_value env obj ppf (ty, kind) =
+  !print_out_value ppf (outval_of_value env obj ty kind)
 
 type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
   | Zero of 'b
@@ -281,7 +281,7 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_lambda ppf ~compilation_unit ~required_globals lam size =
+let load_lambda ppf ~compilation_unit ~required_globals lam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam = Simplif.simplify_lambda lam in
@@ -289,8 +289,7 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_format =
-        Mb_struct { mb_repr = Module_value_only size };
+      main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
       required_globals;
@@ -305,8 +304,8 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type)
+       | Sig_value(id, {val_kind = Val_reg layout; val_type; _}, _) ->
+          Some (outval_of_value env (toplevel_value id) val_type layout)
       | _ -> None
     )
 
@@ -322,7 +321,10 @@ let print_out_exception ppf exn outv =
 
 let print_exception_outcome ppf exn =
   if exn = Out_of_memory then Gc.full_major ();
-  let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
+  let outv =
+    outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
+      (failwith "CR jrayman")
+  in
   print_out_exception ppf exn outv
 
 (* The table of toplevel directives.
@@ -344,8 +346,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg Jkind.(Layout.of_const (Layout.Const.of_sort_const
-        Sort.Const.for_module_field));
+      val_kind = Val_reg (Jkind.Layout.Sort sort);
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -427,7 +428,7 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
+      let compilation_unit, res, required_globals, repr =
         let { Lambda.compilation_unit; main_module_block_format;
               required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
@@ -435,23 +436,20 @@ let execute_phrase print_outcome ppf phr =
             ~style:Plain_block
         in
         remember compilation_unit sg';
-        let size =
+        let repr =
           match main_module_block_format with
-          | Mb_struct { mb_repr = Module_value_only size } -> size
-          | Mb_struct _ ->
-            Misc.fatal_error "Unsupported module format in toplevel"
-            (* CR jrayman: add support *)
+          | Mb_struct { mb_repr } -> mb_repr
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        compilation_unit, close_phrase res, required_globals, size
+        compilation_unit, close_phrase res, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit res size
+          load_lambda ppf ~required_globals ~compilation_unit res repr
         in
         let out_phr =
           match res with
@@ -465,12 +463,15 @@ let execute_phrase print_outcome ppf phr =
                 | _ ->
                     if rewritten then
                       match sg' with
-                      | [ Sig_value (id, vd, _) ] ->
+                      | [Sig_value
+                          (* CR jrayman: is [val_kind] ever not [Val_reg]? *)
+                          (id, { val_type; val_kind = Val_reg layout; _ }, _)]
+                          ->
                           let outv =
                             outval_of_value newenv (toplevel_value id)
-                              vd.val_type
+                              val_type layout
                           in
-                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
+                          let ty = Printtyp.tree_of_type_scheme val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
                     else
@@ -482,6 +483,7 @@ let execute_phrase print_outcome ppf phr =
               if exn = Out_of_memory then Gc.full_major();
               let outv =
                 outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
+                  (failwith "CR jrayman")
               in
               Ophr_exception (exn, outv)
         in

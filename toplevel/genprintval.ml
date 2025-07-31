@@ -68,7 +68,8 @@ module type S =
     val outval_of_value :
           int -> int ->
           (int -> t -> Types.type_expr -> Outcometree.out_value option) ->
-          Env.t -> t -> type_expr -> Outcometree.out_value
+          Env.t -> t -> type_expr ->
+          Jkind_types.Sort.t Jkind_types.Layout.t -> Outcometree.out_value
   end
 
 module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
@@ -150,8 +151,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Generic of Path.t * (int -> (int -> O.t -> Outcometree.out_value,
                                      O.t -> Outcometree.out_value) gen_printer)
 
-    (* CR mixed blocks v1: It would be good, and not hard, to add proper
-       printing support for unboxed values. *)
+    (* CR small-ints: small int support is probably incorrect. *)
     let printers = ref ([
       ( Pident(Ident.create_local "print_int"),
         Simple (Predef.type_int,
@@ -179,10 +179,28 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_nativeint (O.obj x : nativeint))) );
       ( Pident(Ident.create_local "print_int64"),
         Simple (Predef.type_int64,
-                (fun x -> Oval_int64 (O.obj x : int64))) );
+                (fun x -> Oval_int64_u (O.obj x : int64))) );
       ( Pident(Ident.create_local "print_float_u"),
         Simple (Predef.type_unboxed_float,
-                (fun _x -> Oval_stuff "<float#>")) )
+                (fun x -> Oval_float_u (O.obj x : float))) );
+      ( Pident(Ident.create_local "print_float32_u"),
+        Simple (Predef.type_unboxed_float32,
+                (fun x -> Oval_float32_u (O.obj x : Obj.t))) );
+      ( Pident(Ident.create_local "print_int8_u"),
+        Simple (Predef.type_unboxed_int8,
+                (fun x -> Oval_int (O.obj x : int))) );
+      ( Pident(Ident.create_local "print_int16_u"),
+        Simple (Predef.type_unboxed_int16,
+                (fun x -> Oval_int (O.obj x : int))) );
+      ( Pident(Ident.create_local "print_int32_u"),
+        Simple (Predef.type_unboxed_int32,
+                (fun x -> Oval_int32_u (O.obj x : int32))) );
+      ( Pident(Ident.create_local "print_nativeint_u"),
+        Simple (Predef.type_unboxed_nativeint,
+                (fun x -> Oval_nativeint_u (O.obj x : nativeint))) );
+      ( Pident(Ident.create_local "print_int64_u"),
+        Simple (Predef.type_unboxed_int64,
+                (fun x -> Oval_int64_u (O.obj x : int64))) );
     ] : (Path.t * printer) list)
 
     let exn_printer ppf path exn =
@@ -283,18 +301,40 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Vec128 | Vec256 | Vec512 | Word) -> Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
 
-    let outval_of_value max_steps max_depth check_depth env obj ty =
+    (* Should layout be passed here? *)
+    let outval_of_value max_steps max_depth check_depth env obj ty _layout =
 
       let printer_steps = ref max_steps in
 
+      let is_value ty =
+        (* CR jrayman: change [~why] *)
+        match Ctype.type_sort env ty ~why:Let_binding ~fixed:false with
+        | Error _ -> assert false
+        | Ok sort ->
+          begin match Jkind.Sort.default_for_transl_and_get sort with
+          | Jkind.Sort.Const.(Base Value) -> true
+          | _ -> false (* CR jrayman: expand [_] *)
+          end
+      in
+
       let nested_values = ObjTbl.create 8 in
-      let nest_gen err f depth obj ty =
+      let nest_gen cycle f depth obj ty =
         let repr = obj in
-        if not (is_real_block repr) then
+        (* if (match *)
+        (*     Jkind.Layout.to_sort layout *)
+        (*     |> Option.map Jkind.Sort.default_for_transl_and_get *)
+        (*   with *)
+        (*   | Some Jkind.Sort.Const.(Base Value) -> false *)
+        (*   | _ -> true) *)
+        (*   (1* CR jrayman: this is ugly *1) *)
+        (* then *)
+        (*   abstr *)
+        (* else *)
+        if not (is_value ty) || not (is_real_block repr) then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
-            err
+            cycle
           else begin
             ObjTbl.add nested_values repr ();
             let ret = f depth obj ty in
