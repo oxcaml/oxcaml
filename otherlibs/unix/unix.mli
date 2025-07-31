@@ -1163,7 +1163,7 @@ type sigprocmask_command =
   | SIG_BLOCK
   | SIG_UNBLOCK
 
-val sigprocmask : sigprocmask_command -> int list -> int list
+val sigprocmask : sigprocmask_command -> int list -> int list @@ nonportable
 (** [sigprocmask mode sigs] changes the set of blocked signals.
    If [mode] is [SIG_SETMASK], blocked signals are set to those in
    the list [sigs].
@@ -1176,6 +1176,11 @@ val sigprocmask : sigprocmask_command -> int list -> int list
    When the systhreads version of the [Thread] module is loaded, this
    function redirects to [Thread.sigmask]. I.e., [sigprocmask] only
    changes the mask of the current thread.
+
+   This function is nonportable because signal handlers themselves are not
+   required to be portable - we mask all signals on domains other than the main
+   domain so that signal handlers are only executed on the main domain, and it
+   is unsafe to change this sigmask on domains other than the main domain.
 
    @raise Invalid_argument on Windows (no inter-process signals on
    Windows) *)

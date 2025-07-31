@@ -1333,7 +1333,20 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
   init_domain_ml_values(p.ml_values, callback, term_sync);
 
   CAML_GC_MESSAGE(DOMAIN, "Creating a child domain.\n");
+
+#ifdef POSIX_SIGNALS
+  sigset_t mask, old_mask;
+
+  /* Block all signals in domains other than the initial one */
+  sigfillset(&mask);
+  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
+#endif
+
   err = pthread_create(&th, 0, domain_thread_func, (void*)&p);
+
+#ifdef POSIX_SIGNALS
+  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+#endif
 
   if (err) {
     caml_failwith("failed to create domain thread");
