@@ -17,23 +17,23 @@
 module Or_null = Stdlib_stable.Or_null
 
 module Null_array = struct
-  external length : ('a : value_or_null mod separable).
+  external[@layout_poly] length : ('a : any mod separable).
     'a array -> int = "%array_length"
 
-  external get : ('a : value_or_null mod separable).
+  external[@layout_poly] get : ('a : any mod separable).
     'a array -> int -> 'a = "%array_safe_get"
 
-  external set : ('a : value_or_null mod separable).
+  external[@layout_poly] set : ('a : any mod separable).
     'a array -> int -> 'a -> unit = "%array_safe_set"
 
-  external unsafe_get : ('a : value_or_null mod separable).
+  external[@layout_poly] unsafe_get : ('a : any mod separable).
     'a array -> int -> 'a = "%array_unsafe_get"
 
-  external unsafe_set : ('a : value_or_null mod separable).
+  external[@layout_poly] unsafe_set : ('a : any mod separable).
     'a array -> int -> 'a -> unit =
     "%array_unsafe_set"
 
-  external unsafe_blit : ('a : value_or_null mod separable).
+  external[@layout_poly] unsafe_blit : ('a : any mod separable).
     'a array -> int -> 'a array -> int -> int -> unit =
     "%arrayblit"
 end
@@ -275,6 +275,77 @@ let test_or_null_immutable_arrays () =
 
   print_endline "test_or_null_immutable_arrays: passed"
 
+(* Unboxed tuples or 2+ element records are always separable. *)
+
+type or_null_tuple = #(float or_null * string or_null)
+type or_null_triple = #(int or_null * float or_null * myrecord or_null)
+type or_null_record = #{ x : float or_null; y : string or_null }
+type nested_or_null = #(float or_null * #(string or_null * int or_null))
+
+let test_unboxed_products_or_null () =
+  let arr1 : or_null_tuple array =
+    [| #(Null, This "hello"); #(This 3.14, Null); #(This 2.718, This "world") |] in
+  assert (Null_array.length arr1 = 3);
+
+  (match Null_array.get arr1 0 with
+  | #(Null, This "hello") -> ()
+  | _ -> assert false);
+
+  (match Null_array.get arr1 1 with
+  | #(This 3.14, Null) -> ()
+  | _ -> assert false);
+
+  (match Null_array.get arr1 2 with
+  | #(This 2.718, This "world") -> ()
+  | _ -> assert false);
+
+  let arr2 : or_null_record array =
+    [| #{ x = This 10.5; y = This "a" }; #{ x = Null; y = This "b" } |] in
+
+  Null_array.set arr2 0 #{ x = Null; y = Null };
+
+  (match Null_array.get arr2 0 with
+  | #{ x = Null; y = Null } -> ()
+  | _ -> assert false);
+
+  (match arr2 with
+  | [| #{ x = Null; _ }; #{ x = Null; _ } |] -> ()
+  | _ -> assert false);
+
+  let rec1 = { x = 1; y = "one" } in
+  let rec2 = { x = 2; y = "two" } in
+  let arr3 : or_null_triple array =
+    [| #(This 1, Null, This rec1); #(Null, This 99.9, This rec2) |] in
+
+  (match arr3 with
+  | [| #(This 1, Null, This _); #(Null, This 99.9, This _) |] -> ()
+  | _ -> assert false);
+
+  let arr2 : nested_or_null array =
+    [| #(This 1.5, #(Null, This 10));
+       #(Null, #(This "hello", Null));
+       #(This 3.7, #(This "world", This 30)) |] in
+
+  (match arr2 with
+  | [| #(This 1.5, #(Null, This 10));
+       #(Null, #(This "hello", Null));
+       #(This 3.7, #(This "world", This 30)) |] -> ()
+  | _ -> assert false);
+
+  let src = arr2 in
+  let dst : nested_or_null array =
+    [| #(Null, #(Null, Null));
+       #(Null, #(Null, Null));
+       #(Null, #(Null, Null)) |] in
+
+  Null_array.unsafe_blit src 0 dst 1 2;
+
+  (match Null_array.get dst 1 with
+  | #(This 1.5, #(Null, This 10)) -> ()
+  | _ -> assert false);
+
+  print_endline "test_unboxed_products_or_null: passed"
+
 let () =
   test_array_creation ();
   test_array_patterns ();
@@ -284,4 +355,5 @@ let () =
   test_nested_patterns ();
   test_or_null_vs_option_arrays ();
   test_or_null_immutable_arrays ();
+  test_unboxed_products_or_null ();
   print_endline "All tests passed!"

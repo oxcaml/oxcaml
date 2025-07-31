@@ -1,9 +1,10 @@
 module type Element_intf = Test_gen_u_array.Element_intf
 
-type 'a elem =
+type ('a : value_or_null) elem =
   | Number : { ops : (module Element_intf with type t = 'a) } -> 'a elem
-  | Option : 'a elem -> ('a option) elem
-  | Tup2 : 'a1 elem * 'a2 elem -> ('a1 * 'a2) elem
+  | Option : ('a : value_or_null) . 'a elem -> ('a option) elem
+  | Or_null : 'a elem -> ('a or_null) elem
+  | Tup2 : ('a1 : value_or_null) ('a2 : value_or_null) . 'a1 elem * 'a2 elem -> ('a1 * 'a2) elem
   | Tup3 : 'a1 elem * 'a2 elem * 'a3 elem -> ('a1 * 'a2 * 'a3) elem
   | Tup4 : 'a1 elem * 'a2 elem * 'a3 elem * 'a4 elem
       -> ('a1 * 'a2 * 'a3 * 'a4) elem
@@ -80,11 +81,12 @@ end
 let float32_elem = Number { ops = (module Float32_elem) }
 
 let traverse0 (f : 'a. (module Element_intf with type t = 'a) -> 'a) =
-  let rec go : type a . a elem -> a =
+  let rec go : type (a : value_or_null) . a elem -> a =
     fun (elem : a elem) ->
       match elem with
       | Number {ops} -> f ops
       | Option elem -> Some (go elem)
+      | Or_null elem -> This (go elem)
       | Tup2 (e1, e2) -> (go e1, go e2)
       | Tup3 (e1, e2, e3) -> (go e1, go e2, go e3)
       | Tup4 (e1, e2, e3, e4) -> (go e1, go e2, go e3, go e4)
@@ -95,11 +97,13 @@ let traverse0 (f : 'a. (module Element_intf with type t = 'a) -> 'a) =
   go
 
 let traverse1 (f : 'a. (module Element_intf with type t = 'a) -> 'a -> 'a) =
-  let rec go : type a . a elem -> a -> a =
+  let rec go : type (a : value_or_null) . a elem -> a -> a =
     fun (elem : a elem) (a : a) ->
       match elem with
       | Number {ops} -> f ops a
       | Option elem -> Option.map (go elem) a
+      | Or_null elem ->
+        Stdlib_stable.Or_null.map (go elem) a
       | Tup2 (e1, e2) ->
         let a1, a2 = a in
         (go e1 a1, go e2 a2)
@@ -120,7 +124,7 @@ let traverse1 (f : 'a. (module Element_intf with type t = 'a) -> 'a -> 'a) =
 
 let traverse2
       (f : 'a. (module Element_intf with type t = 'a) -> 'a -> 'a -> 'a) =
-  let rec go : type a . a elem -> a -> a -> a =
+  let rec go : type (a : value_or_null) . a elem -> a -> a -> a =
     fun (elem : a elem) (a1 : a) (a2 : a) ->
       match elem with
       | Number {ops} -> f ops a1 a2
@@ -128,6 +132,11 @@ let traverse2
         begin match a1, a2 with
         | None, _ | _, None -> None
         | Some a1, Some a2 -> Some (go elem a1 a2)
+        end
+      | Or_null elem ->
+        begin match a1, a2 with
+        | Null, _ | _, Null -> Null
+        | This a1, This a2 -> This (go elem a1 a2)
         end
       | Tup2 (e1, e2) ->
         let a11, a12 = a1 in
@@ -154,13 +163,14 @@ let traverse2
   in
   go
 
-let rec of_int : type a . a elem -> int -> a =
+let rec of_int : type (a : value_or_null) . a elem -> int -> a =
   fun elem i ->
     match elem with
     | Number {ops} ->
       let module O = (val ops) in
       O.of_int i
     | Option elem -> Some (of_int elem i)
+    | Or_null elem -> This (of_int elem i)
     | Tup2 (e1, e2) -> (of_int e1 i, of_int e2 i)
     | Tup3 (e1, e2, e3) -> (of_int e1 i, of_int e2 i, of_int e3 i)
     | Tup4 (e1, e2, e3, e4) ->
@@ -202,13 +212,14 @@ let max_val elem =
   traverse0 f elem
 
 let min_val elem =
-  let rec go : type a . a elem -> a =
+  let rec go : type (a : value_or_null) . a elem -> a =
     fun (elem : a elem) ->
       match elem with
       | Number {ops} ->
         let module E = (val ops) in
         E.min_val
       | Option elem -> None
+      | Or_null elem -> Null
       | Tup2 (e1, e2) -> (go e1, go e2)
       | Tup3 (e1, e2, e3) -> (go e1, go e2, go e3)
       | Tup4 (e1, e2, e3, e4) -> (go e1, go e2, go e3, go e4)
@@ -224,13 +235,14 @@ let rand elem a =
   in
   traverse1 f elem a
 
-let rec compare : type a . a elem -> a -> a -> int =
+let rec compare : type (a : value_or_null) . a elem -> a -> a -> int =
   fun elem a1 a2 ->
     match elem with
     | Number {ops} ->
       let module E = (val ops) in
       E.compare a1 a2
     | Option elem -> Option.compare (compare elem) a1 a2
+    | Or_null elem -> Stdlib_stable.Or_null.compare (compare elem) a1 a2
     | Tup2 (e1, e2) ->
       let a11, a12 = a1 in
       let a21, a22 = a2 in
@@ -283,9 +295,9 @@ let rec compare : type a . a elem -> a -> a -> int =
               if x <> 0 then x else
                 compare e6 a16 a26
 
-let rec print : type a . a elem -> a -> unit =
+let rec print : type (a : value_or_null) . a elem -> a -> unit =
   let open struct
-    type packed = P : 'a elem * 'a -> packed
+    type packed = P : ('a : value_or_null) . 'a elem * 'a -> packed
 
     let print_comma_sep l =
       Printf.printf "(";
@@ -313,6 +325,14 @@ let rec print : type a . a elem -> a -> unit =
       | None -> Printf.printf "None"
       | Some a -> begin
           Printf.printf "Some ";
+          print elem a
+        end
+      end
+    | Or_null elem ->
+      begin match a with
+      | Null -> Printf.printf "Null"
+      | This a -> begin
+          Printf.printf "This ";
           print elem a
         end
       end
