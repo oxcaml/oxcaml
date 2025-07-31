@@ -1652,9 +1652,9 @@ module Hint = struct
     | Debug s -> Format.fprintf ppf "Debug %s" s
     | Skip -> Format.fprintf ppf "Skip"
     | Close_over x ->
-      Format.fprintf ppf "Close_over(%a)" closure_details_debug_print x
+      Format.fprintf ppf "Close_over (%a)" closure_details_debug_print x
     | Is_closed_by x ->
-      Format.fprintf ppf "Is_closed_by(%a)" closure_details_debug_print x
+      Format.fprintf ppf "Is_closed_by (%a)" closure_details_debug_print x
     | Captured_by_partial_application ->
       Format.fprintf ppf "Captured_by_partial_application"
     | Adj_captured_by_partial_application ->
@@ -3562,9 +3562,7 @@ let alloc_to_value_l2r ?hint m =
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2g :
-    type l r. ?hint:(l * r) S.morph_hint -> (l * r) Value.t -> (l * r) Alloc.t =
- fun ?hint m ->
+let value_to_alloc_r2g ?hint m =
   let { comonadic; monadic } = m in
   let comonadic =
     S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
@@ -4130,9 +4128,6 @@ module Crossing = struct
     let of_bounds c : t = Join_const c
 
     let modality m t = Modality.concat ~then_:t m
-
-    (* CR pdsouza: need to have a look into whether we're using [Crossing_right] and
-       [Crossing_left] the right way round here, and if not why it doesn't type check the other way round *)
 
     let apply_left ~use_hint : t -> _ -> _ = function
       | Join_const c ->

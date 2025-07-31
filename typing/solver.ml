@@ -518,7 +518,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   type ('a, 'd) mode =
     | Amode :
-        'a * ('a, 'l * 'r_) Comp_hint.t * ('a, 'l_ * 'r) Comp_hint.t
+        'a * ('a, 'l * _) Comp_hint.t * ('a, _ * 'r) Comp_hint.t
         -> ('a, 'l * 'r) mode
     | Amodevar : ('a, 'd) morphvar -> ('a, 'd) mode
     | Amodejoin :
@@ -583,7 +583,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       type a l r.
       ?verbose:bool -> a C.obj -> Format.formatter -> (a, l * r) mode -> unit =
    fun ?(verbose = false) (obj : a C.obj) ppf m ->
-    let traversed = if verbose then Some VarSet.empty else Option.None in
+    let traversed = if verbose then Some VarSet.empty else None in
     match m with
     | Amode (a, _, _) -> C.print obj ppf a
     | Amodevar mv -> print_morphvar ?traversed obj ppf mv
@@ -706,7 +706,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let of_const _obj ?hint a =
     let hint : _ Comp_hint.t =
-      match hint with Option.None -> Nil | Some h -> Const h
+      match hint with None -> Nil | Some h -> Const h
     in
     Amode (a, hint, hint)
 
@@ -756,7 +756,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ~hint:
         (match hint with
         | No_hint -> None (C.src dst morph)
-        | Hint small_morph_hint -> Base (small_morph_hint, morph)
+        | Hint h -> Base (h, morph)
         | Wait -> Wait_compose morph)
       morph
 
@@ -787,7 +787,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         INVARIANT listed above. *)
   let update_lower (type a) ~log (obj : a C.obj) v a a_hint =
     (match log with
-    | Option.None -> ()
+    | None -> ()
     | Some log -> log := Clower (v, v.lower, v.lower_hint) :: !log);
     let new_lower = C.join obj v.lower a in
     let new_lower_hint = hint_biased_join obj a a_hint v.lower v.lower_hint in
@@ -799,7 +799,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         INVARIANT listed above. *)
   let update_upper (type a) ~log (obj : a C.obj) v a a_hint =
     (match log with
-    | Option.None -> ()
+    | None -> ()
     | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
     let new_upper = C.meet obj v.upper a in
     let new_upper_hint = hint_biased_meet obj v.upper v.upper_hint a a_hint in
@@ -810,7 +810,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       INVARIANT listed above. *)
   let set_vlower ~log v vlower =
     (match log with
-    | Option.None -> ()
+    | None -> ()
     | Some log -> log := Cvlower (v, v.vlower) :: !log);
     v.vlower <- vlower
 
@@ -1200,7 +1200,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let zap_to_ceil : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
    fun obj m ~log ->
     let ceil = get_ceil obj m in
-    submode obj (Amode (ceil, Nil, Nil)) m ~log |> Result.get_ok;
+    (* This this [submode] call must suceed, we provide a skip hint *)
+    submode obj (Amode (ceil, Const H.const_skip, Const H.const_skip)) m ~log
+    |> Result.get_ok;
     ceil
 
   (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in
@@ -1221,9 +1223,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (mv : (a, allowed * r) morphvar) =
     let rec loop lower =
       let log = ref empty_changes in
-      (* We provide an arbitrary, throwaway hint to this call to [submode_mvc]
+      (* We provide a skip hint to this call to [submode_mvc]
          as it will either succeed or we will undo the change and not use the hint *)
-      let r = submode_mvc ~log:(Some log) obj mv lower Nil in
+      let r = submode_mvc ~log:(Some log) obj mv lower (Const H.const_skip) in
       match r with
       | Ok () -> !log, lower
       | Error (a, _a_hint) ->
@@ -1242,7 +1244,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let zap_to_floor_morphvar obj mv ~commit =
     let log_, lower = zap_to_floor_morphvar_aux obj mv in
     (match commit with
-    | Option.None -> undo_changes log_
+    | None -> undo_changes log_
     | Some log -> log := append_changes !log log_);
     lower
 
@@ -1261,8 +1263,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       VarMap.iter
         (fun _ mv ->
           (* Since this call to [submode_mvc] should always succeed,
-             we provide a throwaway, arbitrary hint *)
-          submode_mvc obj mv floor Nil ~log |> Result.get_ok)
+             we provide a skip hint *)
+          submode_mvc obj mv floor (Const H.const_skip) ~log |> Result.get_ok)
         mvs;
       floor
 
