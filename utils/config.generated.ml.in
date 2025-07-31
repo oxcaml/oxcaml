@@ -129,4 +129,7 @@ let has_avx = "@has_avx@" = "yes"
 
 let has_avx2 = "@has_avx2@" = "yes"
 
+let as_compress_debug_sections_flag = {@QS@|@as_compress_debug_sections_flag@|@QS@}
+let cc_compress_debug_sections_flag = {@QS@|@cc_compress_debug_sections_flag@|@QS@}
+
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"

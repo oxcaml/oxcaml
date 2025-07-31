@@ -372,7 +372,7 @@ let compile infile outfile =
   else
     let dwarf_flag =
       if !Clflags.native_code && !Clflags.debug then
-        Dwarf_flags.get_dwarf_c_toolchain_flag ()
+        Dwarf_flags.get_dwarf_as_toolchain_flag ()
       else
         ""
     in

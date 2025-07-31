@@ -324,6 +324,8 @@ AC_SUBST([ASPP])
 AC_SUBST([endianness])
 AC_SUBST([AS])
 AC_SUBST([asm_cfi_supported])
+AC_SUBST([as_compress_debug_sections_flag])
+AC_SUBST([cc_compress_debug_sections_flag])
 AC_SUBST([sharedlib_cflags])
 AC_SUBST([rpath])
 AC_SUBST([mkdll])
@@ -2627,11 +2629,15 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
 ## Does the assembler support debug prefix map and CFI directives
 as_has_debug_prefix_map=false
 asm_cfi_supported=false
+as_compress_debug_sections_flag=""
+cc_compress_debug_sections_flag=""
 AS_IF([$native_compiler],
   [AS_CASE([$host],
     [*-*-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
-    OCAML_AS_HAS_CFI_DIRECTIVES])])
+    OCAML_AS_HAS_CFI_DIRECTIVES
+    OCAML_AS_COMPRESSION_SUPPORT
+    OCAML_CC_COMPRESSION_SUPPORT])])
 
 ## Frame pointers
 

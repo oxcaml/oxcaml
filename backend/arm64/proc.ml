@@ -447,7 +447,7 @@ let slot_offset (loc : Reg.stack_location) ~stack_class ~stack_offset
 let assemble_file infile outfile =
   let dwarf_flag =
     if !Clflags.native_code && !Clflags.debug then
-      Dwarf_flags.get_dwarf_c_toolchain_flag ()
+      Dwarf_flags.get_dwarf_as_toolchain_flag ()
     else
       ""
   in

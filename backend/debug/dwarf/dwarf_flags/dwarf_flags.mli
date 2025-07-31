@@ -85,3 +85,7 @@ val gdwarf_compression : string ref
     --compress-debug-sections.
     See: https://maskray.me/blog/2022-01-23-compressed-debug-sections *)
 val get_dwarf_c_toolchain_flag : unit -> string
+
+(** Get the DWARF compression flag to pass to the assembler.
+    Similar to get_dwarf_c_toolchain_flag but uses the assembler-specific flag. *)
+val get_dwarf_as_toolchain_flag : unit -> string

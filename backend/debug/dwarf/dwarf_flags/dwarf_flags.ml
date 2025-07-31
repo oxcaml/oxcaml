@@ -185,5 +185,18 @@ let get_dwarf_compression_flag () =
 
 let get_dwarf_c_toolchain_flag () =
   match get_dwarf_compression_flag () with
-  | Some compression -> " -gz=" ^ compression
+  | Some compression ->
+    if not (String.equal Config.cc_compress_debug_sections_flag "") then
+      " " ^ Config.cc_compress_debug_sections_flag ^ "=" ^ compression
+    else
+      ""
+  | None -> ""
+
+let get_dwarf_as_toolchain_flag () =
+  match get_dwarf_compression_flag () with
+  | Some compression ->
+    if not (String.equal Config.as_compress_debug_sections_flag "") then
+      " " ^ Config.as_compress_debug_sections_flag ^ "=" ^ compression
+    else
+      ""
   | None -> ""
