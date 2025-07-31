@@ -1236,27 +1236,26 @@ module Lattices_mono = struct
   let rec print_morph :
       type a b l r. b obj -> Format.formatter -> (a, b, l * r) morph -> unit =
    fun dst ppf -> function
-    | Id -> Format.fprintf ppf "Id"
-    | Meet_with c -> Format.fprintf ppf "Meet (%a)" (print dst) c
-    | Imply c -> Format.fprintf ppf "Imply (%a)" (print dst) c
-    | Proj (_, ax) -> Format.fprintf ppf "Proj (%a)" Axis.print ax
-    | Max_with ax -> Format.fprintf ppf "Max_with (%a)" Axis.print ax
-    | Min_with ax -> Format.fprintf ppf "Min_with (%a)" Axis.print ax
+    | Id -> Format.fprintf ppf "id"
+    | Meet_with c -> Format.fprintf ppf "meet(%a)" (print dst) c
+    | Imply c -> Format.fprintf ppf "imply(%a)" (print dst) c
+    | Proj (_, ax) -> Format.fprintf ppf "proj_%a" Axis.print ax
+    | Max_with ax -> Format.fprintf ppf "max_with_%a" Axis.print ax
+    | Min_with ax -> Format.fprintf ppf "min_with_%a" Axis.print ax
     | Map_comonadic f ->
       let dst0 = proj_obj Areality dst in
-      Format.fprintf ppf "Map_comonadic (%a)" (print_morph dst0) f
-    | Monadic_to_comonadic_min -> Format.fprintf ppf "Monadic_to_comonadic_min"
-    | Comonadic_to_monadic _ -> Format.fprintf ppf "Comonadic_to_monadic"
-    | Monadic_to_comonadic_max -> Format.fprintf ppf "Monadic_to_comonadic_max"
-    | Local_to_regional -> Format.fprintf ppf "Local_to_regional"
-    | Regional_to_local -> Format.fprintf ppf "Regional_to_local"
-    | Locality_as_regionality -> Format.fprintf ppf "Locality_as_regionality"
-    | Regional_to_global -> Format.fprintf ppf "Regional_to_global"
-    | Global_to_regional -> Format.fprintf ppf "Global_to_regional"
+      Format.fprintf ppf "map_comonadic(%a)" (print_morph dst0) f
+    | Monadic_to_comonadic_min -> Format.fprintf ppf "monadic_to_comonadic_min"
+    | Comonadic_to_monadic _ -> Format.fprintf ppf "comonadic_to_monadic"
+    | Monadic_to_comonadic_max -> Format.fprintf ppf "monadic_to_comonadic_max"
+    | Local_to_regional -> Format.fprintf ppf "local_to_regional"
+    | Regional_to_local -> Format.fprintf ppf "regional_to_local"
+    | Locality_as_regionality -> Format.fprintf ppf "locality_as_regionality"
+    | Regional_to_global -> Format.fprintf ppf "regional_to_global"
+    | Global_to_regional -> Format.fprintf ppf "global_to_regional"
     | Compose (f0, f1) ->
       let mid = src dst f0 in
-      Format.fprintf ppf "Compose (%a, %a)" (print_morph dst) f0
-        (print_morph mid) f1
+      Format.fprintf ppf "%a ∘ %a" (print_morph dst) f0 (print_morph mid) f1
 
   let id = Id
 
