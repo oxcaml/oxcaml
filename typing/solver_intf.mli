@@ -304,18 +304,18 @@ module type Solver_mono = sig
         encounters this, it will end the error message there and not try to continue.
     - [Hint morph_hint] - when we want to provide an actual hint, [morph_hint],
         we use this.
-    - [Hole] - this is a special case that should be used carefully. This is for
+    - [Wait] - this is a special case that should be used carefully. This is for
         when the caller is trying to perform a series of morphism applications
-        that can share a single hint. In this case, the caller should use [Hole]
+        that can share a single hint. In this case, the caller should use [Wait]
         for all but the last morphism application, then use [Hint morph_hint] for
         the final application, which will cause [morph_hint] to be used as the hint
-        for the entire series of morphism applications. A [Hole] must always be later
+        for the entire series of morphism applications. A [Wait] must always be later
         followed by some [Hint] before any non-morphism application operations are
         performed on the mode. *)
   type 'd morph_hint =
     | No_hint
     | Hint of 'd hint_morph
-    | Hole
+    | Wait
     constraint 'd = 'l * 'r
 
   (** Apply a monotone morphism, and optionally give it a hint *)

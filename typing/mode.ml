@@ -1702,7 +1702,7 @@ module S = Solver
 type 'd morph_hint = 'd S.morph_hint =
   | No_hint
   | Hint of 'd Hint.morph
-  | Hole
+  | Wait
   constraint 'd = _ * _
 
 type monadic = C.monadic =
@@ -4136,7 +4136,7 @@ module Crossing = struct
       | Join_const c ->
         fun m ->
           Mode.subtract ~hint:(Hint Crossing_right) c
-            (Mode.join_const ~hint:Hole c m)
+            (Mode.join_const ~hint:Wait c m)
 
     let apply_right : t -> _ -> _ = function
       | Join_const c ->
@@ -4174,7 +4174,7 @@ module Crossing = struct
       | Meet_const c ->
         fun m ->
           Mode.imply ~hint:(Hint Crossing_right) c
-            (Mode.meet_const ~hint:Hole c m)
+            (Mode.meet_const ~hint:Wait c m)
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1

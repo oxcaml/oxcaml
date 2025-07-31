@@ -266,7 +266,7 @@ module type S = sig
   type 'd morph_hint =
     | No_hint
     | Hint of 'd Hint.morph
-    | Hole
+    | Wait
     constraint 'd = 'l * 'r
 
   type changes
