@@ -1699,6 +1699,12 @@ end
 module Solver = Solver_mono (Hint) (C)
 module S = Solver
 
+type 'd morph_hint = 'd S.morph_hint =
+  | No_hint
+  | Hint of 'd Hint.morph
+  | Hole
+  constraint 'd = _ * _
+
 type monadic = C.monadic =
   { uniqueness : C.Uniqueness.t;
     contention : C.Contention.t;
@@ -2340,7 +2346,7 @@ module Comonadic_common_gen (Obj : Obj) = struct
   let imply ?hint c m =
     Solver.apply obj ?hint (Imply c) (Solver.disallow_left m)
 
-  let apply_hint morph_hint = Solver.apply Obj.obj ~hint:(`Hint morph_hint) Id
+  let apply_hint morph_hint = Solver.apply Obj.obj ~hint:(Hint morph_hint) Id
 
   module Guts = struct
     let get_floor m = Solver.get_floor obj m
@@ -2404,7 +2410,7 @@ module Monadic_common_gen (Obj : Obj) = struct
   let subtract ?hint c m =
     Solver.apply obj ?hint (Imply c) (Solver.disallow_left m)
 
-  let apply_hint morph_hint = Solver.apply Obj.obj ~hint:(`Hint morph_hint) Id
+  let apply_hint morph_hint = Solver.apply Obj.obj ~hint:(Hint morph_hint) Id
 
   module Guts = struct
     let get_ceil m = Solver.get_floor obj m
@@ -2667,17 +2673,13 @@ module Yielding = struct
 end
 
 let regional_to_local ?hint m =
-  S.apply
-    ?hint:(Option.map (fun hint -> `Hint hint) hint)
-    Locality.Obj.obj C.Regional_to_local m
+  S.apply ?hint Locality.Obj.obj C.Regional_to_local m
 
 let locality_as_regionality m =
-  S.apply ~hint:(`Hint Skip) Regionality.Obj.obj C.Locality_as_regionality m
+  S.apply ~hint:(Hint Skip) Regionality.Obj.obj C.Locality_as_regionality m
 
 let regional_to_global ?hint m =
-  S.apply
-    ?hint:(Option.map (fun hint -> `Hint hint) hint)
-    Locality.Obj.obj C.Regional_to_global m
+  S.apply ?hint Locality.Obj.obj C.Regional_to_global m
 
 module type Areality = sig
   module Const : C.Areality
@@ -2756,7 +2758,7 @@ module Comonadic_with (Areality : Areality) = struct
   end
 
   let proj ax m =
-    Solver.apply ~hint:(`Hint Skip) (proj_obj ax) (Proj (Obj.obj, ax)) m
+    Solver.apply ~hint:(Hint Skip) (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   let min_with ax m =
     Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
@@ -2898,7 +2900,7 @@ module Monadic = struct
   module Const_op = C.Monadic_op
 
   let proj ax m =
-    Solver.apply ~hint:(`Hint Skip) (proj_obj ax) (Proj (Obj.obj, ax)) m
+    Solver.apply ~hint:(Hint Skip) (proj_obj ax) (Proj (Obj.obj, ax)) m
 
   (* The monadic fragment is inverted. *)
 
@@ -3387,19 +3389,11 @@ module Value_with (Areality : Areality) = struct
     { comonadic; monadic }
 
   let join_with ?hint ax c { monadic; comonadic } =
-    let monadic =
-      Monadic.join_with
-        ?hint:(Option.map (fun hint -> `Hint hint) hint)
-        ax c monadic
-    in
+    let monadic = Monadic.join_with ?hint ax c monadic in
     { monadic; comonadic }
 
   let meet_with ?hint ax c { monadic; comonadic } =
-    let comonadic =
-      Comonadic.meet_with
-        ?hint:(Option.map (fun hint -> `Hint hint) hint)
-        ax c comonadic
-    in
+    let comonadic = Comonadic.meet_with ?hint ax c comonadic in
     { comonadic; monadic }
 
   let join l =
@@ -3425,19 +3419,13 @@ module Value_with (Areality : Areality) = struct
     { comonadic; monadic }
 
   let comonadic_to_monadic ?hint m =
-    S.apply
-      ?hint:(Option.map (fun hint -> `Hint hint) hint)
-      Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
+    S.apply ?hint Monadic.Obj.obj (Comonadic_to_monadic Comonadic.Obj.obj) m
 
   let monadic_to_comonadic_min m =
     S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
 
   let meet_const ?hint c { comonadic; monadic } =
-    let comonadic =
-      Comonadic.meet_const
-        ?hint:(Option.map (fun hint -> `Hint hint) hint)
-        c comonadic
-    in
+    let comonadic = Comonadic.meet_const ?hint c comonadic in
     { monadic; comonadic }
 
   let join_const c { comonadic; monadic } =
@@ -3555,7 +3543,7 @@ module Const = struct
 end
 
 let comonadic_locality_as_regionality comonadic =
-  S.apply ~hint:(`Hint Skip) Value.Comonadic.Obj.obj
+  S.apply ~hint:(Hint Skip) Value.Comonadic.Obj.obj
     (Map_comonadic Locality_as_regionality) comonadic
 
 let comonadic_regional_to_local ?hint comonadic =
@@ -3570,30 +3558,24 @@ let alloc_as_value m =
 let alloc_to_value_l2r ?hint m =
   let { comonadic; monadic } = Alloc.disallow_right m in
   let comonadic =
-    S.apply
-      ?hint:(Option.map (fun hint -> `Hint hint) hint)
-      Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional) comonadic
+    S.apply ?hint Value.Comonadic.Obj.obj (Map_comonadic Local_to_regional)
+      comonadic
   in
   { comonadic; monadic }
 
 let value_to_alloc_r2g :
-    type l r. ?hint:(l * r) Hint.morph -> (l * r) Value.t -> (l * r) Alloc.t =
+    type l r. ?hint:(l * r) S.morph_hint -> (l * r) Value.t -> (l * r) Alloc.t =
  fun ?hint m ->
   let { comonadic; monadic } = m in
   let comonadic =
-    S.apply
-      ?hint:(Option.map (fun hint -> `Hint hint) hint)
-      Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global) comonadic
+    S.apply ?hint Alloc.Comonadic.Obj.obj (Map_comonadic Regional_to_global)
+      comonadic
   in
   { comonadic; monadic }
 
 let value_to_alloc_r2l ?hint m =
   let { comonadic; monadic } = m in
-  let comonadic =
-    comonadic_regional_to_local
-      ?hint:(Option.map (fun hint -> `Hint hint) hint)
-      comonadic
-  in
+  let comonadic = comonadic_regional_to_local ?hint comonadic in
   { comonadic; monadic }
 
 module Modality = struct
@@ -4153,14 +4135,14 @@ module Crossing = struct
     let apply_left : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
-          Mode.subtract ~hint:(`Hint Crossing_right) c
-            (Mode.join_const ~hint:`Hole c m)
+          Mode.subtract ~hint:(Hint Crossing_right) c
+            (Mode.join_const ~hint:Hole c m)
 
     let apply_right : t -> _ -> _ = function
       | Join_const c ->
         fun m ->
           (* The right adjoint of join is a restriction of identity *)
-          Mode.join_const ~hint:(`Hint Crossing_left) c m
+          Mode.join_const ~hint:(Hint Crossing_left) c m
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
@@ -4186,13 +4168,13 @@ module Crossing = struct
       | Meet_const c ->
         fun m ->
           (* The left adjoint of meet is a restriction of identity *)
-          Mode.meet_const ~hint:(`Hint Crossing_left) c m
+          Mode.meet_const ~hint:(Hint Crossing_left) c m
 
     let apply_right : t -> _ -> _ = function
       | Meet_const c ->
         fun m ->
-          Mode.imply ~hint:(`Hint Crossing_right) c
-            (Mode.meet_const ~hint:`Hole c m)
+          Mode.imply ~hint:(Hint Crossing_right) c
+            (Mode.meet_const ~hint:Hole c m)
 
     let le (t0 : t) (t1 : t) =
       match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1

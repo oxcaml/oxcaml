@@ -263,6 +263,12 @@ module type S = sig
       right_hint : axhint
     }
 
+  type 'd morph_hint =
+    | No_hint
+    | Hint of 'd Hint.morph
+    | Hole
+    constraint 'd = 'l * 'r
+
   type changes
 
   val undo_changes : changes -> unit
@@ -670,7 +676,7 @@ module type S = sig
     val proj_monadic : 'a Monadic.Axis.t -> ('l * 'r) t -> ('a, 'r * 'l) mode
 
     val meet_const :
-      ?hint:('l * 'r) Hint.morph ->
+      ?hint:('l * 'r) morph_hint ->
       Comonadic.Const.t ->
       ('l * 'r) t ->
       ('l * 'r) t
@@ -686,14 +692,14 @@ module type S = sig
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
     val meet_with :
-      ?hint:('l0 * 'r0) Hint.morph ->
+      ?hint:('l0 * 'r0) morph_hint ->
       'a Comonadic.Axis.t ->
       'a ->
       ('l0 * 'r0) t ->
       ('l0 * 'r0) t
 
     val join_with :
-      ?hint:('r * 'l) Hint.morph ->
+      ?hint:('r * 'l) morph_hint ->
       'a Monadic.Axis.t ->
       'a ->
       ('l * 'r) t ->
@@ -702,7 +708,7 @@ module type S = sig
     val zap_to_legacy : lr -> Const.t
 
     val comonadic_to_monadic :
-      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+      ?hint:('l * 'r) morph_hint -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
 
     (* The following two are about the scenario where we partially apply a
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the
@@ -744,7 +750,7 @@ module type S = sig
 
   (** Converts regional to local, identity otherwise *)
   val regional_to_local :
-    ?hint:('l * 'r) Hint.morph ->
+    ?hint:('l * 'r) morph_hint ->
     ('l * 'r) Regionality.t ->
     ('l * 'r) Locality.t
 
@@ -753,7 +759,7 @@ module type S = sig
 
   (** Converts regional to global, identity otherwise *)
   val regional_to_global :
-    ?hint:('l * 'r) Hint.morph ->
+    ?hint:('l * 'r) morph_hint ->
     ('l * 'r) Regionality.t ->
     ('l * 'r) Locality.t
 
@@ -762,17 +768,17 @@ module type S = sig
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r :
-    ?hint:('l * disallowed) Hint.morph ->
+    ?hint:('l * disallowed) morph_hint ->
     ('l * 'r) Alloc.t ->
     ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val value_to_alloc_r2l :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    ?hint:('l * 'r) morph_hint -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+    ?hint:('l * 'r) morph_hint -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   module Modality : sig
     type 'a raw =

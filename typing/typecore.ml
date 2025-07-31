@@ -573,7 +573,7 @@ let mode_lazy expected_mode_in =
 
 let mode_partial_application expected_mode =
   mode_morph (fun mode -> alloc_as_value
-    (value_to_alloc_r2g ~hint:Captured_by_partial_application mode))
+    (value_to_alloc_r2g ~hint:(Hint Captured_by_partial_application) mode))
     expected_mode
 
 let mode_trywith expected_mode =
@@ -661,7 +661,7 @@ let register_allocation_mode alloc_mode =
   allocations := alloc_mode :: !allocations
 
 let register_allocation_value_mode mode =
-  let alloc_mode = value_to_alloc_r2g ~hint:Register_alloc_mode mode in
+  let alloc_mode = value_to_alloc_r2g ~hint:(Hint Register_alloc_mode) mode in
   register_allocation_mode alloc_mode;
   let mode = alloc_as_value alloc_mode in
   alloc_mode, mode
