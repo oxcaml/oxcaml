@@ -192,6 +192,10 @@ module type S = sig
   module Hint : sig
     type const =
       | Debug of string
+      | Skip
+          (** The skip constant hint. This should be used when we know that the constant
+            will never cause a submoding error, and so this should never have to be
+            printed *)
       | Result_of_lazy
       | Lazy_closure
       | Class

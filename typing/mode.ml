@@ -1560,6 +1560,7 @@ module C = Lattices_mono
 module Hint = struct
   type const =
     | Debug of string
+    | Skip
     | Result_of_lazy
     | Lazy_closure
     | Class
@@ -1571,20 +1572,25 @@ module Hint = struct
     | Is_function_return
     | Stack_expression
 
+  let const_skip = Skip
+
   let const_debug s = Debug s
 
-  let const_debug_print ppf = function
-    | Debug s -> Format.fprintf ppf "Debug (%s)" s
-    | Result_of_lazy -> Format.fprintf ppf "Result_of_lazy"
-    | Lazy_closure -> Format.fprintf ppf "Lazy_closure"
-    | Class -> Format.fprintf ppf "Class"
-    | Tailcall_function -> Format.fprintf ppf "Tailcall_function"
-    | Tailcall_argument -> Format.fprintf ppf "Tailcall_argument"
-    | Mutable_read -> Format.fprintf ppf "Mutable_read"
-    | Mutable_write -> Format.fprintf ppf "Mutable_write"
-    | Forced_lazy_expression -> Format.fprintf ppf "Forced_lazy_expression"
-    | Is_function_return -> Format.fprintf ppf "Is_function_return"
-    | Stack_expression -> Format.fprintf ppf "Stack_expression"
+  let const_debug_print ppf =
+    let open Format in
+    function
+    | Debug s -> fprintf ppf "Debug (%s)" s
+    | Skip -> fprintf ppf "Skip"
+    | Result_of_lazy -> fprintf ppf "Result_of_lazy"
+    | Lazy_closure -> fprintf ppf "Lazy_closure"
+    | Class -> fprintf ppf "Class"
+    | Tailcall_function -> fprintf ppf "Tailcall_function"
+    | Tailcall_argument -> fprintf ppf "Tailcall_argument"
+    | Mutable_read -> fprintf ppf "Mutable_read"
+    | Mutable_write -> fprintf ppf "Mutable_write"
+    | Forced_lazy_expression -> fprintf ppf "Forced_lazy_expression"
+    | Is_function_return -> fprintf ppf "Is_function_return"
+    | Stack_expression -> fprintf ppf "Stack_expression"
 
   type lock_item =
     | Value
@@ -1796,6 +1802,9 @@ module Axerror = struct
       let wrap_print_hint t = fprintf ppf "@ because %t" t in
       function
       | Debug s -> wrap_print_hint (dprintf "DEBUG[%s]" s)
+      | Skip ->
+        (* The point of the [Skip] constant hint is that it should never have to be printed *)
+        assert false
       | Result_of_lazy ->
         wrap_print_hint (dprintf "it is the result of a lazy expression")
       | Lazy_closure ->

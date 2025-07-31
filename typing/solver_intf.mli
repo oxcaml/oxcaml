@@ -332,6 +332,11 @@ module type Hint = sig
   (** Hints describing the reasons for constants *)
   type const
 
+  (** See comment on [Skip] constructor for [const] in [Mode.Hint] for details
+    about this. *)
+  val const_skip : const
+
+  (** A constant hint that can be used for debugging, by providing a custom string message *)
   val const_debug : string -> const
 
   val const_debug_print : Format.formatter -> const -> unit
@@ -343,7 +348,7 @@ module type Hint = sig
 
   val morph_debug_print : Format.formatter -> _ morph -> unit
 
-  (** See comment on [Skip] constructor for ['d morph] in Mode.Hint for details
+  (** See comment on [Skip] constructor for ['d morph] in [Mode.Hint] for details
     about this. *)
   val morph_skip : 'd morph
 

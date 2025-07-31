@@ -185,20 +185,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       end)
     end
 
-    type const_hint =
-      | Base of H.const
-      | Skip
-          (** The [Skip] const hint is for a constant that should never produce an error *)
-
-    let const_hint_debug_print : Format.formatter -> const_hint -> unit =
-      let open Format in
-      fun ppf -> function
-        | Base h -> fprintf ppf "Base (%a)" H.const_debug_print h
-        | Skip -> fprintf ppf "Skip"
-
     type ('a, 'd) t =
       | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
-      | Const : const_hint -> ('a, 'l * 'r) t
+      | Const : H.const -> ('a, 'l * 'r) t
       | Branch : 'a * ('a, 'l * 'r) t * 'a * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
       | Nil
       constraint 'd = _ * _
@@ -215,7 +204,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             (debug_print (Morph_hint.src a_obj morph_hint))
             subhint
         | Const const_hint ->
-          fprintf ppf "Const(%a)" const_hint_debug_print const_hint
+          fprintf ppf "Const(%a)" H.const_debug_print const_hint
         | Branch (x, x_hint, y, y_hint) ->
           fprintf ppf "Branch(%a, %a, %a, %a)" (C.print a_obj) x
             (debug_print a_obj) x_hint (C.print a_obj) y (debug_print a_obj)
@@ -277,7 +266,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     type ('a, 'd) t =
       | Apply : ('b, 'a, 'd) Morph_hint.t * ('b, 'd) t -> ('a, 'd) t
-      | Const : Comp_hint.const_hint -> ('a, 'l * 'r) t
+      | Const : H.const -> ('a, 'l * 'r) t
       | Branch : 'a * ('a, 'l * 'r) t * 'a * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
       | Nil
       constraint 'd = _ * _
@@ -322,10 +311,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         [ `Acc_has_been_used of (b, l * r) hint
         | `Acc_was_not_used of (a, l * r) hint ] =
      fun ~acc b_obj a_obj -> function
-      | Const const_hint -> (
-        match const_hint with
-        | Base const_hint -> `Acc_was_not_used (Const const_hint)
-        | Skip -> assert false)
+      | Const const_hint -> `Acc_was_not_used (Const const_hint)
       | Nil -> `Acc_was_not_used Nil
       | Apply (morph_hint, subhint) -> (
         let recurse_and_apply new_acc b_obj a_obj subhint =
@@ -425,7 +411,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       holed_hint_of_apply_comp_hint subhint' morph_hint
 
   let hint_of_comp_hint a_obj x =
-    Format.(fprintf err_formatter "%a\n" (Comp_hint.debug_print a_obj) x);
+    ignore Comp_hint.debug_print;
+    (* Format.(fprintf err_formatter "%a\n" (Comp_hint.debug_print a_obj) x); *)
     hint_of_holed_hint a_obj (holed_hint_of_comp_hint x)
 
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
@@ -713,13 +700,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ( Comp_hint.Morph_hint.Allow_disallow.disallow_left hint,
         Comp_hint.Allow_disallow.disallow_left var.upper_hint )
 
-  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const Skip, Nil)
+  let min (type a) (obj : a C.obj) = Amode (C.min obj, Const H.const_skip, Nil)
 
-  let max (type a) (obj : a C.obj) = Amode (C.max obj, Nil, Const Skip)
+  let max (type a) (obj : a C.obj) = Amode (C.max obj, Nil, Const H.const_skip)
 
   let of_const _obj ?hint a =
     let hint : _ Comp_hint.t =
-      match hint with Option.None -> Nil | Some h -> Const (Base h)
+      match hint with Option.None -> Nil | Some h -> Const h
     in
     Amode (a, hint, hint)
 
@@ -1123,7 +1110,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the maximum element, and we can use [a_hint_lower]
            as the output's lower hint *)
-        Amode (a, a_hint_lower, Const Skip)
+        Amode (a, a_hint_lower, Const H.const_skip)
       else
         match rest with
         | [] -> Amodejoin (a, a_hint_lower, mvs)
@@ -1148,7 +1135,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (union_prefer_left mvs' mvs)
               xs)
     in
-    loop (C.min obj) (Const Skip) VarMap.empty l
+    loop (C.min obj) (Const H.const_skip) VarMap.empty l
 
   let meet (type a l) obj l =
     let rec loop :
@@ -1162,7 +1149,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then
         (* In this case, [a] is the minimum element, and we can use [a_hint_upper]
            as the output's upper hint *)
-        Amode (a, Const Skip, a_hint_upper)
+        Amode (a, Const H.const_skip, a_hint_upper)
       else
         match rest with
         | [] -> Amodemeet (a, a_hint_upper, mvs)
@@ -1185,7 +1172,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (union_prefer_left mvs' mvs)
               xs)
     in
-    loop (C.max obj) (Const Skip) VarMap.empty l
+    loop (C.max obj) (Const H.const_skip) VarMap.empty l
 
   let get_loose_ceil : type a l r. a C.obj -> (a, l * r) mode -> a =
    fun obj m ->
@@ -1308,7 +1295,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amode (a, a_hint_lower, _a_hint_upper) ->
       if C.le obj (C.max obj) a
       then
-        ( Amode (a, Comp_hint.Allow_disallow.allow_left a_hint_lower, Const Skip),
+        ( Amode
+            ( a,
+              Comp_hint.Allow_disallow.allow_left a_hint_lower,
+              Const H.const_skip ),
           false )
       else
         ( Amodevar
@@ -1346,7 +1336,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       if C.le obj a (C.min obj)
       then
         ( Amode
-            (a, Const Skip, Comp_hint.Allow_disallow.allow_right a_hint_upper),
+            ( a,
+              Const H.const_skip,
+              Comp_hint.Allow_disallow.allow_right a_hint_upper ),
           false )
       else
         ( Amodevar
