@@ -269,7 +269,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let rec aux :
         type a b l r.
         acc:((l * r) H.morph * (a, b, l * r) C.morph) option ->
-        (* TODO - decide if need both of these objects or if either can always be derived *)
+        (* CR pdsouza: decide if need both of these objects or if either can always be derived *)
         b C.obj ->
         a C.obj ->
         (a, l * r) Holed_hint.t ->
@@ -681,7 +681,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let apply_morphvar dst morph morph_hint (Amorphvar (var, morph', morph'_hint))
       =
-    (* TODO - handle [Wait_compose] here (make special [compose] function) *)
     Amorphvar
       (var, C.compose dst morph morph', Compose (morph_hint, morph'_hint))
 
@@ -697,7 +696,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amode (a, a_hint_lower, a_hint_upper) ->
       Amode
         ( C.apply dst morph a,
-          (* TODO - check if need to handle [Wait_compose] here *)
           Apply
             ( Comp_hint.Morph_hint.Allow_disallow.disallow_right hint,
               Comp_hint.Allow_disallow.disallow_right a_hint_lower ),
@@ -708,13 +706,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amodejoin (a, a_hint, vs) ->
       Amodejoin
         ( C.apply dst morph a,
-          (* TODO - check if need to handle [Wait_compose] here *)
           Apply (hint, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
     | Amodemeet (a, a_hint, vs) ->
       Amodemeet
         ( C.apply dst morph a,
-          (* TODO - check if need to handle [Wait_compose] here *)
           Apply (hint, a_hint),
           VarMap.map (apply_morphvar dst morph hint) vs )
 
