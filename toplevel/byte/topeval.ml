@@ -109,9 +109,9 @@ let load_lambda ppf lam =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg layout; val_type}, _) ->
+      | Sig_value(id, {val_kind = Val_reg _; val_type}, _) ->
           Some (outval_of_value env (getvalue (Translmod.toplevel_name id))
-                  val_type layout)
+                  val_type)
       | _ -> None
     )
 
@@ -148,11 +148,8 @@ let execute_phrase print_outcome ppf phr =
                   | [] -> Ophr_signature []
                   | _ ->
                       match find_eval_phrase str with
-                      | Some (exp, sort, _, _) ->
-                        let outv =
-                          outval_of_value newenv v exp.exp_type
-                            (Jkind_types.Layout.Sort sort)
-                        in
+                      | Some (exp, _, _, _) ->
+                        let outv = outval_of_value newenv v exp.exp_type in
                         let ty = Printtyp.tree_of_type_scheme exp.exp_type in
                         Ophr_eval (outv, ty)
                       | None -> Ophr_signature (pr_item oldenv sg'))
@@ -163,7 +160,6 @@ let execute_phrase print_outcome ppf phr =
               if exn = Out_of_memory then Gc.full_major();
               let outv =
                 outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
-                  (failwith "CR jrayman")
               in
               Ophr_exception (exn, outv)
         in
