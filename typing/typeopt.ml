@@ -150,7 +150,8 @@ let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
   | Base Value -> begin
-  (* CR or_null: [immediate_or_null] arrays are intarrays. *)
+  (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
+     supported by the middle-end *)
   if is_always_gc_ignorable env ty
     && Ctype.check_type_nullability env ty Non_null
   then Int
