@@ -3157,13 +3157,13 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   let apply_dbg = Debuginfo.from_location apply.loc in
   let needs_region =
     match apply.mode, (result_mode : Lambda.allocation_mode) with
-    | (Alloc_heap | Alloc_external), Alloc_local ->
+    | Alloc_heap, Alloc_local ->
       let over_app_region = Variable.create "over_app_region" in
       let over_app_ghost_region = Variable.create "over_app_ghost_region" in
       Some (over_app_region, over_app_ghost_region, Continuation.create ())
-    | (Alloc_heap | Alloc_external), (Alloc_heap | Alloc_external)
-    | Alloc_local, _ ->
-      None
+    | Alloc_heap, Alloc_heap | Alloc_local, _ -> None
+    | Alloc_external, _ | _, Alloc_external ->
+      Misc.fatal_error "Application or result modes cannot be External"
   in
   let apply_region, apply_ghost_region =
     match needs_region with
