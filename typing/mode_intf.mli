@@ -213,8 +213,6 @@ module type S = sig
       | Module
       | Class
 
-    val print_lock_item : Format.formatter -> lock_item -> unit
-
     (** A description of what type of closure is closing a value *)
     type closure_context =
       | Function
@@ -253,20 +251,6 @@ module type S = sig
        to type checker limitations *)
     type 'd neg_morph = 'd neg morph constraint 'd = _ * _
   end
-
-  (** Hints for the mode solvers. These are axis-specific hints that contain a trace
-      of the values in a single axis from an error. *)
-  type axhint
-
-  (** Errors for the mode solvers. These are axis-specific processed versions of
-      the errors returned by the solver, as the solver errors consider axis products.
-      The hints in this error type are [axhint] values. *)
-  type 'a axerror =
-    { left : 'a;
-      left_hint : axhint;
-      right : 'a;
-      right_hint : axhint
-    }
 
   type 'd morph_hint =
     | No_hint

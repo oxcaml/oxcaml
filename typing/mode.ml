@@ -1769,17 +1769,12 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
-(** Hints for the mode solvers. These are axis-specific hints that contain a trace
-of the values in a single axis from an error. *)
 type axhint =
   | Apply : 'd Hint.morph * 'b * 'b C.obj * axhint * _ C.morph -> axhint
   | Const : Hint.const -> axhint
   | Nil : axhint
 [@@ocaml.warning "-62"]
 
-(** Provides errors for the mode solvers. These are axis-specific processed versions of
-the errors returned by the solver, as the solver errors consider axis products.
-The hints in this error type are [axhint] values. *)
 type 'a axerror =
   { left : 'a;
     left_hint : axhint;
