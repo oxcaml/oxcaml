@@ -83,6 +83,9 @@ L109:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlIndirect_call__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlIndirect_call = global { ptr, i64 } { ptr @camlIndirect_call__apply_1, i64 4087 }
 @camlIndirect_call__apply_1 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlIndirect_call__apply_HIDE_STAMP }

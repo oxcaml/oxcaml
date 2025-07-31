@@ -53,6 +53,9 @@ L107:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlId_fn__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlId_fn = global { ptr, i64 } { ptr @camlId_fn__f_1, i64 3063 }
 @camlId_fn__f_1 = global { ptr, i64 } { ptr @camlId_fn__f_HIDE_STAMP, i64 108086391056891909 }

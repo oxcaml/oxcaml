@@ -679,7 +679,7 @@ module F = struct
       | `Global symbol -> fprintf ppf "%a %a" Llvm_typ.pp_t typ pp_global symbol
       | `Ident ident -> pp_fun_arg ppf (typ, ident)
     in
-    let call_with_caml_c_call caml_c_call_symbol args res_type =
+    let make_ocaml_c_call caml_c_call_symbol args res_type =
       let res_ident = fresh_ident t in
       add_referenced_symbol t caml_c_call_symbol;
       ins_call_custom_arg ~cc:Ocaml_c_call ~pp_name:pp_global ~pp_arg t
@@ -690,37 +690,33 @@ module F = struct
     in
     let call_func args res_type =
       if stack_ofs > 0
-      then (
-        (* CR yusumez: We assume this is done before arguments are pushed on the
-           stack. This won't necessarily be the case. We should make our own
-           wrapper in runtime/amd64.s that only takes the stack offset and
-           calculates [stack_begin] and [stack_end] itself. *)
-        let stack_end = read_rsp () (* r12 *) in
-        let stack_begin = fresh_ident t (* r13 *) in
-        ins_binop_imm t "sub" stack_end (Int.to_string stack_ofs) stack_begin
-          Llvm_typ.i64;
+      then
+        (* [caml_c_call_stack_args_llvm_backend] is a wrapper around
+           [caml_c_call_stack_args] which computes the address range of the
+           arguments on the stack given the offset. *)
         let args =
           [ Llvm_typ.ptr, `Global func_symbol;
-            Llvm_typ.i64, `Ident stack_begin;
-            Llvm_typ.i64, `Ident stack_end ]
+            Llvm_typ.i64, `String (Int.to_string stack_ofs) ]
           @ List.map (fun (typ, ident) -> typ, `Ident ident) args
         in
         let caml_c_call_stack_args =
+          "caml_c_call_stack_args_llvm_backend"
+          ^
           match (stack_align : Cmm.stack_align) with
-          | Align_16 -> "caml_c_call_stack_args"
-          | Align_32 -> "caml_c_call_stack_args_avx"
-          | Align_64 -> "caml_c_call_stack_args_avx512"
+          | Align_16 -> ""
+          | Align_32 -> "_avx"
+          | Align_64 -> "_avx512"
         in
-        call_with_caml_c_call caml_c_call_stack_args args res_type)
+        make_ocaml_c_call caml_c_call_stack_args args res_type
       else if alloc
       then
+        (* [caml_c_call] doesn't use the second argument since nothing is passed
+           on the stack *)
         let args =
-          [ Llvm_typ.ptr, `Global func_symbol;
-            Llvm_typ.i64, `String "poison";
-            Llvm_typ.i64, `String "poison" ]
+          [Llvm_typ.ptr, `Global func_symbol; Llvm_typ.i64, `String "poison"]
           @ List.map (fun (typ, ident) -> typ, `Ident ident) args
         in
-        call_with_caml_c_call "caml_c_call" args res_type
+        make_ocaml_c_call "caml_c_call" args res_type
       else
         (* Prepare stack pointer *)
         let c_sp = get_c_stack () in
@@ -745,6 +741,7 @@ module F = struct
         (Array.to_list i.res
         |> List.map (fun reg -> Llvm_typ.of_machtyp_component reg.Reg.typ))
     in
+    (* Do the thing *)
     let res_ident = call_func args res_type in
     (* Unpack return values (is it possible to have multiple?) *)
     Array.iteri
