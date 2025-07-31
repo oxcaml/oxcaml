@@ -137,11 +137,11 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let print_untyped_exception ppf obj =
     !print_out_value ppf (Printer.outval_of_untyped_exception obj)
-  let outval_of_value env obj ty kind =
+  let outval_of_value env obj ty =
     Printer.outval_of_value !max_printer_steps !max_printer_depth
-      (fun _ _ _ -> None) env obj ty kind
-  let print_value env obj ppf (ty, kind) =
-    !print_out_value ppf (outval_of_value env obj ty kind)
+      (fun _ _ _ -> None) env obj ty
+  let print_value env obj ppf ty =
+    !print_out_value ppf (outval_of_value env obj ty)
 
   (* Print an exception produced by an evaluation *)
 
@@ -150,10 +150,7 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let print_exception_outcome ppf exn =
     if exn = Out_of_memory then Gc.full_major ();
-    let outv =
-      outval_of_value !toplevel_env (Obj.repr exn)
-        Predef.type_exn (failwith "CR jrayman")
-    in
+    let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
     print_out_exception ppf exn outv;
     if Printexc.backtrace_status ()
     then
