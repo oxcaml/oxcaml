@@ -63,7 +63,8 @@ let main unix argv ppf ~flambda2 =
     Compmisc.read_clflags_from_env ();
     (* Set up DWARF compression for C compiler invocations *)
     if !Clflags.debug && !Clflags.native_code then
-      Clflags.dwarf_c_toolchain_flag := Dwarf_flags.get_dwarf_c_toolchain_flag ();
+      Clflags.dwarf_c_toolchain_flag := 
+        Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
