@@ -137,10 +137,37 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                        assigned to the right values. *)
                     hd, tl
                 in
+                let extra_args_boxed =
+                  List.map (fun _ -> Jsir.Var.fresh ()) extra_args
+                in
+                let res =
+                  List.fold_left
+                    (fun res var ->
+                      let null = Jsir.Var.fresh () in
+                      let res =
+                        To_jsir_result.add_instr_exn res
+                          (Let (null, Constant Null))
+                      in
+                      To_jsir_result.add_instr_exn res
+                        (Let
+                           ( var,
+                             Block
+                               (0, Array.of_list [null], NotArray, Maybe_mutable)
+                           )))
+                    res extra_args_boxed
+                in
                 let res, addr = To_jsir_result.new_block res ~params:[] in
+                let res =
+                  List.fold_left2
+                    (fun res boxed actual ->
+                      To_jsir_result.add_instr_exn res
+                        (Let (actual, Field (boxed, 0, Non_float))))
+                    res extra_args_boxed extra_args
+                in
                 let _env, res = expr ~env ~res cont_body in
                 let env =
-                  To_jsir_env.add_exn_handler env k ~addr ~exn_param ~extra_args
+                  To_jsir_env.add_exn_handler env k ~addr ~exn_param
+                    ~extra_args:extra_args_boxed
                 in
                 env, res
             in
@@ -187,7 +214,48 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         expr ~env ~res body)
 
 and apply_expr ~env ~res e =
-  let var, res =
+  (* Pass in any extra arguments for the exception continuation in mutable
+     variables. A slightly sad hack, but necessary since [Raise] only has one
+     parameter. All exception continuations are non-recursive, so this should be
+     sound. *)
+  let exn_continuation = Apply_expr.exn_continuation e in
+  let extra_args = Exn_continuation.extra_args exn_continuation in
+  let extra_param_vars =
+    if List.length extra_args = 0
+    then
+      (* This case is necessary because some exception continuations might not
+         have been declared via [Let_cont] (instead being toplevel exception
+         continuations), and therefore does not have an entry in the
+         environment.
+
+         CR selee: actually just explicitly check for the toplevel
+         continuation *)
+      []
+    else
+      let _addr, _var, extra_params_vars =
+        To_jsir_env.get_exn_handler_exn env
+          (Exn_continuation.exn_handler exn_continuation)
+      in
+      extra_params_vars
+  in
+  if List.length extra_param_vars <> List.length extra_args
+  then
+    Misc.fatal_errorf "Exception continuation %a expected %d extra_args, got %d"
+      Exn_continuation.print exn_continuation
+      (List.length extra_param_vars)
+      (List.length extra_args);
+  let res =
+    List.fold_left2
+      (fun res param_var (arg, kind) ->
+        match Flambda_kind.With_subkind.kind kind with
+        | Region | Rec_info -> res
+        | Value | Naked_number _ ->
+          let var_to_pass, res = To_jsir_shared.simple ~env ~res arg in
+          To_jsir_result.add_instr_exn res
+            (Set_field (param_var, 0, Non_float, var_to_pass)))
+      res extra_param_vars extra_args
+  in
+  let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
     | Some callee, (Function _ | Method _) ->
@@ -216,13 +284,16 @@ and apply_expr ~env ~res e =
   in
   match Apply_expr.continuation e with
   | Never_returns ->
-    env, To_jsir_result.end_block_with_last_exn res (Return var)
+    env, To_jsir_result.end_block_with_last_exn res (Return return_var)
   | Return cont -> (
     match Continuation.sort cont with
-    | Return -> env, To_jsir_result.end_block_with_last_exn res (Return var)
+    | Return ->
+      env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     | Normal_or_exn ->
       let addr = To_jsir_env.get_continuation_exn env cont in
-      env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var]))
+      ( env,
+        To_jsir_result.end_block_with_last_exn res (Branch (addr, [return_var]))
+      )
     | Toplevel_return | Define_root_symbol -> failwith "unimplemented")
 
 and apply_cont0 ~env ~res apply_cont =
@@ -274,38 +345,20 @@ and apply_cont0 ~env ~res apply_cont =
         let addr = To_jsir_env.get_continuation_exn env continuation in
         Jsir.Branch (addr, args), res
       | Some (raise_kind : Trap_action.Raise_kind.t) ->
-        let _addr, _var, extra_params =
-          To_jsir_env.get_exn_handler_exn env continuation
-        in
-        (* If there are [extra_params], assign them to variables so that the
-           exception handler has access to them. *)
         let raise_kind =
           match raise_kind with
           | Regular -> `Normal
           | Reraise -> `Reraise
           | No_trace -> `Notrace
         in
-        let exn, extra_args =
+        let exn =
           match args with
-          | [] ->
+          | [exn] -> exn
+          | _ ->
             Misc.fatal_errorf
-              "Attempting to call the exception continuation %a with no \
-               arguments"
-              Continuation.print continuation
-          | hd :: tl -> hd, tl
-        in
-        if List.length extra_params <> List.length extra_args
-        then
-          Misc.fatal_errorf
-            "Expected exception continuation %a to take in %d extra_args, but \
-             trying to pass %d extra_args"
-            Continuation.print continuation (List.length extra_params)
-            (List.length extra_args);
-        let res =
-          List.fold_left2
-            (fun res param arg ->
-              To_jsir_result.add_instr_exn res (Assign (param, arg)))
-            res extra_params extra_args
+              "Attempting to call the exception continuation %a with %d \
+               arguments (should be one)"
+              Continuation.print continuation (List.length args)
         in
         Raise (exn, raise_kind), res)
     | Define_root_symbol -> failwith "unimplemented"
