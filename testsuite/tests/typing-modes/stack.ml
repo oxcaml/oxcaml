@@ -261,6 +261,40 @@ Error: This value is "local"
        However, it is expected to be "global".
 |}]
 
+let f2 () =
+    let _ = List.length (stack_ [1; 2; 3]) in
+    42
+[%%expect{|
+Line 2, characters 24-42:
+2 |     let _ = List.length (stack_ [1; 2; 3]) in
+                            ^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       because it is a stack expression.
+       However, it is expected to be "global".
+|}]
+
+let f3 () =
+    let g _ = 42 in
+    g (stack_ [1; 2; 3])
+[%%expect{|
+Line 3, characters 6-24:
+3 |     g (stack_ [1; 2; 3])
+          ^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       because it is a stack expression.
+       However, it is expected to be local to the parent region
+       because it is an argument in a tail call.
+|}]
+
+let f4 (local_ x) =
+    List.length x
+[%%expect{|
+Line 2, characters 16-17:
+2 |     List.length x
+                    ^
+Error: This value is local to the parent region but expected to be "global".
+|}]
+
 (* Allocations that are not supported for stack *)
 let f () = stack_ [i for i = 0 to 9]
 [%%expect{|

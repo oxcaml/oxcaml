@@ -332,7 +332,9 @@ let bug4 : local_ (string -> foo:string -> unit) -> (string -> unit) =
 Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
-Error: This value is "local" but expected to be "global".
+Error: This value is "local" because it DEBUG[type_app v_to_a_r2l]
+       which is "local".
+       However, it is expected to be "global".
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -355,7 +357,11 @@ let bug4' () =
 Line 3, characters 25-31:
 3 |   let local_ perm ~foo = f ~foo in
                              ^^^^^^
-Error: This value is "local" but expected to be local to the parent region
+Error: This value is "local" because it DEBUG[type_app v_to_a_r2l]
+       which is "local" because it DEBUG[region_mode a_to_v_l2r] which is "local"
+       because it DEBUG[region_mode v_to_a_r2l]
+       which is "local".
+       However, it is expected to be local to the parent region
        because it is a function return value without an exclave annotation.
   Hint: This is a partial application
         Adding 1 more argument may make the value non-local

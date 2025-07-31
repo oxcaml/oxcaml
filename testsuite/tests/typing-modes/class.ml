@@ -68,7 +68,10 @@ end
 Line 4, characters 30-31:
 4 |     method foo = portable_use x
                                   ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" because it DEBUG[region_mode a_to_v_l2r]
+       which is "nonportable" because it DEBUG[region_mode v_to_a_r2l]
+       which is "nonportable".
+       However, it is expected to be "portable".
 |}]
 
 (* values written to instance variables need to be legacy *)
@@ -160,7 +163,8 @@ let foo () =
 Line 4, characters 10-11:
 4 |     o#foo x
               ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but expected to be "portable"
+       because it DEBUG[bye] which is "portable".
 |}]
 
 
