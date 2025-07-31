@@ -84,20 +84,21 @@ let rec instrument_result env name ppf clos_typ =
               fprintf ppf "@[<2>%a <--@ %a%a@]@."
                 Printtyp.longident starred_name
                 print_label l
-                (print_value !toplevel_env arg) t1;
+                (print_value !toplevel_env arg) (t1, failwith "CR jrayman");
               may_trace := true;
               let res = (Obj.magic clos_val : Obj.t -> Obj.t) arg in
               may_trace := false;
               fprintf ppf "@[<2>%a -->@ %a@]@."
                 Printtyp.longident starred_name
-                (print_value !toplevel_env res) t2;
+                (print_value !toplevel_env res) (t2, (failwith "CR jrayman"));
               may_trace := true;
               trace_res res
             with exn ->
               may_trace := false;
               fprintf ppf "@[<2>%a raises@ %a@]@."
                 Printtyp.longident starred_name
-                (print_value !toplevel_env (Obj.repr exn)) Predef.type_exn;
+                (print_value !toplevel_env (Obj.repr exn))
+                  (Predef.type_exn, (failwith "CR jrayman"));
               may_trace := true;
               raise exn
           end))
@@ -123,20 +124,21 @@ let instrument_closure env name ppf clos_typ =
             fprintf ppf "@[<2>%a <--@ %a%a@]@."
               Printtyp.longident name
               print_label l
-              (print_value !toplevel_env arg) t1;
+              (print_value !toplevel_env arg) (t1, failwith "CR jrayman");
             may_trace := true;
             let res = invoke_traced_function actual_code closure arg in
             may_trace := false;
             fprintf ppf "@[<2>%a -->@ %a@]@."
               Printtyp.longident name
-              (print_value !toplevel_env res) t2;
+              (print_value !toplevel_env res) (t2, failwith "CR jrayman");
             may_trace := true;
             trace_res res
           with exn ->
             may_trace := false;
             fprintf ppf "@[<2>%a raises@ %a@]@."
               Printtyp.longident name
-              (print_value !toplevel_env (Obj.repr exn)) Predef.type_exn;
+              (print_value !toplevel_env (Obj.repr exn))
+              (Predef.type_exn, failwith "CR jrayman");
             may_trace := true;
             raise exn
         end)
