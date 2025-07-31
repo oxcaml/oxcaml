@@ -326,6 +326,7 @@ module TycompTbl =
 
   end
 
+
 type empty = |
 
 type mode_with_locks = Mode.Value.l * locks
@@ -3303,7 +3304,7 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     {mode; context = Some shared_context}
 
 let closure_mode ~errors ~env ~loc ~item ~lid
-  ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context (comonadic0 : (_ * Allowance.allowed) Mode.Value.Comonadic.t) =
+  ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
   (* [mode] is the mode of the value being closed over, [comonadic0] is the mode of the closure *)
   begin
     match
@@ -4572,7 +4573,7 @@ let sharedness_hint ppf : shared_context -> _ = function
         "@[Hint: This identifier cannot be used uniquely,@ \
           because it is defined outside of the probe.@]"
 
-let print_lock_item_reason ppf (item, lid) =
+let print_lock_item ppf (item, lid) =
   let open Mode.Hint in
   match item with
   | Module ->
@@ -4786,20 +4787,20 @@ let report_lookup_error _loc env ppf = function
       fprintf ppf
         "@[%a local, so cannot be used \
           inside %s.@]"
-        print_lock_item_reason (item, lid)
+        print_lock_item (item, lid)
         (string_of_escaping_context context);
   | Once_value_used_in (item, lid, context) ->
       fprintf ppf
         "@[%a once, so cannot be used \
             inside %s@]"
-        print_lock_item_reason (item, lid)
+        print_lock_item (item, lid)
         (string_of_shared_context context)
   | Value_used_in_closure (item, lid, err) ->
       Mode.Value.Comonadic.report_error ppf ~target:(item, lid) err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"
-        print_lock_item_reason (item, lid)
+        print_lock_item (item, lid)
   | Non_value_used_in_object (lid, typ, err) ->
       fprintf ppf "@[%a must have a type of layout value because it is \
                    captured by an object.@ %a@]"

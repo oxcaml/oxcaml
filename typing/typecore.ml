@@ -253,7 +253,6 @@ type error =
   | Expr_not_a_record_type of record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
   | Submode_failed of Value.error * submode_reason * Env.shared_context option
-  | Submode_failed_alloc of Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
@@ -6356,7 +6355,7 @@ and type_expect_
   | Pexp_while(scond, sbody) ->
       let env = Env.add_share_lock While_loop env in
       let cond_env = Env.add_region_lock env in
-      let mode = mode_region Value.(of_const Const.max) in
+      let mode = mode_region Value.max in
       let wh_cond =
         type_expect cond_env mode scond
           (mk_expected ~explanation:While_loop_conditional Predef.type_bool)
@@ -6381,11 +6380,11 @@ and type_expect_
         exp_env = env }
   | Pexp_for(param, slow, shigh, dir, sbody) ->
       let for_from =
-        type_expect env (mode_region Value.(of_const Const.max)) slow
+        type_expect env (mode_region Value.max) slow
           (mk_expected ~explanation:For_loop_start_index Predef.type_int)
       in
       let for_to =
-        type_expect env (mode_region Value.(of_const Const.max)) shigh
+        type_expect env (mode_region Value.max) shigh
           (mk_expected ~explanation:For_loop_stop_index Predef.type_int)
       in
       let env = Env.add_share_lock For_loop env in
@@ -9802,7 +9801,7 @@ and type_n_ary_function
       | (Check _ | Assume _ | Ignore_assert_all) ->
         Zero_alloc.create_const zero_alloc
     in
-    let alloc_mode : alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
+    let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
     re
       { exp_desc =
           Texp_function
@@ -11060,8 +11059,6 @@ let report_error ~loc env =
       | _ -> []
     in
     Location.errorf ~loc ~sub "%a" (Value.report_error ?target:None) fail_reason
-  | Submode_failed_alloc(fail_reason) ->
-    Location.errorf ~loc "%a" (Alloc.report_error ?target:None) fail_reason
   | Curried_application_complete (lbl, Error (ax, {left; _}), loc_kind) ->
       let sub =
         match loc_kind with
@@ -11103,8 +11100,7 @@ let report_error ~loc env =
           Location.errorf ~loc
             "This function or one of its parameters escape their region@ \
             when it is partially applied."
-      | Error (ax, err) ->
-          let left, right = err.left, err.right in
+      | Error (ax, {left; right; _}) ->
           Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."
