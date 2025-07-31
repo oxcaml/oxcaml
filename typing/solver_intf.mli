@@ -299,10 +299,24 @@ module type Solver_mono = sig
   val print :
     ?verbose:bool -> 'a obj -> Format.formatter -> ('a, 'l * 'r) mode -> unit
 
-  (** Apply a monotone morphism. *)
+  (** Apply a monotone morphism, and optionally give it a hint.
+
+    A hint can be:
+    - [`None] - the default option when no hint is provided. If the error reporter
+        encounters this, it will end the error message there and not try to continue.
+    - [`Hint morph_hint] - when we want to provide an actual hint, [morph_hint],
+        we use this.
+    - [`Hole] - this is a special case that should be used carefully. This is for
+        when the caller is trying to perform a series of morphism applications
+        that can share a single hint. In this case, the caller should use [`Hole]
+        for all but the last morphism application, then use [`Hint morph_hint] for
+        the final application, which will cause [morph_hint] to be used as the hint
+        for the entire series of morphism applications. A [`Hole] must always be later
+        followed by some [`Hint] before any non-morphism application operations are
+        performed on the mode. *)
   val apply :
     'b obj ->
-    ?hint:[`Hint of ('l * 'r) hint_morph | `Hole] ->
+    ?hint:[`None | `Hint of ('l * 'r) hint_morph | `Hole] ->
     ('a, 'b, 'l * 'r) morph ->
     ('a, 'l * 'r) mode ->
     ('b, 'l * 'r) mode
