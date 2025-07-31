@@ -337,6 +337,9 @@ module type Hint = sig
       to the allowance of the morphism. *)
   type 'd morph constraint 'd = 'l * 'r
 
+  (* TEMPORARY FOR DEBUGGING. DELETE ME *)
+  val morph_none : 'd morph
+
   (** See comment on [Skip] constructor for ['d morph] in Mode.Hint for details
     about this. *)
   val morph_skip : 'd morph
