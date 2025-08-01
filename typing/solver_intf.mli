@@ -29,17 +29,20 @@ module type Lattices = sig
   (** Lattice identifers, indexed by ['a] the carrier type of that lattice *)
   type 'a obj
 
-  val min : 'a obj -> 'a
+  (** An element in a lattice whose carrier type is ['a]. *)
+  type 'a elt
 
-  val max : 'a obj -> 'a
+  val min : 'a obj -> 'a elt
 
-  val le : 'a obj -> 'a -> 'a -> bool
+  val max : 'a obj -> 'a elt
 
-  val join : 'a obj -> 'a -> 'a -> 'a
+  val le : 'a obj -> 'a elt -> 'a elt -> bool
 
-  val meet : 'a obj -> 'a -> 'a -> 'a
+  val join : 'a obj -> 'a elt -> 'a elt -> 'a elt
 
-  val print : 'a obj -> Format.formatter -> 'a -> unit
+  val meet : 'a obj -> 'a elt -> 'a elt -> 'a elt
+
+  val print : 'a obj -> Format.formatter -> 'a elt -> unit
 
   val eq_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
 
@@ -50,7 +53,7 @@ end
    category. Among those monotone functions some will have left and right
    adjoints. *)
 module type Lattices_mono = sig
-  include Lattices
+  include Lattices with type 'a elt := 'a
 
   (** Morphism from object of base type ['a] to object of base type ['b] with
       allowance ['d]. See Note [Allowance] in allowance.mli.
