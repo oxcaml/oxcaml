@@ -5,10 +5,6 @@ let unsupported_multiple_return_variables vars =
   if List.length vars <> 1
   then Misc.fatal_error "Multiple return variables are currently unsupported."
 
-let unsupported_multiple_params params =
-  if List.length params <> 1
-  then Misc.fatal_error "Multiple parameters are currently unsupported."
-
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
 let create_let_simple ~env ~res fvar simple =
@@ -112,6 +108,21 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
+  let make_mutables ~res n =
+    let extra_args_boxed = List.init n (fun _ -> Jsir.Var.fresh ()) in
+    let res =
+      List.fold_left
+        (fun res var ->
+          let null = Jsir.Var.fresh () in
+          let res =
+            To_jsir_result.add_instr_exn res (Let (null, Constant Null))
+          in
+          To_jsir_result.add_instr_exn res
+            (Let (var, Block (0, Array.of_list [null], NotArray, Maybe_mutable))))
+        res extra_args_boxed
+    in
+    extra_args_boxed, res
+  in
   match e with
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
@@ -128,12 +139,33 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                 let env = To_jsir_env.add_continuation env k addr in
                 env, res
               | true ->
-                unsupported_multiple_params params;
+                let exn_param, extra_args =
+                  match params with
+                  | [] ->
+                    Misc.fatal_errorf
+                      "No parameters given for exception continuation %a"
+                      Continuation.print k
+                  | hd :: tl -> hd, tl
+                in
+                (* We wrap the [extra_args] into mutable variables, and use
+                   these where the extra_args are used. Later when calling this
+                   continuation, we will make sure that these are assigned to
+                   the right values. *)
+                let extra_args_boxed, res =
+                  make_mutables ~res (List.length extra_args)
+                in
                 let res, addr = To_jsir_result.new_block res ~params:[] in
+                let res =
+                  List.fold_left2
+                    (fun res boxed actual ->
+                      To_jsir_result.add_instr_exn res
+                        (Let (actual, Field (boxed, 0, Non_float))))
+                    res extra_args_boxed extra_args
+                in
                 let _env, res = expr ~env ~res cont_body in
                 let env =
-                  To_jsir_env.add_exn_handler env k ~addr
-                    ~param:(List.hd params)
+                  To_jsir_env.add_exn_handler env k ~addr ~exn_param
+                    ~extra_args:extra_args_boxed
                 in
                 env, res
             in
@@ -180,7 +212,47 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         expr ~env ~res body)
 
 and apply_expr ~env ~res e =
-  let var, res =
+  (* Pass in any extra arguments for the exception continuation in mutable
+     variables. A slightly sad hack, but necessary since [Raise] only has one
+     parameter. *)
+  let exn_continuation = Apply_expr.exn_continuation e in
+  let extra_args = Exn_continuation.extra_args exn_continuation in
+  let extra_param_vars =
+    if Continuation.equal
+         (To_jsir_env.exn_continuation env)
+         (Exn_continuation.exn_handler exn_continuation)
+    then
+      (* This was passed in through a parameter, so has not been declared via a
+         [Let_cont].
+
+         CR selee: we may need to pass in more parameters to the code block so
+         that we have access to the params here *)
+      []
+    else
+      let _addr, _var, extra_params_vars =
+        To_jsir_env.get_exn_handler_exn env
+          (Exn_continuation.exn_handler exn_continuation)
+      in
+      extra_params_vars
+  in
+  if List.length extra_param_vars <> List.length extra_args
+  then
+    Misc.fatal_errorf "Exception continuation %a expected %d extra_args, got %d"
+      Exn_continuation.print exn_continuation
+      (List.length extra_param_vars)
+      (List.length extra_args);
+  let res =
+    List.fold_left2
+      (fun res param_var (arg, kind) ->
+        match Flambda_kind.With_subkind.kind kind with
+        | Region | Rec_info -> res
+        | Value | Naked_number _ ->
+          let var_to_pass, res = To_jsir_shared.simple ~env ~res arg in
+          To_jsir_result.add_instr_exn res
+            (Set_field (param_var, 0, Non_float, var_to_pass)))
+      res extra_param_vars extra_args
+  in
+  let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
     | Some callee, (Function _ | Method _) ->
@@ -209,13 +281,16 @@ and apply_expr ~env ~res e =
   in
   match Apply_expr.continuation e with
   | Never_returns ->
-    env, To_jsir_result.end_block_with_last_exn res (Return var)
+    env, To_jsir_result.end_block_with_last_exn res (Return return_var)
   | Return cont -> (
     match Continuation.sort cont with
-    | Return -> env, To_jsir_result.end_block_with_last_exn res (Return var)
+    | Return ->
+      env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     | Normal_or_exn ->
       let addr = To_jsir_env.get_continuation_exn env cont in
-      env, To_jsir_result.end_block_with_last_exn res (Branch (addr, [var]))
+      ( env,
+        To_jsir_result.end_block_with_last_exn res (Branch (addr, [return_var]))
+      )
     | Toplevel_return | Define_root_symbol -> failwith "unimplemented")
 
 and apply_cont0 ~env ~res apply_cont =
@@ -226,7 +301,11 @@ and apply_cont0 ~env ~res apply_cont =
   let get_last ~raise_kind : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | Toplevel_return ->
-      unsupported_multiple_return_variables args;
+      if List.length args <> 1
+      then
+        Misc.fatal_error
+          "Tried to apply a Toplevel_return with multiple arguments";
+      let module_symbol = List.hd args in
       (* CR selee: This is a hack, but I can't find a way to trigger any
          behaviour that isn't calling [caml_register_global] on the toplevel
          module. I suspect for single-file compilation this is always fine. Will
@@ -246,7 +325,7 @@ and apply_cont0 ~env ~res apply_cont =
                Prim
                  ( Extern "caml_register_global",
                    [ Pc (Int (Targetint.of_int_exn 0));
-                     Pv (List.hd args);
+                     Pv module_symbol;
                      Pc
                        (* CR selee: this assumes javascript, WASM needs just
                           String *)
@@ -269,15 +348,23 @@ and apply_cont0 ~env ~res apply_cont =
           | Reraise -> `Reraise
           | No_trace -> `Notrace
         in
-        unsupported_multiple_return_variables args;
-        Raise (List.hd args, raise_kind), res)
+        let exn =
+          match args with
+          | [exn] -> exn
+          | _ ->
+            Misc.fatal_errorf
+              "Attempting to call the exception continuation %a with %d \
+               arguments (should be one)"
+              Continuation.print continuation (List.length args)
+        in
+        Raise (exn, raise_kind), res)
     | Define_root_symbol -> failwith "unimplemented"
   in
   match Apply_cont.trap_action apply_cont with
   | None -> get_last ~raise_kind:None
   | Some (Push { exn_handler }) -> (
     let last, res = get_last ~raise_kind:None in
-    let handler_addr, handler_var =
+    let handler_addr, handler_var, _extra_args =
       To_jsir_env.get_exn_handler_exn env exn_handler
     in
     match last with
