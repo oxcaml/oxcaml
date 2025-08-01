@@ -72,8 +72,13 @@ let triple (x, y, z) =
 (* Let-expressions *)
 
 let bind id def body =
-  Llet (Strict, Pvalue {raw_kind = Pgenval; nullable = Non_nullable},
-        id, debug_uid_none, def, body)
+  Llet
+    ( Strict,
+      Pvalue { raw_kind = Pgenval; nullable = Non_nullable },
+      id,
+      debug_uid_none,
+      def,
+      body )
 
 (* Typed representation of complex lambdas *)
 
@@ -178,7 +183,7 @@ end = struct
   let func_ _ id body =
     let param_from_name name =
       { name;
-        layout = Pvalue {raw_kind = Pgenval; nullable = Non_nullable};
+        layout = Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
         debug_uid = debug_uid_none;
         attributes = { unbox_param = false };
         mode = alloc_heap
@@ -187,9 +192,9 @@ end = struct
     lfunction
       ~kind:(Curried { nlocal = 1 })
       ~params:[param_from_name id]
-      ~return:(Pvalue {raw_kind = Pgenval; nullable = Non_nullable})
-      ~attr:default_function_attribute ~body ~loc:Loc_unknown
-      ~mode:alloc_heap ~ret_mode:alloc_heap
+      ~return:(Pvalue { raw_kind = Pgenval; nullable = Non_nullable })
+      ~attr:default_function_attribute ~body ~loc:Loc_unknown ~mode:alloc_heap
+      ~ret_mode:alloc_heap
 
   let func arg_sort body_lam id body = func_ arg_sort id (body_lam body)
 
@@ -307,7 +312,8 @@ let apply modname field loc args =
          ap_args = args;
          ap_probe = None;
          ap_loc = of_location ~scopes:empty_scopes loc;
-         ap_result_layout = Pvalue {raw_kind = Pgenval; nullable = Non_nullable};
+         ap_result_layout =
+           Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
          ap_region_close = Rc_normal;
          ap_mode = alloc_heap;
          ap_tailcall = Default_tailcall;
@@ -3046,9 +3052,8 @@ and quote_expression_desc transl stage e =
       fatal_error "Cannot quote constructs related to mutable variables."
     | Texp_atomic_loc _ ->
       fatal_error "Cannot quote Texp_atomic_loc constructs yet."
-    | Texp_idx _ ->
-      fatal_error "Cannot quote Texp_idx constructs yet."
-    | Texp_eval_quotation typ ->
+    | Texp_idx _ -> fatal_error "Cannot quote Texp_idx constructs yet."
+    | Texp_eval_quotation (typ, _) ->
       Exp_desc.eval_quote loc (quote_core_type ~in_constraint:true typ)
   in
   List.iter update_env_without_extra e.exp_extra;
