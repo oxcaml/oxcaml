@@ -119,9 +119,9 @@ let module_substitution sub ms =
 let include_kind sub = function
   | Tincl_structure -> ()
   | Tincl_functor ccs ->
-      List.iter (fun (_, cc) -> sub.module_coercion sub cc) ccs
+      List.iter (fun (_, _, cc) -> sub.module_coercion sub cc) ccs
   | Tincl_gen_functor ccs ->
-      List.iter (fun (_, cc) -> sub.module_coercion sub cc) ccs
+      List.iter (fun (_, _, cc) -> sub.module_coercion sub cc) ccs
 
 let str_include_infos sub {incl_loc; incl_mod; incl_attributes; incl_kind; _} =
   sub.location sub incl_loc;
@@ -553,7 +553,7 @@ let module_coercion sub = function
       sub.env sub env;
       sub.module_coercion sub c1
   | Tcoerce_structure (l1, l2) ->
-      List.iter (fun (_, c) -> sub.module_coercion sub c) l1;
+      List.iter (fun (_, _, c) -> sub.module_coercion sub c) l1;
       List.iter (fun (_, _ ,c) -> sub.module_coercion sub c) l2
   | Tcoerce_primitive {pc_loc; pc_env; _} ->
       sub.location sub pc_loc;

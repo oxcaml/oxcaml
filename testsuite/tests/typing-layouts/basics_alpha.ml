@@ -4,9 +4,9 @@
 *)
 
 
-(* CR mixed-modules: remember to test coalescing(?) functors. The language
- * feature * that swizzles module fields. (the location of this comment is
- * arbitrary) *)
+(* CR mixed-modules: remember to test coalescing(?) functors.
+   The language feature that swizzles module fields. (the location of this
+   comment is arbitrary) *)
 
 type t_any   : any
 type t_value : value

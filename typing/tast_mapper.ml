@@ -135,10 +135,12 @@ let include_kind sub = function
   | Tincl_structure -> Tincl_structure
   | Tincl_functor ccs ->
       Tincl_functor
-        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs)
+        (List.map
+          (fun (nm, mbe, cc) -> (nm, mbe, sub.module_coercion sub cc)) ccs)
   | Tincl_gen_functor ccs ->
       Tincl_gen_functor
-        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs)
+        (List.map
+          (fun (nm, mbe, cc) -> (nm, mbe, sub.module_coercion sub cc)) ccs)
 
 let str_include_infos sub x =
   let incl_loc = sub.location sub x.incl_loc in
@@ -764,7 +766,7 @@ let module_coercion sub = function
   | Tcoerce_alias (env, p, c1) ->
       Tcoerce_alias (sub.env sub env, p, sub.module_coercion sub c1)
   | Tcoerce_structure (l1, l2) ->
-      let l1' = List.map (fun (i,c) -> i, sub.module_coercion sub c) l1 in
+      let l1' = List.map (fun (i,m,c) -> i, m, sub.module_coercion sub c) l1 in
       let l2' =
         List.map (fun (id,i,c) -> id, i, sub.module_coercion sub c) l2
       in

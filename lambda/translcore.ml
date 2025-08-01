@@ -1102,7 +1102,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
           let body, _ =
-            (* CR mixed-modules: Currently we only allow values at the top of a
+            (* CR jrayman: Currently we only allow values at the top of a
                module.  When that changes, some adjustments may be needed
                here. *)
             List.fold_left (fun (body, pos) id ->

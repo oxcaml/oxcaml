@@ -57,6 +57,7 @@ type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
   | Adot of address * Jkind.Sort.t Jkind.Layout.t array * int
+  (* CR jrayman: would it be better for this to be a [module_representation]? *)
 
 type t
 
