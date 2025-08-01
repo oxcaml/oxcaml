@@ -359,6 +359,26 @@
      (run make -s OCAMLYACC_INCLUDE_PATH=%{ocaml_where}))
     (copy yacc/ocamlyacc ocamlyacc)))))
 
+; Regular OCaml Rule (first phase of bootstrapping)
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy %{project_root}/ocamlopt_upstream_flags.sexp %{targets})))
+
+; OxCaml Rule
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (or
+   (= %{context_name} "main")
+   (= %{context_name} "runtime_stdlib")))
+ (action
+  (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
 (install
  (files ocamlyacc)
  (section bin)
