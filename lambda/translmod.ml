@@ -127,7 +127,11 @@ let rec apply_coercion loc strict restr arg =
           else Module_mixed shape
         in
         (* CR jrayman: this is not correct *)
-        let get_layout _pos = layout_module_field in
+        let get_layout _pos =
+          match repr with
+          | Module_value_only _ -> layout_module_field
+          | Module_mixed _ -> assert false
+        in
         let lam =
           Lprim(block_of ~repr,
                 List.map (apply_coercion_field loc get_field) pos_mbe_cc_list,
