@@ -573,3 +573,69 @@ AC_DEFUN([OCAML_CC_SUPPORTS_ATOMIC], [
    AC_MSG_RESULT([no])])
   LIBS="$saved_LIBS"
 ])
+
+AC_DEFUN([OCAML_AS_COMPRESSION_SUPPORT], [
+  AC_MSG_CHECKING([whether the assembler supports --compress-debug-sections=zlib])
+
+  OCAML_CC_SAVE_VARIABLES
+
+  # Modify C-compiler variables to use the assembler
+  CC="$AS"
+  CFLAGS="--compress-debug-sections=zlib -o conftest.$ac_objext"
+  CPPFLAGS=""
+  ac_ext="S"
+  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([
+        .text
+        .globl  test
+test:
+        ret])],
+    [as_compress_debug_sections_flag="--compress-debug-sections"
+     AC_MSG_RESULT([yes])],
+    [# Try -gz=zlib
+     AC_MSG_RESULT([no])
+     AC_MSG_CHECKING([whether the assembler supports -gz=zlib])
+     CFLAGS="-gz=zlib -o conftest.$ac_objext"
+     AC_COMPILE_IFELSE(
+       [AC_LANG_SOURCE([
+        .text
+        .globl  test
+test:
+        ret])],
+       [as_compress_debug_sections_flag="-gz"
+        AC_MSG_RESULT([yes])],
+       [as_compress_debug_sections_flag=""
+        AC_MSG_RESULT([no])])])
+
+  OCAML_CC_RESTORE_VARIABLES
+])
+
+AC_DEFUN([OCAML_CC_COMPRESSION_SUPPORT], [
+  AC_MSG_CHECKING([whether the C compiler supports --compress-debug-sections=zlib])
+
+  saved_CFLAGS="$CFLAGS"
+  CFLAGS="$CFLAGS -g --compress-debug-sections=zlib"
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([[
+int main() { return 0; }
+    ]])],
+    [cc_compress_debug_sections_flag="--compress-debug-sections"
+     AC_MSG_RESULT([yes])],
+    [# Try -gz=zlib
+     AC_MSG_RESULT([no])
+     AC_MSG_CHECKING([whether the C compiler supports -gz=zlib])
+     CFLAGS="$saved_CFLAGS -g -gz=zlib"
+     AC_COMPILE_IFELSE(
+       [AC_LANG_SOURCE([[
+int main() { return 0; }
+       ]])],
+       [cc_compress_debug_sections_flag="-gz"
+        AC_MSG_RESULT([yes])],
+       [cc_compress_debug_sections_flag=""
+        AC_MSG_RESULT([no])])])
+
+  CFLAGS="$saved_CFLAGS"
+])

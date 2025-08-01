@@ -844,6 +844,19 @@ let mk_gdwarf_max_function_complexity f =
       \     will not be emitted, to improve compilation time (default %d)"
       !Dwarf_flags.dwarf_max_function_complexity )
 
+let mk_gdwarf_compression f =
+  ( "-gdwarf-compression",
+    Arg.String f,
+    Format.sprintf " Set the DWARF compression format (default %s)"
+      !Dwarf_flags.gdwarf_compression )
+
+let mk_gdwarf_fission f =
+  ( "-gdwarf-fission",
+    Arg.String f,
+    " Set the DWARF fission method: none, objcopy, or dsymutil (default none).\n\
+    \     Only takes effect with -gno-upstream-dwarf or --enable-oxcaml-dwarf"
+  )
+
 let mk_use_cached_generic_functions f =
   ( "-use-cached-generic-functions",
     Arg.Unit f,
@@ -1463,6 +1476,8 @@ module type Debugging_options = sig
   val gdwarf_may_alter_codegen : unit -> unit
   val no_gdwarf_may_alter_codegen : unit -> unit
   val gdwarf_max_function_complexity : int -> unit
+  val gdwarf_compression : string -> unit
+  val gdwarf_fission : string -> unit
 end
 
 module Make_debugging_options (F : Debugging_options) = struct
@@ -1477,6 +1492,8 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_gdwarf_may_alter_codegen F.gdwarf_may_alter_codegen;
       mk_no_gdwarf_may_alter_codegen F.no_gdwarf_may_alter_codegen;
       mk_gdwarf_max_function_complexity F.gdwarf_max_function_complexity;
+      mk_gdwarf_compression F.gdwarf_compression;
+      mk_gdwarf_fission F.gdwarf_fission;
     ]
 end
 
@@ -1485,7 +1502,11 @@ module Debugging_options_impl = struct
     Debugging.restrict_to_upstream_dwarf := true
 
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false
+    Debugging.restrict_to_upstream_dwarf := false;
+    (* Default to dsymutil on macOS when enabling extended DWARF *)
+    if
+      Target_system.is_macos () && !Clflags.dwarf_fission = Clflags.Fission_none
+    then Clflags.dwarf_fission := Clflags.Fission_dsymutil
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
@@ -1498,6 +1519,20 @@ module Debugging_options_impl = struct
 
   let gdwarf_max_function_complexity c =
     Debugging.dwarf_max_function_complexity := c
+
+  let gdwarf_compression value = Debugging.gdwarf_compression := value
+
+  let gdwarf_fission value =
+    match String.lowercase_ascii value with
+    | "none" -> Clflags.dwarf_fission := Clflags.Fission_none
+    | "objcopy" -> Clflags.dwarf_fission := Clflags.Fission_objcopy
+    | "dsymutil" -> Clflags.dwarf_fission := Clflags.Fission_dsymutil
+    | _ ->
+        raise
+          (Arg.Bad
+             (Printf.sprintf
+                "Invalid value for -gdwarf-fission: %s\n\
+                 Valid values are: none, objcopy, dsymutil" value))
 end
 
 module Extra_params = struct
