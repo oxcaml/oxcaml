@@ -1267,8 +1267,6 @@ and Type : sig
 
   val quote : Location.t -> t -> t'
 
-  val splice : Location.t -> t -> t'
-
   val call_pos : t'
 end = struct
   type s = lambda
@@ -1310,8 +1308,6 @@ end = struct
          (List.map (fun (frag, ty) -> pair (extract frag, extract ty)) a2))
 
   let quote loc a1 = apply1 "Type" "quote" loc (extract a1)
-
-  let splice loc a1 = apply1 "Type" "splice" loc (extract a1)
 
   let call_pos = use "Type" "call_pos"
 end
@@ -2305,7 +2301,7 @@ and quote_pat_extra loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint ty ->
-    Pat.constraint_ loc pat_lam (quote_core_type ~in_constraint:true ty)
+    Pat.constraint_ loc pat_lam (quote_core_type ty)
     |> Pat.wrap
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
@@ -2399,7 +2395,7 @@ and quote_value_pattern p =
     (fun extra p -> quote_pat_extra loc p extra)
     p.pat_extra (Pat.wrap pat_quoted)
 
-and quote_core_type ~in_constraint ty =
+and quote_core_type ty =
   let loc = ty.ctyp_loc in
   match ty.ctyp_desc with
   | Ttyp_var (None, _) -> Type.var loc None |> Type.wrap
@@ -2415,14 +2411,14 @@ and quote_core_type ~in_constraint ty =
     Type.var loc (Some var) |> Type.wrap
   | Ttyp_arrow (arg_lab, ty1, ty2) ->
     let lab = quote_arg_label loc arg_lab
-    and ty1 = quote_core_type ~in_constraint ty1
-    and ty2 = quote_core_type ~in_constraint ty2 in
+    and ty1 = quote_core_type ty1
+    and ty2 = quote_core_type ty2 in
     Type.arrow loc lab ty1 ty2 |> Type.wrap
   | Ttyp_tuple ts ->
     let tups =
       List.map
         (fun (s_opt, ty) ->
-          quote_nonopt loc s_opt, quote_core_type ~in_constraint ty)
+          quote_nonopt loc s_opt, quote_core_type ty)
         ts
     in
     Type.tuple loc tups |> Type.wrap
@@ -2430,18 +2426,18 @@ and quote_core_type ~in_constraint ty =
     let tups =
       List.map
         (fun (s_opt, ty) ->
-          quote_nonopt loc s_opt, quote_core_type ~in_constraint ty)
+          quote_nonopt loc s_opt, quote_core_type ty)
         ts
     in
     Type.unboxed_tuple loc tups |> Type.wrap
   | Ttyp_constr (path, _, tys) ->
     let ident = type_for_path loc path
-    and tys = List.map (quote_core_type ~in_constraint:true) tys in
+    and tys = List.map quote_core_type tys in
     Type.constr loc ident tys |> Type.wrap
   | Ttyp_object (_, _) -> fatal_error "Still not implemented."
   | Ttyp_class (_, _, _) -> fatal_error "Still not implemented."
   | Ttyp_alias (ty, alias_opt, _) -> (
-    let ty = quote_core_type ~in_constraint ty in
+    let ty = quote_core_type ty in
     match alias_opt with
     | None -> ty
     | Some { txt; _ } ->
@@ -2454,12 +2450,12 @@ and quote_core_type ~in_constraint ty =
           match rf.rf_desc with
           | Tinherit ty ->
             Variant_type.Row_field.inherit_ rf.rf_loc
-              (quote_core_type ~in_constraint ty)
+              (quote_core_type ty)
             |> Variant_type.Row_field.wrap
           | Ttag (tag, b, tys) ->
             let variant = Variant.of_string tag.loc tag.txt |> Variant.wrap in
             Variant_type.Row_field.tag rf.rf_loc variant b
-              (List.map (quote_core_type ~in_constraint) tys)
+              (List.map quote_core_type tys)
             |> Variant_type.Row_field.wrap)
         row_fields
     and variant_form =
@@ -2480,7 +2476,7 @@ and quote_core_type ~in_constraint ty =
     let body =
       Lam.list_param_binding Var_type_var extract
         (List.map ident_for_poly_name names)
-        (quote_core_type ~in_constraint ty)
+        (quote_core_type ty)
     in
     without_idents_poly names;
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
@@ -2491,16 +2487,14 @@ and quote_core_type ~in_constraint ty =
       List.map
         (fun (lid, ty) ->
           ( quote_fragment_of_lid Asttypes.(lid.loc) lid.txt,
-            quote_core_type ~in_constraint ty ))
+            quote_core_type ty ))
         pack_fields
     in
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty ->
-    Type.quote loc (quote_core_type ~in_constraint ty) |> Type.wrap
-  | Ttyp_splice ty ->
-    if in_constraint
-    then Type.var loc None |> Type.wrap
-    else Type.splice loc (quote_core_type ~in_constraint ty) |> Type.wrap
+    Type.quote loc (quote_core_type ty) |> Type.wrap
+  | Ttyp_splice _ ->
+    Type.var loc None |> Type.wrap
   | Ttyp_open _ -> fatal_error "Still not implemented."
   | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos
@@ -2729,15 +2723,15 @@ and quote_expression_extra _ _ extra lambda =
   (* Texp_newtype only relevant for functions, handled elsewhere *)
   | Texp_constraint ty ->
     let constr_ =
-      Type_constraint.constraint_ loc (quote_core_type ~in_constraint:true ty)
+      Type_constraint.constraint_ loc (quote_core_type ty)
       |> Type_constraint.wrap
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda) constr_ |> Exp_desc.wrap
   | Texp_coerce (ty_opt, ty) ->
     let coerce =
       Type_constraint.coercion loc
-        (Option.map (quote_core_type ~in_constraint:true) ty_opt)
-        (quote_core_type ~in_constraint:true ty)
+        (Option.map quote_core_type ty_opt)
+        (quote_core_type ty)
       |> Type_constraint.wrap
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda) coerce |> Exp_desc.wrap
