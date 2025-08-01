@@ -152,7 +152,7 @@ val create : unit -> t
    with a certain mutex [m] and with a certain property {i P} of the data
    structure that is protected by the mutex [m]. *)
 
-val wait : t -> Mutex.t -> unit
+val wait : t @ local -> Mutex.t @ local -> unit
 (**The call [wait c m] is permitted only if [m] is the mutex associated
    with the condition variable [c], and only if [m] is currently locked.
    This call atomically unlocks the mutex [m] and suspends the
@@ -164,7 +164,7 @@ val wait : t -> Mutex.t -> unit
    variable [c] holds when [wait] returns; one must explicitly test
    whether {i P} holds after calling [wait]. *)
 
-val signal : t -> unit
+val signal : t @ local -> unit
 (**[signal c] wakes up one of the threads waiting on the condition
    variable [c], if there is one. If there is none, this call has
    no effect.
@@ -172,7 +172,7 @@ val signal : t -> unit
    It is recommended to call [signal c] inside a critical section,
    that is, while the mutex [m] associated with [c] is locked. *)
 
-val broadcast : t -> unit
+val broadcast : t @ local -> unit
 (**[broadcast c] wakes up all threads waiting on the condition
    variable [c]. If there are none, this call has no effect.
 
