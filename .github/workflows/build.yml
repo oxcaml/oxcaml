@@ -133,6 +133,10 @@ jobs:
             os: ubuntu-latest
             cc: clang
 
+          - name: flambda2_runtime5_no_flat_float_array
+            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-flat-float-array
+            os: ubuntu-latest
+
     env:
       J: "3"
       run_testsuite: "true"
