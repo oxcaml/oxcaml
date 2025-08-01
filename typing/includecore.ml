@@ -86,7 +86,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       Ok (Specific (m0, m1, c))
     end
 
-let check_modes env ?(crossing = Crossing.top) ~item ?typ = function
+let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
   | All -> Ok ()
   | Specific (m0, m1, c) ->
       let m0 =
