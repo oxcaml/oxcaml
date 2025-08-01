@@ -7175,6 +7175,7 @@ and type_expect_
           {ty = inner_ty; explanation}
       in
       let exp_desc = match exp.exp_desc with
+      | Texp_record {representation = Record_unboxed} -> not_alloc ()
       | Texp_record r -> Texp_record {r with alloc_mode = Some External}
       | Texp_tuple(el,_) -> Texp_tuple(el,External)
       | Texp_construct(loc,cstr,args,_) ->

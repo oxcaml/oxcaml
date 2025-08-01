@@ -562,6 +562,16 @@ Line 2, characters 22-25:
 Error: This expression is not an allocation site.
 |}]
 
+type t = {x : int} [@@unboxed]
+let bazz () = malloc_ {x = 3}
+[%%expect {|
+type t = { x : int; } [@@unboxed]
+Line 2, characters 22-29:
+2 | let bazz () = malloc_ {x = 3}
+                          ^^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
 let foo () = malloc_ []
 [%%expect {|
 Line 1, characters 21-23:
