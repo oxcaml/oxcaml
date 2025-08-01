@@ -150,9 +150,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Generic of Path.t * (int -> (int -> O.t -> Outcometree.out_value,
                                      O.t -> Outcometree.out_value) gen_printer)
 
-    external float_u_box : float# -> float = "%box_float"
-
-    (* CR small-ints: small int support is probably incorrect. *)
+    (* CR mixed blocks v1: It would be good, and not hard, to add proper
+       printing support for unboxed values. *)
     let printers = ref ([
       ( Pident(Ident.create_local "print_int"),
         Simple (Predef.type_int,
@@ -180,30 +179,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_nativeint (O.obj x : nativeint))) );
       ( Pident(Ident.create_local "print_int64"),
         Simple (Predef.type_int64,
-                (fun x -> Oval_int64 (O.obj x : int64))) );
-      ( Pident(Ident.create_local "print_float_u"),
-        Simple (Predef.type_unboxed_float,
-                (if !Clflags.native_code then
-                   fun x -> Oval_float_u (float_u_box ((Obj.magic Obj.magic : float -> float#) (O.obj x)) )
-                 else fun x -> Oval_float_u (O.obj x : float))) );
-      ( Pident(Ident.create_local "print_float32_u"),
-        Simple (Predef.type_unboxed_float32,
-                (fun x -> Oval_float32_u (O.obj x : Obj.t))) );
-      ( Pident(Ident.create_local "print_int8_u"),
-        Simple (Predef.type_unboxed_int8,
-                (fun x -> Oval_int (O.obj x : int))) );
-      ( Pident(Ident.create_local "print_int16_u"),
-        Simple (Predef.type_unboxed_int16,
-                (fun x -> Oval_int (O.obj x : int))) );
-      ( Pident(Ident.create_local "print_int32_u"),
-        Simple (Predef.type_unboxed_int32,
-                (fun x -> Oval_int32_u (O.obj x : int32))) );
-      ( Pident(Ident.create_local "print_nativeint_u"),
-        Simple (Predef.type_unboxed_nativeint,
-                (fun x -> Oval_nativeint_u (O.obj x : nativeint))) );
-      ( Pident(Ident.create_local "print_int64_u"),
-        Simple (Predef.type_unboxed_int64,
-                (fun x -> Oval_int64_u (O.obj x : int64))) );
+                (fun x -> Oval_int64 (O.obj x : int64)) ))
     ] : (Path.t * printer) list)
 
     let exn_printer ppf path exn =
