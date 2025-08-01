@@ -4,6 +4,8 @@ val split_live_ranges : bool Lazy.t
 
 val split_more_destruction_points : bool Lazy.t
 
+val split_around_loops : bool Lazy.t
+
 val indent : unit -> unit
 
 val dedent : unit -> unit

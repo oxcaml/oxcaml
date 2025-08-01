@@ -417,7 +417,9 @@ module SpillCosts = struct
               | None -> 10
               | Some cost -> int_of_string cost
             in
-            (* CR-soon xclerc for xclerc: consider adding an overflow check. *)
+            (* CR-soon xclerc for xclerc: consider adding an overflow check (See
+               tools/regalloc/regalloc.ml). Or better, share the code between
+               the tool and the allocators. *)
             Misc.power ~base depth
         in
         let cost = base_cost * cost_multiplier in
