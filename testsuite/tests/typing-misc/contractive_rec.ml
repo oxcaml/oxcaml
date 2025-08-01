@@ -167,8 +167,8 @@ Line 1, characters 0-56:
 1 | type ('a [@rec]) bad_wrapper = 'a non_contractive_record;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective covariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Edge cases *)
@@ -335,8 +335,8 @@ Lines 1-2, characters 0-30:
 1 | type ('a [@rec]) bad_constraint = 'b
 2 |   constraint 'a = < foo : 'b >..
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective .
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* [@rec] parameter with type variable in contractive position *)
@@ -356,8 +356,8 @@ Line 2, characters 0-49:
 2 | type ('a [@rec]) bad_wrapper = 'a non_contractive;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective covariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Function types with [@rec] *)
@@ -368,8 +368,8 @@ Line 1, characters 0-41:
 1 | type ('a [@rec]) func_wrapper = 'a -> int;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective contravariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Tuple with [@rec] *)
@@ -380,8 +380,8 @@ Line 1, characters 0-41:
 1 | type ('a [@rec]) tuple_wrapper = 'a * int;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective covariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Deep recursion through structural types *)
@@ -392,8 +392,8 @@ Line 1, characters 0-39:
 1 | type ('a [@rec]) deep = ('a * int) list;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective covariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Type parameters in constraints with invalid usage *)
@@ -403,8 +403,8 @@ Line 1, characters 0-58:
 1 | type ('a [@rec]) constrained = 'b constraint 'b = int * 'a;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective covariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Constraint with mixed contractive/non-contractive variables *)
@@ -416,8 +416,8 @@ Line 2, characters 0-56:
 2 | type ('a [@rec]) bad_mixed_wrapper = 'a mixed_constraint;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
-       The 1st type parameter was expected to be recursive invariant,
-       but it is injective invariant.
+       The 1st type parameter was expected to be recursive,
+       but it is nonrecursive.
 |}]
 
 (* Private types with [@rec] *)
