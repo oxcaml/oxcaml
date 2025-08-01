@@ -357,8 +357,6 @@ and Type : sig
 
   val quote : t -> t
 
-  val splice : t -> t
-
   val call_pos : t
 end
 
