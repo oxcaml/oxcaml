@@ -884,28 +884,66 @@ let constant_or_raise env loc cst =
       c
   | Error err -> raise (Error (loc, env, err))
 
+let extract_optional_tp_from_pattern_constraint_exn env pat = match pat with
+  | {Parsetree.ppat_desc = Ppat_constraint (under_pat, Some ty, modes); _} ->
+      let (path_and_decl, arg) =
+        Typetexp.extract_optional_tp_from_type_parsetree_exn env ty
+      in
+      (path_and_decl, arg,
+      {pat with
+        Parsetree.ppat_desc = Ppat_constraint (under_pat, Some arg, modes)})
+  | _ -> Misc.fatal_error "Missing type annotation"
+
 (* Specific version of type_option, using newty rather than newgenty *)
 
-let type_option mpath ty =
-  newty (Tconstr(predef_path_of_optional_module_path mpath,[ty], ref Mnil))
+let type_option ty =
+  newty (Tconstr(Predef.path_option,[ty], ref Mnil))
+
+let type_generic_option path ty =
+  newty (Tconstr(path, [ty], ref Mnil))
 
 let mkexp exp_desc exp_type exp_loc exp_env =
   { exp_desc; exp_type;
     exp_loc; exp_env; exp_extra = []; exp_attributes = [] }
 
-let type_option_none env mpath ty loc =
-  let lid = Longident.Lident "None" in
-  let cnone = match mpath with
-    | Stdlib_option -> Env.find_ident_constructor Predef.ident_none env
-    | Stdlib_or_null -> Env.find_ident_constructor Predef.ident_null env
+let get_some_and_none_constructors env path =
+  let cstrs = Env.lookup_all_constructors_from_type ~use:false
+    ~loc:Location.none Positive path env
   in
+  match cstrs with
+  | [] | [_] | _ :: _ :: _ :: _ ->
+      Misc.fatal_error "Expecting exactly two constructors"
+  | [c1, use_c1;c2, use_c2] -> (
+      match c1.cstr_arity, c2.cstr_arity with
+      | 1, 0 -> (c1, use_c1), (c2, use_c2)
+      | 0, 1 -> (c2, use_c2), (c1, use_c1)
+      | _ -> Misc.fatal_error "Expecting exactly arities 1 and 0")
+
+let get_some_constructor env path =
+  let (c1, use_c1), _ = get_some_and_none_constructors env path in use_c1(); c1
+
+let get_none_constructor env path =
+  let _, (c2, use_c2) = get_some_and_none_constructors env path in use_c2(); c2
+
+let type_option_none env ty loc =
+  let lid = Longident.Lident "None" in
+  let cnone = Env.find_ident_constructor Predef.ident_none env in
   mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
 
-let extract_option_type env mpath ty =
+let type_generic_option_none env path ty loc =
+  let cnone = get_none_constructor env path in
+  let lid = Longident.Lident cnone.cstr_name in
+  mkexp (Texp_construct(mknoloc lid, cnone, [], None)) ty loc env
+
+let extract_option_type env ty =
   match get_desc (expand_head env ty) with
-  | Tconstr(path, [ty], _) when
-      Path.same path (predef_path_of_optional_module_path mpath) -> ty
+  | Tconstr(path, [ty], _) when Path.same path Predef.path_option -> ty
   | _ -> assert false
+
+let extract_generic_option_type env ty =
+  match get_desc (expand_head env ty) with
+  | Tconstr(_, [ty], _) -> ty
+  | _ -> Misc.fatal_error "Not an option type"
 
 let protect_expansion env ty =
   if Env.has_local_constraints env then generic_instance ty else ty
@@ -3290,10 +3328,16 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       end;
       List.iter (fun f -> f()) tps.tps_pattern_force;
       (match classify_optionality l with
-      | Optional_arg mpath ->
+      | Vanilla_optional_arg ->
           unify_pat val_env pat
-            (type_option mpath
-              (newvar (predef_jkind_of_optional_module_path mpath)))
+            (type_option (newvar Predef.option_argument_jkind));
+      | Generic_optional_arg ->
+          let ((path, decl), _, _) =
+            extract_optional_tp_from_pattern_constraint_exn met_env spat
+          in
+          unify_pat val_env pat
+            (type_generic_option path
+              (newvar (jkind_of_generic_optional_type_path decl)))
       | Required_or_position_arg -> ());
       tps.tps_pattern_variables, pat
     end
@@ -4506,8 +4550,12 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
       match classify_optionality p with
-      | Optional_arg mpath ->
-          newvar (predef_jkind_of_optional_module_path mpath)
+      | Vanilla_optional_arg -> newvar Predef.option_argument_jkind
+      | Generic_optional_arg ->
+          let (_, decl), _ =
+            Typetexp.extract_optional_tp_from_type_parsetree_exn env arg_sty
+          in
+          newvar (jkind_of_generic_optional_type_path decl)
       | Required_or_position_arg ->
       begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
@@ -4528,9 +4576,14 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         match classify_optionality p with
-        | Optional_arg mpath ->
-            type_option mpath
-              (newvar (predef_jkind_of_optional_module_path mpath))
+        | Vanilla_optional_arg ->
+            type_option (newvar Predef.option_argument_jkind)
+        | Generic_optional_arg ->
+            let (path, decl), _ =
+              Typetexp.extract_optional_tp_from_type_parsetree_exn env arg_sty
+            in
+            type_generic_option path
+              (newvar (jkind_of_generic_optional_type_path decl))
         | Required_or_position_arg ->
             newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
@@ -4606,6 +4659,7 @@ let type_approx_fun_one_param
   let loc_fun, ty_fun = in_function in
   let { ty_arg; arg_mode; ty_ret; _ } =
     try filter_arrow env ty_expected label ~force_tpoly:(not has_poly)
+          ~generic_optional_info:None
     with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
@@ -5244,6 +5298,7 @@ type split_function_ty =
 let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
+    ~generic_optional_info
   =
   let alloc_mode =
       (* Unlike most allocations which can be the highest mode allowed by
@@ -5268,6 +5323,7 @@ let split_function_ty
         not has_poly
       in
       try filter_arrow env (instance ty_expected) arg_label ~force_tpoly
+            ~generic_optional_info
       with Filter_arrow_failed err ->
         let err =
           error_of_filter_arrow_failure ~explanation ~first:is_first_val_param
@@ -7462,6 +7518,16 @@ and type_function
           annots
         | _ :: _ -> Alloc.Const.Option.none
       in
+      (* Extract generic optional type info if present *)
+      let generic_optional_info =
+        match typed_arg_label with
+        | Generic_optional _ ->
+            let (path, decl), _, _ =
+              extract_optional_tp_from_pattern_constraint_exn env pat
+            in
+            Some (path, decl)
+        | _ -> None
+      in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
@@ -7471,6 +7537,7 @@ and type_function
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
           ~arg_label:typed_arg_label ~in_function ~has_poly ~mode_annots ~ret_mode_annots
+          ~generic_optional_info
       in
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
@@ -7482,43 +7549,50 @@ and type_function
         | None -> ty_arg_mono, None, pat
         | Some default ->
             let arg_label' = arg_label in
-            let arg_label, mpath =
-              match arg_label,
-                    classify_optionality_parsetree arg_label pat with
-              | (Optional arg_label | Generic_optional (arg_label)),
-                 Optional_arg mpath -> arg_label, mpath
-              | (Optional _ | Generic_optional _), Required_or_position_arg
-              | (Labelled _ | Nolabel), _ ->
+            let arg_label =
+              match arg_label with
+              | Optional arg_label -> arg_label
+              | Generic_optional arg_label -> arg_label
+              | Nolabel | Labelled _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
             let default_arg_jkind, default_arg_sort =
               Jkind.of_new_sort_var ~why:Optional_arg_default
             in
             let ty_default_arg = newvar default_arg_jkind in
-            begin
-              try unify env (type_option mpath ty_default_arg) ty_arg_mono
+            begin try (match classify_optionality_parsetree arg_label' with
+              | Vanilla_optional_arg ->
+                  unify env (type_option ty_default_arg) ty_arg_mono
+              | Generic_optional_arg ->
+                  let (path, _), _, _ =
+                    extract_optional_tp_from_pattern_constraint_exn env pat
+                  in
+                  unify env (type_generic_option path ty_default_arg)
+                    ty_arg_mono
+              | Required_or_position_arg ->
+                  Misc.fatal_error "not possible")
               with Unify _ -> assert false;
             end;
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
             *)
-            let default, pat =
-              match arg_label' with
-              | Optional _ ->
+            let default, pat, path =
+              match classify_optionality_parsetree arg_label' with
+              | Vanilla_optional_arg ->
                   (match pat.ppat_desc with
                   | Ppat_constraint (_, Some sty, _) ->
                       let gloc = { default.pexp_loc with loc_ghost = true } in
                       Ast_helper.Exp.constraint_ default (Some sty) ~loc:gloc []
-                      , pat
-                  | _ -> default, pat)
-              | Generic_optional _ ->
-                  let _, underlying_typ, new_pat =
-                    extract_optional_tp_from_pattern_constraint_exn pat
+                      , pat, None
+                  | _ -> default, pat, None)
+              | Generic_optional_arg ->
+                  let (path, _), underlying_typ, new_pat =
+                    extract_optional_tp_from_pattern_constraint_exn env pat
                   in
                   let gloc = { default.pexp_loc with loc_ghost = true } in
                   Ast_helper.Exp.constraint_ default (Some underlying_typ)
-                    ~loc:gloc [], new_pat
-              | _ -> assert false
+                    ~loc:gloc [], new_pat, Some path
+              | Required_or_position_arg -> assert false
             in
             (* Defaults are always global. They can be moved out of the
                function's region by Simplf.split_default_wrapper. *)
@@ -7526,7 +7600,7 @@ and type_function
               type_expect env mode_legacy default (mk_expected ty_default_arg)
             in
             ty_default_arg,
-            Some (default_arg, arg_label, default_arg_sort, mpath), pat
+            Some (default_arg, arg_label, default_arg_sort, path), pat
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
@@ -7624,10 +7698,19 @@ and type_function
         | None ->
             let param, param_uid = name_pattern "param" [ pat ] in
             Tparam_pat pat, param, param_uid
-        | Some (default_arg, arg_label, default_arg_sort, mpath) ->
+        | Some (default_arg, arg_label, default_arg_sort, None) ->
             let param = Ident.create_local ("*opt*" ^ arg_label) in
             let param_uid = Shape.Uid.internal_not_actually_unique in
-            Tparam_optional_default (pat, default_arg, default_arg_sort, mpath),
+            Tparam_optional_default (pat, default_arg, default_arg_sort, None),
+            param,
+            param_uid
+        | Some (default_arg, arg_label, default_arg_sort, Some path) ->
+            let param =
+              Ident.create_local ("*" ^ Path.name path ^ "*" ^ arg_label)
+            in
+            let param_uid = Shape.Uid.internal_not_actually_unique in
+            Tparam_optional_default (pat, default_arg, default_arg_sort,
+                                     Some path),
             param,
             param_uid
       in
@@ -8030,19 +8113,27 @@ and type_format loc str env =
   with Failure msg ->
     raise (Error (loc, env, Invalid_format msg))
 
-and type_option_some env mpath expected_mode sarg ty ty0 =
-  let ty' = extract_option_type env mpath ty in
-  let ty0' = extract_option_type env mpath ty0 in
+and type_option_some env expected_mode sarg ty ty0 =
+  let ty' = extract_option_type env ty in
+  let ty0' = extract_option_type env ty0 in
   let alloc_mode, argument_mode = register_allocation expected_mode in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
-  let lid, csome = match mpath with
-    | Stdlib_option -> (Longident.Lident "Some",
-      Env.find_ident_constructor Predef.ident_some env)
-    | Stdlib_or_null -> (Longident.Lident "This",
-      Env.find_ident_constructor Predef.ident_this env)
-  in
+  let lid = Longident.Lident "Some" in
+  let csome = Env.find_ident_constructor Predef.ident_some env in
   mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
-    (type_option mpath arg.exp_type) arg.exp_loc arg.exp_env
+    (type_option arg.exp_type) arg.exp_loc arg.exp_env
+
+and type_generic_option_some env path expected_mode sarg ty ty0 =
+  let ty' = extract_generic_option_type env ty in
+  let ty0' = extract_generic_option_type env ty0 in
+  let alloc_mode, argument_mode = register_allocation expected_mode in
+  let arg =
+    type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0'
+  in
+  let csome = get_some_constructor env path in
+  let lid = Longident.Lident csome.cstr_name in
+  mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode))
+    (type_generic_option path arg.exp_type) arg.exp_loc arg.exp_env
 
 (* [expected_mode] is the expected mode of the field. It's already adjusted for
    allocation, mutation and modalities. *)
@@ -8215,10 +8306,19 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
-            let mpath = get_optional_module_path_exn l in
             let ty =
-              type_option_none env mpath (instance (tpoly_get_mono ty_arg))
-                sarg.pexp_loc
+              match classify_optionality l with
+              | Vanilla_optional_arg ->
+                  type_option_none env (instance (tpoly_get_mono ty_arg))
+                    sarg.pexp_loc
+              | Generic_optional_arg ->
+                  let (path, _), _ =
+                    extract_optional_tp_from_type_exn env ty_arg
+                  in
+                  type_generic_option_none env path
+                    (instance (tpoly_get_mono ty_arg)) sarg.pexp_loc
+              | Required_or_position_arg ->
+                  Misc.fatal_error "not optional"
             in
             (* CR layouts v5: change value assumption below when we allow
                non-values in structures. *)
@@ -8371,12 +8471,15 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       in
       (match lbl with
        | Labelled _ | Nolabel -> ()
-       | Optional _ | Generic_optional _ ->
+       | Optional _ ->
            (* CR layouts v5: relax value requirement *)
-           let mpath = get_optional_module_path_exn lbl in
            unify_exp env arg
-            (type_option mpath
-              (newvar (predef_jkind_of_optional_module_path mpath)))
+             (type_option(newvar Predef.option_argument_jkind))
+           (* We always infer the vanilla option argument, even potentially
+             an application may be of some generic optional type *)
+       | Generic_optional _ ->
+           Misc.fatal_error
+             "generic optional arguments not allowed in application positions"
        | Position _ ->
            unify_exp env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg))
@@ -8389,8 +8492,9 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
         if vars = [] then begin
           let ty_arg0' = tpoly_get_mono ty_arg0 in
           if wrapped_in_some then begin
-            let mpath = get_optional_module_path_exn lbl in
-            type_option_some env mpath expected_mode sarg ty_arg' ty_arg0'
+            let (path, _), _ = extract_optional_tp_from_type_exn env ty_arg in
+            type_generic_option_some env path expected_mode sarg ty_arg'
+              ty_arg0'
           end else begin
             type_argument ~overwrite:No_overwrite env expected_mode sarg ty_arg' ty_arg0'
           end
@@ -8438,18 +8542,20 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       in
       (lbl, Arg (arg, mode_arg, sort_arg))
   | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
-      (match expected_label, classify_optionality expected_label with
-      | (Optional _| Generic_optional _), Optional_arg mpath ->
-          let arg = type_option_none env mpath
+      (match expected_label with
+      | Optional _ ->
+          let arg = type_option_none env (instance ty_arg) Location.none in
+          (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
+      | Generic_optional _ ->
+          let (path, _), _ = extract_optional_tp_from_type_exn env ty_arg in
+          let arg = type_generic_option_none env path
                       (instance ty_arg) Location.none
           in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
-      | Position _, Required_or_position_arg ->
+      | Position _ ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
           (lbl, Arg (arg, Mode.Value.legacy, sort_arg))
-      | (Optional _| Generic_optional _), Required_or_position_arg
-      | (Position _ | Labelled _ | Nolabel), _
-          -> assert false)
+      | Labelled _ | Nolabel -> assert false)
   | Omitted _ as arg -> (lbl, arg)
 
 and type_application env app_loc expected_mode position_and_mode
@@ -9254,6 +9360,7 @@ and type_function_cases_expect
         ~in_function ~has_poly:false ~mode_annots:Mode.Alloc.Const.Option.none
         ~ret_mode_annots:Mode.Alloc.Const.Option.none
         ~is_first_val_param:first ~is_final_val_param:true
+        ~generic_optional_info:None
     in
     let cases, partial =
       type_cases Value env
@@ -9795,7 +9902,8 @@ and type_n_ary_function
     | Contains_gadt ->
         (* Assert that [ty] is a function, and return its return type. *)
         let filter_ty_ret_exn ty arg_label ~force_tpoly =
-          match filter_arrow env ty arg_label ~force_tpoly with
+          match filter_arrow env ty arg_label ~force_tpoly
+                  ~generic_optional_info:None with
           | { ty_ret; _ } -> ty_ret
           | exception (Filter_arrow_failed error) ->
               let trace =
@@ -11246,8 +11354,7 @@ let report_error ~loc env =
           let lbl =
             match lbl with
             | Nolabel -> "_"
-            | Labelled s | Optional s | Position s -> s
-            | Generic_optional (_, s) -> s
+            | Labelled s | Optional s | Position s | Generic_optional s -> s
           in
           [Location.msg
              "@[Hint: Try splitting the application in two. The arguments that come@ \
@@ -11416,6 +11523,6 @@ let type_argument env e t1 t2 =
   let exp = type_argument ~overwrite:No_overwrite env mode_legacy e t1 t2 in
   maybe_check_uniqueness_exp exp; exp
 
-let type_option_some env lbl e t1 t2 =
-  let exp = type_option_some env lbl mode_legacy e t1 t2 in
+let type_option_some env e t1 t2 =
+  let exp = type_option_some env mode_legacy e t1 t2 in
   maybe_check_uniqueness_exp exp; exp
