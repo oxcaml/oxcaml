@@ -2917,7 +2917,7 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
-      (* CR mixed-modules: this is the wrong way to do this *)
+      (* CR jrayman: this is the wrong way to do this *)
       let layout =
         match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
         | Error _ -> assert false
@@ -2993,7 +2993,7 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
-      (* CR mixed-modules: this is the wrong way to do this *)
+      (* CR jrayman: this is the wrong way to do this *)
       let layout =
         match Ctype.type_sort !!penv ty_var ~why:Let_binding ~fixed:false with
         | Error _ -> assert false

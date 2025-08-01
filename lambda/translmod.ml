@@ -46,24 +46,6 @@ type error =
 
 exception Error of Location.t * error
 
-(* CR mixed-modules: maybe put this function somewhere else *)
-let rec to_layout : Jkind.Layout.Const.t -> layout = function
-  | Any -> Ptop
-  | Base Void -> assert false
-  | Base Value -> Pvalue generic_value
-  | Base Float32 -> Punboxed_float Unboxed_float32
-  | Base Float64 -> Punboxed_float Unboxed_float64
-  | Base Word -> Punboxed_int Unboxed_nativeint
-  | Base Bits8 -> Punboxed_int Unboxed_int8
-  | Base Bits16 -> Punboxed_int Unboxed_int16
-  | Base Bits32 -> Punboxed_int Unboxed_int32
-  | Base Bits64 -> Punboxed_int Unboxed_int64
-  | Base Vec128 -> Punboxed_vector Unboxed_vec128
-  | Base Vec256 -> Punboxed_vector Unboxed_vec256
-  | Base Vec512 -> Punboxed_vector Unboxed_vec512
-  | Product layouts ->
-    Punboxed_product (List.map to_layout layouts)
-
 let cons_opt x_opt xs =
   match x_opt with
   | None -> xs
@@ -117,19 +99,41 @@ let rec apply_coercion loc strict restr arg =
   match restr with
     Tcoerce_none ->
       arg
-  | Tcoerce_structure(pos_cc_list, id_pos_list) ->
+  | Tcoerce_structure(pos_mbe_cc_list, id_pos_list) ->
       name_lambda strict arg Lambda.layout_module (fun id ->
+        (* CR jrayman: duplicated below *)
+        let block_of ~repr =
+          match repr with
+          | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
+          | Module_mixed shape ->
+            Pmakemixedblock(0, Immutable, shape, alloc_heap)
+        in
         let get_field pos =
           if pos < 0 then lambda_unit
           else
             Lprim(mod_field pos,[Lvar id], loc)
         in
-        let get_layout _pos = Lambda.layout_module_field in
+        let shape =
+          pos_mbe_cc_list
+          |> List.rev_map (fun (_, mbe, _) -> transl_mixed_block_element mbe)
+          |> Array.of_list
+        in
+        let repr =
+          if Array.for_all
+            (function
+            | Value _ -> true
+            | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
+            | Bits64 | Vec128 | Vec256 | Vec512 | Word | Product _ -> false)
+            shape
+          then Module_value_only (Array.length shape)
+          else Module_mixed shape
+        in
+        (* CR jrayman: this is not correct *)
+        let get_layout _pos = layout_module_field in
         let lam =
-          (* CR jrayman: should sometimes be [Pmakemixedblock] *)
-          Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
-                List.map (apply_coercion_field loc get_field)
-                pos_cc_list, loc)
+          Lprim(block_of ~repr,
+                List.map (apply_coercion_field loc get_field) pos_mbe_cc_list,
+                loc)
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
   | Tcoerce_functor(cc_arg, cc_res) ->
@@ -150,7 +154,7 @@ let rec apply_coercion loc strict restr arg =
       name_lambda strict arg Lambda.layout_module
         (fun _ -> apply_coercion loc Alias cc lam)
 
-and apply_coercion_field loc get_field (pos, cc) =
+and apply_coercion_field loc get_field (pos, _mbe, cc) =
   apply_coercion loc Alias cc (get_field pos)
 
 and apply_coercion_result loc strict funct params args cc_res =
@@ -226,28 +230,31 @@ let rec compose_coercions c1 c2 =
   match (c1, c2) with
     (Tcoerce_none, c2) -> c2
   | (c1, Tcoerce_none) -> c1
-  | (Tcoerce_structure (pc1, ids1), Tcoerce_structure (pc2, ids2)) ->
-      let v2 = Array.of_list pc2 in
+  | (Tcoerce_structure (pmc1, ids1), Tcoerce_structure (pmc2, ids2)) ->
+      let v2 = Array.of_list pmc2 in
       let ids1 =
         List.map (fun (id,pos1,c1) ->
             if pos1 < 0 then (id, pos1, c1)
             else
-              let (pos2,c2) = v2.(pos1) in
+              let (pos2,_,c2) = v2.(pos1) in
               (id, pos2, compose_coercions c1 c2))
           ids1
       in
       Tcoerce_structure
         (List.map
-           (fun pc ->
-              match pc with
-              | _, (Tcoerce_primitive _ | Tcoerce_alias _) ->
+           (fun pmc ->
+              match pmc with
+              | _, _, (Tcoerce_primitive _ | Tcoerce_alias _) ->
                 (* These cases do not take an argument (the position is -1),
                    so they do not need adjusting. *)
-                pc
-              | (p1, c1) ->
-                let (p2, c2) = v2.(p1) in
-                (p2, compose_coercions c1 c2))
-          pc1,
+                pmc
+              | (p1, m1, c1) ->
+                let (p2, m2, c2) = v2.(p1) in
+                if Types.equal_mixed_block_element m1 m2
+                then (p2, m1, compose_coercions c1 c2)
+                else fatal_error
+                  "Translmod.compose_coercions: layouts don't match")
+          pmc1,
          ids1 @ ids2)
   | (Tcoerce_functor(arg1, res1), Tcoerce_functor(arg2, res2)) ->
       Tcoerce_functor(compose_coercions arg2 arg1,
@@ -653,7 +660,6 @@ and transl_struct ~scopes loc fields cc rootpath
       {str_final_env; str_items; _} =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
-
 (* The function  transl_structure is called by  the bytecode compiler.
    Some effort is made to compile in top to bottom order, in order to display
    warning by increasing locations. *)
@@ -679,14 +685,14 @@ and transl_structure ~scopes loc
         in
         let repr =
           module_representation_of ~shape:(
-            fields |> List.rev_map (fun (_, sort) -> sort) |> Array.of_list)
+            fields |> List.rev_map (fun (_, mbe) -> mbe) |> Array.of_list)
         in
         match cc with
           Tcoerce_none ->
             Lprim(block_of ~repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
-        | Tcoerce_structure(pos_cc_list, id_pos_list) ->
+        | Tcoerce_structure(pos_mbe_cc_list, id_pos_list) ->
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
@@ -698,17 +704,33 @@ and transl_structure ~scopes loc
               else let id, _ = v.(pos) in Lvar id
             in
             let get_layout pos =
-              if pos < 0 then Lambda.layout_module_field
+              if pos < 0 then Lambda.layout_value_field
               else let _, shape = v.(pos) in
                 shape |> transl_mixed_block_element
                       |> layout_of_mixed_block_element
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
               fields Ident.Set.empty in
+            let new_shape =
+              pos_mbe_cc_list
+              |> List.rev_map
+                (fun (_, mbe, _) -> transl_mixed_block_element mbe)
+              |> Array.of_list
+            in
+            let new_repr =
+              if Array.for_all
+                (function
+                | Value _ -> true
+                | Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32
+                | Bits64 | Vec128 | Vec256 | Vec512 | Word | Product _ -> false)
+                new_shape
+              then Module_value_only (Array.length new_shape)
+              else Module_mixed new_shape
+            in
             let lam =
-              Lprim(block_of ~repr,
+              Lprim(block_of ~repr:new_repr,
                   List.map
-                    (fun (pos, cc) ->
+                    (fun (pos, _mbe, cc) ->
                       match cc with
                       | Tcoerce_primitive p ->
                           let loc = of_location ~scopes p.pc_loc in
@@ -718,14 +740,12 @@ and transl_structure ~scopes loc
                             ~poly_sort:p.pc_poly_sort
                             None
                       | _ -> apply_coercion loc Strict cc (get_field pos))
-                    pos_cc_list, loc)
+                    pos_mbe_cc_list, loc)
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list
             in
-            wrap_id_pos_list loc id_pos_list get_field get_layout lam,
-              Module_value_only (List.length pos_cc_list)
-              (* CR jrayman: fix: [repr] should have the coercion applied *)
+            wrap_id_pos_list loc id_pos_list get_field get_layout lam, new_repr
         | _ ->
             fatal_error "Translmod.transl_structure"
       in
@@ -766,7 +786,7 @@ and transl_structure ~scopes loc
                       let _, _, sort = List.hd l in
                       let shape =
                         sort |> Jkind.Sort.default_for_transl_and_get
-                             |> mixed_block_of_sort
+                             |> mixed_block_element_of_const_sort
                       in
                       id, shape))
               fields
@@ -882,20 +902,18 @@ and transl_structure ~scopes loc
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
             | (id, layout) :: ids_with_layouts ->
-                let shape =
+                let sort =
                   layout |> Jkind.Layout.to_sort
                          |> Option.get
                             (* CR jrayman: is [Option.get] the best choice? *)
                          |> Jkind.Sort.default_for_transl_and_get
-                         |> mixed_block_of_sort
                 in
+                let shape = mixed_block_element_of_const_sort sort in
                 let body, repr =
                   rebind_idents (pos + 1) ((id, shape) :: newfields)
                     ids_with_layouts
                 in
-                let lambda_layout =
-                  to_layout (Jkind.Layout.default_to_value_and_get layout)
-                in
+                let lambda_layout = layout_of_const_sort sort in
                 let id_duid = Lambda.debug_uid_none in
                 (* CR sspies: Can we find a better [debug_uid] here? *)
                 Llet(Alias, lambda_layout, id, id_duid,
@@ -945,16 +963,15 @@ and transl_structure ~scopes loc
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
                 | (id, layout) :: ids_with_layouts ->
-                  let shape =
+                  (* CR jrayman: this code is duplicated above *)
+                  let sort =
                     layout |> Jkind.Layout.to_sort
                            |> Option.get
                               (* CR jrayman: is [Option.get] the best choice? *)
                            |> Jkind.Sort.default_for_transl_and_get
-                           |> mixed_block_of_sort
                   in
-                  let lambda_layout =
-                    to_layout (Jkind.Layout.default_to_value_and_get layout)
-                  in
+                  let shape = mixed_block_element_of_const_sort sort in
+                  let lambda_layout = layout_of_const_sort sort in
                   let body, repr =
                     rebind_idents (pos + 1) ((id, shape) :: newfields)
                       ids_with_layouts
@@ -987,7 +1004,7 @@ and transl_include_functor ~generative modl params scopes loc =
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
     Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
-          List.map (fun (name, cc) ->
+          List.map (fun (name, _mbe, cc) ->
             apply_coercion loc Strict cc (Lvar name))
             coercion,
           loc))
@@ -1336,7 +1353,7 @@ let nat_toplevel_name id =
 
 let field_of_str loc str =
   let ids = Array.of_list (defined_idents str.str_items) in
-  fun (pos, cc) ->
+  fun (pos, _mbe, cc) ->
     match cc with
     | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort } ->
         Translprim.transl_primitive loc pc_desc pc_env pc_type
@@ -1562,7 +1579,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                  map
               | Tmod_structure _
               | Tmod_constraint (_, _, _, Tcoerce_none) ->
-                 List.init (List.length ids0) (fun i -> i, Tcoerce_none)
+                 List.init (List.length ids0) (fun i -> i, Types.Value, Tcoerce_none)
               | _ -> assert false
             in
             Lsequence(lam, loop ids0 map)
@@ -1734,24 +1751,24 @@ let build_ident_map restr idlist more_ids =
     match restr with
     | Tcoerce_none ->
         natural_map 0 Ident.empty [] [] idlist
-    | Tcoerce_structure (pos_cc_list, _id_pos_list) ->
+    | Tcoerce_structure (pos_mbe_cc_list, _id_pos_list) ->
         (* ignore _id_pos_list as the ids are already bound *)
         let idarray = Array.of_list idlist in
         let rec export_map pos map prims aliases undef = function
           | [] ->
               natural_map pos map prims aliases undef
-          | (_source_pos, Tcoerce_primitive p) :: rem ->
+          | (_source_pos, _mbe, Tcoerce_primitive p) :: rem ->
               export_map (pos + 1) map
                 ((pos, p) :: prims) aliases undef rem
-          | (_source_pos, Tcoerce_alias(env, path, cc)) :: rem ->
+          | (_source_pos, _mbe, Tcoerce_alias(env, path, cc)) :: rem ->
               export_map (pos + 1) map prims
                 ((pos, env, path, cc) :: aliases) undef rem
-          | (source_pos, cc) :: rem ->
+          | (source_pos, _mbe, cc) :: rem ->
               let id = idarray.(source_pos) in
               export_map (pos + 1) (Ident.add id (pos, cc) map)
                 prims aliases (list_remove id undef) rem
         in
-        export_map 0 Ident.empty [] [] idlist pos_cc_list
+        export_map 0 Ident.empty [] [] idlist pos_mbe_cc_list
     | _ ->
         fatal_error "Translmod.build_ident_map"
   in
@@ -2121,7 +2138,7 @@ let transl_package_set_fields component_names target_name coercion =
                   get_component id],
                  Loc_unknown))
          0 component_names)
-  | Tcoerce_structure (pos_cc_list, _id_pos_list) ->
+  | Tcoerce_structure (pos_mbe_cc_list, _id_pos_list) ->
       let components =
         Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
               List.map get_component component_names,
@@ -2129,7 +2146,7 @@ let transl_package_set_fields component_names target_name coercion =
       in
       let blk = Ident.create_local "block" in
       let blk_duid = Lambda.debug_uid_none in
-      (List.length pos_cc_list,
+      (List.length pos_mbe_cc_list,
        Llet (Strict, Lambda.layout_module, blk, blk_duid,
              apply_coercion Loc_unknown Strict coercion components,
              make_sequence
@@ -2138,7 +2155,7 @@ let transl_package_set_fields component_names target_name coercion =
                        [Lprim(Pgetglobal target_name, [], Loc_unknown);
                         Lprim(mod_field pos, [Lvar blk], Loc_unknown)],
                        Loc_unknown))
-               0 pos_cc_list))
+               0 pos_mbe_cc_list))
   (*
               (* ignore id_pos_list as the ids are already bound *)
       let id = Array.of_list component_names in
