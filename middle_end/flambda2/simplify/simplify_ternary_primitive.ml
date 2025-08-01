@@ -87,6 +87,13 @@ let simplify_atomic_exchange_field ~original_prim dacc ~original_term _dbg
     (P.result_kind' original_prim)
     ~original_term
 
+let simplify_write_offset _kind dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_
+    ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var:_ =
+  (* Write_offset performs a raw write at a byte offset into a block. We don't
+     try to optimize this primitive as it's used for low-level access
+     patterns. *)
+  SPR.create original_term ~try_reify:false dacc
+
 let simplify_ternary_primitive dacc original_prim (prim : P.ternary_primitive)
     ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3 ~arg3_ty dbg ~result_var =
   let original_term = Named.create_prim original_prim dbg in
@@ -101,6 +108,7 @@ let simplify_ternary_primitive dacc original_prim (prim : P.ternary_primitive)
       simplify_atomic_field_int_arith op ~original_prim
     | Atomic_set_field _ -> simplify_atomic_set_field ~original_prim
     | Atomic_exchange_field _ -> simplify_atomic_exchange_field ~original_prim
+    | Write_offset (kind, _alloc_mode) -> simplify_write_offset kind
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3
     ~arg3_ty ~result_var

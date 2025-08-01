@@ -1376,6 +1376,11 @@ val dls_get : dbg:Debuginfo.t -> expression
 
 val cpu_relax : dbg:Debuginfo.t -> expression
 
+val caml_modify : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val caml_modify_local :
+  dbg:Debuginfo.t -> expression -> expression -> expression -> expression
+
 val poll : dbg:Debuginfo.t -> expression
 
 (** This module defines the various kinds of scalars usable in Cmm. It also provides ways

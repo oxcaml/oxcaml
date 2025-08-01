@@ -222,6 +222,7 @@ let compute_static_size lam =
     | Patomic_land_field
     | Patomic_lor_field
     | Patomic_lxor_field
+    | Psetrawfield
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -350,6 +351,7 @@ let compute_static_size lam =
     | Pbbswap _
     | Pint_as_pointer _
     | Patomic_load_field _
+    | Prawfield
     | Patomic_set_field _
     | Patomic_exchange_field _
     | Patomic_compare_exchange_field _
