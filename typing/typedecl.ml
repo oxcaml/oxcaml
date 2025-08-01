@@ -5530,17 +5530,37 @@ let explain_unbounded ty decl ppf =
       explain_unbound_single ppf ty ty'
   | _ -> ()
 
-let variance {Typedecl_variance.plus; minus; bang; rec_} =
-  let inj = if bang then "injective " else "" in
-  let recursive = if rec_ then "recursive " else "" in
-  let v =
-    match plus, minus with
-      true,  true  -> inj ^ recursive ^ "invariant"
-    | true,  false -> inj ^ recursive ^ "covariant"
-    | false, true  -> inj ^ recursive ^ "contravariant"
-    | false, false -> inj ^ recursive
+(* Describe a variance, mentioning only the properties that differ between
+   the expected variance [v2] and the actual variance [v1]. *)
+let variance ~v1 ~v2 =
+  let open Typedecl_variance in
+  let variance_relevant =
+    (v1.plus && not v2.plus) || (v1.minus && not v2.minus)
   in
-  if v = "" then "unrestricted" else v
+  let injectivity_relevant = v2.bang && not v1.bang in
+  let contractiveness_relevant = v2.rec_ && not v1.rec_ in
+  fun {plus; minus; bang; rec_} ->
+    let v =
+      if not variance_relevant then []
+      else begin
+        match plus, minus with
+        | true,  true  -> ["invariant"]
+        | true,  false -> ["covariant"]
+        | false, true  -> ["contravariant"]
+        | false, false -> ["unrestricted"]
+      end
+    in
+    let v =
+      if not injectivity_relevant then v
+      else if bang then "injective" :: v
+      else "noninjective" :: v
+    in
+    let v =
+      if not contractiveness_relevant then v
+      else if rec_ then "recursive" :: v
+      else "nonrecursive" :: v
+    in
+    String.concat " " v
 
 let variance_context =
   let open Typedecl_variance in
@@ -5574,6 +5594,7 @@ let variance_context =
 
 let variance_variable_error ~v1 ~v2 variable error ppf =
   let open Typedecl_variance in
+  let variance = variance ~v1 ~v2 in
   match error with
   | Variance_not_reflected ->
       fprintf ppf
@@ -5597,6 +5618,7 @@ let variance_variable_error ~v1 ~v2 variable error ppf =
 
 let variance_error ~loc ~v1 ~v2 =
   let open Typedecl_variance in
+  let variance = variance ~v1 ~v2 in
   function
   | Variance_variable_error { error; variable; context } ->
       (* CR dkalinichenko: OxCaml changes the [Ident_names] map from
