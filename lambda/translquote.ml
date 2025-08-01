@@ -3055,7 +3055,7 @@ and quote_expression_desc transl stage e =
       fatal_error "Cannot quote probing constructs."
     | Texp_mutvar _ | Texp_letmutable _ | Texp_setmutvar _ ->
       fatal_error "Cannot quote constructs related to mutable variables."
-    | Texp_eval_quotation typ ->
+    | Texp_eval_quotation (typ, _) ->
       Exp_desc.eval_quote loc (quote_core_type ~in_constraint:true typ)
   in
   List.iter update_env_without_extra e.exp_extra;
