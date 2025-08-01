@@ -405,12 +405,11 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 (******************************)
 
 (* Returns the set of axes that is relevant under a given modality. For example,
-   under the [global] modality, the locality axis is *not* relevant. *)
+   under the [global] modality, the areality axis is *not* relevant. *)
 let relevant_axes_of_modality ~relevant_for_shallow ~modality =
   Axis_set.create ~f:(fun ~axis:(Pack axis) ->
       match axis with
       | Modal axis ->
-        let (P axis) = Mode.Const.Axis.alloc_as_value (P axis) in
         let modality = Mode.Modality.Value.Const.proj axis modality in
         not (Mode.Modality.is_constant (Atom (axis, modality)))
       (* The kind-inference.md document (in the repo) discusses both constant
@@ -435,7 +434,7 @@ module Mod_bounds = struct
   include Types.Jkind_mod_bounds
 
   let min =
-    create ~locality:Locality.min ~linearity:Linearity.min
+    create ~areality:Areality.min ~linearity:Linearity.min
       ~uniqueness:Uniqueness.min ~portability:Portability.min
       ~contention:Contention.min ~yielding:Yielding.min
       ~statefulness:Statefulness.min ~visibility:Visibility.min
@@ -443,7 +442,7 @@ module Mod_bounds = struct
       ~separability:Separability.min
 
   let max =
-    create ~locality:Locality.max ~linearity:Linearity.max
+    create ~areality:Areality.max ~linearity:Linearity.max
       ~uniqueness:Uniqueness.max ~portability:Portability.max
       ~contention:Contention.max ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.max
@@ -451,7 +450,7 @@ module Mod_bounds = struct
       ~separability:Separability.max
 
   let join t1 t2 =
-    let locality = Locality.join (locality t1) (locality t2) in
+    let areality = Areality.join (areality t1) (areality t2) in
     let linearity = Linearity.join (linearity t1) (linearity t2) in
     let uniqueness = Uniqueness.join (uniqueness t1) (uniqueness t2) in
     let portability = Portability.join (portability t1) (portability t2) in
@@ -462,11 +461,11 @@ module Mod_bounds = struct
     let externality = Externality.join (externality t1) (externality t2) in
     let nullability = Nullability.join (nullability t1) (nullability t2) in
     let separability = Separability.join (separability t1) (separability t2) in
-    create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
+    create ~areality ~linearity ~uniqueness ~portability ~contention ~yielding
       ~statefulness ~visibility ~externality ~nullability ~separability
 
   let meet t1 t2 =
-    let locality = Locality.meet (locality t1) (locality t2) in
+    let areality = Areality.meet (areality t1) (areality t2) in
     let linearity = Linearity.meet (linearity t1) (linearity t2) in
     let uniqueness = Uniqueness.meet (uniqueness t1) (uniqueness t2) in
     let portability = Portability.meet (portability t1) (portability t2) in
@@ -477,7 +476,7 @@ module Mod_bounds = struct
     let externality = Externality.meet (externality t1) (externality t2) in
     let nullability = Nullability.meet (nullability t1) (nullability t2) in
     let separability = Separability.meet (separability t1) (separability t2) in
-    create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
+    create ~areality ~linearity ~uniqueness ~portability ~contention ~yielding
       ~statefulness ~visibility ~externality ~nullability ~separability
 
   let less_or_equal t1 t2 =
@@ -488,8 +487,8 @@ module Mod_bounds = struct
       | false, _ -> Not_le [Axis_disagreement axis]
     in
     Sub_result.combine
-      (axis_less_or_equal ~le:Locality.le
-         ~axis:(Pack (Modal (Comonadic Areality))) (locality t1) (locality t2))
+      (axis_less_or_equal ~le:Areality.le
+         ~axis:(Pack (Modal (Comonadic Areality))) (areality t1) (areality t2))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Uniqueness.le
             ~axis:(Pack (Modal (Monadic Uniqueness))) (uniqueness t1)
@@ -531,7 +530,7 @@ module Mod_bounds = struct
          (separability t2)
 
   let equal t1 t2 =
-    Locality.equal (locality t1) (locality t2)
+    Areality.equal (areality t1) (areality t2)
     && Linearity.equal (linearity t1) (linearity t2)
     && Uniqueness.equal (uniqueness t1) (uniqueness t2)
     && Portability.equal (portability t1) (portability t2)
@@ -546,7 +545,7 @@ module Mod_bounds = struct
   let[@inline] get (type a) ~(axis : a Axis.t) t : a =
     match axis with
     | Modal (Monadic Uniqueness) -> uniqueness t
-    | Modal (Comonadic Areality) -> locality t
+    | Modal (Comonadic Areality) -> areality t
     | Modal (Monadic Contention) -> contention t
     | Modal (Comonadic Linearity) -> linearity t
     | Modal (Comonadic Portability) -> portability t
@@ -564,7 +563,7 @@ module Mod_bounds = struct
     in
     Axis_set.empty
     |> add_if
-         (Locality.le Locality.max (locality t))
+         (Areality.le Areality.max (areality t))
          (Modal (Comonadic Areality))
     |> add_if
          (Linearity.le Linearity.max (linearity t))
@@ -598,7 +597,7 @@ module Mod_bounds = struct
          (Nonmodal Separability)
 
   let for_arrow =
-    create ~linearity:Linearity.max ~locality:Locality.max
+    create ~linearity:Linearity.max ~areality:Areality.max
       ~uniqueness:Uniqueness.min ~portability:Portability.max
       ~contention:Contention.min ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.min
@@ -609,7 +608,7 @@ module Mod_bounds = struct
     Mode.Crossing.of_bounds
       Types.Jkind_mod_bounds.
         { comonadic =
-            { areality = locality t;
+            { areality = areality t;
               linearity = linearity t;
               portability = portability t;
               yielding = yielding t;
@@ -1059,7 +1058,7 @@ module Layout_and_axes = struct
                 else Mod_bounds.get ~axis b1
               in
               Mod_bounds.create
-                ~locality:(value_for_axis ~axis:(Modal (Comonadic Areality)))
+                ~areality:(value_for_axis ~axis:(Modal (Comonadic Areality)))
                 ~linearity:(value_for_axis ~axis:(Modal (Comonadic Linearity)))
                 ~uniqueness:(value_for_axis ~axis:(Modal (Monadic Uniqueness)))
                 ~portability:
@@ -1379,7 +1378,7 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~locality:Locality.Const.max
+              Mod_bounds.create ~areality:Regionality.Const.max
                 ~linearity:Linearity.Const.min
                 ~portability:Portability.Const.min ~yielding:Yielding.Const.min
                 ~uniqueness:Uniqueness.Const_op.max
@@ -1397,7 +1396,7 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~locality:Locality.Const.max
+              Mod_bounds.create ~areality:Regionality.Const.max
                 ~linearity:Linearity.Const.min
                 ~portability:Portability.Const.min ~yielding:Yielding.Const.min
                 ~uniqueness:Uniqueness.Const_op.max
@@ -1415,7 +1414,7 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~locality:Locality.Const.max
+              Mod_bounds.create ~areality:Regionality.Const.max
                 ~linearity:Linearity.Const.min
                 ~portability:Portability.Const.min ~yielding:Yielding.Const.min
                 ~contention:Contention.Const_op.max
@@ -1466,7 +1465,7 @@ module Const = struct
        along which modes should a [immediate64] cross? As of today, all of them,
        but the reasoning for each is independent and somewhat subtle:
 
-       * Locality: This is fine, because we do not have stack-allocation on
+       * Areality: This is fine, because we do not have stack-allocation on
        32-bit platforms. Thus mode-crossing is sound at any type on 32-bit,
        including immediate64 types.
 
@@ -1818,7 +1817,6 @@ module Const = struct
           match axis with
           | Modal axis ->
             let t : Modality.t =
-              let (P axis) = Mode.Const.Axis.alloc_as_value (P axis) in
               match axis with
               | Monadic monadic ->
                 Atom
@@ -2469,7 +2467,7 @@ let for_unboxed_record lbls =
 
 let for_non_float ~(why : History.value_creation_reason) =
   let mod_bounds =
-    Mod_bounds.create ~locality:Locality.Const.max
+    Mod_bounds.create ~areality:Regionality.Const.max
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
@@ -2486,7 +2484,7 @@ let for_or_null_argument ident =
       { parent_path = Path.Pident ident; position = 1; arity = 1 }
   in
   let mod_bounds =
-    Mod_bounds.create ~locality:Locality.Const.max
+    Mod_bounds.create ~areality:Regionality.Const.max
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
@@ -2594,7 +2592,7 @@ let for_boxed_tuple elts =
 
 let for_open_boxed_row =
   let mod_bounds =
-    Mod_bounds.create ~locality:Locality.Const.max
+    Mod_bounds.create ~areality:Regionality.Const.max
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
@@ -2635,17 +2633,17 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let ({ linearity; areality = locality; portability; yielding; statefulness }
-        : Mode.Alloc.Comonadic.Const.t) =
-    Alloc.Comonadic.Const.legacy
+  let ({ linearity; areality; portability; yielding; statefulness }
+        : Mode.Value.Comonadic.Const.t) =
+    Value.Comonadic.Const.legacy
   in
-  let ({ contention; uniqueness; visibility } : Mode.Alloc.Monadic.Const_op.t) =
-    Alloc.Monadic.Const_op.max
+  let ({ contention; uniqueness; visibility } : Mode.Value.Monadic.Const_op.t) =
+    Value.Monadic.Const_op.max
   in
   fresh_jkind
     { layout = Sort (Base Value);
       mod_bounds =
-        Mod_bounds.create ~linearity ~locality ~uniqueness ~portability
+        Mod_bounds.create ~linearity ~areality ~uniqueness ~portability
           ~contention ~yielding ~statefulness ~visibility
           ~externality:Externality.max ~nullability:Non_null
           ~separability:Separability.Non_float;
@@ -2655,7 +2653,7 @@ let for_object =
 
 let for_float ident =
   let mod_bounds =
-    Mod_bounds.create ~locality:Locality.Const.max
+    Mod_bounds.create ~areality:Regionality.Const.max
       ~linearity:Linearity.Const.min ~portability:Portability.Const.min
       ~yielding:Yielding.Const.min ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.min ~statefulness:Statefulness.Const.min
@@ -2727,7 +2725,7 @@ let get_modal_bounds (type l r) ~jkind_of_type (jk : (l * r) jkind) =
   in
   Mod_bounds.
     { comonadic =
-        { areality = locality mod_bounds;
+        { areality = areality mod_bounds;
           linearity = linearity mod_bounds;
           portability = portability mod_bounds;
           yielding = yielding mod_bounds;

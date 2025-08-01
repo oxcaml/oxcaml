@@ -480,6 +480,10 @@ module type S = sig
         val value : t -> default:some -> some
 
         val print : Format.formatter -> t -> unit
+
+        val proj : 'a Axis.t -> t -> 'a option
+
+        val set : 'a Axis.t -> 'a option -> t -> t
       end
 
       val is_max : 'a Axis.t -> 'a -> bool
@@ -571,6 +575,10 @@ module type S = sig
 
     module Axis : sig
       val alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed
+
+      val is_areality :
+        'a Alloc.Axis.t ->
+        (('a, Locality.Const.t) Misc.eq, 'a Value.Axis.t) Either.t
     end
 
     val locality_as_regionality : Locality.Const.t -> Regionality.Const.t
@@ -755,16 +763,14 @@ module type S = sig
     programs mode-check. The adjustment is called mode crossing. *)
     type t
 
-    (* CR zqian: Complete the lattice structure of mode crossing. *)
+    include Lattice with type t := t
 
-    (* CR zqian: jkind modal bounds should just be our [t]. In particular, jkind
-       should infer the modal bounds of a type in the form of [Value] instead of
-       [Alloc]. For example, a type could have [regional] modality, in which case
-       it can cross to [regional] but not [global]. *)
+    (* CR zqian: jkind modal bounds should just be our [t], which should allow
+       us to remove [of_bounds]. *)
 
     (** Convert from jkind modal bounds. *)
     val of_bounds :
-      (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) monadic_comonadic -> t
+      (Value.Monadic.Const.t, Value.Comonadic.Const.t) monadic_comonadic -> t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)
@@ -793,15 +799,6 @@ module type S = sig
       t ->
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic ->
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
-
-    (** [le t0 t1] returns [true] if [t0] allows more mode crossing than [t1]. *)
-    val le : t -> t -> bool
-
-    (** The trivial mode crossing that crosses nothing. *)
-    val top : t
-
-    (** The mode crossing that crosses everything. *)
-    val bot : t
 
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Format.formatter -> t -> unit

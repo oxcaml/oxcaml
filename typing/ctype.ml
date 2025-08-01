@@ -5097,7 +5097,7 @@ let mode_crossing_functor =
   }}
 
 (** The mode crossing of any module. *)
-let mode_crossing_module = Mode.Crossing.top
+let mode_crossing_module = Mode.Crossing.max
 
 let zap_modalities_to_floor_if_at_least level =
   if Language_extension.(is_at_least Mode level)
@@ -5111,7 +5111,7 @@ let crossing_of_jkind env jkind =
 let crossing_of_ty env ?modalities ty =
   let crossing =
     if not (is_principal ty)
-      then Crossing.top
+      then Crossing.max
     else
       let jkind = type_jkind_purely env ty in
       crossing_of_jkind env jkind
