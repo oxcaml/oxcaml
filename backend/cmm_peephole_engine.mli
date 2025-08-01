@@ -136,3 +136,10 @@ module Syntax : sig
   (** Environment accessor: [env#.var] *)
   val ( #. ) : Env.t -> 'a pattern_var -> 'a
 end
+
+(** Check equivalence of Cmm terms for the purpose of checking that
+    the engine produces terms equivalent to the ones produced by the
+    original code. *)
+module Cmm_comparator : sig
+  val equivalent : Cmm.expression -> Cmm.expression -> bool
+end

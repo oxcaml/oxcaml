@@ -216,3 +216,133 @@ module Default_variables = struct
 
   let n2 = create_var Int "n2"
 end
+
+module Cmm_comparator = struct
+  (* Note: some of the equality functions should be implemented properly in Cmm;
+     for now we write the simple ones here and use structural equality for the
+     more annoying ones. *)
+  let equal_exit_label (x : Cmm.exit_label) (y : Cmm.exit_label) =
+    (* Use structural equality *)
+    x = y
+
+  let equal_ccatch_flag (x : Cmm.ccatch_flag) (y : Cmm.ccatch_flag) =
+    (* Use structural equality *)
+    x = y
+
+  let equal_trap_action (x : Cmm.trap_action) (y : Cmm.trap_action) =
+    (* Use structural equality *)
+    x = y
+
+  let equal_operation (x : Cmm.operation) (y : Cmm.operation) =
+    (* Use structural equality *)
+    x = y
+
+  let equal_phantom_defining_expr (x : Cmm.phantom_defining_expr)
+      (y : Cmm.phantom_defining_expr) =
+    (* Use structural equality *)
+    x = y
+
+  let equal_symbol (s1 : Cmm.symbol) (s2 : Cmm.symbol) =
+    String.equal s1.sym_name s2.sym_name
+    && Cmm.equal_is_global s1.sym_global s2.sym_global
+
+  let equal_vec128_bits (v1 : Cmm.vec128_bits) (v2 : Cmm.vec128_bits) =
+    Int64.equal v1.word0 v2.word0 && Int64.equal v1.word1 v2.word1
+
+  let equal_vec256_bits (v1 : Cmm.vec256_bits) (v2 : Cmm.vec256_bits) =
+    Int64.equal v1.word0 v2.word0
+    && Int64.equal v1.word1 v2.word1
+    && Int64.equal v1.word2 v2.word2
+    && Int64.equal v1.word3 v2.word3
+
+  let equal_vec512_bits (v1 : Cmm.vec512_bits) (v2 : Cmm.vec512_bits) =
+    Int64.equal v1.word0 v2.word0
+    && Int64.equal v1.word1 v2.word1
+    && Int64.equal v1.word2 v2.word2
+    && Int64.equal v1.word3 v2.word3
+    && Int64.equal v1.word4 v2.word4
+    && Int64.equal v1.word5 v2.word5
+    && Int64.equal v1.word6 v2.word6
+    && Int64.equal v1.word7 v2.word7
+
+  (* Checks equivalence of expressions. At the moment this ignores debuginfo and
+     phantom expressions. *)
+  let rec equivalent (x : Cmm.expression) (y : Cmm.expression) =
+    let module V = Backend_var in
+    let module VP = Backend_var.With_provenance in
+    match x, y with
+    | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
+    | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
+    | Cconst_float32 (f1, _), Cconst_float32 (f2, _) -> Float.equal f1 f2
+    | Cconst_float (f1, _), Cconst_float (f2, _) -> Float.equal f1 f2
+    | Cconst_vec128 (v1, _), Cconst_vec128 (v2, _) -> equal_vec128_bits v1 v2
+    | Cconst_vec256 (v1, _), Cconst_vec256 (v2, _) -> equal_vec256_bits v1 v2
+    | Cconst_vec512 (v1, _), Cconst_vec512 (v2, _) -> equal_vec512_bits v1 v2
+    | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
+    | Cvar v1, Cvar v2 -> V.equal v1 v2
+    | Clet (v1, def1, body1), Clet (v2, def2, body2) ->
+      (* No alpha-equivalence for now *)
+      V.equal (VP.var v1) (VP.var v2)
+      && equivalent def1 def2 && equivalent body1 body2
+    | Cphantom_let (v1, def1, body1), Cphantom_let (v2, def2, body2) ->
+      V.equal (VP.var v1) (VP.var v2)
+      && Option.equal equal_phantom_defining_expr def1 def2
+      && equivalent body1 body2
+    | Ctuple t1, Ctuple t2 -> List.equal equivalent t1 t2
+    | Cop (op1, args1, _), Cop (op2, args2, _) ->
+      equal_operation op1 op2 && List.equal equivalent args1 args2
+    | Csequence (before1, after1), Csequence (before2, after2) ->
+      equivalent before1 before2 && equivalent after1 after2
+    | ( Cifthenelse (cond1, _, ifso1, _, ifnot1, _),
+        Cifthenelse (cond2, _, ifso2, _, ifnot2, _) ) ->
+      equivalent cond1 cond2 && equivalent ifso1 ifso2
+      && equivalent ifnot1 ifnot2
+    | ( Cswitch (scrutinee1, cases1, actions1, _),
+        Cswitch (scrutinee2, cases2, actions2, _) ) ->
+      equivalent scrutinee1 scrutinee2
+      && Misc.Stdlib.Array.equal Int.equal cases1 cases2
+      && Misc.Stdlib.Array.equal
+           (fun (act1, _) (act2, _) -> equivalent act1 act2)
+           actions1 actions2
+    | Ccatch (flag1, handlers1, body1), Ccatch (flag2, handlers2, body2) ->
+      let equal_handler (lbl1, params1, body1, _, is_cold1)
+          (lbl2, params2, body2, _, is_cold2) =
+        (* No alpha equivalence *)
+        Int.equal lbl1 lbl2
+        && List.equal
+             (fun (var1, mtype1) (var2, mtype2) ->
+               V.equal (VP.var var1) (VP.var var2)
+               && Misc.Stdlib.Array.equal Cmm.equal_machtype_component mtype1
+                    mtype2)
+             params1 params2
+        && equivalent body1 body2
+        && Bool.equal is_cold1 is_cold2
+      in
+      equal_ccatch_flag flag1 flag2
+      && List.equal equal_handler handlers1 handlers2
+      && equivalent body1 body2
+    | Cexit (lbl1, args1, traps1), Cexit (lbl2, args2, traps2) ->
+      equal_exit_label lbl1 lbl2
+      && List.equal equivalent args1 args2
+      && List.equal equal_trap_action traps1 traps2
+    | ( ( Cconst_int (_, _)
+        | Cconst_natint (_, _)
+        | Cconst_float32 (_, _)
+        | Cconst_float (_, _)
+        | Cconst_vec128 (_, _)
+        | Cconst_vec256 (_, _)
+        | Cconst_vec512 (_, _)
+        | Cconst_symbol (_, _)
+        | Cvar _
+        | Clet (_, _, _)
+        | Cphantom_let (_, _, _)
+        | Ctuple _
+        | Cop (_, _, _)
+        | Csequence (_, _)
+        | Cifthenelse (_, _, _, _, _, _)
+        | Cswitch (_, _, _, _)
+        | Ccatch (_, _, _)
+        | Cexit (_, _, _) ),
+        _ ) ->
+      false
+end
