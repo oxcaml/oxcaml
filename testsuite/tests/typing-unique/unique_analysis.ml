@@ -806,3 +806,67 @@ Line 3, characters 20-21:
                         ^
 
 |}]
+
+type 'a r = {mutable x : 'a [@atomic]; y : 'a}
+
+let foo (r : 'a r) =
+  let x = [%atomic.loc r.x] in
+  let _ = unique_id x in
+  let _ = r.y in
+  ()
+[%%expect{|
+type 'a r = { mutable x : 'a [@atomic]; y : 'a; }
+Line 6, characters 10-11:
+6 |   let _ = r.y in
+              ^
+Error: This value is read from here, but it has already been used as unique:
+Line 4, characters 23-24:
+4 |   let x = [%atomic.loc r.x] in
+                           ^
+
+|}]
+
+let foo (r : 'a r) =
+  let x = [%atomic.loc r.x] in
+  let _ = aliased_id x in
+  let _ = r.y in
+  ()
+[%%expect{|
+val foo : 'a r -> unit = <fun>
+|}]
+
+
+let foo (r : 'a r) =
+  let _ = r.y in
+  let x = [%atomic.loc r.x] in
+  let _ = unique_id x in
+  ()
+[%%expect{|
+val foo : 'a r @ unique -> unit = <fun>
+|}]
+
+
+let foo (r : 'a r) =
+  let x = [%atomic.loc r.x] in
+  let _ = r.y in
+  let _ = unique_id x in
+  ()
+[%%expect{|
+Line 3, characters 10-11:
+3 |   let _ = r.y in
+              ^
+Error: This value is read from here, but it has already been used as unique:
+Line 2, characters 23-24:
+2 |   let x = [%atomic.loc r.x] in
+                           ^
+
+|}]
+
+let foo (r : 'a r) =
+  let x = [%atomic.loc r.x] in
+  let _ = r.y in
+  let _ = aliased_id x in
+  ()
+[%%expect{|
+val foo : 'a r -> unit = <fun>
+|}]
