@@ -209,6 +209,7 @@ and arg_label = Types.arg_label =
   | Labelled of string
   | Optional of string
   | Position of string
+  | Generic_optional of Longident.t * string
 
 and expression_desc =
     Texp_ident of
@@ -375,7 +376,8 @@ and function_param =
 
 and function_param_kind =
   | Tparam_pat of pattern
-  | Tparam_optional_default of pattern * expression * Jkind.sort
+  | Tparam_optional_default of
+      pattern * expression * Jkind.sort * Btype.optional_module_path
 
 and function_body =
   | Tfunction_body of expression

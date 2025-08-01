@@ -71,6 +71,7 @@ let rec fun_wrapper arg_list acc_id depth path_fun n =
 let string_label = function
   | Nolabel -> "Nolabel"
   | Optional s -> "Optional " ^ s
+  | Generic_optional s -> "Generic_optional " ^ s
   | Labelled s -> "Labelled " ^ s
 
 let replace_mapper id to_replace label =

@@ -294,7 +294,7 @@ module Analyser =
              let pat =
                match param.fp_kind with
                | Tparam_pat pat -> pat
-               | Tparam_optional_default (pat, _, _) -> pat
+               | Tparam_optional_default (pat, _, _, _) -> pat
             in
             tt_param_info_from_pattern
               env

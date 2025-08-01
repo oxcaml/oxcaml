@@ -311,6 +311,9 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
+val predef_path_of_optional_module_path: Btype.optional_module_path -> Path.t
+val predef_jkind_of_optional_module_path: Btype.optional_module_path -> jkind_lr
+
 val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
                   filtered_arrow
         (* A special case of unification (with l:'a -> 'b). If

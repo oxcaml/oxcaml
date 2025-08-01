@@ -374,6 +374,7 @@ let rec split_external_type (ct : core_type) :
     match lab with
     | Nolabel | Labelled _ -> (arg, false) :: args, ret
     | Optional _ -> (arg, true) :: args, ret
+    | Generic_optional _ -> (arg, true) :: args, ret
     | Position _ ->
       (* This is being used only to extract a shape, so being a little wrong
          in some fields is OK. *)

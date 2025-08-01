@@ -1485,3 +1485,91 @@ let triangle_10 = let mutable x = 0 in
 [%%expect{|
 val triangle_10 : int = 55
 |}]
+
+(******************************)
+(* generic optional arguments *)
+(*
+see: generic-optional-arguments/syntax_comparison.ml for a detailed explanation
+*)
+module type T = sig
+  val h : (?x): int or_null -> unit -> int
+end
+let or_null_get x = match x with This x -> x | Null -> 12
+[%%expect {|
+module type T = sig val h : (?x):int or_null -> unit -> int end
+val or_null_get : int or_null -> int = <fun>
+|}]
+
+module M_4 : T = struct
+  let h (?x : int or_null) () = or_null_get x
+end
+[%%expect {|
+module M_4 : T
+|}]
+
+module M_5 : T = struct
+  let h (?(x = 7) : int or_null) () = x
+end
+[%%expect {|
+module M_5 : T @@ stateless
+|}]
+module M_9 : T = struct
+  let h (?x:y : int or_null) () = or_null_get y
+end
+[%%expect {|
+module M_9 : T
+|}]
+module M_9_2 : T = struct
+  let h (?x:(y) : int or_null) () = or_null_get y
+end
+[%%expect {|
+module M_9_2 : T
+|}]
+
+module M_10 : T = struct
+  let h (?x:(y = 11) : int or_null) () = y
+end
+[%%expect {|
+module M_10 : T @@ stateless
+|}]
+
+module M_12 : T = struct
+  let h (?x:(y : int or_null)) () = or_null_get y
+end
+[%%expect {|
+module M_12 : T
+|}]
+
+module M_14 : T = struct
+  let h (?x:(y : int or_null) : int or_null) () = or_null_get y
+end
+[%%expect {|
+module M_14 : T
+|}]
+
+module M_15 : T = struct
+  let h (?x:((y : int) = 1) : int or_null) () = y
+end
+[%%expect {|
+module M_15 : T @@ stateless
+|}]
+
+let v = M_4.h ?x:(This 2) ()
+let v = M_5.h ?x:(This 2) ()
+let v = M_9.h ?x:(This 2) ()
+let v = M_9_2.h ?x:(This 2) ()
+let v = M_10.h ?x:(This 2) ()
+let v = M_12.h ?x:(This 2) ()
+let v = M_14.h ?x:(This 2) ()
+let v = M_15.h ?x:(This 2) ()
+
+[%%expect{|
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+val v : int = 2
+|}]

@@ -45,17 +45,19 @@ val for_tupled_function:
         Ident.t list -> (pattern list * lambda) list -> partial ->
         lambda
 
-(** [for_optional_arg_default pat body ~default_arg ~param] is:
+(** [for_optional_arg_default ~mpath pat body ~default_arg ~param] is:
     {[
       let $pat =
+      (* based on [mpath] *)
         match $param with
-        | Some x -> x
-        | None -> $default_arg
+        | Some/This x -> x
+        | None/Null -> $default_arg
       in
       $body
     ]}
 *)
 val for_optional_arg_default:
+  mpath:Btype.optional_module_path ->
   scopes:scopes -> Location.t -> pattern -> param:Ident.t ->
   default_arg:lambda -> default_arg_sort:Jkind.Sort.Const.t ->
   return_layout:layout -> lambda -> lambda
