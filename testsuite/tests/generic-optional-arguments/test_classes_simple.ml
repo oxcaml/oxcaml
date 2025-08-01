@@ -38,12 +38,16 @@ end
 [%%expect{| |}]
 
 (* Test usage *)
-let () =
-  let obj1 = new without_constructor_arg in
-  let _ = obj1#process MyNone in
-  let _ = obj1#process (MySome 42) in
+let obj1 = new without_constructor_arg
+let _ = obj1#process MyNone
+let _ = obj1#process (MySome 42)
 
-  let obj2 = new with_regular_arg 100 in
-  let _ = obj2#process_optional () in
-  ()
-[%%expect{| |}]
+let obj2 = new with_regular_arg 100
+let _ = obj2#process_optional ()
+[%%expect{|
+val obj1 : without_constructor_arg = <obj>
+- : int = 0
+- : int = 42
+val obj2 : with_regular_arg = <obj>
+- : int = 100
+|}]

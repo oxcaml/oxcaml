@@ -16,15 +16,15 @@ class test_method_only = object
     | MySome n -> n
 end
 [%%expect{|
-type 'a my_option = MyNone | MySome of 'a [@@option_like]
+type 'a my_option = MyNone | MySome of 'a
 class test_method_only :
-  object method process : (?x : int my_option) -> unit -> int end
+  object method process : (?x):int my_option -> unit -> int end
 |}]
 
 (* Test 2: Use the class with method *)
 let obj1 = new test_method_only
 let v1 = obj1#process ()
-let v2 = obj1#process ~x:(MySome 42) ()
+let v2 = obj1#process ?x:(MySome 42) ()
 [%%expect{|
 val obj1 : test_method_only = <obj>
 val v1 : int = 0
@@ -44,7 +44,8 @@ class type interface = object
   method m : (?x):int my_option -> unit -> int
 end
 [%%expect{|
-class type interface = object method m : (?x):int my_option -> unit -> int end
+class type interface =
+  object method m : (?x):int my_option -> unit -> int end
 |}]
 
 (* Test 5: Class implementing the interface *)
@@ -59,7 +60,7 @@ class implementation : interface
 (* Test 5a: Use implementation class *)
 let obj_impl = new implementation
 let v_impl1 = obj_impl#m ()
-let v_impl2 = obj_impl#m ~x:(MySome 99) ()
+let v_impl2 = obj_impl#m ?x:(MySome 99) ()
 [%%expect{|
 val obj_impl : implementation = <obj>
 val v_impl1 : int = 0
@@ -78,7 +79,7 @@ end
 class mixed_args :
   int ->
   object
-    method use_generic : (?opt : string my_option) -> unit -> string
+    method use_generic : (?opt):string my_option -> unit -> string
     method use_regular : int
   end
 |}]
@@ -97,7 +98,7 @@ val v_gen2 : string = "test"
 
 (* Test 7: Inheritance with generic optional methods *)
 class base = object
-  method virtual process : (?x : int my_option) -> unit -> int
+  method virtual process : (?x) : int my_option -> unit -> int
 end
 [%%expect{|
 class base : object method virtual process : (?x : int my_option) -> unit -> int end
@@ -115,7 +116,7 @@ class derived : object method process : (?x : int my_option) -> unit -> int end
 (* Test 7a: Use the derived class *)
 let obj_derived = new derived
 let v3 = obj_derived#process ()
-let v4 = obj_derived#process ~x:(MySome 100) ()
+let v4 = obj_derived#process ?x:(MySome 100) ()
 [%%expect{|
 val obj_derived : derived = <obj>
 val v3 : int = -1
@@ -133,16 +134,16 @@ end
 class multiple_optionals :
   object
     method multi :
-      (?x : int my_option) -> (?y : string my_option) -> unit -> int * string
+      (?x):int my_option -> (?y):string my_option -> unit -> int * string
   end
 |}]
 
 (* Test 8a: Use multiple optionals *)
 let obj_multi = new multiple_optionals
 let v5 = obj_multi#multi ()
-let v6 = obj_multi#multi ~x:(MySome 5) ()
+let v6 = obj_multi#multi ?x:(MySome 5) ()
 let v7 = obj_multi#multi ~y:(MySome "hello") ()
-let v8 = obj_multi#multi ~x:(MySome 10) ~y:(MySome "world") ()
+let v8 = obj_multi#multi ?x:(MySome 10) ~y:(MySome "world") ()
 [%%expect{|
 val obj_multi : multiple_optionals = <obj>
 val v5 : int * string = (0, "")
@@ -163,7 +164,7 @@ end
 class with_state :
   object
     val mutable count : int
-    method increment : (?by : int my_option) -> unit -> int
+    method increment : (?by):int my_option -> unit -> int
   end
 |}]
 
@@ -181,7 +182,7 @@ val v11 : int = 7
 
 (* Test 10: Using generic optional with polymorphic method *)
 class poly_optional = object
-  method poly : 'a. (?x : 'a my_option) -> unit -> 'a option =
+  method poly : 'a. (?x) : 'a my_option -> unit -> 'a option =
     fun ?(x : 'a my_option) () ->
       match x with
       | MyNone -> None
@@ -195,8 +196,8 @@ class poly_optional :
 (* Test 10a: Use polymorphic optional *)
 let obj_poly = new poly_optional
 let v12 = obj_poly#poly ()
-let v13 = obj_poly#poly ~x:(MySome 42) ()
-let v14 = obj_poly#poly ~x:(MySome "poly") ()
+let v13 = obj_poly#poly ?x:(MySome 42) ()
+let v14 = obj_poly#poly ?x:(MySome "poly") ()
 [%%expect{|
 val obj_poly : poly_optional = <obj>
 val v12 : '_weak1 option = None
