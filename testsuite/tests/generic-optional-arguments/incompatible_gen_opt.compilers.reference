@@ -15,6 +15,7 @@ Error: Signature mismatch:
          val f : (?x):int option -> unit -> int
        The type "(?x):int or_null -> unit -> int"
        is not compatible with the type "(?x):int option -> unit -> int"
+       Type "int or_null" is not compatible with type "int option"
        File "incompatible_gen_opt.ml", line 12, characters 2-40:
          Expected declaration
        File "incompatible_gen_opt.ml", line 18, characters 6-7:

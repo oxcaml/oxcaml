@@ -624,57 +624,25 @@ let is_optional_parsetree : Parsetree.arg_label -> bool = function
   | Generic_optional _ -> true
   | _ -> false
 
-(* CR generic-optional: temporary function, to remove *)
-type optional_module_path = Stdlib_option | Stdlib_or_null
+type generic_optional_type_path = Path.t
 
-let classify_module_path : Longident.t -> optional_module_path = function
-  | Lident "option" -> Stdlib_option
-  | Lident "or_null" -> Stdlib_or_null
-  | _ -> failwith "Only expected Stdlib.Option and Stdlib.Or_null"
-
-type optionality = Optional_arg of optional_module_path
+type optionality = Vanilla_optional_arg
+                 | Generic_optional_arg
                  | Required_or_position_arg
 
-let classify_optionality (lbl: Types.arg_label) = match lbl with
-  | Optional _ -> Optional_arg Stdlib_option
-  | Generic_optional(path, _) -> Optional_arg (classify_module_path path)
+let classify_optionality = function
+  | Types.Optional _ -> Vanilla_optional_arg
+  | Generic_optional _ -> Generic_optional_arg
   | Labelled _ | Position _ | Nolabel -> Required_or_position_arg
 
-let extract_optional_tp_from_pattern_constraint_exn pat = match pat with
-  | {Parsetree.ppat_desc = Ppat_constraint (under_pat, ty, modes); _} ->
-    (match ty with
-    (* CR generic-optional:  convert the identifier into a proper path to
-       handle code like type 'a option = 'a not_option *)
-    | Some {ptyp_desc = Ptyp_constr ({ txt = Lident ident_name}, [arg]); _} ->
-        (ident_name, arg,
-        {pat with
-          Parsetree.ppat_desc = Ppat_constraint (under_pat, Some arg, modes)})
-    (* CR generic-optional: handle the case for type int_option = int option *)
-    | Some _  -> failwith "Expected optional type"
-    | None  -> failwith "Missing type annotation"
-    )
-  | _ -> failwith "Missing type annotation"
-
-let classify_optionality_parsetree (lbl : Parsetree.arg_label)
-  (pat : Parsetree.pattern) =
-  match lbl with
-  | Optional _ -> Optional_arg Stdlib_option
+let classify_optionality_parsetree (lbl: Parsetree.arg_label) = match lbl with
+  | Optional _ -> Vanilla_optional_arg
+  | Generic_optional _ -> Generic_optional_arg
   | Labelled _ | Nolabel -> Required_or_position_arg
-  | Generic_optional(_) ->
-    match extract_optional_tp_from_pattern_constraint_exn pat with
-    | "option", _, _ -> Optional_arg Stdlib_option
-    | "or_null", _, _ -> Optional_arg Stdlib_or_null
-    | name, _, _ -> failwith ("Unrecognized generic optional type: " ^ name)
 
-let get_optional_module_path_exn lbl =
-  match classify_optionality lbl with
-  | Optional_arg mpath -> mpath
-  | Required_or_position_arg -> failwith "Expected Optional_arg"
-
-let is_optional arg =
-  match classify_optionality arg with
-  | Optional_arg _ -> true
-  | Required_or_position_arg -> false
+let is_optional = function
+  | Optional _ | Generic_optional _  -> true
+  | Position _ | Nolabel | Labelled _ -> false
 
 let is_position = function Position _ -> true | _ -> false
 
@@ -689,7 +657,7 @@ let label_name = function
   | Labelled s
   | Optional s
   | Position s -> s
-  | Generic_optional (_, s) -> s
+  | Generic_optional s -> s
 
 let prefixed_label_name ppf l =
   let open Format in
@@ -697,7 +665,7 @@ let prefixed_label_name ppf l =
     Nolabel -> fprintf ppf  ""
   | Labelled s | Position s -> fprintf ppf "~%s" s
   | Optional s -> fprintf ppf "?%s" s
-  | Generic_optional (_, s) -> fprintf ppf "(?%s)" s
+  | Generic_optional s -> fprintf ppf "(?%s)" s
 
 let arg_label_compatible param_label arg_label =
   label_name param_label = label_name arg_label

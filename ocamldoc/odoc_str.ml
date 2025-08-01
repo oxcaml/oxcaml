@@ -144,7 +144,8 @@ let string_of_class_params c =
           (if parent then "(" else "")
           (Odoc_print.string_of_type_expr
              (match Btype.classify_optionality label with
-             | Optional_arg mpath -> Odoc_misc.remove_option mpath t
+             | Vanilla_optional_arg -> Odoc_misc.remove_option t
+             | Generic_optional_arg -> t
              | Required_or_position_arg -> t)
           )
           (if parent then ")" else "");

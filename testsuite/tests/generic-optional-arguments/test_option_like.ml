@@ -1,5 +1,5 @@
 (* TEST
- flags = "";
+ flags = "-extension-universe alpha";
  expect;
 *)
 
@@ -203,7 +203,7 @@ end = struct
   type 'a t = Full of 'a | Empty [@@option_like]
 end
 [%%expect {|
-module M : sig type 'a t = Full of 'a | Empty end
+module M : sig type 'a t = Full of 'a | Empty end @@ stateless
 |}]
 
 (* Invalid: need concrete definitions to apply [@@option_like] *)
@@ -226,7 +226,7 @@ end = struct
   type 'a t = Full of 'a | Empty
 end
 [%%expect {|
-module M : sig type 'a t = Full of 'a | Empty end
+module M : sig type 'a t = Full of 'a | Empty end @@ stateless
 |}]
 
 (* Okay:  [@@option_like] in structure but not in signature *)
@@ -236,7 +236,7 @@ end = struct
   type 'a t = Full of 'a | Empty [@@option_like]
 end
 [%%expect {|
-module M : sig type 'a t = Full of 'a | Empty end
+module M : sig type 'a t = Full of 'a | Empty end @@ stateless
 |}]
 
 (* Valid: gadt *)
@@ -274,4 +274,23 @@ Line 1, characters 0-33:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type cannot be marked as option-like because
        extensible variant types cannot be option-like.
+|}]
+
+type 'a option = float [@@option_like]
+
+[%%expect{|
+Line 1, characters 0-38:
+1 | type 'a option = float [@@option_like]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be marked as option-like because it is abstract.
+|}]
+
+
+(* Some concrete type parameter *)
+type (_, _) gadt =
+  | None
+  | Some : 'a -> (int, 'a) gadt
+[@@option_like]
+[%%expect {|
+type (_, _) gadt = None | Some : 'a -> (int, 'a) gadt
 |}]

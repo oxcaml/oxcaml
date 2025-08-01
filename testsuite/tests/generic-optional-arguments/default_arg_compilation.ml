@@ -8,8 +8,8 @@ let f_option (?(x = 33) : int option) () = x
 [%%expect{|
 (let
   (f_option =
-     (function {nlocal = 0} *opt*x[(consts (0)) (non_consts ([0: *]))]
-       param[int] : int (if *opt*x (field_imm 0 *opt*x) 33)))
+     (function {nlocal = 0} *option*x[(consts (0)) (non_consts ([0: *]))]
+       param[int] : int (if *option*x (field_imm 0 *option*x) 33)))
   (apply (field_imm 1 (global Toploop!)) "f_option" f_option))
 val f_option : (?x):int option -> unit -> int = <fun>
 |}]
@@ -29,8 +29,8 @@ let f_or_null (?(x = 48) : int or_null) () = x
 [%%expect{|
 (let
   (f_or_null =
-     (function {nlocal = 0} *opt*x param[int] : int
-       (if (isnull *opt*x) 48 *opt*x)))
+     (function {nlocal = 0} *or_null*x param[int] : int
+       (if (isnull *or_null*x) 48 *or_null*x)))
   (apply (field_imm 1 (global Toploop!)) "f_or_null" f_or_null))
 val f_or_null : (?x):int or_null -> unit -> int = <fun>
 |}]

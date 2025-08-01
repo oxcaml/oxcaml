@@ -480,7 +480,7 @@ let label : Types.arg_label -> Parsetree.arg_label = function
   | Labelled l | Position l -> Labelled l
   | Optional l -> Optional l
   | Nolabel -> Nolabel
-  | Generic_optional (_, l) -> Generic_optional l
+  | Generic_optional l -> Generic_optional l
 
 let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
 

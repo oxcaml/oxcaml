@@ -159,11 +159,20 @@ val type_argument:
         Env.t -> Parsetree.expression ->
         type_expr -> type_expr -> Typedtree.expression
 
+(* Given a pattern, return the generic optional constructor name, underlying
+   type and the updated pattern with generic optional replaced with its
+   underlying type.
+   e.g. (x : int or_null) -> (<or_null>, int, (x : int)) *)
+val extract_optional_tp_from_pattern_constraint_exn:
+        Env.t -> Parsetree.pattern ->
+        (Btype.generic_optional_type_path * type_declaration) *
+        Parsetree.core_type * Parsetree.pattern
+
 val type_option_some:
-        Env.t -> Btype.optional_module_path -> Parsetree.expression ->
+        Env.t -> Parsetree.expression ->
         type_expr-> type_expr -> Typedtree.expression
 val type_option_none:
-        Env.t -> Btype.optional_module_path -> type_expr ->
+        Env.t -> type_expr ->
         Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
 val generalize_structure_exp: Typedtree.expression -> unit

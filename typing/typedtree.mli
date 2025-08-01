@@ -295,7 +295,7 @@ and arg_label = Types.arg_label =
   | Labelled of string
   | Optional of string
   | Position of string
-  | Generic_optional of Longident.t * string
+  | Generic_optional of string
 
 (** Jkinds in the typed tree: Compilation of the typed tree to lambda
     sometimes requires jkind information.  Our approach is to
@@ -563,12 +563,13 @@ and function_param_kind =
   | Tparam_pat of pattern
   (** [Tparam_pat p] is a non-optional argument with pattern [p]. *)
   | Tparam_optional_default of
-      pattern * expression * Jkind.sort * Btype.optional_module_path
-  (** [Tparam_optional_default (p, e, sort, mpath)] is an optional argument [p]
+      pattern * expression * Jkind.sort *
+      Btype.generic_optional_type_path option
+  (** [Tparam_optional_default (p, e, sort, path)] is an optional argument [p]
       with default value [e], i.e. [?x:(p = e)]. If the parameter is of type
       [a option], the pattern and expression are of type [a]. [sort] is the
-      sort of [e]. [mpath] is the generic optional module path, i.e.  [mpath] is
-      [Stdlib.Or_null] in [Stdlib.Or_null.?'x:(p = e)]. *)
+      sort of [e]. [path] is the generic optional type path, i.e.  [path] is
+      [t] in [(?x:(p = e):_ t)]. *)
 
 and function_body =
   | Tfunction_body of expression

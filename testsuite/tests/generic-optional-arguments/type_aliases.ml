@@ -12,7 +12,7 @@ end
 Line 2, characters 16-19:
 2 |   val g : (?x): int -> unit -> int
                     ^^^
-Error: Unknown generic optional argument type
+Error: Unknown generic optional argument type: int
 |}]
 
 (* CR: generic-optional: This should succeed *)
@@ -35,7 +35,18 @@ type int_or_null = int option
 Line 5, characters 16-26:
 5 |   val g : (?x): int_option -> unit -> int
                     ^^^^^^^^^^
-Error: Unknown generic optional argument type
+Error: Unknown generic optional argument type: int_option
+|}]
+
+module M = struct
+  let g (?(x = 42) : int_option) () = x
+  let h (?(x = 42) : int_or_null) () = x
+end
+[%%expect {|
+Line 2, characters 21-31:
+2 |   let g (?(x = 42) : int_option) () = x
+                         ^^^^^^^^^^
+Error: Unknown generic optional argument type: int_option
 |}]
 
 (* CR: generic-optional: This should succeed *)
@@ -65,7 +76,8 @@ type int_int_int_or_null = (int * int * int, float) or_null3
 Line 8, characters 18-37:
 8 |   val fst : (?x): (int * int) option2 -> unit -> int
                       ^^^^^^^^^^^^^^^^^^^
-Error: Unknown generic optional argument type
+Error: Generic optional arguments require types with the [@option_like] attribute.
+       Type "option2" is not marked as option-like
 |}]
 
 (* CR: generic-optional: This should fail *)
@@ -82,25 +94,9 @@ end
 
 [%%expect {|
 type 'a option = float
-module type T = sig val g : (?x):int option -> unit -> int end
-Lines 7-9, characters 15-3:
-7 | ...............struct
-8 |   let g (?(x = 42) : int option) () = x
-9 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val g : (?x):int option/2 -> unit -> int @@ stateless end
-       is not included in
-         T
-       Values do not match:
-         val g : (?x):int option/2 -> unit -> int @@ stateless
-       is not included in
-         val g : (?x):int option/1 -> unit -> int
-       The type "(?x):int option/2 -> unit -> int"
-       is not compatible with the type "(?x):int option/1 -> unit -> int"
-       Type "int option/2" is not compatible with type "int option/1" = "float"
-       Line 1, characters 0-22:
-         Definition of type "option/1"
-       File "_none_", line 1:
-         Definition of type "option/2"
+Line 4, characters 16-26:
+4 |   val g : (?x): int option -> unit -> int
+                    ^^^^^^^^^^
+Error: Generic optional arguments require types with the [@option_like] attribute.
+       Type "option" is not marked as option-like
 |}]

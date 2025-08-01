@@ -311,10 +311,16 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-val predef_path_of_optional_module_path: Btype.optional_module_path -> Path.t
-val predef_jkind_of_optional_module_path: Btype.optional_module_path -> jkind_lr
+val path_of_generic_optional_type_path:
+        Btype.generic_optional_type_path -> Path.t
+val jkind_of_generic_optional_type_path: type_declaration -> jkind_lr
+
+val extract_optional_tp_from_type_exn:
+        Env.t -> type_expr ->
+        (Btype.generic_optional_type_path * type_declaration) * type_expr
 
 val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
+                  generic_optional_info:(Path.t * type_declaration) option ->
                   filtered_arrow
         (* A special case of unification (with l:'a -> 'b). If
            [force_poly] is false then the usual invariant that the

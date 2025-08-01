@@ -454,9 +454,9 @@ and class_type_aux env virt self_scope scty =
       let ty = cty.ctyp_type in
       let ty =
         match Btype.classify_optionality l with
-        | Optional_arg mpath ->
-            let t_cons = Ctype.predef_path_of_optional_module_path mpath in
-            Ctype.newty (Tconstr(t_cons,[ty], ref Mnil))
+        | Vanilla_optional_arg ->
+            Ctype.newty (Tconstr(Predef.path_option,[ty], ref Mnil))
+        | Generic_optional_arg -> ty
         | Required_or_position_arg -> ty
       in
       let clty = class_type env virt self_scope scty in
@@ -1339,20 +1339,18 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
             let optional = Btype.is_optional l in
             let use_arg sarg l' =
               Arg (
+                (* CR generic-optional: Handle the case of generic-optional *)
                 if not optional || Btype.is_optional l' then
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
                   arg, Jkind.Sort.value
                 else
-                  let mpath = Btype.get_optional_module_path_exn l in
-                  (* CR generic-optional: Change the sort when options can
-                     hold non-values. *)
-                  Typecore.type_option_some val_env mpath sarg ty ty0,
+                  Typecore.type_option_some val_env sarg ty ty0,
                       Jkind.Sort.value
               )
             in
-            let eliminate_optional_arg lbl =
-              let mpath = Btype.get_optional_module_path_exn lbl in
-              Arg (Typecore.type_option_none val_env mpath ty0 Location.none,
+            let eliminate_optional_arg _lbl =
+              (* CR generic-optional: Handle the case of generic-optional *)
+              Arg (Typecore.type_option_none val_env ty0 Location.none,
                 (* CR generic-optional: Change the sort when options can hold
                    non-values. *)
                 Jkind.Sort.value)
@@ -1568,15 +1566,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
 let var_option =
   Predef.type_option (Btype.newgenvar Predef.option_argument_jkind)
 
-let var_or_null =
-  Predef.type_or_null
-    (Btype.newgenvar (Jkind.for_or_null_argument Predef.ident_or_null))
-
-let ctype_instance_of_optional_mpath (mpath : Btype.optional_module_path) =
-  match mpath with
-  | Stdlib_option -> Ctype.instance var_option
-  | Stdlib_or_null -> Ctype.instance var_or_null
-
 let rec approx_declaration cl =
   match cl.pcl_desc with
     Pcl_fun (l, _, pat, cl) ->
@@ -1584,9 +1573,9 @@ let rec approx_declaration cl =
       let arg =
         match l with
         | Optional _ -> Ctype.instance var_option
-        | Generic_optional (path, _) ->
-            ctype_instance_of_optional_mpath
-              (Btype.classify_module_path path)
+        | Generic_optional _ ->
+            Misc.fatal_error "Generic optional not supported"
+          (* CR generic-optional: Handle this case *)
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
@@ -1609,7 +1598,9 @@ let rec approx_description ct =
       let l = transl_label l (Some core_type) in
       let arg =
         match Btype.classify_optionality l with
-        | Optional_arg mpath -> ctype_instance_of_optional_mpath mpath
+        | Vanilla_optional_arg -> Ctype.instance var_option
+        | Generic_optional_arg ->
+            Misc.fatal_error "Generic optional not supported"
         | Required_or_position_arg ->
             Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we

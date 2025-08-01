@@ -361,7 +361,7 @@ and arg_label =
   | Labelled of string
   | Optional of string
   | Position of string
-  | Generic_optional of Longident.t * string
+  | Generic_optional of string
 
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr

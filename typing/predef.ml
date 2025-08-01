@@ -379,6 +379,7 @@ let mk_add_type1 add_type type_ident
           position = 1;
           arity = 1}
       ))
+      ?(attributes=[])
     ~variance ~separability env =
   let param = newgenvar param_jkind in
   let decl =
@@ -393,7 +394,7 @@ let mk_add_type1 add_type type_ident
       type_separability = [separability];
       type_is_newtype = false;
       type_expansion_scope = lowest_level;
-      type_attributes = [];
+      type_attributes = attributes;
       type_unboxed_default = false;
       type_uid = Uid.of_predef_id type_ident;
       type_unboxed_version = None;
@@ -532,6 +533,11 @@ let build_initial_env add_type add_extension empty_env =
          Jkind.add_with_bounds
            ~modality:Mode.Modality.Value.Const.id
            ~type_expr:param)
+       ~attributes:[
+         {Parsetree.attr_name = {txt = "option_like"; loc = Location.none};
+          attr_payload = PStr [];
+          attr_loc = Location.none}
+       ]
   |> add_type_with_jkind ident_lexing_position
        ~kind:(
          let lbl (field, field_type) =
@@ -697,6 +703,11 @@ let add_or_null add_type env =
   ~kind:or_null_kind
   ~param_jkind:(Jkind.for_or_null_argument ident_or_null)
   ~jkind:or_null_jkind
+  ~attributes:[
+    {Parsetree.attr_name = {txt = "option_like"; loc = Location.none};
+     attr_payload = PStr [];
+     attr_loc = Location.none}
+  ]
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns

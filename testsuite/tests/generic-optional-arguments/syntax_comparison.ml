@@ -100,7 +100,7 @@ end
 Line 3, characters 10-11:
 3 |   let g (?x) () = option_get x
               ^
-Error: Unknown generic optional argument type
+Error: Generic optional arguments require a type annotation
 |}]
 
 module M_3 : S = struct
@@ -119,7 +119,7 @@ end
 Line 3, characters 11-12:
 3 |   let g (?(x = 5)) () = x
                ^
-Error: Unknown generic optional argument type
+Error: Generic optional arguments require a type annotation
 |}]
 
 module M_4 : T = struct
@@ -167,7 +167,7 @@ end
 Line 3, characters 12-13:
 3 |   let g (?x:y) () = option_get y
                 ^
-Error: Unknown generic optional argument type
+Error: Generic optional arguments require a type annotation
 |}]
 
 module M_8 : S = struct
@@ -186,7 +186,7 @@ end
 Line 3, characters 13-14:
 3 |   let g (?x:(y = 9)) () = y
                  ^
-Error: Unknown generic optional argument type
+Error: Generic optional arguments require a type annotation
 |}]
 
 module M_9 : T = struct
@@ -232,7 +232,7 @@ end
 Line 3, characters 22-25:
 3 |   let g (?x:(y = 1) : int) () = y
                           ^^^
-Error: Unknown generic optional argument type
+Error: Unknown generic optional argument type: int
 |}]
 
 module M_14 : T = struct
