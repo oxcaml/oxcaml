@@ -7254,14 +7254,14 @@ and type_expect_
     begin match Builtin_attributes.get_eval_quote_payload payload with
     | Error () -> raise (Error (loc, env, Eval_quote_format))
     | Ok typ ->
-      let typ = Typetexp.transl_simple_type_univars env typ in
+      let typ = Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
       let eval_type = newty
         (Tarrow
           ((Nolabel, Alloc.legacy, Alloc.legacy)
-          , Predef.type_code (newty (Tquote typ.ctyp_type))
+          , newmono (Predef.type_code (newgenty (Tquote typ.ctyp_type)))
           , newty(Tarrow
             ((Nolabel, Alloc.legacy, Alloc.legacy)
-            , Predef.type_unit
+            , newmono Predef.type_unit
             , typ.ctyp_type
             , commu_ok))
           , commu_ok))
