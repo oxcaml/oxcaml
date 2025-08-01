@@ -597,7 +597,7 @@ val extern_repr_involves_unboxed_products : extern_repr -> bool
 val layout_of_const_sort : Jkind.Sort.Const.t -> layout
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 
-(* CR jrayman: should this be moved? *)
+(* CR jrayman: Move this *)
 val mixed_block_element_of_const_sort :
   Jkind.Sort.Const.t -> Types.mixed_block_element
 
@@ -945,6 +945,7 @@ type runtime_param =
 (* The structure of a module block. This is distinct from
    [Types.record_representation] since, e.g., modules don't support the float
    block optimization. *)
+(* CR jrayman: make this generic? *)
 type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
@@ -1042,7 +1043,7 @@ val layout_object : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
-val layout_module_field : layout (* CR jrayman: delete *)
+val layout_module_field : layout (* CR jrayman: delete? *)
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
