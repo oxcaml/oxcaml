@@ -96,10 +96,10 @@ OxCaml runtime provides several helper functions for working with SIMD vectors.
 
 ```ocaml
 external vec128_stub : (int8x16[@unboxed]) -> (int8x16[@unboxed]) =
-  "unboxed_vec128_stub" "boxed_vec128_stub"
+  "boxed_vec128_stub" "unboxed_vec128_stub"
 
 external vec256_stub : (int8x32[@unboxed]) -> (int8x32[@unboxed]) =
-  "unboxed_vec256_stub" "boxed_vec256_stub"
+  "boxed_vec256_stub" "unboxed_vec256_stub"
 ```
 ```c
 #include <caml/simd.h>
