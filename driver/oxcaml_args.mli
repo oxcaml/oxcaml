@@ -33,33 +33,25 @@ module type Oxcaml_options = sig
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
   val no_regalloc_validate : unit -> unit
-
   val vectorize : unit -> unit
   val no_vectorize : unit -> unit
   val vectorize_max_block_size : int -> unit
   val dvectorize : unit -> unit
-
   val cfg_peephole_optimize : unit -> unit
   val no_cfg_peephole_optimize : unit -> unit
-
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
-
   val cfg_eliminate_dead_trap_handlers : unit -> unit
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
-
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
-
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
-
   val heap_reduction_threshold : int -> unit
   val zero_alloc_check : string -> unit
   val zero_alloc_assert : string -> unit
-
   val dzero_alloc : unit -> unit
   val disable_zero_alloc_checker : unit -> unit
   val disable_precise_zero_alloc_checker : unit -> unit
@@ -67,30 +59,22 @@ module type Oxcaml_options = sig
   val zero_alloc_checker_details_extra : unit -> unit
   val no_zero_alloc_checker_details_extra : unit -> unit
   val zero_alloc_checker_join : int -> unit
-
   val function_layout : string -> unit
   val disable_builtin_check : unit -> unit
   val disable_poll_insertion : unit -> unit
   val enable_poll_insertion : unit -> unit
-
   val symbol_visibility_protected : unit -> unit
   val no_symbol_visibility_protected : unit -> unit
-
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
-
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
-
   val gc_timings : unit -> unit
-
   val no_mach_ir : unit -> unit
-
   val dllvmir : unit -> unit
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
-
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit
@@ -128,7 +112,6 @@ module type Oxcaml_options = sig
   val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
   val flambda2_debug_keep_invalid_handlers : unit -> unit
   val no_flambda2_debug_keep_invalid_handlers : unit -> unit
-
   val flambda2_inline_max_depth : string -> unit
   val flambda2_inline_max_rec_depth : string -> unit
   val flambda2_inline_call_cost : string -> unit
@@ -142,13 +125,9 @@ module type Oxcaml_options = sig
   val flambda2_inline_threshold : string -> unit
   val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
   val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
-
   val flambda2_inlining_report_bin : unit -> unit
-
   val flambda2_unicode : unit -> unit
-
   val flambda2_kind_checks : unit -> unit
-
   val drawfexpr : unit -> unit
   val drawfexpr_to : string -> unit
   val dfexpr : unit -> unit
@@ -193,13 +172,14 @@ end
 (** Transform required command-line arguments into actual arguments.
     Each tool can define its own argument implementations and
     call the right functor to actualize them into [Arg.t] list. *)
-module Make_optcomp_options : Optcomp_options -> Main_args.Arg_list;;
-module Make_opttop_options : Opttop_options -> Main_args.Arg_list;;
+module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
+
+module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
 
 (** Default implementations of required arguments for each tool.  *)
-module Default: sig
-  module Optmain: Optcomp_options
-  module Opttopmain: Opttop_options
+module Default : sig
+  module Optmain : Optcomp_options
+  module Opttopmain : Opttop_options
 end
 
 (** Extra_params module provides a way to read oxcaml
@@ -207,7 +187,7 @@ end
     with the exception of debug printing, such as -dcfg.
 *)
 module Extra_params : sig
-  (** [read_param ppf pos name value] returns whether the param was handled.  *)
   val read_param :
-      Format.formatter -> Compenv.readenv_position -> string -> string -> bool
+    Format.formatter -> Compenv.readenv_position -> string -> string -> bool
+  (** [read_param ppf pos name value] returns whether the param was handled.  *)
 end
