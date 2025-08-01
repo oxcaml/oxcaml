@@ -699,11 +699,11 @@ void caml_thread_interrupt_hook(void)
   /* Do not attempt to yield from the backup thread */
   if (caml_bt_is_self()) return;
 
-  uintnat is_on = 1;
+  uintnat mask = ~ST_INTERRUPT_FLAG;
   atomic_uintnat* req_external_interrupt =
     &Caml_state->requested_external_interrupt;
 
-  if (atomic_compare_exchange_strong(req_external_interrupt, &is_on, 0)) {
+  if (atomic_fetch_and(req_external_interrupt, mask) & ST_INTERRUPT_FLAG) {
     thread_yield();
   }
 
