@@ -143,10 +143,20 @@ let mkTexp_function ?(id = texp_function_defaults)
               fp_kind =
                 (match optional_default with
                 | None -> Tparam_pat pattern
-                | Some default ->
-                    let mpath = Btype.get_optional_module_path_exn arg_label in
-                    Tparam_optional_default
-                      (pattern, default, id.param_sort, mpath));
+                | Some default -> (
+                    match arg_label with
+                    | Optional _ ->
+                        Tparam_optional_default
+                          (pattern, default, id.param_sort, None)
+                    | Generic_optional _ ->
+                        (* For Chamelon's code minimization purposes, we don't
+                           need the exact type path information. Pass None for
+                           now.
+
+                           CR generic-optional: Check if this None is okay *)
+                        Tparam_optional_default
+                          (pattern, default, id.param_sort, None)
+                    | _ -> Misc.fatal_error "Expected optional"));
               fp_param = param;
               fp_param_debug_uid = Lambda.debug_uid_none;
               fp_partial = partial;
@@ -217,7 +227,7 @@ type matched_expression_desc =
 let untype_label = function
   | Typedtree.Position l | Labelled l -> Asttypes.Labelled l
   | Optional l -> Optional l
-  | Generic_optional (_, l) -> Generic_optional l
+  | Generic_optional l -> Generic_optional l
   | Nolabel -> Nolabel
 
 let view_texp (e : expression_desc) =
