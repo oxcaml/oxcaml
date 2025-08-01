@@ -4644,7 +4644,7 @@ let type_approx_constraint_opt ~loc env constraint_ ty_expected =
   | Some ty -> type_approx_constraint ~loc env ty ty_expected
 
 let type_approx_fun_one_param
-    env loc label spato ty_expected ~first ~in_function
+    env loc label spato ty_expected ~first ~in_function ~generic_optional_info
   =
   let mode_annots, has_poly =
     match spato with
@@ -4659,7 +4659,7 @@ let type_approx_fun_one_param
   let loc_fun, ty_fun = in_function in
   let { ty_arg; arg_mode; ty_ret; _ } =
     try filter_arrow env ty_expected label ~force_tpoly:(not has_poly)
-          ~generic_optional_info:None
+          ~generic_optional_info
     with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
@@ -4727,9 +4727,17 @@ and type_approx_function =
     | { pparam_desc = Pparam_newtype _ } :: _ -> ()
     | { pparam_desc = Pparam_val (label, _, pat) } :: params ->
         let label, pat = Typetexp.transl_label_from_pat label pat in
+        let generic_optional_info = match label with
+          | Generic_optional _ ->
+              let path_and_decl, _, _ =
+                extract_optional_tp_from_pattern_constraint_exn env pat
+              in
+              Some path_and_decl
+          | _ -> None
+        in
         let ty_res =
           type_approx_fun_one_param env loc label (Some pat) ty_expected
-            ~first ~in_function
+            ~first ~in_function ~generic_optional_info
         in
         loop env params c body ty_res ~in_function ~first:false
     | [] ->
@@ -4745,7 +4753,7 @@ and type_approx_function =
         | Pfunction_cases ({pc_rhs = e} :: _, _, _) ->
             let ty_res =
               type_approx_fun_one_param env loc Nolabel None ty_expected
-                ~in_function ~first
+                ~in_function ~first ~generic_optional_info:None
             in
             type_approx env e ty_res
         | Pfunction_cases ([], _, _) -> ()
