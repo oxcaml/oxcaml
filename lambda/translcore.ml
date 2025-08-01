@@ -1656,11 +1656,13 @@ and transl_curried_function ~scopes loc repr params body
           match fp_kind with
           | Tparam_pat pat ->
               pat.pat_env, pat.pat_type, Translattribute.transl_param_attributes pat
-          | Tparam_optional_default (pat, expr, _, mpath) ->
+          | Tparam_optional_default (pat, expr, _, None) ->
               expr.exp_env,
-              (match mpath with
-              | Stdlib_option -> Predef.type_option expr.exp_type
-              | Stdlib_or_null -> Predef.type_or_null expr.exp_type),
+              Predef.type_option expr.exp_type,
+              Translattribute.transl_param_attributes pat
+          | Tparam_optional_default (pat, expr, _, Some(path)) ->
+              expr.exp_env,
+              Btype.newgenty (Tconstr(path, [expr.exp_type], ref Mnil)),
               Translattribute.transl_param_attributes pat
         in
         (* CR generic-optional: This also needs to change fp_sort *)
@@ -1684,13 +1686,19 @@ and transl_curried_function ~scopes loc repr params body
                 ~arg_sort:fp_sort ~arg_layout
                 ~return_layout
           | Tparam_optional_default
-              (pat, default_arg, default_arg_sort, mpath) ->
-              let default_arg_sort = Jkind.Sort.default_for_transl_and_get default_arg_sort in
+              (pat, default_arg, default_arg_sort, path) ->
+              let default_arg_sort =
+                Jkind.Sort.default_for_transl_and_get default_arg_sort
+              in
               let default_arg =
                 event_before ~scopes default_arg
                   (transl_exp ~scopes default_arg_sort default_arg)
               in
-              Matching.for_optional_arg_default ~mpath ~return_layout
+              let path = match path with
+                | Some path -> path
+                | None -> Predef.path_option
+              in
+              Matching.for_optional_arg_default ~path ~return_layout
                 ~scopes fp_loc pat body ~default_arg ~default_arg_sort
                 ~param:fp_param
         in

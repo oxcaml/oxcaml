@@ -4484,7 +4484,7 @@ let for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list parti
     (do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list
        partial)
 
-let for_optional_arg_default ~(mpath : Btype.optional_module_path)
+let for_optional_arg_default ~(path : Btype.generic_optional_type_path)
     ~scopes loc pat ~param ~default_arg ~default_arg_sort ~return_layout body
   : lambda
   =
@@ -4496,16 +4496,14 @@ let for_optional_arg_default ~(mpath : Btype.optional_module_path)
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
   let supplied_or_default =
-    match mpath with
-    | Stdlib_or_null ->
-        transl_match_on_or_null
-          default_arg_layout
-          (Lvar param)
-          Loc_unknown
-          ~if_null:default_arg
-          ~if_this:(Lvar param)
-    | Stdlib_option ->
-        transl_match_on_option
+    if Path.same path Predef.path_or_null then
+      transl_match_on_or_null
+        default_arg_layout
+        (Lvar param)
+        Loc_unknown
+        ~if_null:default_arg
+        ~if_this:(Lvar param)
+    else transl_match_on_option
           default_arg_layout
           (Lvar param)
           Loc_unknown
