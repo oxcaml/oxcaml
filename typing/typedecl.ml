@@ -4471,18 +4471,6 @@ let report_error ppf = function
         (Style.as_inline_code Printtyp.longident) lid
         "is private"
   | Variance (Typedecl_variance.Bad_variance (n, v1, v2)) ->
-      let variance {Typedecl_variance.plus; minus; bang; rec_} =
-        let inj = if bang then "injective " else "" in
-        let recursive = if rec_ then "recursive " else "" in
-        let v =
-          match plus, minus with
-            true,  true  -> inj ^ recursive ^ "invariant"
-          | true,  false -> inj ^ recursive ^ "covariant"
-          | false, true  -> inj ^ recursive ^ "contravariant"
-          | false, false -> inj ^ recursive
-        in
-        if v = "" then "unrestricted" else v
-      in
       (match n with
        | Variance_variable_error { error; variable; context } ->
            Printtyp.prepare_for_printing [ variable ];
@@ -4545,6 +4533,34 @@ let report_error ppf = function
       (match n with
        | Variance_variable_error { error = No_variable; _ } -> ()
        | _ ->
+           let variance_relevant =
+            (v1.plus && not v2.plus) || (v1.minus && not v2.minus)
+          in
+          let injectivity_relevant = v2.bang && not v1.bang in
+          let contractiveness_relevant = v2.rec_ && not v1.rec_ in
+          let variance {Typedecl_variance.plus; minus; bang; rec_} =
+            let v =
+              if not variance_relevant then []
+              else begin
+               match plus, minus with
+               | true,  true  -> ["invariant"]
+               | true,  false -> ["covariant"]
+               | false, true  -> ["contravariant"]
+               | false, false -> ["unrestricted"]
+             end
+            in
+            let v = 
+              if not injectivity_relevant then v
+              else if bang then "injective" :: v
+              else "noninjective" :: v
+            in
+            let v = 
+              if not contractiveness_relevant then v
+              else if rec_ then "recursive" :: v
+              else "nonrecursive" :: v
+            in
+            String.concat " " v 
+           in
            fprintf ppf " was expected to be %s,@ but it is %s.@]@]"
              (variance v2) (variance v1))
   | Unavailable_type_constructor p ->

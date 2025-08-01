@@ -283,7 +283,7 @@ Line 1, characters 0-44:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
-       but it is injective covariant.
+       but it is covariant.
 |}]
 
 (* The type's arity must be exactly the same. *)
