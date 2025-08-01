@@ -147,7 +147,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                 let env = To_jsir_env.add_continuation env k addr in
                 (* CR selee: we keep the environment because we need the symbols
                    defined there, but really there should be a way to flush
-                   variables out of the environment to check flambda scoping
+                   variables out of the environment to respect flambda scoping
                    invariants *)
                 let env, res = expr ~env ~res body in
                 let res =
