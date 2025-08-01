@@ -453,6 +453,9 @@ and expression_extra i ppf x attrs =
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs
+  | Texp_alloc ->
+      line i ppf "Texp_alloc\n";
+      attributes i ppf attrs
   | Texp_mode m ->
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
@@ -461,7 +464,10 @@ and expression_extra i ppf x attrs =
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
 
-and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m.mode
+and alloc_mode i ppf (m : alloc_mode) =
+  match m with
+  | Internal m -> alloc_mode_raw i ppf m.mode
+  | External -> line i ppf "alloc_external\n"
 
 and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 
@@ -679,9 +685,6 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
-  | Texp_alloc (e,_) ->
-      line i ppf "Texp_alloc";
-      expression i ppf e;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

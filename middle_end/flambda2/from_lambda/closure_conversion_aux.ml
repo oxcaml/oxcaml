@@ -71,7 +71,7 @@ module IR = struct
       region_close : Lambda.region_close;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
-      mode : Lambda.locality_mode;
+      mode : Lambda.allocation_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
       args_arity : [`Complex] Flambda_arity.t;
@@ -747,7 +747,7 @@ module Function_decls = struct
       { name : Ident.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
-        mode : Lambda.locality_mode
+        mode : Lambda.allocation_mode
       }
 
     type unboxing_kind =
@@ -778,9 +778,9 @@ module Function_decls = struct
         attr : Lambda.function_attribute;
         loc : Lambda.scoped_location;
         recursive : Recursive.t;
-        closure_alloc_mode : Lambda.locality_mode;
+        closure_alloc_mode : Lambda.allocation_mode;
         first_complex_local_param : int;
-        result_mode : Lambda.locality_mode
+        result_mode : Lambda.allocation_mode
       }
 
     let create ~let_rec_ident ~function_slot ~kind ~params ~params_arity
@@ -883,7 +883,7 @@ module Function_decls = struct
   type t =
     { function_decls : Function_decl.t list;
       all_free_idents : Ident.Set.t;
-      alloc_mode : Lambda.locality_mode
+      alloc_mode : Lambda.allocation_mode
     }
 
   let alloc_mode t = t.alloc_mode

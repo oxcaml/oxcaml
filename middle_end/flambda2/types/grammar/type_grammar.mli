@@ -368,6 +368,8 @@ val create_variant :
 
 val mutable_block : Alloc_mode.For_types.t -> t
 
+val mutable_external_block : t
+
 val create_closures : Alloc_mode.For_types.t -> row_like_for_closures -> t
 
 (** Note this assumes the allocation mode is [Heap] *)

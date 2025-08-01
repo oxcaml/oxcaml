@@ -587,6 +587,25 @@ CAMLexport value caml_alloc_shr_no_track_noexc (mlsize_t wosize, tag_t tag)
   return caml_alloc_shr_aux(wosize, tag, 0, NO_PROFINFO);
 }
 
+CAMLexport intnat caml_alloc_malloc_with_reserved(mlsize_t wosize, tag_t tag,
+                                                  reserved_t reserved)
+{
+  void* res = (void*) malloc(Bhsize_wosize(wosize));
+  if (res == NULL) {
+    caml_fatal_out_of_memory();
+  }
+  //CR jcutler for ccasinghino: what color to use here?
+  //NOT_MARKABLE does not seem to exist on runtime4...
+  uintnat color = 0;
+  Hd_hp(res) = Make_header_with_profinfo(wosize, tag, color, reserved);
+  value v = Val_hp(res);
+  mlsize_t scannable_wosize = Scannable_wosize_reserved(reserved, wosize);
+  if (tag < No_scan_tag){
+    for (int i = 0; i < scannable_wosize; i++) Field(v,i) = Val_unit;
+  }
+  return v;
+}
+
 /* Dependent memory is all memory blocks allocated out of the heap
    that depend on the GC (and finalizers) for deallocation.
    For the GC to take dependent memory into account when computing

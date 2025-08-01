@@ -29,6 +29,7 @@ type invalid_stack_primitive =
   | Not_primitive
   | Not_allocating
   | Allocating_on_heap
+  | Allocating_externally
 
 type error =
   | Unknown_builtin_primitive of string
@@ -186,13 +187,13 @@ let gen_array_set_kind mode =
 let prim_sys_argv =
   Lambda.simple_prim_on_values ~name:"caml_sys_argv" ~arity:1 ~alloc:true
 
-let to_locality ~poly = function
+let to_alloc_mode ~poly = function
   | Prim_global, _ -> alloc_heap
   | Prim_local, _ -> alloc_local
   | Prim_poly, _ ->
     match poly with
     | None -> assert false
-    | Some locality -> transl_locality_mode_l locality
+    | Some alloc_mode -> transl_allocation_mode_l alloc_mode
 
 let to_modify_mode ~poly = function
   | Prim_global, _ -> modify_heap
@@ -519,7 +520,7 @@ let array_vec_primitives =
 
 let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   let runtime5 = Config.runtime5 in
-  let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
+  let mode = to_alloc_mode ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
     List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
   in
@@ -1915,7 +1916,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
     else
       prim
   in
-  let to_locality = to_locality ~poly:poly_mode in
+  let to_alloc_mode = to_alloc_mode ~poly:poly_mode in
   let error_loc = to_location loc in
   let rec make_params ty repr_args repr_res =
     match repr_args, repr_res with
@@ -1932,7 +1933,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
           let arg_layout =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
-          let arg_mode = to_locality arg in
+          let arg_mode = to_alloc_mode arg in
           let params, return = make_params ret_ty repr_args repr_res in
           { name = Ident.create_local "prim";
             debug_uid = Lambda.debug_uid_none;
@@ -1956,7 +1957,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
          loc
      in
      let body = lambda_of_prim p.prim_name prim loc args None in
-     let locality_mode = to_locality p.prim_native_repr_res in
+     let allocation_mode = to_alloc_mode p.prim_native_repr_res in
      let () =
        (* CR mshinwell: Write a version of [primitive_may_allocate] that
           works on the [prim] type. *)
@@ -1973,35 +1974,37 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
             (* In this case we add a check to ensure the middle end has
                the correct information as to whether a region was inserted
                at this point. *)
-            match locality_mode, lambda_alloc_mode with
+            match allocation_mode, lambda_alloc_mode with
             | Alloc_heap, Alloc_heap
             | Alloc_local, Alloc_local -> ()
+            | Alloc_external, Alloc_external -> ()
             | Alloc_local, Alloc_heap ->
               (* This case is ok: the Lambda-derived information is more
                  precise.  A region will be inserted, likely unused, and
                  deleted by the middle end. *)
               ()
-            | Alloc_heap, Alloc_local ->
+            | (Alloc_external | Alloc_local | Alloc_heap),
+              (Alloc_external | Alloc_local | Alloc_heap) ->
               Misc.fatal_errorf "Locality mode incompatibility for:@ %a@ \
-                  (from to_locality, %a; from primitive_may_allocate, %a)"
+                  (from to_alloc_mode, %a; from primitive_may_allocate, %a)"
                 Printlambda.lambda body
-                Printlambda.locality_mode locality_mode
-                Printlambda.locality_mode lambda_alloc_mode
+                Printlambda.allocation_mode allocation_mode
+                Printlambda.allocation_mode lambda_alloc_mode
          )
        | _ -> ()
      in
      let region =
-       match locality_mode with
-       | Alloc_heap -> true
+       match allocation_mode with
+       | Alloc_heap | Alloc_external -> true
        | Alloc_local -> false
      in
      let rec count_nlocal = function
        | [] -> assert false
        | [_] -> if region then 0 else 1
-       | Alloc_heap :: args -> count_nlocal args
+       | (Alloc_heap | Alloc_external) :: args -> count_nlocal args
        | (Alloc_local :: _) as args -> List.length args
      in
-     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args)
+     let nlocal = count_nlocal (List.map to_alloc_mode p.prim_native_repr_args)
      in lfunction
        ~kind:(Curried {nlocal})
        ~params
@@ -2010,7 +2013,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
        ~loc
        ~body
        ~mode:alloc_heap
-       ~ret_mode:(to_locality p.prim_native_repr_res)
+       ~ret_mode:(to_alloc_mode p.prim_native_repr_res)
 
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that
@@ -2130,6 +2133,9 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         | Some Alloc_local -> ()
         | Some Alloc_heap ->
             raise (Error (to_location loc, Invalid_stack_primitive Allocating_on_heap))
+        | Some Alloc_external ->
+            raise (Error (to_location loc,
+                          Invalid_stack_primitive Allocating_externally))
         | None -> raise (Error (to_location loc, Invalid_stack_primitive Not_allocating))
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
@@ -2201,6 +2207,9 @@ let report_error ppf = function
         "This primitive always allocates on heap@ \
         (maybe it should be declared with %a or %a?)"
         Style.inline_code "[@local_opt]" Style.inline_code "local_"
+  | Invalid_stack_primitive Allocating_externally ->
+      fprintf ppf
+        "This primitive always allocates externally"
 
 let () =
   Location.register_error_of_exn

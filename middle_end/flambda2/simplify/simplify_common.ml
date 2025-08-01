@@ -135,6 +135,8 @@ let split_direct_over_application apply
        been allocated in their region). *)
     match result_mode with
     | Alloc_heap -> None, Alloc_mode.For_applications.heap
+    | Alloc_external ->
+      Misc.fatal_error "Externally allocated functions are not supported"
     | Alloc_local -> (
       match apply_alloc_mode with
       | Heap ->

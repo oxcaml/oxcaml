@@ -67,6 +67,18 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag) {
   return caml_alloc_with_reserved (wosize, tag, 0);
 }
 
+CAMLexport intnat caml_alloc_malloc(mlsize_t wosize, tag_t tag) {
+  return caml_alloc_malloc_with_reserved(wosize,tag,0);
+}
+
+CAMLexport intnat caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag,
+                                         mlsize_t scannable_prefix)
+{
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(scannable_prefix);
+  return caml_alloc_malloc_with_reserved(wosize,tag,reserved);
+}
+
 /* This is used by the native compiler for large block allocations.
    The resulting block can be filled with [caml_modify], or [caml_initialize],
    or direct writes for integer values and code pointers.

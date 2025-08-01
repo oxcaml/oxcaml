@@ -1039,7 +1039,7 @@ let result_kind_of_nullary_primitive p : result_kind =
 
 let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
   | Local _ -> Coeffects.Has_coeffects
-  | Heap -> Coeffects.No_coeffects
+  | Heap | External -> Coeffects.No_coeffects
 
 let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
   match p with
@@ -1146,7 +1146,11 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Array_length _ -> true
   | Bigarray_length _ -> false
   | String_length _ -> true
-  | Int_as_pointer m -> ( match m with Heap -> true | Local _ -> false)
+  | Int_as_pointer m -> (
+    match m with
+    | Heap -> true
+    | Local _ -> false
+    | External -> Misc.fatal_error "External Int_as_pointer not supported")
   | Opaque_identity _ -> false
   | Int_arith _ -> true
   | Float_arith _ ->
@@ -1158,6 +1162,8 @@ let unary_primitive_eligible_for_cse p ~arg =
     (* For the moment we don't CSE any local allocations. *)
     (* CR mshinwell: relax this in the future? *)
     false
+  | Box_number (_, External) ->
+    Misc.fatal_error "External Box_number not supported"
   | Box_number (_, Heap) | Tag_immediate ->
     (* Boxing or tagging of constants will yield values that can be lifted and
        if needs be deduplicated -- so there's no point in adding CSE variables
@@ -1501,7 +1507,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         (* Local allocations have coeffects, to avoid them being moved past a
            begin/end region. Hence, it is not safe to force the allocation to be
            moved, so we cannot use the `Delay` mode for those. *)
-        match alloc_mode with Heap -> Delay | Local _ -> Strict
+        match alloc_mode with Heap | External -> Delay | Local _ -> Strict
       else Strict
     in
     Only_generative_effects Immutable, coeffects_of_mode alloc_mode, placement
@@ -2205,6 +2211,9 @@ let variadic_primitive_eligible_for_cse p ~args =
   match p with
   | Begin_region _ | Begin_try_region _ -> false
   | Make_block (_, _, Local _) | Make_array (_, _, Local _) -> false
+  | Make_block (_, _, External) -> false
+  | Make_array (_, _, External) ->
+    Misc.fatal_error "External arrays are not supported"
   | Make_block (_, Mutable, _) | Make_array (_, Mutable, _) -> false
   | Make_block (_, Immutable_unique, _) | Make_array (_, Immutable_unique, _) ->
     false
@@ -2274,7 +2283,11 @@ let args_kind_of_variadic_primitive p : arg_kinds =
 let result_kind_of_variadic_primitive p : result_kind =
   match p with
   | Begin_region _ | Begin_try_region _ -> Singleton K.region
-  | Make_block _ | Make_array _ -> Singleton K.value
+  | Make_array (_, _, (Heap | Local _)) -> Singleton K.value
+  | Make_array (_, _, External) ->
+    Misc.fatal_error "Externally arrays are not supported"
+  | Make_block (_, _, (Heap | Local _)) -> Singleton K.value
+  | Make_block (_, _, External) -> Singleton K.naked_nativeint
 
 let effects_and_coeffects_of_begin_region : Effects_and_coeffects.t =
   (* Ensure these don't get moved, but allow them to be deleted. *)
@@ -2286,10 +2299,17 @@ let effects_and_coeffects_of_variadic_primitive p =
   | Make_block (_, mut, alloc_mode) | Make_array (_, mut, alloc_mode) ->
     let coeffects : Coeffects.t =
       match alloc_mode with
-      | Heap -> Coeffects.No_coeffects
+      | Heap | External -> Coeffects.No_coeffects
       | Local _ -> Coeffects.Has_coeffects
     in
-    Effects.Only_generative_effects mut, coeffects, Placement.Strict
+    let effects : Effects.t =
+      match alloc_mode with
+      (* We want to prevent external allocations from being lifted or reordered,
+         so we say they have arbitrary effects *)
+      | External -> Effects.Arbitrary_effects
+      | Heap | Local _ -> Effects.Only_generative_effects mut
+    in
+    effects, coeffects, Placement.Strict
 
 let variadic_classify_for_printing p =
   match p with

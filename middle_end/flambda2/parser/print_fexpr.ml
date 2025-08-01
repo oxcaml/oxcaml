@@ -338,6 +338,7 @@ let alloc_mode_for_allocations_opt ppf (alloc : alloc_mode_for_allocations)
   match alloc with
   | Heap -> ()
   | Local { region = r } -> pp_spaced ~space ppf "&%a" region r
+  | External -> pp_spaced ~space ppf "external_"
 
 let alloc_mode_for_applications_opt ppf (alloc : alloc_mode_for_applications)
     ~space =

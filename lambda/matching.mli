@@ -36,7 +36,7 @@ val for_let:
         lambda
 val for_multiple_match:
         scopes:scopes -> return_layout:layout -> Location.t ->
-        (lambda * Jkind.Sort.Const.t * layout) list -> locality_mode ->
+        (lambda * Jkind.Sort.Const.t * layout) list -> allocation_mode ->
         (pattern * lambda) list -> partial ->
         lambda
 

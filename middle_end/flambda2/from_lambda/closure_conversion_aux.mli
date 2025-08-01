@@ -75,7 +75,7 @@ module IR : sig
       region_close : Lambda.region_close;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
-      mode : Lambda.locality_mode;
+      mode : Lambda.allocation_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
       args_arity : [`Complex] Flambda_arity.t;
@@ -342,7 +342,7 @@ module Function_decls : sig
       { name : Ident.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
-        mode : Lambda.locality_mode
+        mode : Lambda.allocation_mode
       }
 
     val create :
@@ -363,9 +363,9 @@ module Function_decls : sig
       loc:Lambda.scoped_location ->
       free_idents_of_body:Ident.Set.t ->
       Recursive.t ->
-      closure_alloc_mode:Lambda.locality_mode ->
+      closure_alloc_mode:Lambda.allocation_mode ->
       first_complex_local_param:int ->
-      result_mode:Lambda.locality_mode ->
+      result_mode:Lambda.allocation_mode ->
       t
 
     val let_rec_ident : t -> Ident.t
@@ -412,11 +412,11 @@ module Function_decls : sig
 
     val recursive : t -> Recursive.t
 
-    val closure_alloc_mode : t -> Lambda.locality_mode
+    val closure_alloc_mode : t -> Lambda.allocation_mode
 
     val first_complex_local_param : t -> int
 
-    val result_mode : t -> Lambda.locality_mode
+    val result_mode : t -> Lambda.allocation_mode
 
     (* Like [all_free_idents], but for just one function. *)
     val free_idents : t -> Ident.Set.t
@@ -424,9 +424,9 @@ module Function_decls : sig
 
   type t
 
-  val create : Function_decl.t list -> Lambda.locality_mode -> t
+  val create : Function_decl.t list -> Lambda.allocation_mode -> t
 
-  val alloc_mode : t -> Lambda.locality_mode
+  val alloc_mode : t -> Lambda.allocation_mode
 
   val to_list : t -> Function_decl.t list
 

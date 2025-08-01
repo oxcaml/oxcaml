@@ -121,6 +121,18 @@ let extract_constant = function
     Lconst sc -> sc
   | _ -> raise Not_constant
 
+(** Extract a constant if the enclosing block's allocation mode allows
+    the block to be turned into a structured constant *)
+let extract_constant_if_internal alloc_mode lam =
+  match alloc_mode with
+  | External -> raise Not_constant
+  | Internal _ -> extract_constant lam
+
+let extract_constant_if_internal_opt alloc_mode_opt lam =
+  match alloc_mode_opt with
+  | None -> extract_constant lam
+  | Some alloc_mode -> extract_constant_if_internal alloc_mode lam
+
 let extract_float = function
     Const_base(Const_float f) -> f
   | _ -> fatal_error "Translcore.extract_float"
@@ -154,7 +166,9 @@ let maybe_region_layout layout lam =
 let maybe_region_exp sort exp lam =
   maybe_region (fun () -> layout_exp sort exp) lam
 
-let is_alloc_heap = function Alloc_heap -> true | Alloc_local -> false
+let is_alloc_heap = function
+  | Alloc_heap -> true
+  | Alloc_local | Alloc_external -> false
 
 (* In cases where we're careful to preserve syntactic arity, we disable
    the arity fusion attempted by simplif.ml *)
@@ -165,8 +179,8 @@ let function_attribute_disallowing_arity_fusion =
   the corresponding [curried_function_kind]. *)
 let curried_function_kind
     : (function_curry * Mode.Alloc.l) list
-      -> return_mode:locality_mode
-      -> mode:locality_mode
+      -> return_mode:allocation_mode
+      -> mode:allocation_mode
       -> curried_function_kind
   =
   let rec loop params ~return_mode ~mode ~running_count
@@ -187,13 +201,13 @@ let curried_function_kind
     | (Final_arg, _) :: _ -> Misc.fatal_error "Found [Final_arg] too early"
     | (More_args { partial_mode }, _) :: params ->
         match transl_alloc_mode_l partial_mode with
-        | Alloc_heap when not found_local_already ->
+        | (Alloc_heap | Alloc_external) when not found_local_already ->
             loop params ~return_mode ~mode
               ~running_count:0 ~found_local_already
         | Alloc_local ->
             loop params ~return_mode ~mode
               ~running_count:(running_count + 1) ~found_local_already:true
-        | Alloc_heap ->
+        | Alloc_heap | Alloc_external ->
             Misc.fatal_error
               "A function argument with a Global partial_mode unexpectedly \
               found following a function argument with a Local partial_mode"
@@ -245,7 +259,7 @@ type fusable_function =
   { params : function_param list
   ; body : function_body
   ; return_sort : Jkind.Sort.Const.t
-  ; return_mode : locality_mode
+  ; return_mode : allocation_mode
   ; region : bool
   }
 
@@ -273,6 +287,8 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
     ->
       begin match transl_alloc_mode method_.alloc_mode with
       | Alloc_heap -> ()
+      | Alloc_external ->
+          Misc.fatal_error "Externally-allocated methods are not supported."
       | Alloc_local ->
           (* If we support locally-allocated objects, we'll also have to
              pass the new mode back to the caller.
@@ -328,7 +344,7 @@ let can_apply_primitive p pmode pos args =
     else if pos <> Typedtree.Tail then true
     else begin
       let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
-      is_heap_mode (transl_locality_mode_l return_mode)
+      is_heap_mode (transl_allocation_mode_l return_mode)
     end
   end
 
@@ -451,7 +467,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let inlined = Translattribute.get_inlined_attribute funct in
         let specialised = Translattribute.get_specialised_attribute funct in
         let position = transl_apply_position pos in
-        let mode = transl_locality_mode_l ap_mode in
+        let mode = transl_allocation_mode_l ap_mode in
         let result_layout = layout_exp sort e in
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
@@ -466,7 +482,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let specialised = Translattribute.get_specialised_attribute funct in
       let result_layout = layout_exp sort e in
       let position = transl_apply_position position in
-      let mode = transl_locality_mode_l ap_mode in
+      let mode = transl_allocation_mode_l ap_mode in
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
@@ -493,7 +509,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
       begin try
-        Lconst(Const_block(0, List.map extract_constant ll))
+        Lconst(Const_block(0, List.map
+                                (extract_constant_if_internal alloc_mode) ll))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable, Some shape,
                          transl_alloc_mode alloc_mode),
@@ -533,7 +550,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
           let constant =
-            match List.map extract_constant ll with
+            match List.map (extract_constant_if_internal_opt alloc_mode) ll with
             | exception Not_constant -> None
             | constants -> (
               match cstr.cstr_shape with
@@ -627,8 +644,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
-            Lconst(Const_block(0, [const_int tag;
-                                   extract_constant lam]))
+            Lconst(Const_block(0,[const_int tag;
+                                  extract_constant_if_internal alloc_mode lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
@@ -637,7 +654,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
       transl_record ~scopes e.exp_loc e.exp_env
-        (Option.map transl_alloc_mode alloc_mode)
+        alloc_mode
         fields representation extended_expression
   | Texp_record_unboxed_product
         {fields; representation; extended_expression } ->
@@ -806,7 +823,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         end;
         (* Pduparray only works in Alloc_heap mode *)
         if is_local_mode mode then raise Not_constant;
-        begin match List.map extract_constant ll with
+        begin match List.map (extract_constant_if_internal alloc_mode) ll with
         | exception Not_constant
           when kind = Pfloatarray && Types.is_mutable amut ->
             (* We cannot currently lift mutable [Pintarray] arrays safely in
@@ -1281,11 +1298,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
-  (* CR jcutler: Currently, [malloc_] has no semantic meaning. We simply just
-     translate it to a regular heap allocation. This will obviously need to be
-     changed when we actually want malloc_ to malloc.
-   *)
-  | Texp_alloc (e,_) -> transl_exp ~scopes sort e
 
 and pure_module m =
   match m.mod_desc with
@@ -1461,9 +1473,10 @@ and transl_apply ~scopes
               result_layout l
           in
           let nlocal =
-            match join_locality_mode mode (join_locality_mode arg_mode ret_mode) with
+            match join_allocation_mode mode
+                  (join_allocation_mode arg_mode ret_mode) with
             | Alloc_local -> 1
-            | Alloc_heap -> 0
+            | Alloc_heap | Alloc_external -> 0
           in
           let layout_arg = layout_of_sort (to_location loc) sort_arg in
           let params = [{
@@ -1768,7 +1781,7 @@ and transl_curried_function ~scopes loc repr params body
       type acc =
         { body : lambda; (* The function body of those params *)
           return_layout : layout; (* The layout of [body] *)
-          return_mode : locality_mode; (* The mode of [body]. *)
+          return_mode : allocation_mode; (* The mode of [body]. *)
           region : bool; (* Whether the function has its own region *)
           nlocal : int;
           (* An upper bound on the [nlocal] field for the function. If [nlocal]
@@ -1992,7 +2005,8 @@ and transl_setinstvar ~scopes loc self var expr =
     [self; var; transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr], loc)
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
-and transl_record ~scopes loc env mode fields repres opt_init_expr =
+and transl_record ~scopes loc env alloc_mode fields repres opt_init_expr =
+  let mode = Option.map transl_alloc_mode alloc_mode in
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
   let size = Array.length fields in
@@ -2150,7 +2164,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     let lam =
       try
         if mut = Mutable then raise Not_constant;
-        let cl = List.map extract_constant ll in
+        let cl = List.map (extract_constant_if_internal_opt alloc_mode) ll in
         match repres with
         | Record_boxed _ -> Lconst(Const_block(0, cl))
         | Record_inlined (Ordinary {runtime_tag},

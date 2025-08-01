@@ -386,6 +386,7 @@ let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
   | Local { region = r } ->
     let r = find_region env r in
     Alloc_mode.For_allocations.local ~region:r
+  | External -> Alloc_mode.For_allocations.external_
 
 let alloc_mode_for_applications env (alloc : Fexpr.alloc_mode_for_applications)
     =

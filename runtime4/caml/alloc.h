@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+CAMLextern intnat caml_alloc_malloc (mlsize_t wosize, tag_t);
+CAMLextern intnat caml_alloc_mixed_malloc (mlsize_t wosize, tag_t,
+                                           mlsize_t scannable_prefix);
+
 /* It is guaranteed that these allocation functions will not trigger
    any OCaml callback such as finalizers or signal handlers. */
 

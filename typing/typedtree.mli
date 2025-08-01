@@ -103,10 +103,11 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 val print_unique_use : Format.formatter -> unique_use -> unit
 
-type alloc_mode = {
+type alloc_mode = Internal of {
   mode : Mode.Alloc.r;
   locality_context : Env.locality_context option;
 }
+| External
 
 type allocator =
   | Allocator_heap
@@ -292,6 +293,8 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
+  | Texp_alloc
+        (** malloc_ E *)
   | Texp_mode of Mode.Alloc.Const.Option.t
         (** E : _ @@ M  *)
 
@@ -523,8 +526,6 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
-  (* CR external-mode: at the moment, this is only ever Allocator_malloc. *)
-  | Texp_alloc of expression * allocator (** malloc_ exp *)
 
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }

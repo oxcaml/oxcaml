@@ -128,6 +128,8 @@ val immutable_block :
   fields:Type_grammar.t list ->
   Type_grammar.t
 
+val immutable_external_block : Type_grammar.t
+
 val immutable_block_with_size_at_least :
   tag:Tag.t Or_unknown.t ->
   n:Targetint_31_63.t ->

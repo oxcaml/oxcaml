@@ -14,13 +14,14 @@
 
 open Mode
 
-val transl_locality_mode_l : (allowed * 'r) Locality.t -> Lambda.locality_mode
+val transl_allocation_mode_l :
+  (allowed * 'r) Locality.t -> Lambda.allocation_mode
 
-val transl_alloc_mode_l : (allowed * 'r) Alloc.t -> Lambda.locality_mode
+val transl_alloc_mode_l : (allowed * 'r) Alloc.t -> Lambda.allocation_mode
 
-val transl_alloc_mode_r : ('l * allowed) Alloc.t -> Lambda.locality_mode
+val transl_alloc_mode_r : ('l * allowed) Alloc.t -> Lambda.allocation_mode
 
-val transl_alloc_mode : Typedtree.alloc_mode -> Lambda.locality_mode
+val transl_alloc_mode : Typedtree.alloc_mode -> Lambda.allocation_mode
 
 val transl_modify_mode : (allowed * 'r) Locality.t -> Lambda.modify_mode
 
