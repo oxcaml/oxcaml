@@ -26,6 +26,15 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* Note on updating the engine *)
+(* This module was initially merged with support for a subset of the Cmm
+   peephole optimisations performed in Cmm_helpers. It was meant to be extended
+   incrementally, and the individual commits adding support for the various
+   operations were meant to serve as reference for further extensions. These
+   individual commits have disappeared from the main history, but they have been
+   preserved in the cmm-peephole-engine branch of the main repo, accessible at
+   https://github.com/oxcaml/oxcaml/tree/cmm-peephole-engine. *)
+
 (* Variable kinds *)
 
 type _ pattern_kind =
