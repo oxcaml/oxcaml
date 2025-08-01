@@ -7255,6 +7255,10 @@ and type_expect_
     | Error () -> raise (Error (loc, env, Eval_quote_format))
     | Ok typ ->
       let typ = Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
+      let sort = match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
+      | Ok sort -> sort
+      | Error err -> raise (Error (loc, env, Function_type_not_rep (typ.ctyp_type, err)))
+      in
       let eval_type = newty
         (Tarrow
           ((Nolabel, Alloc.legacy, Alloc.legacy)
@@ -7267,7 +7271,7 @@ and type_expect_
           , commu_ok))
       in
       rue {
-        exp_desc = Texp_eval_quotation typ;
+        exp_desc = Texp_eval_quotation (typ, sort);
         exp_loc = loc; exp_extra = [];
         exp_type = eval_type;
         exp_attributes = sexp.pexp_attributes;

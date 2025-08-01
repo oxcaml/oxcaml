@@ -320,7 +320,7 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-  | Texp_eval_quotation of core_type
+  | Texp_eval_quotation of core_type * Jkind.sort
 
 and ident_kind =
   | Id_value

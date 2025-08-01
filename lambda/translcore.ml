@@ -1335,7 +1335,56 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   (* TODO: update scopes *)
   | Texp_antiquotation _ ->
       failwith "Cannot unqoute outside of a quotation context."
-  | Texp_eval_quotation _ -> failwith "[%eval] is unimplemented"
+  | Texp_eval_quotation (_, sort) ->
+      let loc = of_location ~scopes e.exp_loc in
+      let quote_ident = Ident.create_local "quote" in
+      let ret_sort = Jkind.Sort.default_for_transl_and_get sort in
+      let result_layout = layout_of_sort e.exp_loc ret_sort in
+      let body = Lprim (
+        Praise Raise_notrace, [
+          Lprim (Pmakeblock(0, Immutable, None, alloc_heap), [
+            Lprim (Pfield (5, Pointer, Reads_agree), [
+              Lprim (Pgetglobal (Compilation_unit.of_string "Stdlib"), [], loc)
+            ], loc);
+            Lapply {
+              ap_func = Lprim (Pfield (2, Pointer, Reads_agree), [
+                Lprim (Pgetglobal (Compilation_unit.of_string "Stdlib__Quote"), [], loc);
+              ], loc);
+              ap_args = [Lvar quote_ident];
+              ap_result_layout = layout_string;
+              ap_region_close = Rc_nontail;
+              ap_mode = alloc_heap;
+              ap_loc = loc;
+              ap_tailcall = Default_tailcall;
+              ap_inlined = Default_inlined;
+              ap_specialised = Default_specialise;
+              ap_probe = None;
+            }
+          ], loc)
+        ], loc)
+      in
+      lfunction
+        ~kind:(Curried {nlocal=0})
+        ~params:[
+          { name = quote_ident;
+            debug_uid = debug_uid_none;
+            layout = layout_block;
+            attributes = default_param_attribute;
+            mode = alloc_local;
+          };
+          { name = Ident.create_local "unit";
+            debug_uid = debug_uid_none;
+            layout = layout_unit;
+            attributes = default_param_attribute;
+            mode = alloc_heap;
+          };
+        ]
+        ~return:result_layout
+        ~body
+        ~loc
+        ~attr:default_function_attribute
+        ~mode:alloc_heap
+        ~ret_mode:alloc_heap
 
 and pure_module m =
   match m.mod_desc with
