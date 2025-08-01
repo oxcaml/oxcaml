@@ -108,7 +108,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
-  let make_mutables n =
+  let make_mutables ~res n =
     let extra_args_boxed = List.init n (fun _ -> Jsir.Var.fresh ()) in
     let res =
       List.fold_left
@@ -152,7 +152,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                    continuation, we will make sure that these are assigned to
                    the right values. *)
                 let extra_args_boxed, res =
-                  make_mutables (List.length extra_args)
+                  make_mutables ~res (List.length extra_args)
                 in
                 let res, addr = To_jsir_result.new_block res ~params:[] in
                 let res =
