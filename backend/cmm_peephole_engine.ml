@@ -273,8 +273,10 @@ module Cmm_comparator = struct
     match x, y with
     | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
     | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
-    | Cconst_float32 (f1, _), Cconst_float32 (f2, _) -> Float.equal f1 f2
-    | Cconst_float (f1, _), Cconst_float (f2, _) -> Float.equal f1 f2
+    | Cconst_float32 (f1, _), Cconst_float32 (f2, _) ->
+      Int64.(equal (bits_of_float f1) (bits_of_float f2))
+    | Cconst_float (f1, _), Cconst_float (f2, _) ->
+      Int64.(equal (bits_of_float f1) (bits_of_float f2))
     | Cconst_vec128 (v1, _), Cconst_vec128 (v2, _) -> equal_vec128_bits v1 v2
     | Cconst_vec256 (v1, _), Cconst_vec256 (v2, _) -> equal_vec256_bits v1 v2
     | Cconst_vec512 (v1, _), Cconst_vec512 (v2, _) -> equal_vec512_bits v1 v2
