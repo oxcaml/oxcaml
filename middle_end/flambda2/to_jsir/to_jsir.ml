@@ -108,7 +108,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
-  let make_mutables n =
+  let make_mutables ~res n =
     let extra_args_boxed = List.init n (fun _ -> Jsir.Var.fresh ()) in
     let res =
       List.fold_left
@@ -123,6 +123,15 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
     in
     extra_args_boxed, res
   in
+  (* A note on evaluation order: let_cont k = [cont_body] in [body] should be
+     more interpreted like [body] where k = [cont_body], and control flow flows
+     from [body] to [cont_body]. While variables aren't captured in
+     continuations and must be passed explicitly, symbols defined in [body] are
+     scoped in [cont_body].
+
+     Hence, we translate [body] before [cont_body], but make sure that the name
+     [k] exists in the environment before translating [body] so that we can use
+     it. *)
   match e with
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
@@ -131,12 +140,19 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
         Continuation_handler.pattern_match handler
           ~f:(fun params ~handler:cont_body ->
             let params, env = To_jsir_shared.bound_parameters ~env params in
+            let res, addr = To_jsir_result.reserve_address res in
             let env, res =
               match Continuation_handler.is_exn_handler handler with
               | false ->
-                let res, addr = To_jsir_result.new_block res ~params in
-                let _env, res = expr ~env ~res cont_body in
                 let env = To_jsir_env.add_continuation env k addr in
+                (* CR selee: we keep the environment because we need the symbols
+                   defined there, but really there should be a way to flush
+                   variables out of the environment to check flambda scoping
+                   invariants *)
+                let env, res = expr ~env ~res body in
+                let res =
+                  To_jsir_result.new_block_with_addr_exn res ~params ~addr
+                in
                 env, res
               | true ->
                 let exn_param, extra_args =
@@ -152,9 +168,16 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                    continuation, we will make sure that these are assigned to
                    the right values. *)
                 let extra_args_boxed, res =
-                  make_mutables (List.length extra_args)
+                  make_mutables ~res (List.length extra_args)
                 in
-                let res, addr = To_jsir_result.new_block res ~params:[] in
+                let env =
+                  To_jsir_env.add_exn_handler env k ~addr ~exn_param
+                    ~extra_args:extra_args_boxed
+                in
+                let env, res = expr ~env ~res body in
+                let res =
+                  To_jsir_result.new_block_with_addr_exn res ~params:[] ~addr
+                in
                 let res =
                   List.fold_left2
                     (fun res boxed actual ->
@@ -162,14 +185,9 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                         (Let (actual, Field (boxed, 0, Non_float))))
                     res extra_args_boxed extra_args
                 in
-                let _env, res = expr ~env ~res cont_body in
-                let env =
-                  To_jsir_env.add_exn_handler env k ~addr ~exn_param
-                    ~extra_args:extra_args_boxed
-                in
                 env, res
             in
-            expr ~env ~res body))
+            expr ~env ~res cont_body))
   | Recursive handlers ->
     Recursive_let_cont_handlers.pattern_match handlers
       ~f:(fun ~invariant_params ~body conts ->
@@ -191,6 +209,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
               env, res)
             (env, res) domain
         in
+        let env, res = expr ~env ~res body in
         let res =
           Continuation.Lmap.fold
             (fun k handler res ->
@@ -209,7 +228,7 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
             (Flambda.Continuation_handlers.to_map conts)
             res
         in
-        expr ~env ~res body)
+        env, res)
 
 and apply_expr ~env ~res e =
   (* Pass in any extra arguments for the exception continuation in mutable
