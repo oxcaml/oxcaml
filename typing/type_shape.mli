@@ -15,7 +15,8 @@ end
 
 type shape_with_layout =
   { type_shape : Shape.without_layout Shape.ts;
-    type_layout : Layout.t
+    type_layout : Layout.t;
+    type_name : string
   }
 (* CR sspies: There are two options here: We can fold the layout into the shape,
     or we can keep it on the outside. Currently, we keep it on the outside to
@@ -49,6 +50,7 @@ val add_to_type_shapes :
   Uid.t ->
   Types.type_expr ->
   Jkind_types.Sort.Const.t ->
+  name:string ->
   (Path.t -> Uid.t option) ->
   unit
 
@@ -66,8 +68,6 @@ val estimate_layout_from_type_shape :
   Shape.without_layout Shape.ts -> Layout.t option
 
 val estimate_layout_from_type_decl_shape : Shape.tds -> Layout.t option
-
-val type_name : _ Shape.ts -> string
 
 val print_table_all_type_decls : Format.formatter -> unit
 
