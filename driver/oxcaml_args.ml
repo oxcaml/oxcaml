@@ -26,10 +26,10 @@ let mk_no_mach_ir f =
   "-no-mach-ir", Arg.Unit f, " Avoid using the Mach IR (kept temporarily only for backward compatibility, has no effects)"
 
 let mk_ocamlcfg f =
-  "-ocamlcfg", Arg.Unit f, " Use ocamlcfg"
+  "-ocamlcfg", Arg.Unit f, " Use ocamlcfg (deprecated, does nothing)"
 
 let mk_no_ocamlcfg f =
-  "-no-ocamlcfg", Arg.Unit f, " Do not use ocamlcfg"
+  "-no-ocamlcfg", Arg.Unit f, " Do not use ocamlcfg (deprecated, does nothing)"
 ;;
 
 let mk_dcfg f =
@@ -302,12 +302,12 @@ let mk_no_flambda2_result_types f =
 
 let mk_flambda2_basic_meet f =
   "-flambda2-basic-meet", Arg.Unit f,
-  Printf.sprintf " Use a basic meet algorithm (deprecated) (Flambda 2 only)"
+  Printf.sprintf " Use a basic meet algorithm (deprecated, does nothing) (Flambda 2 only)"
 ;;
 
 let mk_flambda2_advanced_meet f =
   "-flambda2-advanced-meet", Arg.Unit f,
-  Printf.sprintf " Use an advanced meet algorithm (deprecated) (Flambda 2 only)"
+  Printf.sprintf " Use an advanced meet algorithm (deprecated, does nothing) (Flambda 2 only)"
 ;;
 
 let mk_flambda2_join_algorithm f =
@@ -1091,8 +1091,8 @@ module Oxcaml_options_impl = struct
   let set' r () = r := true
   let clear' r () = r := false
 
-  let ocamlcfg = set' Oxcaml_flags.use_ocamlcfg
-  let no_ocamlcfg = clear' Oxcaml_flags.use_ocamlcfg
+  let ocamlcfg () = ()
+  let no_ocamlcfg () = ()
   let dcfg = set' Oxcaml_flags.dump_cfg
   let dcfg_invariants = set' Oxcaml_flags.cfg_invariants
   let regalloc x = Oxcaml_flags.regalloc := x
@@ -1464,7 +1464,7 @@ module Extra_params = struct
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
     | "no-mach-ir" -> Oxcaml_options_impl.no_mach_ir (); true
-    | "ocamlcfg" -> set' Oxcaml_flags.use_ocamlcfg
+    | "ocamlcfg" -> let dummy = ref false in set' dummy
     | "cfg-invariants" -> set' Oxcaml_flags.cfg_invariants
     | "regalloc" -> set_string Oxcaml_flags.regalloc
     | "regalloc-linscan-threshold" -> set_int' Oxcaml_flags.regalloc_linscan_threshold

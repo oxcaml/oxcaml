@@ -16,7 +16,6 @@
 
 (** OxCaml specific command line flags *)
 
-val use_ocamlcfg : bool ref
 val dump_cfg : bool ref
 val cfg_invariants : bool ref
 val regalloc : string ref
