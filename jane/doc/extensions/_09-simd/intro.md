@@ -95,8 +95,8 @@ Like floats, both boxed and unboxed SIMD vectors may be passed to C stubs. The
 OxCaml runtime provides several helper functions for working with SIMD vectors.
 
 ```ocaml
-external simd_stub : (int8x16[@unboxed]) -> (int8x16[@unboxed]) =
-  "boxed_integer_simd_stub" "unboxed_integer_simd_stub"
+external vec128_stub : (int8x16[@unboxed]) -> (int8x16[@unboxed]) =
+  "unboxed_vec128_stub" "boxed_vec128_stub"
 
 external vec256_stub : (int8x32[@unboxed]) -> (int8x32[@unboxed]) =
   "unboxed_vec256_stub" "boxed_vec256_stub"
