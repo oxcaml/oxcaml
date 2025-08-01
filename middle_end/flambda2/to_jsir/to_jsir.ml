@@ -108,6 +108,21 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
   expr ~env ~res body
 
 and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
+  let make_mutables n =
+    let extra_args_boxed = List.init n (fun _ -> Jsir.Var.fresh ()) in
+    let res =
+      List.fold_left
+        (fun res var ->
+          let null = Jsir.Var.fresh () in
+          let res =
+            To_jsir_result.add_instr_exn res (Let (null, Constant Null))
+          in
+          To_jsir_result.add_instr_exn res
+            (Let (var, Block (0, Array.of_list [null], NotArray, Maybe_mutable))))
+        res extra_args_boxed
+    in
+    extra_args_boxed, res
+  in
   match e with
   | Non_recursive
       { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
@@ -130,31 +145,14 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
                     Misc.fatal_errorf
                       "No parameters given for exception continuation %a"
                       Continuation.print k
-                  | hd :: tl ->
-                    (* We wrap the [extra_args] into mutable variables, and use
-                       these where the extra_args are used. Later when calling
-                       this continuation, we will make sure that these are
-                       assigned to the right values. *)
-                    hd, tl
+                  | hd :: tl -> hd, tl
                 in
-                let extra_args_boxed =
-                  List.map (fun _ -> Jsir.Var.fresh ()) extra_args
-                in
-                let res =
-                  List.fold_left
-                    (fun res var ->
-                      let null = Jsir.Var.fresh () in
-                      let res =
-                        To_jsir_result.add_instr_exn res
-                          (Let (null, Constant Null))
-                      in
-                      To_jsir_result.add_instr_exn res
-                        (Let
-                           ( var,
-                             Block
-                               (0, Array.of_list [null], NotArray, Maybe_mutable)
-                           )))
-                    res extra_args_boxed
+                (* We wrap the [extra_args] into mutable variables, and use
+                   these where the extra_args are used. Later when calling this
+                   continuation, we will make sure that these are assigned to
+                   the right values. *)
+                let extra_args_boxed, res =
+                  make_mutables (List.length extra_args)
                 in
                 let res, addr = To_jsir_result.new_block res ~params:[] in
                 let res =
@@ -216,20 +214,16 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
 and apply_expr ~env ~res e =
   (* Pass in any extra arguments for the exception continuation in mutable
      variables. A slightly sad hack, but necessary since [Raise] only has one
-     parameter. All exception continuations are non-recursive, so this should be
-     sound. *)
+     parameter. *)
   let exn_continuation = Apply_expr.exn_continuation e in
   let extra_args = Exn_continuation.extra_args exn_continuation in
   let extra_param_vars =
-    if List.length extra_args = 0
+    if Continuation.equal
+         (To_jsir_env.exn_continuation env)
+         (Exn_continuation.exn_handler exn_continuation)
     then
-      (* This case is necessary because some exception continuations might not
-         have been declared via [Let_cont] (instead being toplevel exception
-         continuations), and therefore does not have an entry in the
-         environment.
-
-         CR selee: actually just explicitly check for the toplevel
-         continuation *)
+      (* This was passed in through a parameter, so has not been declared via a
+         [Let_cont]. *)
       []
     else
       let _addr, _var, extra_params_vars =
