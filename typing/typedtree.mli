@@ -103,10 +103,7 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 val print_unique_use : Format.formatter -> unique_use -> unit
 
-type alloc_mode = {
-  mode : Mode.Alloc.r;
-  locality_context : Env.locality_context option;
-}
+type alloc_mode = Mode.Alloc.r
 
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use

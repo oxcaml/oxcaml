@@ -4811,7 +4811,7 @@ let report_error ~loc _env = function
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
         d
-  | Submode_failed (Error (ax, {left; right})) ->
+  | Submode_failed (Error (ax, {left; right; _})) ->
       Location.errorf ~loc
         "This is %a, but expected to be %a."
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left

@@ -112,10 +112,7 @@ let print_unique_use ppf (u,l) =
     (Mode.Uniqueness.print ()) u
     (Mode.Linearity.print ()) l
 
-type alloc_mode = {
-  mode : Mode.Alloc.r;
-  locality_context : Env.locality_context option;
-}
+type alloc_mode = Mode.Alloc.r
 
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
