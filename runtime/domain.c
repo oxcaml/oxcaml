@@ -1799,6 +1799,19 @@ void caml_interrupt_all_signal_safe(void)
   }
 }
 
+void caml_external_interrupt_all_signal_safe(uintnat flags)
+{
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains];
+       d++) {
+    atomic_uintnat * interrupt_word =
+      atomic_load_acquire(&d->interruptor.interrupt_word);
+    if (interrupt_word == NULL) return;
+    atomic_fetch_or(&d->state->requested_external_interrupt, flags);
+    interrupt_domain(&d->interruptor);
+  }
+}
+
 /* To avoid any risk of forgetting an action through a race,
    [caml_reset_young_limit] is the only way (apart from setting
    young_limit to -1 for immediate interruption) through which
