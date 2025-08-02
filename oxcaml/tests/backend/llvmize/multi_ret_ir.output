@@ -80,6 +80,9 @@ L107:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlMulti_ret__gc_roots = global { i64, i64 } { i64 0, i64 2816 }
 @camlMulti_ret = global { ptr, ptr, i64 } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_1, i64 4087 }
 @camlMulti_ret__permute_1 = global { ptr, i64, ptr, i64 } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP, i64 768 }

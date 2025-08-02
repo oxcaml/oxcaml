@@ -305,6 +305,9 @@ L140:                                                ; preds = %L1
 }
 
 declare  double @llvm.fabs.f64(double)
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlFloat_ops__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlFloat_ops = global { ptr, i64 } { ptr @camlFloat_ops__Pmakeblock253, i64 7936 }
 @camlFloat_ops__Pmakeblock253 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64 } { ptr @camlFloat_ops__add_7, ptr @camlFloat_ops__sub_8, ptr @camlFloat_ops__mul_9, ptr @camlFloat_ops__div_10, ptr @camlFloat_ops__neg_11, ptr @camlFloat_ops__abs_12, ptr @camlFloat_ops__compare_13, i64 4087 }

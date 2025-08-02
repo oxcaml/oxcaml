@@ -1352,6 +1352,9 @@ L308:                                                ; preds = %L1
 }
 
 declare  void @llvm.trap()
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlInt_ops__gc_roots = global { i64, i64 } { i64 0, i64 25344 }
 @camlInt_ops = global { i64, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64 } { i64 9, ptr @camlInt_ops__add_23, ptr @camlInt_ops__sub_24, ptr @camlInt_ops__mul_25, ptr @camlInt_ops__div_26, ptr @camlInt_ops__mod__27, ptr @camlInt_ops__land__28, ptr @camlInt_ops__lor__29, ptr @camlInt_ops__lxor__30, ptr @camlInt_ops__lnot__31, ptr @camlInt_ops__lsl__32, ptr @camlInt_ops__lsr__33, ptr @camlInt_ops__asr__34, ptr @camlInt_ops__add_imm_35, ptr @camlInt_ops__sub_imm_36, ptr @camlInt_ops__mul_imm_37, ptr @camlInt_ops__div_imm_38, ptr @camlInt_ops__mod_imm_39, ptr @camlInt_ops__land_imm_40, ptr @camlInt_ops__lor_imm_41, ptr @camlInt_ops__lxor_imm_42, ptr @camlInt_ops__lsl_imm_43, ptr @camlInt_ops__lsr_imm_44, ptr @camlInt_ops__asr_imm_45, i64 3063 }
 @camlInt_ops__asr_imm_45 = global { ptr, i64, i64 } { ptr @camlInt_ops__asr_imm_HIDE_STAMP, i64 108086391056891909, i64 3063 }

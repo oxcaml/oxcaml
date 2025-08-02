@@ -31,6 +31,9 @@ L104:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlConst_val__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlConst_val = global { i64 } { i64 75 }
 
