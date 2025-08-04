@@ -123,13 +123,13 @@ and let_cont ~env ~res (e : Flambda.Let_cont_expr.t) =
     in
     extra_args_boxed, res
   in
-  (* A note on evaluation order: let_cont k = [cont_body] in [body] should be
-     more interpreted like [body] where k = [cont_body], and control flow flows
-     from [body] to [cont_body]. While variables aren't captured in
-     continuations and must be passed explicitly, symbols defined in [body] are
-     scoped in [cont_body].
+  (* A note on evaluation order: let_cont k = [handler] in [body] should be more
+     interpreted like [body] where k = [handler], and control flow flows from
+     [body] to [handler]. While variables aren't captured in continuations and
+     must be passed explicitly, symbols defined in [body] are scoped in
+     [handler].
 
-     Hence, we translate [body] before [cont_body], but make sure that the name
+     Hence, we translate [body] before [handler], but make sure that the name
      [k] exists in the environment before translating [body] so that we can use
      it. *)
   match e with
