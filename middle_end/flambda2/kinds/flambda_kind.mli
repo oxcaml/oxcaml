@@ -136,8 +136,6 @@ module Scannable_block_shape : sig
   val print : Format.formatter -> t -> unit
 
   val element_kind : t -> int -> kind
-
-  (*_ val of_module_representation : Lambda.module_representation -> t *)
 end
 
 module Block_shape : sig

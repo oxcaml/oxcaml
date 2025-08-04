@@ -569,8 +569,11 @@ and value_binding =
 and module_coercion =
     Tcoerce_none
   | Tcoerce_structure of
-      (int * Types.mixed_block_element * module_coercion) list *
-      (Ident.t * int * module_coercion) list
+      { input_repr : Types.module_representation
+      ; output_repr : Types.module_representation
+      ; pos_cc_list : (int * module_coercion) list
+      ; id_pos_list : (Ident.t * int * module_coercion) list
+      }
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
@@ -682,10 +685,8 @@ and open_declaration = module_expr open_infos
 
 and include_kind =
   | Tincl_structure
-  | Tincl_functor of
-    (Ident.t * Types.mixed_block_element * module_coercion) list
-  | Tincl_gen_functor of
-    (Ident.t * Types.mixed_block_element * module_coercion) list
+  | Tincl_functor of (Ident.t * module_coercion) list
+  | Tincl_gen_functor of (Ident.t * module_coercion) list
 
 and 'a include_infos =
     {

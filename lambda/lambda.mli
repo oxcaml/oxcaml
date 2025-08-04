@@ -630,10 +630,6 @@ val layout_of_extern_repr : extern_repr -> layout
 val layout_of_const_sort : Jkind.Sort.Const.t -> layout
 val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 
-(* CR jrayman: Move this *)
-val mixed_block_element_of_const_sort :
-  Jkind.Sort.Const.t -> Types.mixed_block_element
-
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list
@@ -963,9 +959,8 @@ type runtime_param =
   | Rp_unit                               (* The unit value (only used when
                                              there are no other parameters) *)
 
-(* The structure of a module block. This is distinct from
-   [Types.record_representation] since, e.g., modules don't support the float
-   block optimization. *)
+(* Like [Types.mixed_block_shape], but the shape in [Module_mixed] has
+   been translated *)
 type module_representation =
   | Module_value_only of int
   (* All module fields are boxed. The [int] is the number of fields *)
@@ -1162,6 +1157,12 @@ val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> locality_mode)
   -> Types.mixed_product_shape
   -> mixed_block_shape_with_locality_mode
+
+val transl_module_representation :
+  Types.module_representation -> module_representation
+
+val block_of_module_representation :
+  module_representation -> primitive
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 

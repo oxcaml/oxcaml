@@ -1442,8 +1442,6 @@ let rec patch_guarded patch = function
 let rec transl_mixed_product_element_for_read
   (elt : Types.mixed_block_element) =
   match elt with
-  | Void -> fatal_error "Lambda.transl_mixed_product_element_for_read: \
-    tried to convert Void to mixed_block_element"
   | Value -> Value generic_value
     (* CR jrayman: [alloc_heap] is probably not always correct *)
   | Float_boxed -> Float_boxed alloc_heap
@@ -1459,26 +1457,7 @@ let rec transl_mixed_product_element_for_read
   | Word -> Word
   | Product shapes ->
     Product (Array.map transl_mixed_product_element_for_read shapes)
-
-let rec mixed_block_element_of_const_sort :
-  Jkind.Sort.Const.t -> Types.mixed_block_element =
-  function
-  | Base Void -> fatal_error "Lambda.mixed_block_element_of_const_sort: \
-    tried to convert Base Void to mixed_block_element"
-  | Base Value -> Value
-  | Base Bits8 -> Bits8
-  | Base Bits16 -> Bits16
-  | Base Bits32 -> Bits32
-  | Base Bits64 -> Bits64
-  | Base Float32 -> Float32
-  | Base Float64 -> Float64
-  | Base Vec128 -> Vec128
-  | Base Vec256 -> Vec256
-  | Base Vec512 -> Vec512
-  | Base Word -> Word
-  | Product sorts ->
-    Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
-
+  | Void -> Product [||]
 
 let rec transl_address loc = function
   | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
@@ -1488,14 +1467,14 @@ let rec transl_address loc = function
       else Lvar id
   | Env.Adot(addr, field_layouts, pos) ->
       let layout_to_mixed_block layout =
-        match
-          Jkind.Layout.to_sort layout
-        with
+        match Jkind.Layout.to_sort layout with
         | Some sort ->
           sort |> Jkind.Sort.default_for_transl_and_get
-               |> mixed_block_element_of_const_sort
+               |> Types.mixed_block_element_of_const_sort
                |> transl_mixed_product_element_for_read
-        | None -> fatal_error "CR jrayman: write error"
+        | None ->
+          fatal_error
+            "Lambda.transl_address: could not determine layout of field"
       in
       let mixed_blocks = Array.map layout_to_mixed_block field_layouts in
       if Array.for_all
@@ -1584,10 +1563,11 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Void -> Product [||]
   ) shape
 
+(* CR jrayman: is this redundant?
+   Can it be combined with [transl_mixed_product_shape]?
+   Can it be deleted? *)
 let transl_mixed_block_element (mixed_block : Types.mixed_block_element) =
   match mixed_block with
-  | Void -> fatal_error "Lambda.transl_mixed_block_element: \
-    tried to convert Void to mixed_block_element"
   | Value -> Value generic_value
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
@@ -1603,6 +1583,19 @@ let transl_mixed_block_element (mixed_block : Types.mixed_block_element) =
   | Product shapes ->
     let get_value_kind _ = generic_value in
     Product (transl_mixed_product_shape ~get_value_kind shapes)
+  | Void -> Product [||]
+
+
+let transl_module_representation = function
+  | Types.Module_value_only size -> Module_value_only size
+  | Types.Module_mixed shape ->
+    Module_mixed
+      (transl_mixed_product_shape
+        ~get_value_kind:(fun _ -> generic_value) shape)
+
+let block_of_module_representation = function
+  | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
+  | Module_mixed shape -> Pmakemixedblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
