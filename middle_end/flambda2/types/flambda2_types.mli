@@ -489,6 +489,9 @@ val immutable_block :
   fields:t list ->
   t
 
+(** The type of an externally-allocated imutable block *)
+val immutable_external_block : t
+
 (** The type of an immutable block with at least [n] fields and an unknown tag.
     The type of the [n - 1]th field is taken to be an [Equals] to the given
     variable. *)
@@ -500,6 +503,9 @@ val immutable_block_with_size_at_least :
   t
 
 val mutable_block : Alloc_mode.For_types.t -> t
+
+(** The type of an externally-allocated mutable block *)
+val mutable_external_block : t
 
 val variant :
   const_ctors:t ->

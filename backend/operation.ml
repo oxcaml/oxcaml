@@ -448,3 +448,5 @@ let dump ppf op =
     Format.fprintf ppf "alloc %i" bytes
   | Alloc { bytes; dbginfo = _; mode = Local } ->
     Format.fprintf ppf "alloc_local %i" bytes
+  | Alloc { bytes; dbginfo = _; mode = External } ->
+    Format.fprintf ppf "alloc_external %i" bytes

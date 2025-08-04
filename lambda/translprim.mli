@@ -63,6 +63,7 @@ type invalid_stack_primitive =
   | Not_primitive
   | Not_allocating
   | Allocating_on_heap
+  | Allocating_externally
 
 type error =
   | Unknown_builtin_primitive of string

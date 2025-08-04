@@ -452,10 +452,10 @@ val glorb2 : unit -> int t mallocd = <fun>
 (* Can allocate variants with record arguments *)
 
 type 'a t = FooBar of {x : 'a; y : 'a}
-let f x y = FooBar {x;y}
+let f x y = malloc_ (FooBar {x;y})
 [%%expect{|
 type 'a t = FooBar of { x : 'a; y : 'a; }
-val f : 'a -> 'a -> 'a t = <fun>
+val f : 'a @ external_ -> 'a @ external_ -> 'a t mallocd = <fun>
 |}]
 
 type r = {x : int; y : int}
@@ -559,6 +559,16 @@ type t = Foo
 Line 2, characters 22-25:
 2 | let bazz () = malloc_ Foo
                           ^^^
+Error: This expression is not an allocation site.
+|}]
+
+type t = {x : int} [@@unboxed]
+let bazz () = malloc_ {x = 3}
+[%%expect {|
+type t = { x : int; } [@@unboxed]
+Line 2, characters 22-29:
+2 | let bazz () = malloc_ {x = 3}
+                          ^^^^^^^
 Error: This expression is not an allocation site.
 |}]
 
@@ -918,5 +928,13 @@ let f () = malloc_ [%here]
 Line 1, characters 19-26:
 1 | let f () = malloc_ [%here]
                        ^^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+let f (x @ external_) (y @ external_) = malloc_ (stack_ (x,y))
+[%%expect{|
+Line 1, characters 48-62:
+1 | let f (x @ external_) (y @ external_) = malloc_ (stack_ (x,y))
+                                                    ^^^^^^^^^^^^^^
 Error: This expression is not an allocation site.
 |}]

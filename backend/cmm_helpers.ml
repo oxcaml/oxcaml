@@ -272,26 +272,31 @@ let alloc_boxedfloat32_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedfloat32_header, dbg)
   | Local -> Cconst_natint (boxedfloat32_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated float32 not supported"
 
 let alloc_float_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (float_header, dbg)
   | Local -> Cconst_natint (float_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated float not supported"
 
 let alloc_boxedvec128_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedvec128_header, dbg)
   | Local -> Cconst_natint (boxedvec128_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated vec128 not supported"
 
 let alloc_boxedvec256_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedvec256_header, dbg)
   | Local -> Cconst_natint (boxedvec256_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated vec256 not supported"
 
 let alloc_boxedvec512_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedvec512_header, dbg)
   | Local -> Cconst_natint (boxedvec512_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated vec512 not supported"
 
 let alloc_floatarray_header len dbg = Cconst_natint (floatarray_header len, dbg)
 
@@ -299,6 +304,7 @@ let alloc_closure_header ~(mode : Cmm.Alloc_mode.t) sz dbg =
   match mode with
   | Heap -> Cconst_natint (white_closure_header sz, dbg)
   | Local -> Cconst_natint (local_closure_header sz, dbg)
+  | External -> Misc.fatal_error "Externally allocated closures not supported"
 
 let alloc_infix_header ofs dbg = Cconst_natint (infix_header ofs, dbg)
 
@@ -306,16 +312,19 @@ let alloc_boxedint32_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedint32_header, dbg)
   | Local -> Cconst_natint (boxedint32_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated int32 not supported"
 
 let alloc_boxedint64_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedint64_header, dbg)
   | Local -> Cconst_natint (boxedint64_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated int64 not supported"
 
 let alloc_boxedintnat_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedintnat_header, dbg)
   | Local -> Cconst_natint (boxedintnat_local_header, dbg)
+  | External -> Misc.fatal_error "Externally allocated intnat not supported"
 
 (* Integers *)
 
@@ -2131,12 +2140,14 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
     args_memory_chunks =
   (* allocs of size 0 must be statically allocated else the Gc will bug *)
   assert (List.compare_length_with args 0 > 0);
-  if Cmm.Alloc_mode.is_local mode || wordsize <= Config.max_young_wosize
+  if (Cmm.Alloc_mode.is_local mode || wordsize <= Config.max_young_wosize)
+     && not (Cmm.Alloc_mode.is_external mode)
   then
     let hdr =
       match (mode : Cmm.Alloc_mode.t) with
       | Local -> local_block_header ~block_kind tag wordsize
       | Heap -> block_header ~block_kind tag wordsize
+      | External -> Misc.fatal_error "Impossible, mode is not External"
     in
     Cop (Calloc (mode, alloc_block_kind), Cconst_natint (hdr, dbg) :: args, dbg)
   else
@@ -2155,11 +2166,16 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
            fields and memory chunks"
     in
     let caml_alloc_func, caml_alloc_args =
-      match block_kind with
-      | Regular_block -> "caml_alloc_shr_check_gc", [wordsize; tag]
-      | Mixed_block { scannable_prefix } ->
+      match block_kind, (mode : Cmm.Alloc_mode.t) with
+      | Regular_block, Heap -> "caml_alloc_shr_check_gc", [wordsize; tag]
+      | Mixed_block { scannable_prefix }, Heap ->
         Mixed_block_support.assert_mixed_block_support ();
         "caml_alloc_mixed_shr_check_gc", [wordsize; tag; scannable_prefix]
+      | Regular_block, External -> "caml_alloc_malloc", [wordsize; tag]
+      | Mixed_block { scannable_prefix }, External ->
+        "caml_alloc_mixed_malloc", [wordsize; tag; scannable_prefix]
+      | _, Local ->
+        Misc.fatal_error "Impossible, locals are allocated with Calloc."
     in
     Clet
       ( VP.create id,
@@ -4858,6 +4874,9 @@ let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     match mode with
     | Heap -> custom_header ~size
     | Local -> custom_local_header ~size
+    | External ->
+      Misc.fatal_error
+        "Externally allocated unboxed int32 arrays are not supported. "
   in
   let custom_ops =
     (* For odd-length unboxed int32 arrays there are 32 bits spare at the end of
@@ -4898,6 +4917,9 @@ let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     match mode with
     | Heap -> custom_header ~size
     | Local -> custom_local_header ~size
+    | External ->
+      Misc.fatal_error
+        "Externally allocated unboxed float32 arrays are not implemented"
   in
   let custom_ops =
     (* For odd-length unboxed float32 arrays there are 32 bits spare at the end
@@ -4918,6 +4940,10 @@ let allocate_unboxed_int64_or_nativeint_array custom_ops ~elements
     match mode with
     | Heap -> custom_header ~size
     | Local -> custom_local_header ~size
+    | External ->
+      Misc.fatal_error
+        "Externally allocated unboxed int64 or nativeint arrays are not \
+         implemented"
   in
   Cop
     ( Calloc (mode, Alloc_block_kind_int64_u_array),
@@ -4939,6 +4965,9 @@ let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~custom_ops
     match mode with
     | Heap -> custom_header ~size
     | Local -> custom_local_header ~size
+    | External ->
+      Misc.fatal_error
+        "Externally allocated unboxed unboxed vector arrays are not implemented"
   in
   Cop
     ( Calloc (mode, alloc_kind),

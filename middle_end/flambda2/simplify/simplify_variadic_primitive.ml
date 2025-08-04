@@ -53,16 +53,18 @@ let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
     let dacc =
       DA.map_denv dacc ~f:(fun denv -> DE.with_typing_env denv typing_env)
     in
+    let alloc_mode = Alloc_mode.For_allocations.as_type alloc_mode in
+    let fields = List.map snd args_with_tys in
+    let tag, shape = P.Block_kind.to_shape block_kind in
     let ty =
-      let fields = List.map snd args_with_tys in
-      let alloc_mode = Alloc_mode.For_allocations.as_type alloc_mode in
-      let tag, shape = P.Block_kind.to_shape block_kind in
-      match mutable_or_immutable with
-      | Immutable ->
+      match mutable_or_immutable, alloc_mode with
+      | (Immutable | Immutable_unique), External -> T.immutable_external_block
+      | Mutable, External -> T.mutable_external_block
+      | Immutable, (Heap | Local | Unknown) ->
         T.immutable_block ~is_unique:false tag ~shape alloc_mode ~fields
-      | Immutable_unique ->
+      | Immutable_unique, (Heap | Local | Unknown) ->
         T.immutable_block ~is_unique:true tag ~shape alloc_mode ~fields
-      | Mutable -> T.mutable_block alloc_mode
+      | Mutable, (Heap | Local | Unknown) -> T.mutable_block alloc_mode
     in
     let dacc = DA.add_variable dacc result_var ty in
     let dacc =

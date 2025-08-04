@@ -343,22 +343,28 @@ module Alloc_mode = struct
   type t =
     | Heap
     | Local
+    | External
 
   let equal t1 t2 =
     match t1, t2 with
     | Heap, Heap -> true
     | Local, Local -> true
-    | Heap, Local -> false
-    | Local, Heap -> false
+    | External, External -> true
+    | Heap, (Local | External) -> false
+    | Local, (Heap | External) -> false
+    | External, (Local | Heap) -> false
 
   let print ppf t =
     match t with
     | Heap -> Format.fprintf ppf "Heap"
     | Local -> Format.fprintf ppf "Local"
+    | External -> Format.fprintf ppf "External"
 
-  let is_local = function Heap -> false | Local -> true
+  let is_local = function Heap | External -> false | Local -> true
 
-  let is_heap = function Heap -> true | Local -> false
+  let is_heap = function Heap -> true | Local | External -> false
+
+  let is_external = function External -> true | Local | Heap -> false
 end
 
 type alloc_block_kind =

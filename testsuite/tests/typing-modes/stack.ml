@@ -416,3 +416,13 @@ Line 2, characters 17-24:
 Error: This cannot be marked as stack_, because it is either not a primitive,
        or the primitive does not allocate.
 |}]
+
+let foo x y =
+  let _ = stack_ (malloc_ (x,y)) in
+  ()
+[%%expect{|
+Line 2, characters 17-32:
+2 |   let _ = stack_ (malloc_ (x,y)) in
+                     ^^^^^^^^^^^^^^^
+Error: Stack allocating externally allocated expressions is unsupported yet.
+|}]

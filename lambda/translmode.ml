@@ -15,28 +15,30 @@
 open Lambda
 open Mode
 
-let transl_locality_mode = function
+let transl_allocation_mode = function
   | Locality.Const.Global -> alloc_heap
   | Locality.Const.Local -> alloc_local
 
-let transl_locality_mode_l locality =
-  Locality.zap_to_floor locality |> transl_locality_mode
+let transl_allocation_mode_l locality =
+  Locality.zap_to_floor locality |> transl_allocation_mode
 
-let transl_locality_mode_r locality =
+let transl_allocation_mode_r locality =
   (* r mode are for allocations; [optimise_allocations] should have pushed it
      to ceil and determined; here we push it again just to get the constant. *)
-  Locality.zap_to_ceil locality |> transl_locality_mode
+  Locality.zap_to_ceil locality |> transl_allocation_mode
 
 let transl_alloc_mode_l mode =
   (* we only take the locality axis *)
-  Alloc.proj_comonadic Areality mode |> transl_locality_mode_l
+  Alloc.proj_comonadic Areality mode |> transl_allocation_mode_l
 
 let transl_alloc_mode_r mode =
   (* we only take the locality axis *)
-  Alloc.proj_comonadic Areality mode |> transl_locality_mode_r
+  Alloc.proj_comonadic Areality mode |> transl_allocation_mode_r
 
 let transl_alloc_mode (mode : Typedtree.alloc_mode) =
-  transl_alloc_mode_r mode.mode
+  match mode with
+  | Internal mode -> transl_alloc_mode_r mode.mode
+  | External -> alloc_external
 
 let transl_modify_mode locality =
   match Locality.zap_to_floor locality with

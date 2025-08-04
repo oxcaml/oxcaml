@@ -628,7 +628,7 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         k acc (List.map Named.create_var let_bound_vars))
   in
   let alloc_mode_app =
-    match Lambda.locality_mode_of_primitive_description prim_desc with
+    match Lambda.allocation_mode_of_primitive_description prim_desc with
     | None ->
       (* This happens when stack allocation is disabled. *)
       Alloc_mode.For_applications.heap
@@ -637,7 +637,7 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         ~current_ghost_region
   in
   let alloc_mode =
-    match Lambda.locality_mode_of_primitive_description prim_desc with
+    match Lambda.allocation_mode_of_primitive_description prim_desc with
     | None ->
       (* This happens when stack allocation is disabled. *)
       Alloc_mode.For_allocations.heap
@@ -1202,39 +1202,43 @@ type block_static_kind =
   | Constant of Simple.With_debuginfo.t list
 
 let classify_fields_of_block env fields alloc_mode =
-  let is_local =
+  let is_local, is_external =
     match (alloc_mode : Alloc_mode.For_allocations.t) with
-    | Local _ -> true
-    | Heap -> false
+    | Local _ -> true, false
+    | Heap -> false, false
+    | External -> false, true
   in
-  let static_fields =
-    List.fold_left
-      (fun static_fields f ->
-        match static_fields with
-        | None -> None
-        | Some fields ->
-          Simple.pattern_match'
-            (Simple.With_debuginfo.simple f)
-            ~const:(fun _cst -> Some (f :: fields))
-            ~symbol:(fun _sym ~coercion:_ -> Some (f :: fields))
-            ~var:(fun _var ~coercion:_ ->
-              if Env.at_toplevel env
-                 && Flambda_features.classic_mode ()
-                 && not is_local
-              then Some (f :: fields)
-              else None))
-      (Some []) fields
-    |> Option.map List.rev
-  in
-  match static_fields with
-  | None -> Dynamic_block
-  | Some fields ->
-    if List.exists
-         (fun simple_with_dbg ->
-           Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
-         fields
-    then Computed_static fields
-    else Constant fields
+  if is_external
+  then Dynamic_block
+  else
+    let static_fields =
+      List.fold_left
+        (fun static_fields f ->
+          match static_fields with
+          | None -> None
+          | Some fields ->
+            Simple.pattern_match'
+              (Simple.With_debuginfo.simple f)
+              ~const:(fun _cst -> Some (f :: fields))
+              ~symbol:(fun _sym ~coercion:_ -> Some (f :: fields))
+              ~var:(fun _var ~coercion:_ ->
+                if Env.at_toplevel env
+                   && Flambda_features.classic_mode ()
+                   && not is_local
+                then Some (f :: fields)
+                else None))
+        (Some []) fields
+      |> Option.map List.rev
+    in
+    match static_fields with
+    | None -> Dynamic_block
+    | Some fields ->
+      if List.exists
+           (fun simple_with_dbg ->
+             Simple.is_var (Simple.With_debuginfo.simple simple_with_dbg))
+           fields
+      then Computed_static fields
+      else Constant fields
 
 let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
@@ -2580,6 +2584,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     match Function_decl.result_mode decl with
     | Alloc_heap -> false
     | Alloc_local -> true
+    | Alloc_external -> Misc.fatal_error "Result mode cannot be External"
   in
   let main_code =
     Code.create main_code_id ~params_and_body
@@ -2912,12 +2917,15 @@ let close_let_rec acc env ~function_declarations
     (* The closure allocation mode must be the same for all closures in the set
        of closures. *)
     List.fold_left
-      (fun (alloc_mode : Lambda.locality_mode option) function_decl ->
+      (fun (alloc_mode : Lambda.allocation_mode option) function_decl ->
         match alloc_mode, Function_decl.closure_alloc_mode function_decl with
         | None, alloc_mode -> Some alloc_mode
-        | Some Alloc_heap, Alloc_heap | Some Alloc_local, Alloc_local ->
+        | Some Alloc_heap, Alloc_heap
+        | Some Alloc_local, Alloc_local
+        | Some Alloc_external, Alloc_external ->
           alloc_mode
-        | Some Alloc_heap, Alloc_local | Some Alloc_local, Alloc_heap ->
+        | ( Some (Alloc_heap | Alloc_local | Alloc_external),
+            (Alloc_heap | Alloc_local | Alloc_external) ) ->
           Misc.fatal_errorf
             "let-rec group of [lfunction] declarations have inconsistent alloc \
              modes:@ %a"
@@ -3041,9 +3049,10 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     provided @ List.map (fun (p : Function_decl.param) -> IR.Var p.name) params
   in
   let contains_no_escaping_local_allocs =
-    match (result_mode : Lambda.locality_mode) with
+    match (result_mode : Lambda.allocation_mode) with
     | Alloc_heap -> true
     | Alloc_local -> false
+    | Alloc_external -> Misc.fatal_error "Result mode cannot be external"
   in
   let my_region =
     if contains_no_escaping_local_allocs
@@ -3100,7 +3109,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     then Lambda.alloc_heap, first_complex_local_param - num_provided
     else Lambda.alloc_local, 0
   in
-  if not (Lambda.sub_locality_mode closure_alloc_mode apply.IR.mode)
+  if not (Lambda.sub_allocation_mode closure_alloc_mode apply.IR.mode)
   then
     (* This can happen in a dead GADT match case. *)
     ( acc,
@@ -3147,12 +3156,14 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   let acc, remaining = find_simples acc env remaining in
   let apply_dbg = Debuginfo.from_location apply.loc in
   let needs_region =
-    match apply.mode, (result_mode : Lambda.locality_mode) with
+    match apply.mode, (result_mode : Lambda.allocation_mode) with
     | Alloc_heap, Alloc_local ->
       let over_app_region = Variable.create "over_app_region" in
       let over_app_ghost_region = Variable.create "over_app_ghost_region" in
       Some (over_app_region, over_app_ghost_region, Continuation.create ())
     | Alloc_heap, Alloc_heap | Alloc_local, _ -> None
+    | Alloc_external, _ | _, Alloc_external ->
+      Misc.fatal_error "Application or result modes cannot be External"
   in
   let apply_region, apply_ghost_region =
     match needs_region with
@@ -3280,7 +3291,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         remaining : IR.simple list;
         remaining_arity : [`Complex] Flambda_arity.t;
-        result_mode : Lambda.locality_mode
+        result_mode : Lambda.allocation_mode
       }
 
 let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =

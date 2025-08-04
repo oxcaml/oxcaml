@@ -246,6 +246,7 @@ type string_or_bytes = Flambda_primitive.string_or_bytes =
 type alloc_mode_for_allocations =
   | Heap
   | Local of { region : region }
+  | External
 
 type alloc_mode_for_applications =
   | Heap

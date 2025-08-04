@@ -206,6 +206,7 @@ type unsupported_stack_allocation =
   | Object
   | List_comprehension
   | Array_comprehension
+  | External_allocation
 
 type unsupported_external_allocation =
   | Lazy

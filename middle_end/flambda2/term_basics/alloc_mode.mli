@@ -17,7 +17,8 @@ module For_types : sig
   type t = private
     | Heap  (** Normal allocation on the OCaml heap. *)
     | Local  (** Allocation on the local allocation stack. *)
-    | Heap_or_local  (** Allocation with unknown location *)
+    | Unknown  (** Allocation with unknown location *)
+    | External  (** External allocation outside the OCaml heap *)
 
   val print : Format.formatter -> t -> unit
 
@@ -33,12 +34,14 @@ module For_types : sig
   (** Returns [Heap] if stack allocation is disabled! *)
   val unknown : unit -> t
 
-  (** Maps [Alloc_local] to [Heap_or_local], as all Lambda annotations that we
-      transform into constraints have this semantics *)
-  val from_lambda : Lambda.locality_mode -> t
+  val external_ : t
 
-  (** Symmetric to [from_lambda], so [Heap_or_local] is mapped to [Alloc_local] *)
-  val to_lambda : t -> Lambda.locality_mode
+  (** Maps [Alloc_local] to [Unknown], as all Lambda annotations that we
+      transform into constraints have this semantics *)
+  val from_lambda : Lambda.allocation_mode -> t
+
+  (** Symmetric to [from_lambda], so [Unknown] is mapped to [Alloc_local] *)
+  val to_lambda : t -> Lambda.allocation_mode
 end
 
 module For_applications : sig
@@ -62,7 +65,7 @@ module For_applications : sig
   val as_type : t -> For_types.t
 
   val from_lambda :
-    Lambda.locality_mode ->
+    Lambda.allocation_mode ->
     current_region:Variable.t option ->
     current_ghost_region:Variable.t option ->
     t
@@ -78,6 +81,7 @@ module For_allocations : sig
     | Heap  (** Normal allocation on the OCaml heap. *)
     | Local of { region : Variable.t }
         (** Allocation on the local allocation stack in the given region. *)
+    | External  (** Allocation outside the OCaml heap *)
 
   val print : Format.formatter -> t -> unit
 
@@ -85,13 +89,15 @@ module For_allocations : sig
 
   val heap : t
 
+  val external_ : t
+
   (** Returns [Heap] if stack allocation is disabled! *)
   val local : region:Variable.t -> t
 
   val as_type : t -> For_types.t
 
   val from_lambda :
-    Lambda.locality_mode -> current_region:Variable.t option -> t
+    Lambda.allocation_mode -> current_region:Variable.t option -> t
 
   include Contains_names.S with type t := t
 
