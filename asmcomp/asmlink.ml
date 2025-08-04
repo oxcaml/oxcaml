@@ -556,9 +556,10 @@ let call_linker file_list_rev startup_file output_name =
         (* Run objcopy to extract debug info into .debug file *)
         let debug_file = output_name ^ ".debug" in
         let compression_flag = 
-          match Dwarf_flags.get_dwarf_compression_format () with
+          match Dwarf_flags.get_dwarf_objcopy_compression_format () with
           | Some compression -> 
-            Printf.sprintf " --compress-debug-sections=%s" compression
+            Printf.sprintf " %s=%s" 
+              Config.objcopy_compress_debug_sections_flag compression
           | None -> ""
         in
         let objcopy_cmd = 

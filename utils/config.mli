@@ -53,6 +53,9 @@ val as_compress_debug_sections_flag : string
 val cc_compress_debug_sections_flag : string
 (** The flag to use for C compiler debug section compression ("" if none) *)
 
+val objcopy_compress_debug_sections_flag : string
+(** The flag to use for objcopy debug section compression ("" if none) *)
+
 val ocamlc_cflags : string
 (** The flags ocamlc should pass to the C compiler *)
 

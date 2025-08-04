@@ -96,3 +96,8 @@ val get_dwarf_as_toolchain_flag : unit -> string
     Returns Some compression if compression is enabled and not "none" or empty.
     Returns None otherwise. *)
 val get_dwarf_compression_format : unit -> string option
+
+(** Get the DWARF compression format to use with objcopy.
+    Returns Some compression only if compression is enabled and objcopy supports it.
+    Returns None otherwise. *)
+val get_dwarf_objcopy_compression_format : unit -> string option

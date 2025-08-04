@@ -639,3 +639,40 @@ int main() { return 0; }
 
   CFLAGS="$saved_CFLAGS"
 ])
+
+AC_DEFUN([OCAML_OBJCOPY_COMPRESSION_SUPPORT], [
+  AC_MSG_CHECKING([whether objcopy supports --compress-debug-sections=zlib])
+  
+  # Create a test object file
+  echo ".text" > conftest.s
+  echo ".globl test" >> conftest.s
+  echo "test:" >> conftest.s
+  echo "  .byte 0" >> conftest.s
+  
+  # Assemble it
+  $AS -o conftest.o conftest.s 2>/dev/null
+  
+  if test -f conftest.o; then
+    # Try --compress-debug-sections=zlib
+    if objcopy --compress-debug-sections=zlib conftest.o conftest2.o 2>/dev/null; then
+      objcopy_compress_debug_sections_flag="--compress-debug-sections"
+      AC_MSG_RESULT([yes])
+    else
+      # Try -gz=zlib (unlikely for objcopy but check anyway)
+      AC_MSG_RESULT([no])
+      AC_MSG_CHECKING([whether objcopy supports -gz=zlib])
+      if objcopy -gz=zlib conftest.o conftest2.o 2>/dev/null; then
+        objcopy_compress_debug_sections_flag="-gz"
+        AC_MSG_RESULT([yes])
+      else
+        objcopy_compress_debug_sections_flag=""
+        AC_MSG_RESULT([no])
+      fi
+    fi
+    rm -f conftest.o conftest2.o
+  else
+    objcopy_compress_debug_sections_flag=""
+    AC_MSG_RESULT([no (failed to create test object)])
+  fi
+  rm -f conftest.s
+])
