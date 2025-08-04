@@ -48,8 +48,8 @@ let rec count (el : _ Lambda.mixed_block_element) path =
   | i :: path_rest -> (
     match el with
     | Product shape -> count_shape shape i path_rest
-    | Value _ | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Word
-    | Vec128 | Vec256 | Vec512 ->
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+    | Bits64 | Word | Vec128 | Vec256 | Vec512 ->
       Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path")
 
 and count_shape (shape : Lambda.mixed_block_shape) pos path =

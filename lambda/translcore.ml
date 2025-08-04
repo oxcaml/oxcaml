@@ -2340,8 +2340,7 @@ and transl_idx ~scopes loc env ba uas =  (*  *)
       (* [uas_path] is a path into [mbe] *)
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
-  | Baccess_field (id, lbl) ->
-    check_record_field_sort id.loc lbl.lbl_sort;
+  | Baccess_field (_id, lbl) ->
     begin match lbl.lbl_repres with
     | Record_boxed _
     | Record_float | Record_ufloat ->
@@ -2384,7 +2383,8 @@ and transl_idx ~scopes loc env ba uas =  (*  *)
     let index = transl_exp ~scopes index_sort index in
     let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
     let array_kind =
-      array_type_kind ~elt_sort:(Some elt_sort) env loc base_ty
+      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
+        base_ty
     in
     let elt_layout = layout env loc elt_sort elt_ty in
     let mbe = mixed_block_element_of_layout elt_layout in

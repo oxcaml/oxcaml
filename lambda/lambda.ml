@@ -2325,6 +2325,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_float Unboxed_float32 -> Float32
   | Punboxed_int Unboxed_int64 -> Bits64
   | Punboxed_int Unboxed_int32 -> Bits32
+  | Punboxed_int Unboxed_int16 -> Bits16
+  | Punboxed_int Unboxed_int8 -> Bits8
   | Punboxed_int Unboxed_nativeint -> Word
   | Punboxed_vector Unboxed_vec128 -> Vec128
   | Punboxed_vector Unboxed_vec256 -> Vec256
@@ -2335,8 +2337,8 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   match el with
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Word
-  | Vec128 | Vec256 | Vec512 ->
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 ->
     [el]
 
 type will_be_reordered_acc = { seen_flat : bool; last_value_after_flat : bool }
@@ -2347,8 +2349,8 @@ let will_be_reordered (mbe : _ mixed_block_element) =
         match el with
         | Product _ -> assert false
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
-        | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Word | Vec128
-        | Vec256 | Vec512 ->
+        | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+        | Word | Vec128 |  Vec256 | Vec512 ->
           { acc with seen_flat = true })
       { seen_flat = false; last_value_after_flat = false }
       (mixed_block_element_leaves mbe)

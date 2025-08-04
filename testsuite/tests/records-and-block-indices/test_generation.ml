@@ -364,7 +364,7 @@ let test_record_idx_access ty ~local =
                 Type_structure.is_flat_float_record (Type.structure ty)
                 && Type_structure.layout
                      (Type.structure (Type.follow_path ty full_path))
-                   = Value Float
+                   = Value { ignorable = false; non_float = false }
               in
               let sub_ty =
                 if flattened_float
@@ -466,7 +466,12 @@ let test_record_idx_deepening ty =
                       Type_structure.is_flat_float_record (Type.structure ty)
                       && Type_structure.layout
                            (Type.structure (Type.follow_path ty prefix))
-                         = Value Float
+                         = Value { ignorable = false; non_float = false }
+                    in
+                    let to_void =
+                      Type_structure.layout
+                        (Type.structure (Type.follow_path ty full_path))
+                      = Void
                     in
                     if (not from_flattened_float) || suffix = []
                     then (
@@ -475,9 +480,17 @@ let test_record_idx_deepening ty =
                         (Type.code ty) (Path.to_string prefix);
                       line "let deepened = (.idx_mut(shallow)%s) in"
                         (Path.to_string suffix);
-                      seq_assert ~debug_exprs
-                        "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
-                         (Idx_repr.of_idx_mut deepened)"
+                      if to_void
+                      then (
+                        line
+                          "(* No guarantees on representation of idx to void *)";
+                        line "let _ignore = #(idx, deepened) in";
+                        line "();"
+                      )
+                      else
+                        seq_assert ~debug_exprs
+                          "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
+                           (Idx_repr.of_idx_mut deepened)"
                     )
                     else (
                       line

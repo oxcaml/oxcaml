@@ -449,6 +449,7 @@ let ternary_prim_size prim =
   | Atomic_set_field _ -> 1
   | Atomic_exchange_field Immediate -> 1
   | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
+  | Write_offset _ -> 1
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
@@ -458,7 +459,6 @@ let quaternary_prim_size prim =
   | Atomic_compare_and_set_field Any_value
   | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Any_value } ->
     does_not_need_caml_c_call_extcall_size
-  | Write_offset _ -> 1
 
 let variadic_prim_size prim args =
   match (prim : Flambda_primitive.variadic_primitive) with

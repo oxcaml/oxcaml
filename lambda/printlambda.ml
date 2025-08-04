@@ -847,16 +847,16 @@ let primitive ppf = function
   | Ppoke layout ->
       fprintf ppf "(poke@ %a)"
         peek_or_poke layout
-  | Pget_idx (layout, Mutable) ->
+  | Pget_idx (l, Mutable) ->
       fprintf ppf "(get_idx@ %a)"
-        (layout' false) layout
-  | Pget_idx (layout, Immutable) ->
+        layout l
+  | Pget_idx (l, Immutable) ->
       fprintf ppf "(get_idx_imm@ %a)"
-        (layout' false) layout
-  | Pset_idx (layout, mode) ->
+        layout l
+  | Pset_idx (l, mode) ->
       fprintf ppf "(set_idx%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
-        (layout' false) layout
+        layout l
 
 let name_of_primitive = function
   | Pscalar i ->

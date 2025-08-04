@@ -2545,9 +2545,8 @@ let for_non_float ~(why : History.value_creation_reason) =
     ~annotation:None ~why:(Value_creation why)
 
 let for_or_null_argument ident =
-  let why =
-    History.Type_argument
-      { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  let why : History.value_creation_reason =
+    Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
   in
   let mod_bounds =
     Mod_bounds.create ~areality:Regionality.Const.max

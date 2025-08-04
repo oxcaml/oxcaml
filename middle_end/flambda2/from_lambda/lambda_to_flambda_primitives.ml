@@ -530,6 +530,8 @@ let rec convert_layout_to_flambda_kind_with_subkinds (layout : L.layout) :
     | Immediate -> [K.With_subkind.naked_immediate])
   | Punboxed_float Unboxed_float64 -> [K.With_subkind.naked_float]
   | Punboxed_float Unboxed_float32 -> [K.With_subkind.naked_float32]
+  | Punboxed_int Unboxed_int8 -> [K.With_subkind.naked_int8]
+  | Punboxed_int Unboxed_int16 -> [K.With_subkind.naked_int16]
   | Punboxed_int Unboxed_int32 -> [K.With_subkind.naked_int32]
   | Punboxed_int Unboxed_int64 -> [K.With_subkind.naked_int64]
   | Punboxed_int Unboxed_nativeint -> [K.With_subkind.naked_nativeint]
@@ -1641,8 +1643,8 @@ let idx_access_offsets layout idx =
         (* Values are (values to left) beyond the offset *)
         | Value _ -> simple_i64 (Int64.of_int (conv_bc to_left.value))
         (* Flats are gap + (all values) + (flats to left) beyond the offset *)
-        | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Word | Vec128
-        | Vec256 | Vec512 ->
+        | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+        | Word | Vec128 | Vec256 | Vec512 ->
           Prim
             (add gap
                (simple_i64
@@ -1752,6 +1754,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Ptagged_int_index -> conv_from Tagged_immediate
       | Punboxed_int_index Unboxed_int64 -> index
       | Punboxed_int_index Unboxed_int32 -> conv_from Naked_int32
+      | Punboxed_int_index Unboxed_int16 -> conv_from Naked_int16
+      | Punboxed_int_index Unboxed_int8 -> conv_from Naked_int8
       | Punboxed_int_index Unboxed_nativeint -> conv_from Naked_nativeint
     in
     let index_as_bytes =
@@ -1773,24 +1777,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
              [will_be_reordered] check in translcore"
       | None -> Misc.fatal_error "Pidxarray: illegal gap"
     in
-    let custom_word_offset =
-      match ak with
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray
-      | Punboxedfloatarray Unboxed_float64
-      | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-        0
-      | Punboxedfloatarray Unboxed_float32
-      | Punboxedintarray (Unboxed_int64 | Unboxed_int32 | Unboxed_nativeint)
-      | Punboxedvectorarray (Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512)
-        ->
-        8
-    in
     [ Binary
         ( Int_arith (Naked_int64, Add),
           index_as_bytes,
-          simple_i64
-            (Int64.of_int (conv_bc offset_after_index + custom_word_offset)) )
-    ]
+          simple_i64 (Int64.of_int (conv_bc offset_after_index)) ) ]
   | Pidx_deepen (mbe, field_path), [[idx]] -> (
     (* See [jane/doc/extensions/_02-unboxed-types/block-indices.md]. *)
     let cts = Mixed_product_bytes_wrt_path.count mbe field_path in

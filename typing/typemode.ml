@@ -434,7 +434,7 @@ let idx_expected_modalities ~(mut : bool) =
       (fun t (Modality.Atom (ax, a)) -> Modality.Value.Const.set ax a t)
       Modality.Value.Const.id l
   in
-  let expected1 = mutable_implied_modalities mut in
+  let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
   let expected2 =
     if mut
     then
@@ -556,10 +556,8 @@ let transl_modalities ~maturity mut modalities =
         m (implied_modalities t))
     mut_modalities modalities
 
-let let_mutable_modalities m0 =
-  mutable_implied_modalities
-    (Mutable { mode = m0; atomic = Nonatomic })
-    ~for_mutable_variable:true
+let let_mutable_modalities =
+  mutable_implied_modalities true ~for_mutable_variable:true
 
 let untransl_modalities mut t =
   t

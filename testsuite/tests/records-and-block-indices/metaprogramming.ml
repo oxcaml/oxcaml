@@ -331,13 +331,14 @@ module Type_structure = struct
   let array_element (tree : t Tree.t) : t option =
     let ty = nested_unboxed_record tree in
     let ty_layout = layout ty in
-    if ty_layout = Value Float
+    if ty_layout = Value { ignorable = false; non_float = false }
     then None
     else
       (* CR layouts v8: all of these restrictions will eventually be lifted *)
       let supported_in_arrays =
         (Layout.all_scannable ty_layout || Layout.all_ignorable ty_layout)
-        && not (Layout.contains_vec128 ty_layout)
+        && (not (Layout.contains_vec128 ty_layout))
+        && not (Layout.contains_void ty_layout)
       in
       let supported_by_block_indices =
         (not (Layout.reordered_in_block ty_layout))
@@ -418,7 +419,8 @@ let assemble_record_expr boxing name labels vals =
 let assemble_constructor name vals =
   match vals with
   | [] -> name
-  | _ -> name ^ "(" ^ String.concat ~sep:", " vals ^ ")"
+  | [val_] -> "(" ^ name ^ " " ^ val_ ^ ")"
+  | _ -> "(" ^ name ^ " (" ^ String.concat ~sep:", " vals ^ "))"
 
 let assemble_tuple ~sep (boxing : Boxing.t) xs =
   let hash = match boxing with Boxed -> "" | Unboxed -> "#" in
@@ -689,7 +691,7 @@ module Type = struct
     | Int32_u -> sprintf "Int32_u.of_int (i + %d)" i
     | Nativeint -> sprintf "Nativeint.of_int (i + %d)" i
     | Nativeint_u -> sprintf "Nativeint_u.of_int (i + %d)" i
-    | Unit_u -> "unbox_unit ()"
+    | Unit_u -> "(unbox_unit ())"
     | Float -> sprintf "Float.of_int (i + %d)" i
     | Float_u -> sprintf "Float_u.of_int (i + %d)" i
     | Float32 -> sprintf "Float32.of_int (i + %d)" i
@@ -942,7 +944,7 @@ module Type_naming = struct
 end
 
 let preamble ~bytecode =
-  {|type unit_u : void
+  {|type unit_u : void mod everything
 external unbox_unit : unit -> unit_u = "%unbox_unit"
 external globalize : local_ 'a -> 'a = "%obj_dup";;
 |}

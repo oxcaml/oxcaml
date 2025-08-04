@@ -1046,7 +1046,7 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
 let mutvar_mode ~loc ~env m0 exp_mode =
   let m = Value.newvar () in
   let mode = mode_default m in
-  let modalities = Typemode.let_mutable_modalities m0 in
+  let modalities = Typemode.let_mutable_modalities in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
   check_construct_mutability ~loc ~env
     (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
@@ -5895,10 +5895,10 @@ and type_expect_
         match label.lbl_repres with
         | Record_boxed _ -> false
         | Record_mixed mixed ->
-          begin match mixed.(label.lbl_num) with
+          begin match mixed.(label.lbl_pos) with
           | Float_boxed -> true
-          | Float64 | Float32 | Value | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
-          | Word | Product _ ->
+          | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Word | Product _ | Void ->
             false
           end
         | Record_float -> true
@@ -5997,10 +5997,10 @@ and type_expect_
                          match lid.txt with
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
-        | Val_mut (m0, _) -> begin
+        | Val_mut (_m0, _) -> begin
             match path with
             | Path.Pident id ->
-              let modalities = Typemode.let_mutable_modalities m0 in
+              let modalities = Typemode.let_mutable_modalities in
               let mode =
                 Modality.Value.Const.apply modalities actual_mode.mode
               in

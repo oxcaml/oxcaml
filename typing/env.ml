@@ -4265,7 +4265,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
             m0
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
             |> Mode.Modality.Value.Const.apply
-                (Typemode.let_mutable_modalities m0)
+                Typemode.let_mutable_modalities
           in
           mutate_value ~use ~loc path vda;
           Mutable_variable (id, mode, val_type, sort)

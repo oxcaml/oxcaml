@@ -51,8 +51,9 @@ let add { value; flat } { value = value'; flat = flat' } =
 let rec count (el : _ Lambda.mixed_block_element) : t =
   match el with
   | Value _ -> { value = 8; flat = 0 }
-  | Float_boxed _ | Float64 | Float32 | Bits32 | Bits64 | Word ->
-    (* In a record, [float32]s and [bits32]s aren't packed tightly *)
+  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
+    ->
+    (* In a record, bits8/bits16/bits32/float32 aren't packed tightly *)
     { value = 0; flat = 8 }
   | Vec128 -> { value = 0; flat = 16 }
   | Vec256 -> { value = 0; flat = 32 }

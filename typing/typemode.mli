@@ -17,8 +17,7 @@ val transl_modalities :
   Parsetree.modalities ->
   Mode.Modality.Value.Const.t
 
-val let_mutable_modalities :
-  Mode.Value.Comonadic.lr -> Mode.Modality.Value.Const.t
+val let_mutable_modalities : Mode.Modality.Value.Const.t
 
 val untransl_modality :
   'a Mode.Modality.Atom.t -> Parsetree.modality Location.loc

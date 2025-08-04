@@ -536,6 +536,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             unary (Ccall "caml_int64_to_int")
           | Punboxed_int_index Unboxed_int32 ->
             unary (Ccall "caml_int32_to_int")
+          (* CR rtjoa: these small int fns don't exist *)
+          | Punboxed_int_index Unboxed_int16 ->
+            unary (Ccall "caml_int16_to_int")
+          | Punboxed_int_index Unboxed_int8 -> unary (Ccall "caml_int8_to_int")
           | Punboxed_int_index Unboxed_nativeint ->
             unary (Ccall "caml_nativeint_to_int")
         in
