@@ -1793,7 +1793,8 @@ let instance_prim_layout (desc : Primitive.description) ty =
       sort
     in
     let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort sort) in
-    Jkind.History.update_reason jkind (Concrete_creation Layout_poly_in_external)
+    Jkind.History.update_reason
+      jkind (Concrete_creation Layout_poly_in_external)
   in
   For_copy.with_scope (fun copy_scope ->
     let rec inner ty =
