@@ -1,164 +1,164 @@
-tuple: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+tuple: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test tuple:
   Field 0: 3
   Field 1: 7
 
 
-tuple-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+tuple-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test tuple-func-creation:
   Field 0: 3
   Field 1: 7
 
 
-record: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+record: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test record:
   Field 0: 7
   Field 1: 9
 
 
-record-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+record-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test record-func-creation:
   Field 0: 7
   Field 1: 9
 
 
-record_mixed: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+record_mixed: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test record_mixed:
   Field 0: 3
   Field 1: 42
 
 
-record_mixed-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+record_mixed-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test record_mixed-func-creation:
   Field 0: 3
   Field 1: 42
 
 
-record_mixed2: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+record_mixed2: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test record_mixed2:
   Field 0: 3
   Field 1: 42
 
 
-record_mixed2-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+record_mixed2-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test record_mixed2-func-creation:
   Field 0: 3
   Field 1: 42
 
 
-t0: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+t0: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test t0:
   Field 0: 233
   Field 1: 85
   Field 2: 100
 
 
-t0-func-creation: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+t0-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test t0-func-creation:
   Field 0: 233
   Field 1: 85
   Field 2: 100
 
 
-t1: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+t1: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test t1:
   Field 0: 21
   Field 1: 4614253070214989087
   Field 2: 4
 
 
-t1-func-creation: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+t1-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test t1-func-creation:
   Field 0: 21
   Field 1: 4614253070214989087
   Field 2: 4
 
 
-t2 : No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+t2 : No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test t2 :
   Field 0: 3
   Field 1: 199
   Field 2: 777
 
 
-t2-func-creation: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+t2-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test t2-func-creation:
   Field 0: 3
   Field 1: 199
   Field 2: 777
 
 
-r0: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+r0: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test r0:
   Field 0: 3
   Field 1: 1
 
 
-r0-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+r0-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test r0-func-creation:
   Field 0: 3
   Field 1: 1
 
 
-r1: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+r1: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test r1:
   Field 0: 3
   Field 1: 1
 
 
-r1-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+r1-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test r1-func-creation:
   Field 0: 3
   Field 1: 1
 
 
-Bar: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+Bar: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test Bar:
   Field 0: 21
 
 
-Bar-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+Bar-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test Bar-func-creation:
   Field 0: 21
 
 
-B5: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+B5: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test B5:
   Field 0: 11
 
 
-C10d: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+C10d: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test C10d:
   Field 0: 21
   Field 1: 201
 
 
-D1d5: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+D1d5: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test D1d5:
   Field 0: 3
   Field 1: 201
   Field 2: 11
 
 
-B5-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+B5-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test B5-func-creation:
   Field 0: 11
 
 
-C10d-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+C10d-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test C10d-func-creation:
   Field 0: 21
   Field 1: 201
 
 
-D1d5-func-creation: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+D1d5-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test D1d5-func-creation:
   Field 0: 3
   Field 1: 201
   Field 2: 11
 
 
-f2: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+f2: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test f2:
   Field 0: 3
   Field 1: 201
@@ -166,7 +166,7 @@ Test f2:
   Field 3: 13
 
 
-f2-func-creation: No GC-visible allocation occurred, 48 bytes malloc'd, result value is outside minor heap, allocated at runtime
+f2-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test f2-func-creation:
   Field 0: 3
   Field 1: 201
@@ -174,89 +174,89 @@ Test f2-func-creation:
   Field 3: 13
 
 
-list5: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+list5: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test list5:
   Field 0: 11
   Field 1: 1
 
 
-list5-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+list5-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test list5-func-creation:
   Field 0: 11
   Field 1: 1
 
 
-Pack100: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+Pack100: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test Pack100:
   Field 0: 201
 
 
-Pack100-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+Pack100-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test Pack100-func-creation:
   Field 0: 201
 
 
-gadt_int: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+gadt_int: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test gadt_int:
   Field 0: 199
 
 
-gadt_char: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+gadt_char: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test gadt_char:
   Field 0: 199
 
 
-gadt_char: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+gadt_char: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test gadt_char:
   Field 0: 3
 
 
-gadt_int-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+gadt_int-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test gadt_int-func-creation:
   Field 0: 199
 
 
-gadt_char-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+gadt_char-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test gadt_char-func-creation:
   Field 0: 199
 
 
-gadt_unbox-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+gadt_unbox-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test gadt_unbox-func-creation:
   Field 0: 3
 
 
-apple: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+apple: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test apple:
   Field 0: 1859250805
   Field 1: 15
 
 
-apple2: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+apple2: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test apple2:
   Field 0: 1859250805
   Field 1: 85
 
 
-pear: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+pear: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test pear:
   Field 0: 1784419469
   Field 1: 85
 
 
-apple-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+apple-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test apple-func-creation:
   Field 0: 1859250805
   Field 1: 15
 
 
-apple2-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+apple2-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test apple2-func-creation:
   Field 0: 1859250805
   Field 1: 85
 
 
-pear-func-creation: No GC-visible allocation occurred, 32 bytes malloc'd, result value is outside minor heap, allocated at runtime
+pear-func-creation: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test pear-func-creation:
   Field 0: 1784419469
   Field 1: 85

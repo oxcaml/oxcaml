@@ -1,39 +1,42 @@
 (* TEST
  modules = "stubs.c";
+ {
+ not-macos;
+ flags = "-cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_alloc_malloc \
+          -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_alloc_mixed_malloc";
  native;
+ }
 *)
 
 external is_young : ('a : word) -> bool = "is_young" "is_young"
 
 external is_static_alloc : ('a : word) -> bool = "is_static_alloc" "is_static_alloc"
 
-external get_malloc_bytes : unit -> int = "get_malloc_bytes" "get_malloc_bytes"
+(* external get_malloc_bytes : unit -> int = "get_malloc_bytes" "get_malloc_bytes" *)
+external malloc_was_called : unit -> bool = "malloc_was_called" "malloc_was_called"
+external called_malloc_reset : unit -> unit = "called_malloc_reset" "called_malloc_reset"
 
 external print_external_block_entries : ('a : word) -> int64# -> string -> unit = "print_block" "print_block"
 
 let is_a_malloc name ~num_fields f =
+  let () = called_malloc_reset () in
   let prebefore = Gc.allocated_bytes () in
   let before = Gc.allocated_bytes () in
-  let malloc_before = get_malloc_bytes () in
   let v = Sys.opaque_identity f () in
   let after = Gc.allocated_bytes () in
-  let malloc_after = get_malloc_bytes () in
+  let malloc_was_called = malloc_was_called () in
   let gc_delta =
     int_of_float ((after -. before) -. (before -. prebefore))
       / (Sys.word_size/8)
   in
-  let malloc_delta = malloc_after - malloc_before in
   let gc_msg =
     match gc_delta with
     | 0 -> "No GC-visible allocation occurred"
     | n -> "GC-VISIBLE ALLOCATION OCCURRED"
   in
   let malloc_msg =
-    match malloc_delta with
-    | 0 -> "NO MALLOC ALLOCATION"
-    (* This number is always a little larger than the block we asked for, since
-       malloc needs to allocate some bookkeeping space *)
-    | n -> Printf.sprintf "%d bytes malloc'd" n
+    if malloc_was_called then "malloc was called"
+    else "MALLOC NOT CALLED"
   in
   let location =
     if is_young v then "IN MINOR HEAP"
@@ -47,7 +50,6 @@ let is_a_malloc name ~num_fields f =
   Stdlib.flush Stdlib.stdout;
   print_external_block_entries v num_fields name;
   Format.printf "\n";
-
   ()
 
 (*

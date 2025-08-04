@@ -3,18 +3,10 @@
 #include "caml/memory.h"
 #include <stdio.h>
 #include <malloc.h>
+#include <stdbool.h>
 
 CAMLprim value is_young(uint64_t v){
     return Val_bool(Is_young(v));
-}
-
-CAMLprim value get_malloc_bytes(value unit) {
-    // The github actions complain about this occasionally, just silence this particular warning.
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    struct mallinfo info = mallinfo();
-    #pragma GCC diagnostic pop
-    return Val_long(info.uordblks);
 }
 
 CAMLprim value is_static_alloc(uint64_t v) {
@@ -39,4 +31,33 @@ CAMLprim value print_block(uint64_t v, uint64_t fields, value name){
     printf("\n");
     fflush(stdout);
     return Val_unit;
+}
+
+static bool called_malloc = false;
+
+CAMLprim value malloc_was_called()
+{
+  return Val_bool(called_malloc);
+}
+
+CAMLprim value called_malloc_reset()
+{
+  called_malloc = false;
+  return Val_unit;
+}
+
+CAMLextern intnat __real_caml_alloc_malloc (mlsize_t wosize, tag_t);
+
+CAMLprim void __wrap_caml_alloc_malloc(mlsize_t wosize, tag_t tag)
+{
+  called_malloc = true;
+  __real_caml_alloc_malloc(wosize, tag);
+}
+
+CAMLextern intnat __real_caml_alloc_mixed_malloc(mlsize_t, tag_t, mlsize_t);
+
+CAMLprim void __wrap_caml_alloc_mixed_malloc(mlsize_t wosize, tag_t tag, mlsize_t prefix)
+{
+  called_malloc = true;
+  __real_caml_alloc_mixed_malloc(wosize, tag, prefix);
 }
