@@ -55,12 +55,12 @@ exception Invalid_argument of string
 
 #show Some;;
 [%%expect {|
-type 'a option = None | Some of 'a
+type ('a : value_or_null) option = None | Some of 'a
 |}];;
 
 #show option;;
 [%%expect {|
-type 'a option = None | Some of 'a
+type ('a : value_or_null) option = None | Some of 'a
 |}];;
 
 #show Open_binary;;
