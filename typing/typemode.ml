@@ -461,10 +461,10 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
   { txt = Modality s; loc = Location.none }
 
 (* For now, mutable implies:
-  - [global] and [unyielding]
-  - legacy modalities for monadic axes
-  The former is for compatibility with existing code and will be removed in the
-  future. The latter will stay. Implied modalities can be overriden. *)
+   - [global] and [unyielding]
+   - legacy modalities for monadic axes
+   The former is for compatibility with existing code and will be removed in the
+   future. The latter will stay. Implied modalities can be overriden. *)
 (* CR zqian: decouple mutable and [global] *)
 let mutable_implied_modalities (mut : Types.mutability) =
   let comonadic : Modality.t list =
