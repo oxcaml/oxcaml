@@ -704,7 +704,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
        The kind of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
        But the kind of abstract must be a subkind of
-         value_or_null mod non_float
+           value_or_null mod non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -742,7 +742,7 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        The kind of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
        But the kind of abstract must be a subkind of
-         value_or_null mod non_float
+           value_or_null mod non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
