@@ -243,7 +243,7 @@ static void generic_final_minor_update
   for (i = final->old; i < final->young; i++){
     CAMLassert (Is_block (final->table[i].val));
     if (Is_young(final->table[i].val) &&
-        !Is_promoted_hd(caml_get_header_val(final->table[i].val))) {
+        !Is_promoted_hd(Hd_val(final->table[i].val))) {
       ++ todo_count;
     }
   }
@@ -265,7 +265,7 @@ static void generic_final_minor_update
       CAMLassert (Is_block (final->table[i].val));
       CAMLassert (Tag_val (final->table[i].val) != Forward_tag);
       if (Is_young(final->table[i].val) &&
-          !Is_promoted_hd(caml_get_header_val(final->table[i].val))) {
+          !Is_promoted_hd(Hd_val(final->table[i].val))) {
         /** dead */
         fi->todo_tail->item[k] = final->table[i];
         /* The finalisation function is called with unit not with the value */
@@ -287,7 +287,7 @@ static void generic_final_minor_update
   for (i = final->old; i < final->young; i++) {
     CAMLassert (Is_block (final->table[i].val));
     if (Is_young(final->table[i].val)) {
-      CAMLassert (Is_promoted_hd(caml_get_header_val(final->table[i].val)));
+      CAMLassert (Is_promoted_hd(Hd_val(final->table[i].val)));
       final->table[i].val = Field(final->table[i].val, 0);
     }
   }

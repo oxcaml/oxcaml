@@ -47,6 +47,7 @@ let cmi_file = ref None
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
+type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
@@ -60,6 +61,8 @@ and print_types = ref false             (* -i *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_full = ref false              (* For full DWARF support *)
+and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
+and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
@@ -142,6 +145,7 @@ let dump_cse = ref false                (* -dcse *)
 let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
+let llvm_backend = ref false            (* -llvm-backend *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
@@ -450,6 +454,10 @@ let error_style_reader = {
 }
 
 let unboxed_types = ref false
+
+let dump_debug_uids = ref false         (* -ddebug-uids *)
+
+let dump_debug_uid_tables = ref false    (* -ddebug-uid-tables *)
 
 (* This is used by the -save-ir-after and -save-ir-before options. *)
 module Compiler_ir = struct

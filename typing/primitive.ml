@@ -359,8 +359,8 @@ let unboxed_vector = function
    comparison at no performance loss. We still match on the variants to prove here that
    they are all constant constructors. *)
 let equal_unboxed_integer
-      ((Unboxed_int64 | Unboxed_nativeint | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
-       | Unboxed_int) as i1) i2
+      ((Unboxed_int64 | Unboxed_nativeint | Unboxed_int32 | Unboxed_int16
+        | Unboxed_int8 | Unboxed_int) as i1) i2
   =
   i1 = i2
 let equal_unboxed_float

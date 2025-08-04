@@ -132,12 +132,8 @@ let phys_reg ty n =
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
-  | Vec256 ->
-    Arch.Extension.require_vec256 ();
-    hard_vec256_reg.(n - 100)
-  | Vec512 ->
-    Arch.Extension.require_vec512 ();
-    hard_vec512_reg.(n - 100)
+  | Vec256 -> hard_vec256_reg.(n - 100)
+  | Vec512 -> hard_vec512_reg.(n - 100)
 
 let rax = phys_reg Int 0
 let rdi = phys_reg Int 2
@@ -151,8 +147,8 @@ let rbp = phys_reg Int 12
 let destroy_xmm =
   let types =
     ([ Float; Float32; Vec128 ] : machtype_component list)
-    |> add_hard_vec256_regs ~f:(fun _ -> Vec256)
-    |> add_hard_vec512_regs ~f:(fun _ -> Vec512)
+    |> add_hard_vec256_regs ~f:(fun _ : machtype_component -> Vec256)
+    |> add_hard_vec512_regs ~f:(fun _ : machtype_component -> Vec512)
     |> Array.of_list
   in
   fun n -> Array.map (fun t -> phys_reg t (100 + n)) types
@@ -222,7 +218,6 @@ let calling_conventions
         ofs := !ofs + size_vec128
       end
     | Vec256 ->
-      Arch.Extension.require_vec256 ();
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec256 !float;
         incr float
@@ -233,7 +228,6 @@ let calling_conventions
         ofs := !ofs + size_vec256
       end
     | Vec512 ->
-      Arch.Extension.require_vec512 ();
       if !float <= last_float then begin
         loc.(i) <- phys_reg Vec512 !float;
         incr float
@@ -501,16 +495,32 @@ let destroyed_at_single_float64_store =
     (destroy_xmm 15)
 ;;
 
+let all_256bit_regs = []
+  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  |> add_hard_vec512_regs ~f:(fun regs -> regs)
+  |> Array.concat
+
+let all_simd_regs =
+  [hard_float32_reg; hard_float_reg; hard_vec128_reg]
+  |> add_hard_vec256_regs ~f:(fun regs -> regs)
+  |> add_hard_vec512_regs ~f:(fun regs -> regs)
+  |> Array.concat
+
 let destroyed_by_simd_instr (instr : Simd.instr) =
-  match instr.res with
-  | First_arg -> [||]
-  | Res { loc; _ } ->
-    match Simd.loc_is_pinned loc with
-    | Some RAX -> [|rax|]
-    | Some RCX -> [|rcx|]
-    | Some RDX -> [|rdx|]
-    | Some XMM0 -> destroy_xmm 0
-    | None -> [||]
+  (* CR mslater: (SIMD) these don't effect regs 16-31 *)
+  match[@warning "-4"] instr.id with
+  | Vzeroupper -> all_256bit_regs
+  | Vzeroall -> all_simd_regs
+  | _ ->
+    match instr.res with
+    | First_arg -> [||]
+    | Res { loc; _ } ->
+      match Simd.loc_is_pinned loc with
+      | Some RAX -> [|rax|]
+      | Some RCX -> [|rcx|]
+      | Some RDX -> [|rdx|]
+      | Some XMM0 -> destroy_xmm 0
+      | None -> [||]
 
 let destroyed_by_simd_op (op : Simd.operation) =
   match op.instr with
@@ -521,7 +531,9 @@ let destroyed_by_simd_op (op : Simd.operation) =
       (match seq.id with
        | Sqrtss | Sqrtsd | Roundss | Roundsd
        | Pcompare_string _ | Vpcompare_string _
-       | Ptestz | Ptestc | Ptestnzc | Vptestz | Vptestc | Vptestnzc -> [||])
+       | Ptestz | Ptestc | Ptestnzc
+       | Vptestz_X  | Vptestc_X  | Vptestnzc_X
+       | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y -> [||])
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
@@ -713,10 +725,10 @@ let has_three_operand_float_ops () = Arch.Extension.enabled AVX
 
 let operation_supported = function
   | Cpopcnt -> Arch.Extension.enabled POPCNT
-  | Creinterpret_cast V256_of_v256
+  | Creinterpret_cast (V256_of_vec (Vec128 | Vec256) | V128_of_vec Vec256)
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _) ->
     Arch.Extension.enabled_vec256 ()
-  | Creinterpret_cast V512_of_v512
+  | Creinterpret_cast (V512_of_vec _ | V128_of_vec Vec512 | V256_of_vec Vec512)
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
@@ -739,7 +751,7 @@ let operation_supported = function
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128)
+                       V128_of_vec Vec128)
   | Cstatic_cast (Float_of_float32 | Float32_of_float |
                   Int_of_float Float32 | Float_of_int Float32 |
                   Float_of_int Float64 | Int_of_float Float64 |

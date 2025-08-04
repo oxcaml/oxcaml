@@ -595,8 +595,9 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
-  | (Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 |
-     Vec256 | Vec512 | Word | Product _), _ -> false
+  | (Value _ | Float_boxed _ | Float64 | Float32
+     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+     | Vec256 | Vec512 | Word | Product _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
@@ -1473,6 +1474,7 @@ let rec transl_mixed_product_shape ~get_value_kind shape =
          could be improved in the future (same below). *)
       let get_value_kind _ = generic_value in
       Product (transl_mixed_product_shape ~get_value_kind shapes)
+    | Void -> Product [||]
   ) shape
 
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
@@ -1494,6 +1496,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
       let get_value_kind _ = generic_value in
       Product
         (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+    | Void -> Product [||]
   ) shape
 
 (* Compile a sequence of expressions *)
@@ -2381,6 +2384,10 @@ let primitive_result_layout (p : primitive) =
   | Pstring_load_64 { boxed = true; _ } | Pbytes_load_64 { boxed = true; _ }
   | Pbigstring_load_64 { boxed = true; _ } ->
     layout_boxed_int Boxed_int64
+  | Pstring_load_vec { size = Boxed_vec128; boxed = true; _ }
+  | Pbytes_load_vec { size = Boxed_vec128; boxed = true; _ }
+  | Pbigstring_load_vec { size = Boxed_vec128; boxed = true; _ } ->
+    layout_boxed_vector Boxed_vec128
   | Pbigstring_load_32 { boxed = false; _ }
   | Pstring_load_32 { boxed = false; _ }
   | Pbytes_load_32 { boxed = false; _ } -> layout_unboxed_int Unboxed_int32
@@ -2390,6 +2397,10 @@ let primitive_result_layout (p : primitive) =
   | Pbigstring_load_64 { boxed = false; _ }
   | Pstring_load_64 { boxed = false; _ }
   | Pbytes_load_64 { boxed = false; _ } -> layout_unboxed_int Unboxed_int64
+  | Pstring_load_vec { size = Boxed_vec128; boxed = false; _ }
+  | Pbytes_load_vec { size = Boxed_vec128; boxed = false; _ }
+  | Pbigstring_load_vec { size = Boxed_vec128; boxed = false; _ } ->
+    layout_unboxed_vector Unboxed_vec128
   | Pstring_load_vec { size; boxed = false; _ }
   | Pbytes_load_vec { size; boxed = false; _ }
   | Pbigstring_load_vec { size; boxed = false; _ }
@@ -2401,7 +2412,7 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_int64_array_load_vec { size; boxed = false; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = false; _ }
   | Punboxed_int32_array_load_vec { size; boxed = false; _ } ->
-      layout_unboxed_vector (unboxed_vector_of_boxed_vector size)
+    layout_unboxed_vector (unboxed_vector_of_boxed_vector size)
   | Pstring_load_vec { size; boxed = true; _ }
   | Pbytes_load_vec { size; boxed = true; _ }
   | Pbigstring_load_vec { size; boxed = true; _ }
@@ -2413,7 +2424,7 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_int64_array_load_vec { size; boxed = true; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = true; _ }
   | Punboxed_int32_array_load_vec { size; boxed = true; _ } ->
-      layout_boxed_vector size
+    layout_boxed_vector size
   | Pbigarrayref (_, _, kind, _) ->
     begin match kind with
     | Pbigarray_unknown -> layout_any_value

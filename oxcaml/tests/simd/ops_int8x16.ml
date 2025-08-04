@@ -24,9 +24,9 @@ let check_binop msg scalar vector i0 i1 =
   (failmsg := fun () -> Printf.printf "%s: %02x | %02x\n%!" msg i0 i1);
   let r0 = scalar i0 i1 in
   let r1 = scalar i1 i0 in
-  let expect = Int8.of_ints r0 r1 r0 r1 r0 r1 r0 r1 in
-  let v1 = Int8.of_ints i0 i1 i0 i1 i0 i1 i0 i1 in
-  let v2 = Int8.of_ints i1 i0 i1 i0 i1 i0 i1 i0 in
+  let expect = Int8.to_int8x16 r0 r1 r0 r1 r0 r1 r0 r1 in
+  let v1 = Int8.to_int8x16 i0 i1 i0 i1 i0 i1 i0 i1 in
+  let v2 = Int8.to_int8x16 i1 i0 i1 i0 i1 i0 i1 i0 in
   let result = vector v1 v2 in
   eq (int8x16_low_int64 result)
     (int8x16_high_int64 result)
@@ -50,48 +50,48 @@ let () =
   Int8.check_ints (check_binop "cmpgt" Int8.cmpgt cmpgt);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x cvt_sx_i64\n%!" l r);
-      let v = Int8.of_ints l r 0 0 0 0 0 0 in
+      let v = Int8.to_int8x16 l r 0 0 0 0 0 0 in
       let result = cvtsx_i64 v in
       let expectl = Int8.cvtsx_i64 l in
       let expectr = Int8.cvtsx_i64 r in
       eq (int64x2_low_int64 result) (int64x2_high_int64 result) expectl expectr);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x cvt_zx_i64\n%!" l r);
-      let v = Int8.of_ints l r 0 0 0 0 0 0 in
+      let v = Int8.to_int8x16 l r 0 0 0 0 0 0 in
       let result = cvtzx_i64 v in
       let expectl = Int8.cvtzx_i64 l in
       let expectr = Int8.cvtzx_i64 r in
       eq (int64x2_low_int64 result) (int64x2_high_int64 result) expectl expectr);
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x cvt_sx_i32\n%!" l r);
-      let v = Int8.of_ints l r l r 0 0 0 0 in
+      let v = Int8.to_int8x16 l r l r 0 0 0 0 in
       let result = cvtsx_i32 v in
       let expectl = Int8.cvtsx_i32 l in
       let expectr = Int8.cvtsx_i32 r in
-      let expect = Int32s.of_int32s expectl expectr expectl expectr in
+      let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)
         (int32x4_low_int64 expect)
         (int32x4_high_int64 expect));
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x cvt_zx_i32\n%!" l r);
-      let v = Int8.of_ints l r l r 0 0 0 0 in
+      let v = Int8.to_int8x16 l r l r 0 0 0 0 in
       let result = cvtzx_i32 v in
       let expectl = Int8.cvtzx_i32 l in
       let expectr = Int8.cvtzx_i32 r in
-      let expect = Int32s.of_int32s expectl expectr expectl expectr in
+      let expect = Int32s.to_int32x4 expectl expectr expectl expectr in
       eq (int32x4_low_int64 result)
         (int32x4_high_int64 result)
         (int32x4_low_int64 expect)
         (int32x4_high_int64 expect));
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x cvt_sx_i16\n%!" l r);
-      let v = Int8.of_ints l r l r l r l r in
+      let v = Int8.to_int8x16 l r l r l r l r in
       let result = cvtsx_i16 v in
       let expectl = Int8.cvtsx_i16 l in
       let expectr = Int8.cvtsx_i16 r in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -100,12 +100,12 @@ let () =
         (int16x8_high_int64 expect));
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x cvt_zx_i16\n%!" l r);
-      let v = Int8.of_ints l r l r l r l r in
+      let v = Int8.to_int8x16 l r l r l r l r in
       let result = cvtzx_i16 v in
       let expectl = Int8.cvtzx_i16 l in
       let expectr = Int8.cvtzx_i16 r in
       let expect =
-        Int16.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int16.to_int16x8 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int16x8_low_int64 result)
@@ -114,12 +114,12 @@ let () =
         (int16x8_high_int64 expect));
   Int8.check_ints (fun l r ->
       (failmsg := fun () -> Printf.printf "%02x|%02x abs\n%!" l r);
-      let v = Int8.of_ints l r l r l r l r in
+      let v = Int8.to_int8x16 l r l r l r l r in
       let result = abs v in
       let expectl = Int8.abs l in
       let expectr = Int8.abs r in
       let expect =
-        Int8.of_ints expectl expectr expectl expectr expectl expectr expectl
+        Int8.to_int8x16 expectl expectr expectl expectr expectl expectr expectl
           expectr
       in
       eq (int8x16_low_int64 result)

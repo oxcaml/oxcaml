@@ -27,7 +27,6 @@ module Extension = struct
       | SSE4_1
       | SSE4_2
       | CLMUL
-      | LZCNT
       | BMI
       | BMI2
       | AVX
@@ -43,12 +42,11 @@ module Extension = struct
       | SSE4_1 -> 5
       | SSE4_2 -> 6
       | CLMUL -> 7
-      | LZCNT -> 8
-      | BMI -> 9
-      | BMI2 -> 10
-      | AVX -> 11
-      | AVX2 -> 12
-      | AVX512F -> 13
+      | BMI -> 8
+      | BMI2 -> 9
+      | AVX -> 10
+      | AVX2 -> 11
+      | AVX512F -> 12
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -65,7 +63,6 @@ module Extension = struct
     | SSE4_1 -> "SSE41"
     | SSE4_2 -> "SSE42"
     | CLMUL -> "CLMUL"
-    | LZCNT -> "LZCNT"
     | BMI -> "BMI"
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
@@ -81,7 +78,6 @@ module Extension = struct
     | SSE4_1 -> "Penryn+"
     | SSE4_2 -> "Nehalem+"
     | CLMUL -> "Westmere+"
-    | LZCNT -> "Haswell+"
     | BMI -> "Haswell+"
     | BMI2 -> "Haswell+"
     | AVX -> "Sandybridge+"
@@ -94,7 +90,6 @@ module Extension = struct
        disabled as they are included in baseline x86_64. *)
     | POPCNT -> Config.has_popcnt
     | CLMUL -> Config.has_pclmul
-    | LZCNT -> Config.has_lzcnt
     | SSE3 -> Config.has_sse3
     | SSSE3 -> Config.has_ssse3
     | SSE4_1 -> Config.has_sse4_1
@@ -108,7 +103,7 @@ module Extension = struct
   let all =
     Set.of_list
       [ POPCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2; CLMUL;
-        LZCNT; BMI; BMI2; AVX; AVX2; AVX512F ]
+        BMI; BMI2; AVX; AVX2; AVX512F ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -120,7 +115,7 @@ module Extension = struct
     | AVX2, AVX512F
     | BMI, BMI2 -> true
     | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
-      | SSE4_2 | CLMUL | LZCNT | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
+      | SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
 
   let rec fix set less =
     let closure =
@@ -164,15 +159,7 @@ module Extension = struct
   let enabled_vec256 () = enabled AVX
   let enabled_vec512 () = enabled AVX512F
 
-  let require_vec256 () =
-    if not (enabled AVX) then Misc.fatal_error
-      "Using 256-bit registers requires AVX, which is not enabled."
-
-  let require_vec512 () =
-    if not (enabled AVX512F) then Misc.fatal_error
-      "Using 512-bit registers requires AVX512F, which is not enabled."
-
-  let require_instruction (instr : Amd64_simd_instrs.instr) =
+  let enabled_instruction (instr : Amd64_simd_instrs.instr) =
     let enabled : Amd64_simd_defs.ext -> bool = function
       | SSE | SSE2 -> true
       | SSE3 -> enabled SSE3
@@ -184,8 +171,7 @@ module Extension = struct
       | AVX -> enabled AVX
       | AVX2 -> enabled AVX2
     in
-    if not (Array.for_all enabled instr.ext)
-    then Misc.fatal_errorf "Emitted %s, which is not enabled." instr.mnemonic
+    Array.for_all enabled instr.ext
 end
 
 (* Emit elf notes with trap handling information. *)
@@ -317,6 +303,22 @@ let num_args_addressing = function
   | Iindexed2 _ -> 2
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
+
+let addressing_displacement_for_llvmize addr =
+  if not !Clflags.llvm_backend
+  then
+    Misc.fatal_error
+      "Arch.displacement_addressing_for_llvmize: should only be called with \
+        -llvm-backend"
+  else
+    match addr with
+    | Iindexed d -> d
+    | Ibased _
+    | Iindexed2 _
+    | Iscaled _
+    | Iindexed2scaled _ ->
+      Misc.fatal_error
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
 
 (* Printing operations and addressing modes *)
 

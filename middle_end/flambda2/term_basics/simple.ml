@@ -124,6 +124,11 @@ let free_names_in_types t = free_names_with_mode t Name_mode.in_types
 
 let apply_renaming t renaming = Renaming.apply_simple renaming t
 
+let kind t =
+  pattern_match' t ~const:Reg_width_const.kind
+    ~symbol:(fun _sym ~coercion:_ -> Flambda_kind.value)
+    ~var:(fun var ~coercion:_ -> Variable.kind var)
+
 module List = struct
   type nonrec t = t list
 

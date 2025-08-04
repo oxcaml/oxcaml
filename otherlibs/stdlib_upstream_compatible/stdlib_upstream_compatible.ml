@@ -3,4 +3,4 @@ module Int32_u = Int32_u
 module Int64_u = Int64_u
 module Nativeint_u = Nativeint_u
 
-let mixed_block_layout_v3 = ()
+let mixed_block_layout_v4 = ()

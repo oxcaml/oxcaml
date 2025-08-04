@@ -75,7 +75,7 @@ type 'a tree =
 type 'a t =
   { prefix : 'a shape;
     suffix : 'a shape;
-    flattened_reordered_shape : 'a shape;
+    flattened_reordered_shape : 'a shape_with_paths;
     forest : 'a tree array;
     print_locality : Format.formatter -> 'a -> unit
   }
@@ -88,7 +88,7 @@ let value_prefix_len t = Array.length t.prefix
 
 let flat_suffix_len t = Array.length t.suffix
 
-let flattened_reordered_shape t = t.flattened_reordered_shape
+let flattened_reordered_shape t = Array.map fst t.flattened_reordered_shape
 
 let print_indentation ppf k =
   for _ = 1 to k do
@@ -136,6 +136,11 @@ let new_indexes_to_old_indexes t =
     (fun old_index new_index -> result.(new_index) <- old_index)
     old_indexes_to_new_indexes;
   result
+
+let new_index_to_old_path t new_index =
+  snd t.flattened_reordered_shape.(new_index)
+
+let new_block_length t = Array.length t.flattened_reordered_shape
 
 let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   let original_path = path in
@@ -258,7 +263,7 @@ let of_mixed_block_elements ~print_locality
   let forest = build_tree_list old_path_to_new_index [] original_shape in
   { prefix = Array.map fst prefix;
     suffix = Array.map fst suffix;
-    flattened_reordered_shape = Array.map fst flattened_reordered_shape;
+    flattened_reordered_shape;
     forest;
     print_locality
   }

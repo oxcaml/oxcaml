@@ -1105,8 +1105,15 @@ let glb_array_type loc t1 t2 =
     Punboxedintarray Unboxed_nativeint
   | Punboxedintarray _, _ | _, Punboxedintarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec128), Punboxedvectorarray Unboxed_vec128 ->
+  | (Pgenarray | Punboxedvectorarray Unboxed_vec128),
+    Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray Unboxed_vec128
+  | (Pgenarray | Punboxedvectorarray Unboxed_vec256),
+    Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray Unboxed_vec256
+  | (Pgenarray | Punboxedvectorarray Unboxed_vec512),
+    Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
 
@@ -1166,8 +1173,15 @@ let glb_array_ref_type loc t1 t2 =
     Punboxedintarray_ref Unboxed_nativeint
   | Punboxedintarray_ref _, _ | _, Punboxedintarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec128), Punboxedvectorarray Unboxed_vec128 ->
+  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec128),
+    Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_ref Unboxed_vec128
+  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec256),
+    Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray_ref Unboxed_vec256
+  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec512),
+    Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
 
@@ -1241,8 +1255,15 @@ let glb_array_set_type loc t1 t2 =
     Punboxedintarray_set Unboxed_nativeint
   | Punboxedintarray_set _, _ | _, Punboxedintarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec128), Punboxedvectorarray Unboxed_vec128 ->
+  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec128),
+    Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_set Unboxed_vec128
+  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec256),
+    Punboxedvectorarray Unboxed_vec256 ->
+  Punboxedvectorarray_set Unboxed_vec256
+  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec512),
+    Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
 
@@ -2144,6 +2165,7 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Pobj_magic _ | Punbox_vector _ | Punbox_unit
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
+  | Puntag_int _ | Ptag_int _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
   | Pcpu_relax

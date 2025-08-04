@@ -1322,6 +1322,126 @@ let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
        (Format.pp_print_list ~pp_sep (pp_element ~nested:true)))
     arg
 
+
+(* Printing a table of strings with headers. *)
+type table =
+  { columns : column array;
+    num_rows : int
+  }
+
+and column =
+  { mutable header : string;
+    entries : cell array;
+    mutable char_width : int
+  }
+
+and cell = string list
+
+(* Initialize a table by storing the original column string in the cells. *)
+let make_table (columns : (string * string list) list) =
+  match columns with
+  | [] -> fatal_errorf "make_table: empty table"
+  | (_, col) :: _ ->
+    let num_rows = List.length col in
+    let columns =
+      List.map
+        (fun (header, col) ->
+          let char_width, entries =
+            List.fold_right
+              (fun cell (width, acc) ->
+                let char_width = max width (String.length cell) in
+                char_width, [cell] :: acc)
+              col
+              (String.length header, [])
+          in
+          let entries = Array.of_list entries in
+          if Array.length entries <> num_rows then
+            fatal_errorf "make_table: inconsistent column lengths";
+          { header; entries; char_width })
+        columns
+    in
+    { columns = Array.of_list columns; num_rows }
+
+(* Splits all cells based on new lines,
+   and expands the cells with white space to be all of the same length. *)
+let expand_table t =
+  let pad_string desired_length s =
+    s ^ String.make (desired_length - String.length s) ' '
+  in
+  let pad_row_cell desired_depth cell =
+    cell @ List.init (desired_depth - List.length cell) (fun _ -> "")
+  in
+  (* split based on new lines and adjust column width *)
+  for i = 0 to Array.length t.columns - 1 do
+    let column = t.columns.(i) in
+    column.char_width <- String.length column.header;
+    for j = 0 to Array.length column.entries - 1 do
+      let cell_strings = column.entries.(j) in
+      let cell_strings =
+        List.concat_map (String.split_on_char '\n') cell_strings
+      in
+      let cell_max_width =
+        List.fold_left (fun acc s -> max acc (String.length s)) 0 cell_strings
+      in
+      column.char_width <- max column.char_width cell_max_width;
+      column.entries.(j) <- cell_strings
+    done
+  done;
+  (* add empty strings for rows with different depths *)
+  for j = 0 to t.num_rows - 1 do
+    let max_depth = ref 1 in
+    for i = 0 to Array.length t.columns - 1 do
+      max_depth := max !max_depth (List.length t.columns.(i).entries.(j))
+    done;
+    for i = 0 to Array.length t.columns - 1 do
+      t.columns.(i).entries.(j)
+        <- pad_row_cell !max_depth t.columns.(i).entries.(j)
+    done
+  done;
+  (* expand all strings to be of the correct width *)
+  for i = 0 to Array.length t.columns - 1 do
+    let column = t.columns.(i) in
+    column.header <- pad_string column.char_width column.header;
+    for j = 0 to Array.length column.entries - 1 do
+      column.entries.(j)
+        <- List.map (pad_string column.char_width) column.entries.(j)
+    done
+  done
+
+let print_separator ppf table_width =
+  Format.fprintf ppf "|%s|\n" (String.make (table_width - 2) '-')
+
+(* prints a single row of [num_cols] columns *)
+let print_row ppf num_cols f =
+  for i = 0 to num_cols - 1 do
+    Format.fprintf ppf "| %s " (f i)
+  done;
+  Format.fprintf ppf "|\n"
+
+let pp_table ppf (columns : (string * string list) list) =
+  if List.length columns = 0 then fatal_errorf "pp_table: empty table";
+  let table = make_table columns in
+  expand_table table;
+  let table_width =
+    Array.fold_left (fun acc column -> acc + column.char_width) 0 table.columns
+    + 4 (* boundary characters *)
+    + ((Array.length table.columns - 1) * 3 (* inter column boundaries *))
+  in
+  print_separator ppf table_width;
+  print_row ppf (Array.length table.columns)
+    (fun i -> table.columns.(i).header);
+  print_separator ppf table_width;
+  for j = 0 to table.num_rows - 1 do
+    let first_column_cell = table.columns.(0).entries.(j) in
+    let depth = List.length first_column_cell in
+    for k = 0 to depth - 1 do
+      print_row ppf (Array.length table.columns) (fun i ->
+          List.nth table.columns.(i).entries.(j) k)
+    done;
+    print_separator ppf table_width
+  done
+
+
 (* showing configuration and configuration variables *)
 let show_config_and_exit () =
   Config.print_config stdout;

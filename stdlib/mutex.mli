@@ -34,7 +34,7 @@ type t : value mod portable contended
 val create : unit -> t
 (** Return a new mutex. *)
 
-val lock : t -> unit
+val lock : t @ local -> unit
 (** Lock the given mutex. Only one thread can have the mutex locked
    at any time. A thread that attempts to lock a mutex already locked
    by another thread will suspend until the other thread unlocks
@@ -46,13 +46,13 @@ val lock : t -> unit
    @before 4.12 {!Sys_error} was not raised for recursive locking
    (platform-dependent behaviour) *)
 
-val try_lock : t -> bool
+val try_lock : t @ local -> bool
 (** Same as {!Mutex.lock}, but does not suspend the calling thread if
    the mutex is already locked: just return [false] immediately
    in that case. If the mutex is unlocked, lock it and
    return [true]. *)
 
-val unlock : t -> unit
+val unlock : t @ local -> unit
 (** Unlock the given mutex. Other threads suspended trying to lock
    the mutex will restart.  The mutex must have been previously locked
    by the thread that calls {!Mutex.unlock}.
@@ -61,7 +61,7 @@ val unlock : t -> unit
    @before 4.12 {!Sys_error} was not raised when unlocking an unlocked mutex
    or when unlocking a mutex from a different thread. *)
 
-val protect : t -> (unit -> 'a) -> 'a
+val protect : t @ local -> (unit -> 'a) @ local -> 'a
 (** [protect mutex f] runs [f()] in a critical section where [mutex]
     is locked (using {!lock}); it then takes care of releasing [mutex],
     whether [f()] returned a value or raised an exception.

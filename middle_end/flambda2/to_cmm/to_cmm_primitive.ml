@@ -279,15 +279,9 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
   | Naked_vec512s -> C.unboxed_vec512_array_length arr dbg
 
 let array_load_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
-    ~has_custom_ops arr index =
+    arr index =
   let index =
     C.lsl_int (C.untag_int index dbg) (Cconst_int (element_width_log2, dbg)) dbg
-  in
-  let index =
-    (* Skip custom_ops pointer *)
-    if has_custom_ops
-    then C.add_int index (Cconst_int (Arch.size_addr, dbg)) dbg
-    else index
   in
   match vec_kind with
   | Vec128 -> C.unaligned_load_128 arr index dbg
@@ -301,15 +295,9 @@ let array_load_256 = array_load_vector ~vec_kind:Vec256
 let array_load_512 = array_load_vector ~vec_kind:Vec512
 
 let array_set_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
-    ~has_custom_ops arr index new_value =
+    arr index new_value =
   let index =
     C.lsl_int (C.untag_int index dbg) (Cconst_int (element_width_log2, dbg)) dbg
-  in
-  let index =
-    (* Skip custom_ops pointer *)
-    if has_custom_ops
-    then C.add_int index (Cconst_int (Arch.size_addr, dbg)) dbg
-    else index
   in
   match vec_kind with
   | Vec128 -> C.unaligned_set_128 arr index new_value dbg
@@ -329,11 +317,9 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | (Values | Immediates | Unboxed_product _), Immediates ->
     C.int_array_ref arr index dbg
   | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_ref ~has_custom_ops:true arr
-      ~array_index:index dbg
+    C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
   | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_ref ~has_custom_ops:false arr
-      ~array_index:index dbg
+    C.unboxed_int64_or_nativeint_array_ref arr ~array_index:index dbg
   | (Values | Immediates | Unboxed_product _), Values ->
     C.addr_array_ref arr index dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
@@ -346,59 +332,41 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | Unboxed_product _, Naked_int32s ->
     C.unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index:index dbg
   | (Immediates | Naked_floats), Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:false arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:true arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      ~has_custom_ops:true arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
   | Naked_vec128s, Naked_vec128s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      ~has_custom_ops:true arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec256s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      ~has_custom_ops:true arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | Naked_vec128s, Naked_vec512s ->
-    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      ~has_custom_ops:true arr index
+    array_load_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
   | (Immediates | Naked_floats), Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:false arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:true arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      ~has_custom_ops:true arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
   | Naked_vec256s, Naked_vec128s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      ~has_custom_ops:true arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec256s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      ~has_custom_ops:true arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | Naked_vec256s, Naked_vec512s ->
-    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      ~has_custom_ops:true arr index
+    array_load_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
   | (Immediates | Naked_floats), Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:false arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:true arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
   | (Naked_int32s | Naked_float32s), Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      ~has_custom_ops:true arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
   | Naked_vec512s, Naked_vec128s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      ~has_custom_ops:true arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec256s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      ~has_custom_ops:true arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | Naked_vec512s, Naked_vec512s ->
-    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      ~has_custom_ops:true arr index
+    array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Values ) ->
@@ -450,11 +418,9 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | (Values | Immediates | Unboxed_product _), Values init ->
     addr_array_store init ~arr ~index ~new_value dbg
   | (Naked_int64s | Naked_nativeints), (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_set ~has_custom_ops:true arr ~index
-      ~new_value dbg
+    C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
   | Unboxed_product _, (Naked_int64s | Naked_nativeints) ->
-    C.unboxed_int64_or_nativeint_array_set ~has_custom_ops:false arr ~index
-      ~new_value dbg
+    C.unboxed_int64_or_nativeint_array_set arr ~index ~new_value dbg
   | Naked_floats, Naked_floats | Unboxed_product _, Naked_floats ->
     C.float_array_set arr index new_value dbg
   | Naked_float32s, Naked_float32s ->
@@ -468,59 +434,59 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
     C.unboxed_mutable_int32_unboxed_product_array_set arr ~array_index:index
       ~new_value dbg
   | (Immediates | Naked_floats), Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:false arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:true arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int32s | Naked_float32s), Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      ~has_custom_ops:true arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
   | Naked_vec128s, Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      ~has_custom_ops:true arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | Naked_vec128s, Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      ~has_custom_ops:true arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | Naked_vec128s, Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4
-      ~has_custom_ops:true arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:4 arr index
+      new_value
   | (Immediates | Naked_floats), Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:false arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:true arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int32s | Naked_float32s), Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      ~has_custom_ops:true arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
   | Naked_vec256s, Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      ~has_custom_ops:true arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+      new_value
   | Naked_vec256s, Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      ~has_custom_ops:true arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+      new_value
   | Naked_vec256s, Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5
-      ~has_custom_ops:true arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:5 arr index
+      new_value
   | (Immediates | Naked_floats), Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:false arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int64s | Naked_nativeints), Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3
-      ~has_custom_ops:true arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:3 arr index
+      new_value
   | (Naked_int32s | Naked_float32s), Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2
-      ~has_custom_ops:true arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:2 arr index
+      new_value
   | Naked_vec512s, Naked_vec128s ->
-    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      ~has_custom_ops:true arr index new_value
+    array_set_128 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+      new_value
   | Naked_vec512s, Naked_vec256s ->
-    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      ~has_custom_ops:true arr index new_value
+    array_set_256 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+      new_value
   | Naked_vec512s, Naked_vec512s ->
-    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6
-      ~has_custom_ops:true arr index new_value
+    array_set_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
+      new_value
   | ( ( Naked_floats | Naked_int32s | Naked_float32s | Naked_int64s
       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
       Values _ ) ->
@@ -718,6 +684,13 @@ let scalar_type_of_standard_int_or_float :
 let unary_int_arith_primitive _env dbg kind op arg =
   match (op : P.unary_int_arith_op) with
   | Swap_byte_endianness -> (
+    (* CR lthls: Swap_byte_endianness is a weird primitive, that is only defined
+       on a subset of the naked types with tricky semantics, so I would be in
+       favour of not supporting the small integer versions and not changing the
+       other ones
+
+       jvanburen: I think it's well-defined on all of the naked integer types in
+       cmm_helpers... *)
     match (kind : K.Standard_int.t) with
     | Tagged_immediate ->
       C.Scalar_type.Integral.conjugate arg ~outer:tagged_immediate
@@ -729,14 +702,15 @@ let unary_int_arith_primitive _env dbg kind op arg =
          affect the sign of the resulting value. *)
       C.Scalar_type.Integral.static_cast arg ~dbg ~src:naked_immediate
         ~dst:naked_int16
-      |> (fun arg -> C.bbswap Sixteen arg dbg)
+      |> (fun arg -> C.bbswap Unboxed_int16 arg dbg)
       |> C.zero_extend ~bits:16 ~dbg
     | Naked_int8 -> arg
     | Naked_int16 ->
       (* Byte swaps of small integers need a sign-extension in order to match
          the Lambda semantics (where the swap might affect the sign). *)
-      C.sign_extend (C.bbswap Sixteen arg dbg) ~bits:16 ~dbg
-    | Naked_int32 -> C.sign_extend (C.bbswap Thirtytwo arg dbg) ~bits:32 ~dbg
+      C.sign_extend (C.bbswap Unboxed_int16 arg dbg) ~bits:16 ~dbg
+    | Naked_int32 ->
+      C.sign_extend (C.bbswap Unboxed_int32 arg dbg) ~bits:32 ~dbg
     (* int64 and nativeint don't require a sign-extension since they are already
        register-size, but the code is here for consistency: *)
     | Naked_int64 -> C.sign_extend (C.bbswap Sixtyfour arg dbg) ~bits:64 ~dbg

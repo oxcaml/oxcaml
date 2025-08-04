@@ -237,6 +237,11 @@ type float_width =
   | Float64
   | Float32
 
+type vector_width =
+  | Vec128
+  | Vec256
+  | Vec512
+
 type vec128_type =
   | Int8x16
   | Int16x8
@@ -293,9 +298,11 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128
-  | V256_of_v256
-  | V512_of_v512 (* Converts between vector types of the same width. *)
+  (* When reinterpreting a smaller vector as a larger vector, the upper bits are
+     unspecified. *)
+  | V128_of_vec of vector_width
+  | V256_of_vec of vector_width
+  | V512_of_vec of vector_width
 
 (* These casts may require a particular value-preserving operation, e.g.
    truncating a float to an int. *)

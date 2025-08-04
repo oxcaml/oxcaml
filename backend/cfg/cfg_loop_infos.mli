@@ -18,7 +18,13 @@ val compute_loops_of_back_edges : Cfg.t -> Cfg_edge.Set.t -> loops
 type header_map = loop list Label.Map.t
 (* Map from loop header to loops. *)
 
+val compare_loop_by_cardinal : loop -> loop -> int
+(* Compare function to order by increasing size/cardinal. *)
+
 val compute_header_map : loops -> header_map
+
+val merge_loops : loop list -> loop list
+(* Merge the loops which are not nested but have blocks in common. *)
 
 type loop_depths = int Label.Map.t
 (* Maps labels to the number of nested loops it is part of. *)

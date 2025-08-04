@@ -416,8 +416,8 @@ let mk_add_extension add_extension id args =
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind.Sort.Const.t) with
       | Base Value -> ()
-      | Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
+      | Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+             | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _ -> raise_error ())
     args;
   add_extension id
@@ -622,18 +622,6 @@ let add_simd_stable_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float64x2 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
-
-(* CR-soon mslater:
-  Remaining work before these can be moved to stable:
-    - Correct ASAN checks for 32/64 byte memory chunks
-    - Correct TSAN save/restore SIMD registers
-  Not strictly required for stable, but will be necessary:
-    - Align Vec256 stack slots on the OCaml stack
-    - AVX & AVX2 intrinsics (tests: see ops.ml, ocaml_simd_sse)
-*)
-let add_simd_beta_extension_types add_type env =
-  let _, add_type = mk_add_type add_type in
-  env
   |> add_type ident_int8x32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_int16x16 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -646,6 +634,8 @@ let add_simd_beta_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_float64x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
+
+let add_simd_beta_extension_types _add_type env = env
 
 let add_simd_alpha_extension_types add_type env =
   let _, add_type = mk_add_type add_type in

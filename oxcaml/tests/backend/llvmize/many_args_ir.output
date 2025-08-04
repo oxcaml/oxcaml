@@ -1,0 +1,159 @@
+source_filename = "many_args.ml"
+
+@camlMany_args__data_begin = global i64 0
+define void @camlMany_args__code_begin() { ret void }
+
+define cc 104 { { ptr }, { i64 } } @camlMany_args__call_with_HIDE_STAMP(ptr %0, i64 %1)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %3 = alloca i64
+  store i64 %1, ptr %3
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  %14 = alloca i64
+  %15 = alloca i64
+  %16 = alloca i64
+  %17 = alloca i64
+  %18 = alloca i64
+  %19 = load i64, ptr %ds
+  %20 = add i64 %19, 568
+  %21 = inttoptr i64 %20 to ptr
+  %22 = load i64, ptr %ds
+  %23 = add i64 %22, 576
+  %24 = inttoptr i64 %23 to ptr
+  %25 = load i64, ptr %ds
+  %26 = add i64 %25, 584
+  %27 = inttoptr i64 %26 to ptr
+  %28 = load i64, ptr %ds
+  %29 = add i64 %28, 592
+  %30 = inttoptr i64 %29 to ptr
+  %31 = alloca i64
+  %32 = alloca i64
+  br label %L1
+L1:
+  br label %L101
+L101:                                                ; preds = %L1
+  %33 = load i64, ptr %3
+  store i64 %33, ptr %13
+  store ptr @camlMany_args_defn, ptr %14
+  %34 = load i64, ptr %14
+  %35 = add i64 %34, 0
+  %36 = inttoptr i64 %35 to ptr
+  %37 = load i64, ptr %36
+  store i64 %37, ptr %15
+  %38 = load i64, ptr %13
+  store i64 %38, ptr %16
+  %39 = load i64, ptr %16
+  %40 = add i64 %39, 60
+  store i64 %40, ptr %16
+  store i64 7, ptr %17
+  %41 = load i64, ptr %13
+  store i64 %41, ptr %3
+  %42 = load i64, ptr %13
+  store i64 %42, ptr %4
+  %43 = load i64, ptr %17
+  store i64 %43, ptr %5
+  %44 = load i64, ptr %13
+  store i64 %44, ptr %6
+  %45 = load i64, ptr %13
+  store i64 %45, ptr %7
+  %46 = load i64, ptr %13
+  store i64 %46, ptr %8
+  %47 = load i64, ptr %13
+  store i64 %47, ptr %9
+  %48 = load i64, ptr %13
+  store i64 %48, ptr %10
+  %49 = load i64, ptr %13
+  store i64 %49, ptr %11
+  %50 = load i64, ptr %13
+  store i64 %50, ptr %12
+  %51 = load i64, ptr %13
+  store i64 %51, ptr %21
+  %52 = load i64, ptr %13
+  store i64 %52, ptr %24
+  %53 = load i64, ptr %16
+  store i64 %53, ptr %27
+  %54 = load i64, ptr %15
+  store i64 %54, ptr %30
+  %55 = load i64, ptr %3
+  %56 = load i64, ptr %4
+  %57 = load i64, ptr %5
+  %58 = load i64, ptr %6
+  %59 = load i64, ptr %7
+  %60 = load i64, ptr %8
+  %61 = load i64, ptr %9
+  %62 = load i64, ptr %10
+  %63 = load i64, ptr %11
+  %64 = load i64, ptr %12
+  %65 = load ptr, ptr %ds
+  %66 = call cc 104 { { ptr }, { i64 } } @caml_apply13(ptr %65, i64 %55, i64 %56, i64 %57, i64 %58, i64 %59, i64 %60, i64 %61, i64 %62, i64 %63, i64 %64)
+  %67 = extractvalue { { ptr }, { i64 } } %66, 0, 0
+  store ptr %67, ptr %ds
+  %68 = extractvalue { { ptr }, { i64 } } %66, 1, 0
+  store i64 %68, ptr %3
+  br label %L103
+L103:                                                ; preds = %L101
+  %69 = load i64, ptr %3
+  store i64 %69, ptr %18
+  %70 = load i64, ptr %18
+  store i64 %70, ptr %31
+  %71 = load i64, ptr %31
+  store i64 %71, ptr %32
+  %72 = load i64, ptr %32
+  %73 = add i64 %72, 2
+  store i64 %73, ptr %32
+  %74 = load i64, ptr %32
+  store i64 %74, ptr %3
+  %75 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %76 = load ptr, ptr %ds
+  %77 = insertvalue { { ptr }, { i64 } } %75, ptr %76, 0, 0
+  %78 = load i64, ptr %3
+  %79 = insertvalue { { ptr }, { i64 } } %77, i64 %78, 1, 0
+  ret { { ptr }, { i64 } } %79
+}
+
+define cc 104 { { ptr }, { i64 } } @camlMany_args__entry(ptr %0)  {
+  %ds = alloca ptr
+  store ptr %0, ptr %ds
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  %6 = alloca i64
+  br label %L1
+L1:
+  br label %L111
+L111:                                                ; preds = %L1
+  store ptr @camlMany_args, ptr %4
+  %7 = load i64, ptr %4
+  store i64 %7, ptr %5
+  %8 = load i64, ptr %5
+  store i64 %8, ptr %3
+  store i64 1, ptr %6
+  %9 = load i64, ptr %6
+  store i64 %9, ptr %2
+  %10 = extractvalue { { { ptr }, { i64 } } } poison, 0
+  %11 = load ptr, ptr %ds
+  %12 = insertvalue { { ptr }, { i64 } } %10, ptr %11, 0, 0
+  %13 = load i64, ptr %2
+  %14 = insertvalue { { ptr }, { i64 } } %12, i64 %13, 1, 0
+  ret { { ptr }, { i64 } } %14
+}
+
+declare cc 104 { { ptr }, { i64 } } @caml_apply13(ptr, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64)
+@camlMany_args__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
+@camlMany_args = global { ptr, i64 } { ptr @camlMany_args__call_with_1, i64 3063 }
+@camlMany_args__call_with_1 = global { ptr, i64 } { ptr @camlMany_args__call_with_HIDE_STAMP, i64 108086391056891909 }
+@camlMany_args_defn = external global ptr
+
+@camlMany_args__data_end = global i64 0
+define void @camlMany_args__code_end() { ret void }
+@camlMany_args__frametable = global i64 0

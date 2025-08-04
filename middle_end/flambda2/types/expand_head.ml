@@ -191,6 +191,8 @@ end = struct
     | Naked_float32 f ->
       create_naked_float32 (TG.Head_of_kind_naked_float32.create f)
     | Naked_float f -> create_naked_float (TG.Head_of_kind_naked_float.create f)
+    | Naked_int8 i -> create_naked_int8 (TG.Head_of_kind_naked_int8.create i)
+    | Naked_int16 i -> create_naked_int16 (TG.Head_of_kind_naked_int16.create i)
     | Naked_int32 i -> create_naked_int32 (TG.Head_of_kind_naked_int32.create i)
     | Naked_int64 i -> create_naked_int64 (TG.Head_of_kind_naked_int64.create i)
     | Naked_nativeint i ->
@@ -280,6 +282,33 @@ end = struct
         match TG.apply_coercion_head_of_kind_naked_vec512 head coercion with
         | Bottom -> create_bottom K.naked_vec512
         | Ok head -> create_naked_vec512 head))
+    | Naked_int8 Unknown -> create_unknown K.naked_int8
+    | Naked_int8 Bottom -> create_bottom K.naked_int8
+    | Naked_int8 (Ok (No_alias head)) -> (
+      match coercion with
+      | None -> create_naked_int8 head
+      | Some coercion -> (
+        match TG.apply_coercion_head_of_kind_naked_int8 head coercion with
+        | Bottom -> create_bottom K.naked_int8
+        | Ok head -> create_naked_int8 head))
+    | Naked_int16 Unknown -> create_unknown K.naked_int16
+    | Naked_int16 Bottom -> create_bottom K.naked_int16
+    | Naked_int16 (Ok (No_alias head)) -> (
+      match coercion with
+      | None -> create_naked_int16 head
+      | Some coercion -> (
+        match TG.apply_coercion_head_of_kind_naked_int16 head coercion with
+        | Bottom -> create_bottom K.naked_int16
+        | Ok head -> create_naked_int16 head))
+    | Naked_int32 Unknown -> create_unknown K.naked_int32
+    | Naked_int32 Bottom -> create_bottom K.naked_int32
+    | Naked_int32 (Ok (No_alias head)) -> (
+      match coercion with
+      | None -> create_naked_int32 head
+      | Some coercion -> (
+        match TG.apply_coercion_head_of_kind_naked_int32 head coercion with
+        | Bottom -> create_bottom K.naked_int32
+        | Ok head -> create_naked_int32 head))
     | Naked_int64 Unknown -> create_unknown K.naked_int64
     | Naked_int64 Bottom -> create_bottom K.naked_int64
     | Naked_int64 (Ok (No_alias head)) -> (

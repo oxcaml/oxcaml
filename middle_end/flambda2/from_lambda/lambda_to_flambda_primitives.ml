@@ -67,6 +67,8 @@ let standard_int_or_float_of_unboxed_integer (ubint : L.unboxed_integer) :
   | Unboxed_nativeint -> Naked_nativeint
   | Unboxed_int8 -> Naked_int8
   | Unboxed_int16 -> Naked_int16
+  | Unboxed_int8 -> Naked_int8
+  | Unboxed_int16 -> Naked_int16
   | Unboxed_int32 -> Naked_int32
   | Unboxed_int64 -> Naked_int64
 

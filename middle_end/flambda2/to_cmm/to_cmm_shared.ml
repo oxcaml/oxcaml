@@ -323,7 +323,7 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   List.rev args, free_vars, env, res, effs
 
 let bound_parameters_aux ~f env l =
-  let flambda_vars = Bound_parameters.vars l in
+  let flambda_vars = Bound_parameters.vars_and_uids l in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in
   let vars =
     List.map2 (fun v v' -> v, f v') cmm_vars (Bound_parameters.to_list l)
@@ -345,7 +345,8 @@ let invalid res ~message =
         Symbol.create
           (Compilation_unit.get_current_exn ())
           (Linkage_name.of_string
-             (Variable.unique_name (Variable.create "invalid")))
+             (Variable.unique_name
+                (Variable.create "invalid" Flambda_kind.value)))
       in
       let res =
         Cmm_helpers.emit_string_constant

@@ -41,7 +41,7 @@ let create_for_stub dacc ~all_code ~simplify_function_body =
         Code_id.Map.fold
           (fun code_id code denv -> DE.define_code denv ~code_id ~code)
           all_code
-          (DE.enter_set_of_closures denv (Disable_inlining Stub)))
+          (DE.enter_set_of_closures denv ~in_stub:true))
   in
   { dacc_prior_to_sets = dacc;
     simplify_function_body;
@@ -254,7 +254,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
-    DE.enter_set_of_closures denv Do_not_disable_inlining
+    DE.enter_set_of_closures denv ~in_stub:false
     (* Even if we are not rebuilding terms we should always rebuild them for
        local functions. The type of a function is dependent on its term and not
        knowing it prohibits us from inlining it. *)

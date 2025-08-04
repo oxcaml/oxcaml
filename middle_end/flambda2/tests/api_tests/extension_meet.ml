@@ -13,10 +13,10 @@ let _test_recursive_meet () =
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
   in
-  let var_x = Variable.create "x" in
-  let var_y = Variable.create "y" in
-  let var_z = Variable.create "z" in
-  let var_v = Variable.create "v" in
+  let var_x = Variable.create "x" Flambda_kind.value in
+  let var_y = Variable.create "y" Flambda_kind.value in
+  let var_z = Variable.create "z" Flambda_kind.value in
+  let var_v = Variable.create "v" Flambda_kind.value in
   let n_x = Name.var var_x in
   let n_y = Name.var var_y in
   let n_z = Name.var var_z in
@@ -64,7 +64,7 @@ let _test_bottom_detection () =
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
   in
-  let var_x = Variable.create "x" in
+  let var_x = Variable.create "x" Flambda_kind.value in
   let n_x = Name.var var_x in
   let nb_x = Bound_name.create n_x Name_mode.normal in
   let env = TE.add_definition env nb_x Flambda_kind.value in
@@ -98,7 +98,7 @@ let _test_bottom_recursive () =
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
   in
-  let var_x = Variable.create "x" in
+  let var_x = Variable.create "x" Flambda_kind.value in
   let n_x = Name.var var_x in
   let nb_x = Bound_name.create n_x Name_mode.normal in
   let env = TE.add_definition env nb_x Flambda_kind.value in
@@ -142,9 +142,9 @@ let test_double_recursion () =
       ~resolver:(fun _ -> None)
       ~get_imported_names:(fun () -> Name.Set.empty)
   in
-  let var_x = Variable.create "x" in
-  let var_y = Variable.create "y" in
-  let var_z = Variable.create "z" in
+  let var_x = Variable.create "x" Flambda_kind.value in
+  let var_y = Variable.create "y" Flambda_kind.value in
+  let var_z = Variable.create "z" Flambda_kind.value in
   let n_x = Name.var var_x in
   let n_y = Name.var var_y in
   let n_z = Name.var var_z in

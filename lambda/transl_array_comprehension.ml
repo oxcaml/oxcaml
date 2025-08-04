@@ -753,6 +753,7 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       (* The above cases are not actually allowed/tested yet. *)
       Misc.fatal_error
         "Comprehensions on arrays of unboxed vectors are not yet supported."
+        "Comprehensions on arrays of unboxed vectors are not yet supported."
     | _, (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
       Misc.fatal_error
         "Transl_array_comprehension.initial_array: unboxed product array"

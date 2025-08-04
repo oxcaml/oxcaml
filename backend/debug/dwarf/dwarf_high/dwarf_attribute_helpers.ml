@@ -301,8 +301,8 @@ let create_byte_size_exn ~byte_size =
   AV.create spec (V.int64 ~comment:"byte size" (Int64.of_int byte_size))
 
 let create_bit_size bit_size =
-  let spec = AS.create Bit_size Data8 in
-  AV.create spec (V.int64 ~comment:"bit size" bit_size)
+  let spec = AS.create Bit_size Data1 in
+  AV.create spec (V.int8 ~comment:"bit size" bit_size)
 
 let create_data_member_location_offset ~byte_offset =
   let spec = AS.create Data_member_location Data8 in

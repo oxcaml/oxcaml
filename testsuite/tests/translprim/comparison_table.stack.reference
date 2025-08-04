@@ -1,527 +1,534 @@
 (setglobal Comparison_table!
   (let
     (gen_cmp = (function {nlocal = 0} x y : int (caml_compare x y))
-     int_cmp = (function {nlocal = 0} x[int] y[int] : int (%int_compare x y))
+     int_cmp =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int
+         (%int_compare x y))
      bool_cmp =
-       (function {nlocal = 0} x[int] y[int] : int (%int_compare x y))
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int
+         (%int_compare x y))
      intlike_cmp =
-       (function {nlocal = 0} x[int] y[int] : int (%int_compare x y))
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int
+         (%int_compare x y))
      float_cmp =
-       (function {nlocal = 0} x[float] y[float] : int (%float_compare x y))
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int (%float_compare x y))
      string_cmp = (function {nlocal = 0} x y : int (caml_string_compare x y))
      int32_cmp =
-       (function {nlocal = 0} x[int32] y[int32] : int (%int32_compare x y))
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int (%int32_compare x y))
      int64_cmp =
-       (function {nlocal = 0} x[int64] y[int64] : int (%int64_compare x y))
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int (%int64_compare x y))
      nativeint_cmp =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_compare x y))
      gen_eq = (function {nlocal = 0} x y : int (caml_equal x y))
-     int_eq = (function {nlocal = 0} x[int] y[int] : int (%eq x y))
-     bool_eq = (function {nlocal = 0} x[int] y[int] : int (%eq x y))
-     intlike_eq = (function {nlocal = 0} x[int] y[int] : int (%eq x y))
+     int_eq =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%eq x y))
+     bool_eq =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%eq x y))
+     intlike_eq =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%eq x y))
      float_eq =
-       (function {nlocal = 0} x[float] y[float] : int
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int
+
          (%float_ordered_and_equal x y))
      string_eq = (function {nlocal = 0} x y : int (caml_string_equal x y))
      int32_eq =
-       (function {nlocal = 0} x[int32] y[int32] : int (%int32_equal x y))
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
+         (%int32_equal x y))
      int64_eq =
-       (function {nlocal = 0} x[int64] y[int64] : int (%int64_equal x y))
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int
+         (%int64_equal x y))
      nativeint_eq =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_equal x y))
      gen_ne = (function {nlocal = 0} x y : int (caml_notequal x y))
-     int_ne = (function {nlocal = 0} x[int] y[int] : int (%noteq x y))
-     bool_ne = (function {nlocal = 0} x[int] y[int] : int (%noteq x y))
-     intlike_ne = (function {nlocal = 0} x[int] y[int] : int (%noteq x y))
+     int_ne =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%noteq x y))
+     bool_ne =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%noteq x y))
+     intlike_ne =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%noteq x y))
      float_ne =
-       (function {nlocal = 0} x[float] y[float] : int
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int
+
          (%float_unordered_or_notequal x y))
      string_ne = (function {nlocal = 0} x y : int (caml_string_notequal x y))
      int32_ne =
-       (function {nlocal = 0} x[int32] y[int32] : int (%int32_notequal x y))
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
+         (%int32_notequal x y))
      int64_ne =
-       (function {nlocal = 0} x[int64] y[int64] : int (%int64_notequal x y))
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int
+         (%int64_notequal x y))
      nativeint_ne =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_notequal x y))
      gen_lt = (function {nlocal = 0} x y : int (caml_lessthan x y))
-     int_lt = (function {nlocal = 0} x[int] y[int] : int (%int_lessthan x y))
+     int_lt =
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_lessthan x y))
      bool_lt =
-       (function {nlocal = 0} x[int] y[int] : int (%int_lessthan x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_lessthan x y))
      intlike_lt =
-       (function {nlocal = 0} x[int] y[int] : int (%int_lessthan x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_lessthan x y))
      float_lt =
-       (function {nlocal = 0} x[float] y[float] : int
+
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int
+
          (%float_ordered_and_lessthan x y))
      string_lt = (function {nlocal = 0} x y : int (caml_string_lessthan x y))
      int32_lt =
-       (function {nlocal = 0} x[int32] y[int32] : int (%int32_lessthan x y))
+
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
+         (%int32_lessthan x y))
      int64_lt =
-       (function {nlocal = 0} x[int64] y[int64] : int (%int64_lessthan x y))
+
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int
+         (%int64_lessthan x y))
      nativeint_lt =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_lessthan x y))
      gen_gt = (function {nlocal = 0} x y : int (caml_greaterthan x y))
      int_gt =
-       (function {nlocal = 0} x[int] y[int] : int (%int_greaterthan x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_greaterthan x y))
      bool_gt =
-       (function {nlocal = 0} x[int] y[int] : int (%int_greaterthan x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_greaterthan x y))
      intlike_gt =
-       (function {nlocal = 0} x[int] y[int] : int (%int_greaterthan x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_greaterthan x y))
      float_gt =
-       (function {nlocal = 0} x[float] y[float] : int
+
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int
+
          (%float_ordered_and_greaterthan x y))
      string_gt =
        (function {nlocal = 0} x y : int (caml_string_greaterthan x y))
      int32_gt =
-       (function {nlocal = 0} x[int32] y[int32] : int
+
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
+
          (%int32_greaterthan x y))
      int64_gt =
-       (function {nlocal = 0} x[int64] y[int64] : int
+
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int
+
          (%int64_greaterthan x y))
      nativeint_gt =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_greaterthan x y))
      gen_le = (function {nlocal = 0} x y : int (caml_lessequal x y))
      int_le =
-       (function {nlocal = 0} x[int] y[int] : int (%int_lessequal x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_lessequal x y))
      bool_le =
-       (function {nlocal = 0} x[int] y[int] : int (%int_lessequal x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_lessequal x y))
      intlike_le =
-       (function {nlocal = 0} x[int] y[int] : int (%int_lessequal x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_lessequal x y))
      float_le =
-       (function {nlocal = 0} x[float] y[float] : int
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int
+
          (%float_ordered_and_lessequal x y))
      string_le =
        (function {nlocal = 0} x y : int (caml_string_lessequal x y))
      int32_le =
-       (function {nlocal = 0} x[int32] y[int32] : int (%int32_lessequal x y))
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
+         (%int32_lessequal x y))
      int64_le =
-       (function {nlocal = 0} x[int64] y[int64] : int (%int64_lessequal x y))
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int
+         (%int64_lessequal x y))
      nativeint_le =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_lessequal x y))
      gen_ge = (function {nlocal = 0} x y : int (caml_greaterequal x y))
      int_ge =
-       (function {nlocal = 0} x[int] y[int] : int (%int_greaterequal x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_greaterequal x y))
      bool_ge =
-       (function {nlocal = 0} x[int] y[int] : int (%int_greaterequal x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_greaterequal x y))
      intlike_ge =
-       (function {nlocal = 0} x[int] y[int] : int (%int_greaterequal x y))
+
+       (function {nlocal = 0} x[value<int>] y[value<int>] : int (%int_greaterequal x y))
      float_ge =
-       (function {nlocal = 0} x[float] y[float] : int
+       (function {nlocal = 0} x[value<float>] y[value<float>] : int
+
          (%float_ordered_and_greaterequal x y))
      string_ge =
        (function {nlocal = 0} x y : int (caml_string_greaterequal x y))
      int32_ge =
-       (function {nlocal = 0} x[int32] y[int32] : int
+       (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
+
          (%int32_greaterequal x y))
      int64_ge =
-       (function {nlocal = 0} x[int64] y[int64] : int
+       (function {nlocal = 0} x[value<int64>] y[value<int64>] : int
+
          (%int64_greaterequal x y))
      nativeint_ge =
-       (function {nlocal = 0} x[nativeint] y[nativeint] : int
+       (function {nlocal = 0} x[value<nativeint>] y[value<nativeint>] : int
          (%nativeint_greaterequal x y))
      eta_gen_cmp =
        (function {nlocal = 0} prim prim stub : int (caml_compare prim prim))
      eta_int_cmp =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
          (%int_compare prim prim))
      eta_bool_cmp =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
          (%int_compare prim prim))
      eta_intlike_cmp =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
          (%int_compare prim prim))
      eta_float_cmp =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_compare prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_compare prim prim))
      eta_string_cmp =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_compare prim prim))
      eta_int32_cmp =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_compare prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_compare prim prim))
      eta_int64_cmp =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_compare prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_compare prim prim))
      eta_nativeint_cmp =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_compare prim prim))
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_compare prim prim))
      eta_gen_eq =
        (function {nlocal = 0} prim prim stub : int (caml_equal prim prim))
      eta_int_eq =
-       (function {nlocal = 0} prim[int] prim[int] stub : int (%eq prim prim))
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+         (%eq prim prim))
      eta_bool_eq =
-       (function {nlocal = 0} prim[int] prim[int] stub : int (%eq prim prim))
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+         (%eq prim prim))
      eta_intlike_eq =
-       (function {nlocal = 0} prim[int] prim[int] stub : int (%eq prim prim))
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+         (%eq prim prim))
      eta_float_eq =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_ordered_and_equal prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_ordered_and_equal prim prim))
      eta_string_eq =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_equal prim prim))
      eta_int32_eq =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_equal prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_equal prim prim))
      eta_int64_eq =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_equal prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_equal prim prim))
      eta_nativeint_eq =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_equal prim prim))
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_equal prim prim))
      eta_gen_ne =
        (function {nlocal = 0} prim prim stub : int (caml_notequal prim prim))
      eta_int_ne =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%noteq prim prim))
      eta_bool_ne =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%noteq prim prim))
      eta_intlike_ne =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%noteq prim prim))
      eta_float_ne =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_unordered_or_notequal prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_unordered_or_notequal prim prim))
      eta_string_ne =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_notequal prim prim))
      eta_int32_ne =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_notequal prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_notequal prim prim))
      eta_int64_ne =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_notequal prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_notequal prim prim))
      eta_nativeint_ne =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_notequal prim prim))
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_notequal prim prim))
      eta_gen_lt =
        (function {nlocal = 0} prim prim stub : int (caml_lessthan prim prim))
      eta_int_lt =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_lessthan prim prim))
      eta_bool_lt =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_lessthan prim prim))
      eta_intlike_lt =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_lessthan prim prim))
      eta_float_lt =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_ordered_and_lessthan prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_ordered_and_lessthan prim prim))
      eta_string_lt =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_lessthan prim prim))
      eta_int32_lt =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_lessthan prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_lessthan prim prim))
      eta_int64_lt =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_lessthan prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_lessthan prim prim))
      eta_nativeint_lt =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_lessthan prim prim))
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_lessthan prim prim))
      eta_gen_gt =
        (function {nlocal = 0} prim prim stub : int
          (caml_greaterthan prim prim))
      eta_int_gt =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_greaterthan prim prim))
      eta_bool_gt =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_greaterthan prim prim))
      eta_intlike_gt =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_greaterthan prim prim))
      eta_float_gt =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_ordered_and_greaterthan prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_ordered_and_greaterthan prim prim))
      eta_string_gt =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_greaterthan prim prim))
      eta_int32_gt =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_greaterthan prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_greaterthan prim prim))
      eta_int64_gt =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_greaterthan prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_greaterthan prim prim))
      eta_nativeint_gt =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_greaterthan prim prim))
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_greaterthan prim prim))
      eta_gen_le =
        (function {nlocal = 0} prim prim stub : int
          (caml_lessequal prim prim))
      eta_int_le =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_lessequal prim prim))
      eta_bool_le =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_lessequal prim prim))
      eta_intlike_le =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_lessequal prim prim))
      eta_float_le =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_ordered_and_lessequal prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_ordered_and_lessequal prim prim))
      eta_string_le =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_lessequal prim prim))
      eta_int32_le =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_lessequal prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_lessequal prim prim))
      eta_int64_le =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_lessequal prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_lessequal prim prim))
      eta_nativeint_le =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_lessequal prim prim))
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_lessequal prim prim))
      eta_gen_ge =
        (function {nlocal = 0} prim prim stub : int
          (caml_greaterequal prim prim))
      eta_int_ge =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_greaterequal prim prim))
      eta_bool_ge =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_greaterequal prim prim))
      eta_intlike_ge =
-       (function {nlocal = 0} prim[int] prim[int] stub : int
+       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
+
          (%int_greaterequal prim prim))
      eta_float_ge =
-       (function {nlocal = 0} prim[float] prim[float] stub : int
-         (%float_ordered_and_greaterequal prim prim))
+       (function {nlocal = 0} prim[value<float>] prim[value<float>] stub
+         : int (%float_ordered_and_greaterequal prim prim))
      eta_string_ge =
        (function {nlocal = 0} prim prim stub : int
          (caml_string_greaterequal prim prim))
      eta_int32_ge =
-       (function {nlocal = 0} prim[int32] prim[int32] stub : int
-         (%int32_greaterequal prim prim))
+       (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub
+         : int (%int32_greaterequal prim prim))
      eta_int64_ge =
-       (function {nlocal = 0} prim[int64] prim[int64] stub : int
-         (%int64_greaterequal prim prim))
+       (function {nlocal = 0} prim[value<int64>] prim[value<int64>] stub
+         : int (%int64_greaterequal prim prim))
      eta_nativeint_ge =
-       (function {nlocal = 0} prim[nativeint] prim[nativeint] stub : int
-         (%nativeint_greaterequal prim prim))
-     int_vec =[(consts (0))
-               (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
+       (function {nlocal = 0} prim[value<nativeint>] prim[value<nativeint>]
+         stub : int (%nativeint_greaterequal prim prim))
+     int_vec =[value<
+                (consts (0))
+                 (non_consts ([0: ?,
+                               value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 1 1] [0: [0: 1 2] [0: [0: 2 1] 0]]]
-     bool_vec =[(consts (0))
-                (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
+     bool_vec =[value<
+                 (consts (0))
+                  (non_consts ([0: ?,
+                                value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 0 0] [0: [0: 0 1] [0: [0: 1 0] 0]]]
-     intlike_vec =[(consts (0))
-                   (non_consts ([0: *,
-                                 [(consts (0)) (non_consts ([0: *, *]))]]))]
+     intlike_vec =[value<
+                    (consts (0))
+                     (non_consts ([0: ?,
+                                   value<
+                                    (consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 0 0] [0: [0: 0 1] [0: [0: 1 0] 0]]]
-     float_vec =[(consts (0))
-                 (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
+     float_vec =[value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 1. 1.] [0: [0: 1. 2.] [0: [0: 2. 1.] 0]]]
-     string_vec =[(consts (0))
-                  (non_consts ([0: *,
-                                [(consts (0)) (non_consts ([0: *, *]))]]))]
+     string_vec =[value<
+                   (consts (0))
+                    (non_consts ([0: ?,
+                                  value<
+                                   (consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: "1" "1"] [0: [0: "1" "2"] [0: [0: "2" "1"] 0]]]
-     int32_vec =[(consts (0))
-                 (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
+     int32_vec =[value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 1l 1l] [0: [0: 1l 2l] [0: [0: 2l 1l] 0]]]
-     int64_vec =[(consts (0))
-                 (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
+     int64_vec =[value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 1L 1L] [0: [0: 1L 2L] [0: [0: 2L 1L] 0]]]
-     nativeint_vec =[(consts (0))
-                     (non_consts ([0: *,
-                                   [(consts (0)) (non_consts ([0: *, *]))]]))]
+     nativeint_vec =[value<
+                      (consts (0))
+                       (non_consts ([0: ?,
+                                     value<
+                                      (consts (0)) (non_consts ([0: ?, *]))>]))>]
        [0: [0: 1n 1n] [0: [0: 1n 2n] [0: [0: 2n 1n] 0]]]
      test_vec =
        (function {nlocal = 0} cmp eq ne lt gt le ge
-         vec[(consts (0))
-             (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
-         [(consts ())
-          (non_consts ([0: [(consts ()) (non_consts ([0: *, *]))],
-                        [(consts (0)) (non_consts ([0: *, *]))]]))](let
-                                                                    (uncurry =
-                                                                    (function
-                                                                    {nlocal = 0}
-                                                                    f
-                                                                    param
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))]
-                                                                    (apply f
-                                                                    (field_imm 0
-                                                                    param)
-                                                                    (field_imm 1
-                                                                    param)))
-                                                                    map =
-                                                                    (function
-                                                                    {nlocal = 2}
-                                                                    f
-                                                                    l[(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))]
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))]
-                                                                    (apply
-                                                                    (field_imm 19
-                                                                    (global Stdlib__List!))
-                                                                    (apply
-                                                                    uncurry
-                                                                    f) l)))
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0:
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (apply
-                                                                    map
-                                                                    gen_cmp
-                                                                    vec)
-                                                                    (apply
-                                                                    map cmp
-                                                                    vec))
-                                                                    (apply
-                                                                    map
-                                                                    (function
-                                                                    {nlocal = 2}
-                                                                    gen spec
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0:
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))]
-                                                                    (makeblock 0 (
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (apply
-                                                                    map gen
-                                                                    vec)
-                                                                    (apply
-                                                                    map spec
-                                                                    vec)))
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (*,*)
-                                                                    gen_eq
-                                                                    eq)
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (*,*)
-                                                                    gen_ne
-                                                                    ne)
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (*,*)
-                                                                    gen_lt
-                                                                    lt)
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (*,*)
-                                                                    gen_gt
-                                                                    gt)
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (*,*)
-                                                                    gen_le
-                                                                    le)
-                                                                    (makeblock 0 (
-                                                                    [(consts ())
-                                                                    (non_consts (
-                                                                    [0: *, *]))],
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
-                                                                    (makeblock 0 (*,*)
-                                                                    gen_ge
-                                                                    ge) 0)))))))))))
+         vec[value<
+              (consts (0))
+               (non_consts ([0: ?,
+                             value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+         : (consts ())
+            (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>,
+                          value<(consts (0)) (non_consts ([0: ?, *]))>]))
+         (let
+           (uncurry =
+              (function {nlocal = 0} f
+                param[value<(consts ()) (non_consts ([0: ?, ?]))>]
+                (apply f (field_imm 0 param) (field_imm 1 param)))
+            map =
+              (function {nlocal = 2} f
+                l[value<
+                   (consts (0))
+                    (non_consts ([0: ?,
+                                  value<
+                                   (consts (0)) (non_consts ([0: ?, *]))>]))>]
+                : (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))
+                (apply (field_imm 19 (global Stdlib__List!))
+                  (apply uncurry f) l)))
+           (makeblock 0 (value<
+                          (consts ())
+                           (non_consts ([0:
+                                         value<
+                                          (consts (0))
+                                           (non_consts ([0: ?, *]))>,
+                                         value<
+                                          (consts (0))
+                                           (non_consts ([0: ?, *]))>]))>,
+             value<
+              (consts (0))
+               (non_consts ([0: ?,
+                             value<(consts (0)) (non_consts ([0: ?, *]))>]))>)
+             (makeblock 0 (value<
+                            (consts (0))
+                             (non_consts ([0: ?,
+                                           value<
+                                            (consts (0))
+                                             (non_consts ([0: ?, *]))>]))>,
+               value<
+                (consts (0))
+                 (non_consts ([0: ?,
+                               value<(consts (0)) (non_consts ([0: ?, *]))>]))>)
+               (apply map gen_cmp vec) (apply map cmp vec))
+             (apply map
+               (function {nlocal = 2} gen spec
+                 : (consts ())
+                    (non_consts ([0:
+                                  value<
+                                   (consts (0)) (non_consts ([0: ?, *]))>,
+                                  value<
+                                   (consts (0)) (non_consts ([0: ?, *]))>]))
+                 (makeblock 0 (value<
+                                (consts (0))
+                                 (non_consts ([0: ?,
+                                               value<
+                                                (consts (0))
+                                                 (non_consts ([0: ?, *]))>]))>,
+                   value<
+                    (consts (0))
+                     (non_consts ([0: ?,
+                                   value<
+                                    (consts (0)) (non_consts ([0: ?, *]))>]))>)
+                   (apply map gen vec) (apply map spec vec)))
+               (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,
+                 value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>)
+                 (makeblock 0 (*,*) gen_eq eq)
+                 (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,
+                   value<
+                    (consts (0))
+                     (non_consts ([0: ?,
+                                   value<
+                                    (consts (0)) (non_consts ([0: ?, *]))>]))>)
+                   (makeblock 0 (*,*) gen_ne ne)
+                   (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,
+                     value<
+                      (consts (0))
+                       (non_consts ([0: ?,
+                                     value<
+                                      (consts (0)) (non_consts ([0: ?, *]))>]))>)
+                     (makeblock 0 (*,*) gen_lt lt)
+                     (makeblock 0 (value<
+                                    (consts ()) (non_consts ([0: *, *]))>,
+                       value<
+                        (consts (0))
+                         (non_consts ([0: ?,
+                                       value<
+                                        (consts (0)) (non_consts ([0: ?, *]))>]))>)
+                       (makeblock 0 (*,*) gen_gt gt)
+                       (makeblock 0 (value<
+                                      (consts ()) (non_consts ([0: *, *]))>,
+                         value<
+                          (consts (0))
+                           (non_consts ([0: ?,
+                                         value<
+                                          (consts (0))
+                                           (non_consts ([0: ?, *]))>]))>)
+                         (makeblock 0 (*,*) gen_le le)
+                         (makeblock 0 (value<
+                                        (consts ()) (non_consts ([0: *, *]))>,
+                           value<
+                            (consts (0))
+                             (non_consts ([0: ?,
+                                           value<
+                                            (consts (0))
+                                             (non_consts ([0: ?, *]))>]))>)
+                           (makeblock 0 (*,*) gen_ge ge) 0)))))))))))
     (seq
       (apply test_vec int_cmp int_eq int_ne int_lt int_gt int_le int_ge
         int_vec)
@@ -542,93 +549,128 @@
       (let
         (eta_test_vec =
            (function {nlocal = 0} cmp eq ne lt gt le ge
-             vec[(consts (0))
-                 (non_consts ([0: *, [(consts (0)) (non_consts ([0: *, *]))]]))]
-             [(consts ())
-              (non_consts ([0: [(consts ()) (non_consts ([0: *, *]))],
-                            [(consts (0)) (non_consts ([0: *, *]))]]))]
+             vec[value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+             : (consts ())
+                (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>,
+                              value<(consts (0)) (non_consts ([0: ?, *]))>]))
              (let
                (uncurry =
                   (function {nlocal = 0} f
-                    param[(consts ()) (non_consts ([0: *, *]))]
+                    param[value<(consts ()) (non_consts ([0: ?, ?]))>]
                     (apply f (field_imm 0 param) (field_imm 1 param)))
                 map =
                   (function {nlocal = 2} f
-                    l[(consts (0))
-                      (non_consts ([0: *,
-                                    [(consts (0)) (non_consts ([0: *, *]))]]))]
-                    [(consts (0))
-                     (non_consts ([0: *,
-                                   [(consts (0)) (non_consts ([0: *, *]))]]))]
+                    l[value<
+                       (consts (0))
+                        (non_consts ([0: ?,
+                                      value<
+                                       (consts (0)) (non_consts ([0: ?, *]))>]))>]
+                    : (consts (0))
+                       (non_consts ([0: ?,
+                                     value<
+                                      (consts (0)) (non_consts ([0: ?, *]))>]))
                     (apply (field_imm 19 (global Stdlib__List!))
                       (apply uncurry f) l)))
-               (makeblock 0 ([(consts ())
-                              (non_consts ([0:
-                                            [(consts (0))
-                                             (non_consts ([0: *, *]))],
-                                            [(consts (0))
-                                             (non_consts ([0: *, *]))]]))],
-                 [(consts (0))
-                  (non_consts ([0: *,
-                                [(consts (0)) (non_consts ([0: *, *]))]]))])
-                 (makeblock 0 ([(consts (0))
-                                (non_consts ([0: *,
-                                              [(consts (0))
-                                               (non_consts ([0: *, *]))]]))],
-                   [(consts (0))
-                    (non_consts ([0: *,
-                                  [(consts (0)) (non_consts ([0: *, *]))]]))])
+               (makeblock 0 (value<
+                              (consts ())
+                               (non_consts ([0:
+                                             value<
+                                              (consts (0))
+                                               (non_consts ([0: ?, *]))>,
+                                             value<
+                                              (consts (0))
+                                               (non_consts ([0: ?, *]))>]))>,
+                 value<
+                  (consts (0))
+                   (non_consts ([0: ?,
+                                 value<(consts (0)) (non_consts ([0: ?, *]))>]))>)
+                 (makeblock 0 (value<
+                                (consts (0))
+                                 (non_consts ([0: ?,
+                                               value<
+                                                (consts (0))
+                                                 (non_consts ([0: ?, *]))>]))>,
+                   value<
+                    (consts (0))
+                     (non_consts ([0: ?,
+                                   value<
+                                    (consts (0)) (non_consts ([0: ?, *]))>]))>)
                    (apply map eta_gen_cmp vec) (apply map cmp vec))
                  (apply map
                    (function {nlocal = 2} gen spec
-                     [(consts ())
-                      (non_consts ([0:
-                                    [(consts (0)) (non_consts ([0: *, *]))],
-                                    [(consts (0)) (non_consts ([0: *, *]))]]))]
-                     (makeblock 0 ([(consts (0))
-                                    (non_consts ([0: *,
-                                                  [(consts (0))
-                                                   (non_consts ([0: *, *]))]]))],
-                       [(consts (0))
-                        (non_consts ([0: *,
-                                      [(consts (0)) (non_consts ([0: *, *]))]]))])
+                     : (consts ())
+                        (non_consts ([0:
+                                      value<
+                                       (consts (0)) (non_consts ([0: ?, *]))>,
+                                      value<
+                                       (consts (0)) (non_consts ([0: ?, *]))>]))
+                     (makeblock 0 (value<
+                                    (consts (0))
+                                     (non_consts ([0: ?,
+                                                   value<
+                                                    (consts (0))
+                                                     (non_consts ([0: ?, *]))>]))>,
+                       value<
+                        (consts (0))
+                         (non_consts ([0: ?,
+                                       value<
+                                        (consts (0)) (non_consts ([0: ?, *]))>]))>)
                        (apply map gen vec) (apply map spec vec)))
-                   (makeblock 0 ([(consts ()) (non_consts ([0: *, *]))],
-                     [(consts (0))
-                      (non_consts ([0: *,
-                                    [(consts (0)) (non_consts ([0: *, *]))]]))])
+                   (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,
+                     value<
+                      (consts (0))
+                       (non_consts ([0: ?,
+                                     value<
+                                      (consts (0)) (non_consts ([0: ?, *]))>]))>)
                      (makeblock 0 (*,*) eta_gen_eq eq)
-                     (makeblock 0 ([(consts ()) (non_consts ([0: *, *]))],
-                       [(consts (0))
-                        (non_consts ([0: *,
-                                      [(consts (0)) (non_consts ([0: *, *]))]]))])
+                     (makeblock 0 (value<
+                                    (consts ()) (non_consts ([0: *, *]))>,
+                       value<
+                        (consts (0))
+                         (non_consts ([0: ?,
+                                       value<
+                                        (consts (0)) (non_consts ([0: ?, *]))>]))>)
                        (makeblock 0 (*,*) eta_gen_ne ne)
-                       (makeblock 0 ([(consts ()) (non_consts ([0: *, *]))],
-                         [(consts (0))
-                          (non_consts ([0: *,
-                                        [(consts (0))
-                                         (non_consts ([0: *, *]))]]))])
+                       (makeblock 0 (value<
+                                      (consts ()) (non_consts ([0: *, *]))>,
+                         value<
+                          (consts (0))
+                           (non_consts ([0: ?,
+                                         value<
+                                          (consts (0))
+                                           (non_consts ([0: ?, *]))>]))>)
                          (makeblock 0 (*,*) eta_gen_lt lt)
-                         (makeblock 0 ([(consts ()) (non_consts ([0: *, *]))],
-                           [(consts (0))
-                            (non_consts ([0: *,
-                                          [(consts (0))
-                                           (non_consts ([0: *, *]))]]))])
+                         (makeblock 0 (value<
+                                        (consts ()) (non_consts ([0: *, *]))>,
+                           value<
+                            (consts (0))
+                             (non_consts ([0: ?,
+                                           value<
+                                            (consts (0))
+                                             (non_consts ([0: ?, *]))>]))>)
                            (makeblock 0 (*,*) eta_gen_gt gt)
-                           (makeblock 0 ([(consts ())
-                                          (non_consts ([0: *, *]))],[(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *,
-                                                                    [(consts (0))
-                                                                    (non_consts (
-                                                                    [0: *, *]))]]))])
+                           (makeblock 0 (value<
+                                          (consts ())
+                                           (non_consts ([0: *, *]))>,
+                             value<
+                              (consts (0))
+                               (non_consts ([0: ?,
+                                             value<
+                                              (consts (0))
+                                               (non_consts ([0: ?, *]))>]))>)
                              (makeblock 0 (*,*) eta_gen_le le)
-                             (makeblock 0 ([(consts ())
-                                            (non_consts ([0: *, *]))],
-                               [(consts (0))
-                                (non_consts ([0: *,
-                                              [(consts (0))
-                                               (non_consts ([0: *, *]))]]))])
+                             (makeblock 0 (value<
+                                            (consts ())
+                                             (non_consts ([0: *, *]))>,
+                               value<
+                                (consts (0))
+                                 (non_consts ([0: ?,
+                                               value<
+                                                (consts (0))
+                                                 (non_consts ([0: ?, *]))>]))>)
                                (makeblock 0 (*,*) eta_gen_ge ge) 0)))))))))))
         (seq
           (apply eta_test_vec eta_int_cmp eta_int_eq eta_int_ne eta_int_lt

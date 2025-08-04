@@ -18,13 +18,25 @@
 open Allowance
 open Asttypes
 
+type atomic =
+  | Nonatomic
+  | Atomic
+
 type mutability =
   | Immutable
-  | Mutable of Mode.Value.Comonadic.lr
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+      ; atomic : atomic
+      }
 
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
+
+let is_atomic = function
+  | Immutable -> false
+  | Mutable { atomic = Atomic; mode = _ } -> true
+  | Mutable { atomic = Nonatomic; mode = _ } -> false
 
 (** Takes [m0] which is the parameter of [let mutable], returns the
     mode of new values in future writes. *)
@@ -656,6 +668,8 @@ and mixed_block_element =
   | Float32
   | Bits8
   | Bits16
+  | Bits8
+  | Bits16
   | Bits32
   | Bits64
   | Vec128
@@ -663,6 +677,7 @@ and mixed_block_element =
   | Vec512
   | Word
   | Product of mixed_product_shape
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 
@@ -985,13 +1000,17 @@ let compare_tag t1 t2 =
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
-  | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Word, Word
+  | Bits8, Bits8 | Bits16, Bits16
+  | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32 | Bits64
-    | Vec128 | Vec256 | Vec512 | Product _ ), _
+  | ( Value | Float64 | Float32 | Float_boxed | Word
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
@@ -1000,6 +1019,7 @@ let rec compare_mixed_block_element e1 e2 =
   | Float64, Float64 | Float32, Float32
   | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
@@ -1027,6 +1047,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
+  | Void, _ -> -1
+  | _, Void -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
@@ -1184,6 +1206,7 @@ let rec mixed_block_element_to_string = function
     ^ (String.concat ", "
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
+  | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
   | Value -> "value"
@@ -1203,6 +1226,7 @@ let mixed_block_element_to_lowercase_string = function
     ^ (String.concat ", "
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
+  | Void -> "void"
 
 (**** Definitions for backtracking ****)
 

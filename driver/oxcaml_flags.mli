@@ -16,7 +16,6 @@
 
 (** OxCaml specific command line flags *)
 
-val use_ocamlcfg : bool ref
 val dump_cfg : bool ref
 val cfg_invariants : bool ref
 val regalloc : string ref
@@ -58,6 +57,7 @@ type zero_alloc_checker_details_cutoff =
 
 val zero_alloc_checker_details_cutoff : zero_alloc_checker_details_cutoff ref
 val default_zero_alloc_checker_details_cutoff : zero_alloc_checker_details_cutoff
+val zero_alloc_checker_details_extra : bool ref
 
 type zero_alloc_checker_join =
   | Keep_all
@@ -106,7 +106,6 @@ val cached_generic_functions_path : string ref
 
 val symbol_visibility_protected : bool ref
 
-val llvm_backend : bool ref
 val dump_llvmir : bool ref
 val keep_llvmir : bool ref
 val llvm_path : string option ref

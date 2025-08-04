@@ -24,6 +24,7 @@ type t =
 
 type exn_param_alias =
   | Not_aliased
+  | Aliased_to_poison
   | Aliased_to_a_symbol
   | Aliased of
       { alias_var : Variable.t;
@@ -59,13 +60,11 @@ let create ~dummy_toplevel_cont { T.Acc.map; _ } =
             acc
         in
         let acc =
-          Continuation.Map.merge
-            (fun _callee acc args ->
-              match acc, args with
-              | None, None -> assert false
-              | Some set, None -> Some set
-              | None, Some _ -> Some (Continuation.Set.singleton caller)
-              | Some set, Some _ -> Some (Continuation.Set.add caller set))
+          Continuation.Map.update_many
+            (fun _callee acc_opt _args ->
+              match acc_opt with
+              | None -> Some (Continuation.Set.singleton caller)
+              | Some set -> Some (Continuation.Set.add caller set))
             acc elt.apply_cont_args
         in
         acc)
@@ -270,14 +269,18 @@ let minimize_extra_args_for_one_continuation ~(source_info : T.Acc.t)
               ( Variable.Set.remove alias_var extra_args_for_aliases,
                 Aliased { alias_var; exception_param } ))
           ~const:(fun _ ->
-            Misc.fatal_errorf
-              "[Data Flow] Exception param aliased to a constant")
+            (* This can happen when the reaper is enabled and an exn parameter
+               is unused. *)
+            (* CR gbury/ncourant : when we have a proper poison constant, we
+               could/should check that this is exactly the constant aliased *)
+            extra_args_for_aliases, Aliased_to_poison)
           ~symbol:(fun _ ~coercion:_ ->
             extra_args_for_aliases, Aliased_to_a_symbol))
   in
   let lets_to_introduce =
     match exception_handler_first_param_aliased with
-    | Not_aliased | Aliased_to_a_symbol -> Variable.Lmap.empty
+    | Not_aliased | Aliased_to_a_symbol | Aliased_to_poison ->
+      Variable.Lmap.empty
     | Aliased { alias_var = alias; exception_param } ->
       Variable.Lmap.singleton alias (Simple.var exception_param)
   in
@@ -301,7 +304,7 @@ let minimize_extra_args_for_one_continuation ~(source_info : T.Acc.t)
           else
             match exception_handler_first_param_aliased with
             | Not_aliased -> default alias
-            | Aliased_to_a_symbol ->
+            | Aliased_to_a_symbol | Aliased_to_poison ->
               (* We cannot remove the exn param, so even if it is aliased to a
                  symbol, we cannot make use of that information. *)
               removed, lets_to_introduce

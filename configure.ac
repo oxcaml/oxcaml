@@ -196,6 +196,7 @@ AC_ARG_ENABLE([stack_checks],
 AC_SUBST([enable_runtime5])
 AC_SUBST([runtime_suffix])
 AC_SUBST([enable_stack_checks])
+AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
 AC_SUBST([default_build_target])
@@ -323,6 +324,9 @@ AC_SUBST([ASPP])
 AC_SUBST([endianness])
 AC_SUBST([AS])
 AC_SUBST([asm_cfi_supported])
+AC_SUBST([as_compress_debug_sections_flag])
+AC_SUBST([cc_compress_debug_sections_flag])
+AC_SUBST([objcopy_compress_debug_sections_flag])
 AC_SUBST([sharedlib_cflags])
 AC_SUBST([rpath])
 AC_SUBST([mkdll])
@@ -638,6 +642,12 @@ AC_ARG_ENABLE([flambda2],
 AC_ARG_ENABLE([cmm-invariants],
   [AS_HELP_STRING([--enable-cmm-invariants],
     [enable invariants checks in Cmm])])
+
+AC_ARG_ENABLE([oxcaml-dwarf],
+  [AS_HELP_STRING([--enable-oxcaml-dwarf],
+    [enable OxCaml DWARF by default @<:@default=no@:>@])],
+  [],
+  [enable_oxcaml_dwarf=no])
 
 AC_ARG_WITH([target-bindir],
   [AS_HELP_STRING([--with-target-bindir],
@@ -2620,11 +2630,17 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
 ## Does the assembler support debug prefix map and CFI directives
 as_has_debug_prefix_map=false
 asm_cfi_supported=false
+as_compress_debug_sections_flag=""
+cc_compress_debug_sections_flag=""
+objcopy_compress_debug_sections_flag=""
 AS_IF([$native_compiler],
   [AS_CASE([$host],
     [*-*-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
-    OCAML_AS_HAS_CFI_DIRECTIVES])])
+    OCAML_AS_HAS_CFI_DIRECTIVES
+    OCAML_AS_COMPRESSION_SUPPORT
+    OCAML_CC_COMPRESSION_SUPPORT
+    OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
 
 ## Frame pointers
 
@@ -2871,18 +2887,6 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
-
-AC_SUBST([has_lzcnt])
-AC_RUN_IFELSE([AC_LANG_SOURCE([[
-int main(void) {
-  __builtin_cpu_init ();
-  if (__builtin_cpu_supports("lzcnt")) {
-    return 0;
-  } else {
-    return 1;
-  }
-}
-]])], AC_DEFINE([HAS_LZCNT]) has_lzcnt=yes, [])
 
 AC_SUBST([has_sse3])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[

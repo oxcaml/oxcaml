@@ -340,7 +340,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Poptrap _ | Prologue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
-                          Float32_of_int32 | Int32_of_float32 | V128_of_v128))
+                          Float32_of_int32 | Int32_of_float32 |
+                          V128_of_vec Vec128))
     -> [||]
   | Stack_check _ -> assert false (* not supported *)
   | Op (Const_vec256 _ | Const_vec512 _)
@@ -352,7 +353,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
           ((Twofiftysix_aligned|Twofiftysix_unaligned|
             Fivetwelve_aligned|Fivetwelve_unaligned),
             _, _))
-  | Op (Reinterpret_cast (V256_of_v256 | V512_of_v512))
+  | Op (Reinterpret_cast (V128_of_vec (Vec256 | Vec512) |
+                          V256_of_vec _ | V512_of_vec _))
   | Op (Static_cast (V256_of_scalar _ | Scalar_of_v256 _ |
                      V512_of_scalar _ | Scalar_of_v512 _))
     -> Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -443,15 +445,23 @@ let slot_offset (loc : Reg.stack_location) ~stack_class ~stack_offset
 (* Calling the assembler *)
 
 let assemble_file infile outfile =
+  let dwarf_flag =
+    if !Clflags.native_code && !Clflags.debug then
+      Dwarf_flags.get_dwarf_as_toolchain_flag ()
+    else
+      ""
+  in
   Ccomp.command (Config.asm ^ " " ^
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
+                 dwarf_flag ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
 let has_three_operand_float_ops () = false
 
 let operation_supported : Cmm.operation -> bool = function
   | Cprefetch _ | Catomic _
-  | Creinterpret_cast (V256_of_v256 | V512_of_v512)
+  | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
+                       V256_of_vec _ | V512_of_vec _)
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _ |
                   V512_of_scalar _ | Scalar_of_v512 _) ->
     false
@@ -477,7 +487,7 @@ let operation_supported : Cmm.operation -> bool = function
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128)
+                       V128_of_vec Vec128)
   | Cstatic_cast (Float_of_float32 | Float32_of_float |
                   Int_of_float Float32 | Float_of_int Float32 |
                   Float_of_int Float64 | Int_of_float Float64 |

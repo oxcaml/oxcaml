@@ -44,24 +44,13 @@ module Naked_number_kind = struct
     | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
     | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
 
-  let equal t1 t2 =
-    match t1, t2 with
-    | Naked_immediate, Naked_immediate -> true
-    | Naked_float32, Naked_float32 -> true
-    | Naked_float, Naked_float -> true
-    | Naked_int8, Naked_int8 -> true
-    | Naked_int16, Naked_int16 -> true
-    | Naked_int32, Naked_int32 -> true
-    | Naked_int64, Naked_int64 -> true
-    | Naked_nativeint, Naked_nativeint -> true
-    | Naked_vec128, Naked_vec128 -> true
-    | Naked_vec256, Naked_vec256 -> true
-    | Naked_vec512, Naked_vec512 -> true
-    | ( ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
-        | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
-        | Naked_vec128 | Naked_vec256 | Naked_vec512 ),
-        _ ) ->
-      false
+  let equal
+      (( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
+       | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+       | Naked_vec128 | Naked_vec256 | Naked_vec512 ) as x) y =
+    (* polymorphic equality is valid, simpler, and faster than a huge pattern
+       match as long as all of ths constructors are constant *)
+    Stdlib.( = ) x y
 end
 
 type t =
@@ -1049,8 +1038,7 @@ module With_subkind = struct
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
-      | Parrayval
-          (Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int)) ->
+      | Parrayval (Punboxedintarray (Unboxed_int8 | Unboxed_int16)) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
       | Parrayval (Punboxedintarray Unboxed_int32) -> Unboxed_int32_array
       | Parrayval (Punboxedintarray Unboxed_int64) -> Unboxed_int64_array

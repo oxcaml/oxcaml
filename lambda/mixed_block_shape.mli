@@ -73,3 +73,7 @@ val flattened_reordered_shape : 'a t -> 'a Singleton_mixed_block_element.t array
 val lookup_path_producing_new_indexes : 'a t -> int list -> int list
 
 val new_indexes_to_old_indexes : 'a t -> int array
+
+val new_block_length : 'a t -> int
+
+val new_index_to_old_path : 'a t -> int -> int list

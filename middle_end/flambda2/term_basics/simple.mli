@@ -91,6 +91,8 @@ val pattern_match' :
   const:(Reg_width_const.t -> 'a) ->
   'a
 
+val kind : t -> Flambda_kind.t
+
 module List : sig
   type nonrec t = t list
 

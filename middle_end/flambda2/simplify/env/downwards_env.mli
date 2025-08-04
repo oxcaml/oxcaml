@@ -182,7 +182,7 @@ end
 
 val disable_inlining : t -> Disable_inlining.t
 
-val enter_set_of_closures : t -> Disable_inlining.t -> t
+val enter_set_of_closures : t -> in_stub:bool -> t
 
 val set_rebuild_terms : t -> t
 
