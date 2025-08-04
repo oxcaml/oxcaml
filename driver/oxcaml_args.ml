@@ -1517,7 +1517,7 @@ module Debugging_options_impl = struct
   let gdwarf_max_function_complexity c =
     Debugging.dwarf_max_function_complexity := c
 
-  let gdwarf_compression value = 
+  let gdwarf_compression value =
     Debugging.gdwarf_compression := String.lowercase_ascii value
 
   let gdwarf_fission value =

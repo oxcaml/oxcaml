@@ -192,10 +192,9 @@ let get_dwarf_compression_format () =
 
 let get_dwarf_objcopy_compression_format () =
   (* Only use compression with objcopy if it supports it *)
-  if String.equal Config.objcopy_compress_debug_sections_flag "" then
-    None
-  else
-    get_dwarf_compression_format ()
+  if String.equal Config.objcopy_compress_debug_sections_flag ""
+  then None
+  else get_dwarf_compression_format ()
 
 let get_dwarf_c_toolchain_flag () =
   match get_dwarf_compression_flag () with
