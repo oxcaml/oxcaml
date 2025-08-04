@@ -249,18 +249,16 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Le Unsigned -> unsigned_le x y
       | Ge Signed -> use_prim ~env ~res Le [y; x]
       | Ge Unsigned -> unsigned_le y x)
-    | Yielding_int_like_compare_functions signed_or_unsigned ->
-      let env, res =
-        match signed_or_unsigned with
-        | Signed -> env, res
-        | Unsigned ->
-          (* Also unimplemented in Cmm. See [To_cmm_primitive]. *)
-          primitive_not_supported ()
-      in
-      let extern_name =
-        with_int_prefix ~kind ~percent_for_imms:false "compare"
-      in
-      use_prim ~env ~res (Extern extern_name) [prim_arg ~env x])
+    | Yielding_int_like_compare_functions signed_or_unsigned -> (
+      match signed_or_unsigned with
+      | Signed ->
+        let extern_name =
+          with_int_prefix ~kind "compare" ~percent_for_imms:false
+        in
+        use_prim' (Extern extern_name)
+      | Unsigned ->
+        (* Also unimplemented in Cmm. See [To_cmm_primitive]. *)
+        primitive_not_supported ()))
   | Float_arith (bitwidth, op) ->
     let op_name =
       match op with Add -> "add" | Sub -> "sub" | Mul -> "mul" | Div -> "div"
@@ -268,26 +266,53 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     let extern_name = with_float_suffix ~bitwidth op_name in
     use_prim' (Extern extern_name)
   | Float_comp (bitwidth, behaviour) ->
-    ignore (bitwidth, behaviour);
-    primitive_not_supported ()
+    let extern_name =
+      match behaviour with
+      | Yielding_bool comparison -> (
+        let op_name =
+          match comparison with
+          | Eq -> "eq"
+          | Neq -> "neq"
+          | Lt () -> "lt"
+          | Gt () -> "gt"
+          | Le () -> "le"
+          | Ge () -> "ge"
+        in
+        match bitwidth with
+        | Float32 -> primitive_not_supported ()
+        | Float64 -> with_float_suffix ~bitwidth op_name)
+      | Yielding_int_like_compare_functions () -> (
+        match bitwidth with
+        | Float64 -> "caml_float_compare"
+        | Float32 -> "caml_float32_compare")
+    in
+    use_prim' (Extern extern_name)
   | Bigarray_get_alignment dim ->
     ignore dim;
     primitive_not_supported ()
-  | Atomic_set kind ->
-    ignore kind;
-    primitive_not_supported ()
-  | Atomic_exchange kind ->
-    ignore kind;
-    primitive_not_supported ()
+  | Atomic_set _ ->
+    let _var, env, res = use_prim' (Extern "caml_atomic_exchange") in
+    None, env, res
+  | Atomic_exchange _ -> use_prim' (Extern "caml_atomic_exchange")
   | Atomic_int_arith op ->
-    ignore op;
-    primitive_not_supported ()
+    let extern_name =
+      match op with
+      | Fetch_add -> "caml_atomic_fetch_add"
+      | Add -> "caml_atomic_add"
+      | Sub -> "caml_atomic_sub"
+      | And -> "caml_atomic_land"
+      | Or -> "caml_atomic_lor"
+      | Xor -> "caml_atomic_lxor"
+    in
+    use_prim' (Extern extern_name)
   | Poke kind ->
     ignore kind;
     primitive_not_supported ()
 
 let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
-  ignore (env, res, x, y, z);
+  let use_prim' prim =
+    use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y; prim_arg ~env z]
+  in
   match f with
   | Array_set (kind, set_kind) ->
     ignore (kind, set_kind);
@@ -298,12 +323,9 @@ let ternary ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Bigarray_set (dims, kind, layout) ->
     ignore (dims, kind, layout);
     primitive_not_supported ()
-  | Atomic_compare_and_set kind ->
-    ignore kind;
-    primitive_not_supported ()
-  | Atomic_compare_exchange { atomic_kind; args_kind } ->
-    ignore (atomic_kind, args_kind);
-    primitive_not_supported ()
+  | Atomic_compare_and_set _ -> use_prim' (Extern "caml_atomic_cas")
+  | Atomic_compare_exchange _ ->
+    use_prim' (Extern "caml_atomic_compare_exchange")
 
 let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   ignore (env, res, xs);
