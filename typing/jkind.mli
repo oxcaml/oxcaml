@@ -175,6 +175,15 @@ module History : sig
 end
 
 (******************************)
+(* context *)
+
+(** Context for jkind operations. *)
+type jkind_context = {
+  jkind_of_type : Types.type_expr -> Types.jkind_l option;
+  is_abstract : Path.t -> bool;  (* Check if a type path refers to an abstract type *)
+}
+
+(******************************)
 (* errors *)
 
 module Violation : sig
@@ -194,7 +203,7 @@ module Violation : sig
   (** Set [?missing_cmi] to mark [t] as having arisen from a missing cmi *)
 
   val of_ :
-    jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+    context:jkind_context ->
     ?missing_cmi:Path.t ->
     violation ->
     t
@@ -623,14 +632,14 @@ val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
 (** Gets the mode crossing for types of this jkind. *)
 val get_mode_crossing :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   'd Types.jkind ->
   Mode.Crossing.t
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   'd Types.jkind ->
   Jkind_axis.Externality.t
 
@@ -641,7 +650,7 @@ val set_externality_upper_bound :
 
 (** Gets the nullability from a jkind. *)
 val get_nullability :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   Types.jkind_l ->
   Jkind_axis.Nullability.t
 
@@ -702,7 +711,7 @@ type normalize_mode =
 
 val normalize :
   mode:normalize_mode ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   Types.jkind_l ->
   Types.jkind_l
 
@@ -771,7 +780,7 @@ val has_intersection : 'd1 Types.jkind -> 'd2 Types.jkind -> bool
     intersection of the two, not something that modifies the second jkind. *)
 val intersection_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   reason:History.interact_reason ->
   ('l1 * allowed) Types.jkind ->
   ('l2 * allowed) Types.jkind ->
@@ -781,7 +790,7 @@ val intersection_or_error :
     either [t1] or [t2] to make their layouts equal.*)
 val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   Types.jkind_l ->
   Types.jkind_r ->
   bool
@@ -798,7 +807,7 @@ type sub_or_intersect =
     see comments there for more info. *)
 val sub_or_intersect :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   sub_or_intersect
@@ -807,7 +816,7 @@ val sub_or_intersect :
     [Violation.t] upon failure. *)
 val sub_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   (unit, Violation.t) result
@@ -818,7 +827,7 @@ val sub_or_error :
 *)
 val sub_jkind_l :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   ?allow_any_crossing:bool ->
   Types.jkind_l ->
   Types.jkind_l ->
@@ -827,7 +836,7 @@ val sub_jkind_l :
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. *)
 val round_up :
-  jkind_of_type:(Types.type_expr -> Types.jkind_l option) ->
+  context:jkind_context ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind
 

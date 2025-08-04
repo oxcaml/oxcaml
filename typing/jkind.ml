@@ -798,6 +798,14 @@ module With_bounds = struct
           type_exprs)
 end
 
+(******************************)
+(* context *)
+
+type jkind_context = {
+  jkind_of_type : Types.type_expr -> Types.jkind_l option;
+  is_abstract : Path.t -> bool;
+}
+
 module Layout_and_axes = struct
   module Allow_disallow = Allowance.Magic_allow_disallow (struct
     type (_, 'layout, 'd) sided = ('layout, 'd) layout_and_axes
@@ -886,7 +894,7 @@ module Layout_and_axes = struct
      of this function for these axes is undefined; do *not* look at the results for these
      axes.
   *)
-  let normalize (type layout l r1 r2) ~jkind_of_type ~(mode : r2 normalize_mode)
+  let normalize (type layout l r1 r2) ~context ~(mode : r2 normalize_mode)
       ~skip_axes
       ?(map_type_info :
          (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t)
@@ -990,6 +998,7 @@ module Layout_and_axes = struct
                      TransientTypeOps.equal (Transient_expr.repr ty1)
                        (Transient_expr.repr ty2))
                    seen_args args
+                 && not (context.is_abstract p)
               then Skip
               else if fuel > 0
               then
@@ -1132,7 +1141,7 @@ module Layout_and_axes = struct
                 Not_best [@nontail]
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
             | Continue ctl_after_unpacking_b -> (
-              match jkind_of_type ty with
+              match context.jkind_of_type ty with
               | Some b_jkind ->
                 found_jkind_for_ty ctl_after_unpacking_b
                   b_jkind.jkind.mod_bounds b_jkind.jkind.with_bounds
@@ -2122,7 +2131,7 @@ module Jkind_desc = struct
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
-  let sub (type l r) ~type_equal:_ ~jkind_of_type
+  let sub (type l r) ~type_equal:_ ~context
       (sub : (allowed * r) jkind_desc)
       ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
         (l * allowed) jkind_desc) =
@@ -2135,7 +2144,7 @@ module Jkind_desc = struct
             (_ * allowed) jkind_desc),
           _ ) =
       Layout_and_axes.normalize ~skip_axes:axes_max_on_right ~mode:Ignore_best
-        ~jkind_of_type sub
+        ~context sub
     in
     let layout = Layout.sub lay1 lay2 in
     let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
@@ -2674,12 +2683,12 @@ type normalize_mode =
   | Require_best
   | Ignore_best
 
-let[@inline] normalize ~mode ~jkind_of_type t =
+let[@inline] normalize ~mode ~context t =
   let mode : _ Layout_and_axes.normalize_mode =
     match mode with Require_best -> Require_best | Ignore_best -> Ignore_best
   in
   let jkind, fuel_result =
-    Layout_and_axes.normalize ~jkind_of_type ~skip_axes:Axis_set.empty ~mode
+    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty ~mode
       t.jkind
   in
   { t with
@@ -2718,12 +2727,12 @@ let get_layout jk : Layout.Const.t option = Layout.get_const jk.jkind.layout
 
 let extract_layout jk = jk.jkind.layout
 
-let get_modal_bounds (type l r) ~jkind_of_type (jk : (l * r) jkind) =
+let get_modal_bounds (type l r) ~context (jk : (l * r) jkind) =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
-      ~skip_axes:Axis_set.all_nonmodal_axes ~jkind_of_type jk.jkind
+      ~skip_axes:Axis_set.all_nonmodal_axes ~context jk.jkind
   in
   Mod_bounds.
     { comonadic =
@@ -2740,8 +2749,8 @@ let get_modal_bounds (type l r) ~jkind_of_type (jk : (l * r) jkind) =
         }
     }
 
-let get_mode_crossing (type l r) ~jkind_of_type (jk : (l * r) jkind) =
-  let bounds = get_modal_bounds ~jkind_of_type jk in
+let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
+  let bounds = get_modal_bounds ~context jk in
   Mode.Crossing.of_bounds bounds
 
 let to_unsafe_mode_crossing jkind =
@@ -2752,12 +2761,12 @@ let to_unsafe_mode_crossing jkind =
 let all_except_externality =
   Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
 
-let get_externality_upper_bound ~jkind_of_type jk =
+let get_externality_upper_bound ~context jk =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
-      ~skip_axes:all_except_externality ~jkind_of_type jk.jkind
+      ~skip_axes:all_except_externality ~context jk.jkind
   in
   Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
 
@@ -2773,7 +2782,7 @@ let set_externality_upper_bound jk externality_upper_bound =
 let all_except_nullability =
   Axis_set.singleton (Nonmodal Nullability) |> Axis_set.complement
 
-let get_nullability ~jkind_of_type jk =
+let get_nullability ~context jk =
   (* Optimization: Usually, no with-bounds are relevant to nullability. If we check for
      this case, we can avoid calling normalize. *)
   let all_with_bounds_are_irrelevant =
@@ -2788,7 +2797,7 @@ let get_nullability ~jkind_of_type jk =
     let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
             (_ * allowed) jkind_desc),
           _ ) =
-      Layout_and_axes.normalize ~mode:Ignore_best ~jkind_of_type
+      Layout_and_axes.normalize ~mode:Ignore_best ~context
         ~skip_axes:all_except_nullability jk.jkind
     in
     Mod_bounds.get mod_bounds ~axis:(Nonmodal Nullability)
@@ -3283,21 +3292,21 @@ module Violation = struct
      the choice of error message. (Though the [Path.t] payload *is*
      indeed just about the payload.) *)
 
-  let of_ ~jkind_of_type ?missing_cmi violation =
+  let of_ ~context ?missing_cmi violation =
     (* Normalize for better printing *)
     let violation =
       match violation with
       | Not_a_subjkind (jkind1, jkind2, reasons) ->
         let jkind1 =
-          normalize ~mode:Require_best ~jkind_of_type (disallow_right jkind1)
+          normalize ~mode:Require_best ~context (disallow_right jkind1)
         in
         let jkind2 =
-          normalize ~mode:Require_best ~jkind_of_type (disallow_right jkind2)
+          normalize ~mode:Require_best ~context (disallow_right jkind2)
         in
         Not_a_subjkind (jkind1, jkind2, reasons)
       | No_intersection (jkind1, jkind2) ->
         let jkind1 =
-          normalize ~mode:Require_best ~jkind_of_type (disallow_right jkind1)
+          normalize ~mode:Require_best ~context (disallow_right jkind1)
         in
         (* jkind2 can't have with-bounds, by its type *)
         No_intersection (jkind1, jkind2)
@@ -3543,7 +3552,7 @@ let score_reason = function
   | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
   | _ -> 0
 
-let combine_histories ~type_equal ~jkind_of_type reason (Pack_jkind k1)
+let combine_histories ~type_equal ~context reason (Pack_jkind k1)
     (Pack_jkind k2) =
   if flattened_histories
   then
@@ -3553,7 +3562,7 @@ let combine_histories ~type_equal ~jkind_of_type reason (Pack_jkind k1)
       else history_b
     in
     let choose_subjkind_history k_a history_a k_b history_b =
-      match Jkind_desc.sub ~type_equal ~jkind_of_type k_a k_b with
+      match Jkind_desc.sub ~type_equal ~context k_a k_b with
       | Less -> history_a
       | Not_le _ ->
         (* CR layouts: this will be wrong if we ever have a non-trivial meet in
@@ -3582,15 +3591,15 @@ let has_intersection t1 t2 =
   (* Need to check only the layouts: all the axes have bottom elements. *)
   Option.is_some (Layout.intersection t1.jkind.layout t2.jkind.layout)
 
-let intersection_or_error ~type_equal ~jkind_of_type ~reason t1 t2 =
+let intersection_or_error ~type_equal ~context ~reason t1 t2 =
   match Jkind_desc.intersection t1.jkind t2.jkind with
-  | None -> Error (Violation.of_ ~jkind_of_type (No_intersection (t1, t2)))
+  | None -> Error (Violation.of_ ~context (No_intersection (t1, t2)))
   | Some jkind ->
     Ok
       { jkind;
         annotation = None;
         history =
-          combine_histories ~type_equal ~jkind_of_type reason (Pack_jkind t1)
+          combine_histories ~type_equal ~context reason (Pack_jkind t1)
             (Pack_jkind t2);
         has_warned = t1.has_warned || t2.has_warned;
         ran_out_of_fuel_during_normalize =
@@ -3600,10 +3609,10 @@ let intersection_or_error ~type_equal ~jkind_of_type ~reason t1 t2 =
           Not_best (* As required by the fact that this is a [jkind_r] *)
       }
 
-let round_up (type l r) ~jkind_of_type (t : (allowed * r) jkind) :
+let round_up (type l r) ~context (t : (allowed * r) jkind) :
     (l * allowed) jkind =
   let normalized =
-    normalize ~mode:Ignore_best ~jkind_of_type (t |> disallow_right)
+    normalize ~mode:Ignore_best ~context (t |> disallow_right)
   in
   { t with
     jkind = { normalized.jkind with with_bounds = No_with_bounds };
@@ -3616,35 +3625,35 @@ let map_type_expr f t =
   else t (* short circuit this common case *)
 
 (* this is hammered on; it must be fast! *)
-let check_sub ~jkind_of_type sub super =
-  Jkind_desc.sub ~jkind_of_type sub.jkind super.jkind
+let check_sub ~context sub super =
+  Jkind_desc.sub ~context sub.jkind super.jkind
 
-let sub_with_reason ~type_equal ~jkind_of_type sub super =
-  Sub_result.require_le (check_sub ~type_equal ~jkind_of_type sub super)
+let sub_with_reason ~type_equal ~context sub super =
+  Sub_result.require_le (check_sub ~type_equal ~context sub super)
 
-let sub ~type_equal ~jkind_of_type sub super =
-  Result.is_ok (sub_with_reason ~type_equal ~jkind_of_type sub super)
+let sub ~type_equal ~context sub super =
+  Result.is_ok (sub_with_reason ~type_equal ~context sub super)
 
 type sub_or_intersect =
   | Sub
   | Disjoint of Violation.Sub_failure_reason.t Nonempty_list.t
   | Has_intersection of Violation.Sub_failure_reason.t Nonempty_list.t
 
-let sub_or_intersect ~type_equal ~jkind_of_type t1 t2 =
-  match sub_with_reason ~type_equal ~jkind_of_type t1 t2 with
+let sub_or_intersect ~type_equal ~context t1 t2 =
+  match sub_with_reason ~type_equal ~context t1 t2 with
   | Ok () -> Sub
   | Error reason ->
     if has_intersection t1 t2 then Has_intersection reason else Disjoint reason
 
-let sub_or_error ~type_equal ~jkind_of_type t1 t2 =
-  match sub_or_intersect ~type_equal ~jkind_of_type t1 t2 with
+let sub_or_error ~type_equal ~context t1 t2 =
+  match sub_or_intersect ~type_equal ~context t1 t2 with
   | Sub -> Ok ()
   | Disjoint reason | Has_intersection reason ->
     Error
-      (Violation.of_ ~jkind_of_type
+      (Violation.of_ ~context
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~jkind_of_type ?(allow_any_crossing = false) sub
+let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub
     super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
@@ -3660,8 +3669,8 @@ let sub_jkind_l ~type_equal ~jkind_of_type ?(allow_any_crossing = false) sub
            (* CR layouts v2.8: It would be useful report to the user why this
               violation occurred, specifically which axes the violation is
               along. *)
-           let best_sub = normalize ~mode:Require_best ~jkind_of_type sub in
-           Violation.of_ ~jkind_of_type
+           let best_sub = normalize ~mode:Require_best ~context sub in
+           Violation.of_ ~context
              (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
   in
   let* () =
@@ -3673,7 +3682,7 @@ let sub_jkind_l ~type_equal ~jkind_of_type ?(allow_any_crossing = false) sub
   | false ->
     let best_super =
       (* MB_EXPAND_R *)
-      normalize ~mode:Require_best ~jkind_of_type super
+      normalize ~mode:Require_best ~context super
     in
     let right_bounds =
       With_bounds.to_best_eff_map best_super.jkind.with_bounds
@@ -3710,7 +3719,7 @@ let sub_jkind_l ~type_equal ~jkind_of_type ?(allow_any_crossing = false) sub
          joining.  [map_type_info] handles looking for [ty] on the right and
          removing irrelevant axes. *)
       Layout_and_axes.normalize sub.jkind ~skip_axes:axes_max_on_right
-        ~jkind_of_type ~mode:Ignore_best
+        ~context ~mode:Ignore_best
         ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
           let right_relevant_axes =
             (* Look for [ty] on the right. There may be multiple occurrences of

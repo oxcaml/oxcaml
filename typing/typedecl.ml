@@ -1298,9 +1298,9 @@ let rec check_constraints_rec env loc visited ty =
         | Unification_failure err ->
           raise (Error(loc, Constraint_failed (env, err)))
         | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
-          let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+          let context = Ctype.mk_jkind_context_purely env in
           let violation =
-            Jkind.Violation.of_ ~jkind_of_type
+            Jkind.Violation.of_ ~context
               (Not_a_subjkind (Jkind.disallow_right original_jkind,
                                Jkind.disallow_left inferred_jkind,
                                []))
@@ -1472,9 +1472,9 @@ let narrow_to_manifest_jkind env loc decl =
     begin match Jkind.try_allow_r decl.type_jkind with
     | None -> begin
         let type_equal = Ctype.type_equal env in
-        let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+        let context = Ctype.mk_jkind_context_purely env in
         match
-          Jkind.sub_jkind_l ~type_equal ~jkind_of_type
+          Jkind.sub_jkind_l ~type_equal ~context
             manifest_jkind decl.type_jkind
         with
         | Ok () -> ()
@@ -2061,12 +2061,12 @@ let rec update_decl_jkind env dpath decl =
     Jkind.Layout.sub new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
   with
   | Not_le reason ->
-    let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+    let context = Ctype.mk_jkind_context_purely env in
     raise (Error (
       decl.type_loc,
       Jkind_mismatch_of_path (
         dpath,
-        Jkind.Violation.of_ ~jkind_of_type (
+        Jkind.Violation.of_ ~context (
           Not_a_subjkind (
             new_decl.type_jkind, decl.type_jkind, Nonempty_list.to_list reason)))))
   | Less | Equal -> new_decl
@@ -2683,7 +2683,7 @@ let normalize_decl_jkinds env shapes decls =
     let normalized_jkind =
       Jkind.normalize
         ~mode:Require_best
-        ~jkind_of_type:(fun ty -> Some (Ctype.type_jkind env ty))
+        ~context:(Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty)))
         decl.type_jkind
     in
     let decl =
@@ -2698,14 +2698,14 @@ let normalize_decl_jkinds env shapes decls =
          the new jkind (we really only want this check here to check against the
          user-written annotation). We might be able to do a better job here and save
          some work. *)
-      let jkind_of_type ty = Some (Ctype.type_jkind_purely env ty) in
+      let context = Ctype.mk_jkind_context_purely env in
       let type_equal = Ctype.type_equal env in
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
         Jkind.sub_jkind_l
           ~type_equal
-          ~jkind_of_type
+          ~context
           ~allow_any_crossing
           decl.type_jkind
           original_decl.type_jkind
