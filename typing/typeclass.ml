@@ -1377,11 +1377,17 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
                   arg, Jkind.Sort.value
                 else
+                  (let _ = failwith "TRIGGER GEN-OPT 1" in
+                  (* here fun type (l) is optional &&
+                     arg type is not optional (l'), we need to wrap things in
+                     Some *)
                   Typecore.type_option_some val_env sarg ty ty0,
                       Jkind.Sort.value
+                  )
               )
             in
             let eliminate_optional_arg _lbl =
+              let _ = failwith "TRIGGER GEN-OPT 2" in
               (* CR generic-optional: Handle the case of generic-optional *)
               Arg (Typecore.type_option_none val_env ty0 Location.none,
                 (* CR generic-optional: Change the sort when options can hold

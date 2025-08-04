@@ -18,6 +18,24 @@ class with_optional_arg :
   (?x):int my_option -> unit -> object method get : int end
 |}]
 
+(* Test 1: Class with generic optional as constructor argument - SHOULD FAIL *)
+class with_optional_arg_2 (name: string) (?x : int my_option) () = object
+  method get = match x with MyNone -> 0 | MySome n -> n
+end
+[%%expect{|
+class with_optional_arg_2 :
+  string -> (?x):int my_option -> unit -> object method get : int end
+|}]
+
+(* Test 1b: Class with generic optional as constructor argument - SHOULD FAIL *)
+class with_vanilla_optional_arg_default ?(x : int = 2) () = object
+  method get : int = x
+end
+[%%expect{|
+class with_vanilla_optional_arg_default :
+  ?x:int -> unit -> object method get : int end
+|}]
+
 
 (* Test 1b: Class with generic optional as constructor argument - SHOULD FAIL *)
 class with_optional_arg_default (?(x = 2) : int my_option) () = object
@@ -116,4 +134,17 @@ val obj1 : without_constructor_arg = <obj>
 - : int = 42
 val obj2 : with_regular_arg = <obj>
 - : int = 100
+|}]
+
+
+class obj_class = with_optional_arg_2 "hello" ()
+[%%expect{|
+Uncaught exception: Failure("TRIGGER GEN-OPT 2")
+
+|}]
+
+class obj_class = with_optional_arg_2 "hello" ~x:2 ()
+[%%expect{|
+Uncaught exception: Failure("TRIGGER GEN-OPT 1")
+
 |}]
