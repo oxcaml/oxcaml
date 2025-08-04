@@ -850,12 +850,6 @@ let mk_gdwarf_compression f =
     Format.sprintf " Set the DWARF compression format (default %s)"
       !Dwarf_flags.gdwarf_compression )
 
-let mk_gdwarf_compression f =
-  ( "-gdwarf-compression",
-    Arg.String f,
-    Format.sprintf " Set the DWARF compression format (default %s)"
-      !Dwarf_flags.gdwarf_compression )
-
 let mk_use_cached_generic_functions f =
   ( "-use-cached-generic-functions",
     Arg.Unit f,
