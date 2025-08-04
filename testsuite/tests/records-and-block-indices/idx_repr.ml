@@ -1,21 +1,19 @@
-(* See [jane/doc/extensions/_02-unboxed-types/block-indices.md] *)
+(* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md] *)
 type t =
   | Bytecode of { path : int list }
   | Native of { offset : int; gap : int }
 
 external magic_box_bits64 : ('a : bits64) 'b . 'a -> 'b =
   "%box_int64"
-external lessthan_if_bytecode : int -> int -> bool =
-  "caml_lessthan" "caml_greaterthan"
 
 let of_idx idx =
-  let is_bytecode = lessthan_if_bytecode 0 1 in
-  if is_bytecode then
+  match Sys.backend_type with
+  | Bytecode ->
     let r = Obj.repr (magic_box_bits64 idx) in
     let nth_idx n : int = Obj.magic (Obj.field r n) in
     let path = List.init (Obj.size r) nth_idx in
     Bytecode { path }
-  else
+  | Native ->
     let i : int64 = magic_box_bits64 idx in
     let offset =
       Int64.(logand (sub (shift_left one 48) one)) i
@@ -26,6 +24,8 @@ let of_idx idx =
       |> Int64.to_int
     in
     Native { offset; gap }
+  | Other _ ->
+    failwith "unsupported backend"
 
 let of_idx_imm = of_idx
 let of_idx_mut = of_idx

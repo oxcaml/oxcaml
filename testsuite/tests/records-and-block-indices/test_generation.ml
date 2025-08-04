@@ -266,9 +266,10 @@ let test_array_idx_access ~local ty =
             line "(* Paths of depth %d *)" depth;
             line "let next_el = mk_value (i + 100 * %d) in" depth;
             line
-              "(* We update [a.(i)] to become [next_el] by setting all paths \
-               of depth %d *)"
+              "(* We update [a.(i)] at all paths of depth %d to be the \
+               corresponding item *)"
               depth;
+            line "(* in [next_el].*)";
             line "(* [el] is the reference value, updated with [with] *)";
             line "let el = get a i in";
             List.iter unboxed_paths ~f:(fun unboxed_path ->

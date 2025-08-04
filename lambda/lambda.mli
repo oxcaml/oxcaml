@@ -1222,7 +1222,7 @@ val mixed_block_element_of_layout : layout -> unit mixed_block_element
 val mixed_block_element_leaves
   : 'a mixed_block_element -> 'a mixed_block_element list
 
-(** Whether these exists a non-value before a value *)
+(** Whether there exists a non-value before a value *)
 val will_be_reordered : _ mixed_block_element -> bool
 
 val primitive_result_layout : primitive -> layout

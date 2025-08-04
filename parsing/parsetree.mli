@@ -635,15 +635,19 @@ and block_access =
   | Baccess_field of Longident.t loc
       (** [.foo] *)
   | Baccess_array of mutable_flag * index_kind * expression
-      (** Mutable block accesses: [.(E)], [.L(E)], [.l(E)], [.n(E)]
+      (** Mutable array accesses: [.(E)], [.L(E)], [.l(E)], [.n(E)]
           Immutable array accesses: [.:(E)], [.:L(E)], [.:l(E)], [.:n(E)]
 
           Indexed by [int], [int64#], [int32#], or [nativeint#], respectively.
       *)
   | Baccess_block of mutable_flag * expression
+      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
+          (usually followed by unboxed accesses, to deepen the index).
+      *)
 
 and unboxed_access =
   | Uaccess_unboxed_field of Longident.t loc
+      (** [.#foo] *)
 
 and comprehension_iterator =
   | Pcomp_range of

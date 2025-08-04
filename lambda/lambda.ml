@@ -2045,13 +2045,13 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pdls_get
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
+  | Pget_idx _ | Pset_idx _
+  | Ppeek _ | Ppoke _ ->
+    None
   | Pidx_field _
   | Pidx_mixed_field _
   | Pidx_array _
   | Pidx_deepen _
-  | Pget_idx _ | Pset_idx _
-  | Ppeek _ | Ppoke _ ->
-    None
   | Preinterpret_tagged_int63_as_unboxed_int64 ->
     if !Clflags.native_code then None
     else

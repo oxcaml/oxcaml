@@ -469,7 +469,7 @@ val of_new_legacy_sort :
   why:History.concrete_legacy_creation_reason -> 'd Types.jkind
 
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_float].
-    Defaulting the sort variable produces exactly [value].  *)
+    Defaulting the sort variable produces exactly the sort [value].  *)
 val of_new_non_float_sort_var :
   why:History.concrete_creation_reason -> 'd Types.jkind * sort
 

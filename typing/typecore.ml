@@ -5437,7 +5437,7 @@ let may_lower_contravariant_then_generalize env exp =
   if maybe_expansive exp then lower_contravariant env exp.exp_type;
   generalize exp.exp_type
 
-let generalize_type_block_access_result { ba; base_ty; el_ty; flat_float = _ } =
+let generalize_structure_type_block_access_result { ba; base_ty; el_ty; flat_float = _ } =
   generalize_structure base_ty;
   generalize_structure el_ty;
   match ba with
@@ -5450,7 +5450,7 @@ let generalize_type_block_access_result { ba; base_ty; el_ty; flat_float = _ } =
   | Baccess_block (_, idx) ->
     generalize_structure_exp idx
 
-let generalize_type_unboxed_access_result (el_ty, Uaccess_unboxed_field _) =
+let generalize_structure_type_unboxed_access_result (el_ty, Uaccess_unboxed_field _) =
   generalize_structure el_ty
 
 (* value binding elaboration *)
@@ -5863,123 +5863,6 @@ and type_expect_
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
-  in
-  let type_block_access expected_base_ty principal
-      (ba : Parsetree.block_access) : type_block_access_result =
-    match ba with
-    | Baccess_field lid ->
-      let expected_record_type =
-        match extract_concrete_typedecl_protected env expected_base_ty with
-        | Typedecl(p0, p, {type_kind=Type_record _}) ->
-          Some(p0, p, principal)
-        | _ -> None
-      in
-      let labels =
-        Env.lookup_all_labels ~record_form:Legacy ~loc:lid.loc Projection
-          lid.txt env
-      in
-      let label =
-        wrap_disambiguate "This block index is expected to have base"
-          (mk_expected expected_base_ty)
-          (label_disambiguate Legacy Projection lid env expected_record_type)
-          labels
-      in
-      let mut = is_mutable label.lbl_mut in
-      let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
-      if mut then Env.mark_label_used Mutation label.lbl_uid;
-      let ba = Baccess_field (lid, label) in
-      let flat_float  =
-        (* whether we change the final el ty to [float#]. we don't set [el_ty]
-           to [float#] here because it could be a singleton unboxed record
-           containing a float, and thus be followed by an unboxed access *)
-        match label.lbl_repres with
-        | Record_boxed _ -> false
-        | Record_mixed mixed ->
-          begin match mixed.(label.lbl_pos) with
-          | Float_boxed -> true
-          | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Product _ | Void ->
-            false
-          end
-        | Record_float -> true
-        | Record_ufloat -> false
-        | Record_unboxed ->
-          raise (Error (lid.loc, env, Block_access_record_unboxed))
-        | Record_inlined _ ->
-          Misc.fatal_error "Typecore.type_block_access: inlined record"
-      in
-      let modality = label.lbl_modalities in
-      { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
-    | Baccess_array (mut, index_kind, index) ->
-      let elt_jkind, elt_sort =
-        Jkind.of_new_non_float_sort_var ~why:Idx_element in
-      let elt_ty = newvar elt_jkind in
-      let base_ty =
-        match mut with
-        | Immutable -> Predef.type_iarray elt_ty
-        | Mutable -> Predef.type_array elt_ty
-      in
-      let index_type_expected =
-        match index_kind with
-        | Index_int -> Predef.type_int
-        | Index_unboxed_int64 -> Predef.type_unboxed_int64
-        | Index_unboxed_int32 -> Predef.type_unboxed_int32
-        | Index_unboxed_nativeint -> Predef.type_unboxed_nativeint
-      in
-      let index =
-        type_expect env mode_legacy index (mk_expected index_type_expected) in
-      let ba =
-        Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
-      in
-      let mut = match mut with Immutable -> false | Mutable -> true in
-      let modality = Typemode.idx_expected_modalities ~mut in
-      { ba; base_ty; el_ty = elt_ty; flat_float = false; modality }
-    | Baccess_block (mut, idx) ->
-      let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
-      let el_ty = newvar (Jkind.of_new_sort ~why:Idx_element) in
-      let idx_type_expected =
-        match mut with
-        | Immutable -> Predef.type_idx_imm base_ty el_ty
-        | Mutable -> Predef.type_idx_mut base_ty el_ty
-      in
-      let idx =
-        type_expect env mode_legacy idx (mk_expected idx_type_expected) in
-      let ba = Baccess_block (mut, idx) in
-      let mut = match mut with Immutable -> false | Mutable -> true in
-      let modality = Typemode.idx_expected_modalities ~mut in
-      { ba; base_ty; el_ty; flat_float = false; modality }
-  in
-  let type_unboxed_access el_ty ua =
-    match ua with
-    | Parsetree.Uaccess_unboxed_field lid ->
-      let expected_record_type =
-        match extract_concrete_typedecl_protected env el_ty with
-        | Typedecl(p0, p, {type_kind=Type_record_unboxed_product _}) ->
-          (* we treat this as principal because [ty_expected] only
-              affects disambiguation for the block access *)
-          Some(p0, p, is_principal el_ty)
-        | _ -> None
-      in
-      let labels =
-        Env.lookup_all_labels ~record_form:Unboxed_product ~loc:lid.loc
-          Projection lid.txt env
-      in
-      let label =
-        wrap_disambiguate "This unboxed access is expected to have base"
-          (mk_expected el_ty)
-          (label_disambiguate Unboxed_product Projection lid env
-              expected_record_type)
-          labels
-      in
-      let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
-      begin
-        (* The previous element ty must be the base ty of this component *)
-        try unify_exp_types loc env ty_res el_ty
-        with Error (_, _, Expr_type_clash _) ->
-          let err = Invalid_unboxed_access { prev_el_type = el_ty; ua } in
-          raise (Error (lid.loc, env, err))
-      end;
-      (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label)
   in
   match desc with
   | Pexp_ident lid ->
@@ -6571,9 +6454,15 @@ and type_expect_
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
     let { ba; base_ty; el_ty; flat_float; modality } =
-      with_local_level_if_principal ~post:generalize_type_block_access_result
+      with_local_level_if_principal
+        ~post:generalize_structure_type_block_access_result
         (fun () ->
-           let res = type_block_access expected_base_ty principal ba in
+           let res = type_block_access env expected_base_ty principal ba in
+           (* This unification is to get a better [base_ty], and is not
+              necessary for safety (thus we discard the failure). For example,
+              if the initial expected base type is [t array], this makes the
+              next base type [t] (which may be critical to disambiguate the
+              unboxed accesses). *)
            (try unify env res.base_ty expected_base_ty with Unify _ -> ());
            res)
     in
@@ -6589,11 +6478,15 @@ and type_expect_
     let (el_ty, modality), uas =
       List.fold_left_map
         (fun (el_ty, modality) ua ->
+           (* Generalize after each step, otherwise we'll have more
+              "non-principal" warnings than desired. *)
            with_local_level_if_principal
              ~post:(fun ((t,_), ua) ->
-               generalize_type_unboxed_access_result (t,ua))
+               generalize_structure_type_unboxed_access_result (t,ua))
              (fun () ->
-                let (el_ty, ua_modality), ua = type_unboxed_access el_ty ua in
+                let (el_ty, ua_modality), ua =
+                  type_unboxed_access env loc el_ty ua
+                in
                 let modality =
                   Modality.Value.Const.concat modality ~then_:ua_modality in
                 (el_ty, modality), ua
@@ -7393,6 +7286,121 @@ and type_expect_
           exp_env = env }
       | _ -> raise (Error (loc, env, Unexpected_hole));
       end
+
+and type_block_access env expected_base_ty principal
+    (ba : Parsetree.block_access) : type_block_access_result =
+  match ba with
+  | Baccess_field lid ->
+    let expected_record_type =
+      match extract_concrete_typedecl_protected env expected_base_ty with
+      | Typedecl(p0, p, {type_kind=Type_record _}) ->
+        Some(p0, p, principal)
+      | _ -> None
+    in
+    let labels =
+      Env.lookup_all_labels ~record_form:Legacy ~loc:lid.loc Projection
+        lid.txt env
+    in
+    let label =
+      wrap_disambiguate "This block index is expected to have base"
+        (mk_expected expected_base_ty)
+        (label_disambiguate Legacy Projection lid env expected_record_type)
+        labels
+    in
+    let mut = is_mutable label.lbl_mut in
+    let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
+    if mut then Env.mark_label_used Mutation label.lbl_uid;
+    let ba = Baccess_field (lid, label) in
+    let flat_float  =
+      (* whether we change the final el ty to [float#]. we don't set [el_ty]
+          to [float#] here because it could be a singleton unboxed record
+          containing a float, and thus be followed by an unboxed access *)
+      match label.lbl_repres with
+      | Record_boxed _ -> false
+      | Record_mixed mixed ->
+        begin match mixed.(label.lbl_pos) with
+        | Float_boxed -> true
+        | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
+        | Vec128 | Vec256 | Vec512 | Word | Product _ | Void ->
+          false
+        end
+      | Record_float -> true
+      | Record_ufloat -> false
+      | Record_unboxed ->
+        raise (Error (lid.loc, env, Block_access_record_unboxed))
+      | Record_inlined _ ->
+        Misc.fatal_error "Typecore.type_block_access: inlined record"
+    in
+    let modality = label.lbl_modalities in
+    { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
+  | Baccess_array (mut, index_kind, index) ->
+    let elt_jkind, elt_sort =
+      Jkind.of_new_non_float_sort_var ~why:Idx_element in
+    let elt_ty = newvar elt_jkind in
+    let base_ty =
+      match mut with
+      | Immutable -> Predef.type_iarray elt_ty
+      | Mutable -> Predef.type_array elt_ty
+    in
+    let index_type_expected =
+      match index_kind with
+      | Index_int -> Predef.type_int
+      | Index_unboxed_int64 -> Predef.type_unboxed_int64
+      | Index_unboxed_int32 -> Predef.type_unboxed_int32
+      | Index_unboxed_nativeint -> Predef.type_unboxed_nativeint
+    in
+    let index =
+      type_expect env mode_legacy index (mk_expected index_type_expected) in
+    let ba =
+      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
+    in
+    let mut = match mut with Immutable -> false | Mutable -> true in
+    let modality = Typemode.idx_expected_modalities ~mut in
+    { ba; base_ty; el_ty = elt_ty; flat_float = false; modality }
+  | Baccess_block (mut, idx) ->
+    let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
+    let el_ty = newvar (Jkind.of_new_sort ~why:Idx_element) in
+    let idx_type_expected =
+      match mut with
+      | Immutable -> Predef.type_idx_imm base_ty el_ty
+      | Mutable -> Predef.type_idx_mut base_ty el_ty
+    in
+    let idx =
+      type_expect env mode_legacy idx (mk_expected idx_type_expected) in
+    let ba = Baccess_block (mut, idx) in
+    let mut = match mut with Immutable -> false | Mutable -> true in
+    let modality = Typemode.idx_expected_modalities ~mut in
+    { ba; base_ty; el_ty; flat_float = false; modality }
+
+and type_unboxed_access env loc el_ty ua =
+  match ua with
+  | Parsetree.Uaccess_unboxed_field lid ->
+    let expected_record_type =
+      match extract_concrete_typedecl_protected env el_ty with
+      | Typedecl(p0, p, {type_kind=Type_record_unboxed_product _}) ->
+        Some(p0, p, is_principal el_ty)
+      | _ -> None
+    in
+    let labels =
+      Env.lookup_all_labels ~record_form:Unboxed_product ~loc:lid.loc
+        Projection lid.txt env
+    in
+    let label =
+      wrap_disambiguate "This unboxed access is expected to have base"
+        (mk_expected el_ty)
+        (label_disambiguate Unboxed_product Projection lid env
+            expected_record_type)
+        labels
+    in
+    let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
+    begin
+      (* The previous element ty must be the base ty of this component *)
+      try unify_exp_types loc env ty_res el_ty
+      with Error (_, _, Expr_type_clash _) ->
+        let err = Invalid_unboxed_access { prev_el_type = el_ty; ua } in
+        raise (Error (lid.loc, env, err))
+    end;
+    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label)
 
 and expression_constraint pexp =
   { type_without_constraint = (fun env expected_mode ->

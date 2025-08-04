@@ -337,7 +337,9 @@ module Type_structure = struct
       (* CR layouts v8: all of these restrictions will eventually be lifted *)
       let supported_in_arrays =
         (Layout.all_scannable ty_layout || Layout.all_ignorable ty_layout)
-        && (not (Layout.contains_vec128 ty_layout))
+        && (not
+              (Layout.contains_vec128 ty_layout && Layout.is_product ty_layout)
+           )
         && not (Layout.contains_void ty_layout)
       in
       let supported_by_block_indices =
@@ -382,6 +384,8 @@ module Type_structure = struct
     | Int64x2_u -> "int64x2#"
 
   let size (t : t) ~bytecode =
+    (* If a record size test breaks and this logic is changed, make sure
+       [lambda/mixed_product_bytes.ml] is also still correct. *)
     let rec layout_size_in_block (layout : Layout.t) =
       match layout with
       | Value _ | Float64 | Float32 | Bits64 | Bits32 | Word -> 1

@@ -447,6 +447,8 @@ let idx_expected_modalities ~(mut : bool) =
           Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
     else Mode.Modality.Value.Const.id
   in
+  (* CR layouts v8: only perform this check at most twice: for [mut = true] and
+     [mut = false] *)
   match Mode.Modality.Value.Const.equate expected1 expected2 with
   | Ok () -> expected1
   | Error _ ->

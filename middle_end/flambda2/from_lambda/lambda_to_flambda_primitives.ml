@@ -1733,7 +1733,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
     [Simple (Simple.const (Reg_width_const.naked_int64 idx_raw_value))]
   | Pidx_mixed_field (shape, pos, path), [] ->
-    let open Mixed_product_bytes_wrt_path in
+    let open Mixed_product_bytes.Wrt_path in
     let { offset_bytes; gap_bytes } =
       match offset_and_gap (count_shape shape pos path) with
       | Some { offset_bytes; gap_bytes } -> { offset_bytes; gap_bytes }
@@ -1767,7 +1767,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
              simple_i64 (Int64.of_int el_size) ))
     in
     let offset_after_index =
-      match Mixed_product_bytes_wrt_path.(offset_and_gap (count mbe path)) with
+      match Mixed_product_bytes.Wrt_path.(offset_and_gap (count mbe path)) with
       | Some { offset_bytes; gap_bytes } ->
         if Mixed_product_bytes.Byte_count.is_zero gap_bytes
         then offset_bytes
@@ -1782,8 +1782,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           index_as_bytes,
           simple_i64 (Int64.of_int (conv_bc offset_after_index)) ) ]
   | Pidx_deepen (mbe, field_path), [[idx]] -> (
-    (* See [jane/doc/extensions/_02-unboxed-types/block-indices.md]. *)
-    let cts = Mixed_product_bytes_wrt_path.count mbe field_path in
+    (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+    let cts = Mixed_product_bytes.Wrt_path.count mbe field_path in
     let open struct
       type deepening_type =
         | Mixed_product_to_mixed_product
@@ -1793,7 +1793,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     end in
     let deepening_type =
       let outer_has_value_and_flat =
-        Mixed_product_bytes_wrt_path.all cts
+        Mixed_product_bytes.Wrt_path.all cts
         |> Mixed_product_bytes.has_value_and_flat
       in
       if outer_has_value_and_flat

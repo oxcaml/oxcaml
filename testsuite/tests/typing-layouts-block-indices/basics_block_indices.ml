@@ -1,7 +1,10 @@
 (* TEST
  flags = "-extension layouts_alpha";
+ include stdlib_beta;
  expect;
 *)
+
+open Stdlib_beta
 
 (*********************************)
 (* Basic typechecking of indices *)
@@ -52,14 +55,14 @@ type t2 = { mutable a : string; b : int; c : string }
 let a2 () = (.a)
 let b2 () = (.b)
 let a1 () : (t1, _) idx_mut = (.a)
-let b2 () : (t1, _) idx_imm = (.b)
+let b1 () : (t1, _) idx_imm = (.b)
 [%%expect{|
 type t1 = { mutable a : string; b : int; }
 type t2 = { mutable a : string; b : int; c : string; }
 val a2 : unit -> (t2, string) idx_mut = <fun>
 val b2 : unit -> (t2, int) idx_imm = <fun>
 val a1 : unit -> (t1, string) idx_mut = <fun>
-val b2 : unit -> (t1, int) idx_imm = <fun>
+val b1 : unit -> (t1, int) idx_imm = <fun>
 |}]
 
 (* Still disambiguates through a Tpoly *)
@@ -114,7 +117,7 @@ val f : unit -> (wrap_r, int) idx_imm = <fun>
 type y = { y : int }
 type 'a t = { a : 'a }
 let bad c = if c then
-    ((.a.#y) : (y# t, int) idx_imm)
+    ((.a) : (y# t, _) idx_imm)
   else
     (.a.#a)
 [%%expect{|
@@ -286,6 +289,24 @@ Error: This expression cannot be coerced to type ""('a, [ `A | `B ]) idx_mut"";
        The first variant type does not allow tag(s) "`B"
 |}]
 
+(* Immutable, but not mutable, block indices are covariant in their second type
+   parameter. *)
+
+type ('a, +'b) t = ('a, 'b) idx_imm
+[%%expect{|
+type ('a, 'b) t = ('a, 'b) idx_imm
+|}]
+
+type ('a, +'b) bad = ('a, 'b) idx_mut
+[%%expect{|
+Line 1, characters 0-37:
+1 | type ('a, +'b) bad = ('a, 'b) idx_mut
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 2nd type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
 (**********)
 (* Arrays *)
 
@@ -385,8 +406,9 @@ let bad_idx () = (.si)
 Line 1, characters 17-22:
 1 | let bad_idx () = (.si)
                      ^^^^^
-Error: Block indices into records that contain both values and non-values,
-       and occupy over 2^16 bytes, cannot be created.
+Error: This block index cannot be created because it refers to values
+       and non-values that are separated by 2^16 or more bytes in their
+       block, or could be deepened to such an index.
 |}]
 
 (* But we *can* construct a deeper, valid index *)
@@ -403,8 +425,9 @@ type hold_r = { s : string; r : r#; }
 Line 2, characters 17-21:
 2 | let bad_idx () = (.r)
                      ^^^^
-Error: Block indices into records that contain both values and non-values,
-       and occupy over 2^16 bytes, cannot be created.
+Error: This block index cannot be created because it refers to values
+       and non-values that are separated by 2^16 or more bytes in their
+       block, or could be deepened to such an index.
 |}]
 
 (*************************************************************)
@@ -455,8 +478,8 @@ val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 (**************)
 (* Modalities *)
 
-type 'a id = { id : 'a }
-type 'a id = { mutable mut : 'a }
+type 'a box = { item : 'a }
+type 'a box_mut = { mutable mut : 'a }
 type 'a global = { global : 'a @@ global }
 type 'a aliased = { aliased : 'a @@ aliased }
 type 'a many = { many : 'a @@ many }
@@ -465,15 +488,11 @@ type 'a portable = { portable : 'a @@ portable }
 type 'a contended = { contended : 'a @@ contended }
 type 'a mut_not_global = { mutable mut_not_global : 'a @@ local }
 type 'a mut_not_many = { mutable mut_not_many : 'a @@ once }
-type 'a mut_not_global_nor_aliased =
-  (* mut_not_aliased not possible bc global implies aliased *)
-  { mutable mut_not_global_nor_aliased : 'a @@ local unique }
-type 'a mut_not_global_nor_unyielding =
-  (* mut_not_unyielding not possible bc global implies unyielding *)
-  { mutable mut_not_global_nor_unyielding : 'a @@ local yielding }
+type 'a mut_not_aliased = { mutable mut_not_aliased : 'a @@ unique }
+type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding }
 [%%expect{|
-type 'a id = { id : 'a; }
-type 'a id = { mutable mut : 'a; }
+type 'a box = { item : 'a; }
+type 'a box_mut = { mutable mut : 'a; }
 type 'a global = { global_ global : 'a; }
 type 'a aliased = { aliased : 'a @@ aliased; }
 type 'a many = { many : 'a @@ many; }
@@ -482,12 +501,8 @@ type 'a portable = { portable : 'a @@ portable; }
 type 'a contended = { contended : 'a @@ contended; }
 type 'a mut_not_global = { mutable mut_not_global : 'a @@ local; }
 type 'a mut_not_many = { mutable mut_not_many : 'a @@ once; }
-type 'a mut_not_global_nor_aliased = {
-  mutable mut_not_global_nor_aliased : 'a @@ local unique;
-}
-type 'a mut_not_global_nor_unyielding = {
-  mutable mut_not_global_nor_unyielding : 'a @@ local;
-}
+type 'a mut_not_aliased = { mutable mut_not_aliased : 'a @@ unique; }
+type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding; }
 |}]
 
 (* Immutable indices with each disallowed modality *)
@@ -559,22 +574,22 @@ Error: Block indices do not yet support non-default modalities. In particular,
        mutable elements must be many, but this is not.
 |}]
 
-let bad () = (.mut_not_global_nor_aliased)
+let bad () = (.mut_not_aliased)
 [%%expect{|
-Line 1, characters 13-42:
-1 | let bad () = (.mut_not_global_nor_aliased)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 13-31:
+1 | let bad () = (.mut_not_aliased)
+                 ^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be global, but this is not.
+       mutable elements must be aliased, but this is not.
 |}]
 
-let bad () = (.mut_not_global_nor_unyielding)
+let bad () = (.mut_not_unyielding)
 [%%expect{|
-Line 1, characters 13-45:
-1 | let bad () = (.mut_not_global_nor_unyielding)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 13-34:
+1 | let bad () = (.mut_not_unyielding)
+                 ^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be global, but this is not.
+       mutable elements must be unyielding, but this is not.
 |}]
 
 let bad () = (.mut.#contended)
@@ -620,11 +635,11 @@ Line 1, characters 13-28:
 Error: Block indices do not yet support non-default modalities. In particular,
        immutable elements must have the identity modality, but this is global.
 |}]
-let bad () = (.:(0).#id.#global.#id)
+let bad () = (.:(0).#item.#global.#item)
 [%%expect{|
-Line 1, characters 13-36:
-1 | let bad () = (.:(0).#id.#global.#id)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 13-40:
+1 | let bad () = (.:(0).#item.#global.#item)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
        immutable elements must have the identity modality, but this is global.
 |}]
@@ -642,35 +657,16 @@ val ok :
     unit -> ('a unyielding# aliased# many# global# array, 'a) idx_mut =
   <fun>
 |}]
-let ok () = (.mut.#mut_not_global.#id)
+let ok () = (.mut.#mut_not_global.#item)
 [%%expect{|
-val ok : unit -> ('a id/2# mut_not_global# id/1, 'a) idx_mut = <fun>
-|}]
-
-(************)
-(* Variance *)
-
-(* Immutable, but not mutable, block indices are covariant in their second type
-   parameter. *)
-
-type ('a, +'b) t = ('a, 'b) idx_imm
-[%%expect{|
-type ('a, 'b) t = ('a, 'b) idx_imm
-|}]
-
-type ('a, +'b) bad = ('a, 'b) idx_mut
-[%%expect{|
-Line 1, characters 0-37:
-1 | type ('a, +'b) bad = ('a, 'b) idx_mut
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this definition, expected parameter variances are not satisfied.
-       The 2nd type parameter was expected to be covariant,
-       but it is injective invariant.
+val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
 |}]
 
 (******************************************************)
 (* Cannot take an index to float/non-separable arrays *)
 
+(* CR layouts v8: could this error message more clearly point out the problem,
+   that the element type is not [mod non_float]? *)
 let bad () : (float array, _) idx_mut = (.(0))
 [%%expect{|
 Line 1, characters 40-46:
@@ -721,6 +717,22 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
+|}]
+
+(* CR layouts v8: this is similarly sad *)
+let bad (x : float array) =
+  let y = (.(42)) in
+  Idx_mut.unsafe_get x y
+[%%expect{|
+Line 3, characters 23-24:
+3 |   Idx_mut.unsafe_get x y
+                           ^
+Error: This expression has type "('a array, 'a) idx_mut"
+       but an expression was expected of type "(float array, 'b) idx_mut"
+       The kind of float is value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value_or_null mod non_float
+         because of the definition of y at line 2, characters 10-17.
 |}]
 
 type packed = P : 'a -> packed

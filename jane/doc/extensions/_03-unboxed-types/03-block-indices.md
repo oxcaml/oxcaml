@@ -36,8 +36,8 @@ let inc_coord (pts : 'a) (i : ('a, int) idx_mut) =
 
 # Overview
 
-A block index is an opaque, explicit index to an element. The language feature
-includes these predefined types:
+A block index is an opaque, explicit index to an element in a larger structure.
+The language feature includes these predefined types:
 
 ```ocaml
 type ('a, 'b : any) idx_imm : bits64
@@ -89,7 +89,18 @@ access so that indices can be _deepened_. For example, given
 `idx : ('a, pt#) idx_imm`, one may obtain
 `(.idx_imm(idx).#y) : ('a, int) idx_imm`.
 
-# Use cases
+# Example use cases
+
+## Implement "interior pointers"
+
+By packing the base type parameter, block indices can be used to implement
+pointers into a block. (There is ongoing work to create a standardized library
+for interior pointers, but we include this example for illustrative purposes.)
+
+```ocaml
+type ('a : any) iptr = P : #('base * ('base, 'a) idx_imm) -> 'a iptr [@@unboxed]
+type ('a : any) mptr = P : #('base * ('base, 'a) idx_mut) -> 'a mptr [@@unboxed]
+```
 
 ## Allow polymorphic APIs to support fine-grained access
 
@@ -114,17 +125,6 @@ let drop_last_to_y_axis (s : line Stack.t) =
   Stack.update_top s (.q.#y) 0
 ```
 
-## Implement "interior pointers"
-
-By packing the base type parameter, block indices can be used to implement
-pointers into a block. (There is ongoing work to create a standardized library
-for interior pointers, but we include this example for illustrative purposes.)
-
-```ocaml
-type ('a : any) iptr = P : #('base * ('base, 'a) idx_imm) -> 'a iptr [@@unboxed]
-type ('a : any) mptr = P : #('base * ('base, 'a) idx_mut) -> 'a mptr [@@unboxed]
-```
-
 # Edge cases and limitations
 
 1. For block indices to arrays, the array type parameter must be `mod
@@ -143,6 +143,9 @@ type ('a : any) mptr = P : #('base * ('base, 'a) idx_mut) -> 'a mptr [@@unboxed]
 
 # Representation of block indices
 
+_We document the compilation of block indices here, but do not guarantee this
+representation to be stable between versions._
+
 Consider the following type:
 
 ```ocaml
@@ -150,19 +153,23 @@ type a = #{ s : string; i : int64# }
 type b = #{ i : int64#; a : a; s : string }
 type c = { mutable b : b; s : string }
 ```
-The layout of `c` has the shape
-`((b_i64, (a_string, a_i64), b_string), c_string)`,
-whose representation differs between the native and bytecode compilers.
 
-In the native code compiler, it gets reordered (a stable two-color sort that
-puts values before non-values):
+The record `c` presents an interesting problem for block indices: the fields of
+the `b` and `a` unboxed records it contains are not actually contiguous at runtime when
+using the native code compiler. This problem is caused by the
+[mixed block represntation](intro.md#the-mixed-block-representation),
+which mandates that we reorder fields so that values come before unboxed types.
+
+While the layout of `c` has the shape
+`((b_i64, (a_string, a_i64), b_string), c_string)`,
+its representation on the native code compiler looks like this:
 ```
    a_string b_string c_string b_i64 a_i64
 b  ^^^^^^^^^^^^^^^^^          ^^^^^^^^^^^
 a  ^^^^^^^^                         ^^^^^
 ```
 
-In the bytecode compiler, unboxed records are actually boxed, and not
+And in the bytecode compiler, unboxed records are actually boxed, and not
 reordered.
 
 Acccordingly, block indices also have two different representations. In the
@@ -194,6 +201,10 @@ In-memory representation:
   * Unboxed record fields in the index into singleton unboxed records are
     _not_ included in the list of positions, as singleton unboxed records are
     erased during translation to lambda.
+
+While marshaling data should be consistent between bytecode and native, this
+case is safe because mixed blocks (the only `value`s that can contain `bits64`s)
+cannot be marshaled.
 
 For a visualization of the native representation of block indices, and the
 implementation of deepening, see below.

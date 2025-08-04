@@ -526,7 +526,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       Const (Const_block (0, path_consts))
     | Pidx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.
-         See [jane/doc/extensions/_02-unboxed-types/block-indices.md]. *)
+         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       match args with
       | [index] ->
         let index =

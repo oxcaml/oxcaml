@@ -2314,8 +2314,8 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       let exp = transl_exp ~scopes init_expr_sort init_expr in
       Llet(Strict, layout, init_id, init_id_duid, exp, lam)
 
-(* See [jane/doc/extensions/_02-unboxed-types/block-indices.md] *)
-and transl_idx ~scopes loc env ba uas =  (*  *)
+(* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+and transl_idx ~scopes loc env ba uas =
   let ua_to_pos (Uaccess_unboxed_field (_, lbl)) =
     (* erase singleton unboxed products before lambda *)
     if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
@@ -2360,11 +2360,13 @@ and transl_idx ~scopes loc env ba uas =  (*  *)
           ~get_value_kind:(fun _ -> Lambda.generic_value) shape
       in
       (* Check to make sure the gap never overflows.
-         See [jane/doc/extensions/_02-unboxed-types/block-indices.md]. *)
+         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       let cts =
-        Mixed_product_bytes_wrt_path.count_shape shape lbl.lbl_pos uas_path in
+        Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
+      in
       if Option.is_none
-          (Mixed_product_bytes_wrt_path.offset_and_gap cts) then
+           (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
+      then
         raise (Error (loc, Block_index_gap_overflow_possible));
       Lprim (Pidx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
@@ -2698,8 +2700,9 @@ let report_error ppf = function
       (* This error message describes a more conservative rule than we actually
          enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
       fprintf ppf
-        "Block indices into records that contain both values and non-values,@ \
-         and occupy over 2^16 bytes, cannot be created."
+        "This block index cannot be created because it refers to values@ \
+         and non-values that are separated by 2^16 or more bytes in their@ \
+         block, or could be deepened to such an index."
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays whose element layout contains a@ \

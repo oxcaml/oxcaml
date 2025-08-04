@@ -575,7 +575,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   in
   let i = Scalar.integral in
   let f = Scalar.floating in
-  let arg_layouts =
+  let get_arg_layouts () =
     List.map
       (fun (_, repr) -> Lambda.layout_of_extern_repr repr)
       lambda_prim.prim_native_repr_args
@@ -1037,7 +1037,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       (* [Mutable] is the more conservative version *)
       Primitive(Pget_idx (layout, Mutable), 2)
     | "%unsafe_set_idx" ->
-      let layout = List.nth arg_layouts 2 in
+      let layout = List.nth (get_arg_layouts ()) 2 in
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
@@ -2175,6 +2175,7 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
+  | Pget_idx _ | Pset_idx _
   | Prunstack | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
@@ -2217,7 +2218,6 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Pobj_magic _ | Punbox_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-  | Pget_idx _ | Pset_idx _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
   | Punbox_unit
