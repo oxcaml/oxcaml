@@ -20,7 +20,12 @@ let with_int_prefix (kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
   in
   prefix ^ "_" ^ op
 
-let no_op ~env ~res = Jsir.Var.fresh (), env, res
+let no_op ~env ~res = None, env, res
+
+let use_prim ~env ~res prim args =
+  let expr : Jsir.expr = Prim (prim, args) in
+  let var = Jsir.Var.fresh () in
+  Some var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
 
 (* CR selee: implement primitives *)
 
@@ -44,48 +49,56 @@ let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
   | Cpu_relax -> primitive_not_supported ()
 
 let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
-  ignore (env, res, x);
+  let use_prim' ~env ~res prim = use_prim ~env ~res prim [prim_arg ~env x] in
   match f with
   | Block_load { kind = _; mut = _; field } ->
+    let var = Jsir.Var.fresh () in
     let expr : Jsir.expr =
       match prim_arg ~env x with
       | Pv v -> Field (v, Targetint_31_63.to_int field, Non_float)
       | Pc _ -> Misc.fatal_error "Block_load on constant"
     in
+    Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
+  | Duplicate_block _ | Duplicate_array _ | Obj_dup ->
+    use_prim' ~env ~res (Extern "caml_obj_dup")
+  | Is_int _ -> use_prim' ~env ~res IsInt
+  | Is_null -> use_prim ~env ~res Eq [prim_arg ~env x; Pc Null]
+  | Get_tag ->
     let var = Jsir.Var.fresh () in
-    var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
-  | Duplicate_block { kind } ->
-    ignore kind;
-    primitive_not_supported ()
-  | Duplicate_array { kind; source_mutability; destination_mutability } ->
-    ignore (kind, source_mutability, destination_mutability);
-    primitive_not_supported ()
-  | Is_int { variant_only } ->
-    ignore variant_only;
-    primitive_not_supported ()
-  | Is_null -> primitive_not_supported ()
-  | Get_tag -> primitive_not_supported ()
-  | Array_length kind ->
-    ignore kind;
-    primitive_not_supported ()
+    let expr : Jsir.expr =
+      match prim_arg ~env x with
+      | Pv v -> Field (v, 0, Non_float)
+      | Pc _ -> Misc.fatal_error "Get_tag on constant"
+    in
+    Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
+  | Array_length _ -> use_prim' ~env ~res Vectlength
   | Bigarray_length { dimension } ->
-    ignore dimension;
-    primitive_not_supported ()
-  | String_length str ->
-    ignore str;
-    primitive_not_supported ()
+    use_prim ~env ~res (Extern "caml_ba_dim")
+      [prim_arg ~env x; Pc (Int (Targetint.of_int dimension))]
+  | String_length _ -> use_prim' ~env ~res (Extern "caml_ml_string_length")
   | Int_as_pointer mode ->
     ignore mode;
+    (* CR selee: [js_of_ocaml/compiler/tests-check-prim/main.5.4.output] seems
+       to suggest the runtime function is omitted by choice? *)
     primitive_not_supported ()
-  | Opaque_identity { middle_end_only; kind } ->
-    ignore (middle_end_only, kind);
-    primitive_not_supported ()
+  | Opaque_identity { middle_end_only; kind = _ } -> (
+    match middle_end_only, prim_arg ~env x with
+    | true, _ -> no_op ~env ~res
+    | false, Pv v -> Some v, env, res
+    | false, Pc c ->
+      let var = Jsir.Var.fresh () in
+      ( Some var,
+        env,
+        To_jsir_result.add_instr_exn res (Jsir.Let (var, Constant c)) ))
   | Int_arith (kind, op) ->
-    ignore (kind, op);
-    primitive_not_supported ()
+    let op_name = match op with Swap_byte_endianness -> "bswap" in
+    let extern_name = with_int_prefix kind op_name ~percent_for_imms:false in
+    use_prim' ~env ~res (Extern extern_name)
   | Float_arith (bitwidth, op) ->
-    ignore (bitwidth, op);
-    primitive_not_supported ()
+    let suffix = match bitwidth with Float64 -> "" | Float32 -> "32" in
+    let op_name = match op with Abs -> "abs_float" | Neg -> "neg_float" in
+    let extern_name = "caml_" ^ op_name ^ suffix in
+    use_prim' ~env ~res (Extern extern_name)
   | Num_conv { src; dst } ->
     ignore (src, dst);
     primitive_not_supported ()
@@ -102,15 +115,14 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Untag_immediate -> primitive_not_supported ()
   | Tag_immediate -> primitive_not_supported ()
   | Project_function_slot { move_from = _; move_to } ->
-    To_jsir_env.get_function_slot_exn env move_to, env, res
+    Some (To_jsir_env.get_function_slot_exn env move_to), env, res
   | Project_value_slot { project_from = _; value_slot } ->
     (* CR selee: This is also used to call external functions, will need to
        handle that *)
-    To_jsir_env.get_value_slot_exn env value_slot, env, res
+    Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
   | Is_boxed_float -> primitive_not_supported ()
   | Is_flat_float_array -> primitive_not_supported ()
   | End_region _ | End_try_region _ -> no_op ~env ~res
-  | Obj_dup -> primitive_not_supported ()
   | Get_header -> primitive_not_supported ()
   | Atomic_load kind ->
     ignore kind;
@@ -123,12 +135,9 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     primitive_not_supported ()
 
 let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
-  let use_prim' ~env ~res prim x y =
-    let expr : Jsir.expr = Prim (prim, [prim_arg ~env x; prim_arg ~env y]) in
-    let var = Jsir.Var.fresh () in
-    var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
+  let use_prim' ~env ~res prim =
+    use_prim ~env ~res prim [prim_arg ~env x; prim_arg ~env y]
   in
-  let use_prim ~env ~res prim = use_prim' ~env ~res prim x y in
   match f with
   | Block_set { kind; init; field } ->
     ignore (kind, init, field);
@@ -144,7 +153,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     primitive_not_supported ()
   | Phys_equal comparison ->
     let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
-    use_prim ~env ~res prim
+    use_prim' ~env ~res prim
   | Int_arith (kind, op) ->
     let op_name =
       match op with
@@ -158,7 +167,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Xor -> "xor"
     in
     let extern_name = with_int_prefix kind op_name ~percent_for_imms:true in
-    use_prim ~env ~res (Extern extern_name)
+    use_prim' ~env ~res (Extern extern_name)
   | Int_shift (kind, op) ->
     let op_name =
       match kind, op with
@@ -171,20 +180,22 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
     in
     let extern_name = with_int_prefix kind op_name ~percent_for_imms:true in
-    use_prim ~env ~res (Extern extern_name)
+    use_prim' ~env ~res (Extern extern_name)
   | Int_comp (kind, behaviour) -> (
     match behaviour with
     | Yielding_bool comparison -> (
+      let x = prim_arg ~env x in
+      let y = prim_arg ~env y in
       match comparison with
-      | Eq -> use_prim' ~env ~res Eq x y
-      | Neq -> use_prim' ~env ~res Neq x y
-      | Lt Signed -> use_prim' ~env ~res Lt x y
-      | Lt Unsigned -> use_prim' ~env ~res Ult x y
-      | Gt Signed -> use_prim' ~env ~res Lt y x
-      | Gt Unsigned -> use_prim' ~env ~res Ult y x
-      | Le Signed -> use_prim' ~env ~res Le x y
+      | Eq -> use_prim ~env ~res Eq [x; y]
+      | Neq -> use_prim ~env ~res Neq [x; y]
+      | Lt Signed -> use_prim ~env ~res Lt [x; y]
+      | Lt Unsigned -> use_prim ~env ~res Ult [x; y]
+      | Gt Signed -> use_prim ~env ~res Lt [y; x]
+      | Gt Unsigned -> use_prim ~env ~res Ult [y; x]
+      | Le Signed -> use_prim ~env ~res Le [x; y]
       | Le Unsigned -> failwith "bruh"
-      | Ge Signed -> use_prim' ~env ~res Le y x
+      | Ge Signed -> use_prim ~env ~res Le [y; x]
       | Ge Unsigned -> failwith "bruh")
     | Yielding_int_like_compare_functions signed_or_unsigned ->
       let env, res =
@@ -195,7 +206,7 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let extern_name =
         with_int_prefix kind "compare" ~percent_for_imms:false
       in
-      use_prim ~env ~res (Extern extern_name))
+      use_prim' ~env ~res (Extern extern_name))
   | Float_arith (bitwidth, op) ->
     ignore (bitwidth, op);
     primitive_not_supported ()
@@ -249,7 +260,7 @@ let variadic ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
     in
     let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields:xs in
     let var = Jsir.Var.fresh () in
-    var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
+    Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Make_array (kind, mut, mode) ->
     ignore (kind, mut, mode);
     primitive_not_supported ()
