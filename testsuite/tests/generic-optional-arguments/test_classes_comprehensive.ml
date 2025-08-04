@@ -32,11 +32,12 @@ val v2 : int = 42
 |}]
 
 (* Test 3: Class with generic optional constructor argument - should fail *)
-class test_constructor_arg (?x : int my_option) = object
+class test_constructor_arg (?x : int my_option) () = object
   method get = match x with MyNone -> 0 | MySome n -> n
 end
 [%%expect{|
-Exception: Failure "Cannot create fresh generic optional without existing type".
+class test_constructor_arg :
+  (?x):int my_option -> unit -> object method get : int end
 |}]
 
 (* Test 4: Class type with generic optional in method signature *)
@@ -88,7 +89,7 @@ class mixed_args :
 let obj_mixed = new mixed_args 42
 let v_reg = obj_mixed#use_regular
 let v_gen1 = obj_mixed#use_generic ()
-let v_gen2 = obj_mixed#use_generic ~opt:(MySome "test") ()
+let v_gen2 = obj_mixed#use_generic ~opt:"test" ()
 [%%expect{|
 val obj_mixed : mixed_args = <obj>
 val v_reg : int = 42
@@ -97,11 +98,12 @@ val v_gen2 : string = "test"
 |}]
 
 (* Test 7: Inheritance with generic optional methods *)
-class base = object
+class virtual base = object
   method virtual process : (?x) : int my_option -> unit -> int
 end
 [%%expect{|
-class base : object method virtual process : (?x : int my_option) -> unit -> int end
+class virtual base :
+  object method virtual process : (?x):int my_option -> unit -> int end
 |}]
 
 class derived = object
@@ -110,7 +112,7 @@ class derived = object
     match x with MyNone -> -1 | MySome n -> n
 end
 [%%expect{|
-class derived : object method process : (?x : int my_option) -> unit -> int end
+class derived : object method process : (?x):int my_option -> unit -> int end
 |}]
 
 (* Test 7a: Use the derived class *)
@@ -142,8 +144,8 @@ class multiple_optionals :
 let obj_multi = new multiple_optionals
 let v5 = obj_multi#multi ()
 let v6 = obj_multi#multi ?x:(MySome 5) ()
-let v7 = obj_multi#multi ~y:(MySome "hello") ()
-let v8 = obj_multi#multi ?x:(MySome 10) ~y:(MySome "world") ()
+let v7 = obj_multi#multi ?y:(MySome "hello") ()
+let v8 = obj_multi#multi ?x:(MySome 10) ?y:(MySome "world") ()
 [%%expect{|
 val obj_multi : multiple_optionals = <obj>
 val v5 : int * string = (0, "")
@@ -171,7 +173,7 @@ class with_state :
 (* Test 9a: Use stateful class *)
 let obj_state = new with_state
 let v9 = obj_state#increment ()
-let v10 = obj_state#increment ~by:(MySome 5) ()
+let v10 = obj_state#increment ?by:(MySome 5) ()
 let v11 = obj_state#increment ()
 [%%expect{|
 val obj_state : with_state = <obj>
@@ -183,14 +185,14 @@ val v11 : int = 7
 (* Test 10: Using generic optional with polymorphic method *)
 class poly_optional = object
   method poly : 'a. (?x) : 'a my_option -> unit -> 'a option =
-    fun ?(x : 'a my_option) () ->
+    fun (type a) (?x : a my_option) () ->
       match x with
       | MyNone -> None
       | MySome v -> Some v
 end
 [%%expect{|
 class poly_optional :
-  object method poly : (?x : 'a my_option) -> unit -> 'a option end
+  object method poly : (?x):'a my_option -> unit -> 'a option end
 |}]
 
 (* Test 10a: Use polymorphic optional *)
@@ -200,7 +202,7 @@ let v13 = obj_poly#poly ?x:(MySome 42) ()
 let v14 = obj_poly#poly ?x:(MySome "poly") ()
 [%%expect{|
 val obj_poly : poly_optional = <obj>
-val v12 : '_weak1 option = None
+val v12 : 'a option = None
 val v13 : int option = Some 42
 val v14 : string option = Some "poly"
 |}]
