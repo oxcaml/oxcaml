@@ -1573,10 +1573,9 @@ let rec approx_declaration cl =
       let arg =
         match l with
         | Optional _ -> Ctype.instance var_option
-        | Generic_optional _ ->
-            Misc.fatal_error "Generic optional not supported"
           (* CR generic-optional: Handle this case *)
         | Position _ -> Ctype.instance Predef.type_lexing_position
+        | Generic_optional _ (* we approximate most general types *)
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
           (* CR layouts: use of value here may be relaxed when we update
@@ -1600,7 +1599,7 @@ let rec approx_description ct =
         match Btype.classify_optionality l with
         | Vanilla_optional_arg -> Ctype.instance var_option
         | Generic_optional_arg ->
-            Misc.fatal_error "Generic optional not supported"
+            Misc.fatal_error "Generic optional not supported 2 "
         | Required_or_position_arg ->
             Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we
