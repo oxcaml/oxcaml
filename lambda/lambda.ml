@@ -2432,8 +2432,8 @@ let primitive_result_layout (p : primitive) =
   | Parrayblit _
     -> layout_unit
   | Pgetglobal _ | Psetglobal _ | Pgetpredef _ -> layout_module_field
-  | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
-  | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pmakearray _ | Pmakearray_dynamic _
+  | Pduprecord _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
 
   (* CR jcutler for ccasinghino: in cases like these where you know there's a
@@ -2445,6 +2445,10 @@ let primitive_result_layout (p : primitive) =
   | Pmakeblock (_,_,_,Alloc_external) -> layout_unboxed_nativeint
   | Pmakemixedblock (_,_,_,(Alloc_heap | Alloc_local)) -> layout_block
   | Pmakemixedblock (_,_,_,Alloc_external) -> layout_unboxed_nativeint
+  | Pmakefloatblock (_,(Alloc_heap | Alloc_local)) -> layout_block
+  | Pmakefloatblock (_,Alloc_external) -> layout_unboxed_nativeint
+  | Pmakeufloatblock (_,Alloc_external) -> layout_unboxed_nativeint
+  | Pmakeufloatblock (_,(Alloc_heap | Alloc_local)) -> layout_block
 
   | Pfield _ | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)

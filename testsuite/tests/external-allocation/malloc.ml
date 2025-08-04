@@ -114,6 +114,14 @@ let () = is_a_malloc "r1" ~num_fields:#2L (fun () -> malloc_ (Foo {flag = true; 
 let r1_func flag id = malloc_ (Foo {flag; id})
 let () = is_a_malloc "r1-func-creation" ~num_fields:#2L (fun () -> r1_func true 0)
 
+type f0 = {x : float; y : float}
+let float x y = malloc_ {x;y}
+let () = is_a_malloc "float record" ~num_fields:#2L (fun () -> float 1.0 2.0)
+
+type f1 = {x : float#; y : float#}
+let floatu x y = malloc_ {x;y}
+let () = is_a_malloc "floatu record" ~num_fields:#2L (fun () -> floatu #1.0 #2.0)
+
 (* Variant allocations *)
 type 'a variant = Bar of 'a
 let () = is_a_malloc "Bar" ~num_fields:#1L (fun () -> malloc_ (Bar 10))

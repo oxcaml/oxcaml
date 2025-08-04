@@ -112,6 +112,18 @@ Test r1-func-creation:
   Field 1: 1
 
 
+float record: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
+Test float record:
+  Field 0: 4607182418800017408
+  Field 1: 4611686018427387904
+
+
+floatu record: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
+Test floatu record:
+  Field 0: 4607182418800017408
+  Field 1: 4611686018427387904
+
+
 Bar: No GC-visible allocation occurred, malloc was called, result value is outside minor heap, allocated at runtime
 Test Bar:
   Field 0: 21
