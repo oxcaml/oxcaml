@@ -292,8 +292,7 @@ static void * caml_thread_tick(void * arg)
   while(! atomic_load_acquire(stop)) {
     st_msleep(Thread_timeout);
 
-    atomic_fetch_or_explicit(&domain->requested_external_interrupt,
-                             ST_INTERRUPT_FLAG, memory_order_release);
+    atomic_fetch_or(&domain->requested_external_interrupt, ST_INTERRUPT_FLAG);
     caml_interrupt_self();
   }
   return NULL;
