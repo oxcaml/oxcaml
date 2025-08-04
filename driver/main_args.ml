@@ -1178,6 +1178,7 @@ module type Jscomp_options = sig
   val _drawflambda : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _classic_inlining : unit -> unit
 end
 
 module type Opttop_options = sig
@@ -1742,6 +1743,7 @@ struct
     mk_cc F._cc;
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
+    mk_classic_inlining F._classic_inlining;
     mk_cmi_file F._cmi_file;
     mk_color F._color;
     mk_error_style F._error_style;
@@ -2377,6 +2379,7 @@ third-party libraries such as Lwt, but with a different API."
       custom_runtime := true
     let _v () = Compenv.print_version_and_library "js-of-ocaml IR compiler"
 
+    let _classic_inlining () = set_oclassic ()
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
   end
