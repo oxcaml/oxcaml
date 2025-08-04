@@ -95,7 +95,13 @@ let compile_file ?output ?(opt="") ?stable_name name =
     | Some _ | None -> "" in
   let debug_flags =
     if !Clflags.debug && Config.ccomp_type <> "msvc" then
-      "-g" ^ !Clflags.dwarf_c_toolchain_flag
+      (* DWARF compression is only configured for native code compilation.
+         The dwarf_c_toolchain_flag is set in optmaindriver.ml and will be
+         empty when compiling C files from bytecode tools like ocamlc. *)
+      let compression_flag = 
+        if !Clflags.native_code then !Clflags.dwarf_c_toolchain_flag else ""
+      in
+      "-g" ^ compression_flag
     else
       ""
   in
