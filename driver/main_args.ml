@@ -1176,9 +1176,9 @@ module type Jscomp_options = sig
   val _dflambda_verbose : unit -> unit
   val _djsir : unit -> unit
   val _drawflambda : unit -> unit
+  val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
-  val _classic_inlining : unit -> unit
 end
 
 module type Opttop_options = sig
