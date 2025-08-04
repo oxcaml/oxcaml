@@ -1199,39 +1199,72 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let loc = default.pexp_loc in
       let open Ast_helper in
-      let scases = [
-        Exp.case
-          (Pat.construct ~loc
-             (mknoloc (Longident.(Ldot (Lident "*predef*", "Some"))))
-             (Some ([], Pat.var ~loc (mknoloc "*sth*"))))
-          (Exp.ident ~loc (mknoloc (Longident.Lident "*sth*")));
-
-        Exp.case
-          (Pat.construct ~loc
-             (mknoloc (Longident.(Ldot (Lident "*predef*", "None"))))
-             None)
-          default;
-       ]
-      in
-      let param_suffix =
+      let scases =
         match l with
-        | Optional name -> name
-        | Generic_optional name -> name
+        | Optional _ ->
+            [
+              Exp.case
+                (Pat.construct ~loc
+                  (mknoloc (Longident.(Ldot (Lident "*predef*", "Some"))))
+                  (Some ([], Pat.var ~loc (mknoloc "*sth*"))))
+                (Exp.ident ~loc (mknoloc (Longident.Lident "*sth*")));
+
+              Exp.case
+                (Pat.construct ~loc
+                  (mknoloc (Longident.(Ldot (Lident "*predef*", "None"))))
+                  None)
+              default;
+            ]
+        | Generic_optional _ ->
+            let (tp_path, _), _, _ =
+              Typecore.extract_optional_tp_from_pattern_constraint_exn
+                val_env spat
+            in
+            let some_cons = Typecore.get_some_constructor val_env tp_path in
+            let none_cons = Typecore.get_none_constructor val_env tp_path in
+            [
+              Exp.case
+                (Pat.construct ~loc
+                  (mknoloc (Longident.Lident some_cons.cstr_name))
+                  (Some ([], Pat.var ~loc (mknoloc "*sth*"))))
+                (Exp.ident ~loc (mknoloc (Longident.Lident "*sth*")));
+
+              Exp.case
+                (Pat.construct ~loc
+                  (mknoloc (Longident.(Lident none_cons.cstr_name)))
+                  None)
+              default;
+            ]
+        | Nolabel | Labelled _ ->
+            Misc.fatal_error "[default] allowed only with optional argument"
+      in
+      let param_name =
+        match l with
+        | Optional name -> "*opt*" ^ name
+        | Generic_optional name -> "*genopt*" ^ name
         | Nolabel | Labelled _ ->
           Misc.fatal_error "[default] allowed only with optional argument"
       in
-      let param_name = "*opt*" ^ param_suffix in
       let smatch =
         Exp.match_ ~loc (Exp.ident ~loc (mknoloc (Longident.Lident param_name)))
           scases
       in
       let sfun =
-        Cl.fun_ ~loc:scl.pcl_loc
-          l None
-          (Pat.var ~loc (mknoloc param_name))
-          (Cl.let_ ~loc:scl.pcl_loc Nonrecursive [Vb.mk spat smatch] sbody)
-          (* Note: we don't put the '#default' attribute, as it
-             is not detected for class-level let bindings.  See #5975.*)
+        match l with
+        | Optional _ ->
+            Cl.fun_ ~loc:scl.pcl_loc
+              l None
+              (Pat.var ~loc (mknoloc param_name))
+              (Cl.let_ ~loc:scl.pcl_loc Nonrecursive [Vb.mk spat smatch] sbody)
+              (* Note: we don't put the '#default' attribute, as it
+                is not detected for class-level let bindings.  See #5975.*)
+        | Generic_optional _ ->
+            (* I am not sure why patterns are derefed in the optional case,
+               but spat has constraint that is important for translating
+               generic optionals.  *)
+            Cl.fun_ ~loc:scl.pcl_loc l None spat sbody
+        | Nolabel | Labelled _ ->
+          Misc.fatal_error "[default] allowed only with optional argument"
       in
       class_expr cl_num val_env met_env virt self_scope sfun
   | Pcl_fun (l, None, spat, scl') ->

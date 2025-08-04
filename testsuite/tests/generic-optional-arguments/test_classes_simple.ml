@@ -10,12 +10,22 @@ type 'a my_option =
 
 (* Test 1: Class with generic optional as constructor argument - SHOULD FAIL *)
 class with_optional_arg (?x : int my_option) () = object
-     method get = match x with MyNone -> 0 | MySome n -> n
-   end
+  method get = match x with MyNone -> 0 | MySome n -> n
+end
 [%%expect{|
 type 'a my_option = MyNone | MySome of 'a
 class with_optional_arg :
   (?x):int my_option -> unit -> object method get : int end
+|}]
+
+
+(* Test 1b: Class with generic optional as constructor argument - SHOULD FAIL *)
+class with_optional_arg_default (?(x = 2) : int my_option) () = object
+  method get = x
+end
+[%%expect{|
+class with_optional_arg_default :
+  (?x):int my_option -> unit -> object method get : int my_option end
 |}]
 
 (* Test 2: Class with NO constructor arguments, but method has generic optional - SHOULD WORK *)
@@ -55,6 +65,45 @@ class type interface =
 |}]
 
 (* Test usage *)
+
+(* Test usage of with_optional_arg *)
+let obj3 = new with_optional_arg ()
+let _ = obj3#get
+let obj4 = new with_optional_arg ?x:MyNone ()
+let _ = obj4#get
+let obj5 = new with_optional_arg ~x:123 ()
+let _ = obj5#get
+[%%expect{|
+val obj3 : with_optional_arg = <obj>
+- : int = 0
+val obj4 : with_optional_arg = <obj>
+- : int = 0
+val obj5 : with_optional_arg = <obj>
+- : int = 123
+|}]
+
+
+(* Test usage of with_optional_arg_default *)
+let obj3 = new with_optional_arg_default ()
+let _ = obj3#get
+let obj4 = new with_optional_arg_default ?x:MyNone ()
+let _ = obj4#get
+let obj4 = new with_optional_arg_default ?x:(MySome 4) ()
+let _ = obj4#get
+let obj5 = new with_optional_arg_default ~x:123 ()
+let _ = obj5#get
+[%%expect{|
+val obj3 : with_optional_arg_default = <obj>
+- : int my_option = MyNone
+val obj4 : with_optional_arg_default = <obj>
+- : int my_option = MyNone
+val obj4 : with_optional_arg_default = <obj>
+- : int my_option = MySome 4
+val obj5 : with_optional_arg_default = <obj>
+- : int my_option = MySome 123
+|}]
+
+
 let obj1 = new without_constructor_arg
 let _ = obj1#process MyNone
 let _ = obj1#process (MySome 42)
@@ -67,22 +116,4 @@ val obj1 : without_constructor_arg = <obj>
 - : int = 42
 val obj2 : with_regular_arg = <obj>
 - : int = 100
-|}]
-
-(* Test usage of with_optional_arg *)
-let obj3 = new with_optional_arg ()
-let _ = obj3#get
-
-let obj4 = new with_optional_arg ?x:MyNone ()
-let _ = obj4#get
-
-let obj5 = new with_optional_arg ~x:123 ()
-let _ = obj5#get
-[%%expect{|
-val obj3 : with_optional_arg = <obj>
-- : int = 0
-val obj4 : with_optional_arg = <obj>
-- : int = 0
-val obj5 : with_optional_arg = <obj>
-- : int = 123
 |}]
