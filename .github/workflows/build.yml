@@ -193,7 +193,7 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       with:
         repository: 'ocaml/dune'
-        ref: '3.15.2'
+        ref: '3.15.3'
         path: 'dune'
 
     - name: Build dune
