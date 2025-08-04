@@ -853,7 +853,8 @@ let mk_gdwarf_compression f =
 let mk_gdwarf_fission f =
   ( "-gdwarf-fission",
     Arg.String f,
-    " Set the DWARF fission method: none, objcopy, or dsymutil (default none).\n\
+    " Set the DWARF fission method: none, objcopy, or dsymutil.\n\
+    \     Default: none (dsymutil on macOS with --enable-oxcaml-dwarf).\n\
     \     Only takes effect with -gno-upstream-dwarf or --enable-oxcaml-dwarf"
   )
 
@@ -1520,7 +1521,8 @@ module Debugging_options_impl = struct
   let gdwarf_max_function_complexity c =
     Debugging.dwarf_max_function_complexity := c
 
-  let gdwarf_compression value = Debugging.gdwarf_compression := value
+  let gdwarf_compression value = 
+    Debugging.gdwarf_compression := String.lowercase_ascii value
 
   let gdwarf_fission value =
     match String.lowercase_ascii value with

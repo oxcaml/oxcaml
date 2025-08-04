@@ -574,7 +574,7 @@ let call_linker file_list_rev startup_file output_name =
             (Filename.quote link_output_name)
             (Filename.quote output_name)
         in
-        let objcopy_exit = Sys.command objcopy_cmd in
+        let objcopy_exit = Ccomp.command objcopy_cmd in
         Misc.remove_file link_output_name;
         if objcopy_exit <> 0 then
           raise (Error(Objcopy_error objcopy_exit))
@@ -586,7 +586,7 @@ let call_linker file_list_rev startup_file output_name =
         (* Run dsymutil on the executable *)
         let dsymutil_cmd = 
           Printf.sprintf "dsymutil %s" (Filename.quote output_name) in
-        let dsymutil_exit = Sys.command dsymutil_cmd in
+        let dsymutil_exit = Ccomp.command dsymutil_cmd in
         if dsymutil_exit <> 0 then
           raise (Error(Dsymutil_error dsymutil_exit))
   end
