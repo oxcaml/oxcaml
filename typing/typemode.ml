@@ -400,7 +400,7 @@ let untransl_modality (a : _ Modality.Atom.t) : Parsetree.modality loc =
 
    Implied modalities can be overriden. *)
 (* CR zqian: remove [1] and [2] *)
-let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
+let mutable_implied_modalities ~for_mutable_variable mut =
   let comonadic : Modality.Atom.packed list =
     [ P (Comonadic (Areality, Meet_with Regionality.Const.legacy));
       P (Comonadic (Linearity, Meet_with Linearity.Const.legacy));
@@ -411,15 +411,48 @@ let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
       P (Monadic (Contention, Join_with Contention.Const.legacy));
       P (Monadic (Visibility, Join_with Visibility.Const.legacy)) ]
   in
-  match mut with
-  | Immutable -> []
-  | Mutable _ -> if for_mutable_variable then monadic else monadic @ comonadic
+  if mut
+  then if for_mutable_variable then monadic else monadic @ comonadic
+  else []
 
-let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
+let mutable_implied_modalities ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
     (fun t (Modality.Atom.P a) -> Modality.Value.Const.set a t)
     Modality.Value.Const.id l
+
+let idx_expected_modalities ~(mut : bool) =
+  (* There are two design constraints on what modalities we allow in an index
+     creation to contain. Because these are coupled, this function checks that
+     they are equal.
+      1. The default modalities (id for non-mutable fields, global many aliased
+         unyielding for mutable fields) should work.
+      2. It should also be safe wrt to type signatures given to block index
+         primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
+  let modality_of_list l =
+    List.fold_left
+      (fun t (Modality.Atom (ax, a)) -> Modality.Value.Const.set ax a t)
+      Modality.Value.Const.id l
+  in
+  let expected1 = mutable_implied_modalities mut in
+  let expected2 =
+    if mut
+    then
+      (* If this list is updated, the external bindings in the [Idx_imm] and
+         [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
+      modality_of_list
+        [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
+          Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
+          Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
+          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
+    else Mode.Modality.Value.Const.id
+  in
+  match Mode.Modality.Value.Const.equate expected1 expected2 with
+  | Ok () -> expected1
+  | Error _ ->
+    Misc.fatal_error
+      "Typemode.idx_expected_modalities: mismatch with mutable implied \
+       modalities"
 
 (* Since [yielding] is the default mode in presence of [local],
    the [global] modality must also apply [unyielding] unless specified.
@@ -452,7 +485,10 @@ let implied_modalities (P a : Modality.Atom.packed) : Modality.Atom.packed list
   | _ -> []
 
 let least_modalities_implying mut (t : Modality.Value.Const.t) =
-  let baseline = mutable_implied_modalities ~for_mutable_variable:false mut in
+  let baseline =
+    mutable_implied_modalities ~for_mutable_variable:false
+      (Types.is_mutable mut)
+  in
   let annotated = Modality.Value.Const.(diff baseline t) in
   let implied = List.concat_map implied_modalities annotated in
   let exclude_implied =
@@ -502,7 +538,8 @@ let sort_dedup_modalities ~warn l =
 
 let transl_modalities ~maturity mut modalities =
   let mut_modalities =
-    mutable_implied_modalities mut ~for_mutable_variable:false
+    mutable_implied_modalities (Types.is_mutable mut)
+      ~for_mutable_variable:false
   in
   let modalities = List.map (transl_modality ~maturity) modalities in
   (* axes listed in the order of implication. *)

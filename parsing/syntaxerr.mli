@@ -44,6 +44,7 @@ type error =
   | Let_mutable_not_allowed_at_structure_level of Location.t
   | Let_mutable_not_allowed_in_class_definition of Location.t
   | Let_mutable_not_allowed_with_function_bindings of Location.t
+  | Block_access_bad_paren of Location.t
 
 exception Error of error
 exception Escape_error

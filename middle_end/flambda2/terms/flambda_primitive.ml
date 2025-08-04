@@ -1667,6 +1667,7 @@ type binary_primitive =
   | Bigarray_get_alignment of int
   | Atomic_load_field of Block_access_field_kind.t
   | Poke of Flambda_kind.Standard_int_or_float.t
+  | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
 
 let binary_primitive_eligible_for_cse p =
   match p with
@@ -1684,7 +1685,7 @@ let binary_primitive_eligible_for_cse p =
        floating-point arithmetic operations. See also the comment in
        effects_and_coeffects of unary primitives. *)
     Flambda_features.float_const_prop ()
-  | Atomic_load_field (Any_value | Immediate) | Poke _ -> false
+  | Atomic_load_field (Any_value | Immediate) | Poke _ | Read_offset _ -> false
 
 let compare_binary_primitive p1 p2 =
   let binary_primitive_numbering p =
@@ -1702,6 +1703,7 @@ let compare_binary_primitive p1 p2 =
     | Bigarray_get_alignment _ -> 10
     | Atomic_load_field _ -> 11
     | Poke _ -> 12
+    | Read_offset _ -> 13
   in
   match p1, p2 with
   | ( Block_set { kind = kind1; init = init1; field = field1 },
@@ -1756,10 +1758,13 @@ let compare_binary_primitive p1 p2 =
       block_access_field_kind2
   | Poke kind1, Poke kind2 ->
     Flambda_kind.Standard_int_or_float.compare kind1 kind2
+  | Read_offset (kind1, mut1), Read_offset (kind2, mut2) ->
+    let c = Array_load_kind.compare kind1 kind2 in
+    if c <> 0 then c else Stdlib.compare mut1 mut2
   | ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
       | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _
       | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
-      | Atomic_load_field _ | Poke _ ),
+      | Atomic_load_field _ | Poke _ | Read_offset _ ),
       _ ) ->
     Stdlib.compare
       (binary_primitive_numbering p1)
@@ -1804,6 +1809,9 @@ let print_binary_primitive ppf p =
   | Poke kind ->
     fprintf ppf "@[(Poke@ %a)@]"
       Flambda_kind.Standard_int_or_float.print_lowercase kind
+  | Read_offset (kind, mut) ->
+    fprintf ppf "@[(Read_offset@ %a %s)@]" Flambda_kind.With_subkind.print kind
+      (match mut with Immutable -> "Immutable" | Mutable -> "Mutable")
 
 let args_kind_of_binary_primitive p =
   match p with
@@ -1830,6 +1838,7 @@ let args_kind_of_binary_primitive p =
   | Bigarray_get_alignment _ -> bigstring_kind, K.naked_immediate
   | Atomic_load_field (Any_value | Immediate) -> K.value, K.value
   | Poke kind -> K.naked_nativeint, K.Standard_int_or_float.to_kind kind
+  | Read_offset _ -> K.value, K.naked_int64
 
 let result_kind_of_binary_primitive p : result_kind =
   match p with
@@ -1855,6 +1864,7 @@ let result_kind_of_binary_primitive p : result_kind =
   | Bigarray_get_alignment _ -> Singleton K.naked_immediate
   | Atomic_load_field (Any_value | Immediate) -> Singleton K.value
   | Poke _ -> Unit
+  | Read_offset (kind, _) -> Singleton (K.With_subkind.kind kind)
 
 let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   match p with
@@ -1885,13 +1895,14 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   | Atomic_load_field (Any_value | Immediate) ->
     Arbitrary_effects, Has_coeffects, Strict
   | Poke _ -> Arbitrary_effects, No_coeffects, Strict
+  | Read_offset _ -> Arbitrary_effects, No_coeffects, Strict
 
 let binary_classify_for_printing p =
   match p with
   | Array_load _ -> Destructive
   | Block_set _ | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _
   | Float_arith _ | Float_comp _ | Bigarray_load _ | String_or_bigstring_load _
-  | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ ->
+  | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ | Read_offset _ ->
     Neither
 
 let free_names_binary_primitive p =
@@ -1899,7 +1910,8 @@ let free_names_binary_primitive p =
   | Block_set _ | Array_load _ | String_or_bigstring_load _ | Bigarray_load _
   | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _ | Float_arith _
   | Float_comp _ | Bigarray_get_alignment _ | Atomic_load_field _
-  | Poke (_ : Flambda_kind.Standard_int_or_float.t) ->
+  | Poke (_ : Flambda_kind.Standard_int_or_float.t)
+  | Read_offset _ ->
     Name_occurrences.empty
 
 let apply_renaming_binary_primitive p _renaming =
@@ -1907,7 +1919,8 @@ let apply_renaming_binary_primitive p _renaming =
   | Block_set _ | Array_load _ | String_or_bigstring_load _ | Bigarray_load _
   | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _ | Float_arith _
   | Float_comp _ | Bigarray_get_alignment _ | Atomic_load_field _
-  | Poke (_ : Flambda_kind.Standard_int_or_float.t) ->
+  | Poke (_ : Flambda_kind.Standard_int_or_float.t)
+  | Read_offset _ ->
     p
 
 let ids_for_export_binary_primitive p =
@@ -1915,7 +1928,8 @@ let ids_for_export_binary_primitive p =
   | Block_set _ | Array_load _ | String_or_bigstring_load _ | Bigarray_load _
   | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _ | Float_arith _
   | Float_comp _ | Bigarray_get_alignment _ | Atomic_load_field _
-  | Poke (_ : Flambda_kind.Standard_int_or_float.t) ->
+  | Poke (_ : Flambda_kind.Standard_int_or_float.t)
+  | Read_offset _ ->
     Ids_for_export.empty
 
 type int_atomic_op =
@@ -1943,6 +1957,7 @@ type ternary_primitive =
   | Atomic_field_int_arith of int_atomic_op
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
+  | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
 
 type quaternary_primitive =
   | Atomic_compare_and_set_field of Block_access_field_kind.t
@@ -1956,7 +1971,8 @@ let ternary_primitive_eligible_for_cse p =
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
   | Atomic_field_int_arith _
   | Atomic_set_field (Immediate | Any_value)
-  | Atomic_exchange_field (Immediate | Any_value) ->
+  | Atomic_exchange_field (Immediate | Any_value)
+  | Write_offset _ ->
     false
 
 let quaternary_primitive_eligible_for_cse p =
@@ -1976,6 +1992,7 @@ let compare_ternary_primitive p1 p2 =
     | Atomic_field_int_arith _ -> 3
     | Atomic_set_field _ -> 4
     | Atomic_exchange_field _ -> 5
+    | Write_offset _ -> 6
   in
   match p1, p2 with
   | Array_set (kind1, set_kind1), Array_set (kind2, set_kind2) ->
@@ -2003,9 +2020,13 @@ let compare_ternary_primitive p1 p2 =
       Atomic_exchange_field block_access_field_kind2 ) ->
     Block_access_field_kind.compare block_access_field_kind1
       block_access_field_kind2
+  | Write_offset (array_set_kind1, mode1), Write_offset (array_set_kind2, mode2)
+    ->
+    let c = Array_set_kind.compare array_set_kind1 array_set_kind2 in
+    if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
   | ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
       | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-        ),
+      | Write_offset _ ),
       _ ) ->
     Stdlib.compare
       (ternary_primitive_numbering p1)
@@ -2058,6 +2079,9 @@ let print_ternary_primitive ppf p =
   | Atomic_exchange_field block_access_field_kind ->
     fprintf ppf "@[(Atomic_exchange_field@ %a)@]" Block_access_field_kind.print
       block_access_field_kind
+  | Write_offset (kind, mode) ->
+    Format.fprintf ppf "@[(Write_offset@ %a %a)@]"
+      Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
 
 let print_quaternary_primitive ppf p =
   let fprintf = Format.fprintf in
@@ -2111,6 +2135,7 @@ let args_kind_of_ternary_primitive p =
   | Atomic_set_field (Immediate | Any_value)
   | Atomic_exchange_field (Immediate | Any_value) ->
     K.value, K.value, K.value
+  | Write_offset (kind, _) -> K.value, K.naked_int64, K.With_subkind.kind kind
 
 let args_kind_of_quaternary_primitive p =
   match p with
@@ -2126,7 +2151,8 @@ let result_kind_of_ternary_primitive p : result_kind =
   | Atomic_field_int_arith (Add | Sub | And | Or | Xor)
   | Atomic_set_field _ ->
     Unit
-  | Atomic_field_int_arith Fetch_add | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith Fetch_add | Atomic_exchange_field _ | Write_offset _
+    ->
     Singleton K.value
 
 let result_kind_of_quaternary_primitive p : result_kind =
@@ -2140,7 +2166,8 @@ let effects_and_coeffects_of_ternary_primitive p :
   | Array_set _ -> writing_to_an_array
   | Bytes_or_bigstring_set _ -> writing_to_bytes_or_bigstring
   | Bigarray_set (_, kind, _) -> writing_to_a_bigarray kind
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
+  | Write_offset _ ->
     Arbitrary_effects, Has_coeffects, Strict
 
 let effects_and_coeffects_of_quaternary_primitive p :
@@ -2152,7 +2179,8 @@ let effects_and_coeffects_of_quaternary_primitive p :
 let ternary_classify_for_printing p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
+  | Write_offset _ ->
     Neither
 
 let quaternary_classify_for_printing p =
@@ -2162,7 +2190,8 @@ let quaternary_classify_for_printing p =
 let free_names_ternary_primitive p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
+  | Write_offset _ ->
     Name_occurrences.empty
 
 let free_names_quaternary_primitive p =
@@ -2173,7 +2202,8 @@ let free_names_quaternary_primitive p =
 let apply_renaming_ternary_primitive p _ =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
+  | Write_offset _ ->
     p
 
 let apply_renaming_quaternary_primitive p _ =
@@ -2183,7 +2213,8 @@ let apply_renaming_quaternary_primitive p _ =
 let ids_for_export_ternary_primitive p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
+  | Write_offset _ ->
     Ids_for_export.empty
 
 let ids_for_export_quaternary_primitive p =

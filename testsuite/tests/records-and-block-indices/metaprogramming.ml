@@ -328,6 +328,25 @@ module Type_structure = struct
         None
       else Some (Record (fields, Boxed))
 
+  let array_element (tree : t Tree.t) : t option =
+    let ty = nested_unboxed_record tree in
+    let ty_layout = layout ty in
+    if ty_layout = Value Float
+    then None
+    else
+      (* CR layouts v8: all of these restrictions will eventually be lifted *)
+      let supported_in_arrays =
+        (Layout.all_scannable ty_layout || Layout.all_ignorable ty_layout)
+        && not (Layout.contains_vec128 ty_layout)
+      in
+      let supported_by_block_indices =
+        (not (Layout.reordered_in_block ty_layout))
+        && Layout.is_non_float ty_layout
+      in
+      if supported_in_arrays && supported_by_block_indices
+      then Some ty
+      else None
+
   let rec to_string (t : t) : string =
     match t with
     | Record (ts, boxing) ->

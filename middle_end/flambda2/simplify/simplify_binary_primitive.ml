@@ -1055,6 +1055,12 @@ let simplify_poke dacc ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_
     ~result_var =
   SPR.create_unit dacc ~result_var ~original_term
 
+let simplify_read_offset ~original_prim dacc ~original_term _dbg ~arg1:_
+    ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
+  SPR.create_unknown dacc ~result_var
+    (P.result_kind' original_prim)
+    ~original_term
+
 let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
     ~arg1 ~arg1_ty ~arg2 ~arg2_ty dbg ~result_var =
   let original_term = Named.create_prim original_prim dbg in
@@ -1109,6 +1115,7 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
       simplify_bigarray_get_alignment align ~original_prim
     | Atomic_load_field _ -> simplify_atomic_load_field ~original_prim
     | Poke _ -> simplify_poke
+    | Read_offset _ -> simplify_read_offset ~original_prim
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var
 
@@ -1117,7 +1124,8 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
   | Block_set _ | Array_load _ | Int_arith _ | Int_shift _
   | Int_comp (_, Yielding_int_like_compare_functions _)
   | Float_arith _ | Float_comp _ | Phys_equal _ | String_or_bigstring_load _
-  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ ->
+  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _
+  | Read_offset _ ->
     None
   | Int_comp (kind, Yielding_bool op) -> (
     match kind with
