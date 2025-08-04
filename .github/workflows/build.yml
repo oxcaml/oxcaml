@@ -168,7 +168,7 @@ jobs:
       id: cache
       with:
         path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-patched-dune-3152-menhir-20231231-rev13
+        key: ${{ matrix.os }}-cache-ocaml-414-dune-3153-menhir-20231231-rev13
 
     - name: Checkout OCaml 4.14
       uses: actions/checkout@master
