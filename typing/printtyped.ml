@@ -92,7 +92,7 @@ let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
   | Mutable m ->
-    fprintf f "Mutable(%a)" Mode.Alloc.Comonadic.Const.print m
+    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) m
 
 let fmt_virtual_flag f x =
   match x with
@@ -308,6 +308,8 @@ let rec core_type i ppf x =
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
+  | Ttyp_of_kind jkind ->
+      line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
 
 and labeled_core_type i ppf (l, t) =
@@ -418,7 +420,8 @@ and function_body i ppf (body : function_body) =
       expression (i+1) ppf e
   | Tfunction_cases
       { fc_cases; fc_loc; fc_exp_extra; fc_attributes; fc_arg_mode;
-        fc_arg_sort; fc_param = _; fc_partial; fc_env = _; fc_ret_type = _ }
+        fc_arg_sort; fc_param = _; fc_param_debug_uid = _;
+        fc_partial; fc_env = _; fc_ret_type = _ }
     ->
       line i ppf "Tfunction_cases%a %a\n"
         fmt_partiality fc_partial
@@ -489,11 +492,16 @@ and expression i ppf x =
   match x.exp_desc with
   | Texp_ident (li,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
+  | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
   | Texp_let (rf, l, e) ->
       line i ppf "Texp_let %a\n" fmt_rec_flag rf;
       list i (value_binding rf) ppf l;
       expression i ppf e;
+  | Texp_letmutable (vb, e) ->
+      line i ppf "Texp_letmutable\n";
+      value_binding Nonrecursive i ppf vb;
+      expression i ppf e
   | Texp_function { params; body; alloc_mode = am } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
@@ -612,6 +620,9 @@ and expression i ppf x =
   | Texp_new (li, _, _, _) -> line i ppf "Texp_new %a\n" fmt_path li;
   | Texp_setinstvar (_, s, _, e) ->
       line i ppf "Texp_setinstvar %a\n" fmt_path s;
+      expression i ppf e;
+  | Texp_setmutvar (lid, _, e) ->
+      line i ppf "Texp_setmutvar %a\n" fmt_ident lid.txt;
       expression i ppf e;
   | Texp_override (_, l) ->
       line i ppf "Texp_override\n";

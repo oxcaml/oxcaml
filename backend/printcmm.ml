@@ -38,6 +38,8 @@ let machtype_component ppf (ty : machtype_component) =
   | Int -> fprintf ppf "int"
   | Float -> fprintf ppf "float"
   | Vec128 -> fprintf ppf "vec128"
+  | Vec256 -> fprintf ppf "vec256"
+  | Vec512 -> fprintf ppf "vec512"
   | Float32 -> fprintf ppf "float32"
   | Valx2 -> fprintf ppf "valx2"
 
@@ -59,6 +61,8 @@ let exttype ppf = function
   | XFloat -> fprintf ppf "float"
   | XFloat32 -> fprintf ppf "float32"
   | XVec128 -> fprintf ppf "vec128"
+  | XVec256 -> fprintf ppf "vec256"
+  | XVec512 -> fprintf ppf "vec512"
 
 let extcall_signature ppf (ty_res, ty_args) =
   (match ty_args with
@@ -104,6 +108,22 @@ let vec128_name = function
   | Float32x4 -> "float32x4"
   | Float64x2 -> "float64x2"
 
+let vec256_name = function
+  | Int8x32 -> "int8x32"
+  | Int16x16 -> "int16x16"
+  | Int32x8 -> "int32x8"
+  | Int64x4 -> "int64x4"
+  | Float32x8 -> "float32x8"
+  | Float64x4 -> "float64x4"
+
+let vec512_name = function
+  | Int8x64 -> "int8x64"
+  | Int16x32 -> "int16x32"
+  | Int32x16 -> "int32x16"
+  | Int64x8 -> "int64x8"
+  | Float32x16 -> "float32x16"
+  | Float64x8 -> "float64x8"
+
 let chunk = function
   | Byte_unsigned -> "unsigned int8"
   | Byte_signed -> "signed int8"
@@ -113,6 +133,10 @@ let chunk = function
   | Thirtytwo_signed -> "signed int32"
   | Onetwentyeight_unaligned -> "unaligned vec128"
   | Onetwentyeight_aligned -> "aligned vec128"
+  | Twofiftysix_unaligned -> "unaligned vec256"
+  | Twofiftysix_aligned -> "aligned vec256"
+  | Fivetwelve_unaligned -> "unaligned vec512"
+  | Fivetwelve_aligned -> "aligned vec512"
   | Word_int -> "int"
   | Word_val -> "val"
   | Single { reg = Float64 } -> "float32_as_float64"
@@ -192,6 +216,8 @@ let to_string msg =
 
 let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | V128_of_v128 -> "vec128 as vec128"
+  | V256_of_v256 -> "vec256 as vec256"
+  | V512_of_v512 -> "vec512 as vec512"
   | Value_of_int -> "int as value"
   | Int_of_value -> "value as int"
   | Float32_of_float -> "float as float32"
@@ -210,6 +236,10 @@ let static_cast : Cmm.static_cast -> string = function
   | Float_of_float32 -> "float32->float"
   | Scalar_of_v128 ty -> Printf.sprintf "%s->scalar" (vec128_name ty)
   | V128_of_scalar ty -> Printf.sprintf "scalar->%s" (vec128_name ty)
+  | Scalar_of_v256 ty -> Printf.sprintf "%s->scalar" (vec256_name ty)
+  | V256_of_scalar ty -> Printf.sprintf "scalar->%s" (vec256_name ty)
+  | Scalar_of_v512 ty -> Printf.sprintf "%s->scalar" (vec512_name ty)
+  | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
   | Capply (_ty, _) -> "app" ^ location d
@@ -285,11 +315,19 @@ let operation d = function
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
   | Cpoll -> "poll"
+  | Cpause -> "pause"
 
 let rec expr ppf = function
   | Cconst_int (n, _dbg) -> fprintf ppf "%i" n
   | Cconst_natint (n, _dbg) -> fprintf ppf "%s" (Nativeint.to_string n)
-  | Cconst_vec128 ({ low; high }, _dbg) -> fprintf ppf "%016Lx:%016Lx" high low
+  | Cconst_vec128 ({ word0; word1 }, _dbg) ->
+    fprintf ppf "%016Lx:%016Lx" word1 word0
+  | Cconst_vec256 ({ word0; word1; word2; word3 }, _dbg) ->
+    fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx" word3 word2 word1 word0
+  | Cconst_vec512
+      ({ word0; word1; word2; word3; word4; word5; word6; word7 }, _dbg) ->
+    fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx" word7
+      word6 word5 word4 word3 word2 word1 word0
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
   | Cconst_symbol (s, _dbg) ->
@@ -437,9 +475,10 @@ let fundecl ppf f =
       cases
   in
   with_location_mapping ~label:"Function" ~dbg:f.fun_dbg ppf (fun () ->
-      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a)@]@ @[%a@])@]@."
+      fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
         (location f.fun_dbg) print_codegen_options f.fun_codegen_options
-        f.fun_name.sym_name print_cases f.fun_args sequence f.fun_body)
+        f.fun_name.sym_name print_cases f.fun_args machtype f.fun_ret_type
+        sequence f.fun_body)
 
 let data_item ppf = function
   | Cdefine_symbol { sym_name; sym_global = Local } ->
@@ -452,8 +491,16 @@ let data_item ppf = function
   | Cint n -> fprintf ppf "int %s" (Nativeint.to_string n)
   | Csingle f -> fprintf ppf "single %F" f
   | Cdouble f -> fprintf ppf "double %F" f
-  | Cvec128 { high; low } ->
-    fprintf ppf "vec128 %s:%s" (Int64.to_string high) (Int64.to_string low)
+  | Cvec128 { word0; word1 } ->
+    fprintf ppf "vec128 %s:%s" (Int64.to_string word1) (Int64.to_string word0)
+  | Cvec256 { word0; word1; word2; word3 } ->
+    fprintf ppf "vec256 %s:%s:%s:%s" (Int64.to_string word3)
+      (Int64.to_string word2) (Int64.to_string word1) (Int64.to_string word0)
+  | Cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    fprintf ppf "vec512 %s:%s:%s:%s:%s:%s:%s:%s" (Int64.to_string word7)
+      (Int64.to_string word6) (Int64.to_string word5) (Int64.to_string word4)
+      (Int64.to_string word3) (Int64.to_string word2) (Int64.to_string word1)
+      (Int64.to_string word0)
   | Csymbol_address s ->
     fprintf ppf "addr %a:\"%s\"" is_global s.sym_global s.sym_name
   | Csymbol_offset (s, o) ->

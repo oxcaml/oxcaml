@@ -102,7 +102,9 @@ let transl_type_extension ~scopes env rootpath tyext body =
         transl_extension_constructor ~scopes env
           (field_path rootpath ext.ext_id) ext
       in
-      Llet(Strict, Lambda.layout_block, ext.ext_id, lam, body))
+      (* CR sspies: Can we find a better [debug_uid] here? *)
+      Llet(Strict, Lambda.layout_block, ext.ext_id,
+           Lambda.debug_uid_none, lam, body))
     tyext.tyext_constructors
     body
 
@@ -127,9 +129,10 @@ let rec apply_coercion loc strict restr arg =
         wrap_id_pos_list loc id_pos_list get_field lam)
   | Tcoerce_functor(cc_arg, cc_res) ->
       let param = Ident.create_local "funarg" in
+      let param_duid = Lambda.debug_uid_none in
       let carg = apply_coercion loc Alias cc_arg (Lvar param) in
       apply_coercion_result loc strict arg
-        [{name = param; layout = Lambda.layout_module;
+        [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
         [carg] cc_res
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort } ->
@@ -149,9 +152,11 @@ and apply_coercion_result loc strict funct params args cc_res =
   match cc_res with
   | Tcoerce_functor(cc_arg, cc_res) ->
     let param = Ident.create_local "funarg" in
+    let param_duid = Lambda.debug_uid_none in
     let arg = apply_coercion loc Alias cc_arg (Lvar param) in
     apply_coercion_result loc strict funct
       ({ name = param;
+         debug_uid = param_duid;
          layout = Lambda.layout_module;
          attributes = Lambda.default_param_attribute;
          mode = alloc_heap } :: params)
@@ -195,9 +200,10 @@ and wrap_id_pos_list loc id_pos_list get_field lam =
     List.fold_left (fun (lam, fv, s) (id',pos,c) ->
       if Ident.Set.mem id' fv then
         let id'' = Ident.create_local (Ident.name id') in
+        let id''_duid = Lambda.debug_uid_none in
         let rhs = apply_coercion loc Alias c (get_field pos) in
         let fv_rhs = free_variables rhs in
-        (Llet(Alias, Lambda.layout_module_field, id'', rhs, lam),
+        (Llet(Alias, Lambda.layout_module_field, id'', id''_duid, rhs, lam),
          Ident.Set.union fv fv_rhs,
          Ident.Map.add id' id'' s)
       else (lam, fv, s))
@@ -355,14 +361,14 @@ type binding_status =
   | Defined
 
 type id_or_ignore_loc =
-  | Id of Ident.t
+  | Id of Ident.t * Lambda.debug_uid
   | Ignore_loc of Lambda.scoped_location
 
 let extract_unsafe_cycle id status init cycle_start =
   let info i = match init.(i) with
     | Result.Error r ->
         begin match id.(i) with
-        | Id id -> id, r
+        | Id (id, _) -> id, r
         | Ignore_loc _ ->
             assert false (* Can't refer to something without a name. *)
         end
@@ -400,7 +406,7 @@ let reorder_rec_bindings bindings =
           status.(i) <- Inprogress parent;
           for j = 0 to num_bindings - 1 do
             match id.(j) with
-            | Id id when Ident.Set.mem id fv.(i) -> emit_binding (Some i) j
+            | Id (id, _) when Ident.Set.mem id fv.(i) -> emit_binding (Some i) j
             | _ -> ()
           done
         end;
@@ -423,8 +429,8 @@ let eval_rec_bindings bindings cont =
   | (Ignore_loc _, _, _) :: rem
   | (_, None, _) :: rem ->
       bind_inits rem
-  | (Id id, Some(loc, shape), _rhs) :: rem ->
-      Llet(Strict, Lambda.layout_module, id,
+  | (Id (id, id_duid), Some(loc, shape), _rhs) :: rem ->
+      Llet(Strict, Lambda.layout_module, id, id_duid,
            Lapply{
              ap_loc=Loc_unknown;
              ap_func=mod_prim "init_mod";
@@ -443,8 +449,8 @@ let eval_rec_bindings bindings cont =
       patch_forwards bindings
   | (Ignore_loc loc, None, rhs) :: rem ->
       Lsequence(Lprim(Pignore, [rhs], loc), bind_strict rem)
-  | (Id id, None, rhs) :: rem ->
-      Llet(Strict, Lambda.layout_module, id, rhs, bind_strict rem)
+  | (Id (id, id_duid), None, rhs) :: rem ->
+      Llet(Strict, Lambda.layout_module, id, id_duid, rhs, bind_strict rem)
   | (_id, Some _, _rhs) :: rem ->
       bind_strict rem
   and patch_forwards = function
@@ -453,7 +459,7 @@ let eval_rec_bindings bindings cont =
   | (Ignore_loc _, _, _rhs) :: rem
   | (_, None, _rhs) :: rem ->
       patch_forwards rem
-  | (Id id, Some(_loc, shape), rhs) :: rem ->
+  | (Id (id, _), Some(_loc, shape), rhs) :: rem ->
       Lsequence(
         Lapply {
           ap_loc=Loc_unknown;
@@ -475,13 +481,13 @@ let compile_recmodule ~scopes compile_rhs bindings cont =
   eval_rec_bindings
     (reorder_rec_bindings
        (List.map
-          (fun {mb_id=id; mb_name; mb_expr=modl; _} ->
+          (fun {mb_id=id; mb_uid=id_duid; mb_name; mb_expr=modl; _} ->
              let id_or_ignore_loc, shape =
                match id with
                | None ->
                  let loc = of_location ~scopes mb_name.loc in
                  Ignore_loc loc, Result.Error Unnamed
-               | Some id -> Id id, init_shape id modl
+               | Some id -> Id (id, id_duid), init_shape id modl
              in
              (id_or_ignore_loc, modl.mod_loc, shape, compile_rhs id modl))
           bindings))
@@ -495,7 +501,8 @@ let transl_class_bindings ~scopes cl_list =
    List.map
      (fun ({ci_id_class=id; ci_expr=cl; ci_virt=vf}, meths) ->
        let def, rkind = transl_class ~scopes ids id meths cl vf in
-       (id, rkind, def))
+       (* CR sspies: Can we find a better [debug_uid] here? *)
+       (id, Lambda.debug_uid_none, rkind, def))
      cl_list)
 
 (* Compile one or more functors, merging curried functors to produce
@@ -549,15 +556,22 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
   assert (List.length functor_params_rev >= 1);  (* cf. [transl_module] *)
   let params, body =
     List.fold_left (fun (params, body) (param, loc, arg_coercion) ->
+        let param_duid = Lambda.debug_uid_none in
+        (* CR sspies: Add a debug uid to the functor argument via [Named] and
+           then propagate it here. Note that we use it twice below, once for
+           param and once for param'. *)
         let param' = Ident.rename param in
         let arg = apply_coercion loc Alias arg_coercion (Lvar param') in
         let params = {
           name = param';
+          debug_uid = param_duid;
           layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute;
           mode = alloc_heap
         } :: params in
-        let body = Llet (Alias, Lambda.layout_module, param, arg, body) in
+        let body = Llet (Alias, Lambda.layout_module, param, param_duid, arg,
+                         body)
+        in
         params, body)
       ([], transl_module ~scopes res_coercion body_path body)
       functor_params_rev
@@ -724,11 +738,13 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
           transl_type_extension ~scopes item.str_env rootpath tyext body, size
       | Tstr_exception ext ->
           let id = ext.tyexn_constructor.ext_id in
+          let id_duid = Lambda.debug_uid_none in
+          (* CR sspies: Can we find a better [debug_uid] here? *)
           let path = field_path rootpath id in
           let body, size =
             transl_structure ~scopes loc (id::fields) cc rootpath final_env rem
           in
-          Llet(Strict, Lambda.layout_block, id,
+          Llet(Strict, Lambda.layout_block, id, id_duid,
                transl_extension_constructor ~scopes
                                             item.str_env
                                             path
@@ -736,6 +752,7 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
           size
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
+          let id_duid = mb.mb_uid in
           (* Translate module first *)
           let subscopes = match id with
             | None -> scopes
@@ -759,7 +776,8 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
                                of_location ~scopes mb.mb_name.loc), body),
               size
           | Some id ->
-              Llet(pure_module mb.mb_expr, Lambda.layout_module, id, module_body, body), size
+              Llet(pure_module mb.mb_expr, Lambda.layout_module, id,
+              id_duid, module_body, body), size
           end
       | Tstr_module ({mb_presence=Mp_absent}) ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
@@ -793,6 +811,7 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
           let ids = bound_value_identifiers incl.incl_type in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
+          let mid_duid = Lambda.debug_uid_none in
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
@@ -800,7 +819,9 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
                 let body, size =
                   rebind_idents (pos + 1) (id :: newfields) ids
                 in
-                Llet(Alias, Lambda.layout_module_field, id,
+                let id_duid = Lambda.debug_uid_none in
+                (* CR sspies: Can we find a better [debug_uid] here? *)
+                Llet(Alias, Lambda.layout_module_field, id, id_duid,
                      Lprim(mod_field pos, [Lvar mid],
                            of_location ~scopes incl.incl_loc), body),
                 size
@@ -818,7 +839,7 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
                 Strict, transl_include_functor ~generative:true modl ccs
                           scopes loc
           in
-          Llet(let_kind, Lambda.layout_module, mid, modl, body),
+          Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           size
 
       | Tstr_open od ->
@@ -833,6 +854,7 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
           | _ ->
               let ids = bound_value_identifiers od.open_bound_items in
               let mid = Ident.create_local "open" in
+              let mid_duid = Lambda.debug_uid_none in
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
@@ -840,13 +862,15 @@ and transl_structure ~scopes loc fields cc rootpath final_env = function
                   let body, size =
                     rebind_idents (pos + 1) (id :: newfields) ids
                   in
-                  Llet(Alias, Lambda.layout_module_field, id,
+                  let id_duid = Lambda.debug_uid_none in
+                  (* CR sspies: Can we find a better [debug_uid] here? *)
+                  Llet(Alias, Lambda.layout_module_field, id, id_duid,
                       Lprim(mod_field pos, [Lvar mid],
                             of_location ~scopes od.open_loc), body),
                   size
               in
               let body, size = rebind_idents 0 fields ids in
-              Llet(pure, Lambda.layout_module, mid,
+              Llet(pure, Lambda.layout_module, mid, mid_duid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body),
               size
           end
@@ -922,7 +946,9 @@ let required_globals ~flambda body =
 
 let add_arg_block_to_module_block primary_block_lam size restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
+  let primary_block_id_duid = Lambda.debug_uid_none in
   let arg_block_id = Ident.create_local "*arg-block*" in
+  let arg_block_id_duid = Lambda.debug_uid_none in
   let arg_block_lam =
     apply_coercion Loc_unknown Strict restr (Lvar primary_block_id)
   in
@@ -930,8 +956,10 @@ let add_arg_block_to_module_block primary_block_lam size restr =
   let all_fields = List.init size get_field @ [Lvar arg_block_id] in
   let arg_block_field = size in
   let new_size = size + 1 in
-  Llet(Strict, layout_module, primary_block_id, primary_block_lam,
-       Llet(Strict, layout_module, arg_block_id, arg_block_lam,
+  Llet(Strict, layout_module, primary_block_id,
+       primary_block_id_duid, primary_block_lam,
+       Llet(Strict, layout_module, arg_block_id,
+            arg_block_id_duid, arg_block_lam,
             Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                   all_fields,
                   Loc_unknown))),
@@ -943,6 +971,8 @@ let add_runtime_parameters lam params =
     List.map
       (fun name ->
         { name;
+          debug_uid = Lambda.debug_uid_none;
+          (* CR sspies: Can we find a better [debug_uid] here? *)
           layout = Pvalue Lambda.generic_value;
           attributes = Lambda.default_param_attribute;
           mode = Lambda.alloc_heap })
@@ -1258,6 +1288,8 @@ let transl_store_structure ~scopes glob map prims aliases str =
                         (add_idents false ids subst) cont rem)
         | Tstr_exception ext ->
             let id = ext.tyexn_constructor.ext_id in
+            let id_duid = Lambda.debug_uid_none in
+            (* CR sspies: Can we find a better [debug_uid] here? *)
             let path = field_path rootpath id in
             let loc = of_location ~scopes ext.tyexn_constructor.ext_loc in
             let lam =
@@ -1266,7 +1298,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                                            path
                                            ext.tyexn_constructor
             in
-            Lsequence(Llet(Strict, Lambda.layout_block, id,
+            Lsequence(Llet(Strict, Lambda.layout_block, id, id_duid,
                            Lambda.subst no_env_update subst lam,
                            store_ident loc id),
                       transl_store ~scopes rootpath
@@ -1286,6 +1318,8 @@ let transl_store_structure ~scopes glob map prims aliases str =
             )
         | Tstr_module{mb_id=Some id;mb_loc=loc;mb_presence=Mp_present;
                       mb_expr={mod_desc = Tmod_structure str}} ->
+            let id_duid = Lambda.debug_uid_none in
+            (* CR sspies: Can we find a better [debug_uid] here? *)
             let loc = of_location ~scopes loc in
             let lam =
               transl_store
@@ -1296,7 +1330,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
             (* Careful: see next case *)
             let subst = !transl_store_subst in
             Lsequence(lam,
-                      Llet(Strict, Lambda.layout_module, id,
+                      Llet(Strict, Lambda.layout_module, id, id_duid,
                            Lambda.subst no_env_update subst
                              (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                                     List.map (fun id -> Lvar id)
@@ -1314,6 +1348,8 @@ let transl_store_structure ~scopes glob map prims aliases str =
           } ->
             (*    Format.printf "coerc id %s: %a@." (Ident.unique_name id)
                                 Includemod.print_coercion cc; *)
+            let id_duid = Lambda.debug_uid_none in
+            (* CR sspies: Can we find a better [debug_uid] here? *)
             let loc = of_location ~scopes loc in
             let lam =
               transl_store
@@ -1325,7 +1361,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
             let subst = !transl_store_subst in
             let field = field_of_str loc str in
             Lsequence(lam,
-                      Llet(Strict, Lambda.layout_module, id,
+                      Llet(Strict, Lambda.layout_module, id, id_duid,
                            Lambda.subst no_env_update subst
                              (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                                     List.map field map, loc)),
@@ -1336,6 +1372,8 @@ let transl_store_structure ~scopes glob map prims aliases str =
         | Tstr_module
             {mb_id=Some id; mb_presence=Mp_present; mb_expr=modl;
              mb_loc=loc; mb_attributes} ->
+            let id_duid = Lambda.debug_uid_none in
+            (* CR sspies: Can we find a better [debug_uid] here? *)
             let lam =
               Translattribute.add_inline_attribute
                 (transl_module
@@ -1349,7 +1387,8 @@ let transl_store_structure ~scopes glob map prims aliases str =
                the compilation unit (add_ident true returns subst unchanged).
                If not, we can use the value from the global
                (add_ident true adds id -> Pgetglobal... to subst). *)
-            Llet(Strict, Lambda.layout_module, id, Lambda.subst no_env_update subst lam,
+            Llet(Strict, Lambda.layout_module, id, id_duid,
+                 Lambda.subst no_env_update subst lam,
                  Lsequence(store_ident (of_location ~scopes loc) id,
                            transl_store ~scopes rootpath
                              (add_ident true id subst)
@@ -1408,6 +1447,8 @@ let transl_store_structure ~scopes glob map prims aliases str =
                     cont rem
               | id :: ids, arg :: args ->
                   Llet(Alias, Lambda.layout_module_field, id,
+                       Lambda.debug_uid_none,
+                       (* CR sspies: Can we find a better [debug_uid] here? *)
                        Lambda.subst no_env_update subst (field arg),
                        Lsequence(store_ident (of_location ~scopes loc) id,
                                  loop ids args))
@@ -1428,12 +1469,16 @@ let transl_store_structure ~scopes glob map prims aliases str =
             let ids = bound_value_identifiers incl.incl_type in
             let modl = incl.incl_mod in
             let mid = Ident.create_local "include" in
+            let mid_duid = Lambda.debug_uid_none in
             let loc = of_location ~scopes incl.incl_loc in
             let rec store_idents pos = function
               | [] -> transl_store
                         ~scopes rootpath (add_idents true ids subst) cont rem
               | id :: idl ->
-                  Llet(Alias, Lambda.layout_module_field, id, Lprim(mod_field pos, [Lvar mid],
+                  let id_duid = Lambda.debug_uid_none in
+                  (* CR sspies: Can we find a better [debug_uid] here? *)
+                  Llet(Alias, Lambda.layout_module_field, id, id_duid,
+                      Lprim(mod_field pos, [Lvar mid],
                                                  loc),
                        Lsequence(store_ident loc id,
                                  store_idents (pos + 1) idl))
@@ -1446,7 +1491,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
               | Tincl_gen_functor ccs ->
                   transl_include_functor ~generative:true modl ccs scopes loc
             in
-            Llet(Strict, Lambda.layout_module, mid,
+            Llet(Strict, Lambda.layout_module, mid, mid_duid,
                  Lambda.subst no_env_update subst modl,
                  store_idents 0 ids)
         | Tstr_open od ->
@@ -1463,7 +1508,10 @@ let transl_store_structure ~scopes glob map prims aliases str =
                   | [] -> transl_store ~scopes rootpath
                             (add_idents true ids0 subst) cont rem
                   | id :: idl ->
-                      Llet(Alias, Lambda.layout_module_field, id, Lvar ids.(pos),
+                      let id_duid = Lambda.debug_uid_none in
+                      (* CR sspies: Can we find a better [debug_uid] here? *)
+                      Llet(Alias, Lambda.layout_module_field, id, id_duid,
+                           Lvar ids.(pos),
                            Lsequence(store_ident loc id,
                                      store_idents (pos + 1) idl))
                 in
@@ -1481,19 +1529,22 @@ let transl_store_structure ~scopes glob map prims aliases str =
                 | _ ->
                     let ids = bound_value_identifiers od.open_bound_items in
                     let mid = Ident.create_local "open" in
+                    let mid_duid = Lambda.debug_uid_none in
                     let loc = of_location ~scopes od.open_loc in
                     let rec store_idents pos = function
                         [] -> transl_store ~scopes rootpath
                                 (add_idents true ids subst) cont rem
                       | id :: idl ->
-                          Llet(Alias, Lambda.layout_module_field, id,
+                        (* CR sspies: Can we find a better [debug_uid] here? *)
+                          let id_duid = Lambda.debug_uid_none in
+                          Llet(Alias, Lambda.layout_module_field, id, id_duid,
                                Lprim(mod_field pos,
                                      [Lvar mid], loc),
                                Lsequence(store_ident loc id,
                                          store_idents (pos + 1) idl))
                     in
                     Llet(
-                      pure, Lambda.layout_module, mid,
+                      pure, Lambda.layout_module, mid, mid_duid,
                       Lambda.subst no_env_update subst
                         (transl_module ~scopes Tcoerce_none None od.open_expr),
                       store_idents 0 ids)
@@ -1608,6 +1659,7 @@ let store_arg_block_with_module_block
     module_name set_primary_fields restr size =
   let glob = Lprim(Pgetglobal module_name, [], Loc_unknown) in
   let primary_block_id = Ident.create_local "*primary-block*" in
+  let primary_block_id_duid = Lambda.debug_uid_none in
   let primary_block_lam =
     (* We could just access the global, but if [restr] is the trivial coercion,
        that would end up storing the global in itself as a circular reference,
@@ -1619,6 +1671,7 @@ let store_arg_block_with_module_block
     Lprim(Pmakeblock(0, Immutable, None, alloc_heap), fields, Loc_unknown)
   in
   let arg_block_id = Ident.create_local "*arg-block*" in
+  let arg_block_duid = Lambda.debug_uid_none in
   let arg_block_lam =
     apply_coercion Loc_unknown Strict restr (Lvar primary_block_id)
   in
@@ -1629,9 +1682,10 @@ let store_arg_block_with_module_block
   in
   let lam =
     Lsequence(set_primary_fields,
-              Llet(Strict, layout_module, primary_block_id, primary_block_lam,
-                   Llet(Strict, layout_module, arg_block_id, arg_block_lam,
-                        set_arg_block)))
+              Llet(Strict, layout_module, primary_block_id,
+                   primary_block_id_duid, primary_block_lam,
+                   Llet(Strict, layout_module, arg_block_id, arg_block_duid,
+                        arg_block_lam, set_arg_block)))
   in
   new_size, lam, Some arg_field
 
@@ -1771,6 +1825,7 @@ let toploop_setvalue_id id = toploop_setvalue id (Lvar id)
 
 let close_toplevel_term (lam, ()) =
   Ident.Set.fold (fun id l -> Llet(Strict, Lambda.layout_any_value, id,
+                                  Lambda.debug_uid_none,
                                   toploop_getvalue id, l))
                 (free_variables lam) lam
 
@@ -1851,6 +1906,7 @@ let transl_toplevel_item ~scopes item =
             transl_include_functor ~generative:true modl ccs scopes loc
       in
       let mid = Ident.create_local "include" in
+      let mid_duid = Lambda.debug_uid_none in
       let rec set_idents pos = function
         [] ->
           lambda_unit
@@ -1858,7 +1914,7 @@ let transl_toplevel_item ~scopes item =
           Lsequence(toploop_setvalue id
                       (Lprim(mod_field pos, [Lvar mid], Loc_unknown)),
                     set_idents (pos + 1) ids) in
-      Llet(Strict, Lambda.layout_module, mid, modl, set_idents 0 ids)
+      Llet(Strict, Lambda.layout_module, mid, mid_duid, modl, set_idents 0 ids)
   | Tstr_primitive descr ->
       record_primitive descr.val_val;
       lambda_unit
@@ -1873,6 +1929,7 @@ let transl_toplevel_item ~scopes item =
       | _ ->
           let ids = bound_value_identifiers od.open_bound_items in
           let mid = Ident.create_local "open" in
+          let mid_duid = Lambda.debug_uid_none in
           let rec set_idents pos = function
               [] ->
                 lambda_unit
@@ -1881,7 +1938,7 @@ let transl_toplevel_item ~scopes item =
                             (Lprim(mod_field pos, [Lvar mid], Loc_unknown)),
                           set_idents (pos + 1) ids)
           in
-          Llet(pure, Lambda.layout_module, mid,
+          Llet(pure, Lambda.layout_module, mid, mid_duid,
                transl_module ~scopes Tcoerce_none None od.open_expr,
                set_idents 0 ids)
       end
@@ -1970,8 +2027,9 @@ let transl_package_set_fields component_names target_name coercion =
               Loc_unknown)
       in
       let blk = Ident.create_local "block" in
+      let blk_duid = Lambda.debug_uid_none in
       (List.length pos_cc_list,
-       Llet (Strict, Lambda.layout_module, blk,
+       Llet (Strict, Lambda.layout_module, blk, blk_duid,
              apply_coercion Loc_unknown Strict coercion components,
              make_sequence
                (fun pos _id ->

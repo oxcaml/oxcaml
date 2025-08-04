@@ -23,7 +23,7 @@ type t : value mod contended portable
 (** {1 Thread creation and termination} *)
 
 module Portable : sig
-  val create : ('a -> 'b) @ portable -> 'a -> t
+  val create : ('a -> 'b) @ once portable -> 'a -> t
   (** [Thread.Portable.create funct arg] creates a new thread of control,
      in which the function application [funct arg]
      is executed concurrently with the other threads of the domain.
@@ -193,3 +193,9 @@ val set_uncaught_exception_handler : (exn -> unit) @ portable -> unit
 
     If the newly set uncaught exception handler raise an exception,
     {!default_uncaught_exception_handler} will be called. *)
+
+val use_domains : unit -> unit
+(** [Thread.use_domains ()] sets the internal locking system to the one
+    used by domains. This ensures that domains can be started from threads
+    other than the initial one. It prevents the use of a custom locking
+    scheme, such as the one used by pyocaml. *)

@@ -134,7 +134,7 @@ module CIS = Code_id_or_symbol
 module SCC_lifted_constants = Strongly_connected_components.Make (CIS)
 
 let build_dep_graph t =
-  fold t ~init:(CIS.Map.empty, CIS.Map.empty)
+  fold t ~init:(CIS.Lmap.empty, CIS.Map.empty)
     ~f:(fun (dep_graph, code_id_or_symbol_to_const) lifted_constant ->
       ListLabels.fold_left (LC.definitions lifted_constant)
         ~init:(dep_graph, code_id_or_symbol_to_const)
@@ -165,26 +165,32 @@ let build_dep_graph t =
               (CIS.set_of_code_id_set free_code_ids)
           in
           let being_defined =
-            D.bound_static definition |> Bound_static.everything_being_defined
+            D.bound_static definition
+            |> Bound_static.everything_being_defined_as_list
           in
-          CIS.Set.fold
-            (fun being_defined (dep_graph, code_id_or_symbol_to_const) ->
-              let dep_graph = CIS.Map.add being_defined deps dep_graph in
+          List.fold_left
+            (fun (dep_graph, code_id_or_symbol_to_const) being_defined ->
+              let dep_graph = CIS.Lmap.add being_defined deps dep_graph in
               let code_id_or_symbol_to_const =
                 CIS.Map.add being_defined
                   (Lifted_constant.create_definition definition)
                   code_id_or_symbol_to_const
               in
               dep_graph, code_id_or_symbol_to_const)
-            being_defined
-            (dep_graph, code_id_or_symbol_to_const)))
+            (dep_graph, code_id_or_symbol_to_const)
+            being_defined))
 
-let remove_values_not_in_domain (m : CIS.Set.t CIS.Map.t) =
-  CIS.Map.map
+let remove_values_not_in_domain (m : CIS.Set.t CIS.Lmap.t) =
+  let domain =
+    CIS.Lmap.fold
+      (fun value _ domain -> CIS.Set.add value domain)
+      m CIS.Set.empty
+  in
+  CIS.Lmap.map
     (fun values ->
       (* CR lmaurer: This should use a map/set intersection function, which
          should be easy to define with the Patricia tree refactor *)
-      CIS.Set.filter (fun value -> CIS.Map.mem value m) values)
+      CIS.Set.filter (fun value -> CIS.Set.mem value domain) values)
     m
 
 type sort_result = { innermost_first : LC.t array }
@@ -208,8 +214,9 @@ let sort0 t =
     remove_values_not_in_domain lifted_constants_dep_graph
   in
   let innermost_first =
-    lifted_constants_dep_graph
-    |> SCC_lifted_constants.connected_components_sorted_from_roots_to_leaf
+    CIS.Lmap.bindings lifted_constants_dep_graph
+    |> SCC_lifted_constants
+       .stable_connected_components_sorted_from_roots_to_leaf
     |> ArrayLabels.map ~f:(fun (group : SCC_lifted_constants.component) ->
            let code_id_or_symbols =
              match group with

@@ -109,6 +109,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
   |> DA.with_shareable_constants ~shareable_constants
   |> DA.with_slot_offsets ~slot_offsets
   |> DA.reset_continuation_lifting_budget
+  |> DA.reset_continuation_specialization_budget
 
 let extract_accumulators_from_function outer_dacc ~dacc_after_body
     ~uacc_after_upwards_traversal =
@@ -574,7 +575,7 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures
                 fun_types,
               outer_dacc ),
             old_code_id )
-        | Code_id old_code_id ->
+        | Code_id { code_id = old_code_id; only_full_applications } ->
           let code_id, outer_dacc, code_ids_to_never_delete_this_set =
             simplify_function context ~outer_dacc function_slot old_code_id
               ~closure_bound_names_inside_function:closure_bound_names_inside
@@ -595,7 +596,7 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures
               result_code_ids_to_never_delete_this_set
           in
           ( (code_ids_to_never_delete_this_set, fun_types, outer_dacc),
-            (Code_id code_id
+            (Code_id { code_id; only_full_applications }
               : Function_declarations.code_id_in_function_declaration) ))
       (Code_id.Set.empty, Function_slot.Map.empty, outer_dacc)
       all_function_decls_in_set
@@ -607,7 +608,7 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures
            code_ids ->
         match code_id with
         | Deleted _ -> code_ids
-        | Code_id code_id -> Code_id.Set.add code_id code_ids)
+        | Code_id { code_id; _ } -> Code_id.Set.add code_id code_ids)
       all_function_decls_in_set Code_id.Set.empty
   in
   let dacc =
@@ -682,7 +683,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let value_slot_types =
     Value_slot.Map.mapi
       (fun value_slot in_slot ->
-        let kind = K.With_subkind.kind (Value_slot.kind value_slot) in
+        let kind = Value_slot.kind value_slot in
         Simple.pattern_match in_slot
           ~const:(fun _ -> T.alias_type_of kind in_slot)
           ~name:(fun name ~coercion ->
@@ -797,6 +798,12 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
     Simplified_named.create_with_known_free_names ~find_code_characteristics
       (Named.create_set_of_closures set_of_closures)
       ~free_names:(Named.free_names named)
+  in
+  let dacc =
+    DA.map_denv dacc
+      ~f:
+        (DE.map_specialization_cost
+           ~f:(Specialization_cost.add_set_of_closures set_of_closures))
   in
   Simplify_named_result.create dacc
     [ { Expr_builder.let_bound = bound_vars;

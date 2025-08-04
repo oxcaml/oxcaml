@@ -16,6 +16,7 @@
 module K = Flambda_kind
 module TG = Type_grammar
 module TE = Typing_env
+module ME = Meet_env
 module TEE = Typing_env_extension
 module TEL = Typing_env_level
 module ET = Expand_head.Expanded_type
@@ -92,17 +93,39 @@ let get_nth_joined_env index joined_envs =
    the target environment if they have been demoted. *)
 
 module Thing_in_env (Thing : Container_types.S) () : sig
-  include Container_types.S with type t = private Thing.t
+  include
+    Container_types.S
+      with type t = private Thing.t
+       and type Set.t = private Thing.Set.t
+       and type +!'a Map.t = private 'a Thing.Map.t
 
   val create : Thing.t -> t
+
+  val create_set : Thing.Set.t -> Set.t
+
+  val create_map : 'a Thing.Map.t -> 'a Map.t
 end = struct
   include Thing
 
   let create thing = thing
+
+  let create_set s = s
+
+  let create_map m = m
+end
+
+module Variable_in_target_env = struct
+  include Thing_in_env (Variable) ()
 end
 
 module Name_in_target_env = struct
   include Thing_in_env (Name) ()
+
+  let var (var : Variable_in_target_env.t) : t =
+    create (Name.var (var :> Variable.t))
+
+  let var_map (type a) (m : a Variable_in_target_env.Map.t) : a Map.t =
+    create_map (Name.var_map (m :> a Variable.Map.t))
 end
 
 module Simple_in_target_env : sig
@@ -133,11 +156,11 @@ module Simple_in_one_joined_env : sig
 end = struct
   include Thing_in_env (Simple) ()
 
-  let pattern_match (t : t) ~name:on_name ~const =
+  let[@inline always] pattern_match (t : t) ~name:on_name ~const =
     Simple.pattern_match
       (t :> Simple.t)
       ~name:(fun name ~coercion ->
-        on_name (Name_in_one_joined_env.create name) ~coercion)
+        (on_name [@inlined hint]) (Name_in_one_joined_env.create name) ~coercion)
       ~const
 end
 
@@ -919,7 +942,7 @@ module Join_equations = struct
         | Known ty, st -> Name_in_target_env.Map.add var ty equations, st)
       vars (equations, st)
 
-  let add_joined_simple ~joined_envs demoted_var canonicals joined_types =
+  let add_joined_simple ~joined_envs demoted_var canonicals kind joined_types =
     Name_in_target_env.Map.update demoted_var
       (fun types_of_demoted_var ->
         let types_of_demoted_var =
@@ -934,7 +957,7 @@ module Join_equations = struct
                 Simple.pattern_match canonical_simple
                   ~const:More_type_creators.type_for_const
                   ~name:(fun name ~coercion ->
-                    TG.apply_coercion (TE.find env name None) coercion)
+                    TG.apply_coercion (TE.find env name (Some kind)) coercion)
               in
               let expanded =
                 Expand_head.expand_head0 env ty
@@ -1000,7 +1023,7 @@ type t =
   { join_aliases : Join_aliases.t;
     join_types : Join_equations.t;
     existential_vars : K.t Variable.Map.t;
-    pending_vars : Simples_in_joined_envs.t Name_in_target_env.Map.t;
+    pending_vars : Simples_in_joined_envs.t Variable_in_target_env.Map.t;
     (* Existential variables that have been defined by their names in all the
        joined environment, but whose type has not yet been computed. *)
     joined_envs : TE.t Index.Map.t;
@@ -1090,8 +1113,14 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
           let canonicals =
             Simples_in_joined_envs.in_envs all_levels canonicals
           in
+          (* Passing [None] to [TE.find] here is OK, because [name] has been
+             demoted in at least one environment thus cannot be imported. *)
+          let ty_in_target_env =
+            TE.find target_env (name_in_target_env :> Name.t) None
+          in
+          let kind = TG.kind ty_in_target_env in
           Join_equations.add_joined_simple ~joined_envs:t.joined_envs
-            name_in_target_env canonicals join_types)
+            name_in_target_env canonicals kind join_types)
         demoted_in_some_envs t.join_types
     in
     let { Join_aliases.values_in_target_env = join_types;
@@ -1126,7 +1155,7 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
         Join_equations.n_way_join ~n_way_join_type equations_to_join
           joined_equations t
       in
-      if Name_in_target_env.Map.is_empty t.pending_vars
+      if Variable_in_target_env.Map.is_empty t.pending_vars
       then
         let symbol_projections =
           n_way_join_symbol_projections ~exists_in_target_env
@@ -1141,22 +1170,38 @@ let n_way_join_levels ~n_way_join_type t all_levels : _ Or_bottom.t =
           }
       else
         let join_types =
-          Name_in_target_env.Map.fold
-            (fun name_in_target_env canonicals ->
+          Variable_in_target_env.Map.fold
+            (fun var_in_target_env canonicals join_types ->
               let canonicals =
                 Simples_in_joined_envs.in_envs all_levels canonicals
               in
+              let kind =
+                try
+                  Variable.Map.find
+                    (var_in_target_env :> Variable.t)
+                    t.existential_vars
+                with Not_found ->
+                  Misc.fatal_errorf
+                    "Extra equations can only be added on existential \
+                     variables, which %a is not."
+                    Variable_in_target_env.print var_in_target_env
+              in
               Join_equations.add_joined_simple ~joined_envs:t.joined_envs
-                name_in_target_env canonicals)
+                (Name_in_target_env.var var_in_target_env)
+                canonicals kind join_types)
             t.pending_vars t.join_types
         in
         let equations_to_join =
-          Name_in_target_env.Map.mapi
-            (fun var _ -> Join_equations.find var join_types)
+          Variable_in_target_env.Map.mapi
+            (fun var _ ->
+              Join_equations.find (Name_in_target_env.var var) join_types)
             t.pending_vars
         in
-        let pending_vars = Name_in_target_env.Map.empty in
-        loop equations_to_join equations { t with pending_vars; join_types }
+        let pending_vars = Variable_in_target_env.Map.empty in
+        loop
+          (Name_in_target_env.var_map equations_to_join)
+          equations
+          { t with pending_vars; join_types }
     in
     loop equations_to_join Name_in_target_env.Map.empty t
 
@@ -1177,7 +1222,7 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
       { join_aliases = Join_aliases.empty;
         join_types = Join_equations.empty;
         existential_vars = Variable.Map.empty;
-        pending_vars = Name_in_target_env.Map.empty;
+        pending_vars = Variable_in_target_env.Map.empty;
         joined_envs;
         target_env
       }
@@ -1201,15 +1246,17 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after target_env
         (fun name (simple : Simple_in_target_env.t) target_env ->
           let name = (name :> Name.t) in
           let simple = (simple :> Simple.t) in
+          (* Passing [None] to [TE.find] here is OK, because [name] has been
+             demoted in at least one environment thus cannot be imported. *)
           let kind = TG.kind (TE.find target_env name None) in
           let ty = TG.alias_type_of kind simple in
-          TE.add_equation ~meet_type target_env name ty)
+          ME.add_equation ~meet_type target_env name ty)
         demoted_in_target_env target_env
     in
     let target_env =
       Name_in_target_env.Map.fold
         (fun name ty target_env ->
-          TE.add_equation ~meet_type target_env (name :> Name.t) ty)
+          ME.add_equation ~meet_type target_env (name :> Name.t) ty)
         equations target_env
     in
     let target_env =
@@ -1236,7 +1283,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
         assert (not (TE.is_bottom parent_env));
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
-        match TE.add_env_extension_strict ~meet_type typing_env extension with
+        match ME.add_env_extension_strict ~meet_type typing_env extension with
         | Bottom ->
           (* We can reach bottom here if the extension was created in a more
              generic context, but is added in a context where it is no longer
@@ -1254,7 +1301,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
       { join_aliases = t.join_aliases;
         join_types = t.join_types;
         existential_vars = t.existential_vars;
-        pending_vars = Name_in_target_env.Map.empty;
+        pending_vars = Variable_in_target_env.Map.empty;
         joined_envs;
         target_env = t.target_env
       }
@@ -1269,6 +1316,8 @@ let n_way_join_env_extension ~n_way_join_type ~meet_type t envs_with_extensions
       Name_in_target_env.Map.fold
         (fun name (simple : Simple_in_target_env.t) equations ->
           let kind =
+            (* Passing [None] to [TE.find] here is OK, because [name] has been
+               demoted in at least one environment thus cannot be imported. *)
             match Name.must_be_var_opt (name :> Name.t) with
             | None -> TG.kind (TE.find t.target_env (name :> Name.t) None)
             | Some var -> (
@@ -1314,10 +1363,11 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * _ =
       Join_aliases.add_existential_var ~exists_in_target_env simples
         t.join_aliases
     in
-    let var_as_name = Name_in_target_env.create (Name.var var) in
     let existential_vars = Variable.Map.add var kind t.existential_vars in
     let pending_vars =
-      Name_in_target_env.Map.add var_as_name simples t.pending_vars
+      Variable_in_target_env.Map.add
+        (Variable_in_target_env.create var)
+        simples t.pending_vars
     in
     Ok (Simple.var var), { t with existential_vars; join_aliases; pending_vars }
 
@@ -1325,7 +1375,10 @@ type env_id = Index.t
 
 type 'a join_arg = env_id * 'a
 
-let target_join_env { target_env; _ } = target_env
+let code_age_relation { target_env; _ } = TE.code_age_relation target_env
+
+let code_age_relation_resolver { target_env; _ } =
+  TE.code_age_relation_resolver target_env
 
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 

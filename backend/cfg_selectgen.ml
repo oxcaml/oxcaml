@@ -22,13 +22,17 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Int = Numbers.Int
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
+
+type error = Builtin_not_recognized of string
+
+exception Error of error * Debuginfo.t
 
 (* CR-soon gyorsh: This functor must not have state, because it is instantiated
    twice with the same [Target] (see [Asmgen] and [Peephole_utils] to avoid
@@ -46,6 +50,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_float _ -> true
     | Cconst_symbol _ -> true
     | Cconst_vec128 _ -> true
+    | Cconst_vec256 _ -> true
+    | Cconst_vec512 _ -> true
     | Cvar _ -> true
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
@@ -59,7 +65,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         List.for_all is_simple_expr args
         (* The following may have side effects *)
       | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll ->
+      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -94,7 +100,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let module EC = SU.Effect_and_coeffect in
     match exp with
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_symbol _ | Cconst_vec128 _ | Cvar _ ->
+    | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+    | Cvar _ ->
       EC.none
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
@@ -107,7 +114,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         match op with
         | Cextcall { effects = e; coeffects = ce } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
-        | Capply _ | Cprobe _ | Copaque | Cpoll -> EC.arbitrary
+        | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
         | Calloc (Heap, _) -> EC.none
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
@@ -278,18 +285,17 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cconst_symbol (func, _dbg) :: rem ->
         Terminator (Call { op = Direct func; label_after }), rem
       | _ -> Terminator (Call { op = Indirect; label_after }), args)
-    | Cextcall { func; builtin = true } ->
-      Misc.fatal_errorf "Selection.select_operation: builtin not recognized %s"
-        func ()
-    | Cextcall
-        { func; alloc; ty; ty_args; returns; builtin = false; effects; _ } ->
+    | Cextcall { func; alloc; ty; ty_args; returns; builtin; effects } ->
+      if builtin && not !Oxcaml_flags.disable_builtin_check
+      then raise (Error (Builtin_not_recognized func, dbg));
       let external_call =
         { Cfg.func_symbol = func;
           alloc;
           effects;
           ty_res = ty;
           ty_args;
-          stack_ofs = -1
+          stack_ofs = -1;
+          stack_align = Align_16
         }
       in
       if returns
@@ -336,6 +342,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
              { bytes = 0; dbginfo = [placeholder_for_alloc_block_kind]; mode }),
         args )
     | Cpoll -> SU.basic_op Poll, args
+    | Cpause -> SU.basic_op Pause, args
     | Caddi -> select_arith_comm Iadd args
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
@@ -595,7 +602,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | [] -> List.map (fun _ -> Cmm.XInt) args
       | _ :: _ -> ty_args
     in
-    let locs, stack_ofs = Proc.loc_external_arguments ty_args in
+    let locs, stack_ofs, align = Proc.loc_external_arguments ty_args in
     let ty_args = Array.of_list ty_args in
     if stack_ofs <> 0
     then SU.insert env sub_cfg (SU.make_stack_offset stack_ofs) [||] [||];
@@ -603,13 +610,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (fun i arg ->
         insert_move_extcall_arg env sub_cfg ty_args.(i) arg locs.(i) dbg)
       args;
-    Ok (Array.concat (Array.to_list locs), stack_ofs)
+    Ok (Array.concat (Array.to_list locs), stack_ofs, align)
 
   and emit_stores env sub_cfg dbg (args : Cmm.expression list) regs_addr =
+    let byte_offset = ref (-Arch.size_int) in
     let addressing_mode =
-      ref (Arch.offset_addressing Arch.identity_addressing (-Arch.size_int))
+      ref (Arch.offset_addressing Arch.identity_addressing !byte_offset)
     in
-    let byte_offset = ref 0 in
     let base =
       assert (Array.length regs_addr = 1);
       ref regs_addr
@@ -640,10 +647,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               match r.Reg.typ with
               | Float -> Double
               | Float32 -> Single { reg = Float32 }
-              | Vec128 ->
-                (* 128-bit memory operations are unaligned by default. Aligned
-                   (big)array operations are handled separately via cmm. *)
-                Onetwentyeight_unaligned
+              (* SIMD memory operations are unaligned by default. Aligned
+                 bigarray operations are handled separately via cmm. *)
+              | Vec128 -> Onetwentyeight_unaligned
+              | Vec256 -> Twofiftysix_unaligned
+              | Vec512 -> Fivetwelve_unaligned
               | Val | Addr | Int -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
@@ -654,32 +662,35 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Maybe_out_of_range ->
                 Target.is_store_out_of_range chunk ~byte_offset:!byte_offset
             in
-            let new_addressing_mode =
-              match is_out_of_range with
-              | Within_range -> !addressing_mode
-              | Out_of_range ->
-                (* Use a temporary to store the address [!base + offset]. *)
-                let tmp = Reg.createv Cmm.typ_int in
-                (* CR-someday xclerc: Now that this code in the "generic" part,
-                   it is maybe a bit unexpected to assume there is no better
-                   sequence to emit x += k. That being said, it is a corner
-                   case. *)
-                insert_debug env sub_cfg
-                  (Op (SU.make_const_int (Nativeint.of_int !byte_offset)))
-                  dbg [||] tmp;
-                insert_debug env sub_cfg (Op (Operation.Intop Iadd)) dbg
-                  (Array.append !base tmp) tmp;
-                (* Use the temporary as the new base address. *)
-                base := tmp;
-                Arch.identity_addressing
+            let reset_addressing () =
+              (* Use a temporary to store the address [!base + !byte_offset]. *)
+              let tmp = Reg.createv Cmm.typ_int in
+              (* CR-someday xclerc: Now that this code in the "generic" part, it
+                 is maybe a bit unexpected to assume there is no better sequence
+                 to emit x += k. That being said, it is a corner case. *)
+              insert_debug env sub_cfg
+                (Op (SU.make_const_int (Nativeint.of_int !byte_offset)))
+                dbg [||] tmp;
+              (* The new base is a pointer into the middle of an ocaml value. *)
+              assert (!byte_offset > 0);
+              let new_base = Reg.createv Cmm.typ_addr in
+              insert_debug env sub_cfg (Op (Operation.Intop Iadd)) dbg
+                (Array.append !base tmp) new_base;
+              (* Use the temporary as the new base address. *)
+              base := new_base;
+              byte_offset := 0;
+              addressing_mode := Arch.identity_addressing
             in
+            (match is_out_of_range with
+            | Within_range -> ()
+            | Out_of_range -> reset_addressing ());
             insert_debug env sub_cfg
-              (Op (Store (chunk, new_addressing_mode, false)))
+              (Op (Store (chunk, !addressing_mode, false)))
               dbg
-              (Array.append [| r |] regs_addr)
+              (Array.append [| r |] !base)
               [||];
             let size = SU.size_component r.Reg.typ in
-            addressing_mode := Arch.offset_addressing new_addressing_mode size;
+            addressing_mode := Arch.offset_addressing !addressing_mode size;
             byte_offset := !byte_offset + size
           done
         | Some op ->
@@ -727,6 +738,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec128 (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_vec128 in
       Ok (insert_op env sub_cfg (SU.make_const_vec128 bits) [||] r)
+    | Cconst_vec256 (bits, _dbg) ->
+      let r = Reg.createv Cmm.typ_vec256 in
+      Ok (insert_op env sub_cfg (Operation.Const_vec256 bits) [||] r)
+    | Cconst_vec512 (bits, _dbg) ->
+      let r = Reg.createv Cmm.typ_vec512 in
+      Ok (insert_op env sub_cfg (Operation.Const_vec512 bits) [||] r)
     | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -811,7 +828,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ccatch (rec_flag, handlers, e1) ->
       emit_tail_catch env sub_cfg rec_flag handlers e1
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_symbol _ | Cconst_vec128 _ | Cvar _ | Ctuple _ | Cexit _ ->
+    | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+    | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_expr_raise (env : SU.environment) sub_cfg k
@@ -898,12 +916,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Ok rd
       | Terminator
           (Prim { op = External ({ ty_args; ty_res; _ } as r); label_after }) ->
-        let* loc_arg, stack_ofs =
+        let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
         let rd = Reg.createv ty_res in
         let term =
-          Cfg.Prim { op = External { r with stack_ofs }; label_after }
+          Cfg.Prim
+            { op = External { r with stack_ofs; stack_align }; label_after }
         in
         let loc_res =
           SU.insert_op_debug' env sub_cfg term dbg loc_arg
@@ -922,7 +941,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Sub_cfg.add_never_block sub_cfg ~label:label_after;
         Ok rd
       | Terminator (Call_no_return ({ func_symbol; ty_args; _ } as r)) ->
-        let* loc_arg, stack_ofs =
+        let* loc_arg, stack_ofs, stack_align =
           emit_extcall_args env sub_cfg ty_args new_args dbg
         in
         let keep_for_checking =
@@ -934,7 +953,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         let rd = Reg.createv ty in
         let label = Cmm.new_label () in
-        let r = { r with stack_ofs } in
+        let r = { r with stack_ofs; stack_align } in
         let term : Cfg.terminator =
           if keep_for_checking
           then Prim { op = External r; label_after = label }
@@ -1162,7 +1181,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             match reg.Reg.typ with
             | Addr -> assert false
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Float32 -> ())
+            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
         SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);
@@ -1486,7 +1505,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           (Cfg.of_cmm_codegen_option f.Cmm.fun_codegen_options)
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
-        ~next_instruction_id:Sub_cfg.instr_id
+        ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
     in
     let layout = DLL.make_empty () in
     let entry_block =
@@ -1550,3 +1569,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
        (Cfg_with_infos.make cfg_with_layout); *)
     Cfg_simplify.run cfg_with_layout
 end
+
+let report_error ppf = function
+  | Builtin_not_recognized name ->
+    Format.fprintf ppf
+      "External annotated with [@@@@builtin] is not recognized: %S" name
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (err, dbg) ->
+      let loc = Debuginfo.to_location dbg in
+      Some (Location.error_of_printer ~loc report_error err)
+    | _ -> None)

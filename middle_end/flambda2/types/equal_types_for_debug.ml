@@ -17,6 +17,7 @@ module TE = Typing_env
 module TEE = Typing_env_extension
 module TG = Type_grammar
 module ET = Expand_head.Expanded_type
+module ME = Meet_env
 
 type renaming =
   { mutable left_renaming : Variable.t Variable.Map.t;
@@ -43,7 +44,7 @@ type env =
   { parent_env : TE.t;
     left_env : TE.t;
     right_env : TE.t;
-    meet_type : TE.meet_type;
+    meet_type : ME.meet_type;
     renaming : renaming
   }
 
@@ -54,12 +55,12 @@ let extension_env env left_env right_env = { env with left_env; right_env }
 
 let add_env_extension env ext1 ext2 =
   extension_env env
-    (TE.add_env_extension ~meet_type:env.meet_type env.left_env ext1)
-    (TE.add_env_extension ~meet_type:env.meet_type env.right_env ext2)
+    (ME.add_env_extension ~meet_type:env.meet_type env.left_env ext1)
+    (ME.add_env_extension ~meet_type:env.meet_type env.right_env ext2)
 
 let add_env_extension_strict env ext1 ext2 =
-  ( TE.add_env_extension_strict ~meet_type:env.meet_type env.left_env ext1,
-    TE.add_env_extension_strict ~meet_type:env.meet_type env.right_env ext2 )
+  ( ME.add_env_extension_strict ~meet_type:env.meet_type env.left_env ext1,
+    ME.add_env_extension_strict ~meet_type:env.meet_type env.right_env ext2 )
 
 let exists_in_parent_env env name =
   TE.mem ~min_name_mode:Name_mode.in_types env.parent_env name
@@ -127,9 +128,9 @@ let equal_env_extension ~equal_type env ext1 ext2 =
 let equal_row_like_case ~equal_type ~equal_maps_to ~equal_lattice ~equal_shape
     env (t1 : (_, _, _) TG.row_like_case) (t2 : (_, _, _) TG.row_like_case) =
   match
-    ( TE.add_env_extension_strict env.left_env t1.env_extension
+    ( ME.add_env_extension_strict env.left_env t1.env_extension
         ~meet_type:env.meet_type,
-      TE.add_env_extension_strict env.right_env t2.env_extension
+      ME.add_env_extension_strict env.right_env t2.env_extension
         ~meet_type:env.meet_type )
   with
   | Or_bottom.Bottom, Or_bottom.Bottom -> true
@@ -260,6 +261,10 @@ let equal_head_of_kind_value_non_null ~equal_type env
     equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
   | Boxed_vec128 (t1, a1), Boxed_vec128 (t2, a2) ->
     equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+  | Boxed_vec256 (t1, a1), Boxed_vec256 (t2, a2) ->
+    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
+  | Boxed_vec512 (t1, a1), Boxed_vec512 (t2, a2) ->
+    equal_type env t1 t2 && Alloc_mode.For_types.equal a1 a2
   | Closures c1, Closures c2 ->
     equal_row_like_for_closures ~equal_type env c1.by_function_slot
       c2.by_function_slot
@@ -274,8 +279,8 @@ let equal_head_of_kind_value_non_null ~equal_type env
          t1.contents t2.contents
     && Alloc_mode.For_types.equal t1.alloc_mode t2.alloc_mode
   | ( ( Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
-      | Boxed_int32 _ | Boxed_vec128 _ | Boxed_int64 _ | Boxed_nativeint _
-      | Closures _ | String _ | Array _ ),
+      | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+      | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _ | Array _ ),
       _ ) ->
     false
 
@@ -347,6 +352,18 @@ let equal_head_of_kind_naked_vec128 (t1 : TG.head_of_kind_naked_vec128)
     (t1 :> Vector_types.Vec128.Bit_pattern.Set.t)
     (t2 :> Vector_types.Vec128.Bit_pattern.Set.t)
 
+let equal_head_of_kind_naked_vec256 (t1 : TG.head_of_kind_naked_vec256)
+    (t2 : TG.head_of_kind_naked_vec256) =
+  Vector_types.Vec256.Bit_pattern.Set.equal
+    (t1 :> Vector_types.Vec256.Bit_pattern.Set.t)
+    (t2 :> Vector_types.Vec256.Bit_pattern.Set.t)
+
+let equal_head_of_kind_naked_vec512 (t1 : TG.head_of_kind_naked_vec512)
+    (t2 : TG.head_of_kind_naked_vec512) =
+  Vector_types.Vec512.Bit_pattern.Set.equal
+    (t1 :> Vector_types.Vec512.Bit_pattern.Set.t)
+    (t2 :> Vector_types.Vec512.Bit_pattern.Set.t)
+
 let equal_head_of_kind_rec_info (t1 : TG.head_of_kind_rec_info)
     (t2 : TG.head_of_kind_rec_info) =
   Rec_info_expr.equal t1 t2
@@ -365,7 +382,7 @@ let is_non_obviously_unknown (t : ET.descr) =
   | Value head -> is_unknown_head_of_kind_value head
   | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     false
 
 let is_bottom_head_of_kind_value (t : TG.head_of_kind_value) =
@@ -378,7 +395,7 @@ let is_non_obviously_bottom (t : ET.descr) =
   | Value head -> is_bottom_head_of_kind_value head
   | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     false
 
 let equal_expanded_head ~equal_type env (t1 : ET.t) (t2 : ET.t) =
@@ -403,11 +420,14 @@ let equal_expanded_head ~equal_type env (t1 : ET.t) (t2 : ET.t) =
     | Naked_nativeint t1, Naked_nativeint t2 ->
       equal_head_of_kind_naked_nativeint t1 t2
     | Naked_vec128 t1, Naked_vec128 t2 -> equal_head_of_kind_naked_vec128 t1 t2
+    | Naked_vec256 t1, Naked_vec256 t2 -> equal_head_of_kind_naked_vec256 t1 t2
+    | Naked_vec512 t1, Naked_vec512 t2 -> equal_head_of_kind_naked_vec512 t1 t2
     | Rec_info t1, Rec_info t2 -> equal_head_of_kind_rec_info t1 t2
     | Region t1, Region t2 -> equal_head_of_kind_region t1 t2
     | ( ( Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
         | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
-        | Naked_nativeint _ | Naked_vec128 _ | Rec_info _ | Region _ ),
+        | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+        | Rec_info _ | Region _ ),
         _ ) ->
       false)
 

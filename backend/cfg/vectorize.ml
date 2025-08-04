@@ -6,7 +6,7 @@ open! Int_replace_polymorphic_compare
    use vector operations if possible *)
 (* CR gyorsh: how does the info from [reg_map] flow between blocks? *)
 
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 module State : sig
   type t
@@ -59,7 +59,7 @@ end = struct
   let extra_debug = true
 
   let dump_if c t =
-    if c && !Flambda_backend_flags.dump_vectorize
+    if c && !Oxcaml_flags.dump_vectorize
     then Format.fprintf t.ppf_dump
     else Format.ifprintf t.ppf_dump
 
@@ -253,7 +253,9 @@ end = struct
     | Const_float32 _, Const_float32 _
     | Const_float _, Const_float _
     | Const_symbol _, Const_symbol _
-    | Const_vec128 _, Const_vec128 _ ->
+    | Const_vec128 _, Const_vec128 _
+    | Const_vec256 _, Const_vec256 _
+    | Const_vec512 _, Const_vec512 _ ->
       true
     | ( Load
           { memory_chunk = memory_chunk1;
@@ -295,6 +297,8 @@ end = struct
     | Const_float _, _
     | Const_symbol _, _
     | Const_vec128 _, _
+    | Const_vec256 _, _
+    | Const_vec512 _, _
     | Stackoffset _, _
     | Load _, _
     | Store _, _
@@ -307,6 +311,7 @@ end = struct
     | Static_cast _, _
     | Probe_is_enabled _, _
     | Opaque, _
+    | Pause, _
     | Begin_region, _
     | End_region, _
     | Specific _, _
@@ -795,9 +800,10 @@ end = struct
                         | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _
                           ),
                         _ )
-                  | Opaque | Begin_region | End_region | Dls_get | Poll
+                  | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
                   | Const_int _ | Const_float32 _ | Const_float _
-                  | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+                  | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+                  | Const_vec512 _ | Stackoffset _ | Load _
                   | Store (_, _, _)
                   | Intop _ | Intop_atomic _
                   | Floatop (_, _)
@@ -1030,8 +1036,8 @@ end = struct
           | Begin_region | End_region ->
             (* conservative, don't reorder around region begin/end. *)
             create Arbitrary
-          | Name_for_debugger _ | Dls_get | Poll | Opaque | Probe_is_enabled _
-            ->
+          | Name_for_debugger _ | Dls_get | Poll | Opaque | Pause
+          | Probe_is_enabled _ ->
             (* conservative, don't reorder around this instruction. *)
             (* CR-someday gyorsh: Poll insertion pass is after the vectorizer.
                Currently, it inserts instruction at the end of a block, so it
@@ -1049,8 +1055,8 @@ end = struct
               "Unexpected instruction Spill or Reload during vectorize"
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Stackoffset _ | Intop _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _
-            ->
+          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
+          | Intop_imm _ | Floatop _ | Csel _ | Alloc _ ->
             None)
 
       let create (instruction : Instruction.t) reaching_definitions : t option =
@@ -2295,10 +2301,10 @@ end = struct
         | Specific s -> Vectorize_specific.is_seed_store s
         | Alloc _ | Load _ | Move | Reinterpret_cast _ | Static_cast _ | Spill
         | Reload | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Intop _
-        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
-        | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
-        | Poll ->
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Stackoffset _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
+        | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region
+        | End_region | Name_for_debugger _ | Dls_get | Poll ->
           None)
 
     let from_block (block : Block.t) deps : t list =
@@ -3127,7 +3133,7 @@ let count block computation =
     |> Profile.Counters.set "tried_to_vectorize_blocks" 1
     |> Profile.Counters.set "block_size" (Block.size block)
   in
-  if Block.size block > !Flambda_backend_flags.vectorize_max_block_size
+  if Block.size block > !Oxcaml_flags.vectorize_max_block_size
   then counter |> Profile.Counters.set "block_too_big" 1
   else
     match computation with
@@ -3143,13 +3149,13 @@ let maybe_vectorize block =
   let instruction_count = Block.size block in
   let label = Block.start block in
   State.dump state "\nBlock %a:\n" Label.print label;
-  if instruction_count > !Flambda_backend_flags.vectorize_max_block_size
+  if instruction_count > !Oxcaml_flags.vectorize_max_block_size
   then (
     State.dump state
       "Skipping block %a with %d instructions (> %d = \
        max_block_size_to_vectorize).\n"
       Label.print label instruction_count
-      !Flambda_backend_flags.vectorize_max_block_size;
+      !Oxcaml_flags.vectorize_max_block_size;
     None)
   else
     let deps = lazy (Dependencies.from_block block) in

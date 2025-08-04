@@ -60,8 +60,8 @@ let flush_cmm_helpers_state res =
 
 let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* If someone wants to add 32-bit support in the future there will be a
-     (merged) PR on ocaml-flambda/flambda-backend which can be used as a guide:
-     https://github.com/ocaml-flambda/flambda-backend/pull/685 *)
+     (merged) PR on oxcaml/oxcaml which can be used as a guide:
+     https://github.com/oxcaml/oxcaml/pull/685 *)
   if Target_system.is_32_bit ()
   then
     Misc.fatal_error
@@ -132,7 +132,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       then fun_codegen
       else Cmm.No_CSE :: fun_codegen
     in
-    C.cfunction (C.fundecl entry_sym [] body fun_codegen dbg Default_poll)
+    C.cfunction
+      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in

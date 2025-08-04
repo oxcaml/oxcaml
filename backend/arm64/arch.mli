@@ -19,7 +19,7 @@
 
 val macosx : bool
 val is_asan_enabled : bool ref
-
+val feat_cssc : bool ref
 (* Machine-specific command-line options *)
 
 val command_line_options : (string * Arg.spec * string) list
@@ -77,6 +77,10 @@ val size_float : int
 
 val size_vec128 : int
 
+val size_vec256 : int
+
+val size_vec512 : int
+
 val allow_unaligned_access : bool
 
 (* Behavior of division *)
@@ -98,6 +102,8 @@ val num_args_addressing : addressing_mode -> int
 val print_addressing :
   (Format.formatter -> 'a -> unit) -> addressing_mode ->
   Format.formatter -> 'a array -> unit
+
+val specific_operation_name : specific_operation -> string
 
 val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->

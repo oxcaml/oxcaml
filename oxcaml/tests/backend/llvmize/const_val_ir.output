@@ -1,0 +1,33 @@
+source_filename = "const_val_ir.ml"
+
+@camlConst_val_ir.data_begin = global i64 0
+define void @camlConst_val_ir.code_begin() { ret void }
+
+define i64 @camlConst_val_ir.entry()  {
+  %1 = alloca i64
+  %2 = alloca i64
+  %3 = alloca i64
+  %4 = alloca i64
+  %5 = alloca i64
+  br label %6
+6:
+  br label %7
+7:                                                ; preds = %6
+  store ptr @camlConst_val_ir, ptr %3
+  %8 = load i64, ptr %3
+  store i64 %8, ptr %4
+  %9 = load i64, ptr %4
+  store i64 %9, ptr %2
+  store i64 1, ptr %5
+  %10 = load i64, ptr %5
+  store i64 %10, ptr %1
+  %11 = load i64, ptr %1
+  ret i64 %11
+}
+
+@camlConst_val_ir.gc_roots = global { i64, i64 } { i64 0, i64 1792 }
+@camlConst_val_ir = global { i64 } { i64 75 }
+
+@camlConst_val_ir.data_end = global i64 0
+define void @camlConst_val_ir.code_end() { ret void }
+@camlConst_val_ir.frametable = global i64 0

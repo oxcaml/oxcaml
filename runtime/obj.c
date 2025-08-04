@@ -36,7 +36,7 @@ static int obj_tag (value arg)
 {
   header_t hd;
 
-  if (arg == Val_null) {
+  if (Is_null(arg)) {
     return 1010;   /* null_tag */
   } else if (Is_long (arg)) {
     return 1000;   /* int_tag */
@@ -259,9 +259,9 @@ CAMLprim value caml_obj_add_offset (value v, value offset)
 CAMLprim value caml_obj_compare_and_swap (value v, value f,
                                           value oldv, value newv)
 {
-  int res = caml_atomic_cas_field(v, Int_val(f), oldv, newv);
+  value res = caml_atomic_cas_field(v, f, oldv, newv);
   caml_check_urgent_gc(Val_unit);
-  return Val_int(res);
+  return res;
 }
 
 CAMLprim value caml_obj_is_shared (value obj)
@@ -410,5 +410,5 @@ CAMLprim value caml_succ_scannable_prefix_len (value v) {
 
 CAMLprim value caml_is_null(value v)
 {
-  return v == Val_null ? Val_true : Val_false;
+  return Is_null(v) ? Val_true : Val_false;
 }

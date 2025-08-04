@@ -160,6 +160,12 @@ type u = r#
 type r = { s : string; f : float#; }
 type u = r#
 |}]
+type r = { f : float#; si : #(string * int64) }
+type u = r#
+[%%expect{|
+type r = { f : float#; si : #(string * int64); }
+type u = r#
+|}]
 
 (* But not float, mixed float/float#, or [@@unboxed] records *)
 type r = { f : float ; f2 : float }
@@ -170,6 +176,7 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
+Hint: Float records don't get unboxed versions.
 |}]
 type r = { f : float ; f2 : float# }
 type bad = r#
@@ -179,6 +186,7 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
+Hint: Float records don't get unboxed versions.
 |}]
 type r = { i : int } [@@unboxed]
 type bad = r#
@@ -188,6 +196,7 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
+Hint: [@@unboxed] records don't get unboxed versions.
 |}]
 type ('a : float64) t = { i : 'a ; j : 'a }
 type floatu_t : float64 & float64 = float t#
@@ -197,6 +206,7 @@ Line 2, characters 42-44:
 2 | type floatu_t : float64 & float64 = float t#
                                               ^^
 Error: The type "t" has no unboxed version.
+Hint: Float records don't get unboxed versions.
 |}]
 
 (* A type can get an unboxed version from both the manifest and kind *)
@@ -311,7 +321,7 @@ type t = int
 and ok = t#
 [%%expect{|
 type t = int
-and bad = t#
+and ok = t#
 |}]
 
 type t = int
@@ -690,12 +700,19 @@ module type Bad = sig
   type t
 end with type t := float#
 [%%expect{|
-Line 3, characters 9-25:
+Lines 1-3, characters 18-25:
+1 | ..................sig
+2 |   type t
 3 | end with type t := float#
-             ^^^^^^^^^^^^^^^^
-Error: The layout of type "float#" is float64
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = float#
+       is not included in
+         type t
+       The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of type "float#" must be a sublayout of value
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-8.
 |}]
 

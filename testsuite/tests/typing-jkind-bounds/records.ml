@@ -128,7 +128,7 @@ type 'a t : immutable_data = { mutable x : 'a }
 Line 1, characters 0-47:
 1 | type 'a t : immutable_data = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ many unyielding
+Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -156,7 +156,7 @@ type t : immutable_data = { x : unit -> unit }
 Line 1, characters 0-46:
 1 | type t : immutable_data = { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable
+Error: The kind of type "t" is value mod immutable non_float
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -189,7 +189,7 @@ type t : mutable_data = { x : unit -> unit }
 Line 1, characters 0-44:
 1 | type t : mutable_data = { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable
+Error: The kind of type "t" is value mod immutable non_float
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of mutable_data
          because of the annotation on the declaration of the type t.
@@ -270,7 +270,7 @@ type 'a t : immutable_data with 'a = { mutable x : 'a }
 Line 1, characters 0-55:
 1 | type 'a t : immutable_data with 'a = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ many unyielding
+Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -285,7 +285,7 @@ type 'a t : immutable_data with 'a = { x : 'a -> 'a }
 Line 1, characters 0-53:
 1 | type 'a t : immutable_data with 'a = { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value mod immutable
+Error: The kind of type "t" is value mod immutable non_float
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -320,8 +320,8 @@ Line 1, characters 0-52:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t" is immutable_data with 'a
          because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod external_
-         with 'a
+       But the kind of type "t" must be a subkind of
+           value mod external_ with 'a
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -625,10 +625,10 @@ Line 1, characters 24-28:
                             ^^^^
 Error: This expression has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
-       The kind of (unit -> unit) t is value mod immutable
+       The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-22.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
 |}, Principal{|
 Line 1, characters 24-28:
@@ -639,7 +639,7 @@ Error: This expression has type "(unit -> unit) t"
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-22.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
 |}]
 
@@ -650,10 +650,10 @@ Line 1, characters 24-28:
                             ^^^^
 Error: This expression has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
-       The kind of (unit -> unit) t is value mod immutable
+       The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-22.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod external_
+           value mod external_
          because of the definition of cross_external at line 13, characters 58-69.
 |}, Principal{|
 Line 1, characters 24-28:
@@ -664,7 +664,7 @@ Error: This expression has type "(unit -> unit) t"
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-22.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod external_
+           value mod external_
          because of the definition of cross_external at line 13, characters 58-69.
 |}]
 
@@ -745,10 +745,10 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) t" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) t is value mod immutable
+       The kind of (unit -> unit) t is value mod immutable non_float
          because of the definition of t at line 1, characters 0-22.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 18, characters 0-47.
 |}, Principal{|
 Line 1, characters 14-30:
@@ -759,7 +759,7 @@ Error: This type "(unit -> unit) t" should be an instance of type
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-22.
        But the kind of (unit -> unit) t must be a subkind of
-         value mod portable
+           value mod portable
          because of the definition of require_portable at line 18, characters 0-47.
 |}]
 

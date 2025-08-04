@@ -1412,10 +1412,12 @@ val do_domain_local_at_exit : (unit -> unit) ref @@ nonportable
 (** {1:modules Standard library modules } *)
 
 (*MODULE_ALIASES*)
+include sig
 module Arg            = Arg
 module Array          = Array
 module ArrayLabels    = ArrayLabels
 module Atomic         = Atomic
+module Backoff        = Backoff
 module Bigarray       = Bigarray
 module Bool           = Bool
 module Buffer         = Buffer
@@ -1482,3 +1484,4 @@ module Type           = Type
 module Uchar          = Uchar
 module Unit           = Unit
 module Weak           = Weak
+end @@ nonportable

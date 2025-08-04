@@ -129,6 +129,10 @@ module Layout = struct
 
       let vec128 = Base Sort.Vec128
 
+      let vec256 = Base Sort.Vec256
+
+      let vec512 = Base Sort.Vec512
+
       let of_base : Sort.base -> t = function
         | Value -> value
         | Void -> void
@@ -140,6 +144,8 @@ module Layout = struct
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
     end
 
     include Static
@@ -345,7 +351,7 @@ module Layout = struct
       | Any -> fprintf ppf "any"
       | Sort s -> Sort.format ppf s
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf " & " in
+        let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
@@ -353,6 +359,7 @@ end
 
 module Externality = Externality
 module Nullability = Nullability
+module Separability = Jkind_axis.Separability
 
 module History = struct
   include Jkind_intf.History
@@ -399,13 +406,13 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 
 (* Returns the set of axes that is relevant under a given modality. For example,
    under the [global] modality, the locality axis is *not* relevant. *)
-let relevant_axes_of_modality ~relevant_for_nullability ~modality =
+let relevant_axes_of_modality ~relevant_for_shallow ~modality =
   Axis_set.create ~f:(fun ~axis:(Pack axis) ->
       match axis with
       | Modal axis ->
         let (P axis) = Mode.Const.Axis.alloc_as_value (P axis) in
         let modality = Mode.Modality.Value.Const.proj axis modality in
-        not (Mode.Modality.is_constant modality)
+        not (Mode.Modality.is_constant (Atom (axis, modality)))
       (* The kind-inference.md document (in the repo) discusses both constant
          modalities and identity modalities. Of course, reality has modalities
          (such as [shared]) that are neither constants nor identities. Here, we
@@ -416,7 +423,11 @@ let relevant_axes_of_modality ~relevant_for_nullability ~modality =
          non-identity modalities. *)
       | Nonmodal Externality -> true
       | Nonmodal Nullability -> (
-        match relevant_for_nullability with
+        match relevant_for_shallow with
+        | `Relevant -> true
+        | `Irrelevant -> false)
+      | Nonmodal Separability -> (
+        match relevant_for_shallow with
         | `Relevant -> true
         | `Irrelevant -> false))
 
@@ -429,6 +440,7 @@ module Mod_bounds = struct
       ~contention:Contention.min ~yielding:Yielding.min
       ~statefulness:Statefulness.min ~visibility:Visibility.min
       ~externality:Externality.min ~nullability:Nullability.min
+      ~separability:Separability.min
 
   let max =
     create ~locality:Locality.max ~linearity:Linearity.max
@@ -436,6 +448,7 @@ module Mod_bounds = struct
       ~contention:Contention.max ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.max
       ~externality:Externality.max ~nullability:Nullability.max
+      ~separability:Separability.max
 
   let join t1 t2 =
     let locality = Locality.join (locality t1) (locality t2) in
@@ -448,8 +461,9 @@ module Mod_bounds = struct
     let visibility = Visibility.join (visibility t1) (visibility t2) in
     let externality = Externality.join (externality t1) (externality t2) in
     let nullability = Nullability.join (nullability t1) (nullability t2) in
+    let separability = Separability.join (separability t1) (separability t2) in
     create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
-      ~statefulness ~visibility ~externality ~nullability
+      ~statefulness ~visibility ~externality ~nullability ~separability
 
   let meet t1 t2 =
     let locality = Locality.meet (locality t1) (locality t2) in
@@ -462,8 +476,9 @@ module Mod_bounds = struct
     let visibility = Visibility.meet (visibility t1) (visibility t2) in
     let externality = Externality.meet (externality t1) (externality t2) in
     let nullability = Nullability.meet (nullability t1) (nullability t2) in
+    let separability = Separability.meet (separability t1) (separability t2) in
     create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
-      ~statefulness ~visibility ~externality ~nullability
+      ~statefulness ~visibility ~externality ~nullability ~separability
 
   let less_or_equal t1 t2 =
     let[@inline] axis_less_or_equal ~le ~axis a b : Sub_result.t =
@@ -507,8 +522,13 @@ module Mod_bounds = struct
          (axis_less_or_equal ~le:Externality.le
             ~axis:(Pack (Nonmodal Externality)) (externality t1)
             (externality t2))
-    @@ axis_less_or_equal ~le:Nullability.le ~axis:(Pack (Nonmodal Nullability))
-         (nullability t1) (nullability t2)
+    @@ Sub_result.combine
+         (axis_less_or_equal ~le:Nullability.le
+            ~axis:(Pack (Nonmodal Nullability)) (nullability t1)
+            (nullability t2))
+    @@ axis_less_or_equal ~le:Separability.le
+         ~axis:(Pack (Nonmodal Separability)) (separability t1)
+         (separability t2)
 
   let equal t1 t2 =
     Locality.equal (locality t1) (locality t2)
@@ -521,6 +541,7 @@ module Mod_bounds = struct
     && Visibility.equal (visibility t1) (visibility t2)
     && Externality.equal (externality t1) (externality t2)
     && Nullability.equal (nullability t1) (nullability t2)
+    && Separability.equal (separability t1) (separability t2)
 
   let[@inline] get (type a) ~(axis : a Axis.t) t : a =
     match axis with
@@ -534,6 +555,7 @@ module Mod_bounds = struct
     | Modal (Monadic Visibility) -> visibility t
     | Nonmodal Externality -> externality t
     | Nonmodal Nullability -> nullability t
+    | Nonmodal Separability -> separability t
 
   (** Get all axes that are set to max *)
   let get_max_axes t =
@@ -571,6 +593,9 @@ module Mod_bounds = struct
     |> add_if
          (Nullability.le Nullability.max (nullability t))
          (Nonmodal Nullability)
+    |> add_if
+         (Separability.le Separability.max (separability t))
+         (Nonmodal Separability)
 
   let for_arrow =
     create ~linearity:Linearity.max ~locality:Locality.max
@@ -578,6 +603,7 @@ module Mod_bounds = struct
       ~contention:Contention.min ~yielding:Yielding.max
       ~statefulness:Statefulness.max ~visibility:Visibility.min
       ~externality:Externality.max ~nullability:Nullability.Non_null
+      ~separability:Separability.Non_float
 
   let to_mode_crossing t =
     Mode.Crossing.of_bounds
@@ -626,7 +652,11 @@ module With_bounds = struct
       in
       let irrelevant_axes = Axis_set.complement relevant_axes in
       (* nullability is always implicitly irrelevant since it isn't deep *)
-      Axis_set.remove irrelevant_axes (Nonmodal Nullability)
+      let irrelevant_axes =
+        Axis_set.remove irrelevant_axes (Nonmodal Nullability)
+      in
+      (* same for separability *)
+      Axis_set.remove irrelevant_axes (Nonmodal Separability)
   end
 
   let to_best_eff_map = function
@@ -733,10 +763,10 @@ module With_bounds = struct
       With_bounds (With_bounds_types.singleton type_expr type_info)
     | With_bounds bounds -> With_bounds (add_bound type_expr type_info bounds)
 
-  let add_modality ~relevant_for_nullability ~modality ~type_expr
+  let add_modality ~relevant_for_shallow ~modality ~type_expr
       (t : (allowed * 'r) t) : (allowed * 'r) t =
     let relevant_axes =
-      relevant_axes_of_modality ~relevant_for_nullability ~modality
+      relevant_axes_of_modality ~relevant_for_shallow ~modality
     in
     match t with
     | No_with_bounds ->
@@ -921,6 +951,7 @@ module Layout_and_axes = struct
         type t =
           { tuple_fuel : int;
             constr : (int * type_expr list) Path.Map.t;
+            seen_row_var : Numbers.Int.Set.t;
             fuel_status : Fuel_status.t
           }
 
@@ -934,10 +965,12 @@ module Layout_and_axes = struct
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
             constr = Path.Map.empty;
+            seen_row_var = Numbers.Int.Set.empty;
             fuel_status = Sufficient_fuel
           }
 
-        let rec check ({ tuple_fuel; constr; fuel_status = _ } as t) ty =
+        let rec check
+            ({ tuple_fuel; constr; seen_row_var; fuel_status = _ } as t) ty =
           match Types.get_desc ty with
           | Tpoly (ty, _) -> check t ty
           | Ttuple _ ->
@@ -963,8 +996,20 @@ module Layout_and_axes = struct
                 Continue
                   { t with constr = Path.Map.add p (fuel - 1, args) constr }
               else Stop { t with fuel_status = Ran_out_of_fuel })
+          | Tvariant _ -> (
+            let row_var_id = get_id (Btype.proxy ty) in
+            match Numbers.Int.Set.mem row_var_id seen_row_var with
+            | false ->
+              Continue
+                { t with
+                  seen_row_var = Numbers.Int.Set.add row_var_id seen_row_var
+                }
+            | true ->
+              (* For our purposes, row variables are like constructors with no arguments,
+                 so if we saw one already, we don't need to expand it again. *)
+              Skip)
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tvariant _ | Tunivar _ | Tpackage _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -1026,6 +1071,7 @@ module Layout_and_axes = struct
                 ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
+                ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
                 : Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
@@ -1046,6 +1092,15 @@ module Layout_and_axes = struct
                 let bounds_so_far, nested_with_bounds, fuel_result1 =
                   loop new_ctl bounds_so_far next_relevant_axes
                     (With_bounds.to_list b_with_bounds)
+                in
+                let nested_with_bounds =
+                  With_bounds.map
+                    (fun ti ->
+                      { relevant_axes =
+                          Axis_set.intersection ti.relevant_axes
+                            next_relevant_axes
+                      })
+                    nested_with_bounds
                 in
                 (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
                    quadratic stack growth for very widely recursive types. This is
@@ -1215,7 +1270,7 @@ let outcometree_of_type = ref (fun _ -> assert false)
 
 let set_outcometree_of_type p = outcometree_of_type := p
 
-let outcometree_of_modalities_new = ref (fun _ _ _ -> assert false)
+let outcometree_of_modalities_new = ref (fun _ _ -> assert false)
 
 let set_outcometree_of_modalities_new p = outcometree_of_modalities_new := p
 
@@ -1256,49 +1311,67 @@ module Const = struct
         name : string
       }
 
-    let mk_jkind ~mode_crossing ~nullability (layout : Layout.Const.t) =
+    let mk_jkind ~mode_crossing ~nullability ~separability
+        (layout : Layout.Const.t) =
       let mod_bounds =
         (match mode_crossing with
         | true -> Mod_bounds.min
         | false -> Mod_bounds.max)
         |> Mod_bounds.set_nullability nullability
+        |> Mod_bounds.set_separability separability
       in
       { layout; mod_bounds; with_bounds = No_with_bounds }
 
     let any =
-      { jkind = mk_jkind Any ~mode_crossing:false ~nullability:Maybe_null;
+      { jkind =
+          mk_jkind Any ~mode_crossing:false ~nullability:Maybe_null
+            ~separability:Maybe_separable;
         name = "any"
       }
 
     let any_mod_everything =
-      { jkind = mk_jkind Any ~mode_crossing:true ~nullability:Maybe_null;
+      { jkind =
+          mk_jkind Any ~mode_crossing:true ~nullability:Maybe_null
+            ~separability:Maybe_separable;
         name = "any mod everything"
       }
 
+    (* CR layouts v3: replace with [any_separable] when
+       [or_null array]s are implemented. *)
     let any_non_null =
-      { jkind = mk_jkind Any ~mode_crossing:false ~nullability:Non_null;
+      { jkind =
+          mk_jkind Any ~mode_crossing:false ~nullability:Non_null
+            ~separability:Separable;
         name = "any_non_null"
       }
 
+    (* CR layouts v3: replace with [any_separable] when
+       [or_null array]s are implemented. *)
     let any_non_null_mod_everything =
-      { jkind = mk_jkind Any ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind Any ~mode_crossing:true ~nullability:Non_null
+            ~separability:Separable;
         name = "any_non_null mod everything"
       }
 
     let value_or_null =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Maybe_null;
+          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Maybe_null
+            ~separability:Maybe_separable;
         name = "value_or_null"
       }
 
     let value_or_null_mod_everything =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null;
+          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
+            ~separability:Maybe_separable;
         name = "value_or_null mod everything"
       }
 
     let value =
-      { jkind = mk_jkind (Base Value) ~mode_crossing:false ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Separable;
         name = "value"
       }
 
@@ -1313,7 +1386,8 @@ module Const = struct
                 ~contention:Contention.Const_op.min
                 ~statefulness:Statefulness.Const.min
                 ~visibility:Visibility.Const_op.min ~externality:Externality.max
-                ~nullability:Nullability.Non_null;
+                ~nullability:Nullability.Non_null
+                ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
           };
         name = "immutable_data"
@@ -1330,7 +1404,8 @@ module Const = struct
                 ~contention:Contention.Const_op.min
                 ~statefulness:Statefulness.Const.min
                 ~visibility:Visibility.Const_op.max ~externality:Externality.max
-                ~nullability:Nullability.Non_null;
+                ~nullability:Nullability.Non_null
+                ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
           };
         name = "sync_data"
@@ -1347,26 +1422,35 @@ module Const = struct
                 ~uniqueness:Uniqueness.Const_op.max
                 ~statefulness:Statefulness.Const.min
                 ~visibility:Visibility.Const_op.max ~externality:Externality.max
-                ~nullability:Nullability.Non_null;
+                ~nullability:Nullability.Non_null
+                ~separability:Separability.Non_float;
             with_bounds = No_with_bounds
           };
         name = "mutable_data"
       }
 
-    (* CR layouts v3: change to [or_null] when separability is implemented. *)
+    (* CR layouts v3: replace with [any_separable] when
+       [or_null array]s are implemented. *)
     let void =
-      { jkind = mk_jkind (Base Void) ~mode_crossing:false ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Void) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "void"
       }
 
     let immediate =
-      { jkind = mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "immediate"
       }
 
+    (* CR layouts v3: replace with [any_separable] when
+       [or_null array]s are implemented. *)
     let immediate_or_null =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null;
+          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
+            ~separability:Non_float;
         name = "immediate_or_null"
       }
 
@@ -1410,108 +1494,192 @@ module Const = struct
         name = "immediate64"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let float64 =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        (* [separability] is intentionally [Non_float]:
+           only boxed floats are relevant for separability. *)
         name = "float64"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_float =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null;
+          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        (* [separability] is intentionally [Non_float]:
+           only boxed floats are relevant for separability. *)
         name = "float64 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        (* [separability] is intentionally [Non_float]:
+           only boxed floats are relevant for separability. *)
         name = "float32"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null;
+          mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        (* [separability] is intentionally [Non_float]:
+           only boxed floats are relevant for separability. *)
         name = "float32 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let word =
-      { jkind = mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "word"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_nativeint =
-      { jkind = mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "word mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits8 =
-      { jkind = mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits8"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_int8 =
-      { jkind = mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits8 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits16 =
       { jkind =
-          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits16"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_int16 =
-      { jkind = mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits16 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits32"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_int32 =
-      { jkind = mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits32 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let bits64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits64"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_int64 =
-      { jkind = mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "bits64 mod everything"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let vec128 =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null;
+          mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
         name = "vec128"
       }
 
-    (* CR layouts v3: change to [Maybe_null] when separability is implemented. *)
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let vec256 =
+      { jkind =
+          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec256"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let vec512 =
+      { jkind =
+          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec512"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
     let kind_of_unboxed_128bit_vectors =
-      { jkind = mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null;
+      { jkind =
+          mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
         name = "vec128 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_256bit_vectors =
+      { jkind =
+          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec256 mod everything"
+      }
+
+    (* CR layouts v3: change to [Maybe_null] when
+       [or_null array]s are implemented. *)
+    let kind_of_unboxed_512bit_vectors =
+      { jkind =
+          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "vec512 mod everything"
       }
 
     let all =
@@ -1544,7 +1712,11 @@ module Const = struct
         bits64;
         kind_of_unboxed_int64;
         vec128;
-        kind_of_unboxed_128bit_vectors ]
+        kind_of_unboxed_128bit_vectors;
+        vec256;
+        kind_of_unboxed_256bit_vectors;
+        vec512;
+        kind_of_unboxed_512bit_vectors ]
 
     let of_attribute : Builtin_attributes.jkind_attribute -> t = function
       | Immediate -> immediate
@@ -1637,7 +1809,7 @@ module Const = struct
         (fun acc (Axis.Pack axis) ->
           match axis with
           | Modal axis ->
-            let then_ : Modality.t =
+            let t : Modality.t =
               let (P axis) = Mode.Const.Axis.alloc_as_value (P axis) in
               match axis with
               | Monadic monadic ->
@@ -1648,7 +1820,8 @@ module Const = struct
                   ( axis,
                     Meet_with (Mode.Value.Comonadic.Const.min_axis comonadic) )
             in
-            Modality.Value.Const.compose acc ~then_
+            let (Atom (axis, a)) = t in
+            Modality.Value.Const.set axis a acc
           | Nonmodal _ ->
             (* TODO: don't know how to print *)
             acc)
@@ -1672,7 +1845,7 @@ module Const = struct
             in
             ( !outcometree_of_type type_expr,
               !outcometree_of_modalities_new
-                Types.Immutable []
+                Types.Immutable
                 (modality_to_ignore_axes axes_ignored_by_modalities) ))
           (With_bounds.to_list actual.with_bounds)
       in
@@ -1717,8 +1890,9 @@ module Const = struct
                 { jkind =
                     { layout = jkind.layout;
                       mod_bounds =
-                        Mod_bounds.set_nullability Nullability.Non_null
-                          Mod_bounds.max;
+                        Mod_bounds.set_separability Separability.Separable
+                          (Mod_bounds.set_nullability Nullability.Non_null
+                             Mod_bounds.max);
                       with_bounds = No_with_bounds
                     };
                   name = Layout.Const.to_string jkind.layout
@@ -1728,7 +1902,7 @@ module Const = struct
           match out_jkind_verbose with
           | Some out_jkind -> out_jkind
           | None ->
-            (* If we fail, try again with nullable jkinds. *)
+            (* If we fail, try again with nullable/maybe-separable jkinds. *)
             let out_jkind_verbose =
               convert_with_base
                 ~base:
@@ -1809,6 +1983,8 @@ module Const = struct
       | "bits32" -> Builtin.bits32.jkind
       | "bits64" -> Builtin.bits64.jkind
       | "vec128" -> Builtin.vec128.jkind
+      | "vec256" -> Builtin.vec256.jkind
+      | "vec512" -> Builtin.vec512.jkind
       | "immutable_data" -> Builtin.immutable_data.jkind
       | "sync_data" -> Builtin.sync_data.jkind
       | "mutable_data" -> Builtin.mutable_data.jkind
@@ -1817,30 +1993,8 @@ module Const = struct
     | Mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
-      let parsed_modifiers = Typemode.transl_modifier_annots modifiers in
       let mod_bounds =
-        let value_for_axis (type a) ~(axis : a Axis.t) : a =
-          let (module A) = Axis.get axis in
-          let parsed_modifier =
-            Typemode.Transled_modifiers.get ~axis parsed_modifiers
-          in
-          let base_bound = Mod_bounds.get ~axis base.mod_bounds in
-          match parsed_modifier, base_bound with
-          | None, base_modifier -> base_modifier
-          | Some parsed_modifier, base_modifier ->
-            A.meet base_modifier parsed_modifier.txt
-        in
-        Mod_bounds.create
-          ~locality:(value_for_axis ~axis:(Modal (Comonadic Areality)))
-          ~linearity:(value_for_axis ~axis:(Modal (Comonadic Linearity)))
-          ~uniqueness:(value_for_axis ~axis:(Modal (Monadic Uniqueness)))
-          ~portability:(value_for_axis ~axis:(Modal (Comonadic Portability)))
-          ~contention:(value_for_axis ~axis:(Modal (Monadic Contention)))
-          ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
-          ~statefulness:(value_for_axis ~axis:(Modal (Comonadic Statefulness)))
-          ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
-          ~externality:(value_for_axis ~axis:(Nonmodal Externality))
-          ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
+        Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
     | Product ts ->
@@ -1855,14 +2009,13 @@ module Const = struct
       | Left_jkind (transl_type, _) ->
         let type_ = transl_type type_ in
         let modality =
-          Typemode.transl_modalities ~maturity:Stable Immutable [] modalities
+          Typemode.transl_modalities ~maturity:Stable Immutable modalities
         in
         { layout = base.layout;
           mod_bounds = base.mod_bounds;
           with_bounds =
-            With_bounds.add_modality ~modality
-              ~relevant_for_nullability:`Irrelevant ~type_expr:type_
-              base.with_bounds
+            With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
+              ~type_expr:type_ base.with_bounds
         })
     | Default | Kind_of _ -> raise ~loc:jkind.pjkind_loc Unimplemented_syntax
 
@@ -1876,7 +2029,11 @@ module Const = struct
       (jkind : 'd t) =
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
       match l, Mod_bounds.nullability jkind.mod_bounds with
-      | (Base (Float64 | Float32 | Word | Bits32 | Bits64 | Vec128) | Any), _
+      | ( ( Base
+              ( Float64 | Float32 | Word | Bits32 | Bits64 | Vec128 | Vec256
+              | Vec512 )
+          | Any ),
+          _ )
       | Base Value, Non_null
       | Base Value, Maybe_null ->
         Stable
@@ -1923,21 +2080,16 @@ module Desc = struct
         | Some c -> Const.format ppf c
         | None -> assert false (* handled above *))
     in
-    format_desc ~nested:false ppf t
+    format_desc ppf ~nested:false t
 end
 
 module Jkind_desc = struct
   let of_const t = Layout_and_axes.map Layout.of_const t
 
-  let add_nullability_crossing t =
-    { t with
-      mod_bounds = Mod_bounds.set_nullability Nullability.min t.mod_bounds
-    }
-
   let unsafely_set_bounds t ~from =
     { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
 
-  let add_with_bounds ~relevant_for_nullability ~type_expr ~modality t =
+  let add_with_bounds ~relevant_for_shallow ~type_expr ~modality t =
     match Types.get_desc type_expr with
     | Tarrow (_, _, _, _) ->
       (* Optimization: all arrow types have the same (with-bound-free) jkind, so
@@ -1948,13 +2100,13 @@ module Jkind_desc = struct
           Mod_bounds.join t.mod_bounds
             (Mod_bounds.set_min_in_set Mod_bounds.for_arrow
                (Axis_set.complement
-                  (relevant_axes_of_modality ~modality ~relevant_for_nullability)))
+                  (relevant_axes_of_modality ~modality ~relevant_for_shallow)))
       }
     | _ ->
       { t with
         with_bounds =
-          With_bounds.add_modality ~relevant_for_nullability ~type_expr
-            ~modality t.with_bounds
+          With_bounds.add_modality ~relevant_for_shallow ~type_expr ~modality
+            t.with_bounds
       }
 
   let max = of_const Const.max
@@ -1995,17 +2147,21 @@ module Jkind_desc = struct
 
   let map_type_expr f t = Layout_and_axes.map_type_expr f t
 
-  let of_new_sort_var nullability_upper_bound =
+  let of_new_sort_var nullability_upper_bound separability_upper_bound =
     let layout, sort = Layout.of_new_sort_var () in
     ( { layout;
         mod_bounds =
-          Mod_bounds.set_nullability nullability_upper_bound Mod_bounds.max;
+          Mod_bounds.max
+          |> Mod_bounds.set_nullability nullability_upper_bound
+          |> Mod_bounds.set_separability separability_upper_bound;
         with_bounds = No_with_bounds
       },
       sort )
 
   module Builtin = struct
     let any = max
+
+    let any_non_null = of_const Const.Builtin.any_non_null.jkind
 
     let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
@@ -2026,12 +2182,17 @@ module Jkind_desc = struct
 
   let product tys_modalities layouts =
     let layout = Layout.product layouts in
+    let relevant_for_shallow =
+      (* Shallow axes like nullability or separability are relevant for
+         1-field unboxed records and irrelevant for everything else. *)
+      match List.length layouts with 1 -> `Relevant | _ -> `Irrelevant
+    in
     let mod_bounds = Mod_bounds.min in
     let with_bounds =
       List.fold_right
         (fun (type_expr, modality) bounds ->
-          With_bounds.add_modality ~relevant_for_nullability:`Relevant
-            ~type_expr ~modality bounds)
+          With_bounds.add_modality ~relevant_for_shallow ~type_expr ~modality
+            bounds)
         tys_modalities No_with_bounds
     in
     { layout; mod_bounds; with_bounds }
@@ -2080,6 +2241,10 @@ module Builtin = struct
     | _ ->
       fresh_jkind Jkind_desc.Builtin.any ~annotation:(mk_annot "any")
         ~why:(Any_creation why)
+
+  let any_non_null ~why =
+    fresh_jkind Jkind_desc.Builtin.any_non_null
+      ~annotation:(mk_annot "any_non_null") ~why:(Any_creation why)
 
   let value_v1_safety_check =
     { jkind = Jkind_desc.Builtin.value_or_null;
@@ -2152,9 +2317,6 @@ module Builtin = struct
      want [Best] jkinds there. *)
 end
 
-let add_nullability_crossing t =
-  { t with jkind = Jkind_desc.add_nullability_crossing t.jkind }
-
 let unsafely_set_bounds (type l r) ~(from : (l * r) jkind) t =
   { t with jkind = Jkind_desc.unsafely_set_bounds t.jkind ~from:from.jkind }
 
@@ -2164,7 +2326,7 @@ let add_with_bounds ~modality ~type_expr t =
       Jkind_desc.add_with_bounds
       (* We only care about types in fields of unboxed products for the
          nullability of the overall kind *)
-        ~relevant_for_nullability:`Irrelevant ~type_expr ~modality t.jkind
+        ~relevant_for_shallow:`Irrelevant ~type_expr ~modality t.jkind
   }
 
 let has_with_bounds (type r) (t : (_ * r) jkind) =
@@ -2176,13 +2338,13 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (* construction *)
 
 let of_new_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null in
+  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Maybe_separable in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why = fst (of_new_sort_var ~why)
 
 let of_new_legacy_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Non_null in
+  let jkind, sort = Jkind_desc.of_new_sort_var Non_null Separable in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_legacy_creation why), sort
 
 let of_new_legacy_sort ~why = fst (of_new_legacy_sort_var ~why)
@@ -2297,10 +2459,59 @@ let for_unboxed_record lbls =
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
+let for_non_float ~(why : History.value_creation_reason) =
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation why)
+
+let for_or_null_argument ident =
+  let why =
+    History.Type_argument
+      { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null
+      ~separability:Separability.Maybe_separable
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation why)
+
+let for_abbreviation ~type_jkind_purely ~modality ty =
+  (* CR layouts v2.8: This should really use layout_of *)
+  let jkind = type_jkind_purely ty in
+  let with_bounds_types =
+    let relevant_axes =
+      relevant_axes_of_modality ~relevant_for_shallow:`Relevant ~modality
+    in
+    With_bounds_types.singleton ty { relevant_axes }
+  in
+  fresh_jkind_poly
+    { layout = jkind.jkind.layout;
+      mod_bounds = Mod_bounds.min;
+      with_bounds = With_bounds with_bounds_types
+    }
+    ~annotation:None ~why:Abbreviation
+
 let for_boxed_variant cstrs =
   let open Types in
   if List.for_all
-       (fun cstr ->
+       (* CR layouts v12: This code assumes that all voids mode-cross. I
+          think that's probably not what we want. *)
+         (fun cstr ->
          match cstr.cd_args with
          | Cstr_tuple args ->
            List.for_all (fun arg -> Sort.Const.(equal void arg.ca_sort)) args
@@ -2322,10 +2533,7 @@ let for_boxed_variant cstrs =
         cstrs
     in
     if has_gadt_constructor
-       (* CR layouts v2.8: This is sad, but I don't know how to account for
-          existentials in the with_bounds. See doc named "Existential
-          with_bounds". *)
-    then Builtin.value ~why:Boxed_variant
+    then for_non_float ~why:Boxed_variant
     else
       let base =
         (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
@@ -2349,6 +2557,36 @@ let for_boxed_tuple elts =
       add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr)
     elts
     (Builtin.immutable_data ~why:Tuple |> mark_best)
+
+let for_open_boxed_row =
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.max ~portability:Portability.Const.max
+      ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
+      ~visibility:Visibility.Const_op.max ~externality:Externality.max
+      ~nullability:Nullability.Non_null ~separability:Separability.Non_float
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Value_creation Polymorphic_variant)
+
+let for_boxed_row row =
+  if Btype.tvariant_not_immediate row
+  then
+    if not (Btype.static_row row)
+    then
+      (* CR layouts v2.8: We can probably do a fair bit better here in most cases *)
+      for_open_boxed_row
+    else
+      let base = Builtin.immutable_data ~why:Polymorphic_variant in
+      Btype.fold_row
+        (fun jkind type_expr ->
+          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr
+            jkind)
+        base row
+      |> mark_best
+  else Builtin.immediate ~why:Immediate_polymorphic_variant
 
 let for_arrow =
   fresh_jkind
@@ -2375,10 +2613,25 @@ let for_object =
       mod_bounds =
         Mod_bounds.create ~linearity ~locality ~uniqueness ~portability
           ~contention ~yielding ~statefulness ~visibility
-          ~externality:Externality.max ~nullability:Non_null;
+          ~externality:Externality.max ~nullability:Non_null
+          ~separability:Separability.Non_float;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
+
+let for_float ident =
+  let mod_bounds =
+    Mod_bounds.create ~locality:Locality.Const.max
+      ~linearity:Linearity.Const.min ~portability:Portability.Const.min
+      ~yielding:Yielding.Const.min ~uniqueness:Uniqueness.Const_op.max
+      ~contention:Contention.Const_op.min ~statefulness:Statefulness.Const.min
+      ~visibility:Visibility.Const_op.min ~externality:Externality.max
+      ~nullability:Nullability.Non_null ~separability:Separability.Separable
+  in
+  fresh_jkind
+    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    ~annotation:None ~why:(Primitive ident)
+  |> mark_best
 
 (******************************)
 (* elimination and defaulting *)
@@ -2512,11 +2765,21 @@ let set_nullability_upper_bound jk nullability_upper_bound =
   in
   { jk with jkind = { jk.jkind with mod_bounds = new_bounds } }
 
+let set_separability_upper_bound jk separability_upper_bound =
+  { jk with
+    jkind =
+      { jk.jkind with
+        mod_bounds =
+          Mod_bounds.set_separability separability_upper_bound
+            jk.jkind.mod_bounds
+      }
+  }
+
 let set_layout jk layout = { jk with jkind = { jk.jkind with layout } }
 
 let apply_modality_l modality jk =
   let relevant_axes =
-    relevant_axes_of_modality ~modality ~relevant_for_nullability:`Relevant
+    relevant_axes_of_modality ~modality ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
     Mod_bounds.set_min_in_set jk.jkind.mod_bounds
@@ -2533,13 +2796,25 @@ let apply_modality_l modality jk =
 
 let apply_modality_r modality jk =
   let relevant_axes =
-    relevant_axes_of_modality ~modality ~relevant_for_nullability:`Relevant
+    relevant_axes_of_modality ~modality ~relevant_for_shallow:`Relevant
   in
   let mod_bounds =
     Mod_bounds.set_max_in_set jk.jkind.mod_bounds
       (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+let apply_or_null jkind =
+  match Mod_bounds.nullability jkind.jkind.mod_bounds with
+  | Maybe_null ->
+    let jkind = set_nullability_upper_bound jkind Non_null in
+    let jkind =
+      match Mod_bounds.separability jkind.jkind.mod_bounds with
+      | Maybe_separable -> jkind
+      | Separable | Non_float -> set_separability_upper_bound jkind Non_float
+    in
+    Ok jkind
+  | Non_null -> Error ()
 
 let get_annotation jk = jk.annotation
 
@@ -2681,6 +2956,9 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
+    | Mutable_var_assignment ->
+      fprintf ppf "it's the type of a mutable variable used in an assignment"
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -2690,7 +2968,6 @@ module Format_history = struct
     | Wildcard -> fprintf ppf "it's a _ in the type"
     | Unification_var -> fprintf ppf "it's a fresh unification variable"
     | Array_element -> fprintf ppf "it's the type of an array element"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let rec format_annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =
@@ -2711,6 +2988,8 @@ module Format_history = struct
     | Type_variable name -> fprintf ppf "the type variable %s" name
     | Type_wildcard loc ->
       fprintf ppf "the wildcard _ at %a" Location.print_loc_in_lowercase loc
+    | Type_of_kind loc ->
+      fprintf ppf "the type at %a" Location.print_loc_in_lowercase loc
     | With_error_message (_message, context) ->
       (* message gets printed in [format_flattened_history] so we ignore it here *)
       format_annotation_context ppf context
@@ -2839,6 +3118,10 @@ module Format_history = struct
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
          compilers team with this message: %s)@]" s
+    | Array_type_kind ->
+      fprintf ppf
+        "it's the element type for an array operation with an opaque@ array \
+         type"
 
   let format_product_creation_reason ppf : History.product_creation_reason -> _
       = function
@@ -2883,6 +3166,7 @@ module Format_history = struct
       in
       fprintf ppf "of the definition%a at %a" format_id id
         Location.print_loc_in_lowercase loc
+    | Abbreviation -> fprintf ppf "it is the expansion of a type abbreviation"
 
   let format_interact_reason ppf : History.interact_reason -> _ = function
     | Gadt_equation name ->
@@ -3102,15 +3386,18 @@ module Violation = struct
       | Sort (Base _) | Any -> false
     in
     let format_layout_or_kind ppf jkind =
+      let indent =
+        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
+      in
       match mismatch_type with
-      | Mode -> Format.fprintf ppf "@,%a" format jkind
-      | Layout -> Layout.format ppf jkind.jkind.layout
+      | Mode -> fprintf ppf "%t%a" indent format jkind
+      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
       then dprintf "%s representable" verb
       else
-        dprintf "%s a sub%s of %a" verb layout_or_kind format_layout_or_kind k2
+        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_layout_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmi_option =
       match t with
@@ -3128,7 +3415,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
             subjkind_format "is not" k2,
             None )
         | Some p ->
@@ -3141,8 +3428,8 @@ module Violation = struct
         assert (Option.is_none missing_cmi);
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s %a" layout_or_kind format_layout_or_kind k1,
-          dprintf "does not overlap with %a" format_layout_or_kind k2,
+          dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+          dprintf "does not overlap with@ %a" format_layout_or_kind k2,
           None )
     in
     if display_histories
@@ -3150,15 +3437,15 @@ module Violation = struct
       let connective =
         match t.violation, has_sort_var (get k2).layout with
         | Not_a_subjkind _, false ->
-          dprintf "be a sub%s of %a" layout_or_kind format_layout_or_kind k2
+          dprintf "be a sub%s of@ %a" layout_or_kind format_layout_or_kind k2
         | No_intersection _, false ->
-          dprintf "overlap with %a" format_layout_or_kind k2
+          dprintf "overlap with@ %a" format_layout_or_kind k2
         | _, true -> dprintf "be representable"
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
-             (dprintf "@[<hov 2>The %s of %a is %a@]" layout_or_kind pp_former
+             (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
                 former format_layout_or_kind k1)
            ~layout_or_kind)
         k1
@@ -3442,7 +3729,9 @@ let is_value_for_printing ~ignore_null { jkind; _ } =
       then
         { value with
           mod_bounds =
-            Mod_bounds.set_nullability Nullability.Maybe_null value.mod_bounds
+            Mod_bounds.set_separability Separability.Maybe_separable
+              (Mod_bounds.set_nullability Nullability.Maybe_null
+                 value.mod_bounds)
         }
         :: values
       else values
@@ -3476,6 +3765,8 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
+    | Mutable_var_assignment -> fprintf ppf "Mutable_var_assignment"
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3484,7 +3775,6 @@ module Debug_printers = struct
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
     | Array_element -> fprintf ppf "Array_element"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let rec annotation_context :
       type l r. _ -> (l * r) History.annotation_context -> unit =
@@ -3502,6 +3792,7 @@ module Debug_printers = struct
     | Type_variable name -> fprintf ppf "Type_variable %S" name
     | Type_wildcard loc ->
       fprintf ppf "Type_wildcard (%a)" Location.print_loc loc
+    | Type_of_kind loc -> fprintf ppf "Type_of_kind (%a)" Location.print_loc loc
     | With_error_message (message, context) ->
       fprintf ppf "With_error_message (%s, %a)" message annotation_context
         context
@@ -3577,6 +3868,7 @@ module Debug_printers = struct
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Unknown s -> fprintf ppf "Unknown %s" s
+    | Array_type_kind -> fprintf ppf "Array_type_kind"
 
   let product_creation_reason ppf : History.product_creation_reason -> _ =
     function
@@ -3617,6 +3909,7 @@ module Debug_printers = struct
       fprintf ppf "Generalized (%s, %a)"
         (match id with Some id -> Ident.unique_name id | None -> "")
         Location.print_loc loc
+    | Abbreviation -> fprintf ppf "Abbreviation"
 
   let interact_reason ppf : History.interact_reason -> _ = function
     | Gadt_equation p -> fprintf ppf "Gadt_equation %a" Path.print p

@@ -34,6 +34,8 @@ type 'a error =
   }
 
 module Solver_mono (C : Lattices_mono) = struct
+  type nonrec 'a error = 'a error
+
   type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
 
   module VarMap = Map.Make (struct
@@ -98,6 +100,8 @@ module Solver_mono (C : Lattices_mono) = struct
 
   and ('b, 'd) morphvar =
     | Amorphvar : 'a var * ('a, 'b, 'd) C.morph -> ('b, 'd) morphvar
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
 
   let get_key (Amorphvar (v, m)) = v.id, Any_morph m
 
@@ -134,6 +138,8 @@ module Solver_mono (C : Lattices_mono) = struct
         'a * ('a, disallowed * 'r) morphvar VarMap.t
         -> ('a, disallowed * 'r) mode
         (** [Amodemeet a [mv0, mv1, ..]] represents [a meet mv0 meet mv1 meet ..]. *)
+    constraint 'd = _ * _
+  [@@ocaml.warning "-62"]
 
   (** Prints a mode variable, including the set of variables below it
       (recursively). To handle cycles, [traversed] is the set of variables that
@@ -169,7 +175,8 @@ module Solver_mono (C : Lattices_mono) = struct
           (var_map_to_list v.vlower)
 
   and print_morphvar :
-      type a d. ?traversed:VarSet.t -> a C.obj -> _ -> (a, d) morphvar -> _ =
+      type a l r.
+      ?traversed:VarSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =
    fun ?traversed dst ppf (Amorphvar (v, f)) ->
     let src = C.src dst f in
     Format.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var ?traversed src)
@@ -260,7 +267,7 @@ module Solver_mono (C : Lattices_mono) = struct
 
   let max (type a) (obj : a C.obj) = Amode (C.max obj)
 
-  let of_const a = Amode a
+  let of_const _obj a = Amode a
 
   let apply_morphvar dst morph (Amorphvar (var, morph')) =
     Amorphvar (var, C.compose dst morph morph')
@@ -330,7 +337,7 @@ module Solver_mono (C : Lattices_mono) = struct
       let f' = C.left_adjoint obj f in
       let src = C.src obj f in
       let a' = C.apply src f' a in
-      assert (Result.is_ok (submode_cv ~log src a' v));
+      submode_cv ~log src a' v |> Result.get_ok;
       Ok ()
 
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
@@ -423,8 +430,9 @@ module Solver_mono (C : Lattices_mono) = struct
           let src = C.src dst g in
           let g'f = C.compose src g' (C.disallow_right f) in
           let x = Amorphvar (v, g'f) in
-          if not (VarMap.exists (fun _ mv -> eq_morphvar mv x) u.vlower)
-          then set_vlower ~log u (VarMap.add (get_key x) x u.vlower);
+          let key = get_key x in
+          if not (VarMap.mem key u.vlower)
+          then set_vlower ~log u (VarMap.add key x u.vlower);
           Ok ())
 
   let cnt_id = ref 0
@@ -568,7 +576,7 @@ module Solver_mono (C : Lattices_mono) = struct
   let zap_to_ceil : type a l. a C.obj -> (a, l * allowed) mode -> log:_ -> a =
    fun obj m ~log ->
     let ceil = get_ceil obj m in
-    assert (submode obj (Amode ceil) m ~log |> Result.is_ok);
+    submode obj (Amode ceil) m ~log |> Result.get_ok;
     ceil
 
   (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in
@@ -622,7 +630,7 @@ module Solver_mono (C : Lattices_mono) = struct
           mvs a
       in
       VarMap.iter
-        (fun _ mv -> assert (submode_mvc obj mv floor ~log |> Result.is_ok))
+        (fun _ mv -> submode_mvc obj mv floor ~log |> Result.get_ok)
         mvs;
       floor
 
@@ -678,175 +686,15 @@ module Solver_mono (C : Lattices_mono) = struct
     | Amodevar mv ->
       let u = fresh obj in
       let mu = Amorphvar (u, C.id) in
-      assert (Result.is_ok (submode_mvmv obj ~log:None mu mv));
+      submode_mvmv obj ~log:None mu mv |> Result.get_ok;
       allow_left (Amodevar mu), true
     | Amodemeet (a, mvs) ->
       let u = fresh obj in
       let mu = Amorphvar (u, C.id) in
-      assert (Result.is_ok (submode_mvc obj ~log:None mu a));
+      submode_mvc obj ~log:None mu a |> Result.get_ok;
       VarMap.iter
-        (fun _ mv -> assert (Result.is_ok (submode_mvmv obj ~log:None mu mv)))
+        (fun _ mv -> submode_mvmv obj ~log:None mu mv |> Result.get_ok)
         mvs;
       allow_left (Amodevar mu), true
-end
-[@@inline always]
-
-module Solvers_polarized (C : Lattices_mono) = struct
-  module S = Solver_mono (C)
-
-  type changes = S.changes
-
-  let empty_changes = S.empty_changes
-
-  let undo_changes = S.undo_changes
-
-  module type Solver_polarized =
-    Solver_polarized
-      with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
-       and type 'a obj := 'a C.obj
-       and type 'a error := 'a error
-       and type changes := changes
-
-  module rec Positive :
-    (Solver_polarized
-      with type 'd polarized = 'd pos
-       and type ('a, 'd) mode_op = ('a, 'd) Negative.mode) = struct
-    type 'd polarized = 'd pos
-
-    type ('a, 'd) mode_op = ('a, 'd) Negative.mode
-
-    type ('a, 'd) mode = ('a, 'd) S.mode constraint 'd = 'l * 'r
-
-    include Magic_allow_disallow (S)
-
-    let newvar = S.newvar
-
-    let submode = S.submode
-
-    let join = S.join
-
-    let meet = S.meet
-
-    let of_const _ = S.of_const
-
-    let min = S.min
-
-    let max = S.max
-
-    let zap_to_floor = S.zap_to_floor
-
-    let zap_to_ceil = S.zap_to_ceil
-
-    let newvar_above = S.newvar_above
-
-    let newvar_below = S.newvar_below
-
-    let get_ceil = S.get_ceil
-
-    let get_floor = S.get_floor
-
-    let get_loose_ceil = S.get_loose_ceil
-
-    let get_loose_floor = S.get_loose_floor
-
-    let print ?(verbose = false) = S.print ~verbose
-
-    let via_monotone = S.apply
-
-    let via_antitone = S.apply
-  end
-
-  and Negative :
-    (Solver_polarized
-      with type 'd polarized = 'd neg
-       and type ('a, 'd) mode_op = ('a, 'd) Positive.mode) = struct
-    type 'd polarized = 'd neg
-
-    type ('a, 'd) mode_op = ('a, 'd) Positive.mode
-
-    type ('a, 'd) mode = ('a, 'r * 'l) S.mode constraint 'd = 'l * 'r
-
-    include Magic_allow_disallow (struct
-      type ('a, _, 'd) sided = ('a, 'd) mode
-
-      let disallow_right = S.disallow_left
-
-      let disallow_left = S.disallow_right
-
-      let allow_right = S.allow_left
-
-      let allow_left = S.allow_right
-    end)
-
-    let newvar = S.newvar
-
-    let submode obj m0 m1 ~log =
-      Result.map_error
-        (fun { left; right } -> { left = right; right = left })
-        (S.submode obj m1 m0 ~log)
-
-    let join = S.meet
-
-    let meet = S.join
-
-    let of_const _ = S.of_const
-
-    let min = S.max
-
-    let max = S.min
-
-    let zap_to_floor = S.zap_to_ceil
-
-    let zap_to_ceil = S.zap_to_floor
-
-    let newvar_above = S.newvar_below
-
-    let newvar_below = S.newvar_above
-
-    let get_ceil = S.get_floor
-
-    let get_floor = S.get_ceil
-
-    let get_loose_ceil = S.get_loose_floor
-
-    let get_loose_floor = S.get_loose_ceil
-
-    let print ?(verbose = false) = S.print ~verbose
-
-    let via_monotone = S.apply
-
-    let via_antitone = S.apply
-  end
-
-  (* Definitions to show that this solver works over a category. *)
-  module Category = struct
-    type 'a obj = 'a C.obj
-
-    type ('a, 'b, 'd) morph = ('a, 'b, 'd) C.morph
-
-    type ('a, 'd) mode =
-      | Positive of ('a, 'd pos) Positive.mode
-      | Negative of ('a, 'd neg) Negative.mode
-
-    let apply_into_positive :
-        type a b l r.
-        b obj ->
-        (a, b, l * r) morph ->
-        (a, l * r) mode ->
-        (b, l * r) Positive.mode =
-     fun obj morph -> function
-      | Positive mode -> Positive.via_monotone obj morph mode
-      | Negative mode -> Positive.via_antitone obj morph mode
-
-    let apply_into_negative :
-        type a b l r.
-        b obj ->
-        (a, b, l * r) morph ->
-        (a, l * r) mode ->
-        (b, r * l) Negative.mode =
-     fun obj morph -> function
-      | Positive mode -> Negative.via_antitone obj morph mode
-      | Negative mode -> Negative.via_monotone obj morph mode
-  end
 end
 [@@inline always]

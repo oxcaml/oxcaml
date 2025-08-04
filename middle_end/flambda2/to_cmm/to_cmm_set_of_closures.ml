@@ -149,11 +149,12 @@ end = struct
     | Value_slot { value_slot; is_scanned; size } ->
       let simple = Value_slot.Map.find value_slot value_slots in
       let kind = Value_slot.kind value_slot in
-      if (not
-            (Flambda_kind.equal
-               (Flambda_kind.With_subkind.kind kind)
-               Flambda_kind.value))
-         && is_scanned
+      let kind_with_subkind =
+        if Value_slot.is_always_immediate value_slot
+        then KS.tagged_immediate
+        else KS.anything kind
+      in
+      if (not (Flambda_kind.equal kind Flambda_kind.value)) && is_scanned
       then
         Misc.fatal_errorf
           "Value slot %a not of kind Value (%a) but is visible by GC"
@@ -162,7 +163,7 @@ end = struct
       let env, res, fields, chunk_acc, updates =
         match contents with
         | `Expr field ->
-          let chunk = C.memory_chunk_of_kind kind in
+          let chunk = C.memory_chunk_of_kind kind_with_subkind in
           let chunk_acc =
             rev_append_chunks ~for_static_sets [chunk] chunk_acc
           in
@@ -179,11 +180,9 @@ end = struct
               } ->
             let update_kind =
               let module UK = C.Update_kind in
-              match KS.kind kind with
+              match kind with
               | Value ->
-                if KS.Non_null_value_subkind.equal
-                     (KS.non_null_value_subkind kind)
-                     Tagged_immediate
+                if Value_slot.is_always_immediate value_slot
                 then UK.tagged_immediates
                 else UK.pointers
               | Naked_number Naked_immediate
@@ -192,6 +191,8 @@ end = struct
                 UK.naked_int64s
               | Naked_number Naked_float -> UK.naked_floats
               | Naked_number Naked_vec128 -> UK.naked_vec128_fields
+              | Naked_number Naked_vec256 -> UK.naked_vec256_fields
+              | Naked_number Naked_vec512 -> UK.naked_vec512_fields
               (* The "fields" update kinds are used because we are writing into
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields
@@ -200,7 +201,7 @@ end = struct
               | Naked_number Naked_int8 -> UK.naked_int8_fields
               | Region | Rec_info ->
                 Misc.fatal_errorf "Unexpected value slot kind for %a: %a"
-                  Value_slot.print value_slot KS.print kind
+                  Value_slot.print value_slot Flambda_kind.print kind
             in
             let env, res, updates =
               C.make_update env res dbg update_kind
@@ -235,7 +236,7 @@ end = struct
           List.rev_append (P.define_symbol (R.symbol res function_symbol)) acc
       in
       match code_id with
-      | Code_id code_id -> (
+      | Code_id { code_id; only_full_applications } -> (
         let code_symbol =
           R.symbol_of_code_id res ~currently_in_inlined_body:false code_id
         in
@@ -277,12 +278,16 @@ end = struct
                store code ID %a which is classified as \
                Full_and_partial_application (so the expected size is 3)"
               Function_slot.print function_slot size Code_id.print code_id;
+          let curry_code_pointer =
+            if only_full_applications
+            then P.term_of_symbol ~dbg C.fail_if_called_indirectly_sym
+            else
+              P.term_of_symbol ~dbg
+                (C.curry_function_sym kind params_ty result_ty)
+          in
           let acc =
             P.term_of_symbol ~dbg code_symbol
-            :: P.int ~dbg closure_info
-            :: P.term_of_symbol ~dbg
-                 (C.curry_function_sym kind params_ty result_ty)
-            :: acc
+            :: P.int ~dbg closure_info :: curry_code_pointer :: acc
           in
           ( acc,
             rev_append_chunks ~for_static_sets
@@ -515,7 +520,13 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     Env.get_code_metadata env code_id
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
   in
-  C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll, res
+  let fun_ret_type =
+    Env.get_code_metadata env code_id
+    |> Code_metadata.result_arity |> C.extended_machtype_of_return_arity
+    |> C.Extended_machtype.to_machtype
+  in
+  ( C.fundecl fun_sym fun_params fun_body fun_flags fun_dbg fun_poll fun_ret_type,
+    res )
 
 let params_and_body env res code_id p ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~translate_expr =
@@ -564,7 +575,7 @@ let debuginfo_for_set_of_closures env set =
          ->
            match code_id with
            | Deleted { dbg; _ } -> dbg
-           | Code_id code_id ->
+           | Code_id { code_id; only_full_applications = _ } ->
              Code_metadata.dbg (Env.get_code_metadata env code_id))
     |> List.sort Debuginfo.compare
   in

@@ -21,6 +21,8 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+
 external runtime5 : unit -> bool @@ portable = "%runtime5"
 
 exception Encapsulated of string
@@ -33,7 +35,7 @@ module Runtime_4 = struct
     end
 
     let[@inline] access f =
-      try f Access.Access with
+      try (f [@inlined hint]) Access.Access with
       | exn ->
         let bt = Printexc.get_raw_backtrace () in
         let exn_string = Printexc.to_string exn in
@@ -127,15 +129,15 @@ module Runtime_4 = struct
   (* Unimplemented functions *)
   let not_implemented () =
     failwith "Multi-domain functionality not supported in runtime4"
-  type !'a t
+  type !'a t : value mod portable contended with 'a
   type id = int
   let spawn' _ = not_implemented ()
   let join _ = not_implemented ()
   let get_id _ = not_implemented ()
-  let self () = not_implemented ()
-  let cpu_relax () = not_implemented ()
-  let is_main_domain () = not_implemented ()
-  let recommended_domain_count () = not_implemented ()
+
+  let self () = 0
+  let is_main_domain () = true
+  let recommended_domain_count () = 1
 end
 
 module Runtime_5 = struct
@@ -150,24 +152,20 @@ module Runtime_5 = struct
       | Running
       | Finished of ('a, exn) result [@warning "-unused-constructor"]
 
-    type 'a term_sync = {
+    type 'a term_sync : value mod portable contended with 'a = {
       (* protected by [mut] *)
       mutable state : 'a state [@warning "-unused-field"] ;
       mut : Mutex.t ;
       cond : Condition.t ;
-    }
+    } [@@unsafe_allow_any_mode_crossing]
 
     external spawn : (unit -> 'a) @ portable once -> 'a term_sync -> t @@ portable
       = "caml_domain_spawn"
     external self : unit -> t @@ portable
       = "caml_ml_domain_id" [@@noalloc]
-    external cpu_relax : unit -> unit @@ portable
-      = "caml_ml_domain_cpu_relax"
     external get_recommended_domain_count: unit -> int @@ portable
       = "caml_recommended_domain_count" [@@noalloc]
   end
-
-  let cpu_relax () = Raw.cpu_relax ()
 
   type id = Raw.t
 
@@ -185,7 +183,7 @@ module Runtime_5 = struct
     end
 
     let[@inline] access (f : Access.t -> 'a @ portable contended) =
-      try f Access.Access with
+      try (f [@inlined hint]) Access.Access with
       | exn ->
         let bt = Printexc.get_raw_backtrace () in
         let exn_string = Printexc.to_string exn in
@@ -231,11 +229,12 @@ module Runtime_5 = struct
 
     let key_counter = Atomic.make 0
 
-    type key_initializer : immutable_data =
+    type key_initializer : value mod contended portable =
         KI: 'a key * ('a -> (Access.t -> 'a) @ portable) @@ portable -> key_initializer
     [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
 
-    type key_initializer_list : immutable_data = key_initializer list
+    type key_initializer_list : value mod contended portable =
+      key_initializer list
 
     let parent_keys = Atomic.make ([] : key_initializer_list)
 
@@ -335,7 +334,7 @@ module Runtime_5 = struct
     let get_initial_keys access : key_value list =
       List.map
         (fun (KI (k, split)) -> KV (k, (split (get access k))))
-        (Atomic.Contended.get parent_keys)
+        (Atomic.Contended.get parent_keys : key_initializer_list)
 
     let set_initial_keys access (l: key_value list) =
       List.iter (fun (KV (k, v)) -> set access k (v access)) l
@@ -472,13 +471,12 @@ module type S = sig
     val init : unit -> unit
   end
 
-  type !'a t
+  type !'a t : value mod portable contended with 'a
   val spawn' : (DLS.Access.t -> 'a) @ portable once -> 'a t @@ portable
   val join : 'a t -> 'a @@ portable
   type id = private int
   val get_id : 'a t -> id @@ portable
   val self : unit -> id @@ portable
-  val cpu_relax : unit -> unit @@ portable
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable

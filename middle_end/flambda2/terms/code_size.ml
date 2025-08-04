@@ -142,14 +142,16 @@ let arith_conversion_size src dst =
 
 let unbox_number kind =
   match (kind : Flambda_kind.Boxable_number.t) with
-  | Naked_float | Naked_float32 | Naked_vec128 -> 1 (* 1 load *)
+  | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
+    1 (* 1 load *)
   | Naked_int64 when arch32 -> 4 (* 2 Cadda + 2 loads *)
   | Naked_int32 | Naked_int64 | Naked_nativeint -> 2
 (* Cadda + load *)
 
 let box_number kind =
   match (kind : Flambda_kind.Boxable_number.t) with
-  | Naked_float | Naked_float32 | Naked_vec128 -> alloc_size (* 1 alloc *)
+  | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
+    alloc_size (* 1 alloc *)
   | Naked_int32 when not arch32 -> 1 + alloc_size (* shift/sextend + alloc *)
   | Naked_int32 | Naked_int64 | Naked_nativeint -> alloc_size (* alloc *)
 
@@ -161,7 +163,7 @@ let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   | Immediates -> 1 (* cadda + load *)
   | Naked_floats | Values -> 1
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s ->
+  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     (* more computation is needed because of the representation using a custom
        block *)
     2
@@ -183,7 +185,7 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   | Values (Assignment Local | Initialization) -> 1
   | Immediates | Naked_floats -> 1
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s ->
+  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     2 (* as above *)
 
 let string_or_bigstring_load kind width =
@@ -207,6 +209,8 @@ let string_or_bigstring_load kind width =
     (* add, load (allow_unaligned_access) *)
     (* 37 (not allow_unaligned_access) *)
     | One_twenty_eight _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Two_fifty_six _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Five_twelve _ -> 2 (* add, load (alignment handled explicitly) *)
   in
   start_address_load + elt_load
 
@@ -362,7 +366,7 @@ let nullary_prim_size prim =
   | Probe_is_enabled { name = _ } -> 4
   | Enter_inlined_apply _ -> 0
   | Dls_get -> 1
-  | Poll -> alloc_size
+  | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size prim =
   match (prim : Flambda_primitive.unary_primitive) with
@@ -374,7 +378,7 @@ let unary_prim_size prim =
     match array_kind with
     | Array_kind
         ( Immediates | Values | Naked_floats | Naked_int64s | Naked_nativeints
-        | Naked_vec128s | Unboxed_product _ ) ->
+        | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ) ->
       array_length_size
     | Array_kind (Naked_int32s | Naked_float32s) ->
       (* There is a dynamic check here to see the number of elements *)
@@ -405,7 +409,7 @@ let unary_prim_size prim =
   | End_region { ghost } | End_try_region { ghost } -> if ghost then 0 else 1
   | Obj_dup -> needs_caml_c_call_extcall_size + 1
   | Get_header -> 2
-  | Atomic_load _ | Peek _ -> 1
+  | Peek _ -> 1
   | Make_lazy _ -> alloc_size + 1
 
 let binary_prim_size prim =
@@ -428,11 +432,7 @@ let binary_prim_size prim =
     binary_float_comp_primitive width cmp
   | Float_comp (_width, Yielding_int_like_compare_functions ()) -> 8
   | Bigarray_get_alignment _ -> 3 (* load data + add index + and *)
-  | Atomic_int_arith _ -> 1
-  | Atomic_set Immediate -> 1
-  | Atomic_exchange Immediate -> 1
-  | Atomic_exchange Any_value | Atomic_set Any_value ->
-    does_not_need_caml_c_call_extcall_size
+  | Atomic_load_field _ -> 1
   | Poke _ -> 1
 
 let ternary_prim_size prim =
@@ -443,10 +443,18 @@ let ternary_prim_size prim =
     5 (* ~ 3 block_load + 2 block_set *)
   | Bigarray_set (_dims, _kind, _layout) -> 2
   (* ~ 1 block_load + 1 block_set *)
-  | Atomic_compare_and_set Immediate -> 3
-  | Atomic_compare_exchange { atomic_kind = _; args_kind = Immediate } -> 1
-  | Atomic_compare_and_set Any_value
-  | Atomic_compare_exchange { atomic_kind = _; args_kind = Any_value } ->
+  | Atomic_field_int_arith _ -> 1
+  | Atomic_set_field _ -> 1
+  | Atomic_exchange_field Immediate -> 1
+  | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
+
+let quaternary_prim_size prim =
+  match (prim : Flambda_primitive.quaternary_primitive) with
+  | Atomic_compare_and_set_field Immediate -> 3
+  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Immediate } ->
+    1
+  | Atomic_compare_and_set_field Any_value
+  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Any_value } ->
     does_not_need_caml_c_call_extcall_size
 
 let variadic_prim_size prim args =
@@ -465,6 +473,7 @@ let prim (prim : Flambda_primitive.t) =
   | Unary (p, _) -> unary_prim_size p
   | Binary (p, _, _) -> binary_prim_size p
   | Ternary (p, _, _, _) -> ternary_prim_size p
+  | Quaternary (p, _, _, _, _) -> quaternary_prim_size p
   | Variadic (p, args) -> variadic_prim_size p args
 
 let simple simple =

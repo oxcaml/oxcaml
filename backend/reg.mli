@@ -93,6 +93,7 @@ val is_reg : t -> bool
 val is_stack :  t -> bool
 val is_unknown : t -> bool
 val is_preassigned : t -> bool
+val is_domainstate : t -> bool
 
 module Set: Set.S with type elt = t
 module Map: Map.S with type key = t
@@ -113,3 +114,8 @@ val same : t -> t -> bool
 val compare : t -> t -> int
 val same_loc : t -> t -> bool
 val same_loc_fatal_on_unknown : fatal_message:string -> t -> t -> bool
+
+module For_testing : sig
+  val get_stamp : unit -> int
+  val set_state : stamp:int -> relocatable_regs:t list -> unit
+end

@@ -59,6 +59,13 @@ let dummy =
 let currstamp = ref 0
 let all_relocatable_regs = ref ([] : t list)
 
+module For_testing = struct
+  let get_stamp () = !currstamp
+  let set_state ~stamp ~relocatable_regs =
+    currstamp := stamp;
+    all_relocatable_regs := relocatable_regs  
+end
+
 let create_gen ~name ~typ ~loc =
   let preassigned =
     match loc with
@@ -119,6 +126,11 @@ let is_reg t =
   match t.loc with
   | Reg _ -> true
   | Stack _ | Unknown -> false
+
+let is_domainstate t =
+  match t.loc with
+  | Stack (Domainstate _) -> true
+  | Stack (Incoming _ | Outgoing _ | Local _) | Reg _ | Unknown -> false
 
 let clear_relocatable_regs () =
   (* When clear_relocatable_regs is called for the first time, the current

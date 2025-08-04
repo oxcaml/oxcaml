@@ -245,7 +245,8 @@ Line 2, characters 0-37:
 2 | and r_bad = #{ y : float#; z : s t2 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r_bad is '_representable_layout_1 & '_representable_layout_2
+       The layout of r_bad is
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed record.
        But the layout of r_bad must be a sublayout of value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
@@ -625,6 +626,7 @@ Line 1, characters 11-12:
                ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
+      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 let _ = { u = #5.0 }
@@ -643,6 +645,7 @@ Line 1, characters 22-23:
                           ^
 Error: Unbound record field "u"
 Hint: There is an unboxed record field with this name.
+      To project an unboxed record field, use ".#u" instead of ".u".
 |}]
 
 let bad_get t = t.#b
@@ -652,6 +655,7 @@ Line 1, characters 19-20:
                        ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
+      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 (*****************************************************************************)
@@ -735,20 +739,14 @@ Error: The universal type variable 'a was declared to have kind any.
 type a = B of b
 and b : any = #{ i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-15:
-1 | type a = B of b
-             ^^^^^^
-Error: Type "b" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b
+and b = #{ i : int; j : int; }
 |}]
 type a = B of b_portable
 and b_portable : any mod portable = #{ i : int ; j : int }
 [%%expect{|
-Line 1, characters 9-24:
-1 | type a = B of b_portable
-             ^^^^^^^^^^^^^^^
-Error: Type "b_portable" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type a = B of b_portable
+and b_portable = #{ i : int; j : int; }
 |}]
 type a = B of b
 and b : any & any & any = #{ i : int ; j : int }
@@ -770,10 +768,11 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-         value mod aliased immutable & value mod aliased immutable
+           value mod aliased immutable non_float
+           & value mod aliased immutable non_float
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
-         value_or_null mod portable & value_or_null mod portable
+           value_or_null mod portable & value_or_null mod portable
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without

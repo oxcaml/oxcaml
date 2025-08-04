@@ -51,10 +51,10 @@ let class_of_operation (op : Operation.t)
   | Csel _
   | Reinterpret_cast _ | Static_cast _
   | Const_int _ | Const_float32 _ | Const_float _
-  | Const_symbol _ | Const_vec128 _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Intop_imm _ | Intop_atomic _
-  | Name_for_debugger _ | Probe_is_enabled _ | Opaque
+  | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get
     -> Use_default
 
@@ -69,9 +69,9 @@ let is_cheap_operation (op : Operation.t)
   | Csel _
   | Reinterpret_cast _ | Static_cast _
   | Const_float32 _ | Const_float _
-  | Const_symbol _ | Const_vec128 _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Intop_imm _ | Intop_atomic _
-  | Name_for_debugger _ | Probe_is_enabled _ | Opaque
+  | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get
     -> Cheap false

@@ -154,6 +154,7 @@ and out_type =
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
+  | Otyp_of_kind of out_jkind
 
 and out_constructor = {
   ocstr_name: string;
@@ -191,7 +192,8 @@ and out_sig_item =
         out_rec_status
   | Osig_typext of out_extension_constructor * out_ext_status
   | Osig_modtype of string * out_module_type
-  | Osig_module of string * out_module_type * out_rec_status
+  | Osig_module of string * out_module_type * out_modality_new list
+      * out_rec_status
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
   | Osig_ellipsis

@@ -13,3 +13,7 @@ val equal_arch : X86_ast.arch -> X86_ast.arch -> bool
 val equal_addr : X86_ast.addr -> X86_ast.addr -> bool
 
 val equal_arg : X86_ast.arg -> X86_ast.arg -> bool
+
+val is_mem : X86_ast.arg -> bool
+
+val is_regf : X86_ast.arg -> bool

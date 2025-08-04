@@ -19,11 +19,14 @@ module K = Flambda_kind
 module MTC = More_type_creators
 module TG = Type_grammar
 module TE = Typing_env
+module ME = Meet_env
 module TEE = Typing_env_extension
 module TEL = Typing_env_level
 module Vec128 = Vector_types.Vec128.Bit_pattern
+module Vec256 = Vector_types.Vec256.Bit_pattern
+module Vec512 = Vector_types.Vec512.Bit_pattern
 
-type 'a meet_return_value = 'a TE.meet_return_value =
+type 'a meet_return_value = 'a ME.meet_return_value =
   | Left_input
   | Right_input
   | Both_inputs
@@ -55,7 +58,7 @@ let add_equation (simple : Simple.t) ty_of_simple env ~meet_type :
     let ty_of_name =
       TG.apply_coercion ty_of_simple coercion_from_simple_to_name
     in
-    match TE.add_equation_strict env name ty_of_name ~meet_type with
+    match ME.add_equation_strict env name ty_of_name ~meet_type with
     | Ok env -> Ok (New_result (), env)
     | Bottom -> Bottom (New_result ())
   in
@@ -64,11 +67,9 @@ let add_equation (simple : Simple.t) ty_of_simple env ~meet_type :
          that is matches the assigned type. *)
       if Flambda_features.check_light_invariants ()
       then assert (TG.get_alias_opt ty_of_simple == None);
-      let expanded =
-        Expand_head.expand_head0 env (MTC.type_for_const const)
-          ~known_canonical_simple_at_in_types_mode:(Some simple)
-      in
-      match meet_type env (ET.to_type expanded) ty_of_simple with
+      (* Make sure to not use an alias type, or we will loop! *)
+      let concrete_ty_of_const = ET.to_type (ET.create_const const) in
+      match meet_type env concrete_ty_of_const ty_of_simple with
       | Or_bottom.Ok (_, env) -> Ok (New_result (), env)
       | Or_bottom.Bottom -> Bottom (New_result ()))
 
@@ -297,7 +298,7 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
         let level = TE.cut scoped_env ~cut_after:join_scope in
         let initial_env = add_defined_vars initial_env level in
         let ext = TEE.from_map (TEL.equations level) in
-        TE.add_env_extension_strict initial_env ext ~meet_type)
+        ME.add_env_extension_strict initial_env ext ~meet_type)
   in
   let env_a, env_b = Or_bottom.Ok env, Or_bottom.Ok env in
   let env_a, env_b =
@@ -305,18 +306,18 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_type ~n_way_join
     | No_extensions -> env_a, env_b
     | Ext { when_a; when_b } ->
       ( Or_bottom.bind env_a ~f:(fun env ->
-            TE.add_env_extension_strict env when_a ~meet_type),
+            ME.add_env_extension_strict env when_a ~meet_type),
         Or_bottom.bind env_b ~f:(fun env ->
-            TE.add_env_extension_strict env when_b ~meet_type) )
+            ME.add_env_extension_strict env when_b ~meet_type) )
   in
   let env_a, env_b =
     match extensions2 with
     | No_extensions -> env_a, env_b
     | Ext { when_a; when_b } ->
       ( Or_bottom.bind env_a ~f:(fun env ->
-            TE.add_env_extension_strict env when_a ~meet_type),
+            ME.add_env_extension_strict env when_a ~meet_type),
         Or_bottom.bind env_b ~f:(fun env ->
-            TE.add_env_extension_strict env when_b ~meet_type) )
+            ME.add_env_extension_strict env when_b ~meet_type) )
   in
   let a_result : _ meet_result =
     match env_a with
@@ -717,6 +718,12 @@ and meet_expanded_head0 env (descr1 : ET.descr) (descr2 : ET.descr) :
   | Naked_vec128 head1, Naked_vec128 head2 ->
     map_result ~f:ET.create_naked_vec128
       (meet_head_of_kind_naked_vec128 env head1 head2)
+  | Naked_vec256 head1, Naked_vec256 head2 ->
+    map_result ~f:ET.create_naked_vec256
+      (meet_head_of_kind_naked_vec256 env head1 head2)
+  | Naked_vec512 head1, Naked_vec512 head2 ->
+    map_result ~f:ET.create_naked_vec512
+      (meet_head_of_kind_naked_vec512 env head1 head2)
   | Rec_info head1, Rec_info head2 ->
     map_result ~f:ET.create_rec_info
       (meet_head_of_kind_rec_info env head1 head2)
@@ -724,7 +731,8 @@ and meet_expanded_head0 env (descr1 : ET.descr) (descr2 : ET.descr) :
     map_result ~f:ET.create_region (meet_head_of_kind_region env head1 head2)
   | ( ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
       | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_vec128 _
-      | Naked_int64 _ | Naked_nativeint _ | Rec_info _ | Region _ ),
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_int64 _ | Naked_nativeint _
+      | Rec_info _ | Region _ ),
       _ ) ->
     assert false
 
@@ -877,6 +885,16 @@ and meet_head_of_kind_value_non_null env
       ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_vec128 ~meet_a:meet
       ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
       ~right_b:alloc_mode2
+  | Boxed_vec256 (n1, alloc_mode1), Boxed_vec256 (n2, alloc_mode2) ->
+    combine_results2 env
+      ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_vec256 ~meet_a:meet
+      ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
+      ~right_b:alloc_mode2
+  | Boxed_vec512 (n1, alloc_mode1), Boxed_vec512 (n2, alloc_mode2) ->
+    combine_results2 env
+      ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_vec512 ~meet_a:meet
+      ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
+      ~right_b:alloc_mode2
   | ( Closures { by_function_slot = by_function_slot1; alloc_mode = alloc_mode1 },
       Closures
         { by_function_slot = by_function_slot2; alloc_mode = alloc_mode2 } ) ->
@@ -903,8 +921,8 @@ and meet_head_of_kind_value_non_null env
       (element_kind1, length1, contents1, alloc_mode1)
       (element_kind2, length2, contents2, alloc_mode2)
   | ( ( Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
-      | Boxed_int32 _ | Boxed_vec128 _ | Boxed_int64 _ | Boxed_nativeint _
-      | Closures _ | String _ | Array _ ),
+      | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+      | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _ | Array _ ),
       _ ) ->
     (* This assumes that all the different constructors are incompatible. This
        could break very hard for dubious uses of Obj. *)
@@ -1177,6 +1195,22 @@ and meet_head_of_kind_naked_vec128 env t1 t2 =
     (t2 : TG.head_of_kind_naked_vec128 :> Vec128.Set.t)
     ~of_set:TG.Head_of_kind_naked_vec128.create_non_empty_set
 
+and meet_head_of_kind_naked_vec256 env t1 t2 =
+  set_meet
+    (module Vec256.Set)
+    env
+    (t1 : TG.head_of_kind_naked_vec256 :> Vec256.Set.t)
+    (t2 : TG.head_of_kind_naked_vec256 :> Vec256.Set.t)
+    ~of_set:TG.Head_of_kind_naked_vec256.create_non_empty_set
+
+and meet_head_of_kind_naked_vec512 env t1 t2 =
+  set_meet
+    (module Vec512.Set)
+    env
+    (t1 : TG.head_of_kind_naked_vec512 :> Vec512.Set.t)
+    (t2 : TG.head_of_kind_naked_vec512 :> Vec512.Set.t)
+    ~of_set:TG.Head_of_kind_naked_vec512.create_non_empty_set
+
 and meet_head_of_kind_rec_info env _t1 _t2 =
   (* CR-someday lmaurer: This could be doing things like discovering two depth
      variables are equal *)
@@ -1356,11 +1390,11 @@ and meet_row_like :
       | Ok (maps_to_result, env) -> (
         let env : _ Or_bottom.t =
           match
-            TE.add_env_extension_strict env case1.env_extension ~meet_type
+            ME.add_env_extension_strict env case1.env_extension ~meet_type
           with
           | Bottom -> Bottom
           | Ok env ->
-            TE.add_env_extension_strict env case2.env_extension ~meet_type
+            ME.add_env_extension_strict env case2.env_extension ~meet_type
         in
         match env with
         | Bottom -> bottom_case (New_result ())
@@ -1392,6 +1426,14 @@ and meet_row_like :
       (case2 :
         ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) :
       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option =
+    (* CR bclement: When we return [None] below but either of the inputs were
+       not [None], we fall back to the [other] case. This can cause loss of
+       precision if the [other] case is not [Bottom], as we forget that the
+       current case is impossible.
+
+       Fixing this would require storing [Or_unknown_or_bottom.t] in the
+       row_like_for_block case, so leave it as is for now -- this should be
+       fairly rare. *)
     match case1, case2 with
     | None, None -> None
     | Some case1, None -> (
@@ -1403,7 +1445,7 @@ and meet_row_like :
         match case1 with
         | Unknown -> (
           match
-            TE.add_env_extension_strict base_env other_case.env_extension
+            ME.add_env_extension_strict base_env other_case.env_extension
               ~meet_type
           with
           | Bottom -> None
@@ -1422,7 +1464,7 @@ and meet_row_like :
         match case2 with
         | Unknown -> (
           match
-            TE.add_env_extension_strict base_env other_case.env_extension
+            ME.add_env_extension_strict base_env other_case.env_extension
               ~meet_type
           with
           | Bottom -> None
@@ -1439,7 +1481,7 @@ and meet_row_like :
         Some Unknown
       | Known case, Unknown -> (
         match
-          TE.add_env_extension_strict base_env case.env_extension ~meet_type
+          ME.add_env_extension_strict base_env case.env_extension ~meet_type
         with
         | Bottom -> None
         | Ok env ->
@@ -1448,7 +1490,7 @@ and meet_row_like :
           Some (Known case))
       | Unknown, Known case -> (
         match
-          TE.add_env_extension_strict base_env case.env_extension ~meet_type
+          ME.add_env_extension_strict base_env case.env_extension ~meet_type
         with
         | Bottom -> None
         | Ok env ->
@@ -1660,7 +1702,7 @@ and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
       let kind = TG.kind t1 in
       if not (List.for_all (fun (_, t) -> K.equal kind (TG.kind t)) ts)
       then
-        Misc.fatal_errorf "Kind mismatch upon join:@ %a"
+        Misc.fatal_errorf "Kind mismatch upon join:@ %a@ versus@ %a" TG.print t1
           (Format.pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ versus@ ")
              TG.print)
@@ -1823,6 +1865,28 @@ and n_way_join_expanded_head env kind (expandeds : ET.t Join_env.join_arg list)
               n_way_join_head_of_kind_naked_vec128 env (head1, id1) heads
             in
             ET.create_naked_vec128 head
+          | Naked_vec256 head1 ->
+            let heads =
+              extract_head_exn
+                (function[@warning "-fragile-match"]
+                  | Naked_vec256 head -> head | _ -> assert false)
+                expandeds
+            in
+            let>>+ head =
+              n_way_join_head_of_kind_naked_vec256 env (head1, id1) heads
+            in
+            ET.create_naked_vec256 head
+          | Naked_vec512 head1 ->
+            let heads =
+              extract_head_exn
+                (function[@warning "-fragile-match"]
+                  | Naked_vec512 head -> head | _ -> assert false)
+                expandeds
+            in
+            let>>+ head =
+              n_way_join_head_of_kind_naked_vec512 env (head1, id1) heads
+            in
+            ET.create_naked_vec512 head
           | Rec_info head1 ->
             let heads =
               extract_head_exn
@@ -2044,6 +2108,38 @@ and n_way_join_head_of_kind_value_non_null env
         in
         let>>+ n = n_way_join env ns in
         TG.Head_of_kind_value_non_null.create_boxed_vec128 n alloc_mode
+      | Boxed_vec256 (n, alloc_mode) ->
+        let ns, alloc_mode =
+          List.fold_right
+            (fun (other_id, other_head) (ns, alloc_mode) ->
+              match[@warning "-fragile-match"]
+                (other_head : TG.head_of_kind_value_non_null)
+              with
+              | Boxed_vec256 (other_n, other_alloc_mode) ->
+                ( (other_id, other_n) :: ns,
+                  join_alloc_mode alloc_mode other_alloc_mode )
+              | _ -> raise Unknown_result)
+            other_heads
+            ([first_id, n], alloc_mode)
+        in
+        let>>+ n = n_way_join env ns in
+        TG.Head_of_kind_value_non_null.create_boxed_vec256 n alloc_mode
+      | Boxed_vec512 (n, alloc_mode) ->
+        let ns, alloc_mode =
+          List.fold_right
+            (fun (other_id, other_head) (ns, alloc_mode) ->
+              match[@warning "-fragile-match"]
+                (other_head : TG.head_of_kind_value_non_null)
+              with
+              | Boxed_vec512 (other_n, other_alloc_mode) ->
+                ( (other_id, other_n) :: ns,
+                  join_alloc_mode alloc_mode other_alloc_mode )
+              | _ -> raise Unknown_result)
+            other_heads
+            ([first_id, n], alloc_mode)
+        in
+        let>>+ n = n_way_join env ns in
+        TG.Head_of_kind_value_non_null.create_boxed_vec512 n alloc_mode
       | Closures { by_function_slot; alloc_mode } ->
         let function_slots, alloc_mode =
           List.fold_right
@@ -2282,6 +2378,14 @@ and n_way_join_head_of_kind_naked_nativeint env t1 ts : _ n_way_join_result =
 
 and n_way_join_head_of_kind_naked_vec128 env t1 ts : _ n_way_join_result =
   n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_vec128.union
+    env t1 ts
+
+and n_way_join_head_of_kind_naked_vec256 env t1 ts : _ n_way_join_result =
+  n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_vec256.union
+    env t1 ts
+
+and n_way_join_head_of_kind_naked_vec512 env t1 ts : _ n_way_join_result =
+  n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_vec512.union
     env t1 ts
 
 and n_way_join_head_of_kind_rec_info env (t1, _) ts : _ n_way_join_result =
@@ -2709,7 +2813,10 @@ and n_way_join_function_type (env : Join_env.t)
     match func_types with
     | [] -> Bottom, env
     | (id1, { code_id = code_id1; rec_info = rec_info1 }) :: func_types -> (
-      let target_typing_env = Join_env.target_join_env env in
+      let target_code_age_relation = Join_env.code_age_relation env in
+      let target_code_age_relation_resolver =
+        Join_env.code_age_relation_resolver env
+      in
       let code_id, _, rec_infos =
         List.fold_left
           (fun (code_id1, code_age_relation1, rec_infos)
@@ -2722,18 +2829,14 @@ and n_way_join_function_type (env : Join_env.t)
                code age relation meet would remain though as it's useful
                elsewhere.) *)
             match
-              Code_age_relation.join
-                ~target_t:(TE.code_age_relation target_typing_env)
-                ~resolver:(TE.code_age_relation_resolver target_typing_env)
-                code_age_relation1
+              Code_age_relation.join ~target_t:target_code_age_relation
+                ~resolver:target_code_age_relation_resolver code_age_relation1
                 (TE.code_age_relation (Join_env.joined_env env id2))
                 code_id1 code_id2
             with
             | Unknown -> raise Unknown_result
             | Known code_id ->
-              ( code_id,
-                TE.code_age_relation target_typing_env,
-                (id2, rec_info2) :: rec_infos ))
+              code_id, target_code_age_relation, (id2, rec_info2) :: rec_infos)
           ( code_id1,
             TE.code_age_relation (Join_env.joined_env env id1),
             [id1, rec_info1] )
@@ -2763,8 +2866,3 @@ let meet env ty1 ty2 : _ Or_bottom.t =
     | Ok (r, env) ->
       let res_ty = extract_value r ty1 ty2 in
       if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
-
-let meet_shape env t ~shape : _ Or_bottom.t =
-  if TE.is_bottom env
-  then Bottom
-  else match meet env t shape with Bottom -> Bottom | Ok (_, env) -> Ok env

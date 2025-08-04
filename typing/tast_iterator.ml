@@ -313,7 +313,7 @@ let function_body sub body =
   | Tfunction_cases
       { fc_cases; fc_exp_extra; fc_loc; fc_attributes; fc_env;
         fc_arg_mode = _; fc_arg_sort = _; fc_ret_type = _;
-        fc_partial = _; fc_param = _;
+        fc_partial = _; fc_param = _; fc_param_debug_uid = _;
       } ->
       List.iter (sub.case sub) fc_cases;
       Option.iter (extra sub) fc_exp_extra;
@@ -338,6 +338,9 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);
+      sub.expr sub exp
+  | Texp_letmutable (vb, exp) ->
+      sub.value_binding sub vb;
       sub.expr sub exp
   | Texp_function { params; body; _ } ->
       List.iter (function_param sub) params;
@@ -416,8 +419,12 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       sub.expr sub exp
   | Texp_new (_, lid, _, _) -> iter_loc sub lid
   | Texp_instvar (_, _, s) -> iter_loc sub s
+  | Texp_mutvar id -> iter_loc sub id
   | Texp_setinstvar (_, _, s, exp) ->
       iter_loc sub s;
+      sub.expr sub exp
+  | Texp_setmutvar (id, _, exp) ->
+      iter_loc sub id;
       sub.expr sub exp
   | Texp_override (_, list) ->
       List.iter (fun (_, s, e) -> iter_loc sub s; sub.expr sub e) list
@@ -676,6 +683,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_open (_, mod_ident, t) ->
       iter_loc sub mod_ident;
       sub.typ sub t
+  | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 
 let class_structure sub {cstr_self; cstr_fields; _} =

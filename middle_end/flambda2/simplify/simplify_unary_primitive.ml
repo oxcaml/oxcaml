@@ -69,8 +69,7 @@ let simplify_project_value_slot function_slot value_slot ~min_name_mode dacc
           simple
       in
       let dacc =
-        DA.add_variable dacc result_var
-          (T.alias_type_of (K.With_subkind.kind kind) simple)
+        DA.add_variable dacc result_var (T.alias_type_of kind simple)
       in
       SPR.create (Named.create_simple simple) ~try_reify:true dacc
     | Need_meet ->
@@ -81,7 +80,7 @@ let simplify_project_value_slot function_slot value_slot ~min_name_mode dacc
             (T.closure_with_at_least_this_value_slot
                ~this_function_slot:function_slot value_slot
                ~value_slot_var:(Bound_var.var result_var) ~value_slot_kind:kind)
-          ~result_var ~result_kind:(K.With_subkind.kind kind)
+          ~result_var ~result_kind:kind
       in
       let dacc = DA.add_use_of_value_slot result.dacc value_slot in
       SPR.with_dacc result dacc
@@ -89,7 +88,8 @@ let simplify_project_value_slot function_slot value_slot ~min_name_mode dacc
   let dacc =
     Simplify_common.add_symbol_projection result.dacc ~projected_from:closure
       (Symbol_projection.Projection.project_value_slot function_slot value_slot)
-      ~projection_bound_to:result_var ~kind
+      ~projection_bound_to:result_var
+      ~kind:(Flambda_kind.With_subkind.anything kind)
   in
   SPR.with_dacc result dacc
 
@@ -122,6 +122,14 @@ let simplify_unbox_number (boxable_number_kind : K.Boxable_number.t) dacc
       ( T.boxed_vec128_alias_to ~naked_vec128:result_var'
           (Alloc_mode.For_types.unknown ()),
         K.naked_vec128 )
+    | Naked_vec256 ->
+      ( T.boxed_vec256_alias_to ~naked_vec256:result_var'
+          (Alloc_mode.For_types.unknown ()),
+        K.naked_vec256 )
+    | Naked_vec512 ->
+      ( T.boxed_vec512_alias_to ~naked_vec512:result_var'
+          (Alloc_mode.For_types.unknown ()),
+        K.naked_vec512 )
   in
   let alloc_mode =
     T.prove_alloc_mode_of_boxed_number (DA.typing_env dacc) boxed_number_ty
@@ -181,6 +189,8 @@ let simplify_box_number (boxable_number_kind : K.Boxable_number.t) alloc_mode
     | Naked_int64 -> T.box_int64 naked_number_ty alloc_mode
     | Naked_nativeint -> T.box_nativeint naked_number_ty alloc_mode
     | Naked_vec128 -> T.box_vec128 naked_number_ty alloc_mode
+    | Naked_vec256 -> T.box_vec256 naked_number_ty alloc_mode
+    | Naked_vec512 -> T.box_vec512 naked_number_ty alloc_mode
   in
   let dacc = DA.add_variable dacc result_var ty in
   SPR.create original_term ~try_reify:true dacc
@@ -766,6 +776,8 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
       | Naked_int64 -> T.box_int64
       | Naked_nativeint -> T.box_nativeint
       | Naked_vec128 -> T.box_vec128
+      | Naked_vec256 -> T.box_vec256
+      | Naked_vec512 -> T.box_vec512
     in
     let ty = boxer contents_ty Alloc_mode.For_types.heap in
     let dacc = DA.add_variable dacc result_var ty in
@@ -786,17 +798,6 @@ let simplify_get_header ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
-
-let simplify_atomic_load (block_access_field_kind : P.Block_access_field_kind.t)
-    ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_ ~result_var =
-  match block_access_field_kind with
-  | Immediate ->
-    let dacc = DA.add_variable dacc result_var T.any_tagged_immediate in
-    SPR.create original_term ~try_reify:false dacc
-  | Any_value ->
-    SPR.create_unknown dacc ~result_var
-      (P.result_kind' original_prim)
-      ~original_term
 
 let[@inline always] simplify_immutable_block_load0
     (access_kind : P.Block_access_kind.t) ~field ~min_name_mode dacc
@@ -1003,8 +1004,6 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | End_try_region { ghost = _ } -> simplify_end_try_region
     | Obj_dup -> simplify_obj_dup dbg
     | Get_header -> simplify_get_header ~original_prim
-    | Atomic_load block_access_field_kind ->
-      simplify_atomic_load block_access_field_kind ~original_prim
     | Peek _ -> simplify_peek ~original_prim
     | Make_lazy _ -> simplify_lazy ~original_prim
   in

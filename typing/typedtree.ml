@@ -215,6 +215,7 @@ and expression_desc =
       Path.t * Longident.t loc * Types.value_description * ident_kind * unique_use
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
+  | Texp_letmutable of value_binding * expression
   | Texp_function of
       { params : function_param list;
         body : function_body;
@@ -265,6 +266,7 @@ and expression_desc =
     }
   | Texp_for of {
       for_id  : Ident.t;
+      for_debug_uid: Shape.Uid.t;
       for_pat : Parsetree.pattern;
       for_from : expression;
       for_to   : expression;
@@ -276,7 +278,9 @@ and expression_desc =
   | Texp_new of
       Path.t * Longident.t loc * Types.class_declaration * apply_position
   | Texp_instvar of Path.t * Path.t * string loc
+  | Texp_mutvar of Ident.t loc
   | Texp_setinstvar of Path.t * Path.t * string loc * expression
+  | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
   | Texp_letmodule of
       Ident.t option * string option loc * Types.module_presence * module_expr *
@@ -290,6 +294,7 @@ and expression_desc =
       let_ : binding_op;
       ands : binding_op list;
       param : Ident.t;
+      param_debug_uid : Shape.Uid.t;
       param_sort : Jkind.sort;
       body : value case;
       body_sort : Jkind.sort;
@@ -333,6 +338,7 @@ and comprehension_clause_binding =
 and comprehension_iterator =
   | Texp_comp_range of
       { ident     : Ident.t
+      ; ident_debug_uid : Shape.Uid.t
       ; pattern   : Parsetree.pattern
       ; start     : expression
       ; stop      : expression
@@ -356,6 +362,7 @@ and function_param =
   {
     fp_arg_label: arg_label;
     fp_param: Ident.t;
+    fp_param_debug_uid : Shape.Uid.t;
     fp_partial: partial;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
@@ -382,6 +389,7 @@ and function_cases =
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
     fc_param: Ident.t;
+    fc_param_debug_uid: Shape.Uid.t;
     fc_loc: Location.t;
     fc_exp_extra: exp_extra option;
     fc_attributes: attributes;
@@ -476,12 +484,17 @@ and class_field_desc =
   | Tcf_initializer of expression
   | Tcf_attribute of attribute
 
+and held_locks = Env.locks * Longident.t * Location.t
+
+and mode_with_locks = Mode.Value.l * held_locks option
+
 (* Value expressions for the module language *)
 
 and module_expr =
   { mod_desc: module_expr_desc;
     mod_loc: Location.t;
     mod_type: Types.module_type;
+    mod_mode : mode_with_locks;
     mod_env: Env.t;
     mod_attributes: attribute list;
    }
@@ -626,6 +639,7 @@ and module_declaration =
      md_uid: Uid.t;
      md_presence: module_presence;
      md_type: module_type;
+     md_modalities: Mode.Modality.Value.t;
      md_attributes: attribute list;
      md_loc: Location.t;
     }
@@ -715,6 +729,7 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
 
 and package_type = {
@@ -1347,3 +1362,9 @@ let loc_of_decl ~uid =
   | Module_substitution msd -> msd.ms_name
   | Class cd -> cd.ci_id_name
   | Class_type ctd -> ctd.ci_id_name
+
+let min_mode_with_locks = (Mode.Value.(disallow_right legacy), None)
+
+let mode_without_locks_exn = function
+  | (_, Some _) -> assert false
+  | (m, None) -> m

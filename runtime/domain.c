@@ -775,6 +775,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   goto domain_init_complete;
 
 alloc_main_stack_failure:
+  caml_free_stack_cache(domain_state->stack_cache);
 create_stack_cache_failure:
   caml_remove_generational_global_root(&domain_state->dls_root);
 reallocate_minor_heap_failure:
@@ -1241,9 +1242,11 @@ static void* domain_thread_func(void* v)
   struct domain_ml_values *ml_values = p->ml_values;
 
 #ifndef _WIN32
-  void * signal_stack = caml_init_signal_stack();
+  errno = 0;
+  size_t signal_stack_size = 0;
+  void * signal_stack = caml_init_signal_stack(&signal_stack_size);
   if (signal_stack == NULL) {
-    caml_fatal_error("Failed to create domain: signal stack");
+    caml_fatal_error("Failed to create domain: signal stack (errno %d)", errno);
   }
 #endif
 
@@ -1303,7 +1306,7 @@ static void* domain_thread_func(void* v)
     free_domain_ml_values(ml_values);
   }
 #ifndef _WIN32
-  caml_free_signal_stack(signal_stack);
+  caml_free_signal_stack(signal_stack, signal_stack_size);
 #endif
   return 0;
 }
@@ -2143,6 +2146,7 @@ static void domain_terminate (void)
   if(domain_state->current_stack != NULL) {
     caml_free_stack(domain_state->current_stack);
   }
+  caml_free_stack_cache(domain_state->stack_cache);
   caml_free_backtrace_buffer(domain_state->backtrace_buffer);
   caml_free_gc_regs_buckets(domain_state->gc_regs_buckets);
 
@@ -2164,7 +2168,12 @@ CAMLprim value caml_ml_domain_cpu_relax(value t)
 {
   struct interruptor* self = &domain_self->interruptor;
   handle_incoming_otherwise_relax (self);
+
+#ifndef POLL_INSERTION
+  return caml_process_pending_actions_with_root(t);
+#else
   return Val_unit;
+#endif
 }
 
 CAMLprim value caml_domain_dls_set(value t)

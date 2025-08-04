@@ -65,6 +65,7 @@ type pattern_variable =
     pv_id: Ident.t;
     pv_uid: Uid.t;
     pv_mode: Mode.Value.l;
+    pv_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
     pv_as_var: bool;
@@ -112,18 +113,22 @@ type existential_restriction =
   | In_class_def (** or in [class c = let ... in ...] *)
   | In_self_pattern (** or in self pattern *)
 
+type mutable_restriction =
+  | In_group
+  | In_rec
+
 type module_patterns_restriction =
   | Modules_allowed of { scope: int }
   | Modules_rejected
   | Modules_ignored
 
 val type_binding:
-        Env.t -> rec_flag ->
+        Env.t -> mutable_flag -> rec_flag ->
           ?force_toplevel:bool ->
           Parsetree.value_binding list ->
           Typedtree.value_binding list * Env.t
 val type_let:
-        existential_restriction -> Env.t -> rec_flag ->
+        existential_restriction -> Env.t -> mutable_flag -> rec_flag ->
           Parsetree.value_binding list ->
           Typedtree.value_binding list * Env.t
 val type_expression:
@@ -143,9 +148,11 @@ val check_partial:
         ?lev:int -> Env.t -> type_expr ->
         Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
 val type_expect:
-        Env.t -> Parsetree.expression -> type_expected -> Typedtree.expression
+        Env.t -> ?mode:Mode.Value.r -> Parsetree.expression -> type_expected ->
+          Typedtree.expression
 val type_exp:
-        Env.t -> Parsetree.expression -> Typedtree.expression
+        Env.t -> ?mode: Mode.Value.r -> Parsetree.expression ->
+          Typedtree.expression
 val type_approx:
         Env.t -> Parsetree.expression -> type_expr -> unit
 val type_argument:
@@ -168,8 +175,9 @@ val optimise_allocations: unit -> unit
 val has_poly_constraint : Parsetree.pattern -> bool
 
 
-val name_pattern : string -> Typedtree.pattern list -> Ident.t
-val name_cases : string -> Typedtree.value Typedtree.case list -> Ident.t
+val name_pattern : string -> Typedtree.pattern list -> Ident.t * Uid.t
+val name_cases :
+          string -> Typedtree.value Typedtree.case list -> Ident.t * Uid.t
 
 (* Why are we calling [submode]? This tells us why. *)
 type submode_reason =
@@ -267,6 +275,7 @@ type error =
   | Cannot_infer_signature
   | Not_a_packed_module of type_expr
   | Unexpected_existential of existential_restriction * string
+  | Unexpected_mutable of mutable_restriction
   | Invalid_interval
   | Invalid_for_loop_index
   | Invalid_comprehension_for_range_iterator_index
@@ -289,6 +298,7 @@ type error =
   | Float32_literal of string
   | Illegal_letrec_pat
   | Illegal_letrec_expr
+  | Illegal_mutable_pat
   | Illegal_class_expr
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
@@ -320,12 +330,14 @@ type error =
   | Function_type_not_rep of type_expr * Jkind.Violation.t
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
+  | Mutable_var_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Cannot_stack_allocate of Env.locality_context option
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
-  | Impossible_function_jkind of type_expr * jkind_lr
+  | Impossible_function_jkind of
+      { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
 
@@ -337,8 +349,7 @@ val report_error: loc:Location.t -> Env.t -> error -> Location.error
 
 (* Forward declaration, to be filled in by Typemod.type_module *)
 val type_module:
-  (Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t *
-    Env.locks) ref
+  (Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t) ref
 (* Forward declaration, to be filled in by Typemod.type_open *)
 val type_open:
   (?used_slot:bool ref -> override_flag -> Env.t -> Location.t ->
@@ -347,7 +358,7 @@ val type_open:
 (* Forward declaration, to be filled in by Typemod.type_open_decl *)
 val type_open_decl:
   (?used_slot:bool ref -> Env.t -> Parsetree.open_declaration ->
-   Typedtree.open_declaration * Types.signature * Env.t)
+   Typedtree.open_declaration * Env.t)
     ref
 (* Forward declaration, to be filled in by Typeclass.class_structure *)
 val type_object:

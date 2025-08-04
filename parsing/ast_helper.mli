@@ -90,6 +90,7 @@ module Typ :
     val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
                  -> core_type
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
+    val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
     val force_poly: core_type -> core_type
@@ -149,8 +150,8 @@ module Exp:
 
     val ident: ?loc:loc -> ?attrs:attrs -> lid -> expression
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> expression
-    val let_: ?loc:loc -> ?attrs:attrs -> rec_flag -> value_binding list
-              -> expression -> expression
+    val let_: ?loc:loc -> ?attrs:attrs -> mutable_flag -> rec_flag ->
+              value_binding list -> expression -> expression
     val function_ : ?loc:loc -> ?attrs:attrs -> function_param list
                    -> function_constraint -> function_body
                    -> expression

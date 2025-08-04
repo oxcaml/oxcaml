@@ -1416,6 +1416,12 @@ module Named = struct
       | Naked_number Naked_vec128 ->
         Simple.const
           (Reg_width_const.naked_vec128 Vector_types.Vec128.Bit_pattern.zero)
+      | Naked_number Naked_vec256 ->
+        Simple.const
+          (Reg_width_const.naked_vec256 Vector_types.Vec256.Bit_pattern.zero)
+      | Naked_number Naked_vec512 ->
+        Simple.const
+          (Reg_width_const.naked_vec512 Vector_types.Vec512.Bit_pattern.zero)
       | Region -> Misc.fatal_error "[Region] kind not expected here"
       | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
     in
@@ -1447,12 +1453,14 @@ module Named = struct
              | Deleted_code
              | Static_const
                  ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
-                 | Boxed_int64 _ | Boxed_vec128 _ | Boxed_nativeint _
-                 | Immutable_float_block _ | Immutable_float_array _
-                 | Immutable_float32_array _ | Mutable_string _
-                 | Immutable_string _ | Empty_array _ | Immutable_value_array _
-                 | Immutable_int32_array _ | Immutable_int64_array _
-                 | Immutable_nativeint_array _ | Immutable_vec128_array _ ) ->
+                 | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _
+                 | Boxed_vec512 _ | Boxed_nativeint _ | Immutable_float_block _
+                 | Immutable_float_array _ | Immutable_float32_array _
+                 | Mutable_string _ | Immutable_string _ | Empty_array _
+                 | Immutable_value_array _ | Immutable_int32_array _
+                 | Immutable_int64_array _ | Immutable_nativeint_array _
+                 | Immutable_vec128_array _ | Immutable_vec256_array _
+                 | Immutable_vec512_array _ ) ->
                acc)
            init
 end
@@ -1463,11 +1471,16 @@ module Invalid = struct
     | Apply_cont_of_unreachable_continuation of Continuation.t
     | Defining_expr_of_let of Bound_pattern.t * Named.t
     | Closure_type_was_invalid of Apply_expr.t
+    | Direct_application_parameter_kind_mismatch of
+        { params_arity : [`Complex] Flambda_arity.t;
+          args_arity : [`Complex] Flambda_arity.t;
+          apply : Apply_expr.t
+        }
     | Application_argument_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
     | Application_result_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
-    | Partial_application_mode_mismatch of Apply_expr.t
+    | Partial_application_mode_mismatch of Apply_expr.t * Code_metadata.t
     | Partial_application_mode_mismatch_in_lambda of Debuginfo.t
     | Calling_local_returning_closure_with_normal_apply of Apply_expr.t
     | Zero_switch_arms
@@ -1494,6 +1507,13 @@ module Invalid = struct
       Format.asprintf
         "@[<hov 1>(Closure_type_was_invalid@ @[<hov 1>(apply_expr@ %a)@])@]"
         Apply_expr.print apply_expr
+    | Direct_application_parameter_kind_mismatch
+        { params_arity; args_arity; apply } ->
+      Format.asprintf
+        "@[<hov 1>(Direct_application_parameter_kind_mismatch@ @[<hov \
+         1>(params_arity %a)@ (args_arity@ %a)@ (apply_expr@ %a)@])@]"
+        Flambda_arity.print params_arity Flambda_arity.print args_arity
+        Apply_expr.print apply
     | Application_argument_kind_mismatch (args_arity, apply_expr) ->
       Format.asprintf
         "@[<hov 1>(Application_argument_kind_mismatch@ @[<hov 1>(args_arity@ \
@@ -1504,11 +1524,11 @@ module Invalid = struct
         "@[<hov 1>(Application_result_kind_mismatch@ @[<hov 1>(result_arity@ \
          %a)@ (apply_expr@ %a)@])@]"
         Flambda_arity.print result_arity Apply_expr.print apply_expr
-    | Partial_application_mode_mismatch apply_expr ->
+    | Partial_application_mode_mismatch (apply_expr, code_metadata) ->
       Format.asprintf
         "@[<hov 1>(Partial_application_mode_mismatch@ @[<hov 1>(apply_expr@ \
-         %a)@])@]"
-        Apply_expr.print apply_expr
+         %a)@ (callee's_code_metadata@ (%a))@])@]"
+        Apply_expr.print apply_expr Code_metadata.print code_metadata
     | Partial_application_mode_mismatch_in_lambda dbg ->
       Format.asprintf
         "@[<hov 1>(Partial_application_mode_mismatch_in_lambda@ @[<hov 1>(dbg@ \

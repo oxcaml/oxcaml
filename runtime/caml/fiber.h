@@ -104,6 +104,14 @@ struct stack_info {
  * .        Red Zone        .
  * |                        |
  * +------------------------+ <--- Stack_base
+ * [ if guard pages:
+ * .                        .
+ * |    caml_plat_pagesize  |      mprotect()ed
+ * .                        .
+ * +------------------------+ <--- Protected_stack_page
+ * .      (padding)         .
+ * .                        .
+ * ]
  * |   struct stack_info    |
  * +------------------------+ <--- Caml_state->current_stack
  */
@@ -265,6 +273,7 @@ extern value caml_global_data;
 #define Trap_link(tp) ((tp)[1])
 
 struct stack_info** caml_alloc_stack_cache (void);
+void caml_free_stack_cache(struct stack_info**);
 CAMLextern struct stack_info* caml_alloc_main_stack (uintnat init_wsize);
 
 void caml_scan_stack(
