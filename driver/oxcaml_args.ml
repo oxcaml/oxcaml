@@ -1503,11 +1503,7 @@ module Debugging_options_impl = struct
     Debugging.restrict_to_upstream_dwarf := true
 
   let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false;
-    (* Default to dsymutil on macOS when enabling extended DWARF *)
-    if
-      Target_system.is_macos () && !Clflags.dwarf_fission = Clflags.Fission_none
-    then Clflags.dwarf_fission := Clflags.Fission_dsymutil
+    Debugging.restrict_to_upstream_dwarf := false
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
