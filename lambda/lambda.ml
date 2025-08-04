@@ -168,9 +168,9 @@ type primitive =
   | Punboxed_product_field of int * layout list
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pidx_field of int
-  | Pidx_mixed_field of mixed_block_shape * int * int list
-  | Pidx_array of
+  | Pmake_idx_field of int
+  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_array of
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
@@ -2048,9 +2048,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pget_idx _ | Pset_idx _
   | Ppeek _ | Ppoke _ ->
     None
-  | Pidx_field _
-  | Pidx_mixed_field _
-  | Pidx_array _
+  | Pmake_idx_field _
+  | Pmake_idx_mixed_field _
+  | Pmake_idx_array _
   | Pidx_deepen _
   | Preinterpret_tagged_int63_as_unboxed_int64 ->
     if !Clflags.native_code then None
@@ -2204,7 +2204,7 @@ let primitive_can_raise prim =
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
-  | Pidx_field _ | Pidx_mixed_field _ | Pidx_array _ | Pidx_deepen _
+  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
   | Ppeek _ | Ppoke _ ->
     false
@@ -2410,7 +2410,7 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
   | Parray_element_size_in_bytes _ -> layout_int
-  | Pidx_field _ | Pidx_mixed_field _ | Pidx_array _ | Pidx_deepen _ ->
+  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _ ->
     Punboxed_int Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
   | Pufloatfield _ -> Punboxed_float Unboxed_float64

@@ -2351,7 +2351,7 @@ and transl_idx ~scopes loc env ba uas =
               Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
                 in non-mixed boxed record")
         uas;
-      Lprim (Pidx_field lbl.lbl_pos, [], (of_location ~scopes loc))
+      Lprim (Pmake_idx_field lbl.lbl_pos, [], (of_location ~scopes loc))
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
@@ -2368,7 +2368,7 @@ and transl_idx ~scopes loc env ba uas =
            (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
       then
         raise (Error (loc, Block_index_gap_overflow_possible));
-      Lprim (Pidx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
+      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     end
   | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
@@ -2395,7 +2395,7 @@ and transl_idx ~scopes loc env ba uas =
        support striped arrays *)
     if will_be_reordered mbe then
       raise (Error (loc, Element_would_be_reordered_in_record));
-    Lprim (Pidx_array (array_kind, index_kind, mbe, uas_path), [index],
+    Lprim (Pmake_idx_array (array_kind, index_kind, mbe, uas_path), [index],
            (of_location ~scopes loc))
   end
 

@@ -518,13 +518,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pget_idx _ -> binary (Ccall "caml_unsafe_get_idx_bytecode")
     | Pset_idx _ -> ternary (Ccall "caml_unsafe_set_idx_bytecode")
-    | Pidx_field pos -> Const (Const_block (0, [Const_base (Const_int pos)]))
-    | Pidx_mixed_field (_, pos, path) ->
+    | Pmake_idx_field pos ->
+      Const (Const_block (0, [Const_base (Const_int pos)]))
+    | Pmake_idx_mixed_field (_, pos, path) ->
       let path_consts =
         List.map (fun x -> Const_base (Const_int x)) (pos :: path)
       in
       Const (Const_block (0, path_consts))
-    | Pidx_array (_, ik, _, path) -> (
+    | Pmake_idx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       match args with

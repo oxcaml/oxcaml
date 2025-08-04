@@ -1729,10 +1729,10 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
        actually nullary. *)
     let num_bytes = array_element_size_in_bytes array_kind in
     [Simple (Simple.const_int (Targetint_31_63.of_int num_bytes))]
-  | Pidx_field pos, [] ->
+  | Pmake_idx_field pos, [] ->
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
     [Simple (Simple.const (Reg_width_const.naked_int64 idx_raw_value))]
-  | Pidx_mixed_field (shape, pos, path), [] ->
+  | Pmake_idx_mixed_field (shape, pos, path), [] ->
     let open Mixed_product_bytes.Wrt_path in
     let { offset_bytes; gap_bytes } =
       match offset_and_gap (count_shape shape pos path) with
@@ -1745,7 +1745,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         (Int64.of_int (conv_bc offset_bytes))
     in
     [Simple (Simple.const (Reg_width_const.naked_int64 idx_raw_value))]
-  | Pidx_array (ak, ik, mbe, path), [[index]] ->
+  | Pmake_idx_array (ak, ik, mbe, path), [[index]] ->
     let index_as_int64 =
       let conv_from src =
         H.Prim (Unary (Num_conv { src; dst = Naked_int64 }, index))
@@ -2933,7 +2933,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
        here, either a bug in [Closure_conversion] or the wrong number of \
        arguments"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | (Pprobe_is_enabled _ | Pidx_field _ | Pidx_mixed_field _), _ :: _ ->
+  | (Pprobe_is_enabled _ | Pmake_idx_field _ | Pmake_idx_mixed_field _), _ :: _
+    ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for nullary primitive \
        %a (%a)"
@@ -2948,8 +2949,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
       | Patomic_load_field _ | Pmixedfield _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
-      | Parray_element_size_in_bytes _ | Pidx_array _ | Pidx_deepen _ | Ppeek _
-      | Pmakelazyblock _
+      | Parray_element_size_in_bytes _ | Pmake_idx_array _ | Pidx_deepen _
+      | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _) ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
