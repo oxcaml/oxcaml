@@ -242,10 +242,7 @@ and apply_expr ~env ~res e =
          (Exn_continuation.exn_handler exn_continuation)
     then
       (* This was passed in through a parameter, so has not been declared via a
-         [Let_cont].
-
-         CR selee: we may need to pass in more parameters to the code block so
-         that we have access to the params here *)
+         [Let_cont] and expects zero [extra_args]. *)
       []
     else
       let _addr, _var, extra_params_vars =
