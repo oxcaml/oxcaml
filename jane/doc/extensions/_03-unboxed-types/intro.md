@@ -49,7 +49,7 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
 
 The type system also supports one *composite* layout: unboxed products:
 * `l1 & l2 & ... & lk` is the layout of unboxed products where the first element
-  of the project has layout `l1`, the second has layout `l2`, and so on.
+  of the product has layout `l1`, the second has layout `l2`, and so on.
 
 Over time, we'll be adding more layouts here.
 
