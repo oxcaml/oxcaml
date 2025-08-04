@@ -1641,7 +1641,8 @@ and transl_tupled_function
 and add_type_shapes_of_pattern ~env sort pattern =
   let var_list = Typedtree.pat_bound_idents_full sort pattern in
   List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-    Type_shape.add_to_type_shapes var_uid type_expr var_sort
+    let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
+    Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
       (Env.find_uid_of_path env))
   var_list
 
