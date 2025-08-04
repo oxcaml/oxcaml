@@ -904,3 +904,34 @@ Error: This type "float unbx or_null" should be an instance of type
            any mod separable
          because of the definition of accepts_sep at line 2, characters 0-41.
 |}]
+
+(* [@@layout_poly] respects separability. *)
+
+external[@layout_poly] make_vect : ('a : any mod separable) . int -> 'a -> 'a array =
+  "%makearray_dynamic"
+
+[%%expect{|
+external make_vect : ('a : any mod separable). int -> 'a -> 'a array
+  = "%makearray_dynamic" [@@layout_poly]
+|}]
+
+let succeeds = make_vect 2 (This 4)
+[%%expect{|
+val succeeds : int or_null array = [|This 4; This 4|]
+|}]
+
+let fails = make_vect 3 (This 5.)
+
+[%%expect{|
+Line 1, characters 30-32:
+1 | let fails = make_vect 3 (This 5.)
+                                  ^^
+Error: This expression has type "float" but an expression was expected of type
+         "('a : value mod non_float)"
+       The kind of float is value mod many unyielding stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
