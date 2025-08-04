@@ -96,11 +96,11 @@ let () = is_a_malloc "t1" ~num_fields:#3L (fun () -> malloc_ {x = 10; y = #3.14;
 let t1_func x y z = malloc_ {x; y; z}
 let () = is_a_malloc "t1-func-creation" ~num_fields:#3L (fun () -> t1_func 10 #3.14 #4L)
 
-type t2 = {x : bool; y : int; z : int32#}
-let () = is_a_malloc "t2 " ~num_fields:#3L (fun () -> malloc_ {x = true; y = 99; z = #777l})
+type t2 = {x : bool; y : int; z : int64#}
+let () = is_a_malloc "t2 " ~num_fields:#3L (fun () -> malloc_ {x = true; y = 99; z = #777L})
 
 let t2_func x y z = malloc_ {x; y; z}
-let () = is_a_malloc "t2-func-creation" ~num_fields:#3L (fun () -> t2_func true 99 #777l)
+let () = is_a_malloc "t2-func-creation" ~num_fields:#3L (fun () -> t2_func true 99 #777L)
 
 type r0 = {flag : bool; id : int}
 let () = is_a_malloc "r0" ~num_fields:#2L (fun () -> malloc_ {flag = true; id = 0})
