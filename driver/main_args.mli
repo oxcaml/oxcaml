@@ -96,6 +96,8 @@ module type Compiler_options = sig
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
+  val _use_debugging_shapes : unit -> unit
+  val _use_old_merlin_shapes : unit -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit

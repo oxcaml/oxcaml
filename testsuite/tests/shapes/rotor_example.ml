@@ -41,9 +41,9 @@ module Int = struct
 end
 [%%expect{|
 {
- "Int"[module] -> {<.13>
-                   "t"[type] -> <.10>;
-                   "to_string"[value] -> <.11>;
+ "Int"[module] -> {<.21>
+                   "t"[type] -> <.18>;
+                   "to_string"[value] -> <.19>;
                    };
  }
 module Int : sig type t = int val to_string : int -> string end
@@ -55,9 +55,9 @@ module String = struct
 end
 [%%expect{|
 {
- "String"[module] -> {<.17>
-                      "t"[type] -> <.14>;
-                      "to_string"[value] -> <.15>;
+ "String"[module] -> {<.30>
+                      "t"[type] -> <.27>;
+                      "to_string"[value] -> <.28>;
                       };
  }
 module String : sig type t = string val to_string : 'a -> 'a end
@@ -66,7 +66,7 @@ module String : sig type t = string val to_string : 'a -> 'a end
 module P = Pair(Int)(Pair(String)(Int))
 [%%expect{|
 {
- "P"[module] -> {<.18>
+ "P"[module] -> {<.36>
                  "t"[type] -> <.5>;
                  "to_string"[value] -> <.6>;
                  };
