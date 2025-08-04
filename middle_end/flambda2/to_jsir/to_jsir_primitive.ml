@@ -181,14 +181,14 @@ let binary ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Gt Signed -> use_prim' ~env ~res Lt y x
       | Gt Unsigned -> use_prim' ~env ~res Ult y x
       | Le Signed -> use_prim' ~env ~res Le x y
-      | Le Unsigned -> failwith "bruh"
+      | Le Unsigned -> primitive_not_supported ()
       | Ge Signed -> use_prim' ~env ~res Le y x
-      | Ge Unsigned -> failwith "bruh")
+      | Ge Unsigned -> primitive_not_supported ())
     | Yielding_int_like_compare_functions signed_or_unsigned ->
       let env, res =
         match signed_or_unsigned with
         | Signed -> env, res
-        | Unsigned -> failwith "bruh"
+        | Unsigned -> primitive_not_supported ()
       in
       let extern_name =
         with_int_prefix kind "compare" ~percent_for_imms:false
