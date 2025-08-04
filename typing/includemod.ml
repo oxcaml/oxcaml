@@ -929,7 +929,7 @@ and signature_components :
   | (sigi1, sigi2, pos) :: rem ->
       let shape_modified = ref false in
       (* CR jrayman: replace all [Some Value]s *)
-      let id, item, paired_uids, shape_map, (runtime_repr : mixed_block_element option) =
+      let id, item, paired_uids, shape_map, runtime_repr =
         match sigi1, sigi2 with
         | Sig_value(id1, valdecl1, _) ,Sig_value(_id2, valdecl2, _) ->
             let item =
@@ -946,7 +946,7 @@ and signature_components :
                              |> Jkind.Sort.default_for_transl_and_get
                              |> Lambda.mixed_block_element_of_const_sort)
               | Val_mut _
-              | Val_ivar _
+              | Val_ivar _ (* CR jrayman: is this correct? *)
               | Val_self _
               | Val_anc _ ->
                 Misc.fatal_error
