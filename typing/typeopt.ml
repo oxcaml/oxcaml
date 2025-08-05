@@ -115,15 +115,15 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
-(* CR layouts v2.8: Calling [type_legacy_sort] in [typeopt] is not ideal
+(* CR layouts v2.8: Calling [type_sort] in [typeopt] is not ideal
    and this function should be removed at some point. To do that, there
    needs to be a way to store sort vars on [Tconstr]s. That means
    either introducing a [Tpoly_constr], allow type parameters with
    sort info, or do something else. *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
-let type_legacy_sort ~why env loc ty =
-  match Ctype.type_legacy_sort ~why env ty with
+let type_sort ~why env loc ty =
+  match Ctype.type_sort ~why ~fixed:false env ty with
   | Ok sort -> sort
   | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
 
@@ -150,7 +150,11 @@ let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
   | Base Value -> begin
-  if is_always_gc_ignorable env ty then Int
+  (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
+     supported by the middle-end *)
+  if is_always_gc_ignorable env ty
+    && Ctype.check_type_nullability env ty Non_null
+  then Int
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
       Any
@@ -264,7 +268,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
     | Some s -> s
     | None ->
       Jkind.Sort.default_for_transl_and_get
-        (type_legacy_sort ~why:Array_element env loc ty)
+        (type_sort ~why:Array_element env loc ty)
   in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =

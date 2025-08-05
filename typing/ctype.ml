@@ -1783,20 +1783,18 @@ let instance_prim_layout (desc : Primitive.description) ty =
   if not desc.prim_is_layout_poly
   then ty, None
   else
-  let new_sort_and_jkind = ref None in
-  let get_jkind () =
-    (* CR layouts v2.8: This should replace only the layout component of the
-       jkind. It's possible that we might want a primitive that accepts a
-       mode-crossing, layout-polymorphic parameter. *)
-    match !new_sort_and_jkind with
-    | Some (_, jkind) ->
-      jkind
+  let new_sort = ref None in
+  let get_jkind jkind =
+    let sort = match !new_sort with
+    | Some sort -> sort
     | None ->
-      let jkind, sort =
-        Jkind.of_new_sort_var ~why:Layout_poly_in_external
-      in
-      new_sort_and_jkind := Some (sort, jkind);
-      jkind
+      let sort = Jkind.Sort.new_var () in
+      new_sort := Some sort;
+      sort
+    in
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort sort) in
+    Jkind.History.update_reason
+      jkind (Concrete_creation Layout_poly_in_external)
   in
   For_copy.with_scope (fun copy_scope ->
     let rec inner ty =
@@ -1807,10 +1805,10 @@ let instance_prim_layout (desc : Primitive.description) ty =
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
           For_copy.redirect_desc copy_scope ty
-            (Tvar {r with jkind = get_jkind ()})
+            (Tvar {r with jkind = get_jkind jkind})
         | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
           For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind ()})
+            (Tunivar {r with jkind = get_jkind jkind})
         | _ -> ()
         end;
         iter_type_expr inner ty
@@ -1818,8 +1816,8 @@ let instance_prim_layout (desc : Primitive.description) ty =
     in
     inner ty;
     unmark_type ty;
-    match !new_sort_and_jkind with
-    | Some (sort, _) ->
+    match !new_sort with
+    | Some sort ->
       (* We don't want to lower the type vars from generic_level due to usages
          in [includecore.ml]. This means an extra [instance] call is needed in
          [type_ident], but we only hit it if it's layout polymorphic. *)
@@ -2654,11 +2652,6 @@ let constrain_type_jkind_exn env texn ty jkind =
   | Ok _ -> ()
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 
-let type_legacy_sort ~why env ty =
-  let jkind, sort = Jkind.of_new_legacy_sort_var ~why in
-  match constrain_type_jkind env ty jkind with
-  | Ok _ -> Ok sort
-  | Error _ as e -> e
 
 (* Note: Because [estimate_type_jkind] actually returns an upper bound, this
    function computes an inaccurate intersection in some cases.

@@ -631,11 +631,6 @@ val type_sort :
   fixed:bool ->
   Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
-(* As [type_sort ~fixed:false], but constrain the jkind to be non-null.
-   Used for checking array elements. *)
-val type_legacy_sort :
-  why:Jkind.History.concrete_legacy_creation_reason ->
-  Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
 (* Jkind checking. [constrain_type_jkind] will update the jkind of type
    variables to make the check true, if possible.  [check_decl_jkind] and

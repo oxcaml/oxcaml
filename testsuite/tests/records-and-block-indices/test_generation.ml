@@ -106,19 +106,19 @@ open Stdlib_stable
 open Stdlib_beta
 
 external[@layout_poly] makearray_dynamic_local :
-  ('a : any_non_null) . int -> 'a -> 'a array @ local =
+  ('a : any mod separable) . int -> 'a -> 'a array @ local =
   "%makearray_dynamic"
 
 external[@layout_poly] makearray_dynamic :
-  ('a : any_non_null) . int -> 'a -> 'a array =
+  ('a : any mod separable) . int -> 'a -> 'a array =
   "%makearray_dynamic"
 
 external[@layout_poly] get :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a =
   "%array_safe_get"
 
 external[@layout_poly] set :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
   "%array_safe_set"
 
 let failwithf fmt = Printf.ksprintf failwith fmt
