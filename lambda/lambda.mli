@@ -388,7 +388,6 @@ and array_kind =
   | Pgcignorableproductarray of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
 
-
 (** When accessing a flat float array, we need to know the mode which we should
     box the resulting float at. *)
 and array_ref_kind =
@@ -531,6 +530,7 @@ and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+
 and peek_or_poke =
   | Ppp_tagged_immediate
   | Ppp_unboxed_float32
@@ -1250,7 +1250,7 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
-(** construction helpers *)
+(** Construction helpers *)
 
 val int : _ Scalar.Integral.t
 
@@ -1274,7 +1274,7 @@ val and_ : locality_mode Scalar.Integral.t binop
 val icmp : integer_comparison -> any_locality_mode Scalar.Integral.t binop
 
 val static_cast
-  : src:any_locality_mode Scalar.t
+   : src:any_locality_mode Scalar.t
   -> dst:locality_mode Scalar.t
   -> lambda
   -> loc:scoped_location
