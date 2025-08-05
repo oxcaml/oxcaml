@@ -1258,7 +1258,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Record { fields; kind = Record_boxed | Record_floats } ->
       let fields =
         List.map
-          (fun (name, type_shape, type_layout) ->
+          (fun (name, _, type_shape, type_layout) ->
             let base_layout =
               match type_layout with
               | Layout.Base base_layout -> base_layout
@@ -1279,7 +1279,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         "Unboxed records should not reach this stage. They are deconstructed \
          by unarization in earlier stages of the compiler."
     | Record
-        { fields = [(field_name, sh, Base base_layout)]; kind = Record_unboxed }
+        { fields = [(field_name, _, sh, Base base_layout)]; kind = Record_unboxed }
       ->
       let field_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
@@ -1292,10 +1292,10 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
          [flatten_shape]. *)
     | Record { fields = [] | _ :: _ :: _; kind = Record_unboxed } ->
       assert false
-    | Record { fields = [(_, _, Product _)]; kind = Record_unboxed } ->
+    | Record { fields = [(_, _, _, Product _)]; kind = Record_unboxed } ->
       assert false
     | Record { fields; kind = Record_mixed mixed_block_shapes } ->
-      let fields = List.map (fun (name, sh, ly) -> Some name, sh, ly) fields in
+      let fields = List.map (fun (name, _, sh, ly) -> Some name, sh, ly) fields in
       let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
       let fields =
         List.map
@@ -1565,7 +1565,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       _ ) ->
     Misc.fatal_error "record must have value layout"
-  | Record { fields = [(_, sh, ly)]; kind = Record_unboxed }, _
+  | Record { fields = [(_, _, sh, ly)]; kind = Record_unboxed }, _
     when Layout.equal ly type_layout -> (
     match type_layout with
     | Product _ -> flatten_shape sh ly
@@ -1579,12 +1579,12 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     ->
     Misc.fatal_errorf "unboxed record must have exactly one field, found %a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string)
-      (List.map (fun (name, _, _) -> name) fields)
+      (List.map (fun (name, _, _, _) -> name) fields)
   | Record { fields; kind = Record_unboxed_product }, _ -> (
     match type_layout with
     | Layout.Product prod_shapes
       when List.length prod_shapes = List.length fields ->
-      List.concat_map (fun (_, sh, ly) -> flatten_shape sh ly) fields
+      List.concat_map (fun (_, _, sh, ly) -> flatten_shape sh ly) fields
     | Layout.Product _ -> Misc.fatal_error "unboxed record field mismatch"
     | Layout.Base _ ->
       Misc.fatal_error "unboxed record must have product layout")
