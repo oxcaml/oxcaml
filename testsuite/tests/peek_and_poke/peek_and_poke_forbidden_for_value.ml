@@ -18,34 +18,25 @@ external write : ('a : any mod external_). 'a t -> 'a -> unit = "%poke"
   [@@layout_poly]
 |}]
 
-let bad_read p : string = read p
+type v : value_or_null mod external_
+
+(* CR dkalinichenko: this used to test that peek and poke is forbidden
+   for non-immediate values, but currently, [any mod external] rules them out.
+   We will have non-immediate external values once externality is a modal axis. *)
+
+let bad_read p : v = read p
 [%%expect {|
-Line 1, characters 26-32:
-1 | let bad_read p : string = read p
-                              ^^^^^^
-Error: This expression has type "('a : value_or_null mod external_)"
-       but an expression was expected of type "string"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of
-           value_or_null mod external_
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+type v : value_or_null mod external_
+>> Fatal error: Blambda_of_lambda: (peek
+tagged_immediate) is not supported in bytecode
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
-let bad_write p (s : string) = write p s
+let bad_write p (v : v) = write p v
 [%%expect {|
-Line 1, characters 39-40:
-1 | let bad_write p (s : string) = write p s
-                                           ^
-Error: This expression has type "string" but an expression was expected of type
-         "('a : value_or_null mod external_)"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of
-           value_or_null mod external_
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+>> Fatal error: Blambda_of_lambda: (poke
+tagged_immediate) is not supported in bytecode
+Uncaught exception: Misc.Fatal_error
+
 |}]
