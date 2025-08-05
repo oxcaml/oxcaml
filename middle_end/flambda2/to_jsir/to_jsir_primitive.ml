@@ -131,37 +131,37 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
       identity ~env ~res x
     | (Tagged_immediate | Naked_immediate), Naked_float32 ->
       caml_of "float32" "int"
-    | Naked_float32, (Tagged_immediate | Naked_immediate) ->
-      caml_to "float32" "int"
     | (Tagged_immediate | Naked_immediate), Naked_float -> caml_of "float" "int"
-    | Naked_float, (Tagged_immediate | Naked_immediate) -> caml_of "int" "float"
     | (Tagged_immediate | Naked_immediate), Naked_int32 -> caml_of "int32" "int"
-    | Naked_int32, (Tagged_immediate | Naked_immediate) -> caml_to "int32" "int"
     | (Tagged_immediate | Naked_immediate), Naked_int64 -> caml_of "int64" "int"
-    | Naked_int64, (Tagged_immediate | Naked_immediate) -> caml_to "int64" "int"
     | (Tagged_immediate | Naked_immediate), Naked_nativeint ->
       caml_of "nativeint" "int"
-    | Naked_nativeint, (Tagged_immediate | Naked_immediate) ->
-      caml_to "nativeint" "int"
+    | Naked_float32, (Tagged_immediate | Naked_immediate) ->
+      caml_to "float32" "int"
     | Naked_float32, Naked_float -> caml_of "float" "float32"
-    | Naked_float, Naked_float32 -> caml_of "float32" "float"
     | Naked_float32, Naked_int32 | Naked_int32, Naked_float32 ->
       primitive_not_supported ()
     | Naked_float32, Naked_int64 -> caml_to_bytecode "float32" "int64"
-    | Naked_int64, Naked_float32 -> caml_of_bytecode "float32" "int64"
     | Naked_float32, Naked_nativeint | Naked_nativeint, Naked_float32 ->
       primitive_not_supported ()
+    | Naked_float, (Tagged_immediate | Naked_immediate) -> caml_of "int" "float"
+    | Naked_float, Naked_float32 -> caml_of "float32" "float"
     | Naked_float, Naked_int32 -> caml_of "int32" "float"
-    | Naked_int32, Naked_float -> caml_to "int32" "float"
     | Naked_float, Naked_int64 -> caml_of "int64" "float"
-    | Naked_int64, Naked_float -> caml_to "int64" "float"
     | Naked_float, Naked_nativeint -> caml_of "nativeint" "float"
-    | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
+    | Naked_int32, (Tagged_immediate | Naked_immediate) -> caml_to "int32" "int"
+    | Naked_int32, Naked_float -> caml_to "int32" "float"
     | Naked_int32, Naked_int64 -> caml_of "int64" "int32"
-    | Naked_int64, Naked_int32 -> caml_to "int64" "int32"
     | Naked_int32, Naked_nativeint -> caml_of "nativeint" "int32"
-    | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
+    | Naked_int64, (Tagged_immediate | Naked_immediate) -> caml_to "int64" "int"
+    | Naked_int64, Naked_float32 -> caml_of_bytecode "float32" "int64"
+    | Naked_int64, Naked_float -> caml_to "int64" "float"
+    | Naked_int64, Naked_int32 -> caml_to "int64" "int32"
     | Naked_int64, Naked_nativeint -> caml_to "int64" "nativeint"
+    | Naked_nativeint, (Tagged_immediate | Naked_immediate) ->
+      caml_to "nativeint" "int"
+    | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
+    | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
     | Naked_nativeint, Naked_int64 -> caml_to "nativeint" "int64")
   | Boolean_not -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret ->
