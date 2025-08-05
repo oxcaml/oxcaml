@@ -456,7 +456,8 @@ and expression_desc =
   | Pexp_array of mutable_flag * expression list
       (** [[| E1; ...; En |]] or [[: E1; ...; En :]] *)
   | Pexp_idx of block_access * unboxed_access list
-      (** [(BA1 UA1 UA2 ...)] e.g. [(.foo.#bar.#baz)] *)
+      (** [(BA1 UA1 UA2 ...)] e.g. [(.foo.#bar.#baz)]
+          Above, BA1=.foo, UA1=.#bar, and UA2=#.baz *)
   | Pexp_ifthenelse of expression * expression * expression option
       (** [if E1 then E2 else E3] *)
   | Pexp_sequence of expression * expression  (** [E1; E2] *)

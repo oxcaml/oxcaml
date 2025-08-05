@@ -6462,10 +6462,16 @@ and type_expect_
         (fun () ->
            let res = type_block_access env expected_base_ty principal ba in
            (* This unification is to get a better [base_ty], and is not
-              necessary for safety (thus we discard the failure). For example,
-              if the initial expected base type is [t array], this makes the
-              next base type [t] (which may be critical to disambiguate the
-              unboxed accesses). *)
+              necessary for safety (thus we discard the failure).
+
+              It's safe to throw away the error because if this unification
+              fails, the unification of the expected type and the index type at
+              the end of this case will also fail.
+
+              This helps type checking in cases such as where the initial
+              expected base type is [t array], which makes the next base type
+              [t] (which may be critical to disambiguate the unboxed accesses).
+           *)
            (try unify env res.base_ty expected_base_ty with Unify _ -> ());
            res)
     in
