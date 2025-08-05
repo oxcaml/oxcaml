@@ -140,9 +140,9 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | (Tagged_immediate | Naked_immediate), Naked_int64 -> caml_of "int64" "int"
     | Naked_int64, (Tagged_immediate | Naked_immediate) -> caml_to "int64" "int"
     | (Tagged_immediate | Naked_immediate), Naked_nativeint ->
-      caml_to "nativeint" "int"
-    | Naked_nativeint, (Tagged_immediate | Naked_immediate) ->
       caml_of "nativeint" "int"
+    | Naked_nativeint, (Tagged_immediate | Naked_immediate) ->
+      caml_to "nativeint" "int"
     | Naked_float32, Naked_float -> caml_of "float" "float32"
     | Naked_float, Naked_float32 -> caml_of "float32" "float"
     | Naked_float32, Naked_int32 | Naked_int32, Naked_float32 ->
