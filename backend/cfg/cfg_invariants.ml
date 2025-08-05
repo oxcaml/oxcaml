@@ -245,7 +245,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
             | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll
             | Pause | Alloc _ )
-        | Reloadretaddr | Prologue | Stack_check _ ->
+        | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
           cur_stack_offset)
   in
   if not (Int.equal stack_offset_after_body terminator_stack_offset)

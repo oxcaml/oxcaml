@@ -609,7 +609,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
                   | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Pause)
-  | Poptrap _ | Prologue ->
+  | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
     assert false (* the instruction is added after register allocation *)

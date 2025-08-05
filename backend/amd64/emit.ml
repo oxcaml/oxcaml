@@ -880,22 +880,6 @@ let emit_test i ~(taken : X86_ast.condition -> unit) = function
     I.test (int 1) (arg8 i 0);
     taken E
 
-(* Deallocate the stack frame before a return or tail call *)
-
-let output_epilogue f =
-  if !frame_required
-  then (
-    let n = frame_size () - 8 - if fp then 8 else 0 in
-    if n <> 0
-    then (
-      I.add (int n) rsp;
-      D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp then I.pop rbp;
-    f ();
-    (* reset CFA back cause function body may continue *)
-    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n)
-  else f ()
-
 (* Floating-point constants *)
 
 let float_constants = ref ([] : (int64 * L.t) list)
@@ -1784,6 +1768,17 @@ let emit_instr ~first ~fallthrough i =
       then (
         I.sub (int n) rsp;
         D.cfi_adjust_cfa_offset ~bytes:n)
+  | Lepilogue ->
+    (* Deallocate the stack frame before a return or tail call *)
+    assert !frame_required;
+    let n = frame_size () - 8 - if fp then 8 else 0 in
+    if n <> 0
+    then (
+      I.add (int n) rsp;
+      D.cfi_adjust_cfa_offset ~bytes:(-n));
+    if fp then I.pop rbp;
+    (* reset CFA back cause function body may continue *)
+    if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->
     if Nativeint.equal n 0n
@@ -1858,7 +1853,7 @@ let emit_instr ~first ~fallthrough i =
     add_used_symbol func.sym_name;
     emit_call func;
     record_frame i.live (Dbg_other i.dbg)
-  | Lcall_op Ltailcall_ind -> output_epilogue (fun () -> I.jmp (arg i 0))
+  | Lcall_op Ltailcall_ind -> I.jmp (arg i 0)
   | Lcall_op (Ltailcall_imm { func }) ->
     if String.equal func.sym_name !function_name
     then
@@ -1866,10 +1861,9 @@ let emit_instr ~first ~fallthrough i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point ->
         I.jmp (emit_label_arg ~section:Text tailrec_entry_point)
-    else
-      output_epilogue (fun () ->
-          add_used_symbol func.sym_name;
-          emit_jump func)
+    else (
+      add_used_symbol func.sym_name;
+      emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
     add_used_symbol func;
     if stack_ofs > 0
@@ -2324,7 +2318,7 @@ let emit_instr ~first ~fallthrough i =
     then I.mov (domain_field Domainstate.Domain_dls_root) (res i 0)
     else Misc.fatal_error "Dls is not supported in runtime4."
   | Lreloadretaddr -> ()
-  | Lreturn -> output_epilogue (fun () -> I.ret ())
+  | Lreturn -> I.ret ()
   | Llabel { label = lbl; section_name } ->
     let lbl = label_to_asm_label ~section:Text lbl in
     emit_Llabel fallthrough lbl section_name
@@ -2421,8 +2415,8 @@ let emit_instr ~first ~fallthrough i =
 let rec emit_all ~first ~fallthrough i =
   match i.desc with
   | Lend -> ()
-  | Lprologue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _ | Lop _
-  | Lcall_op _ | Llabel _ | Lbranch _
+  | Lprologue | Lepilogue | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
+  | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
   | Lcondbranch (_, _)
   | Lcondbranch3 (_, _, _)
   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
@@ -2771,8 +2765,8 @@ let emit_probe_handler_wrapper p =
       name, handler_code_sym
     | Lcall_op
         (Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _ | Lextcall _)
-    | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-    | Lop _ | Llabel _ | Lbranch _
+    | Lprologue | Lepilogue | Lend | Lreloadretaddr | Lreturn | Lentertrap
+    | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
@@ -2935,8 +2929,8 @@ let emit_probe_notes0 () =
       | Lcall_op
           ( Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _
           | Lextcall _ )
-      | Lprologue | Lend | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-      | Lop _ | Llabel _ | Lbranch _
+      | Lprologue | Lepilogue | Lend | Lreloadretaddr | Lreturn | Lentertrap
+      | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
       | Lcondbranch (_, _)
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _

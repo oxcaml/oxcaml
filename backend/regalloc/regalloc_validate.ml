@@ -489,7 +489,14 @@ end = struct
     with
     (* The instruction was present before. *)
     | Some { instr = old_instr; successor_id = old_successor_id }, false ->
-      if not (InstructionId.equal old_successor_id successor_id)
+      (* CR cfalas: clean this up *)
+      let successor_instr = Hashtbl.find_opt t.instructions old_successor_id in
+      if not
+           (InstructionId.equal old_successor_id successor_id
+           ||
+           match successor_instr with
+           | Some { instr = { desc = Epilogue; _ }; _ } -> true
+           | _ -> false)
       then
         Regalloc_utils.fatal
           "The instruction's no. %a successor id has changed. Before \

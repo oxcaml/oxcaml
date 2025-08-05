@@ -198,7 +198,8 @@ module Polls_before_prtc_transfer = struct
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ )
-    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
       Ok dom
 
   let terminator :
@@ -360,7 +361,9 @@ let add_poll_or_alloc_basic :
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
-  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> points
+  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
+    ->
+    points
 
 let add_calls_terminator :
     Cfg.terminator Cfg.instruction -> polling_points -> polling_points =

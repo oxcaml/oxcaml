@@ -6,6 +6,7 @@ open! Int_replace_polymorphic_compare [@@warning "-66"]
 let from_basic (basic : basic) : Linear.instruction_desc =
   match basic with
   | Prologue -> Lprologue
+  | Epilogue -> Lepilogue
   | Reloadretaddr -> Lreloadretaddr
   | Pushtrap { lbl_handler } -> Lpushtrap { lbl_handler }
   | Poptrap { lbl_handler } -> Lpoptrap { lbl_handler }
