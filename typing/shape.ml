@@ -848,7 +848,7 @@ let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
   | ( Ts_tuple _,
       ( Product _
       | Base
-          ( Void | Bits8 | Bits16 | Bits32 | Bits64 | Float64 | Float32
+          ( Void | Untagged_immediate | Bits8 | Bits16 | Bits32 | Bits64 | Float64 | Float32
           | Word | Vec128 | Vec256 | Vec512 ) ) ) ->
     Misc.fatal_errorf "tuple shape must have layout value, but has layout %a"
       Layout.format layout
@@ -866,7 +866,7 @@ let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
       (List.length shapes) (List.length lys)
   | ( Ts_unboxed_tuple _,
       Base
-        ( Void | Value | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+        ( Void | Value | Untagged_immediate | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
         | Bits64 | Vec128 | Vec256 | Vec512 ) ) ->
     Misc.fatal_errorf
       "unboxed tuple must have unboxed product layout, but has layout %a"

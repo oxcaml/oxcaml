@@ -119,6 +119,8 @@ module Layout = struct
 
       let word = Base Sort.Word
 
+      let untagged_immediate = Base Sort.Untagged_immediate
+
       let bits8 = Base Sort.Bits8
 
       let bits16 = Base Sort.Bits16
@@ -136,6 +138,7 @@ module Layout = struct
       let of_base : Sort.base -> t = function
         | Value -> value
         | Void -> void
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
@@ -1563,6 +1566,13 @@ module Const = struct
         name = "word mod everything"
       }
 
+    let kind_of_untagged_immediate =
+      { jkind =
+          mk_jkind (Base Untagged_immediate) ~mode_crossing:true
+            ~nullability:Non_null ~separability:Non_float;
+        name = "untagged_immediate mod everything"
+      }
+
     (* CR layouts v3: change to [Maybe_null] when
        [or_null array]s are implemented. *)
     let bits8 =
@@ -2039,7 +2049,7 @@ module Const = struct
       match l, Mod_bounds.nullability jkind.mod_bounds with
       | ( ( Base
               ( Float64 | Float32 | Word | Bits32 | Bits64 | Vec128 | Vec256
-              | Vec512 )
+              | Vec512 | Untagged_immediate )
           | Any ),
           _ )
       | Base Value, Non_null

@@ -497,6 +497,7 @@ and boxed_vector = Primitive.boxed_vector =
 
 and peek_or_poke =
   | Ppp_tagged_immediate
+  | Ppp_untagged_immediate
   | Ppp_unboxed_float32
   | Ppp_unboxed_float
   | Ppp_unboxed_int8
@@ -2224,6 +2225,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Bits16 -> layout_unboxed_int16
   | Base Bits32 -> layout_unboxed_int32
   | Base Bits64 -> layout_unboxed_int64
+  | Base Untagged_immediate -> layout_unboxed_int Unboxed_int
   | Base Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
@@ -2469,6 +2471,7 @@ let primitive_result_layout (p : primitive) =
   | Ppeek layout -> (
       match layout with
       | Ppp_tagged_immediate -> layout_int
+      | Ppp_untagged_immediate -> layout_unboxed_int Unboxed_int
       | Ppp_unboxed_float32 -> layout_unboxed_float Unboxed_float32
       | Ppp_unboxed_float -> layout_unboxed_float Unboxed_float64
       | Ppp_unboxed_int8 -> layout_unboxed_int8

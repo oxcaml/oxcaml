@@ -37,10 +37,12 @@ let constant_int size n : constant =
   match (size : Scalar.any_locality_mode Scalar.Integral.Width.t) with
   | Taggable Int -> Const_int n
   | Taggable Int8 -> Const_int (Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
-  | Taggable Int16 -> Const_int (Numbers.Int16.to_int (Numbers.Int16.of_int_exn n))
+  | Taggable Int16 ->
+    Const_int (Numbers.Int16.to_int (Numbers.Int16.of_int_exn n))
   | Boxable (Int32 Any_locality_mode) -> Const_int32 (Int32.of_int n)
   | Boxable (Int64 Any_locality_mode) -> Const_int64 (Int64.of_int n)
-  | Boxable (Nativeint Any_locality_mode) -> Const_nativeint (Nativeint.of_int n)
+  | Boxable (Nativeint Any_locality_mode) ->
+    Const_nativeint (Nativeint.of_int n)
 
 let const_int size n = Const_base (constant_int size n)
 
@@ -95,7 +97,7 @@ let sign_extend width exp =
     | exp ->
       let width = tagged_immediate bits in
       let int_size = Prim (caml_sys_const Int_size, [unit]) in
-      let unused_bits = Prim (Subint, [int_size;  width]) in
+      let unused_bits = Prim (Subint, [int_size; width]) in
       Prim (Asrint, [Prim (Lslint, [exp; unused_bits]); unused_bits])
   in
   match (width : tagged_integer) with
@@ -491,9 +493,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           comp_expr
             (Lambda.Lprim (Pctconst Word_size, [Lambda.lambda_unit], loc))
         in
-        let element_size =
-          Prim (Lsrint, [word_size; tagged_immediate 3])
-        in
+        let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pfield_computed _sem -> binary Getvectitem

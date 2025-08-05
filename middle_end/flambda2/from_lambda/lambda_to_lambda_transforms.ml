@@ -138,7 +138,7 @@ let rec_catch_for_for_loop env loc ident duid start stop
   in
   let next_value_of_counter : L.lambda =
     match dir with
-    | Upto   -> L.succ int_scalar (Lvar ident) ~loc
+    | Upto -> L.succ int_scalar (Lvar ident) ~loc
     | Downto -> L.pred int_scalar (Lvar ident) ~loc
   in
   let lam : L.lambda =
@@ -216,10 +216,8 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
   let env, initialize =
     let index = Ident.create_local "index" in
     let index_duid = Lambda.debug_uid_none in
-    rec_catch_for_for_loop env loc index index_duid
-      (L.tagged_immediate 0)
-      (L.pred L.int length ~loc)
-      Upto
+    rec_catch_for_for_loop env loc index index_duid (L.tagged_immediate 0)
+      (L.pred L.int length ~loc) Upto
       (Lprim
          ( Parraysetu (array_set_kind, Ptagged_int_index),
            [Lvar array; Lvar index; init],

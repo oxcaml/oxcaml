@@ -533,6 +533,7 @@ and boxed_vector = Primitive.boxed_vector =
 
 and peek_or_poke =
   | Ppp_tagged_immediate
+  | Ppp_untagged_immediate
   | Ppp_unboxed_float32
   | Ppp_unboxed_float
   | Ppp_unboxed_int8

@@ -416,7 +416,7 @@ let mk_add_extension add_extension id args =
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind.Sort.Const.t) with
       | Base Value -> ()
-      | Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
+      | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
              | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _ -> raise_error ())
     args;
@@ -505,7 +505,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type ident_floatarray ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_int
        ~jkind:Jkind.Const.Builtin.immediate
-       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
+       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_immediate
   |> add_type ident_int32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
   |> add_type ident_int64 ~jkind:Jkind.Const.Builtin.immutable_data

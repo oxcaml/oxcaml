@@ -78,7 +78,7 @@ module Integral = struct
       let naked_sort = function
         | Int8 -> Jkind_types.Sort.Const.bits8
         | Int16 -> Jkind_types.Sort.Const.bits16
-        | Int -> Jkind_types.Sort.Const.word
+        | Int -> Jkind_types.Sort.Const.untagged_immediate
     end
 
     include Maybe_naked.Make1 (struct

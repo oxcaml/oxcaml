@@ -1695,6 +1695,7 @@ module Element_repr = struct
       | Base Bits16 -> Unboxed_element Bits16
       | Base Bits32 -> Unboxed_element Bits32
       | Base Bits64 -> Unboxed_element Bits64
+      | Base Untagged_immediate -> Unboxed_element Word
       | Base Vec128 -> Unboxed_element Vec128
       | Base Vec256 -> Unboxed_element Vec256
       | Base Vec512 -> Unboxed_element Vec512

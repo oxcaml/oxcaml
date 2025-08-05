@@ -542,6 +542,11 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           arg_transformer = None;
           return_transformer = None
         } ]
+    | Untagged_immediate ->
+      [ { kind = K.naked_immediate;
+          arg_transformer = None;
+          return_transformer = None
+        } ]
     | Vec128 ->
       [ { kind = K.naked_vec128;
           arg_transformer = None;

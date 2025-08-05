@@ -24,6 +24,9 @@ module type Sort = sig
   type base =
     | Void  (** No run time representation at all *)
     | Value  (** Standard ocaml value representation *)
+    | Untagged_immediate
+        (** Untagged 31- or 63-bit immediates, but without the tag bit, so they must
+        never be visible to the GC *)
     | Float64  (** Unboxed 64-bit floats *)
     | Float32  (** Unboxed 32-bit floats *)
     | Word  (** Unboxed native-size integers *)
@@ -58,6 +61,8 @@ module type Sort = sig
     val float32 : t
 
     val word : t
+
+    val untagged_immediate : t
 
     val bits8 : t
 

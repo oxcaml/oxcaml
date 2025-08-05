@@ -1325,8 +1325,8 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Punboxed_int Unboxed_int32 -> Some Ppp_unboxed_int32
     | Punboxed_int Unboxed_int64 -> Some Ppp_unboxed_int64
     | Punboxed_int Unboxed_nativeint -> Some Ppp_unboxed_nativeint
+    | Punboxed_int Unboxed_int -> Some Ppp_untagged_immediate
     | Pvalue { raw_kind = Pintval ; _ } -> Some Ppp_tagged_immediate
-    | Punboxed_int Unboxed_int
     | Ptop
     | Pvalue _
     | Punboxed_vector _

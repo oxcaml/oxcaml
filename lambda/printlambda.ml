@@ -368,6 +368,7 @@ let field_read_semantics ppf sem =
 let peek_or_poke ppf (pp : peek_or_poke) =
   match pp with
   | Ppp_tagged_immediate -> fprintf ppf "tagged_immediate"
+  | Ppp_untagged_immediate -> fprintf ppf "untagged_immediate"
   | Ppp_unboxed_float32 -> fprintf ppf "unboxed_float32"
   | Ppp_unboxed_float -> fprintf ppf "unboxed_float"
   | Ppp_unboxed_int8 -> fprintf ppf "unboxed_int8"

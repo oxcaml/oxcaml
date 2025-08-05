@@ -74,6 +74,7 @@ let standard_int_or_float_of_peek_or_poke (layout : L.peek_or_poke) :
     K.Standard_int_or_float.t =
   match layout with
   | Ppp_tagged_immediate -> Tagged_immediate
+  | Ppp_untagged_immediate -> Naked_immediate
   | Ppp_unboxed_float32 -> Naked_float32
   | Ppp_unboxed_float -> Naked_float
   | Ppp_unboxed_int8 -> Naked_int8
@@ -1452,7 +1453,7 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
         (* CR-someday jvanburen: Untagging int8/16 is not the sleekest. we
            should be able to untag without a Num_conv primitive, maybe by making
            subkinds of Tagged_immediate *)
-        let arg : H.expr_primitive = (Unary (Untag_immediate, arg)) in
+        let arg : H.expr_primitive = Unary (Untag_immediate, arg) in
         let src = I_or_f.Naked_immediate in
         match width with
         | Int8 -> Unary (Num_conv { src; dst = Naked_int8 }, Prim arg)
