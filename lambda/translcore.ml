@@ -1108,7 +1108,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             List.fold_left (fun (body, pos) id ->
               Llet(Alias, Lambda.layout_module_field, id,
                    Lambda.debug_uid_none,
-                   Lprim(mod_field pos, [Lvar oid],
+                   Lprim(mod_field pos (Module_value_only (-1)), [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)

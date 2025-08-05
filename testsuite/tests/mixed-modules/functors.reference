@@ -1,6 +1,12 @@
 Test 1: no coercion in or out
 1.
-0+1
-Test 4: coercion in and out
+1
+Test 2: coercion in, no coercion out
+11.
+10+1
+Test 3: coercion out, no coercion in
 4.
-2*2
+(1+1)*2
+Test 4: coercion in and out
+6.
+(3)*2
