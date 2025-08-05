@@ -317,24 +317,22 @@ Error: The type constructor "t#" expects 1 argument(s),
 (*******************************************)
 (* Type recursion through unboxed versions *)
 
-type t = int
-and ok = t#
+type t = string
+and bad = t#
 [%%expect{|
-type t = int
-and ok = t#
+Line 2, characters 0-12:
+2 | and bad = t#
+    ^^^^^^^^^^^^
+Error: The type "t" has no unboxed version.
 |}]
 
-type t = int
+type t = string
 and bad = t# * t#
 [%%expect{|
-Line 1, characters 0-12:
-1 | type t = int
-    ^^^^^^^^^^^^
-Error:
-       The layout of t# is word
-         because it is the unboxed version of the primitive type int.
-       But the layout of t# must be a sublayout of value
-         because it's the type of a tuple element.
+Line 2, characters 0-17:
+2 | and bad = t# * t#
+    ^^^^^^^^^^^^^^^^^
+Error: The type "t" has no unboxed version.
 |}]
 
 type bad_a = X of bad_b#
@@ -347,12 +345,15 @@ Error: The type "bad_b" has no unboxed version.
 |}]
 
 type a = b
-and b = int
+and b = string
 type bad = a#
 [%%expect{|
 type a = b
-and b = int
-type bad = a#
+and b = string
+Line 3, characters 11-13:
+3 | type bad = a#
+               ^^
+Error: The type "a" has no unboxed version.
 |}]
 
 (* Recursive modules *)
@@ -378,13 +379,15 @@ end = struct
   type t = Bad2.t#
 end
 and Bad2 : sig
-  type t = int
+  type t = string
 end = struct
-  type t = int
+  type t = string
 end
 [%%expect{|
-module rec Bad1 : sig type t = Bad2.t# end
-and Bad2 : sig type t = int end
+Line 2, characters 11-18:
+2 |   type t = Bad2.t#
+               ^^^^^^^
+Error: The type "Bad2.t" has no unboxed version.
 |}]
 
 module rec Bad1 : sig
@@ -741,23 +744,12 @@ Error: In this "with" constraint, the new definition of "t"
 (* Can't substitute an unboxed version for a nonexistent unboxed version *)
 module type Bad = sig
   type t = float#
-end with type t := int#
+end with type t := string#
 [%%expect{|
-Lines 1-3, characters 18-23:
-1 | ..................sig
-2 |   type t = float#
-3 | end with type t := int#
-Error: In this "with" constraint, the new definition of "t"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type t = int#
-       is not included in
-         type t = float#
-       The type "int#" is not equal to the type "float/1#" = "float/2#"
-       Line 1, characters 0-20:
-         Definition of type "float/1"
-       File "_none_", line 1:
-         Definition of type "float/2"
+Line 3, characters 19-26:
+3 | end with type t := string#
+                       ^^^^^^^
+Error: The type "string" has no unboxed version.
 |}]
 
 (* Test subst when a decl's type_unboxed_version over-approximately [None]
@@ -903,17 +895,16 @@ module type S = sig
   module type x
   module M:x
 end
-with module type x = sig type t = int end
+with module type x = sig type t = string end
 module Bad (M : S) = struct
   let id : M.M.t# -> r# = fun x -> x
 end
 [%%expect{|
-module type S = sig module type x = sig type t = int end module M : x end
-Line 7, characters 35-36:
+module type S = sig module type x = sig type t = string end module M : x end
+Line 7, characters 11-17:
 7 |   let id : M.M.t# -> r# = fun x -> x
-                                       ^
-Error: This expression has type "M.M.t#" = "int#"
-       but an expression was expected of type "r#"
+               ^^^^^^
+Error: The type "M.M.t" has no unboxed version.
 |}]
 
 (* Destructive substition *)
@@ -939,13 +930,16 @@ module type S = sig
   module type x
   module M:x
 end
-with module type x := sig type t = int end
+with module type x := sig type t = string end
 module Bad (M : S) = struct
   type u = M.M.t#
 end
 [%%expect{|
-module type S = sig module M : sig type t = int end end
-module Bad : functor (M : S) -> sig type u = M.M.t# end
+module type S = sig module M : sig type t = string end end
+Line 7, characters 11-17:
+7 |   type u = M.M.t#
+               ^^^^^^
+Error: The type "M.M.t" has no unboxed version.
 |}]
 
 (***********************)
@@ -991,17 +985,18 @@ module F :
 
 (* No unboxed version *)
 module type S = sig type t end
-type m = (module S with type t = int)
+type m = (module S with type t = string)
 module Bad (X : sig val x : m end) = struct
   module M = (val X.x)
   type u = M.t#
 end
 [%%expect{|
 module type S = sig type t end
-type m = (module S with type t = int)
-module Bad :
-  functor (X : sig val x : m end) ->
-    sig module M : sig type t = int end type u = M.t# end
+type m = (module S with type t = string)
+Line 5, characters 11-15:
+5 |   type u = M.t#
+               ^^^^
+Error: The type "M.t" has no unboxed version.
 |}]
 
 (******************************)
