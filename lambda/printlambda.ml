@@ -182,7 +182,8 @@ let rec mixed_block_element print_value_kind ppf el =
   | Product shape ->
         fprintf ppf "product %a"
           (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-                     (mixed_block_element print_value_kind)) (Array.to_list shape)
+                     (mixed_block_element print_value_kind))
+            (Array.to_list shape)
 
 
 let constructor_shape print_value_kind ppf shape =
@@ -717,28 +718,36 @@ let primitive ppf = function
        (if boxed then "" else "#") array_index_kind index_kind
   | Pfloatarray_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "floatarray.%sget128%s%s"
-       (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+       (if unsafe then "unsafe_" else "")
+       (if boxed then "" else "#") (locality_kind mode)
   | Pfloat_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "float_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Pint_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "int_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_float_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_float32_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float32_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_int32_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int32_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_int64_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int64_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_nativeint_array_load_vec {unsafe; mode; boxed} ->
      fprintf ppf "unboxed_nativeint_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#") (locality_kind mode)
+      (if unsafe then "unsafe_" else "")
+      (if boxed then "" else "#") (locality_kind mode)
   | Pfloatarray_set_vec {unsafe; boxed} ->
      fprintf ppf "floatarray.%sset128%s"
       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")

@@ -88,7 +88,8 @@ let min_int () = succ (max_int ())
 
 let[@inline] unsigned_to_int t = to_int t land ((1 lsl size) - 1)
 
-let[@inline] unsigned_compare n m = compare (sub n (min_int ())) (sub m (min_int ()))
+let[@inline] unsigned_compare n m =
+  compare (sub n (min_int ())) (sub m (min_int ()))
 
 let[@inline] unsigned_lt n m = sub n (min_int ()) < sub m (min_int ())
 

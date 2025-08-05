@@ -260,7 +260,8 @@ let print p osig_val_decl =
     | _, Unboxed_integer (Unboxed_int | Unboxed_int8 | Unboxed_int16) -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
-    | _, Unboxed_integer (Unboxed_int64 | Unboxed_int32 | Unboxed_nativeint) -> true
+    | _, Unboxed_integer (Unboxed_int64 | Unboxed_int32 | Unboxed_nativeint) ->
+      true
     | _, Same_as_ocaml_repr _ ->
       (* We require [@unboxed] for non-value types in upstream-compatible code,
          but treat it as optional otherwise. We thus print the [@unboxed]
@@ -854,10 +855,13 @@ let prim_has_valid_reprs ~loc prim =
               let module I = Scalar.Intrinsic in
               match I.With_percent_prefix.of_string name with
               | intrinsic ->
-                exactly (List.map (fun sort -> Same_as_ocaml_repr sort) (I.sort intrinsic))
+                exactly
+                  (List.map (fun sort -> Same_as_ocaml_repr sort)
+                     (I.sort intrinsic))
               | exception Not_found ->
                 if is_builtin_prim_name name then no_non_value_repr
-                  (* These can probably support non-value reprs if the need arises:
+                  (* These can probably support non-value reprs if the
+                     need arises:
                      {|
                        | "%send"
                        | "%sendself"

@@ -165,9 +165,9 @@ type primitive =
   (* Boolean operations *)
   | Psequand | Psequor | Pnot
   | Pphys_equal of Phys_equal.t
-  (** Unlike in the language specification, the compiler defines physical equality
-     as referential equality on all values, including immediates and immutable
-     blocks. *)
+  (** Unlike in the language specification, the compiler defines physical
+      equality as referential equality on all values, including immediates
+      and immutable blocks. *)
   (* Scalar operations *)
   | Pscalar of locality_mode Scalar.Intrinsic.t
   | Poffsetref of int

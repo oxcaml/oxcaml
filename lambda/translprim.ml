@@ -992,8 +992,10 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_unit" -> Primitive(Punbox_unit, 1)
-    | "%unbox_nativeint" -> static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
-    | "%box_nativeint" -> static_cast ~src:(naked (i nativeint)) ~dst:(i nativeint)
+    | "%unbox_nativeint" ->
+      static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
+    | "%box_nativeint" ->
+      static_cast ~src:(naked (i nativeint)) ~dst:(i nativeint)
     | "%untag_int8" -> static_cast ~src:(i int8) ~dst:(naked (i int8))
     | "%tag_int8" -> static_cast ~src:(naked (i int8)) ~dst:(i int8)
     | "%untag_int16" -> static_cast ~src:(i int16) ~dst:(naked (i int16))
@@ -1019,11 +1021,13 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
            | Some prim -> prim ~mode
            | None ->
              match Scalar.Intrinsic.With_percent_prefix.of_string s with
-             | exception Not_found -> raise (Error (loc, Unknown_builtin_primitive s))
+             | exception Not_found ->
+               raise (Error (loc, Unknown_builtin_primitive s))
              | intrinsic ->
                let arity = Scalar.Intrinsic.arity intrinsic in
                let intrinsic =
-                 Scalar.Intrinsic.map intrinsic ~f:(fun Any_locality_mode -> mode)
+                 Scalar.Intrinsic.map intrinsic
+                   ~f:(fun Any_locality_mode -> mode)
                in
                (Primitive (Pscalar intrinsic, arity)))
   in
@@ -2159,8 +2163,10 @@ let lambda_primitive_needs_event_after = function
   | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pisnull | Pisout
   | Pprobe_is_enabled _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-  | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_compare_set_field _ | Patomic_fetch_add_field
+  | Patomic_add_field | Patomic_sub_field
+  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+  | Patomic_load_field _ | Patomic_set_field _
   | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Pobj_magic _ | Punbox_vector _ | Punbox_unit
