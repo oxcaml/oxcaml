@@ -2296,7 +2296,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
   | Texp_array (_, _, es, _) ->
     UF.pars (List.map (fun e -> check_uniqueness_exp ~overwrite:None ienv e) es)
-  | Texp_idx (ba, uas) ->
+  | Texp_idx (ba, _uas) ->
     let block_access = function
       | Baccess_field _ -> UF.unused
       | Baccess_array
@@ -2310,8 +2310,10 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
         check_uniqueness_exp ~overwrite:None ienv index
       | Baccess_block (_, idx) -> check_uniqueness_exp ~overwrite:None ienv idx
     in
-    let unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
-    UF.pars (block_access ba :: List.map unboxed_access uas)
+    (* All unboxed accesses are unused, but we include the below match in case
+       we add new unboxed access types *)
+    let _unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
+    block_access ba
   | Texp_ifthenelse (if_, then_, else_opt) ->
     (* if' is only borrowed, not used; but probably doesn't matter because of
        mode crossing *)

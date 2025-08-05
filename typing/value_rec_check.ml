@@ -738,7 +738,7 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_array (_, elt_sort, exprs, _) ->
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       list expression exprs << array_mode exp elt_sort
-    | Texp_idx (ba, uas) ->
+    | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
         | Baccess_array
@@ -752,10 +752,10 @@ let rec expression : Typedtree.expression -> term_judg =
         | Baccess_block (_, idx) ->
           expression idx << Dereference
       in
-      let unboxed_access = function
-        | Uaccess_unboxed_field _ -> empty
-      in
-      join (block_access ba :: List.map unboxed_access uas)
+      (* All unboxed accesses are nonrecursive, but we include the below match
+         in case we add new unboxed access types *)
+      let _unboxed_access = function Uaccess_unboxed_field _ -> empty in
+      block_access ba
     | Texp_list_comprehension { comp_body; comp_clauses } ->
       join ((expression comp_body << Guard) ::
             comprehension_clauses comp_clauses)

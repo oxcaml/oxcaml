@@ -4369,7 +4369,7 @@ let rec is_nonexpansive exp =
       && is_nonexpansive_opt (Option.map fst extended_expression)
   | Texp_field(exp, _, _, _, _, _) -> is_nonexpansive exp
   | Texp_unboxed_field(exp, _, _, _, _) -> is_nonexpansive exp
-  | Texp_idx (ba, uas) ->
+  | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> true
         | Baccess_array
@@ -4382,10 +4382,10 @@ let rec is_nonexpansive exp =
           is_nonexpansive index
         | Baccess_block (_, idx) -> is_nonexpansive idx
       in
-      let unboxed_access = function
-        | Uaccess_unboxed_field _ -> true
-      in
-      block_access ba && List.for_all unboxed_access uas
+      (* All unboxed accesses are nonexpansive, but we include the below match
+         in case we add new unboxed access types *)
+      let _unboxed_access = function Uaccess_unboxed_field _ -> true in
+      block_access ba
   | Texp_ifthenelse(_cond, ifso, ifnot) ->
       is_nonexpansive ifso && is_nonexpansive_opt ifnot
   | Texp_sequence (_e1, _jkind, e2) -> is_nonexpansive e2  (* PR#4354 *)
