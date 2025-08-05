@@ -1274,8 +1274,10 @@ val reset: unit -> unit
     Module accesses are always immutable, except in translobj where the
     method cache is stored in a mutable module field.
 *)
-(* CR jrayman: [mod_field] and [mod_setfield] assume non-mixed blocks *)
-val mod_field: ?read_semantics: field_read_semantics -> int -> primitive
+val mod_field:
+  ?read_semantics: field_read_semantics -> int ->
+  module_representation -> primitive
+(* CR jrayman: check if [mod_setfield] needs module repr *)
 val mod_setfield: int -> primitive
 
 val structured_constant_layout : structured_constant -> layout
