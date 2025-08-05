@@ -33,16 +33,16 @@ open Stdlib_upstream_compatible
 let _fail_when_no_extensions () = (.contents)
 
 external[@layout_poly] makearray_dynamic :
-  ('a : any_non_null). int -> ('a [@local_opt]) -> ('a array [@local_opt]) =
+  ('a : any mod separable). int -> ('a [@local_opt]) -> ('a array [@local_opt]) =
   "%makearray_dynamic"
 external[@layout_poly] makearray_dynamic_local :
-  ('a : any_non_null) . int -> 'a -> 'a array @ local =
+  ('a : any mod separable) . int -> 'a -> 'a array @ local =
   "%makearray_dynamic"
 external[@layout_poly] get :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a =
   "%array_safe_get"
 external[@layout_poly] set :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
   "%array_safe_set"
 
 (*******************************************************)
