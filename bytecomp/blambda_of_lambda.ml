@@ -532,15 +532,17 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [index] ->
         let index =
           match ik with
-          | Ptagged_int_index -> comp_expr index
+          | Ptagged_int_index
+          (* int8/int16 are already tagged ints on bytecode
+             (note: this is untested, as there is no frontend support for
+             small-int block indices) *)
+          | Punboxed_int_index Unboxed_int8
+          | Punboxed_int_index Unboxed_int16 ->
+            comp_expr index
           | Punboxed_int_index Unboxed_int64 ->
             unary (Ccall "caml_int64_to_int")
           | Punboxed_int_index Unboxed_int32 ->
             unary (Ccall "caml_int32_to_int")
-          (* CR rtjoa: these small int fns don't exist *)
-          | Punboxed_int_index Unboxed_int16 ->
-            unary (Ccall "caml_int16_to_int")
-          | Punboxed_int_index Unboxed_int8 -> unary (Ccall "caml_int8_to_int")
           | Punboxed_int_index Unboxed_nativeint ->
             unary (Ccall "caml_nativeint_to_int")
         in

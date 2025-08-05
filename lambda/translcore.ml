@@ -2373,6 +2373,7 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
     let index_sort, index_kind = match index_kind with
+      (* CR layouts v8: support small ints *)
       | Index_int ->
         Jkind.Sort.Const.value, Ptagged_int_index
       | Index_unboxed_int64 ->
