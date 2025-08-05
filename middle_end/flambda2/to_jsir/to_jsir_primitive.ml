@@ -33,8 +33,6 @@ let use_prim ~env ~res prim args =
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
 
-(* CR selee: implement primitives *)
-
 let nullary ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
   match f with
