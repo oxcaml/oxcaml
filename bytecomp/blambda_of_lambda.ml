@@ -532,13 +532,13 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [index] ->
         let index =
           match ik with
-          | Ptagged_int_index
-          (* int8/int16 are already tagged ints on bytecode
-             (note: this is untested, as there is no frontend support for
-             small-int block indices) *)
-          | Punboxed_int_index Unboxed_int8
-          | Punboxed_int_index Unboxed_int16 ->
-            comp_expr index
+          | Ptagged_int_index -> comp_expr index
+          | Punboxed_int_index (Unboxed_int8 | Unboxed_int16) ->
+            (* [int8#]/[int16#] are already tagged ints on bytecode, so this
+               case is likely implemented by [comp_expr index]. But this should
+               be unreachable as the frontend doesn't support these indices. *)
+            Misc.fatal_error
+              "Array block indices with small int indices not expected"
           | Punboxed_int_index Unboxed_int64 ->
             unary (Ccall "caml_int64_to_int")
           | Punboxed_int_index Unboxed_int32 ->
