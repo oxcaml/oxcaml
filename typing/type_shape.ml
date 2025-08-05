@@ -680,120 +680,144 @@ let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
 
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
-let rec unfold_and_evaluate subst_type subst_constr (t : Shape.t) =
-  (* we special case the case where the head is a projection, because of
-     recursive unfolding *)
-  let head, args = decompose_application t in
-  let maybe_evaluated_shape =
-    match head.Shape.desc with
-    | Proj_decl (str, i) -> (
-      let args = List.map (unfold_and_evaluate subst_type subst_constr) args in
-      let str = unfold_and_evaluate subst_type subst_constr str in
-      match str.Shape.desc with
-      | Mutrec ts ->
-        let rec_binder = Recursive_binder.mk_recursive_binder () in
-        let subst_constr = update_subst_with_mutrec_decl subst_constr str ts in
-        let subst_constr =
-          update_subst_with_id_arg_binder subst_constr i args rec_binder
+let rec unfold_and_evaluate ~depth subst_type subst_constr (t : Shape.t) =
+  if depth >= 3
+  then Shape.leaf' None
+  else
+    let depth = depth + 1 in
+    (* we special case the case where the head is a projection, because of
+       recursive unfolding *)
+    let head, args = decompose_application t in
+    let maybe_evaluated_shape =
+      match head.Shape.desc with
+      | Proj_decl (str, i) -> (
+        let args =
+          List.map (unfold_and_evaluate ~depth subst_type subst_constr) args
         in
-        let ts = Ident.Map.find i ts in
-        unfold_and_evaluate subst_type subst_constr (Shape.app_list ts args)
-        |> Recursive_binder.bind_recursive_binder ~preserve_uid:false rec_binder
-        |> Option.some
-      | _ -> assert false
-      (* projections are always directly applied to the mutrec *))
-    | _ -> None
-  in
-  match maybe_evaluated_shape with
-  | Some t -> t
-  | None -> (
-    match t.desc with
-    | Var id -> (
-      match Ident.Map.find_opt id subst_type with
-      | Some t -> t
-      | None -> Shape.leaf' None (* free type variable should not happen *))
-    | Constr (id, constr_args) -> (
-      let constr_args =
-        List.map (unfold_and_evaluate subst_type subst_constr) constr_args
-      in
-      match find_constr_id_with_args subst_constr id constr_args with
-      | Some t -> Recursive_binder.use_recursive_binder t
-      | None -> (
-        match find_mut_rec_shape subst_constr id with
-        | Some t ->
-          unfold_and_evaluate subst_type subst_constr
-            (Shape.app_list t constr_args)
-        | None -> Shape.leaf' None))
-    | App (f, arg) -> (
-      let f = unfold_and_evaluate subst_type subst_constr f in
-      let arg = unfold_and_evaluate subst_type subst_constr arg in
-      match f.Shape.desc with
-      | Abs (x, s') ->
-        unfold_and_evaluate (Ident.Map.add x arg subst_type) subst_constr s'
-      | _ -> Shape.app f ~arg)
-    | Proj_decl _ -> assert false (* see [maybe_evaluated_shape] above *)
-    | Variant { simple_constructors; complex_constructors } ->
-      let complex_constructors =
-        Shape.complex_constructors_map
-          (fun ((sh, ly) : Shape.t * _) ->
-            unfold_and_evaluate subst_type subst_constr sh, ly)
-          complex_constructors
-      in
-      Shape.variant simple_constructors complex_constructors
-    | Record { fields; kind } ->
-      Shape.record kind
-        (List.map
-           (fun ((name, sh, ly) : _ * Shape.t * _) ->
-             name, unfold_and_evaluate subst_type subst_constr sh, ly)
-           fields)
-    | Poly_variant constrs ->
-      Shape.poly_variant
-        (Shape.poly_variant_constructors_map
-           (fun (sh : Shape.t) ->
-             unfold_and_evaluate subst_type subst_constr sh)
-           constrs)
-    | Arrow (arg, ret) ->
-      Shape.arrow
-        (unfold_and_evaluate subst_type subst_constr arg)
-        (unfold_and_evaluate subst_type subst_constr ret)
-    | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
-      Shape.variant_unboxed name arg_name
-        (unfold_and_evaluate subst_type subst_constr arg_shape)
-        arg_layout
-    | Proj (t, i) ->
-      Shape.proj (unfold_and_evaluate subst_type subst_constr t) i
-    | Tuple args ->
-      Shape.tuple
-        (List.map
-           (fun (sh : Shape.t) ->
-             unfold_and_evaluate subst_type subst_constr sh)
-           args)
-    | Unboxed_tuple args ->
-      Shape.unboxed_tuple
-        (List.map
-           (fun (sh : Shape.t) ->
-             unfold_and_evaluate subst_type subst_constr sh)
-           args)
-    | Predef (p, args) ->
-      Shape.predef p
-        (List.map
-           (fun (sh : Shape.t) ->
-             unfold_and_evaluate subst_type subst_constr sh)
-           args)
-    | Mu body -> Shape.mu (unfold_and_evaluate subst_type subst_constr body)
-    | Alias t -> Shape.alias (unfold_and_evaluate subst_type subst_constr t)
-    | Struct items ->
-      Shape.str
-        (Shape.Item.Map.map
-           (fun (sh : Shape.t) ->
-             unfold_and_evaluate subst_type subst_constr sh)
-           items)
-    (* normal forms for CBV evaluation *)
-    | Mutrec _ | Abs _ | Error _ | Comp_unit _ | Rec_var _ | Leaf ->
-      t (* normal form in this CBV evaluation *))
+        let str = unfold_and_evaluate ~depth subst_type subst_constr str in
+        match str.Shape.desc with
+        | Mutrec ts ->
+          let rec_binder = Recursive_binder.mk_recursive_binder () in
+          let subst_constr =
+            update_subst_with_mutrec_decl subst_constr str ts
+          in
+          let subst_constr =
+            update_subst_with_id_arg_binder subst_constr i args rec_binder
+          in
+          let ts = Ident.Map.find i ts in
+          unfold_and_evaluate ~depth subst_type subst_constr
+            (Shape.app_list ts args)
+          |> Recursive_binder.bind_recursive_binder ~preserve_uid:false
+               rec_binder
+          |> Option.some
+        | Leaf -> None
+        | _ -> assert false
+        (* projections are always directly applied to the mutrec *))
+      | _ -> None
+    in
+    match maybe_evaluated_shape with
+    | Some t -> t
+    | None -> (
+      match t.desc with
+      | Var id -> (
+        match Ident.Map.find_opt id subst_type with
+        | Some t -> t
+        | None -> Shape.leaf' None (* free type variable should not happen *))
+      | Constr (id, constr_args) -> (
+        let constr_args =
+          List.map
+            (unfold_and_evaluate ~depth subst_type subst_constr)
+            constr_args
+        in
+        match find_constr_id_with_args subst_constr id constr_args with
+        | Some t -> Recursive_binder.use_recursive_binder t
+        | None -> (
+          match find_mut_rec_shape subst_constr id with
+          | Some t ->
+            unfold_and_evaluate ~depth subst_type subst_constr
+              (Shape.app_list t constr_args)
+          | None -> Shape.leaf' None))
+      | App (f, arg) -> (
+        let f = unfold_and_evaluate ~depth subst_type subst_constr f in
+        let arg = unfold_and_evaluate ~depth subst_type subst_constr arg in
+        match f.Shape.desc with
+        | Abs (x, s') ->
+          unfold_and_evaluate ~depth
+            (Ident.Map.add x arg subst_type)
+            subst_constr s'
+        | _ -> Shape.app f ~arg)
+      | Proj_decl _ ->
+        Shape.leaf' None
+        (* only possible for the [Leaf] case, see [maybe_evaluated_shape] above *)
+      | Variant { simple_constructors; complex_constructors } ->
+        let complex_constructors =
+          Shape.complex_constructors_map
+            (fun ((sh, ly) : Shape.t * _) ->
+              unfold_and_evaluate ~depth subst_type subst_constr sh, ly)
+            complex_constructors
+        in
+        Shape.variant simple_constructors complex_constructors
+      | Record { fields; kind } ->
+        Shape.record kind
+          (List.map
+             (fun ((name, sh, ly) : _ * Shape.t * _) ->
+               name, unfold_and_evaluate ~depth subst_type subst_constr sh, ly)
+             fields)
+      | Poly_variant constrs ->
+        Shape.poly_variant
+          (Shape.poly_variant_constructors_map
+             (fun (sh : Shape.t) ->
+               unfold_and_evaluate ~depth subst_type subst_constr sh)
+             constrs)
+      | Arrow (arg, ret) ->
+        Shape.arrow
+          (unfold_and_evaluate ~depth subst_type subst_constr arg)
+          (unfold_and_evaluate ~depth subst_type subst_constr ret)
+      | Variant_unboxed { name; arg_name; arg_shape; arg_layout } ->
+        Shape.variant_unboxed name arg_name
+          (unfold_and_evaluate ~depth subst_type subst_constr arg_shape)
+          arg_layout
+      | Proj (t, i) ->
+        Shape.proj (unfold_and_evaluate ~depth subst_type subst_constr t) i
+      | Tuple args ->
+        Shape.tuple
+          (List.map
+             (fun (sh : Shape.t) ->
+               unfold_and_evaluate ~depth subst_type subst_constr sh)
+             args)
+      | Unboxed_tuple args ->
+        Shape.unboxed_tuple
+          (List.map
+             (fun (sh : Shape.t) ->
+               unfold_and_evaluate ~depth subst_type subst_constr sh)
+             args)
+      | Predef (p, args) ->
+        Shape.predef p
+          (List.map
+             (fun (sh : Shape.t) ->
+               unfold_and_evaluate ~depth subst_type subst_constr sh)
+             args)
+      | Mu body ->
+        Shape.mu (unfold_and_evaluate ~depth subst_type subst_constr body)
+      | Alias t ->
+        Shape.alias (unfold_and_evaluate ~depth subst_type subst_constr t)
+      | Struct items ->
+        Shape.str
+          (Shape.Item.Map.map
+             (fun (sh : Shape.t) ->
+               unfold_and_evaluate ~depth subst_type subst_constr sh)
+             items)
+      (* normal forms for CBV evaluation *)
+      | Mutrec _ | Abs _ | Error _ | Comp_unit _ | Rec_var _ | Leaf ->
+        t (* normal form in this CBV evaluation *))
 
+(* CR sspies: The performance of this evaluation is quite poor, requiring us to
+   limit the depth to about 3 at the moment. Improve it using caching to make it
+   possible to have deeper shapes. *)
 let unfold_and_evaluate t =
-  unfold_and_evaluate Ident.Map.empty (Ident.Map.empty, Ident.Map.empty) t
+  unfold_and_evaluate ~depth:0 Ident.Map.empty
+    (Ident.Map.empty, Ident.Map.empty)
+    t
 
 type shape_with_layout =
   { type_shape : Shape.t;
