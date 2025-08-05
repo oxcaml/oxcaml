@@ -2993,7 +2993,7 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
 (* Make the initial environment, without language extensions *)
-let initial =
+let initial () =
   let add_type_and_remember_decl (type_ident : Ident.t) decl env =
     if !Clflags.use_old_merlin_shapes then
       add_type type_ident decl env ~check:false
@@ -3022,7 +3022,7 @@ let add_language_extension_types env =
     | false -> env
   in
   lazy
-    Language_extension.(env
+    Language_extension.(env ()
     |> add SIMD Stable Predef.add_simd_stable_extension_types
     |> add SIMD Beta Predef.add_simd_beta_extension_types
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
