@@ -1448,15 +1448,15 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
     (* First, untag/unbox the value if necessary, then do the conversion. *)
     let arg : H.expr_primitive =
       match (src : L.any_locality_mode Scalar.Width.t) with
-      | Integral width -> (
+      | Integral (Taggable width) -> (
         (* CR-someday jvanburen: Untagging int8/16 is not the sleekest. we
            should be able to untag without a Num_conv primitive, maybe by making
            subkinds of Tagged_immediate *)
-        let arg : H.simple_or_prim = Prim (Unary (Untag_immediate, arg)) in
+        let arg : H.expr_primitive = (Unary (Untag_immediate, arg)) in
         let src = I_or_f.Naked_immediate in
         match width with
-        | Int8 -> Unary (Num_conv { src; dst = Naked_int8 }, arg)
-        | Int16 -> Unary (Num_conv { src; dst = Naked_int16 }, arg)
+        | Int8 -> Unary (Num_conv { src; dst = Naked_int8 }, Prim arg)
+        | Int16 -> Unary (Num_conv { src; dst = Naked_int16 }, Prim arg)
         | Int -> arg)
       | Integral (Boxable (Int32 Any_locality_mode)) ->
         Unary (Unbox_number Naked_int32, arg)
