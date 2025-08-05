@@ -132,13 +132,12 @@ type 'a t : immutable_data = Foo of { mutable x : 'a }
 Line 1, characters 0-54:
 1 | type 'a t : immutable_data = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding
+Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
 
        The first mode-crosses less than the second along:
-         linearity: mod many with 'a ≰ mod many
          contention: mod uncontended ≰ mod contended
          portability: mod portable with 'a ≰ mod portable
          statefulness: mod stateless with 'a ≰ mod stateless
@@ -275,7 +274,7 @@ type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
 Line 1, characters 0-62:
 1 | type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding
+Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.

@@ -181,18 +181,19 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : mutable_data with 'a end
        is not included in
-         sig type 'a t : mutable_data with 'a @@ unyielding end
+         sig type 'a t : mutable_data with 'a @@ unyielding many end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
-         type 'a t : mutable_data with 'a @@ unyielding
+         type 'a t : mutable_data with 'a @@ unyielding many
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
        But the kind of the first must be a subkind of mutable_data
-         with 'a @@ unyielding
+         with 'a @@ unyielding many
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many
          yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
@@ -202,7 +203,7 @@ end = struct
   type 'a t : mutable_data with 'a @@ many unyielding
 end
 [%%expect {|
-module M : sig type 'a t : mutable_data with 'a @@ unyielding end
+module M : sig type 'a t : mutable_data with 'a @@ unyielding many end
 |}]
 
 (* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data *)

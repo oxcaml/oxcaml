@@ -86,7 +86,6 @@ Error: The kind of type "'a F(Ref).t" is mutable_data
          because of the definition of t at line 4, characters 0-38.
 
        The first mode-crosses less than the second along:
-         linearity: mod many with 'a ≰ mod many
          portability: mod portable with 'a ≰ mod portable
          statefulness: mod stateless with 'a ≰ mod stateless
 |}]
