@@ -1447,19 +1447,17 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
   | Value src, dst ->
     (* First, untag/unbox the value if necessary, then do the conversion. *)
     let arg : H.expr_primitive =
-      match src with
-      | Integral (Taggable width) ->
-        (* CR jvanburen: Untagging int8/16 is not the sleekest. we should be
-           able to untag without a Num_conv primitive, maybe by making subkinds
-           of Tagged_immediate *)
-        let arg : H.simple_or_prim =
-          let src = I_or_f.Naked_immediate in
-          match width with
-          | Int8 -> Prim (Unary (Num_conv { src; dst = Naked_int8 }, arg))
-          | Int16 -> Prim (Unary (Num_conv { src; dst = Naked_int16 }, arg))
-          | Int -> arg
-        in
-        Unary (Untag_immediate, arg)
+      match (src : L.any_locality_mode Scalar.Width.t) with
+      | Integral width -> (
+        (* CR-someday jvanburen: Untagging int8/16 is not the sleekest. we
+           should be able to untag without a Num_conv primitive, maybe by making
+           subkinds of Tagged_immediate *)
+        let arg : H.simple_or_prim = Prim (Unary (Untag_immediate, arg)) in
+        let src = I_or_f.Naked_immediate in
+        match width with
+        | Int8 -> Unary (Num_conv { src; dst = Naked_int8 }, arg)
+        | Int16 -> Unary (Num_conv { src; dst = Naked_int16 }, arg)
+        | Int -> arg)
       | Integral (Boxable (Int32 Any_locality_mode)) ->
         Unary (Unbox_number Naked_int32, arg)
       | Integral (Boxable (Int64 Any_locality_mode)) ->
@@ -1515,10 +1513,8 @@ let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
     Prim (Unary (Num_conv { src; dst }, arg))
 
 and static_cast ~(src : L.any_locality_mode Scalar.t)
-    ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region :
-    H.simple_or_prim =
-  if Scalar.equal Scalar.equal_any_locality_mode src
-       (Scalar.ignore_locality dst)
+    ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region =
+  if Scalar.equal (fun _ _ -> true) src dst
   then arg
   else static_cast0 ~src ~dst arg ~current_region
 
@@ -1859,12 +1855,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
           ~dst:(integral_scalar width) ~current_region
       in
       let arg2 =
-        let int_scalar =
-          Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
-        in
-        let naked_int_scalar =
-          Scalar.naked (Scalar.Integral.Width.Taggable Int)
-        in
+        let int_scalar : _ Scalar.Integral.t = Value (Taggable Int) in
+        let naked_int_scalar : _ Scalar.Integral.t = Naked (Taggable Int) in
         let src = match rhs with Int -> Scalar.integral int_scalar in
         static_cast arg2 ~src
           ~dst:(Scalar.integral naked_int_scalar)
