@@ -610,13 +610,13 @@ type t =
   | K2 : global_ string * (float -> float) @@ many * string -> t
 type t = {
   global_ x : string;
-  mutable y : float -> float;
+  mutable y : float -> float @@ many;
   z : string @@ global many;
 }
 type t1 = { mutable x : float; mutable f : float -> float; }
 type t2 = {
-  mutable x : float @@ local once;
-  mutable f : float -> float @@ local once;
+  mutable x : float @@ local;
+  mutable f : float -> float @@ local;
 }
 |}]
 

@@ -179,11 +179,12 @@ Line 3, characters 11-12:
                ^
 Error: This type "a" = "int ref" should be an instance of type
          "('a : immutable_data)"
-       The kind of a is mutable_data with int @@ unyielding many.
+       The kind of a is mutable_data with int @@ unyielding.
        But the kind of a must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
 
        The first mode-crosses less than the second along:
+         linearity: mod many with int ≰ mod many
          contention: mod uncontended ≰ mod contended
          portability: mod portable with int ≰ mod portable
          statefulness: mod stateless with int ≰ mod stateless
@@ -343,19 +344,18 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : mutable_data with 'a end
        is not included in
-         sig type 'a t : mutable_data with 'a @@ unyielding many end
+         sig type 'a t : mutable_data with 'a @@ unyielding end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
-         type 'a t : mutable_data with 'a @@ unyielding many
+         type 'a t : mutable_data with 'a @@ unyielding
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
        But the kind of the first must be a subkind of mutable_data
-         with 'a @@ unyielding many
+         with 'a @@ unyielding
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
-         linearity: mod many with 'a ≰ mod many
          yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
@@ -423,14 +423,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type 'a t : mutable_data with 'a @@ unyielding many end
+         sig type 'a t : mutable_data with 'a @@ unyielding end
        is not included in
          sig type 'a t : immutable_data with 'a end
        Type declarations do not match:
-         type 'a t : mutable_data with 'a @@ unyielding many
+         type 'a t : mutable_data with 'a @@ unyielding
        is not included in
          type 'a t : immutable_data with 'a
-       The kind of the first is mutable_data with 'a @@ unyielding many
+       The kind of the first is mutable_data with 'a @@ unyielding
          because of the definition of t at line 4, characters 2-40.
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 2, characters 2-56.
