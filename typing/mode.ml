@@ -3479,69 +3479,72 @@ module Crossing = struct
   *)
 
   module Monadic = struct
-    module Modality = Modality.Monadic.Const
     module Mode = Value.Monadic
 
-    type t = Modality.t
+    type t = Modality of Modality.Monadic.Const.t [@@unboxed]
 
-    let of_bounds c : t = Join_const c
+    let of_bounds c = Modality (Join_const c)
 
-    let modality m t = Modality.concat ~then_:t m
+    let modality m (Modality t) =
+      Modality (Modality.Monadic.Const.concat ~then_:t m)
 
-    let apply_left : t -> _ -> _ = function
-      | Join_const c -> fun m -> Mode.subtract c (Mode.join_const c m)
+    let apply_left (Modality (Join_const c)) m =
+      Mode.subtract c (Mode.join_const c m)
 
-    let apply_right : t -> _ -> _ = function
-      | Join_const c ->
-        fun m ->
-          (* The right adjoint of join is a restriction of identity *)
-          Mode.join_const c m
+    let apply_right (Modality (Join_const c)) m =
+      (* The right adjoint of join is a restriction of identity *)
+      Mode.join_const c m
 
-    let le (t0 : t) (t1 : t) =
-      match t0, t1 with Join_const c0, Join_const c1 -> Mode.Const.le c1 c0
+    let le (Modality (Join_const c0)) (Modality (Join_const c1)) =
+      Mode.Const.le c1 c0
 
-    let top : t = Join_const Mode.Const.min
+    let max = Modality (Join_const Mode.Const.min)
 
-    let bot : t = Join_const Mode.Const.max
+    let min = Modality (Join_const Mode.Const.max)
 
-    let join (Join_const c0 : t) (Join_const c1 : t) : t =
-      Join_const (Mode.Const.meet c0 c1)
+    let join (Modality (Join_const c0)) (Modality (Join_const c1)) =
+      Modality (Join_const (Mode.Const.meet c0 c1))
 
-    let meet (Join_const c0 : t) (Join_const c1 : t) : t =
-      Join_const (Mode.Const.join c0 c1)
+    let meet (Modality (Join_const c0)) (Modality (Join_const c1)) =
+      Modality (Join_const (Mode.Const.join c0 c1))
+
+    let print ppf (Modality t) =
+      Format.fprintf ppf "Modality %a" Modality.Monadic.Const.print t
   end
 
   module Comonadic = struct
-    module Modality = Modality.Comonadic.Const
     module Mode = Value.Comonadic
 
-    type t = Modality.t
+    type t = Modality of Modality.Comonadic.Const.t [@@unboxed]
 
-    let of_bounds c : t = Meet_const c
+    let of_bounds c = Modality (Meet_const c)
 
-    let modality m t = Modality.concat ~then_:t m
+    let modality m (Modality t) =
+      Modality (Modality.Comonadic.Const.concat ~then_:t m)
 
-    let apply_left : t -> _ -> _ = function
-      | Meet_const c ->
-        fun m ->
-          (* The left adjoint of meet is a restriction of identity *)
-          Mode.meet_const c m
+    let apply_left (Modality (Meet_const c)) m =
+      (* The left adjoint of meet is a restriction of identity *)
+      Mode.meet_const c m
 
-    let apply_right : t -> _ -> _ = function
-      | Meet_const c -> fun m -> Mode.imply c (Mode.meet_const c m)
+    let apply_right (Modality (Meet_const c)) m =
+      Mode.imply c (Mode.meet_const c m)
 
-    let le (t0 : t) (t1 : t) =
-      match t0, t1 with Meet_const c0, Meet_const c1 -> Mode.Const.le c0 c1
+    let le (Modality (Meet_const c0)) (Modality (Meet_const c1)) =
+      Mode.Const.le c0 c1
 
-    let top : t = Meet_const Mode.Const.max
+    let max = Modality (Meet_const Mode.Const.max)
 
-    let bot : t = Meet_const Mode.Const.min
+    let min = Modality (Meet_const Mode.Const.min)
 
-    let join (Meet_const c0 : t) (Meet_const c1 : t) : t =
-      Meet_const (Mode.Const.join c0 c1)
+    let join (Modality (Meet_const c0)) (Modality (Meet_const c1)) =
+      Modality (Meet_const (Mode.Const.join c0 c1))
 
-    let meet (Meet_const c0 : t) (Meet_const c1 : t) : t =
-      Meet_const (Mode.Const.meet c0 c1)
+    let meet (Modality (Meet_const c0)) (Modality (Meet_const c1)) =
+      Modality (Meet_const (Mode.Const.meet c0 c1))
+
+    let print ppf (Modality t) =
+      Format.fprintf ppf "Modality %a" Modality.Comonadic.Const.print t
+  end
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
@@ -3598,9 +3601,9 @@ module Crossing = struct
   let le t0 t1 =
     Monadic.le t0.monadic t1.monadic && Comonadic.le t0.comonadic t1.comonadic
 
-  let max = { monadic = Monadic.top; comonadic = Comonadic.top }
+  let max = { monadic = Monadic.max; comonadic = Comonadic.max }
 
-  let min = { monadic = Monadic.bot; comonadic = Comonadic.bot }
+  let min = { monadic = Monadic.min; comonadic = Comonadic.min }
 
   let legacy = max (* legacy behavior is no mode crossing *)
 
