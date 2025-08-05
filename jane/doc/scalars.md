@@ -1,6 +1,6 @@
-# Scalar Types and Static Casting
+# Scalar Types
 
-This document specifies the semantics of scalar type conversions in the OxCaml compiler. It covers both the high-level OCaml value representation (front-end) and the lower-level representation used during compilation and at runtime (back-end).
+This document specifies the semantics of scalar types and their conversions in the OxCaml compiler. It covers both the high-level OCaml value representation (front-end) and the lower-level representation used during compilation and at runtime (back-end).
 
 ## Front-End Semantics
 
@@ -278,3 +278,15 @@ We plan to move away from requiring untagged values to fill their containers. Th
 - **Unsigned integer ↔ float conversions**: Currently limited to signed integers
 - **Front-end unsigned integers**: Extend OCaml's type system to include unsigned integer types
 - **Extended width integers**: Support for `int128`/`uint128`
+
+# Byte Ordering
+Byte ordering is that of the target machine, and matches C stubs compiled for that machine.
+
+## Byte Swapping
+
+The `bswap` intrisics work as expected on integers that have a bit-width that is a multiple of 8 - it reverses the order of the bytes in the integer.
+
+For compatibility with OCaml, the `%bswap16` primitive operates on tagged immediate values. It swaps the low two bytes, zeroing all bits above that. It does *not* sign-extend the result. It operates this way on both 32- and 64-bit targets.
+
+## Future Work
+At the moment, "standard" byte-swaps and the `%bswap16` primitive share the same operation in flambda, and are only distinguished by the `Naked_number_kind`, but we should change that.
