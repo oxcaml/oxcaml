@@ -3682,32 +3682,34 @@ let addr_array_length arg dbg =
    (e.g., bswap). *)
 
 let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
-  match bitwidth with
-  | Sixteen | Thirtytwo | Sixtyfour ->
-    let op = Cbswap { bitwidth } in
-    if Proc.operation_supported op
-       && not (bitwidth = Cmm.Sixtyfour && size_int < 8)
-    then Cop (op, [arg], dbg)
-    else
-      let func, tyarg =
-        match bitwidth with
-        | Sixteen -> "caml_bswap16_direct", XInt16
-        | Thirtytwo -> "caml_int32_direct_bswap", XInt32
-        | Sixtyfour -> "caml_int64_direct_bswap", XInt64
-      in
-      Cop
-        ( Cextcall
-            { func;
-              builtin = false;
-              returns = true;
-              effects = No_effects;
-              coeffects = No_coeffects;
-              ty = typ_int;
-              alloc = false;
-              ty_args = [tyarg]
-            },
-          [arg],
-          dbg )
+  let op = Cbswap { bitwidth } in
+  if Proc.operation_supported op
+     && not
+          ((match bitwidth with
+           | Sixtyfour -> true
+           | Sixteen | Thirtytwo -> false)
+          && size_int < 8)
+  then Cop (op, [arg], dbg)
+  else
+    let func, tyarg =
+      match bitwidth with
+      | Sixteen -> "caml_bswap16_direct", XInt16
+      | Thirtytwo -> "caml_int32_direct_bswap", XInt32
+      | Sixtyfour -> "caml_int64_direct_bswap", XInt64
+    in
+    Cop
+      ( Cextcall
+          { func;
+            builtin = false;
+            returns = true;
+            effects = No_effects;
+            coeffects = No_coeffects;
+            ty = typ_int;
+            alloc = false;
+            ty_args = [tyarg]
+          },
+        [arg],
+        dbg )
 
 type binary_primitive = expression -> expression -> Debuginfo.t -> expression
 
