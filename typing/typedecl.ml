@@ -827,9 +827,12 @@ let shape_extension_constructor ext uid =
     (old_merlin_shape_extension_constructor ext uid)
   else
     Shape.leaf uid
-    (* CR sspies: In the future, we should use a more precise shape here. For
-       now we simply use a leaf to indicate that there is some shape here and
-       avoid confusing the analysis. *)
+    (* CR sspies: The debugging shapes currently lose information in this case.
+       Specifcally, we lose the information about the arguments of the extension
+       constructor. To properly support this, we need to extend the shape type
+       and keep track of this UID. Doing so will require additional changes to
+       the DWARF emission in the backend due to the representation of extension
+       constructors at runtime. *)
 
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
