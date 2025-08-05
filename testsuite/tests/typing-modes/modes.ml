@@ -391,10 +391,10 @@ type r = Foo of string @@ global aliased many
 type r = Foo of string @@ global many aliased
 |}]
 
-(* mutable implies [global] and [unyielding], and legacy modalities for monadic
-   axes. *)
+(* mutable implies global aliased many. No warnings are given since we imagine
+   that the coupling will be removed soon. *)
 type r = {
-  mutable x : string @@ global unyielding aliased
+  mutable x : string @@ global aliased many
 }
 [%%expect{|
 type r = { mutable x : string; }
