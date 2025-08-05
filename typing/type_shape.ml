@@ -113,7 +113,7 @@ module Type_shape = struct
         | None -> (
           match uid_of_path path with
           | Some uid ->
-            Ts_constr
+            Shape.Ts_constr
               ((uid, path, Layout_to_be_determined), of_expr_list constrs)
           | None -> Ts_other Layout_to_be_determined))
       | Ttuple exprs -> Ts_tuple (of_expr_list (List.map snd exprs))
@@ -123,9 +123,9 @@ module Type_shape = struct
            This code used to only work for [_type_vars = []]. *)
         of_type_expr_go ~depth ~visited type_expr uid_of_path
       | Tunboxed_tuple exprs ->
-        Ts_unboxed_tuple (of_expr_list (List.map snd exprs))
+        Shape.Ts_unboxed_tuple (of_expr_list (List.map snd exprs))
       | Tobject _ | Tnil | Tfield _ ->
-        Ts_other Layout_to_be_determined
+        Shape.Ts_other Layout_to_be_determined
         (* Objects are currently not supported in the debugger. *)
       | Tlink _ | Tsubst _ ->
         Misc.fatal_error "linking and substitution should not reach this stage."
@@ -147,156 +147,20 @@ module Type_shape = struct
                 [{ pv_constr_name = name; pv_constr_args = of_expr_list args }])
             row_fields
         in
-        Ts_variant row_fields
+        Shape.Ts_variant row_fields
       | Tarrow (_, arg, ret, _) ->
-        Ts_arrow
+        Shape.Ts_arrow
           ( of_type_expr_go ~depth ~visited arg uid_of_path,
             of_type_expr_go ~depth ~visited ret uid_of_path )
       | Tunivar { name; _ } -> Ts_var (name, Layout_to_be_determined)
       | Tof_kind _ -> Ts_other Layout_to_be_determined
       | Tpackage _ ->
-        Ts_other
+        Shape.Ts_other
           Layout_to_be_determined (* CR sspies: Support first-class modules. *)
 
   let of_type_expr (expr : Types.type_expr) uid_of_path =
     of_type_expr_go ~visited:Numbers.Int.Set.empty ~depth:0 expr uid_of_path
 
-  let rec shape_with_layout ~(layout : Layout.t) (sh : without_layout ts) :
-      Layout.t ts =
-    match sh, layout with
-    | Ts_constr ((uid, path, Layout_to_be_determined), shapes), _ ->
-      Ts_constr ((uid, path, layout), shapes)
-    | Ts_tuple shapes, Base Value ->
-      let shapes_with_layout =
-        List.map (shape_with_layout ~layout:(Layout.Base Value)) shapes
-      in
-      Ts_tuple shapes_with_layout
-    | ( Ts_tuple _,
-        ( Product _
-        | Base
-            ( Void | Bits8 | Bits16 | Bits32 | Bits64 | Float64 | Float32 | Word
-            | Vec128 | Vec256 | Vec512 ) ) ) ->
-      Misc.fatal_errorf "tuple shape must have layout value, but has layout %a"
-        Layout.format layout
-    | Ts_unboxed_tuple shapes, Product lys
-      when List.length shapes = List.length lys ->
-      let shapes_and_layouts = List.combine shapes lys in
-      let shapes_with_layout =
-        List.map
-          (fun (shape, layout) -> shape_with_layout ~layout shape)
-          shapes_and_layouts
-      in
-      Ts_unboxed_tuple shapes_with_layout
-    | Ts_unboxed_tuple shapes, Product lys ->
-      Misc.fatal_errorf "unboxed tuple shape has %d shapes, but %d layouts"
-        (List.length shapes) (List.length lys)
-    | ( Ts_unboxed_tuple _,
-        Base
-          ( Void | Value | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
-          | Bits64 | Vec128 | Vec256 | Vec512 ) ) ->
-      Misc.fatal_errorf
-        "unboxed tuple must have unboxed product layout, but has layout %a"
-        Layout.format layout
-    | Ts_var (name, Layout_to_be_determined), _ -> Ts_var (name, layout)
-    | Ts_arrow (arg, ret), Base Value -> Ts_arrow (arg, ret)
-    | Ts_arrow _, _ ->
-      Misc.fatal_errorf "function type shape must have layout value"
-    | Ts_predef (predef, shapes), _
-      when Layout.equal (Predef.to_layout predef) layout ->
-      Ts_predef (predef, shapes)
-    | Ts_predef (predef, _), _ ->
-      Misc.fatal_errorf
-        "predef %s has layout %a, but is expected to have layout %a"
-        (Predef.to_string predef) Layout.format (Predef.to_layout predef)
-        Layout.format layout
-    | Ts_variant fields, Base Value ->
-      let fields =
-        poly_variant_constructors_map
-          (shape_with_layout ~layout:(Layout.Base Value))
-          fields
-      in
-      Ts_variant fields
-    | Ts_variant _, _ ->
-      Misc.fatal_errorf "polymorphic variant must have layout value"
-    | Ts_other Layout_to_be_determined, _ -> Ts_other layout
-
-  let rec print : type a. Format.formatter -> a ts -> unit =
-   (* CR sspies: We should figure out pretty printing for shapes. For now, this
-      verbose non-boxed version should be fine. *)
-   fun ppf -> function
-    | Ts_predef (predef, shapes) ->
-      Format.fprintf ppf "%s (%a)" (Predef.to_string predef)
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           print)
-        shapes
-    | Ts_constr ((uid, path, _), shapes) ->
-      Format.fprintf ppf "Ts_constr uid=%a path=%a (%a)" Uid.print uid
-        Path.print path
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           print)
-        shapes
-    | Ts_tuple shapes ->
-      Format.fprintf ppf "Ts_tuple (%a)"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           print)
-        shapes
-    | Ts_unboxed_tuple shapes ->
-      Format.fprintf ppf "Ts_unboxed_tuple (%a)"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           print)
-        shapes
-    | Ts_var (name, _) ->
-      Format.fprintf ppf "Ts_var (%a)"
-        (fun ppf opt -> Format.pp_print_option Format.pp_print_string ppf opt)
-        name
-    | Ts_arrow (arg, ret) ->
-      Format.fprintf ppf "Ts_arrow (%a, %a)" print arg print ret
-    | Ts_variant fields ->
-      Format.fprintf ppf "Ts_variant (%a)"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           (fun ppf { pv_constr_name; pv_constr_args } ->
-             Format.fprintf ppf "%s (%a)" pv_constr_name
-               (Format.pp_print_list
-                  ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-                  print)
-               pv_constr_args))
-        fields
-    | Ts_other _ -> Format.fprintf ppf "Ts_other"
-
-  (* CR sspies: This is a hacky "solution" to do type variable substitution in
-     type expression shapes. In subsequent PRs, this code should be changed to
-     use the shape mechanism instead. *)
-  let rec replace_tvar t ~(pairs : (without_layout ts * without_layout ts) list)
-      =
-    match
-      List.find_map
-        (fun (from, to_) -> if t = from then Some to_ else None)
-        pairs
-    with
-    | Some new_type -> new_type
-    | None -> (
-      match t with
-      | Ts_constr (uid, shape_list) ->
-        Ts_constr (uid, List.map (replace_tvar ~pairs) shape_list)
-      | Ts_tuple shape_list ->
-        Ts_tuple (List.map (replace_tvar ~pairs) shape_list)
-      | Ts_unboxed_tuple shape_list ->
-        Ts_unboxed_tuple (List.map (replace_tvar ~pairs) shape_list)
-      | Ts_var (name, ly) -> Ts_var (name, ly)
-      | Ts_predef (predef, shape_list) -> Ts_predef (predef, shape_list)
-      | Ts_arrow (arg, ret) ->
-        Ts_arrow (replace_tvar ~pairs arg, replace_tvar ~pairs ret)
-      | Ts_variant fields ->
-        let fields =
-          poly_variant_constructors_map (replace_tvar ~pairs) fields
-        in
-        Ts_variant fields
-      | Ts_other ly -> Ts_other ly)
 end
 
 module Type_decl_shape = struct

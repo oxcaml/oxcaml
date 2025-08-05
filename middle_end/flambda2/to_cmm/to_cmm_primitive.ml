@@ -702,15 +702,15 @@ let unary_int_arith_primitive _env dbg kind op arg =
          affect the sign of the resulting value. *)
       C.Scalar_type.Integral.static_cast arg ~dbg ~src:naked_immediate
         ~dst:naked_int16
-      |> (fun arg -> C.bbswap Unboxed_int16 arg dbg)
+      |> (fun arg -> C.bbswap Sixteen arg dbg)
       |> C.zero_extend ~bits:16 ~dbg
     | Naked_int8 -> arg
     | Naked_int16 ->
       (* Byte swaps of small integers need a sign-extension in order to match
          the Lambda semantics (where the swap might affect the sign). *)
-      C.sign_extend (C.bbswap Unboxed_int16 arg dbg) ~bits:16 ~dbg
+      C.sign_extend (C.bbswap Sixteen arg dbg) ~bits:16 ~dbg
     | Naked_int32 ->
-      C.sign_extend (C.bbswap Unboxed_int32 arg dbg) ~bits:32 ~dbg
+      C.sign_extend (C.bbswap Thirtytwo arg dbg) ~bits:32 ~dbg
     (* int64 and nativeint don't require a sign-extension since they are already
        register-size, but the code is here for consistency: *)
     | Naked_int64 -> C.sign_extend (C.bbswap Sixtyfour arg dbg) ~bits:64 ~dbg

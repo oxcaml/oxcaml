@@ -45,12 +45,6 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
-let check_record_field_sort loc : Jkind.Sort.Const.t -> _ = function
-  | Base (Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
-          Vec128 | Vec256 | Vec512 | Word)
-  | Product _ -> ()
-  | Base Void -> raise (Error (loc, Illegal_void_record_field))
-
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
   ref((fun ~scopes:_ _cc _rootpath _modl -> assert false) :

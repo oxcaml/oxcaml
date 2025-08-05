@@ -211,8 +211,6 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Float32 -> Unboxed_float Unboxed_float32
   | Base Bits8 -> Unboxed_int Unboxed_int8
   | Base Bits16 -> Unboxed_int Unboxed_int16
-  | Base Bits8 -> Unboxed_int Unboxed_int8
-  | Base Bits16 -> Unboxed_int Unboxed_int16
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
@@ -1019,8 +1017,6 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
-  | ((  Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512)
   | ((  Base (Void | Float32 | Float64 | Word | Bits8 | Bits16 | Bits32
              | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->

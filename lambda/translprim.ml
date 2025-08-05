@@ -2165,7 +2165,6 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Pobj_magic _ | Punbox_vector _ | Punbox_unit
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-  | Puntag_int _ | Ptag_int _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
   | Pcpu_relax

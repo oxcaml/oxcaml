@@ -3683,7 +3683,6 @@ let addr_array_length arg dbg =
 
 let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
   match bitwidth with
-  | Eight -> arg
   | Sixteen | Thirtytwo | Sixtyfour ->
     let op = Cbswap { bitwidth } in
     if Proc.operation_supported op
@@ -3692,7 +3691,6 @@ let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
     else
       let func, tyarg =
         match bitwidth with
-        | Eight -> assert false
         | Sixteen -> "caml_bswap16_direct", XInt16
         | Thirtytwo -> "caml_int32_direct_bswap", XInt32
         | Sixtyfour -> "caml_int64_direct_bswap", XInt64

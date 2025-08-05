@@ -668,8 +668,6 @@ and mixed_block_element =
   | Float32
   | Bits8
   | Bits16
-  | Bits8
-  | Bits16
   | Bits32
   | Bits64
   | Vec128

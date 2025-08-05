@@ -1040,6 +1040,7 @@ module With_subkind = struct
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
       | Parrayval (Punboxedintarray (Unboxed_int8 | Unboxed_int16)) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
+      | Parrayval (Punboxedintarray Unboxed_int) -> Immediate_array
       | Parrayval (Punboxedintarray Unboxed_int32) -> Unboxed_int32_array
       | Parrayval (Punboxedintarray Unboxed_int64) -> Unboxed_int64_array
       | Parrayval (Punboxedintarray Unboxed_nativeint) ->

@@ -35,6 +35,14 @@ let unboxed_integer : Lambda.unboxed_integer -> string = function
   | Unboxed_int32 -> "unboxed_int32"
   | Unboxed_int64 -> "unboxed_int64"
 
+let unboxed_integer_suffix = function
+  | Unboxed_int8 -> "int8"
+  | Unboxed_int16 -> "int16"
+  | Unboxed_int -> "int"
+  | Unboxed_nativeint -> "nativeint"
+  | Unboxed_int32 -> "int32"
+  | Unboxed_int64 -> "int64"
+
 let unboxed_float_suffix = function
   | Unboxed_float64 -> "float"
   | Unboxed_float32 -> "float32"
@@ -45,7 +53,6 @@ let unboxed_vector_suffix = function
   | Unboxed_vec512 -> "vec512"
 
 (* Uses in most contexts get the "unboxed_" prefix *)
-let unboxed_integer ui = "unboxed_" ^ unboxed_integer_suffix ui
 let unboxed_float uf = "unboxed_" ^ unboxed_float_suffix uf
 let unboxed_vector uv = "unboxed_" ^ unboxed_vector_suffix uv
 
@@ -127,7 +134,6 @@ let array_index_kind ppf k =
   match k with
   | Ptagged_int_index -> fprintf ppf "int"
   | Punboxed_int_index i -> pp_print_string ppf (unboxed_integer i)
-  | Punboxed_int_index i -> pp_print_string ppf (unboxed_integer i)
 
 let array_set_kind ppf k =
   let pp_mode ppf = function
@@ -165,8 +171,6 @@ let rec mixed_block_element print_value_kind ppf el =
   | Float_boxed _ -> fprintf ppf "float"
   | Float32 -> fprintf ppf "float32"
   | Float64 -> fprintf ppf "float64"
-  | Bits8 -> fprintf ppf "bits8"
-  | Bits16 -> fprintf ppf "bits16"
   | Bits8 -> fprintf ppf "bits8"
   | Bits16 -> fprintf ppf "bits16"
   | Bits32 -> fprintf ppf "bits32"

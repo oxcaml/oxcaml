@@ -99,20 +99,6 @@ module Scoped_location = Debuginfo.Scoped_location
 
 let dbg = false
 
-let sort_check_not_void loc sort =
-  let rec contains_void : Jkind.Sort.Const.t -> bool = function
-    | Base Void -> true
-    | Base (Value | Float64 | Float32 | Word
-            | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512) -> false
-    | Product [] ->
-      Misc.fatal_error "nil in sort_check_not_void"
-    | Product ss -> List.exists contains_void ss
-  in
-  if contains_void sort then
-    raise (Error (loc, Void_layout))
-;;
-
 let debugf fmt =
   if dbg
   then Format.eprintf fmt
