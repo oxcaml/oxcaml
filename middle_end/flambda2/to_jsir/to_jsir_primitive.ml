@@ -1,5 +1,6 @@
 let primitive_not_supported () =
-  Misc.fatal_error "This primitive is not supported for JavaScript/WASM compilation."
+  Misc.fatal_error
+    "This primitive is not supported for JavaScript/WASM compilation."
 
 (** Convert a [Simple.t] into a [Jsir.prim_arg]. *)
 let prim_arg ~env simple =
@@ -27,6 +28,10 @@ let with_float_suffix ~(bitwidth : Flambda_primitive.float_bitwidth) op =
   "caml_" ^ op ^ suffix
 
 let no_op ~env ~res = None, env, res
+
+let identity ~env ~res x =
+  let var, res = To_jsir_shared.simple ~env ~res x in
+  Some var, env, res
 
 let use_prim ~env ~res prim args =
   let expr : Jsir.expr = Prim (prim, args) in
@@ -92,13 +97,9 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
       [prim_arg ~env x; Pc (Int (Targetint.of_int dimension))]
   | String_length _ -> use_prim' (Extern "caml_ml_string_length")
   | Int_as_pointer _ -> use_prim' (Extern "caml_int_as_pointer")
-  | Opaque_identity { middle_end_only; kind = _ } -> (
-    match middle_end_only with
-    | true -> no_op ~env ~res
-    | false ->
-      (* CR selee: treating these as the identity for now *)
-      let var, res = To_jsir_shared.simple ~env ~res x in
-      Some var, env, res)
+  | Opaque_identity { middle_end_only = _; kind = _ } ->
+    (* CR selee: treating these as the identity for now *)
+    identity ~env ~res x
   | Int_arith (kind, op) ->
     let op_name = match op with Swap_byte_endianness -> "bswap" in
     let extern_name = with_int_prefix ~kind op_name ~percent_for_imms:false in
@@ -125,7 +126,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     use_prim' (Extern extern_name)
   | Unbox_number _ | Box_number _ | Untag_immediate | Tag_immediate ->
     (* everything is boxed and tagged in JS *)
-    no_op ~env ~res
+    identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
     Some (To_jsir_env.get_function_slot_exn env move_to), env, res
   | Project_value_slot { project_from = _; value_slot } ->
