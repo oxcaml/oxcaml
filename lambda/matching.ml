@@ -2134,8 +2134,6 @@ let inline_lazy_force_cond arg pos loc =
   let varg = Lvar idarg in
   let tag = Ident.create_local "tag" in
   let tag_duid = Lambda.debug_uid_none in
-  (* XXX mshinwell: why was this changed to phys_equal instead of icmp?
-     This question seems to crop up a lot in the diff *)
   let test_tag t = icmp Ceq int (Lvar tag) (lconst_int int t) ~loc in
   Llet
     ( Strict,
