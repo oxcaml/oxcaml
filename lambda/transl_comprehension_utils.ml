@@ -32,10 +32,8 @@ module Let_binding = struct
 end
 
 module Lambda_utils = struct
-  let int_scalar = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
-
   module Constants = struct
-    let int n = Lconst (const_int int_scalar n)
+    let int n = lconst_int int n
 
     let float f = Lconst (Const_base (Const_float (Float.to_string f)))
 
@@ -117,7 +115,7 @@ module Lambda_utils = struct
     (module struct
       let binop prim l r = Lprim (Pscalar (Binary prim), [l; r], loc)
 
-      let size = int_scalar
+      let size = int
 
       let ( + ) = binop (Integral (size, Add))
 
