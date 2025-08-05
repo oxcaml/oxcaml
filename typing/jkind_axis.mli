@@ -55,11 +55,13 @@ module Axis : sig
       | Externality : Externality.t t
       | Nullability : Nullability.t t
       | Separability : Separability.t t
+
+    val get : 'a t -> (module Axis_ops with type t = 'a)
   end
 
   (** Represents an axis of a jkind *)
   type 'a t =
-    | Modal : 'a Mode.Alloc.Axis.t -> 'a t
+    | Modal : 'a Mode.Value.Axis.t -> 'a t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]

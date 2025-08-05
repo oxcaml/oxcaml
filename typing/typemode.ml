@@ -8,107 +8,89 @@ open Jkind_axis
    externality/nullability) will stay in this file, while [transl_modifiers]
    should go into [typekind.ml] and calls [transl_modalities]. *)
 
-type modal = private |
-
-type maybe_nonmodal = private |
-
-type 'm annot_type =
-  | Modifier : maybe_nonmodal annot_type
-  | Mode : modal annot_type
-  | Modality : modal annot_type
+type annot_type =
+  | Modifier
+  | Mode
+  | Modality
 
 type error =
   | Duplicated_axis : _ Axis.t -> error
-  | Unrecognized_modifier : _ annot_type * string -> error
+  | Unrecognized_modifier : annot_type * string -> error
 
 exception Error of Location.t * error
 
-module Axis_pair = struct
-  type 'm t =
-    | Modal_axis_pair : 'a Mode.Alloc.Axis.t * 'a -> modal t
-    | Any_axis_pair : 'a Axis.t * 'a -> maybe_nonmodal t
-    | Everything_but_nullability : maybe_nonmodal t
+module Modal_axis_pair = struct
+  [@@@warning "-18"]
 
-  let of_string s =
-    let open Mode in
+  type t = P : 'a Alloc.Axis.t * 'a -> t
+
+  type t_value = P : 'a Value.Axis.t * 'a -> t_value
+
+  let to_value (P (ax, a) : t) : t_value =
+    match Const.Axis.is_areality ax with
+    | Left Refl -> P (Comonadic Areality, Const.locality_as_regionality a)
+    | Right ax -> P (ax, a)
+
+  let of_string s : t =
+    let comonadic (type a) (ax : a Alloc.Comonadic.Axis.t) (a : a) : t =
+      P (Comonadic ax, a)
+    in
+    let monadic (type a) (ax : a Alloc.Monadic.Axis.t) (a : a) : t =
+      P (Monadic ax, a)
+    in
     match s with
-    | "local" -> Any_axis_pair (Modal (Comonadic Areality), Locality.Const.Local)
-    | "global" ->
-      Any_axis_pair (Modal (Comonadic Areality), Locality.Const.Global)
-    | "unique" ->
-      Any_axis_pair (Modal (Monadic Uniqueness), Uniqueness.Const.Unique)
-    | "aliased" ->
-      Any_axis_pair (Modal (Monadic Uniqueness), Uniqueness.Const.Aliased)
-    | "once" -> Any_axis_pair (Modal (Comonadic Linearity), Linearity.Const.Once)
-    | "many" -> Any_axis_pair (Modal (Comonadic Linearity), Linearity.Const.Many)
-    | "nonportable" ->
-      Any_axis_pair
-        (Modal (Comonadic Portability), Portability.Const.Nonportable)
-    | "portable" ->
-      Any_axis_pair (Modal (Comonadic Portability), Portability.Const.Portable)
-    | "contended" ->
-      Any_axis_pair (Modal (Monadic Contention), Contention.Const.Contended)
-    | "shared" ->
-      Any_axis_pair (Modal (Monadic Contention), Contention.Const.Shared)
-    | "uncontended" ->
-      Any_axis_pair (Modal (Monadic Contention), Contention.Const.Uncontended)
-    | "maybe_null" ->
-      Any_axis_pair (Nonmodal Nullability, Nullability.Maybe_null)
-    | "non_null" -> Any_axis_pair (Nonmodal Nullability, Nullability.Non_null)
-    | "internal" -> Any_axis_pair (Nonmodal Externality, Externality.Internal)
-    | "external64" ->
-      Any_axis_pair (Nonmodal Externality, Externality.External64)
-    | "external_" -> Any_axis_pair (Nonmodal Externality, Externality.External)
-    | "yielding" ->
-      Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Yielding)
-    | "unyielding" ->
-      Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Unyielding)
-    | "stateless" ->
-      Any_axis_pair
-        (Modal (Comonadic Statefulness), Statefulness.Const.Stateless)
-    | "observing" ->
-      Any_axis_pair
-        (Modal (Comonadic Statefulness), Statefulness.Const.Observing)
-    | "stateful" ->
-      Any_axis_pair (Modal (Comonadic Statefulness), Statefulness.Const.Stateful)
-    | "immutable" ->
-      Any_axis_pair (Modal (Monadic Visibility), Visibility.Const.Immutable)
-    | "read" -> Any_axis_pair (Modal (Monadic Visibility), Visibility.Const.Read)
-    | "read_write" ->
-      Any_axis_pair (Modal (Monadic Visibility), Visibility.Const.Read_write)
-    | "maybe_separable" ->
-      Any_axis_pair (Nonmodal Separability, Separability.Maybe_separable)
-    | "separable" ->
-      Any_axis_pair (Nonmodal Separability, Separability.Separable)
-    | "non_float" ->
-      Any_axis_pair (Nonmodal Separability, Separability.Non_float)
-    | "everything" -> Everything_but_nullability
+    | "local" -> comonadic Areality Local
+    (* "regional" is not supported *)
+    | "global" -> comonadic Areality Global
+    | "unique" -> monadic Uniqueness Unique
+    | "aliased" -> monadic Uniqueness Aliased
+    | "once" -> comonadic Linearity Once
+    | "many" -> comonadic Linearity Many
+    | "nonportable" -> comonadic Portability Nonportable
+    | "portable" -> comonadic Portability Portable
+    | "contended" -> monadic Contention Contended
+    | "shared" -> monadic Contention Shared
+    | "uncontended" -> monadic Contention Uncontended
+    | "yielding" -> comonadic Yielding Yielding
+    | "unyielding" -> comonadic Yielding Unyielding
+    | "stateless" -> comonadic Statefulness Stateless
+    | "observing" -> comonadic Statefulness Observing
+    | "stateful" -> comonadic Statefulness Stateful
+    | "immutable" -> monadic Visibility Immutable
+    | "read" -> monadic Visibility Read
+    | "read_write" -> monadic Visibility Read_write
     | _ -> raise Not_found
 end
 
-let transl_annot (type m) ~(annot_type : m annot_type) ~required_mode_maturity
-    annot : m Axis_pair.t Location.loc =
-  Option.iter
-    (fun maturity ->
-      Language_extension.assert_enabled ~loc:annot.loc Mode maturity)
-    required_mode_maturity;
-  let pair : m Axis_pair.t =
-    match Axis_pair.of_string annot.txt, annot_type with
-    | Any_axis_pair (Nonmodal _, _), (Mode | Modality)
-    | Everything_but_nullability, (Mode | Modality)
-    | (exception Not_found) ->
-      raise (Error (annot.loc, Unrecognized_modifier (annot_type, annot.txt)))
-    | Any_axis_pair (Modal axis, mode), Mode -> Modal_axis_pair (axis, mode)
-    | Any_axis_pair (Modal axis, mode), Modality -> Modal_axis_pair (axis, mode)
-    | pair, Modifier -> pair
-  in
-  { txt = pair; loc = annot.loc }
+module Axis_pair = struct
+  type t = P : 'a Axis.t * 'a -> t
 
-let unpack_mode_annot { txt = Parsetree.Mode s; loc } = { txt = s; loc }
+  [@@@warning "-18"]
+
+  let of_string s =
+    match Modal_axis_pair.of_string s with
+    | modal ->
+      let (P (ax, a)) = Modal_axis_pair.to_value modal in
+      P (Modal ax, a)
+    | exception Not_found -> (
+      let nonmodal (type a) (ax : a Axis.Nonmodal.t) (a : a) : t =
+        P (Nonmodal ax, a)
+      in
+      match s with
+      | "maybe_null" -> nonmodal Nullability Maybe_null
+      | "non_null" -> nonmodal Nullability Non_null
+      | "internal" -> nonmodal Externality Internal
+      | "external64" -> nonmodal Externality External64
+      | "external_" -> nonmodal Externality External
+      | "maybe_separable" -> nonmodal Separability Maybe_separable
+      | "separable" -> nonmodal Separability Separable
+      | "non_float" -> nonmodal Separability Non_float
+      | _ -> raise Not_found)
+end
 
 module Transled_modifiers = struct
   type t =
-    { locality : Mode.Locality.Const.t Location.loc option;
+    { areality : Mode.Regionality.Const.t Location.loc option;
       linearity : Mode.Linearity.Const.t Location.loc option;
       uniqueness : Mode.Uniqueness.Const.t Location.loc option;
       portability : Mode.Portability.Const.t Location.loc option;
@@ -122,7 +104,7 @@ module Transled_modifiers = struct
     }
 
   let empty =
-    { locality = None;
+    { areality = None;
       linearity = None;
       uniqueness = None;
       portability = None;
@@ -137,7 +119,7 @@ module Transled_modifiers = struct
 
   let get (type a) ~(axis : a Axis.t) (t : t) : a Location.loc option =
     match axis with
-    | Modal (Comonadic Areality) -> t.locality
+    | Modal (Comonadic Areality) -> t.areality
     | Modal (Comonadic Linearity) -> t.linearity
     | Modal (Monadic Uniqueness) -> t.uniqueness
     | Modal (Comonadic Portability) -> t.portability
@@ -152,7 +134,7 @@ module Transled_modifiers = struct
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
       t =
     match axis with
-    | Modal (Comonadic Areality) -> { t with locality = value }
+    | Modal (Comonadic Areality) -> { t with areality = value }
     | Modal (Comonadic Linearity) -> { t with linearity = value }
     | Modal (Monadic Uniqueness) -> { t with uniqueness = value }
     | Modal (Comonadic Portability) -> { t with portability = value }
@@ -166,12 +148,9 @@ module Transled_modifiers = struct
 end
 
 let transl_mod_bounds annots =
-  let step bounds_so_far annot =
-    match
-      transl_annot ~annot_type:Modifier ~required_mode_maturity:None
-      @@ unpack_mode_annot annot
-    with
-    | { txt = Any_axis_pair (type a) ((axis, mode) : a Axis.t * a); loc } ->
+  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
+    match Axis_pair.of_string txt with
+    | P (type a) ((axis, mode) : a Axis.t * a) ->
       let (module A) = Axis.get axis in
       let is_top = A.le A.max mode in
       if is_top
@@ -184,24 +163,27 @@ let transl_mod_bounds annots =
       let is_dup =
         Option.is_some (Transled_modifiers.get ~axis bounds_so_far)
       in
-      if is_dup then raise (Error (annot.loc, Duplicated_axis axis));
+      if is_dup then raise (Error (loc, Duplicated_axis axis));
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
-    | { txt = Everything_but_nullability; loc } ->
-      Transled_modifiers.
-        { locality = Some { txt = Locality.Const.min; loc };
-          linearity = Some { txt = Linearity.Const.min; loc };
-          uniqueness = Some { txt = Uniqueness.Const_op.min; loc };
-          portability = Some { txt = Portability.Const.min; loc };
-          contention = Some { txt = Contention.Const_op.min; loc };
-          yielding = Some { txt = Yielding.Const.min; loc };
-          externality = Some { txt = Externality.min; loc };
-          statefulness = Some { txt = Statefulness.Const.min; loc };
-          visibility = Some { txt = Visibility.Const_op.min; loc };
-          nullability =
-            Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
-          separability =
-            Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
-        }
+    | exception Not_found -> (
+      match txt with
+      | "everything" ->
+        Transled_modifiers.
+          { areality = Some { txt = Regionality.Const.min; loc };
+            linearity = Some { txt = Linearity.Const.min; loc };
+            uniqueness = Some { txt = Uniqueness.Const_op.min; loc };
+            portability = Some { txt = Portability.Const.min; loc };
+            contention = Some { txt = Contention.Const_op.min; loc };
+            yielding = Some { txt = Yielding.Const.min; loc };
+            externality = Some { txt = Externality.min; loc };
+            statefulness = Some { txt = Statefulness.Const.min; loc };
+            visibility = Some { txt = Visibility.Const_op.min; loc };
+            nullability =
+              Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
+            separability =
+              Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
+          }
+      | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
   in
   let empty_modifiers = Transled_modifiers.empty in
   let modifiers = List.fold_left step empty_modifiers annots in
@@ -212,7 +194,7 @@ let transl_mod_bounds annots =
       ( Transled_modifiers.get ~axis:(Modal (Comonadic Yielding)) modifiers,
         Transled_modifiers.get ~axis:(Modal (Comonadic Areality)) modifiers )
     with
-    | None, Some { txt = Locality.Const.Global; _ } ->
+    | None, Some { txt = Regionality.Const.Global; _ } ->
       Transled_modifiers.set ~axis:(Modal (Comonadic Yielding)) modifiers
         (Some { txt = Yielding.Const.Unyielding; loc = Location.none })
     | _, _ -> modifiers
@@ -244,8 +226,8 @@ let transl_mod_bounds annots =
     | _, _ -> modifiers
   in
   let open Types.Jkind_mod_bounds in
-  let locality =
-    Option.fold ~some:Location.get_txt ~none:Locality.max modifiers.locality
+  let areality =
+    Option.fold ~some:Location.get_txt ~none:Areality.max modifiers.areality
   in
   let linearity =
     Option.fold ~some:Location.get_txt ~none:Linearity.max modifiers.linearity
@@ -282,7 +264,7 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Separability.max
       modifiers.separability
   in
-  create ~locality ~linearity ~uniqueness ~portability ~contention ~yielding
+  create ~areality ~linearity ~uniqueness ~portability ~contention ~yielding
     ~statefulness ~visibility ~externality ~nullability ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
@@ -314,31 +296,19 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   { annots with yielding; contention; portability }
 
 let transl_mode_annots annots : Alloc.Const.Option.t =
-  let step modifiers_so_far annot =
-    let { txt =
-            Modal_axis_pair (type a) ((axis, mode) : a Mode.Alloc.Axis.t * a);
-          loc
-        } =
-      transl_annot ~annot_type:Mode ~required_mode_maturity:(Some Stable)
-      @@ unpack_mode_annot annot
+  let step modes_so_far { txt = Parsetree.Mode txt; loc } =
+    Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
+    let (P (ax, a)) =
+      try Modal_axis_pair.of_string txt
+      with Not_found -> raise (Error (loc, Unrecognized_modifier (Mode, txt)))
     in
-    let axis = Axis.Modal axis in
-    if Option.is_some (Transled_modifiers.get ~axis modifiers_so_far)
-    then raise (Error (annot.loc, Duplicated_axis axis));
-    Transled_modifiers.set ~axis modifiers_so_far (Some { txt = mode; loc })
+    if Option.is_some (Alloc.Const.Option.proj ax modes_so_far)
+    then
+      let (P ax) = Const.Axis.alloc_as_value (P ax) in
+      raise (Error (loc, Duplicated_axis (Modal ax)))
+    else Alloc.Const.Option.set ax (Some a) modes_so_far
   in
-  let empty_modifiers = Transled_modifiers.empty in
-  let modes = List.fold_left step empty_modifiers annots in
-  default_mode_annots
-    { areality = Option.map get_txt modes.locality;
-      linearity = Option.map get_txt modes.linearity;
-      uniqueness = Option.map get_txt modes.uniqueness;
-      portability = Option.map get_txt modes.portability;
-      contention = Option.map get_txt modes.contention;
-      yielding = Option.map get_txt modes.yielding;
-      statefulness = Option.map get_txt modes.statefulness;
-      visibility = Option.map get_txt modes.visibility
-    }
+  List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
@@ -397,65 +367,26 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
       visibility ]
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
-  let axis_pair =
-    transl_annot ~annot_type:Modality ~required_mode_maturity:(Some maturity)
-      { txt = modality; loc }
+  Language_extension.assert_enabled ~loc Mode maturity;
+  let (P (ax, a)) =
+    try Modal_axis_pair.(of_string modality |> to_value)
+    with Not_found ->
+      raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
   let atom =
-    match axis_pair.txt with
-    | Modal_axis_pair (Comonadic Areality, mode) ->
-      Modality.Atom
-        (Comonadic Areality, Meet_with (Const.locality_as_regionality mode))
-    | Modal_axis_pair (Comonadic Linearity, mode) ->
-      Modality.Atom (Comonadic Linearity, Meet_with mode)
-    | Modal_axis_pair (Comonadic Portability, mode) ->
-      Modality.Atom (Comonadic Portability, Meet_with mode)
-    | Modal_axis_pair (Monadic Uniqueness, mode) ->
-      Modality.Atom (Monadic Uniqueness, Join_with mode)
-    | Modal_axis_pair (Monadic Contention, mode) ->
-      Modality.Atom (Monadic Contention, Join_with mode)
-    | Modal_axis_pair (Comonadic Yielding, mode) ->
-      Modality.Atom (Comonadic Yielding, Meet_with mode)
-    | Modal_axis_pair (Comonadic Statefulness, mode) ->
-      Modality.Atom (Comonadic Statefulness, Meet_with mode)
-    | Modal_axis_pair (Monadic Visibility, mode) ->
-      Modality.Atom (Monadic Visibility, Join_with mode)
+    match ax with
+    | Comonadic _ -> Modality.Atom (ax, Meet_with a)
+    | Monadic _ -> Modality.Atom (ax, Join_with a)
   in
   atom, loc
 
 let untransl_modality (a : Modality.t) : Parsetree.modality loc =
   let s =
     match a with
-    | Atom (Comonadic Areality, Meet_with Regionality.Const.Global) -> "global"
-    | Atom (Comonadic Areality, Meet_with Regionality.Const.Local) -> "local"
-    | Atom (Comonadic Linearity, Meet_with Linearity.Const.Many) -> "many"
-    | Atom (Comonadic Linearity, Meet_with Linearity.Const.Once) -> "once"
-    | Atom (Monadic Uniqueness, Join_with Uniqueness.Const.Aliased) -> "aliased"
-    | Atom (Monadic Uniqueness, Join_with Uniqueness.Const.Unique) -> "unique"
-    | Atom (Comonadic Portability, Meet_with Portability.Const.Portable) ->
-      "portable"
-    | Atom (Comonadic Portability, Meet_with Portability.Const.Nonportable) ->
-      "nonportable"
-    | Atom (Monadic Contention, Join_with Contention.Const.Contended) ->
-      "contended"
-    | Atom (Monadic Contention, Join_with Contention.Const.Shared) -> "shared"
-    | Atom (Monadic Contention, Join_with Contention.Const.Uncontended) ->
-      "uncontended"
-    | Atom (Comonadic Yielding, Meet_with Yielding.Const.Yielding) -> "yielding"
-    | Atom (Comonadic Yielding, Meet_with Yielding.Const.Unyielding) ->
-      "unyielding"
-    | Atom (Comonadic Statefulness, Meet_with Statefulness.Const.Stateless) ->
-      "stateless"
-    | Atom (Comonadic Statefulness, Meet_with Statefulness.Const.Observing) ->
-      "observing"
-    | Atom (Comonadic Statefulness, Meet_with Statefulness.Const.Stateful) ->
-      "stateful"
-    | Atom (Monadic Visibility, Join_with Visibility.Const.Immutable) ->
-      "immutable"
-    | Atom (Monadic Visibility, Join_with Visibility.Const.Read) -> "read"
-    | Atom (Monadic Visibility, Join_with Visibility.Const.Read_write) ->
-      "read_write"
-    | _ -> failwith "BUG: impossible modality atom"
+    | Atom (ax, Meet_with a) ->
+      Format.asprintf "%a" (Value.Const.print_axis ax) a
+    | Atom (ax, Join_with a) ->
+      Format.asprintf "%a" (Value.Const.print_axis ax) a
   in
   { txt = Modality s; loc = Location.none }
 

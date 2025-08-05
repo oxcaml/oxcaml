@@ -85,7 +85,7 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** The mod-bounds of a jkind *)
 module Jkind_mod_bounds : sig
-  module Locality = Mode.Locality.Const
+  module Areality = Mode.Regionality.Const
   module Linearity = Mode.Linearity.Const
   module Uniqueness = Mode.Uniqueness.Const_op
   module Portability = Mode.Portability.Const
@@ -100,7 +100,7 @@ module Jkind_mod_bounds : sig
   type t
 
   val create :
-    locality:Locality.t ->
+    areality:Areality.t ->
     linearity:Linearity.t ->
     uniqueness:Uniqueness.t ->
     portability:Portability.t ->
@@ -113,7 +113,7 @@ module Jkind_mod_bounds : sig
     separability:Separability.t ->
     t
 
-  val locality : t -> Locality.t
+  val areality : t -> Areality.t
   val linearity : t -> Linearity.t
   val uniqueness : t -> Uniqueness.t
   val portability : t -> Portability.t
@@ -125,7 +125,7 @@ module Jkind_mod_bounds : sig
   val nullability : t -> Nullability.t
   val separability : t -> Separability.t
 
-  val set_locality : Locality.t -> t -> t
+  val set_areality : Areality.t -> t -> t
   val set_linearity : Linearity.t -> t -> t
   val set_uniqueness : Uniqueness.t -> t -> t
   val set_portability : Portability.t -> t -> t

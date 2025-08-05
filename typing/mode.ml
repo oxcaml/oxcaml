@@ -2465,6 +2465,36 @@ module Value_with (Areality : Areality) = struct
           visibility
         }
 
+      let proj (type a) (ax : a Axis.t) (t : t) : a option =
+        match ax with
+        | Monadic ax -> (
+          match ax with
+          | Uniqueness -> t.uniqueness
+          | Contention -> t.contention
+          | Visibility -> t.visibility)
+        | Comonadic ax -> (
+          match ax with
+          | Areality -> t.areality
+          | Linearity -> t.linearity
+          | Portability -> t.portability
+          | Yielding -> t.yielding
+          | Statefulness -> t.statefulness)
+
+      let set (type a) (ax : a Axis.t) (a : a option) (t : t) : t =
+        match ax with
+        | Monadic ax -> (
+          match ax with
+          | Uniqueness -> { t with uniqueness = a }
+          | Contention -> { t with contention = a }
+          | Visibility -> { t with visibility = a })
+        | Comonadic ax -> (
+          match ax with
+          | Areality -> { t with areality = a }
+          | Linearity -> { t with linearity = a }
+          | Portability -> { t with portability = a }
+          | Yielding -> { t with yielding = a }
+          | Statefulness -> { t with statefulness = a })
+
       let print ppf
           { areality;
             uniqueness;
@@ -2785,15 +2815,23 @@ module Const = struct
     }
 
   module Axis = struct
-    let alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed = function
-      | P (Comonadic Areality) -> P (Comonadic Areality)
-      | P (Comonadic Linearity) -> P (Comonadic Linearity)
-      | P (Comonadic Portability) -> P (Comonadic Portability)
-      | P (Comonadic Yielding) -> P (Comonadic Yielding)
-      | P (Comonadic Statefulness) -> P (Comonadic Statefulness)
-      | P (Monadic Uniqueness) -> P (Monadic Uniqueness)
-      | P (Monadic Contention) -> P (Monadic Contention)
-      | P (Monadic Visibility) -> P (Monadic Visibility)
+    let is_areality (type a) :
+        a Alloc.Axis.t ->
+        ((a, Locality.Const.t) Misc.eq, a Value.Axis.t) Either.t = function
+      | Comonadic Areality -> Left Refl
+      | Comonadic Linearity -> Right (Comonadic Linearity)
+      | Comonadic Portability -> Right (Comonadic Portability)
+      | Comonadic Yielding -> Right (Comonadic Yielding)
+      | Comonadic Statefulness -> Right (Comonadic Statefulness)
+      | Monadic Uniqueness -> Right (Monadic Uniqueness)
+      | Monadic Contention -> Right (Monadic Contention)
+      | Monadic Visibility -> Right (Monadic Visibility)
+
+    let alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed =
+     fun (P ax) ->
+      match is_areality ax with
+      | Left Refl -> P (Comonadic Areality)
+      | Right ax -> P ax
   end
 
   let locality_as_regionality = C.locality_as_regionality
@@ -3382,6 +3420,12 @@ module Crossing = struct
     let top : t = Join_const Mode.Const.min
 
     let bot : t = Join_const Mode.Const.max
+
+    let join (Join_const c0 : t) (Join_const c1 : t) : t =
+      Join_const (Mode.Const.meet c0 c1)
+
+    let meet (Join_const c0 : t) (Join_const c1 : t) : t =
+      Join_const (Mode.Const.join c0 c1)
   end
 
   module Comonadic = struct
@@ -3390,9 +3434,7 @@ module Crossing = struct
 
     type t = Modality.t
 
-    let of_bounds c : t =
-      let c = C.apply Mode.Obj.obj (Map_comonadic Locality_as_regionality) c in
-      Meet_const c
+    let of_bounds c : t = Meet_const c
 
     let modality m t = Modality.concat ~then_:t m
 
@@ -3411,6 +3453,12 @@ module Crossing = struct
     let top : t = Meet_const Mode.Const.max
 
     let bot : t = Meet_const Mode.Const.min
+
+    let join (Meet_const c0 : t) (Meet_const c1 : t) : t =
+      Meet_const (Mode.Const.join c0 c1)
+
+    let meet (Meet_const c0 : t) (Meet_const c1 : t) : t =
+      Meet_const (Mode.Const.meet c0 c1)
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
@@ -3467,9 +3515,23 @@ module Crossing = struct
   let le t0 t1 =
     Monadic.le t0.monadic t1.monadic && Comonadic.le t0.comonadic t1.comonadic
 
-  let top = { monadic = Monadic.top; comonadic = Comonadic.top }
+  let max = { monadic = Monadic.top; comonadic = Comonadic.top }
 
-  let bot = { monadic = Monadic.bot; comonadic = Comonadic.bot }
+  let min = { monadic = Monadic.bot; comonadic = Comonadic.bot }
+
+  let legacy = max (* legacy behavior is no mode crossing *)
+
+  let join t0 t1 =
+    { monadic = Monadic.join t0.monadic t1.monadic;
+      comonadic = Comonadic.join t0.comonadic t1.comonadic
+    }
+
+  let meet t0 t1 =
+    { monadic = Monadic.meet t0.monadic t1.monadic;
+      comonadic = Comonadic.meet t0.comonadic t1.comonadic
+    }
+
+  let equal t0 t1 = le t0 t1 && le t1 t0
 
   let print ppf t =
     let print_atom ppf = function
