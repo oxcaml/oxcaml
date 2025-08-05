@@ -34,7 +34,7 @@ end = struct
       -> ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b)
       -> 'd t
       -> 'd
-      -> ('a, 'b) stack = "caml_alloc_stack"
+      -> ('a, 'b) stack = "caml_alloc_stack_bind"
 
     external runstack : ('a, 'b) stack -> ('c -> 'a) -> 'c -> 'b = "%runstack"
 

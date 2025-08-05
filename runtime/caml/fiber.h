@@ -68,10 +68,10 @@ struct stack_info {
   void* local_top;
   intnat local_limit;
 
-  /* Dynamic binding */
+  /* Temporary dynamic binding, applying only in this fiber */
   /* TODO: Consider making this a table of bindings */
   value dyn;
-  value bind;
+  value val;
 };
 
 #ifdef STACK_GUARD_PAGES
