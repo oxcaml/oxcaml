@@ -243,8 +243,7 @@ module Intrinsic : sig
           { src : any_locality_mode t;
             dst : 'mode t
           }
-      (** See scalar.md in the repo root for documentation on the semantics. *)
-
+          (** See scalar.md in the repo root for documentation on the semantics. *)
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 

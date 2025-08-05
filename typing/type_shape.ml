@@ -160,7 +160,6 @@ module Type_shape = struct
 
   let of_type_expr (expr : Types.type_expr) uid_of_path =
     of_type_expr_go ~visited:Numbers.Int.Set.empty ~depth:0 expr uid_of_path
-
 end
 
 module Type_decl_shape = struct
