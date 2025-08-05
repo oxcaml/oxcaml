@@ -1,0 +1,6 @@
+Test 1: Open with module ident
+42. hello
+Test 2: Open with inline struct
+42. hello
+Test 3: Open with functor
+42. hello
