@@ -1279,8 +1279,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
         "Unboxed records should not reach this stage. They are deconstructed \
          by unarization in earlier stages of the compiler."
     | Record
-        { fields = [(field_name, _, sh, Base base_layout)]; kind = Record_unboxed }
-      ->
+        { fields = [(field_name, _, sh, Base base_layout)];
+          kind = Record_unboxed
+        } ->
       let field_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
           base_layout ~rec_env
@@ -1295,7 +1296,9 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
     | Record { fields = [(_, _, _, Product _)]; kind = Record_unboxed } ->
       assert false
     | Record { fields; kind = Record_mixed mixed_block_shapes } ->
-      let fields = List.map (fun (name, _, sh, ly) -> Some name, sh, ly) fields in
+      let fields =
+        List.map (fun (name, _, sh, ly) -> Some name, sh, ly) fields
+      in
       let fields = flatten_fields_in_mixed_record ~mixed_block_shapes fields in
       let fields =
         List.map

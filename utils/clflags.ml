@@ -85,7 +85,7 @@ let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
 let use_old_merlin_shapes =             (* -use-old-merlin-shapes *)
-  ref (not (Config.oxcaml_dwarf))
+  ref false
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)

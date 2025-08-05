@@ -392,7 +392,11 @@ module Type_decl_shape = struct
         in
         Array.of_list lys
     in
-    { Shape.name; constr_uid = Some cstr_args.cd_uid; kind = constructor_repr; args }
+    { Shape.name;
+      constr_uid = Some cstr_args.cd_uid;
+      kind = constructor_repr;
+      args
+    }
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     match cstr_args.cd_args with

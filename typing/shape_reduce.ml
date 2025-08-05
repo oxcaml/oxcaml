@@ -473,36 +473,60 @@ end) = struct
               | exception Not_found -> nored ()
               | nf -> force env nf |> reset_uid_if_new_binding
               end
-          (* CR sspies: The following cases are for Merlin. *)
+          (* Merlin Reductions: The following reductions are not correct from a
+             a runtime perspective (e.g., we cannot project out the tuple or
+             record from a constructor, because these contents are not
+             represented as separate blocks at runtime.) The projections are
+             needed for Merlin to work correctly. For DWARF emission, they
+             should never be triggered, since we only evaluate shape for
+             type expressions (e.g., t.field is not a type).  *)
           | NVariant constrs when Shape.Item.is_constructor item ->
             let name = Shape.Item.name item in
             (match List.find_opt (fun c -> String.equal c.name name) constrs with
             | Some { name = _; constr_uid; kind = _; args } ->
-              let shape_map = List.fold_left
-              (fun shape_map { field_name; field_uid; field_value = sh, _ } ->
-                match field_name with
-                | Some name ->
+              let has_unnamed_field =
+                List.exists (fun { field_name; _ } ->
+                  Option.is_none field_name) args in
+              if has_unnamed_field then
+                let tuple_args = List.map (fun { field_name = _; field_uid;
+                                               field_value = sh, _ } ->
                   let sh = delayed_nf_set_uid sh field_uid in
-                  Item.Map.add (name, Sig_component_kind.Label) sh shape_map
-                | None -> shape_map
-              ) Item.Map.empty args  in
-              { desc = NStruct shape_map; uid = constr_uid; approximated = false }
+                  force env sh
+                ) args in
+                { desc = NTuple tuple_args; uid = constr_uid;
+                  approximated = false }
+              else
+                let fields = List.map (fun { field_name; field_uid;
+                                           field_value = sh, layout } ->
+                  let name = Option.get field_name in
+                  let sh = delayed_nf_set_uid sh field_uid in
+                  (name, field_uid, sh, layout)
+                ) args in
+                { desc = NRecord { fields; kind = Record_boxed };
+                  uid = constr_uid; approximated = false }
             | None -> nored())
-          | NVariant_unboxed { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout = _ } when Shape.Item.is_constructor item ->
+          | NVariant_unboxed { name; variant_uid; arg_name; arg_uid;
+                               arg_shape; arg_layout }
+            when Shape.Item.is_constructor item ->
             let item_name = Shape.Item.name item in
             if String.equal name item_name then
-              let shape_map = match arg_name with
+              match arg_name with
                 | Some arg_name ->
                   let sh = delayed_nf_set_uid arg_shape arg_uid in
-                  Item.Map.add (arg_name, Sig_component_kind.Label) sh Item.Map.empty
-                | None -> Item.Map.empty
-              in
-              { desc = NStruct shape_map; uid = variant_uid; approximated = false }
+                  let fields = [(arg_name, arg_uid, sh, arg_layout)] in
+                  { desc = NRecord { fields; kind = Record_boxed };
+                    uid = variant_uid; approximated = false }
+                | None ->
+                  let sh = delayed_nf_set_uid arg_shape arg_uid in
+                  let sh = force env sh in
+                  { desc = NUnboxed_tuple [sh]; uid = variant_uid;
+                    approximated = false }
             else nored()
           | NRecord { fields; kind = _ }
             when Shape.Item.is_label item || Shape.Item.is_unboxed_label item ->
             let field_name = Shape.Item.name item in
-            (match List.find_opt (fun (name, _, _, _) -> String.equal name field_name) fields with
+            (match List.find_opt (fun (name, _, _, _) ->
+               String.equal name field_name) fields with
             | Some (_, field_uid, field_shape, _) ->
               force env field_shape |> set_uid_if_none field_uid
             | None -> nored())
