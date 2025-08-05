@@ -609,7 +609,7 @@ type ('a : void) void4 = Void4 of 'a
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
-type 'a any4 = Any4 of 'a
+type ('a : value_or_null) any4 = Any4 of 'a
 |}];;
 
 (************************************************************)

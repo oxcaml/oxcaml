@@ -404,7 +404,7 @@ Error: This type "'a or_null" should be an instance of type "('b : value)"
 type (_, _ : value_or_null) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@@unboxed]
 
 [%%expect{|
-type (_, _) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@@unboxed]
+type (_, _ : value_or_null) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@@unboxed]
 |}]
 
 let gadt_null = Gadt Null

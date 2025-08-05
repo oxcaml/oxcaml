@@ -738,7 +738,7 @@ type ('a : value_or_null) record : value mod non_float =
   { x : 'a; y : int or_null; z : float }
 
 [%%expect{|
-type 'a record = { x : 'a; y : int or_null; z : float; }
+type ('a : value_or_null) record = { x : 'a; y : int or_null; z : float; }
 |}]
 
 type ('a : value_or_null) smth : immediate with 'a
@@ -750,11 +750,11 @@ type ('a : immediate) bounded
 type works = int or_null smth bounded
 
 [%%expect{|
-type 'a smth : immediate with 'a
+type ('a : value_or_null) smth : immediate with 'a
 type ('a : immediate) bounded
 type works = int or_null smth bounded
 |}, Principal{|
-type 'a smth : immediate with 'a
+type ('a : value_or_null) smth : immediate with 'a
 type ('a : immediate) bounded
 Line 7, characters 13-29:
 7 | type works = int or_null smth bounded

@@ -352,6 +352,7 @@ AC_SUBST([cmm_invariants])
 AC_SUBST([windows_unicode])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
+AC_SUBST([oxcaml_dwarf_flags_for_compiler])
 AC_SUBST([probes])
 AC_SUBST([oc_native_compflags])
 AC_SUBST([afl])
@@ -710,6 +711,12 @@ AC_ARG_ENABLE([stack-allocation],
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
     [enable insertion of poll points])])
+
+AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
+  [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
+    [Compile the compiler and standard library with OxCaml DWARF])],
+  [],
+  [enable_oxcaml_dwarf_on_compiler=no])
 
 AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
@@ -2835,6 +2842,11 @@ AS_IF([test x"$probes" = "xfalse"],
 AS_IF([test x"$with_afl" = "xyes"],
   [afl=true],
   [afl=false])
+
+# Configure DWARF debugging flags for oxcaml compiler
+AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
+  [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf"],
+  [oxcaml_dwarf_flags_for_compiler=""])
 
 # Enable debugging support
 # TODO: add a --disable-debug-info configure option that disables debugging
