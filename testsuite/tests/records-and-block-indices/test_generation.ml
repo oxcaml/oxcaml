@@ -108,29 +108,29 @@ let interesting_type_trees test : Type_structure.t Tree.t list =
     Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
   in
   let enumerated_type_trees =
+    (* more trees, fewer types *)
+    List.concat_map interesting_type_pairs ~f:(fun leaves ->
+        List.concat_map
+          (more_enumerated_trees
+          @ if patient then interesting_large_trees else []
+          )
+          ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
+    )
+    (* fewer trees, more types *)
+    @ List.concat_map enumerated_trees ~f:(fun shape ->
+          Tree.enumerate ~shape
+            ~leaves:
+              (if patient then more_interesting_types else interesting_types)
+      )
+    @ hardcoded_type_trees
+  in
+  let enumerated_type_trees =
     if is_idx_test test && not patient
     then
-      (* idx tests are more expensive *)
-      (* fewer trees and types *)
-      List.concat_map enumerated_trees ~f:(fun shape ->
-          Tree.enumerate ~shape ~leaves:interesting_types
-      )
-    else
-      (* more trees, fewer types *)
-      List.concat_map interesting_type_pairs ~f:(fun leaves ->
-          List.concat_map
-            (more_enumerated_trees
-            @ if patient then interesting_large_trees else []
-            )
-            ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
-      )
-      (* fewer trees, more types *)
-      @ List.concat_map enumerated_trees ~f:(fun shape ->
-            Tree.enumerate ~shape
-              ~leaves:
-                (if patient then more_interesting_types else interesting_types)
-        )
-      @ hardcoded_type_trees
+      (* idx tests are expensive, so take a subset *)
+      let () = Random.init (Hashtbl.hash test) in
+      List.filteri ~f:(fun i _ -> Random.int 5 = 0) enumerated_type_trees
+    else enumerated_type_trees
   in
   List.sort_uniq enumerated_type_trees ~cmp:(Tree.compare Type_structure.compare)
 
