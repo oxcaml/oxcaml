@@ -743,6 +743,7 @@ and address_unforced =
       pos : int }
     (* [field_layouts] is a [list] here because it is constructed with iterative
        prepending *)
+    (* CR jrayman: is this still true? *)
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -2204,7 +2205,6 @@ let rec components_of_module_maker
         List.filter_map
           (fun (item, _) -> field_layout_of_signature_item item)
           items_and_paths
-        |> List.rev
       in
       let next_address () =
         let addr : address_unforced =
