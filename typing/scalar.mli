@@ -339,3 +339,7 @@ module Intrinsic : sig
     val of_string : string -> t
   end
 end
+
+val equal_any_locality_mode : any_locality_mode -> any_locality_mode -> bool
+
+val equal : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool

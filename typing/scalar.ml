@@ -596,3 +596,46 @@ module Intrinsic = struct
       else of_string (StringLabels.sub s ~pos:1 ~len:(len - 1))
   end
 end
+
+let equal_any_locality_mode Any_locality_mode Any_locality_mode = true
+
+let equal (type a b) (eq_mode : a -> b -> bool) (t1 : a t) (t2 : b t) : bool =
+  match t1, t2 with
+  | Value (Integral (Taggable Int8)), Value (Integral (Taggable Int8)) -> true
+  | Value (Integral (Taggable Int16)), Value (Integral (Taggable Int16)) -> true
+  | Value (Integral (Taggable Int)), Value (Integral (Taggable Int)) -> true
+  | Value (Integral (Boxable (Int32 m1))), Value (Integral (Boxable (Int32 m2))) ->
+    eq_mode m1 m2
+  | Value (Integral (Boxable (Int64 m1))), Value (Integral (Boxable (Int64 m2))) ->
+    eq_mode m1 m2
+  | Value (Integral (Boxable (Nativeint m1))),
+    Value (Integral (Boxable (Nativeint m2))) ->
+    eq_mode m1 m2
+  | Value (Floating (Float32 m1)), Value (Floating (Float32 m2)) -> eq_mode m1 m2
+  | Value (Floating (Float64 m1)), Value (Floating (Float64 m2)) -> eq_mode m1 m2
+  | Naked (Integral (Taggable Int8)), Naked (Integral (Taggable Int8)) -> true
+  | Naked (Integral (Taggable Int16)), Naked (Integral (Taggable Int16)) -> true
+  | Naked (Integral (Taggable Int)), Naked (Integral (Taggable Int)) -> true
+  | Naked (Integral (Boxable (Int32 Any_locality_mode))),
+    Naked (Integral (Boxable (Int32 Any_locality_mode))) ->
+    true
+  | Naked (Integral (Boxable (Int64 Any_locality_mode))),
+    Naked (Integral (Boxable (Int64 Any_locality_mode))) ->
+    true
+  | Naked (Integral (Boxable (Nativeint Any_locality_mode))),
+    Naked (Integral (Boxable (Nativeint Any_locality_mode))) ->
+    true
+  | Naked (Floating (Float32 Any_locality_mode)),
+    Naked (Floating (Float32 Any_locality_mode)) ->
+    true
+  | Naked (Floating (Float64 Any_locality_mode)),
+    Naked (Floating (Float64 Any_locality_mode)) ->
+    true
+  | ( ( Value (Integral (Taggable (Int8 | Int16 | Int)))
+      | Value (Integral (Boxable (Int32 _ | Int64 _ | Nativeint _)))
+      | Value (Floating (Float32 _ | Float64 _))
+      | Naked (Integral (Taggable (Int8 | Int16 | Int)))
+      | Naked (Integral (Boxable (Int32 _ | Int64 _ | Nativeint _)))
+      | Naked (Floating (Float32 _ | Float64 _)) ),
+      _ ) ->
+    false
