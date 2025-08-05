@@ -33,7 +33,18 @@ module Storer = Switch.Store (struct
   let make_key = Lambda.make_key
 end)
 
-let const_int x = Const (Const_base (Const_int x))
+let constant_int size n : constant =
+  match (size : Scalar.any_locality_mode Scalar.Integral.Width.t) with
+  | Taggable Int -> Const_int n
+  | Taggable Int8 -> Const_int (Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
+  | Taggable Int16 -> Const_int (Numbers.Int16.to_int (Numbers.Int16.of_int_exn n))
+  | Boxable (Int32 Any_locality_mode) -> Const_int32 (Int32.of_int n)
+  | Boxable (Int64 Any_locality_mode) -> Const_int64 (Int64.of_int n)
+  | Boxable (Nativeint Any_locality_mode) -> Const_nativeint (Nativeint.of_int n)
+
+let const_int size n = Const_base (constant_int size n)
+
+let tagged_immediate n = Const (const_int (Taggable Int) n)
 
 let unit = Const Lambda.const_unit
 
@@ -82,9 +93,9 @@ let sign_extend width exp =
       when is_immed ((n lsl unused_bits) asr unused_bits) ->
       Const (Const_base (Const_int ((n lsl unused_bits) asr unused_bits)))
     | exp ->
-      let width = const_int bits in
+      let width = tagged_immediate bits in
       let int_size = Prim (caml_sys_const Int_size, [unit]) in
-      let unused_bits = Prim (Subint, [int_size; width]) in
+      let unused_bits = Prim (Subint, [int_size;  width]) in
       Prim (Asrint, [Prim (Lslint, [exp; unused_bits]); unused_bits])
   in
   match (width : tagged_integer) with
@@ -98,7 +109,7 @@ let zero_extend width exp =
     match exp with
     | Const (Const_base (Const_int n)) when is_immed (n land mask) ->
       Const (Const_base (Const_int (n land mask)))
-    | exp -> Prim (Andint, [exp; const_int mask])
+    | exp -> Prim (Andint, [exp; tagged_immediate mask])
   in
   match (width : tagged_integer) with
   | Int -> exp
@@ -353,7 +364,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pignore -> (
       match args with
-      | [arg] -> Sequence (comp_expr arg, Const (Const_base (Const_int 0)))
+      | [arg] -> Sequence (comp_expr arg, unit)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pnot -> unary Boolnot
     | Psequand -> (
@@ -481,7 +492,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             (Lambda.Lprim (Pctconst Word_size, [Lambda.lambda_unit], loc))
         in
         let element_size =
-          Prim (Lsrint, [word_size; Const (Const_base (Const_int 3))])
+          Prim (Lsrint, [word_size; tagged_immediate 3])
         in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
@@ -900,7 +911,7 @@ and comp_unary_scalar_intrinsic op x =
       comp_binary_scalar_intrinsic
         (Scalar.Intrinsic.Binary.Integral (size, Add))
         x
-        (Const (Lambda.const_int size n))
+        (Const (const_int (Scalar.Integral.width size) n))
     in
     match op with
     | Succ -> comp_offset 1

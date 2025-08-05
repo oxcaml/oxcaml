@@ -1812,7 +1812,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
     | Ref ->
       begin match args with
       | hd :: rest ->
-        hd :: Lconst (Lambda.const_int Lambda.int 0) :: rest
+        hd :: tagged_immediate 0 :: rest
       | _ -> assert false
       end
     | Field -> args

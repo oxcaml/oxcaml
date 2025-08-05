@@ -52,7 +52,7 @@ let rec eliminate_ref id = function
   | Lprim(Psetfield(0, _, _), [Lvar v; e], _) when Ident.same v id ->
       Lassign(id, eliminate_ref id e)
   | Lprim(Poffsetref delta, [Lvar v], loc) when Ident.same v id ->
-    Lassign(id, add int ~loc (Lmutvar id) (lconst_int int delta))
+    Lassign(id, add int ~loc (Lmutvar id) (tagged_immediate delta))
   | Lprim(p, el, loc) ->
       Lprim(p, List.map (eliminate_ref id) el, loc)
   | Lswitch(e, sw, loc, kind) ->

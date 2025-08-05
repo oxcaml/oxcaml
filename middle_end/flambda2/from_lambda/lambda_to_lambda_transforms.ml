@@ -199,13 +199,12 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
             loc )
       in
       let length_is_greater_than_zero_and_is_one_mod_two =
-        let int = int_scalar in
         L.Lprim
           ( Psequand,
-            [ L.icmp ~loc Cgt L.int length (L.lconst_int int 0);
+            [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
               L.icmp ~loc Cne L.int
-                (L.and_ L.int length (L.lconst_int int 1) ~loc)
-                (L.lconst_int int 0) ],
+                (L.and_ L.int length (L.tagged_immediate 1) ~loc)
+                (L.tagged_immediate 0) ],
             loc )
       in
       L.Lifthenelse
@@ -218,11 +217,8 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     let index = Ident.create_local "index" in
     let index_duid = Lambda.debug_uid_none in
     rec_catch_for_for_loop env loc index index_duid
-      (Lconst (L.const_int L.int 0))
-      (Lprim
-         ( Pscalar (Binary (Integral (L.int, Sub))),
-           [length; Lconst (L.const_int L.int 1)],
-           loc ))
+      (L.tagged_immediate 0)
+      (L.pred L.int length ~loc)
       Upto
       (Lprim
          ( Parraysetu (array_set_kind, Ptagged_int_index),
@@ -339,7 +335,7 @@ let makearray_dynamic_non_scannable_unboxed_product env
     L.(
       Lprim
         ( Pccall external_call_desc,
-          [lconst_int int num_components; is_local; length],
+          [tagged_immediate num_components; is_local; length],
           loc ))
   in
   match init with
@@ -578,9 +574,7 @@ let arrayblit_expanded env ~(src_mutability : L.mutable_flag)
     let addint x y = L.add L.int x y ~loc in
     let subint x y = L.sub L.int x y ~loc in
     let src_end_pos_exclusive = addint (Lvar src_start_pos) (Lvar length) in
-    let src_end_pos_inclusive =
-      subint src_end_pos_exclusive (L.lconst_int L.int 1)
-    in
+    let src_end_pos_inclusive = L.pred L.int src_end_pos_exclusive ~loc in
     let dst_start_pos_minus_src_start_pos =
       subint (Lvar dst_start_pos) (Lvar src_start_pos)
     in

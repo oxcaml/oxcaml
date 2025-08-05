@@ -455,8 +455,7 @@ let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
           (inh_init,
            Llet (Strict, layout_array Pgenarray, inh, inh_duid,
                  mkappl(oo_prim "inherits", narrow_args @
-                        [path_lam;
-                         (lconst_int int (if top then 1 else 0))],
+                        [path_lam; Lambda.of_bool top],
                        layout_array Pgenarray),
                  Llet(StrictOpt, layout_t, obj_init, Lambda.debug_uid_none,
                   lfield inh 0, cl_init)))
@@ -659,7 +658,7 @@ let rec builtin_meths self env env2 body =
     | Lprim(Parrayrefu _, [Lvar s; Lvar n], _) when List.mem s self ->
         "var", [Lvar n]
     | Lprim(Pfield(n, _, _), [Lvar e], _) when Ident.same e env ->
-        "env", [Lvar env2; (lconst_int int n)]
+        "env", [Lvar env2; (tagged_immediate n)]
     | Lsend(Self, met, Lvar s, [], _, _, _, _) when List.mem s self ->
         "meth", [met]
     | _ -> raise Not_found
@@ -730,7 +729,7 @@ module M = struct
     | "send_env"   -> SendEnv
     | "send_meth"  -> SendMeth
     | _ -> assert false
-    in (lconst_int int (Obj.magic tag)) :: args
+    in (tagged_immediate (Obj.magic tag)) :: args
 end
 open M
 

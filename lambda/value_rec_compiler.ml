@@ -923,7 +923,7 @@ let compile_letrec input_bindings body =
         in
         let alloc =
           Lprim (Pccall alloc_prim,
-                 List.map (fun n -> Lconst (Lambda.const_int int n)) const_args,
+                 List.map Lambda.tagged_immediate const_args,
                  no_loc)
         in
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))

@@ -89,7 +89,7 @@ let transl_extension_constructor ~scopes env path ext =
          to pattern typing, as patterns can close over them. *)
       Lprim (Pmakeblock (Obj.object_tag, Immutable_unique, None, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
-         Lprim (prim_fresh_oo_id, [(lconst_int int 0)], loc)],
+         Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
   | Text_rebind(path, _lid) ->
       transl_extension_path loc env path
@@ -511,7 +511,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
           List.fold_left
             (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
-            ((lconst_int int runtime_tag) : lambda)
+            ((tagged_immediate runtime_tag) : lambda)
             ll
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
@@ -618,16 +618,16 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_variant(l, arg) ->
       let tag = Btype.hash_variant l in
       begin match arg with
-        None -> (lconst_int int tag)
+        None -> (tagged_immediate tag)
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
-            Lconst(Const_block(0, [const_int int tag;
+            Lconst(Const_block(0, [const_int tag;
                                    extract_constant lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
-                  [lconst_int int tag; lam],
+                  [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->

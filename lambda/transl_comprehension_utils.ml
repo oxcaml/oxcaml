@@ -33,7 +33,7 @@ end
 
 module Lambda_utils = struct
   module Constants = struct
-    let int n = lconst_int int n
+    let int n = tagged_immediate n
 
     let float f = Lconst (Const_base (Const_float (Float.to_string f)))
 

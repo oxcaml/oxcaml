@@ -120,7 +120,6 @@ type region_close =
   | Rc_nontail
   | Rc_close_at_apply
 
-
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Scalar = Scalar
@@ -657,7 +656,6 @@ let must_be_value layout =
 
 type structured_constant =
     Const_base of constant
-  | Const_naked_immediate of int * Scalar.Integral.Taggable.Width.t
   | Const_block of int * structured_constant list
   | Const_mixed_block of int * mixed_block_shape * structured_constant list
   | Const_float_array of string list
@@ -960,30 +958,15 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
     arg_block_idx: int; }
 
-let const_int size n =
-  match (size : _ Scalar.Integral.t) with
-  | Value (Taggable (Int8 | Int16 | Int)) -> Const_base (Const_int n)
-  | Value (Boxable (Int32 _)) ->
-    Const_base (Const_int32 (Int32.of_int n))
-  | Value (Boxable (Int64 _)) ->
-    Const_base (Const_int64 (Int64.of_int n))
-  | Value (Boxable (Nativeint _)) ->
-    Const_base (Const_nativeint (Nativeint.of_int n))
-  | Naked (Taggable taggable) -> Const_naked_immediate (n, taggable)
-  | Naked (Boxable (Int32 _)) ->
-    Const_base (Const_unboxed_int32 (Int32.of_int n))
-  | Naked (Boxable (Int64 _)) ->
-    Const_base (Const_unboxed_int64 (Int64.of_int n))
-  | Naked (Boxable (Nativeint _)) ->
-    Const_base (Const_unboxed_nativeint (Nativeint.of_int n))
+let const_int n = Const_base (Const_int n)
 
-let lconst_int size n = Lconst (const_int size n)
+let tagged_immediate n = Lconst (const_int n)
 
 let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
 
-let const_unit = const_int int 0
+let const_unit = const_int 0
 
-let dummy_constant = Lconst (const_int int (0xBBBB / 2))
+let dummy_constant = tagged_immediate (0xBBBB / 2)
 
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
@@ -1022,8 +1005,8 @@ let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
 let lambda_unit = Lconst const_unit
 
 let of_bool = function
-  | true -> Lconst (const_int int 1)
-  | false -> Lconst (const_int int 0)
+  | true -> tagged_immediate 1
+  | false -> tagged_immediate 0
 
 (* CR vlaviron: review the following cases *)
 let non_null_value raw_kind =
@@ -2225,12 +2208,6 @@ let constant_layout: constant -> layout = function
 
 let structured_constant_layout = function
   | Const_base const -> constant_layout const
-  | Const_naked_immediate ((_ : int), Int8) ->
-    Punboxed_int Unboxed_int8
-  | Const_naked_immediate ((_ : int), Int16) ->
-    Punboxed_int Unboxed_int16
-  | Const_naked_immediate ((_ : int), Int) ->
-    Punboxed_int Unboxed_int
   | Const_mixed_block _ | Const_block _ | Const_immstring _ ->
     non_null_value Pgenval
   | Const_float_array _ | Const_float_block _ ->

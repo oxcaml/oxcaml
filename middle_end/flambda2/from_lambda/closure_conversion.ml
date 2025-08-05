@@ -102,16 +102,6 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     Simple.With_debuginfo.create (Simple.const cst) dbg
   in
   match const with
-  | Const_naked_immediate (c, Int8) ->
-    ( acc,
-      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
-      "naked_int8" )
-  | Const_naked_immediate (c, Int16) ->
-    ( acc,
-      reg_width (RWC.naked_int16 (Numeric_types.Int16.of_int_exn c)),
-      "naked_int16" )
-  | Const_naked_immediate (c, Int) ->
-    acc, reg_width (RWC.naked_immediate (Targetint_31_63.of_int c)), "naked_int"
   | Const_base (Const_int c) ->
     acc, reg_width (RWC.tagged_immediate (Targetint_31_63.of_int c)), "int"
   | Const_base (Const_char c) ->
@@ -210,7 +200,6 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         Lambda.structured_constant =
       match c with
       | Const_base (Const_float f) -> Const_base (Const_unboxed_float f)
-      | Const_naked_immediate _
       | Const_base
           ( Const_int _ | Const_char _ | Const_string _ | Const_float32 _
           | Const_unboxed_float _ | Const_unboxed_float32 _ | Const_int32 _

@@ -587,8 +587,6 @@ val layout_of_extern_repr : extern_repr -> layout
 
 type structured_constant =
     Const_base of constant
-  | Const_naked_immediate of int * Scalar.Integral.Taggable.Width.t
-  (** this is a stopgap until naked immediate values exist in [constant] *)
   | Const_block of int * structured_constant list
   | Const_mixed_block of int * mixed_block_shape * structured_constant list
   | Const_float_array of string list
@@ -986,8 +984,9 @@ type arg_descr =
 val make_key: lambda -> lambda option
 
 val const_unit: structured_constant
-val const_int : _ Scalar.Integral.t -> int -> structured_constant
-val lconst_int : _ Scalar.Integral.t -> int -> lambda
+val const_int : int -> structured_constant
+
+val tagged_immediate : int -> lambda
 val lambda_unit: lambda
 
 val of_bool : bool -> lambda

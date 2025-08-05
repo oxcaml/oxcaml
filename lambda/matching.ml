@@ -2134,7 +2134,7 @@ let inline_lazy_force_cond arg pos loc =
   let varg = Lvar idarg in
   let tag = Ident.create_local "tag" in
   let tag_duid = Lambda.debug_uid_none in
-  let test_tag t = icmp Ceq int (Lvar tag) (lconst_int int t) ~loc in
+  let test_tag t = icmp Ceq int (Lvar tag) (tagged_immediate t) ~loc in
   Llet
     ( Strict,
       Lambda.layout_lazy,
@@ -2747,7 +2747,7 @@ module SArg = struct
   let make_offset arg n =
     match n with
     | 0 -> arg
-    | _ -> Lambda.add int arg (lconst_int int n) ~loc:Loc_unknown
+    | _ -> Lambda.add int arg (tagged_immediate n) ~loc:Loc_unknown
 
   let bind arg body =
     let newvar, newvar_duid, newarg =
@@ -2771,7 +2771,7 @@ module SArg = struct
 
   let make_is_nonzero arg =
     if !Clflags.native_code
-    then icmp Cne int arg (lconst_int int 0) ~loc:Loc_unknown
+    then icmp Cne int arg (tagged_immediate 0) ~loc:Loc_unknown
     else arg
 
   let arg_as_test arg = arg

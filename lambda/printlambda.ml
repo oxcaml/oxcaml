@@ -1063,8 +1063,6 @@ let debug_uid ppf duid =
     fprintf ppf "%@{%a}" Shape.Uid.print duid
 
 let rec struct_const ppf = function
-  | Const_naked_immediate(n, _) ->
-    fprintf ppf "%i" n
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
   | Const_base(Const_string (s, _, _)) -> fprintf ppf "%S" s
