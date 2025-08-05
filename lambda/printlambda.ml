@@ -19,22 +19,6 @@ open Primitive
 open Types
 open Lambda
 
-let primitive_unboxed_integer : Primitive.unboxed_integer -> string = function
-  | Unboxed_int8 -> "unboxed_int8"
-  | Unboxed_int16 -> "unboxed_int16"
-  | Unboxed_int -> "unboxed_int"
-  | Unboxed_nativeint -> "unboxed_nativeint"
-  | Unboxed_int32 -> "unboxed_int32"
-  | Unboxed_int64 -> "unboxed_int64"
-
-let unboxed_integer : Lambda.unboxed_integer -> string = function
-  | Unboxed_int8 -> "unboxed_int8"
-  | Unboxed_int16 -> "unboxed_int16"
-  | Unboxed_int -> "unboxed_int"
-  | Unboxed_nativeint -> "unboxed_nativeint"
-  | Unboxed_int32 -> "unboxed_int32"
-  | Unboxed_int64 -> "unboxed_int64"
-
 let unboxed_integer_suffix = function
   | Unboxed_int8 -> "int8"
   | Unboxed_int16 -> "int16"
@@ -53,6 +37,7 @@ let unboxed_vector_suffix = function
   | Unboxed_vec512 -> "vec512"
 
 (* Uses in most contexts get the "unboxed_" prefix *)
+let unboxed_integer ui = "unboxed_" ^ unboxed_integer_suffix ui
 let unboxed_float uf = "unboxed_" ^ unboxed_float_suffix uf
 let unboxed_vector uv = "unboxed_" ^ unboxed_vector_suffix uv
 
@@ -74,6 +59,11 @@ let boxed_vector = function
   | Boxed_vec128 -> "vec128"
   | Boxed_vec256 -> "vec256"
   | Boxed_vec512 -> "vec512"
+
+let vector_width = function
+  | Boxed_vec128 -> "128"
+  | Boxed_vec256 -> "256"
+  | Boxed_vec512 -> "512"
 
 let rec scannable_product_element_kinds kinds =
   "[" ^ String.concat "; " (List.map scannable_product_element_kind kinds) ^ "]"
@@ -98,7 +88,7 @@ let array_kind = function
   | Pintarray -> "int"
   | Pfloatarray -> "float"
   | Punboxedfloatarray f -> unboxed_float f
-  | Punboxedintarray i -> primitive_unboxed_integer i
+  | Punboxedintarray i -> unboxed_integer i
   | Punboxedvectorarray v -> unboxed_vector v
   | Pgcscannableproductarray kinds ->
     "scannableproduct " ^ scannable_product_element_kinds kinds
@@ -121,7 +111,7 @@ let array_ref_kind ppf k =
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_ref Unboxed_float32 -> fprintf ppf "unboxed_float32"
-  | Punboxedintarray_ref i -> pp_print_string ppf (primitive_unboxed_integer i)
+  | Punboxedintarray_ref i -> pp_print_string ppf (unboxed_integer i)
   | Punboxedvectorarray_ref Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_ref Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_ref Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
@@ -147,7 +137,7 @@ let array_set_kind ppf k =
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"
   | Punboxedfloatarray_set Unboxed_float32 -> fprintf ppf "unboxed_float32"
-  | Punboxedintarray_set i -> pp_print_string ppf (primitive_unboxed_integer i)
+  | Punboxedintarray_set i -> pp_print_string ppf (unboxed_integer i)
   | Punboxedvectorarray_set Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_set Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_set Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
@@ -180,11 +170,9 @@ let rec mixed_block_element print_value_kind ppf el =
   | Vec512 -> fprintf ppf "vec512"
   | Word -> fprintf ppf "word"
   | Product shape ->
-        fprintf ppf "product %a"
-          (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-                     (mixed_block_element print_value_kind))
-            (Array.to_list shape)
-
+    fprintf ppf "product %a"
+      (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
+         (mixed_block_element print_value_kind)) (Array.to_list shape)
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -561,7 +549,8 @@ let primitive ppf = function
   | Pmakearray (k, Mutable, mode) ->
      fprintf ppf "make%sarray[%s]" (locality_mode_if_local mode) (array_kind k)
   | Pmakearray (k, Immutable, mode) ->
-     fprintf ppf "make%sarray_imm[%s]" (locality_mode_if_local mode) (array_kind k)
+     fprintf ppf "make%sarray_imm[%s]" (locality_mode_if_local mode)
+       (array_kind k)
   | Pmakearray (k, Immutable_unique, mode) ->
       fprintf ppf "make%sarray_unique[%s]" (locality_mode_if_local mode)
         (array_kind k)
@@ -615,7 +604,8 @@ let primitive ppf = function
       print_bigarray "set" unsafe kind ppf layout
   | Pbigarraydim(n) -> fprintf ppf "Bigarray.dim_%i" n
   | Pstring_load_16 {unsafe; index_kind} ->
-     fprintf ppf "string.%sget16[indexed by %a]" (if unsafe then "unsafe_" else "")
+     fprintf ppf "string.%sget16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
        array_index_kind index_kind
   | Pstring_load_32 {unsafe; index_kind; mode; boxed} ->
      fprintf ppf "string.%sget32%s%s[indexed by %a]"
@@ -629,17 +619,14 @@ let primitive ppf = function
      fprintf ppf "string.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pstring_load_vec {unsafe; index_kind; mode; boxed; size} ->
+  | Pstring_load_vec {size; unsafe; index_kind; mode; boxed} ->
      fprintf ppf "string.%sunaligned_get%s%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
-       (match size with
-        | Boxed_vec128 -> "128"
-        | Boxed_vec256 -> "256"
-        | Boxed_vec512 -> "512")
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_load_16 {unsafe; index_kind} ->
-     fprintf ppf "bytes.%sget16[indexed by %a]" (if unsafe then "unsafe_" else "")
+     fprintf ppf "bytes.%sget16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
        array_index_kind index_kind
   | Pbytes_load_32 {unsafe; index_kind; mode; boxed} ->
      fprintf ppf "bytes.%sget32%s%s[indexed by %a]"
@@ -653,12 +640,14 @@ let primitive ppf = function
      fprintf ppf "bytes.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbytes_load_vec {unsafe; index_kind; mode; boxed} ->
-     fprintf ppf "bytes.%sunaligned_get128%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+  | Pbytes_load_vec {size; unsafe; index_kind; mode; boxed} ->
+     fprintf ppf "bytes.%sunaligned_get%s%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (vector_width size)
+       (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
   | Pbytes_set_16 {unsafe; index_kind} ->
-     fprintf ppf "bytes.%sset16[indexed by %a]" (if unsafe then "unsafe_" else "")
+     fprintf ppf "bytes.%sset16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
        array_index_kind index_kind
   | Pbytes_set_32 {unsafe; index_kind; boxed} ->
      fprintf ppf "bytes.%sset32%s[indexed by %a]"
@@ -672,9 +661,9 @@ let primitive ppf = function
      fprintf ppf "bytes.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbytes_set_vec { unsafe; boxed; index_kind } ->
-     fprintf ppf "bytes.%sunaligned_get128%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+  | Pbytes_set_vec { size; unsafe; boxed; index_kind } ->
+     fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
   | Pbigstring_load_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sget16[indexed by %a]"
@@ -691,11 +680,13 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbigstring_load_vec { unsafe; aligned; mode; boxed; index_kind } ->
-     fprintf ppf "bigarray.array1.%s%sget128%s%s[indexed by %a]"
+  | Pbigstring_load_vec { size; unsafe; aligned; mode; boxed; index_kind } ->
+     fprintf ppf "bigarray.array1.%s%sget%s%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
-       (if boxed then "" else "#") (locality_kind mode) array_index_kind index_kind
+       (vector_width size)
+       (if boxed then "" else "#") (locality_kind mode)
+       array_index_kind index_kind
   | Pbigstring_set_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -711,104 +702,114 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbigstring_set_vec { unsafe; aligned; boxed; index_kind } ->
-     fprintf ppf "bigarray.array1.%s%sget128%s[indexed by %a]"
+  | Pbigstring_set_vec { size; unsafe; aligned; boxed; index_kind } ->
+     fprintf ppf "bigarray.array1.%s%sset%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
+       (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
-  | Pfloatarray_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "floatarray.%sget128%s%s"
-       (if unsafe then "unsafe_" else "")
+  | Pfloatarray_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "floatarray.%sget%s%s%s"
+       (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
-  | Pfloat_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "float_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Pfloat_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "float_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Pint_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "int_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Pint_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "int_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_float_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_float_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Punboxed_float_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_float_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_float32_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_float32_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Punboxed_float32_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_float32_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_int32_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_int32_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Punboxed_int32_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_int32_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_int64_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_int64_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Punboxed_int64_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_int64_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Punboxed_nativeint_array_load_vec {unsafe; mode; boxed} ->
-     fprintf ppf "unboxed_nativeint_array.%sget128%s%s"
-      (if unsafe then "unsafe_" else "")
+  | Punboxed_nativeint_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "unboxed_nativeint_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
-  | Pfloatarray_set_vec {unsafe; boxed} ->
-     fprintf ppf "floatarray.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Pfloat_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "float_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Pint_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "int_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_float_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "unboxed_float_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_float32_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "unboxed_float32_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_int32_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "unboxed_int32_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_int64_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "unboxed_int64_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
-  | Punboxed_nativeint_array_set_vec {unsafe; boxed} ->
-     fprintf ppf "unboxed_nativeint_array.%sset128%s"
-      (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+  | Pfloatarray_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "floatarray.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Pfloat_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "float_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Pint_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "int_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_float_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_float_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_float32_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_float32_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_int32_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_int32_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_int64_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_int64_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Punboxed_nativeint_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "unboxed_nativeint_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
   | Pint_as_pointer m -> fprintf ppf "int_as_pointer%s" (locality_kind m)
   | Patomic_load_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_load_imm"
-        | Pointer -> fprintf ppf "atomic_load_ptr")
+        | Immediate -> fprintf ppf "atomic_load_field_imm"
+        | Pointer -> fprintf ppf "atomic_load_field_ptr")
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_set_imm"
-        | Pointer -> fprintf ppf "atomic_set_ptr")
+        | Immediate -> fprintf ppf "atomic_set_field_imm"
+        | Pointer -> fprintf ppf "atomic_set_field_ptr")
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_exchange_imm"
-        | Pointer -> fprintf ppf "atomic_exchange_ptr")
+        | Immediate -> fprintf ppf "atomic_exchange_field_imm"
+        | Pointer -> fprintf ppf "atomic_exchange_field_ptr")
   | Patomic_compare_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_compare_exchange_imm"
-        | Pointer -> fprintf ppf "atomic_compare_exchange_ptr")
+        | Immediate -> fprintf ppf "atomic_compare_exchange_field_imm"
+        | Pointer -> fprintf ppf "atomic_compare_exchange_field_ptr")
   | Patomic_compare_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_compare_set_imm"
-        | Pointer -> fprintf ppf "atomic_compare_set_ptr")
-  | Patomic_fetch_add_field -> fprintf ppf "atomic_fetch_add"
-  | Patomic_add_field -> fprintf ppf "atomic_add"
-  | Patomic_sub_field -> fprintf ppf "atomic_sub"
-  | Patomic_land_field -> fprintf ppf "atomic_land"
-  | Patomic_lor_field -> fprintf ppf "atomic_lor"
-  | Patomic_lxor_field -> fprintf ppf "atomic_lxor"
+        | Immediate -> fprintf ppf "atomic_compare_set_field_imm"
+        | Pointer -> fprintf ppf "atomic_compare_set_field_ptr")
+  | Patomic_fetch_add_field -> fprintf ppf "atomic_fetch_add_field"
+  | Patomic_add_field -> fprintf ppf "atomic_add_field"
+  | Patomic_sub_field -> fprintf ppf "atomic_sub_field"
+  | Patomic_land_field -> fprintf ppf "atomic_land_field"
+  | Patomic_lor_field -> fprintf ppf "atomic_lor_field"
+  | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ppoll -> fprintf ppf "poll"
+  | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
   | Pobj_magic _ -> fprintf ppf "obj_magic"
+  | Punbox_unit -> fprintf ppf "unbox_unit"
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
-  | Punbox_unit -> fprintf ppf "unbox_unit"
   | Parray_to_iarray -> fprintf ppf "array_to_iarray"
   | Parray_of_iarray -> fprintf ppf "array_of_iarray"
   | Pget_header m -> fprintf ppf "get_header%s" (locality_kind m)
@@ -822,12 +823,11 @@ let primitive ppf = function
   | Ppoke layout ->
       fprintf ppf "(poke@ %a)"
         peek_or_poke layout
-  | Pcpu_relax -> fprintf ppf "cpu_relax"
 
 let name_of_primitive = function
   | Pscalar i ->
-    Scalar.Intrinsic.map i ~f:(fun _ -> Scalar.Any_locality_mode)|>
-    Scalar.Intrinsic.to_string
+    Scalar.Intrinsic.map i ~f:(fun _ -> Scalar.Any_locality_mode)
+    |> Scalar.Intrinsic.to_string
   | Pphys_equal Eq -> "eq"
   | Pphys_equal Noteq -> "noteq"
   | Pbytes_of_string -> "Pbytes_of_string"
@@ -929,30 +929,31 @@ let name_of_primitive = function
   | Pint_as_pointer _ -> "Pint_as_pointer"
   | Patomic_load_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_load_imm"
-        | Pointer -> "atomic_load_ptr")
+        | Immediate -> "atomic_load_field_imm"
+        | Pointer -> "atomic_load_field_ptr")
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_set_imm"
-        | Pointer -> "atomic_set_ptr")
+        | Immediate -> "atomic_set_field_imm"
+        | Pointer -> "atomic_set_field_ptr")
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_exchange_imm"
-        | Pointer -> "atomic_exchange_ptr")
+        | Immediate -> "atomic_exchange_field_imm"
+        | Pointer -> "atomic_exchange_field_ptr")
   | Patomic_compare_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_compare_exchange_imm"
-        | Pointer -> "atomic_compare_exchange_ptr")
+        | Immediate -> "atomic_compare_exchange_field_imm"
+        | Pointer -> "atomic_compare_exchange_field_ptr")
   | Patomic_compare_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
-        | Immediate -> "atomic_compare_set_imm"
-        | Pointer -> "atomic_compare_set_ptr")
-  | Patomic_fetch_add_field -> "Patomic_fetch_add"
-  | Patomic_add_field -> "Patomic_add"
-  | Patomic_sub_field -> "Patomic_sub"
-  | Patomic_land_field -> "Patomic_land"
-  | Patomic_lor_field -> "Patomic_lor"
-  | Patomic_lxor_field -> "Patomic_lxor"
+        | Immediate -> "atomic_compare_set_field_imm"
+        | Pointer -> "atomic_compare_set_field_ptr")
+  | Patomic_fetch_add_field -> "Patomic_fetch_add_field"
+  | Patomic_add_field -> "Patomic_add_field"
+  | Patomic_sub_field -> "Patomic_sub_field"
+  | Patomic_land_field -> "Patomic_land_field"
+  | Patomic_lor_field -> "Patomic_lor_field"
+  | Patomic_lxor_field -> "Patomic_lxor_field"
+  | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Prunstack -> "Prunstack"
   | Presume -> "Presume"
@@ -963,9 +964,9 @@ let name_of_primitive = function
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
   | Pobj_magic _ -> "Pobj_magic"
+  | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
-  | Punbox_unit -> "Punbox_unit"
   | Parray_of_iarray -> "Parray_of_iarray"
   | Parray_to_iarray -> "Parray_to_iarray"
   | Pget_header _ -> "Pget_header"
@@ -975,7 +976,6 @@ let name_of_primitive = function
       "Preinterpret_unboxed_int64_as_tagged_int63"
   | Ppeek _ -> "Ppeek"
   | Ppoke _ -> "Ppoke"
-  | Pcpu_relax -> "Pcpu_relax"
 
 let zero_alloc_attribute ppf check =
   match check with
