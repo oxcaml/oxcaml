@@ -826,7 +826,6 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%int64_to_int32" -> static_cast ~src:(i int64) ~dst:(i int32)
     | "%int64_of_nativeint" -> static_cast ~dst:(i int64) ~src:(i nativeint)
     | "%int64_to_nativeint" -> static_cast ~src:(i int64) ~dst:(i nativeint)
-
     | "%caml_ba_ref_1" ->
       Primitive
         ((Pbigarrayref(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout)),
