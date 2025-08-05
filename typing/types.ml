@@ -1226,6 +1226,7 @@ let rec bound_value_identifiers_and_layouts ~layout_value = function
   | Sig_typext(id, _, _, _) :: rem
   | Sig_module(id, Mp_present, _, _, _) :: rem
   | Sig_class(id, _, _, _) :: rem ->
+      (* CR jrayman: probably better to have more granularity *)
       (id, layout_value) ::
         bound_value_identifiers_and_layouts ~layout_value rem
   | _ :: rem -> bound_value_identifiers_and_layouts ~layout_value rem
