@@ -4,24 +4,64 @@ The `Static_cast` operator in `scalar.mli` allows conversions between different 
 
 ## Conversion Matrix
 
-The following table shows all valid conversions between source and destination types. Each cell describes the operation performed.
+The conversion tables are split by destination type for better readability. Each cell describes the operation performed.
 
-| Source ↓ / Destination → | Tagged int | Untagged int | Untagged int8 | Untagged int16 | Boxed int32 | Unboxed int32 | Boxed int64 | Unboxed int64 | Boxed nativeint | Unboxed nativeint | Boxed float | Unboxed float | Boxed float32 | Unboxed float32 |
-|--------------------------|------------|--------------|----------------|-----------------|-------------|----------------|-------------|----------------|------------------|-------------------|-------------|----------------|---------------|------------------|
-| **Tagged int**           | no-op      | untag        | untag + trunc  | untag + trunc   | untag + trunc + box (32-bit: untag + box) | untag + trunc (32-bit: untag) | untag + sign-ext + box | untag + sign-ext | untag + sign-ext + box (32-bit: untag + box) | untag + sign-ext (32-bit: untag) | untag + int→float + box | untag + int→float | untag + int→float + box | untag + int→float |
-| **Untagged int**         | tag        | no-op        | trunc          | trunc           | trunc + box (32-bit: box) | trunc (32-bit: no-op) | sign-ext + box (32-bit: box) | sign-ext (32-bit: no-op) | sign-ext + box (32-bit: box) | sign-ext (32-bit: no-op) | int→float + box | int→float     | int→float + box | int→float        |
-| **Untagged int8**        | sign-ext + tag | sign-ext | no-op          | sign-ext        | sign-ext + box | sign-ext      | sign-ext + box | sign-ext      | sign-ext + box   | sign-ext          | sign-ext + int→float + box | sign-ext + int→float | sign-ext + int→float + box | sign-ext + int→float |
-| **Untagged int16**       | sign-ext + tag | sign-ext | trunc          | no-op           | sign-ext + box | sign-ext      | sign-ext + box | sign-ext      | sign-ext + box   | sign-ext          | sign-ext + int→float + box | sign-ext + int→float | sign-ext + int→float + box | sign-ext + int→float |
-| **Boxed int32**          | unbox + trunc + tag (32-bit: unbox + tag) | unbox + sign-ext (32-bit: unbox) | unbox + trunc | unbox + trunc | no-op       | unbox          | unbox + sign-ext + box | unbox + sign-ext | unbox + sign-ext + box (32-bit: unbox + box) | unbox + sign-ext (32-bit: unbox) | unbox + int→float + box | unbox + int→float | unbox + int→float + box | unbox + int→float |
-| **Unboxed int32**        | trunc + tag (32-bit: tag) | sign-ext (32-bit: no-op) | trunc          | trunc           | box         | no-op          | sign-ext + box | sign-ext      | sign-ext + box (32-bit: box) | sign-ext (32-bit: no-op) | int→float + box | int→float     | int→float + box | int→float        |
-| **Boxed int64**          | unbox + trunc + tag | unbox + trunc | unbox + trunc | unbox + trunc | unbox + trunc + box | unbox + trunc | no-op       | unbox          | unbox + box (32-bit: unbox + trunc + box) | unbox (32-bit: unbox + trunc) | unbox + int→float + box | unbox + int→float | unbox + int→float + box | unbox + int→float |
-| **Unboxed int64**        | trunc + tag | trunc        | trunc          | trunc           | trunc + box | trunc         | box         | no-op          | trunc + box      | no-op (32-bit: trunc) | int→float + box | int→float     | int→float + box | int→float        |
-| **Boxed nativeint**      | unbox + trunc + tag (32-bit: unbox + tag) | unbox + trunc (32-bit: unbox) | unbox + trunc | unbox + trunc | unbox + trunc + box (32-bit: unbox + box) | unbox + trunc (32-bit: unbox) | unbox + sign-ext + box (32-bit: unbox + box) | unbox (32-bit: unbox + sign-ext) | no-op            | unbox             | unbox + int→float + box | unbox + int→float | unbox + int→float + box | unbox + int→float |
-| **Unboxed nativeint**    | trunc + tag (32-bit: tag) | trunc (32-bit: no-op) | trunc          | trunc           | trunc + box (32-bit: box) | trunc (32-bit: no-op) | box (32-bit: sign-ext + box) | no-op (32-bit: sign-ext) | box              | no-op             | int→float + box | int→float     | int→float + box | int→float        |
-| **Boxed float**          | unbox + float→int + tag | unbox + float→int | unbox + float→int + trunc | unbox + float→int + trunc | unbox + float→int + trunc + box | unbox + float→int + trunc | unbox + float→int + box (32-bit: unbox + float→int + trunc + box) | unbox + float→int (32-bit: unbox + float→int + trunc) | unbox + float→int + box | unbox + float→int | no-op       | unbox          | unbox + f64→f32 + box | unbox + f64→f32  |
-| **Unboxed float**        | float→int + tag | float→int    | float→int + trunc      | float→int + trunc       | float→int + trunc + box | float→int + trunc     | float→int + box (32-bit: float→int + trunc + box) | float→int (32-bit: float→int + trunc)     | float→int + box  | float→int         | box         | no-op          | f64→f32 + box | f64→f32          |
-| **Boxed float32**        | unbox + float→int + tag | unbox + float→int | unbox + float→int + trunc | unbox + float→int + trunc | unbox + float→int + trunc + box | unbox + float→int + trunc | unbox + float→int + box (32-bit: unbox + float→int + trunc + box) | unbox + float→int (32-bit: unbox + float→int + trunc) | unbox + float→int + box | unbox + float→int | unbox + f32→f64 + box | unbox + f32→f64 | no-op         | unbox            |
-| **Unboxed float32**      | float→int + tag | float→int    | float→int + trunc      | float→int + trunc       | float→int + trunc + box | float→int + trunc     | float→int + box (32-bit: float→int + trunc + box) | float→int (32-bit: float→int + trunc)     | float→int + box  | float→int         | f32→f64 + box | f32→f64       | box           | no-op            |
+### Table 1: Conversions to Tagged/Untagged Integers
+
+| Source ↓ / Destination → | Tagged int | Untagged int | Untagged int8 | Untagged int16 |
+|--------------------------|------------|--------------|----------------|-----------------|
+| **Tagged int**           | no-op      | untag        | untag + trunc  | untag + trunc   |
+| **Untagged int**         | tag        | no-op        | trunc          | trunc           |
+| **Untagged int8**        | sign-ext + tag | sign-ext | no-op          | sign-ext        |
+| **Untagged int16**       | sign-ext + tag | sign-ext | trunc          | no-op           |
+| **Boxed int32**          | unbox + trunc + tag (32-bit: unbox + tag) | unbox + sign-ext (32-bit: unbox) | unbox + trunc | unbox + trunc |
+| **Unboxed int32**        | trunc + tag (32-bit: tag) | sign-ext (32-bit: no-op) | trunc          | trunc           |
+| **Boxed int64**          | unbox + trunc + tag | unbox + trunc | unbox + trunc | unbox + trunc |
+| **Unboxed int64**        | trunc + tag | trunc        | trunc          | trunc           |
+| **Boxed nativeint**      | unbox + trunc + tag (32-bit: unbox + tag) | unbox + trunc (32-bit: unbox) | unbox + trunc | unbox + trunc |
+| **Unboxed nativeint**    | trunc + tag (32-bit: tag) | trunc (32-bit: no-op) | trunc          | trunc           |
+| **Boxed float**          | unbox + float→int + tag | unbox + float→int | unbox + float→int + trunc | unbox + float→int + trunc |
+| **Unboxed float**        | float→int + tag | float→int    | float→int + trunc      | float→int + trunc       |
+| **Boxed float32**        | unbox + float→int + tag | unbox + float→int | unbox + float→int + trunc | unbox + float→int + trunc |
+| **Unboxed float32**      | float→int + tag | float→int    | float→int + trunc      | float→int + trunc       |
+
+### Table 2: Conversions to Boxed/Unboxed int32/int64/nativeint
+
+| Source ↓ / Destination → | Unboxed int32 | Unboxed int64 | Unboxed nativeint | Boxed int32 | Boxed int64 | Boxed nativeint |
+|--------------------------|----------------|----------------|-------------------|-------------|-------------|------------------|
+| **Tagged int**           | untag + trunc (32-bit: untag) | untag + sign-ext | untag + sign-ext (32-bit: untag) | untag + trunc + box (32-bit: untag + box) | untag + sign-ext + box | untag + sign-ext + box (32-bit: untag + box) |
+| **Untagged int**         | trunc (32-bit: no-op) | sign-ext (32-bit: no-op) | sign-ext (32-bit: no-op) | trunc + box (32-bit: box) | sign-ext + box (32-bit: box) | sign-ext + box (32-bit: box) |
+| **Untagged int8**        | sign-ext      | sign-ext      | sign-ext          | sign-ext + box | sign-ext + box | sign-ext + box   |
+| **Untagged int16**       | sign-ext      | sign-ext      | sign-ext          | sign-ext + box | sign-ext + box | sign-ext + box   |
+| **Boxed int32**          | unbox          | unbox + sign-ext | unbox + sign-ext (32-bit: unbox) | no-op       | unbox + sign-ext + box | unbox + sign-ext + box (32-bit: no-op) |
+| **Unboxed int32**        | no-op          | sign-ext      | sign-ext (32-bit: no-op) | box         | sign-ext + box | sign-ext + box (32-bit: box) |
+| **Boxed int64**          | unbox + trunc | unbox          | unbox (32-bit: unbox + trunc) | unbox + trunc + box | no-op       | no-op (32-bit: unbox + trunc + box) |
+| **Unboxed int64**        | trunc         | no-op          | no-op (32-bit: trunc) | trunc + box | box         | trunc + box      |
+| **Boxed nativeint**      | unbox + trunc (32-bit: unbox) | unbox (32-bit: unbox + sign-ext) | unbox             | unbox + trunc + box (32-bit: no-op) | unbox + sign-ext + box (32-bit: unbox + sign-ext + box) | no-op            |
+| **Unboxed nativeint**    | trunc (32-bit: no-op) | no-op (32-bit: sign-ext) | no-op             | trunc + box (32-bit: box) | box (32-bit: sign-ext + box) | box              |
+| **Boxed float**          | unbox + float→int + trunc | unbox + float→int (32-bit: unbox + float→int + trunc) | unbox + float→int | unbox + float→int + trunc + box | unbox + float→int + box (32-bit: unbox + float→int + trunc + box) | unbox + float→int + box |
+| **Unboxed float**        | float→int + trunc     | float→int (32-bit: float→int + trunc)     | float→int         | float→int + trunc + box | float→int + box (32-bit: float→int + trunc + box) | float→int + box  |
+| **Boxed float32**        | unbox + float→int + trunc | unbox + float→int (32-bit: unbox + float→int + trunc) | unbox + float→int | unbox + float→int + trunc + box | unbox + float→int + box (32-bit: unbox + float→int + trunc + box) | unbox + float→int + box |
+| **Unboxed float32**      | float→int + trunc     | float→int (32-bit: float→int + trunc)     | float→int         | float→int + trunc + box | float→int + box (32-bit: float→int + trunc + box) | float→int + box  |
+
+### Table 3: Conversions to Floating-Point Types
+
+| Source ↓ / Destination → | Boxed float | Unboxed float | Boxed float32 | Unboxed float32 |
+|--------------------------|-------------|----------------|---------------|------------------|
+| **Tagged int**           | untag + int→float + box | untag + int→float | untag + int→float + box | untag + int→float |
+| **Untagged int**         | int→float + box | int→float     | int→float + box | int→float        |
+| **Untagged int8**        | sign-ext + int→float + box | sign-ext + int→float | sign-ext + int→float + box | sign-ext + int→float |
+| **Untagged int16**       | sign-ext + int→float + box | sign-ext + int→float | sign-ext + int→float + box | sign-ext + int→float |
+| **Boxed int32**          | unbox + int→float + box | unbox + int→float | unbox + int→float + box | unbox + int→float |
+| **Unboxed int32**        | int→float + box | int→float     | int→float + box | int→float        |
+| **Boxed int64**          | unbox + int→float + box | unbox + int→float | unbox + int→float + box | unbox + int→float |
+| **Unboxed int64**        | int→float + box | int→float     | int→float + box | int→float        |
+| **Boxed nativeint**      | unbox + int→float + box | unbox + int→float | unbox + int→float + box | unbox + int→float |
+| **Unboxed nativeint**    | int→float + box | int→float     | int→float + box | int→float        |
+| **Boxed float**          | no-op       | unbox          | unbox + f64→f32 + box | unbox + f64→f32  |
+| **Unboxed float**        | box         | no-op          | f64→f32 + box | f64→f32          |
+| **Boxed float32**        | unbox + f32→f64 + box | unbox + f32→f64 | no-op         | unbox            |
+| **Unboxed float32**      | f32→f64 + box | f32→f64       | box           | no-op            |
 
 ## Operation Descriptions
 
