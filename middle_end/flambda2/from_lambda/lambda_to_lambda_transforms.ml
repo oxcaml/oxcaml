@@ -138,10 +138,8 @@ let rec_catch_for_for_loop env loc ident duid start stop
   in
   let next_value_of_counter : L.lambda =
     match dir with
-    | Upto ->
-      Lprim (Pscalar (Unary (Integral (int_scalar, Succ))), [L.Lvar ident], loc)
-    | Downto ->
-      Lprim (Pscalar (Unary (Integral (int_scalar, Pred))), [L.Lvar ident], loc)
+    | Upto   -> L.succ int_scalar (Lvar ident) ~loc
+    | Downto -> L.pred int_scalar (Lvar ident) ~loc
   in
   let lam : L.lambda =
     (* Care needs to be taken here not to cause overflow if, for an incrementing
