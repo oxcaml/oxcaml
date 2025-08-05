@@ -2132,7 +2132,36 @@ end) = struct
           let lbl_tpath = get_type_path lbl in
           compare_type_path env tpath lbl_tpath
         in
-        List.find check_type lbls
+        let lbl, use = List.find check_type lbls in
+        let expanded_lbl =
+          (* Find the label that requires the fewest expansion steps, i.e., the
+             most-expanded version of our alias, to get the most permissive
+             parameter jkind. See https://github.com/oxcaml/oxcaml/pull/4441 *)
+          let matching_lbls = List.filter check_type lbls in
+          let count_expansions p =
+            let rec count p n =
+              match expand_path env p with
+              | p' when Path.same p p' -> n
+              | p' -> count p' (n + 1)
+            in
+            count p 0
+          in
+          let initial_score = count_expansions (get_type_path lbl) in
+          let best_lbl, _ =
+            List.fold_left
+              (fun ((_best_lbl, best_score) as acc) (lbl, _) ->
+                let lbl_tpath = get_type_path lbl in
+                let score = count_expansions lbl_tpath in
+                if score < best_score then (lbl, score) else acc)
+              (lbl, initial_score) matching_lbls
+          in
+          best_lbl
+        in
+        (* Return triple:
+           - expanded_lbl: the label with fewest expansions (for typechecking)
+           - use: the usage function to mark the label as used
+           - lbl: the original matched label (for disambiguation warnings) *)
+        (expanded_lbl, use, lbl)
 
   (* warn if there are several distinct candidates in scope *)
   let warn_if_ambiguous warn lid env lbl rest =
@@ -2212,16 +2241,16 @@ end) = struct
         usage lid env
         expected_type
         candidates_in_scope =
-    let lbl = match expected_type with
+    let lbl, lbl_for_warn = match expected_type with
     | None ->
         (* no expected type => no disambiguation *)
         begin match filter (force_error candidates_in_scope) with
         | Ok [] | Error [] -> assert false
-        | Error((lbl, _use) :: _rest) -> lbl (* will fail later *)
+        | Error((lbl, _use) :: _rest) -> lbl, lbl (* will fail later *)
         | Ok((lbl, use) :: rest) ->
             use ();
             warn_if_ambiguous warn lid env lbl rest;
-            lbl
+            lbl, lbl
         end
     | Some(tpath0, tpath, principal) ->
        (* If [expected_type] is available, the candidate selected
@@ -2236,7 +2265,7 @@ end) = struct
            force [candidates_in_scope]: we just skip this case if there
            are no candidates in scope *)
         begin match disambiguate_by_type env tpath candidates_in_scope with
-        | lbl, use ->
+        | lbl, use, lbl_for_use ->
           use ();
           if not principal then begin
             (* Check if non-principal type is affecting result *)
@@ -2253,9 +2282,9 @@ end) = struct
                definition in scope *)
             if not (compare_type_path env tpath lbl_tpath)
             then warn_non_principal warn lid
-            else warn_if_ambiguous warn lid env lbl rest;
+            else warn_if_ambiguous warn lid env lbl_for_use rest;
           end;
-          lbl
+          lbl, lbl_for_use
         | exception Not_found ->
         (* look outside the lexical scope *)
         match lookup_from_type env tpath usage lid with
@@ -2264,7 +2293,7 @@ end) = struct
              structural labels cannot be qualified anyway *)
           if in_env lbl then warn_out_of_scope warn lid env tpath;
           if not principal then warn_non_principal warn lid;
-          lbl
+          lbl, lbl
         | exception Not_found ->
         match filter (force_error candidates_in_scope) with
         | Ok lbls | Error lbls ->
@@ -2283,7 +2312,7 @@ end) = struct
     in
     (* warn only on nominal labels *)
     if in_env lbl then
-      warn_if_disambiguated_name warn lid lbl candidates_in_scope;
+      warn_if_disambiguated_name warn lid lbl_for_warn candidates_in_scope;
     lbl
 end
 

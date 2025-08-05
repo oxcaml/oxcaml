@@ -14,7 +14,8 @@ let to_option (x : 'a or_null) =
   | This x -> Some x
 
 [%%expect{|
-val to_option : 'a or_null -> 'a option = <fun>
+val to_option : ('a : value_or_null mod non_null). 'a or_null -> 'a option =
+  <fun>
 |}]
 
 let of_option (x : 'a option) =
