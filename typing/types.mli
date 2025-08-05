@@ -1144,6 +1144,9 @@ val may_equal_constr :
 
 (* Equality *)
 
+val equal_module_representation :
+  module_representation -> module_representation -> bool
+
 val equal_record_representation :
   record_representation -> record_representation -> bool
 

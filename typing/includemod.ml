@@ -418,10 +418,10 @@ let rec print_coercion ppf c =
   let pr fmt = Format.fprintf ppf fmt in
   match c with
     Tcoerce_none -> pr "id"
-  | Tcoerce_structure (fl, nl) ->
+  | Tcoerce_structure { pos_cc_list; id_pos_list } ->
       pr "@[<2>struct@ %a@ %a@]"
-        (print_list print_coercion2) fl
-        (print_list print_coercion3) nl
+        (print_list print_coercion2) pos_cc_list
+        (print_list print_coercion3) id_pos_list
   | Tcoerce_functor (inp, out) ->
       pr "@[<2>functor@ (%a)@ (%a)@]"
         print_coercion inp
@@ -433,9 +433,8 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         Printtyp.path p
         print_coercion c
-and print_coercion2 ppf (n, e, c) =
-  Format.fprintf ppf "@[%d,@ %s,@ %a@]"
-    n (Types.mixed_block_element_to_string e) print_coercion c
+and print_coercion2 ppf (n, c) =
+  Format.fprintf ppf "@[%d,@ %a@]" n print_coercion c
 and print_coercion3 ppf (i, n, c) =
   Format.fprintf ppf "@[%s, %d,@ %a@]"
     (Ident.unique_name i) n print_coercion c
@@ -454,15 +453,15 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion cc id_pos_list =
+let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
   let rec is_identity_coercion pos = function
   | [] ->
       true
-  | (n, _, c) :: rem ->
+  | (n, c) :: rem ->
       n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
-  if is_identity_coercion 0 cc
+  if is_identity_coercion 0 pos_cc_list
   then Tcoerce_none
-  else Tcoerce_structure (cc, id_pos_list)
+  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
 
 
 (* Build a table of the components of sig1, along with their positions.
@@ -564,7 +563,7 @@ let mark_error_as_unrecoverable r =
 
 module Sign_diff = struct
   type 'a t = {
-    runtime_coercions: ('a * mixed_block_element * Typedtree.module_coercion) list;
+    runtime_coercions: ('a * Typedtree.module_coercion) list;
     shape_map: Shape.Map.t;
     deep_modifications:bool;
     errors: (Ident.t * Error.sigitem_symptom) list;
@@ -885,7 +884,7 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
       ([], 0) sig1 in
   let module_repr_of_sig sig_ =
     sig_ |> List.filter_map Env.field_layout_of_signature_item
-         |> List.rev_map
+         |> List.map
            (fun layout -> layout |> Jkind.Layout.to_sort
                                  |> Option.get (* CR jrayman *)
                                  |> Jkind.Sort.default_for_transl_and_get
@@ -893,8 +892,8 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
          |> Array.of_list
          |> module_representation_of_mixed_product_shape
   in
-  let repr1 = module_repr_of_sig sig1 in
-  let repr2 = module_repr_of_sig sig2 in
+  let input_repr = module_repr_of_sig sig1 in
+  let output_repr = module_repr_of_sig sig2 in
   let exported_len1, runtime_len1, comps1 =
     build_component_table (fun pos _name -> pos) sig1
   in
@@ -920,10 +919,14 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-          Ok (simplify_structure_coercion cc id_pos_list, shape)
-        else
-          Ok (Tcoerce_structure (cc, id_pos_list), shape)
+        let coercion =
+          if runtime_len1 = runtime_len2 then (* see PR#5098 *)
+            simplify_structure_coercion input_repr output_repr cc id_pos_list
+          else
+            Tcoerce_structure
+              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
+        in
+        Ok (coercion, shape)
     | missings, incompatibles, _runtime_coercions, _leftovers ->
         Error {
           Error.env=new_env;
@@ -940,7 +943,7 @@ and signature_components :
   | [] -> Sign_diff.{ empty with shape_map }
   | (sigi1, sigi2, pos) :: rem ->
       let shape_modified = ref false in
-      let id, item, paired_uids, shape_map, runtime_repr =
+      let id, item, paired_uids, shape_map, present_at_runtime =
         match sigi1, sigi2 with
         | Sig_value(id1, valdecl1, _) ,Sig_value(_id2, valdecl2, _) ->
             let item =
@@ -949,24 +952,13 @@ and signature_components :
                 (Subst.Lazy.force_value_description valdecl2)
             in
             let item = mark_error_as_recoverable item in
-            let runtime_repr = match valdecl2.val_kind with
-              | Val_prim _ -> None
-              | Val_reg layout ->
-                Some (layout |> Jkind.Layout.to_sort
-                             |> Option.get (* CR jrayman *)
-                             |> Jkind.Sort.default_for_transl_and_get
-                             |> mixed_block_element_of_const_sort)
-              | Val_mut _ ->
-                Misc.fatal_error
-                  "Includemod.signature_components: mutable var in signature"
-              (* CR jrayman: replace all [Some Value]s *)
-              | Val_ivar _ -> Some Value
-              | Val_self _ -> Some Value
-              | Val_anc _ -> Some Value
+            let present_at_runtime = match valdecl2.val_kind with
+              | Val_prim _ -> false
+              | _ -> true
             in
             let shape_map = Shape.Map.add_value_proj shape_map id1 orig_shape in
             let paired_uids = (valdecl1.val_uid, valdecl2.val_uid) in
-            id1, item, paired_uids, shape_map, runtime_repr
+            id1, item, paired_uids, shape_map, present_at_runtime
         | Sig_type(id1, tydec1, _, _), Sig_type(_id2, tydec2, _, _) ->
             let item =
               type_declarations ~loc ~direction env subst id1 tydec1 tydec2
@@ -975,7 +967,7 @@ and signature_components :
             (* Right now we don't filter hidden constructors / labels from the
             shape. *)
             let shape_map = Shape.Map.add_type_proj shape_map id1 orig_shape in
-            id1, item, (tydec1.type_uid, tydec2.type_uid), shape_map, None
+            id1, item, (tydec1.type_uid, tydec2.type_uid), shape_map, false
         | Sig_typext(id1, ext1, _, _), Sig_typext(_id2, ext2, _, _) ->
             let item =
               extension_constructors ~loc ~direction env subst id1 ext1 ext2
@@ -984,11 +976,7 @@ and signature_components :
             let shape_map =
               Shape.Map.add_extcons_proj shape_map id1 orig_shape
             in
-            ( id1,
-              item,
-              (ext1.ext_uid, ext2.ext_uid),
-              shape_map,
-              Some mixed_block_element_for_type_extension )
+            id1, item, (ext1.ext_uid, ext2.ext_uid), shape_map, true
         | Sig_module(id1, pres1, mty1, _, _), Sig_module(_, pres2, mty2, _, _)
           -> begin
               let orig_shape =
@@ -1011,19 +999,17 @@ and signature_components :
                        It could still be useful for merlin. *)
                     Shape.Map.add_module shape_map id1 orig_shape
               in
-              let runtime_repr, item =
+              let present_at_runtime, item =
                 match pres1, pres2, mty1.md_type with
-                | Mp_present, Mp_present, _ ->
-                  Some mixed_block_element_for_module, item
-                | _, Mp_absent, _ -> None, item
+                | Mp_present, Mp_present, _ -> true, item
+                | _, Mp_absent, _ -> false, item
                 | Mp_absent, Mp_present, Mty_alias p1 ->
-                  ( Some mixed_block_element_for_module,
-                    Result.map (fun i -> Tcoerce_alias (env, p1, i)) item )
+                    true, Result.map (fun i -> Tcoerce_alias (env, p1, i)) item
                 | Mp_absent, Mp_present, _ -> assert false
               in
               let item = mark_error_as_unrecoverable item in
               let paired_uids = (mty1.md_uid, mty2.md_uid) in
-              id1, item, paired_uids, shape_map, runtime_repr
+              id1, item, paired_uids, shape_map, present_at_runtime
             end
         | Sig_modtype(id1, info1, _), Sig_modtype(_id2, info2, _) ->
             let item =
@@ -1033,7 +1019,7 @@ and signature_components :
               Shape.Map.add_module_type_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            id1, item, (info1.mtd_uid, info2.mtd_uid), shape_map, None
+            id1, item, (info1.mtd_uid, info2.mtd_uid), shape_map, false
         | Sig_class(id1, decl1, _, _), Sig_class(_id2, decl2, _, _) ->
             let item =
               class_declarations env subst id1 ~mmodes decl1 decl2
@@ -1042,11 +1028,7 @@ and signature_components :
               Shape.Map.add_class_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            ( id1,
-              item,
-              (decl1.cty_uid, decl2.cty_uid),
-              shape_map,
-              Some mixed_block_element_for_class )
+            id1, item, (decl1.cty_uid, decl2.cty_uid), shape_map, true
         | Sig_class_type(id1, info1, _, _), Sig_class_type(_id2, info2, _, _) ->
             let item =
               class_type_declarations ~loc env subst info1 info2
@@ -1055,7 +1037,7 @@ and signature_components :
             let shape_map =
               Shape.Map.add_class_type_proj shape_map id1 orig_shape
             in
-            id1, item, (info1.clty_uid, info2.clty_uid), shape_map, None
+            id1, item, (info1.clty_uid, info2.clty_uid), shape_map, false
         | _ ->
             assert false
       in
@@ -1083,8 +1065,7 @@ and signature_components :
               Cmt_format.record_declaration_dependency paired_uids
             end;
             let runtime_coercions =
-              runtime_repr |> Option.map (fun mbe -> pos, mbe, x)
-                           |> Option.to_list
+              if present_at_runtime then [pos,x] else []
             in
             Sign_diff.{ empty with deep_modifications; runtime_coercions }
         | Error { error; recoverable=_ } ->
