@@ -759,6 +759,19 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
          block index (idx or mut_idx).
 |}]
 
+(*******************)
+(* Private records *)
+
+type t = private { i : int }
+let bad () = (.i)
+[%%expect{|
+type t = private { i : int; }
+Line 2, characters 15-16:
+2 | let bad () = (.i)
+                   ^
+Error: Block indices do not support private records.
+|}]
+
 (****************)
 (* Principality *)
 

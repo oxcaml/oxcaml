@@ -314,6 +314,7 @@ type error =
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
+  | Block_access_private_record
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.Value.equate_error }
   | Submode_failed of

@@ -270,6 +270,7 @@ type error =
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
+  | Block_access_private_record
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.Value.equate_error }
   | Submode_failed of
@@ -7331,6 +7332,12 @@ and type_block_access env expected_base_ty principal
       | Record_inlined _ ->
         Misc.fatal_error "Typecore.type_block_access: inlined record"
     in
+    let () =
+      match label.lbl_private with
+      | Public -> ()
+      | Private ->
+        raise (Error (lid.loc, env, Block_access_private_record))
+    in
     let modality = label.lbl_modalities in
     { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
   | Baccess_array (mut, index_kind, index) ->
@@ -11488,6 +11495,9 @@ let report_error ~loc env =
   | Block_access_record_unboxed ->
     Location.error ~loc
       "Block indices do not support [@@unboxed] records."
+  | Block_access_private_record ->
+    Location.error ~loc
+      "Block indices do not support private records."
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Value.Error(ax, { left; right }) = err in
     let print_modality id ppf m =
