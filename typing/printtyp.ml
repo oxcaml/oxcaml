@@ -1731,7 +1731,7 @@ let typexp mode ppf ty =
 
 (* Only used for printing a single modality in error message *)
 let modality ?(id = fun _ppf -> ()) ppf modality =
-  if Mode.Modality.is_id modality then id ppf
+  if Mode.Modality.Atom.is_id modality then id ppf
   else
     modality
     |> Typemode.untransl_modality

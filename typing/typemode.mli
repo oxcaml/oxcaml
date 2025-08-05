@@ -20,7 +20,8 @@ val transl_modalities :
 val let_mutable_modalities :
   Mode.Value.Comonadic.lr -> Mode.Modality.Value.Const.t
 
-val untransl_modality : Mode.Modality.t -> Parsetree.modality Location.loc
+val untransl_modality :
+  'a Mode.Modality.Atom.t -> Parsetree.modality Location.loc
 
 (** Un-interpret modalities back to parsetree. Takes the mutability and
     attributes on the field and remove mutable-implied modalities accordingly.

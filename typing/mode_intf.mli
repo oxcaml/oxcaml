@@ -44,23 +44,14 @@ module type Lattice_product = sig
 
   type 'a axis
 
-  (** [min_axis ax] returns the [min] for the [ax] axis. *)
-  val min_axis : 'a axis -> 'a
-
-  (** [max_axis ax] returns the [max] for the [ax] axis. *)
-  val max_axis : 'a axis -> 'a
-
   (** [min_with ax elt] returns [min] but with the axis [ax] set to [elt]. *)
   val min_with : 'a axis -> 'a -> t
 
   (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
   val max_with : 'a axis -> 'a -> t
 
-  (** [le_axis ax] returns the [le] function for the [ax] axis. *)
-  val le_axis : 'a axis -> 'a -> 'a -> bool
-
-  (** [print_axis ax] returns the [print] function for the [ax] axis. *)
-  val print_axis : 'a axis -> Format.formatter -> 'a -> unit
+  module Per_axis :
+    Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
 end
 
 type equate_step =
@@ -619,30 +610,48 @@ module type S = sig
   val value_to_alloc_r2g : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   module Modality : sig
-    type 'a raw =
-      | Meet_with : 'a -> 'a raw
-          (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be [max]
+    module Comonadic : sig
+      module Atom : sig
+        type 'a t =
+          | Meet_with of 'a
+              (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be [max]
           in which case it's the identity modality. *)
-      | Join_with : 'a -> 'a raw
-          (** [Join_with c] takes [x] and returns [join c x]. [c] can be [min]
+        [@@unboxed]
+      end
+    end
+
+    module Monadic : sig
+      module Atom : sig
+        type 'a t =
+          | Join_with of 'a
+              (** [Join_with c] takes [x] and returns [join c x]. [c] can be [min]
           in which case it's the identity modality. *)
+        [@@unboxed]
+      end
+    end
 
-    (** An atom modality is a [raw] accompanied by the axis it acts on. *)
-    type t = Atom : 'a Value.Axis.t * 'a raw -> t
+    module Atom : sig
+      type 'a t =
+        | Monadic of 'a Value.Monadic.Axis.t * 'a Monadic.Atom.t
+        | Comonadic of 'a Value.Comonadic.Axis.t * 'a Comonadic.Atom.t
 
-    (** Test if the given modality is the identity modality. *)
-    val is_id : t -> bool
+      type packed = P : 'a t -> packed
 
-    (** Test if the given modality is a constant modality. *)
-    val is_constant : t -> bool
+      (** Test if the given modality is the identity modality. *)
+      val is_id : 'a t -> bool
 
-    (** Printing for debugging *)
-    val print : Format.formatter -> t -> unit
+      (** Test if the given modality is a constant modality. *)
+      val is_constant : 'a t -> bool
+
+      (** Printing for debugging *)
+      val print : Format.formatter -> 'a t -> unit
+
+      (** Returns the axis that the atom modality belongs to. *)
+      val axis : 'a t -> 'a Value.Axis.t
+    end
 
     module Value : sig
-      type atom := t
-
-      type error = Error : 'a Value.Axis.t * 'a raw Solver.error -> error
+      type error = Error : 'a Atom.t Solver.error -> error
 
       type nonrec equate_error = equate_step * error
 
@@ -676,15 +685,15 @@ module type S = sig
         (** [concat ~then t] returns the modality that is [then_] after [t]. *)
         val concat : then_:t -> t -> t
 
-        (** [set ax a t] overwrite the [ax] axis of [t] to be [a]. *)
-        val set : 'a Value.Axis.t -> 'a raw -> t -> t
+        (** [set a t] overwrites an axis of [t] to be [a]. *)
+        val set : 'a Atom.t -> t -> t
 
-        (** Project out the [raw] for the given axis in the given modality. *)
-        val proj : 'a Value.Axis.t -> t -> 'a raw
+        (** [proj ax t] projects out the axis [ax] of [t]. *)
+        val proj : 'a Value.Axis.t -> t -> 'a Atom.t
 
         (** [diff t0 t1] returns a list of atoms in [t1] that are different than
         [t0]. *)
-        val diff : t -> t -> atom list
+        val diff : t -> t -> Atom.packed list
 
         (** [equate t0 t1] checks that [t0 = t1].
             Definition: [t0 = t1] iff [t0 <= t1] and [t1 <= t0]. *)
