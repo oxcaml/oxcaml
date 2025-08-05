@@ -2134,6 +2134,8 @@ let inline_lazy_force_cond arg pos loc =
   let varg = Lvar idarg in
   let tag = Ident.create_local "tag" in
   let tag_duid = Lambda.debug_uid_none in
+  (* XXX mshinwell: why was this changed to phys_equal instead of icmp?
+     This question seems to crop up a lot in the diff *)
   let test_tag t = phys_equal (Lvar tag) (lconst_int int t) ~loc in
   Llet
     ( Strict,
@@ -2710,6 +2712,7 @@ let make_test_sequence value_kind loc fail size arg const_lambda_list =
     share_actions_tree value_kind const_lambda_list fail
   in
   let rec make_test_sequence const_lambda_list =
+    (* XXX mshinwell: why was the "&& lt_tst <> Pignore" removed? *)
     if List.length const_lambda_list >= 4 then
       split_sequence const_lambda_list
     else
@@ -2729,9 +2732,10 @@ let make_test_sequence value_kind loc fail size arg const_lambda_list =
 
 module SArg = struct
   type primitive = Lambda.primitive
+
   let int_scalar =
-    Scalar.Maybe_naked.Value
-      (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
+    Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
+
   let pintcomp cmp =
     Pscalar (Binary (Icmp (int_scalar, cmp)))
 
