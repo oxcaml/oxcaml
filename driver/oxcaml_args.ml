@@ -1508,6 +1508,11 @@ module Debugging_options_impl = struct
   let no_restrict_to_upstream_dwarf () =
     Debugging.restrict_to_upstream_dwarf := false;
     Clflags.use_old_merlin_shapes := false
+  (* CR sspies: We have to be careful here. We can only enable new DWARF on the
+     compiler once we have fixed the Merlin support. Otherwise, we will have
+     different kinds of shape information between the compiler and the code.
+     This would likely break Merlin lookups for code in the compiler, but
+     otherwise probably has limited effect. *)
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
