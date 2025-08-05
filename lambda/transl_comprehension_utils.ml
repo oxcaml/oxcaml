@@ -125,10 +125,9 @@ module Lambda_utils = struct
 
       let ( / ) = binop (Integral (size, Div Unsafe))
 
-      (* XXX mshinwell: why is this Pphys_equal not Icmp? *)
-      let ( = ) x y = Lprim (Pphys_equal Eq, [x; y], loc)
+      let ( = ) = binop (Icmp (size, Ceq))
 
-      let ( <> ) x y = Lprim (Pphys_equal Noteq, [x; y], loc)
+      let ( <> ) = binop (Icmp (size, Cne))
 
       let ( < ) = binop (Icmp (size, Clt))
 
