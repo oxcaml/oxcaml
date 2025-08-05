@@ -205,7 +205,6 @@ type primitive =
   | Pisnull
   (* Test if the (integer) argument is outside an interval *)
   | Pisout
-
   (* Operations on Bigarrays: (unsafe, #dimensions, kind, layout) *)
   | Pbigarrayref of bool * int * bigarray_kind * bigarray_layout
   | Pbigarrayset of bool * int * bigarray_kind * bigarray_layout
@@ -355,6 +354,7 @@ and extern_repr =
   | Unboxed_integer of unboxed_integer
 
 and external_call_description = extern_repr Primitive.description_gen
+
 and integer_comparison = Scalar.Integer_comparison.t =
     Ceq | Cne | Clt | Cgt | Cle | Cge
 
@@ -979,9 +979,7 @@ let const_int size n =
 
 let lconst_int size n = Lconst (const_int size n)
 
-let int =
-  Scalar.Maybe_naked.Value
-    (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
+let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
 
 let const_unit = const_int int 0
 
@@ -2372,7 +2370,6 @@ let primitive_result_layout (p : primitive) =
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
-  | Punbox_unit -> layout_unboxed_unit
   | Pmixedfield (path, shape, _) -> layout_of_mixed_block_shape shape ~path
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
@@ -2385,6 +2382,7 @@ let primitive_result_layout (p : primitive) =
     -> layout_int
   | Parrayrefu (array_ref_kind, _, _) | Parrayrefs (array_ref_kind, _, _) ->
     array_ref_kind_result_layout array_ref_kind
+  | Punbox_unit -> layout_unboxed_unit
   | Pstring_load_32 { boxed = true; _ } | Pbytes_load_32 { boxed = true; _ }
   | Pbigstring_load_32 { boxed = true; _ } ->
     layout_boxed_int Boxed_int32
@@ -2715,8 +2713,7 @@ let rec ignorable_product_element_kind_involves_int
   | Pproduct_ignorable kinds ->
     List.exists ignorable_product_element_kind_involves_int kinds
 
-(* Functions for simulating naked int primitives. This is used for bytecode
-   compilation which doesn't support naked int primitives directly *)
+(* Construction helpers *)
 
 let unary p arg ~loc = Lprim (Pscalar (Unary p), [arg], loc)
 let binary p x y ~loc = Lprim (Pscalar (Binary p), [x; y], loc)
