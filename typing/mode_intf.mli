@@ -775,13 +775,34 @@ module type S = sig
     val max : t
   end
 
+  (** Some modes might be indistinguishable for values of some type, in which
+    case the actual/expected mode of values can be adjusted accordingly to make
+    more programs mode-check. The adjustment is called mode crossing. *)
   module Crossing : sig
-    (** The mode crossing capability pertaining to a type.
+    module Atom : sig
+      (** The mode crossing capability on an axis whose carrier type is ['a].
+      Currently it has only one constructor and is thus unboxed. *)
+      type 'a t =
+        | Modality of 'a Modality.Atom.t
+            (** The mode crossing caused by a modality atom on an axis whose
+      carrier type is ['a]. For a concrete example, consider:
 
-    Some modes might be indistinguishable for values of some type, in which case
-    the actual/expected mode of values can be adjusted accordingly to make more
-    programs mode-check. The adjustment is called mode crossing. *)
+      type 'x r = { x : 'x @@ portable } [@@unboxed]
+
+      The type ['x r] can cross the portability axis. This is represented as
+      [Modality (Meet_with Portable) : Portability.Const.t t]. *)
+      [@@unboxed]
+
+      include
+        Solver_intf.Lattices
+          with type 'a elt := 'a t
+           and type 'a obj := 'a Value.Axis.t
+    end
+
+    (** The mode crossing capability on all axes *)
     type t
+
+    val proj : 'a Value.Axis.t -> t -> 'a Atom.t
 
     include Lattice with type t := t
 

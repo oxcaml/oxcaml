@@ -2339,6 +2339,13 @@ module Value_with (Areality : Areality) = struct
       | Monadic ax -> Axis.print ppf ax
       | Comonadic ax -> Axis.print ppf ax
 
+    let eq t0 t1 =
+      match t0, t1 with
+      | Monadic _, Comonadic _ -> None
+      | Comonadic _, Monadic _ -> None
+      | Monadic ax0, Monadic ax1 -> Axis.eq ax0 ax1
+      | Comonadic ax0, Comonadic ax1 -> Axis.eq ax0 ax1
+
     let all =
       List.map (fun (Monadic.Axis.P ax) -> P (Monadic ax)) Monadic.Axis.all
       @ List.map
@@ -3545,6 +3552,72 @@ module Crossing = struct
     let print ppf (Modality t) =
       Format.fprintf ppf "Modality %a" Modality.Comonadic.Const.print t
   end
+
+  module Atom = struct
+    type 'a t = Modality of 'a Modality.Atom.t [@@unboxed]
+
+    let min : _ Value.Axis.t -> _ t = function
+      | Monadic ax ->
+        Modality (Monadic (ax, Join_with (Value.Monadic.Const.Per_axis.max ax)))
+      | Comonadic ax ->
+        Modality
+          (Comonadic (ax, Meet_with (Value.Comonadic.Const.Per_axis.min ax)))
+
+    let max : _ Value.Axis.t -> _ t = function
+      | Monadic ax ->
+        Modality (Monadic (ax, Join_with (Value.Monadic.Const.Per_axis.min ax)))
+      | Comonadic ax ->
+        Modality
+          (Comonadic (ax, Meet_with (Value.Comonadic.Const.Per_axis.max ax)))
+
+    let le (type a) (ax : a Value.Axis.t) (Modality t0) (Modality t1) =
+      match ax, t0, t1 with
+      | Monadic ax, Monadic (_, Join_with c0), Monadic (_, Join_with c1) ->
+        Value.Monadic.Const.Per_axis.le ax c1 c0
+      | Comonadic ax, Comonadic (_, Meet_with c0), Comonadic (_, Meet_with c1)
+        ->
+        Value.Comonadic.Const.Per_axis.le ax c0 c1
+      | Monadic _, Comonadic _, _ -> .
+      | Monadic _, _, Comonadic _ -> .
+      | Comonadic _, Monadic _, _ -> .
+      | Comonadic _, _, Monadic _ -> .
+
+    let join (type a) (ax : a Value.Axis.t) (Modality t0) (Modality t1) =
+      match ax, t0, t1 with
+      | Monadic ax, Monadic (_, Join_with c0), Monadic (_, Join_with c1) ->
+        Modality
+          (Monadic (ax, Join_with (Value.Monadic.Const.Per_axis.meet ax c0 c1)))
+      | Comonadic ax, Comonadic (_, Meet_with c0), Comonadic (_, Meet_with c1)
+        ->
+        Modality
+          (Comonadic
+             (ax, Meet_with (Value.Comonadic.Const.Per_axis.join ax c0 c1)))
+      | Monadic _, Comonadic _, _ -> .
+      | Monadic _, _, Comonadic _ -> .
+      | Comonadic _, Monadic _, _ -> .
+      | Comonadic _, _, Monadic _ -> .
+
+    let meet (type a) (ax : a Value.Axis.t) (Modality t0) (Modality t1) =
+      match ax, t0, t1 with
+      | Monadic ax, Monadic (_, Join_with c0), Monadic (_, Join_with c1) ->
+        Modality
+          (Monadic (ax, Join_with (Value.Monadic.Const.Per_axis.join ax c0 c1)))
+      | Comonadic ax, Comonadic (_, Meet_with c0), Comonadic (_, Meet_with c1)
+        ->
+        Modality
+          (Comonadic
+             (ax, Meet_with (Value.Comonadic.Const.Per_axis.meet ax c0 c1)))
+      | Monadic _, Comonadic _, _ -> .
+      | Monadic _, _, Comonadic _ -> .
+      | Comonadic _, Monadic _, _ -> .
+      | Comonadic _, _, Monadic _ -> .
+
+    let print _ ppf (Modality t) =
+      Format.fprintf ppf "Modality %a" Modality.Atom.print t
+
+    let eq_obj = Value.Axis.eq
+
+    let print_obj = Value.Axis.print
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
@@ -3618,6 +3691,15 @@ module Crossing = struct
     }
 
   let equal t0 t1 = le t0 t1 && le t1 t0
+
+  let proj (ax : _ Value.Axis.t)
+      ({ monadic = Modality monadic; comonadic = Modality comonadic } : t) :
+      _ Atom.t =
+    match ax with
+    | Monadic ax ->
+      Modality (Monadic (ax, Modality.Monadic.Const.proj ax monadic))
+    | Comonadic ax ->
+      Modality (Comonadic (ax, Modality.Comonadic.Const.proj ax comonadic))
 
   let print ppf t =
     let print_atom ppf (Modality.Atom.P a) =
