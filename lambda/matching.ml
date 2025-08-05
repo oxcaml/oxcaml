@@ -2136,7 +2136,7 @@ let inline_lazy_force_cond arg pos loc =
   let tag_duid = Lambda.debug_uid_none in
   (* XXX mshinwell: why was this changed to phys_equal instead of icmp?
      This question seems to crop up a lot in the diff *)
-  let test_tag t = phys_equal (Lvar tag) (lconst_int int t) ~loc in
+  let test_tag t = icmp Ceq int (Lvar tag) (lconst_int int t) ~loc in
   Llet
     ( Strict,
       Lambda.layout_lazy,
@@ -2687,12 +2687,7 @@ let rec do_tests_nofail value_kind loc tst arg = function
           act, value_kind )
 
 let make_test_sequence value_kind loc fail size arg const_lambda_list =
-  let icmp size cmp =
-    match (size : _ Scalar.Integral.t), cmp with
-    | Value (Taggable Int), Ceq -> Pphys_equal Eq
-    | Value (Taggable Int), Cne -> Pphys_equal Noteq
-    | size, cmp -> Pscalar (Binary (Icmp (size, cmp)))
-  in
+  let icmp size cmp = Pscalar (Binary (Icmp (size, cmp))) in
   let fcmp size cmp = Pscalar (Binary (Fcmp (size, cmp))) in
   let cmp cmp_if_i cmp_if_f =
     match (size : _ Scalar.t) with
@@ -2701,20 +2696,15 @@ let make_test_sequence value_kind loc fail size arg const_lambda_list =
     | Naked (Floating x) -> fcmp (Naked x) cmp_if_f
     | Value (Floating x) -> fcmp (Value x) cmp_if_f
   in
-  let tst =
-    cmp Cne CFneq
-  in
-  let lt_tst =
-    cmp Clt CFlt
-  in
+  let tst = cmp Cne CFneq in
+  let lt_tst = cmp Clt CFlt in
   let const_lambda_list = sort_lambda_list const_lambda_list in
   let hs, const_lambda_list, fail =
     share_actions_tree value_kind const_lambda_list fail
   in
   let rec make_test_sequence const_lambda_list =
-    (* XXX mshinwell: why was the "&& lt_tst <> Pignore" removed? *)
-    if List.length const_lambda_list >= 4 then
-      split_sequence const_lambda_list
+    if List.length const_lambda_list >= 4
+    then split_sequence const_lambda_list
     else
       match fail with
       | None -> do_tests_nofail value_kind loc tst arg const_lambda_list

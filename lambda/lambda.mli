@@ -1269,8 +1269,9 @@ val and_ : locality_mode Scalar.Integral.t binop
 
 (** This is ONLY for comparing scalar integral values.
 
-    It may NOT be applied to arbitrary arguments of kind value, even if they
-    are both known to be immediates. Use [phys_equal] for that. *)
+    It may NOT be applied to arbitrary arguments of kind value, as it can cause flambda2
+    to infer that the arguments are always both tagged immediates. Use [phys_equal] to
+    compare values when either of them might not be an immediate. *)
 val icmp : integer_comparison -> any_locality_mode Scalar.Integral.t binop
 
 val static_cast
