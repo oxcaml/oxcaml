@@ -2721,15 +2721,11 @@ let make_test_sequence value_kind loc fail size arg const_lambda_list =
 module SArg = struct
   type primitive = Lambda.primitive
 
-  let int_scalar =
-    Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
+  let pintcomp cmp = Pscalar (Binary (Icmp (int, cmp)))
 
-  let pintcomp cmp =
-    Pscalar (Binary (Icmp (int_scalar, cmp)))
+  let eqint = pintcomp Ceq
 
-  let eqint = Pphys_equal Eq
-
-  let neint = Pphys_equal Noteq
+  let neint = pintcomp Cne
 
   let leint = pintcomp Cle
 
@@ -2774,10 +2770,9 @@ module SArg = struct
   let make_isin h arg = Lprim (Pnot, [ make_isout h arg ], Loc_unknown)
 
   let make_is_nonzero arg =
-    if !Clflags.native_code then
-      Lprim (Pphys_equal Noteq, [ arg; lconst_int int 0 ], Loc_unknown)
-    else
-      arg
+    if !Clflags.native_code
+    then icmp Cne int arg (lconst_int int 0) ~loc:Loc_unknown
+    else arg
 
   let arg_as_test arg = arg
 

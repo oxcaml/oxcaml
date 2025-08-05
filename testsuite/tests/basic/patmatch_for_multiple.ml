@@ -32,8 +32,8 @@ match (3, 2, 1) with
    *match*/286 =[value<int>] 1)
   (catch
     (catch
-      (catch (if (%noteq *match*/285 3) (exit 3) (exit 1)) with (3)
-        (if (%noteq *match*/284 1) (exit 2) (exit 1)))
+      (catch (if (%int_notequal *match*/285 3) (exit 3) (exit 1)) with (3)
+        (if (%int_notequal *match*/284 1) (exit 2) (exit 1)))
      with (2) 0)
    with (1) 1))
 (let
@@ -41,8 +41,8 @@ match (3, 2, 1) with
    *match*/285 =[value<int>] 2
    *match*/286 =[value<int>] 1)
   (catch
-    (if (%noteq *match*/285 3) (if (%noteq *match*/284 1) 0 (exit 1))
-      (exit 1))
+    (if (%int_notequal *match*/285 3)
+      (if (%int_notequal *match*/284 1) 0 (exit 1)) (exit 1))
    with (1) 1))
 - : bool = false
 |}];;
@@ -62,7 +62,7 @@ match (3, 2, 1) with
   (catch
     (catch
       (catch
-        (if (%noteq *match*/290 3) (exit 6)
+        (if (%int_notequal *match*/290 3) (exit 6)
           (let
             (x/293 =a[value<
                        (consts ())
@@ -70,7 +70,7 @@ match (3, 2, 1) with
                (makeblock 0 *match*/289 *match*/290 *match*/291))
             (exit 4 x/293)))
        with (6)
-        (if (%noteq *match*/289 1) (exit 5)
+        (if (%int_notequal *match*/289 1) (exit 5)
           (let
             (x/292 =a[value<
                        (consts ())
@@ -87,8 +87,8 @@ match (3, 2, 1) with
    *match*/290 =[value<int>] 2
    *match*/291 =[value<int>] 1)
   (catch
-    (if (%noteq *match*/290 3)
-      (if (%noteq *match*/289 1) 0
+    (if (%int_notequal *match*/290 3)
+      (if (%int_notequal *match*/289 1) 0
         (exit 4 (makeblock 0 *match*/289 *match*/290 *match*/291)))
       (exit 4 (makeblock 0 *match*/289 *match*/290 *match*/291)))
    with (4 x/287[value<
