@@ -40,6 +40,7 @@ module Modal_axis_pair = struct
     in
     match s with
     | "local" -> comonadic Areality Local
+    (* "regional" is not supported *)
     | "global" -> comonadic Areality Global
     | "unique" -> monadic Uniqueness Unique
     | "aliased" -> monadic Uniqueness Aliased
