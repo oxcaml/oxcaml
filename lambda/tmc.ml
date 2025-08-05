@@ -877,6 +877,8 @@ let rec choice ctx t =
     (* in common cases we just return *)
     | Pphys_equal _
     | Pscalar _
+    (* Note for Pscalar: operations returning boxed values could be
+       considered constructions someday *)
     | Pbytes_to_string | Pbytes_of_string
     | Parray_to_iarray | Parray_of_iarray
     | Pgetglobal _ | Psetglobal _ | Pgetpredef _
@@ -897,6 +899,7 @@ let rec choice ctx t =
     | Pignore
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
+    | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
     | Prunstack | Pperform | Presume | Preperform | Pdls_get
@@ -908,7 +911,7 @@ let rec choice ctx t =
     | Patomic_lor_field | Patomic_lxor_field
     | Patomic_load_field _ | Patomic_set_field _
     | Pcpu_relax
-    | Punbox_vector _ | Pbox_vector (_, _) | Punbox_unit
+    | Punbox_vector _ | Pbox_vector (_, _)
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
     | Pmakelazyblock _
@@ -933,9 +936,6 @@ let rec choice ctx t =
     | Pobj_dup
     | Pobj_magic _
     | Pprobe_is_enabled _
-
-    (* operations returning boxed values could be considered
-       constructions someday *)
 
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _

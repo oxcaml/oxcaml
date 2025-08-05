@@ -692,7 +692,7 @@ let unary_int_arith_primitive _env dbg kind op arg =
        cmm_helpers... *)
     match (kind : K.Standard_int.t) with
     | Tagged_immediate ->
-      (* CR mshinwell: Why does this case arise when it did not before? *)
+      (* XXX mshinwell: Why does this case arise when it did not before? *)
       C.Scalar_type.Integral.conjugate arg ~outer:tagged_immediate
         ~inner:naked_immediate ~dbg ~f:(fun arg ->
           C.bbswap Sixteen arg dbg |> C.zero_extend ~bits:16 ~dbg)

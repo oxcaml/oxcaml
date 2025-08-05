@@ -32,9 +32,7 @@ module Let_binding = struct
 end
 
 module Lambda_utils = struct
-  let int_scalar =
-    Scalar.Maybe_naked.Value
-      (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
+  let int_scalar = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
 
   module Constants = struct
     let int n = Lconst (const_int int_scalar n)
@@ -129,6 +127,7 @@ module Lambda_utils = struct
 
       let ( / ) = binop (Integral (size, Div Unsafe))
 
+      (* XXX mshinwell: why is this Pphys_equal not Icmp? *)
       let ( = ) x y = Lprim (Pphys_equal Eq, [x; y], loc)
 
       let ( <> ) x y = Lprim (Pphys_equal Noteq, [x; y], loc)
@@ -137,9 +136,9 @@ module Lambda_utils = struct
 
       let ( > ) = binop (Icmp (size, Cgt))
 
-      let ( <= ) = binop (Icmp (size, Clt))
+      let ( <= ) = binop (Icmp (size, Cle))
 
-      let ( >= ) = binop (Icmp (size, Cgt))
+      let ( >= ) = binop (Icmp (size, Cge))
 
       let ( && ) l r = Lprim (Psequand, [l; r], loc)
 
