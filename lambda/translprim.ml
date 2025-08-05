@@ -556,8 +556,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   let int8 : _ Scalar.Integral.t = Value (Taggable Int8) in
   let int16 : _ Scalar.Integral.t = Value (Taggable Int16) in
   let int32 : _ Scalar.Integral.t = Value (Boxable (Int32 mode)) in
-  let nativeint : _ Scalar.Integral.t = Value (Boxable (Nativeint mode)) in
   let int64 : _ Scalar.Integral.t = Value (Boxable (Int64 mode)) in
+  let nativeint : _ Scalar.Integral.t = Value (Boxable (Nativeint mode)) in
   let float : _ Scalar.Floating.t = Value (Float64 mode) in
   let float32 : _ Scalar.Floating.t = Value (Float32 mode) in
   let unary op : prim = Primitive (Pscalar (Unary op), 1) in
@@ -568,9 +568,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
   let fcmp size cmp =
     binary (Fcmp (Scalar.Floating.ignore_locality size, cmp))
   in
-  let naked scalar =
-    Scalar.Maybe_naked.Naked (Scalar.width scalar)
-  in
+  let naked scalar = Scalar.naked (Scalar.width scalar) in
   let static_cast ~src ~dst =
     let src = Scalar.ignore_locality src in
     unary (Static_cast { src; dst })
@@ -761,7 +759,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%array_element_size_in_bytes" ->
       (* The array kind will be filled in later *)
       Primitive (Parray_element_size_in_bytes Pgenarray, 1)
-    | "%obj_size" -> Primitive ((Parraylength gen_array_kind), 1)
+    | "%obj_size" -> Primitive ((Parraylength Pgenarray), 1)
     | "%obj_field" -> Primitive ((Parrayrefu (Pgenarray_ref mode, Ptagged_int_index, Mutable)), 2)
     | "%obj_set_field" ->
       Primitive
@@ -990,7 +988,6 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       if runtime5 then Primitive (Presume, 4) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%poll" -> Primitive (Ppoll, 1)
-    | "%unbox_unit" -> Primitive(Punbox_unit, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
     | "%box_nativeint" ->
@@ -1003,32 +1000,31 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%box_int32" -> static_cast ~src:(naked (i int32)) ~dst:(i int32)
     | "%unbox_int64" -> static_cast ~src:(i int64) ~dst:(naked (i int64))
     | "%box_int64" -> static_cast ~src:(naked (i int64)) ~dst:(i int64)
+    | "%unbox_unit" -> Primitive(Punbox_unit, 1)
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       Primitive(Preinterpret_tagged_int63_as_unboxed_int64, 1)
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       Primitive(Preinterpret_unboxed_int64_as_tagged_int63, 1)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
-    | s ->
-      if String.length s = 0 || s.[0] <> '%' then
-        External lambda_prim
-      else
-        (match String.Map.find_opt s indexing_primitives with
+    | s when String.length s > 0 && s.[0] = '%' ->
+      (match String.Map.find_opt s indexing_primitives with
+       | Some prim -> prim ~mode
+       | None ->
+         match String.Map.find_opt s array_vec_primitives with
          | Some prim -> prim ~mode
          | None ->
-           match String.Map.find_opt s array_vec_primitives with
-           | Some prim -> prim ~mode
-           | None ->
-             match Scalar.Intrinsic.With_percent_prefix.of_string s with
-             | exception Not_found ->
-               raise (Error (loc, Unknown_builtin_primitive s))
-             | intrinsic ->
-               let arity = Scalar.Intrinsic.arity intrinsic in
-               let intrinsic =
-                 Scalar.Intrinsic.map intrinsic
-                   ~f:(fun Any_locality_mode -> mode)
-               in
-               (Primitive (Pscalar intrinsic, arity)))
+           match Scalar.Intrinsic.With_percent_prefix.of_string s with
+           | exception Not_found ->
+             raise (Error (loc, Unknown_builtin_primitive s))
+           | intrinsic ->
+             let arity = Scalar.Intrinsic.arity intrinsic in
+             let intrinsic =
+               Scalar.Intrinsic.map intrinsic
+                 ~f:(fun Any_locality_mode -> mode)
+             in
+             (Primitive (Pscalar intrinsic, arity)))
+    | _ -> External lambda_prim
   in
   prim
 
@@ -2101,8 +2097,9 @@ let lambda_primitive_needs_event_after = function
     let may_allocate =
       match Scalar.ignore_locality result with
       | Value x | Naked x ->
+        (* Note this is only for bytecode! *)
         match x with
-          Floating (Float32 _ | Float64 _)
+        | Floating (Float32 _ | Float64 _)
         | Integral (Boxable _) -> true
         | Integral (Taggable _) -> false
     in
@@ -2166,13 +2163,13 @@ let lambda_primitive_needs_event_after = function
   | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_load_field _ | Patomic_set_field _
-  | Pctconst _ | Pint_as_pointer _ | Popaque _
+  | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
-  | Pobj_magic _ | Punbox_vector _ | Punbox_unit
+  | Pobj_magic _ | Punbox_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
-  | Pcpu_relax
+  | Punbox_unit
     -> false
 
 (* Determine if a primitive should be surrounded by an "after" debug event *)
