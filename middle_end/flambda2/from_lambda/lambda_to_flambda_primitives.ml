@@ -1410,6 +1410,23 @@ let[@inline always] match_on_array_set_kind ~array array_set_kind f :
            a singleton. *)
         [K.With_subkind.tagged_immediate] )
 
+let const width i = Simple.const_int_of_kind (I.to_kind width) i
+
+let check_zero_division width arg1 arg2 (operator : P.binary_int_arith_op) dbg :
+    H.expr_primitive =
+  (* CR gbury: try and avoid the unboxing duplication of arg2. (the simplifier
+     might cse the duplication away, but it won't be the case for classic
+     mode). *)
+  Checked
+    { primitive = Binary (Int_arith (width, operator), arg1, arg2);
+      validity_conditions =
+        [ Binary
+            (Int_comp (width, Yielding_bool Neq), arg2, Simple (const width 0))
+        ];
+      failure = Division_by_zero;
+      dbg
+    }
+
 let opaque layout arg ~middle_end_only : H.expr_primitive list =
   let kinds = Flambda_arity.unarize (Flambda_arity.from_lambda_list [layout]) in
   if List.compare_lengths kinds arg <> 0
@@ -1423,130 +1440,132 @@ let opaque layout arg ~middle_end_only : H.expr_primitive list =
       Unary (Opaque_identity { middle_end_only; kind }, arg_component))
     arg kinds
 
-let rec static_cast ~(src : L.any_locality_mode Scalar.t)
+let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
     ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region :
     H.simple_or_prim =
-  if Stdlib.( = ) src (Scalar.ignore_locality dst)
-  then arg
-  else
-    match src, dst with
-    | Value src, dst ->
-      let arg : H.expr_primitive =
-        match (src : L.any_locality_mode Scalar.Width.t) with
-        | Integral (Taggable Int8) ->
-          (* CR jvanburen: Untagging int8/16 is not the sleekest. we should be
-             able to untag without a Num_conv primitive, maybe by making
-             subkinds of Tagged_immediate *)
-          Unary
-            ( Num_conv { src = Naked_immediate; dst = Naked_int8 },
-              Prim (Unary (Untag_immediate, arg)) )
-        | Integral (Taggable Int16) ->
-          Unary
-            ( Num_conv { src = Naked_immediate; dst = Naked_int16 },
-              Prim (Unary (Untag_immediate, arg)) )
-        | Integral (Taggable Int) -> Unary (Untag_immediate, arg)
-        | Floating (Float32 Any_locality_mode) ->
-          Unary (Unbox_number Naked_float32, arg)
-        | Floating (Float64 Any_locality_mode) ->
-          Unary (Unbox_number Naked_float, arg)
-        | Integral (Boxable (Int32 Any_locality_mode)) ->
-          Unary (Unbox_number Naked_int32, arg)
-        | Integral (Boxable (Nativeint Any_locality_mode)) ->
-          Unary (Unbox_number Naked_nativeint, arg)
-        | Integral (Boxable (Int64 Any_locality_mode)) ->
-          Unary (Unbox_number Naked_int64, arg)
-      in
-      static_cast (H.Prim arg) ~src:(Scalar.Maybe_naked.Naked src) ~dst
-        ~current_region
-    | src, Value dst -> (
-      let arg =
-        let dst = Scalar.Maybe_naked.Naked (Scalar.Width.ignore_locality dst) in
-        if Stdlib.( = ) src dst
-        then arg
-        else static_cast arg ~src ~dst ~current_region
-      in
-      let box_number width mode : H.simple_or_prim =
-        let mode =
-          Alloc_mode.For_allocations.from_lambda mode ~current_region
-        in
-        Prim (Unary (Box_number (width, mode), arg))
-      in
-      match (dst : L.locality_mode Scalar.Width.t) with
-      | Floating (Float32 mode) -> box_number Naked_float32 mode
-      | Floating (Float64 mode) -> box_number Naked_float mode
-      | Integral (Boxable (Int32 mode)) -> box_number Naked_int32 mode
-      | Integral (Boxable (Nativeint mode)) -> box_number Naked_nativeint mode
-      | Integral (Boxable (Int64 mode)) -> box_number Naked_int64 mode
+  match src, dst with
+  | Value src, dst ->
+    (* First, untag/unbox the value if necessary, then do the conversion. *)
+    let arg : H.expr_primitive =
+      match src with
       | Integral (Taggable width) ->
+        (* CR jvanburen: Untagging int8/16 is not the sleekest. we should be
+           able to untag without a Num_conv primitive, maybe by making subkinds
+           of Tagged_immediate *)
         let arg : H.simple_or_prim =
-          let dst = I_or_f.Naked_immediate in
-          match (width : Scalar.Integral.Taggable.Width.t) with
+          let src = I_or_f.Naked_immediate in
+          match width with
+          | Int8 -> Prim (Unary (Num_conv { src; dst = Naked_int8 }, arg))
+          | Int16 -> Prim (Unary (Num_conv { src; dst = Naked_int16 }, arg))
           | Int -> arg
-          | Int16 -> Prim (Unary (Num_conv { src = Naked_int16; dst }, arg))
-          | Int8 -> Prim (Unary (Num_conv { src = Naked_int8; dst }, arg))
         in
-        Prim (Unary (Tag_immediate, arg)))
-    | Naked src, Naked dst ->
-      let standard_int_or_float_of_scalar_width :
-          L.any_locality_mode Scalar.Width.t -> I_or_f.t = function
-        | Integral (Taggable Int8) -> Naked_int8
-        | Integral (Taggable Int16) -> Naked_int16
-        | Integral (Taggable Int) -> Naked_immediate
-        | Floating (Float32 Any_locality_mode) -> Naked_float32
-        | Floating (Float64 Any_locality_mode) -> Naked_float
-        | Integral (Boxable (Int32 Any_locality_mode)) -> Naked_int32
-        | Integral (Boxable (Nativeint Any_locality_mode)) -> Naked_nativeint
-        | Integral (Boxable (Int64 Any_locality_mode)) -> Naked_int64
+        Unary (Untag_immediate, arg)
+      | Integral (Boxable (Int32 Any_locality_mode)) ->
+        Unary (Unbox_number Naked_int32, arg)
+      | Integral (Boxable (Int64 Any_locality_mode)) ->
+        Unary (Unbox_number Naked_int64, arg)
+      | Integral (Boxable (Nativeint Any_locality_mode)) ->
+        Unary (Unbox_number Naked_nativeint, arg)
+      | Floating (Float32 Any_locality_mode) ->
+        Unary (Unbox_number Naked_float32, arg)
+      | Floating (Float64 Any_locality_mode) ->
+        Unary (Unbox_number Naked_float, arg)
+    in
+    static_cast (H.Prim arg) ~src:(Scalar.naked src) ~dst ~current_region
+  | src, Value dst -> (
+    (* The inverse of the previous case: first do the conversion, then tag/box
+       the result. *)
+    let arg =
+      let dst = Scalar.naked (Scalar.Width.ignore_locality dst) in
+      static_cast arg ~src ~dst ~current_region
+    in
+    let box_number width mode : H.simple_or_prim =
+      let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
+      Prim (Unary (Box_number (width, mode), arg))
+    in
+    match dst with
+    | Integral (Taggable width) ->
+      let arg : H.simple_or_prim =
+        let dst = I_or_f.Naked_immediate in
+        match width with
+        | Int8 -> Prim (Unary (Num_conv { src = Naked_int8; dst }, arg))
+        | Int16 -> Prim (Unary (Num_conv { src = Naked_int16; dst }, arg))
+        | Int -> arg
       in
-      let src = standard_int_or_float_of_scalar_width src in
-      let dst = standard_int_or_float_of_scalar_width dst in
-      Prim (Unary (Num_conv { src; dst }, arg))
+      Prim (Unary (Tag_immediate, arg))
+    | Integral (Boxable (Int32 mode)) -> box_number Naked_int32 mode
+    | Integral (Boxable (Int64 mode)) -> box_number Naked_int64 mode
+    | Integral (Boxable (Nativeint mode)) -> box_number Naked_nativeint mode
+    | Floating (Float32 mode) -> box_number Naked_float32 mode
+    | Floating (Float64 mode) -> box_number Naked_float mode)
+  | Naked src, Naked dst ->
+    let standard_int_or_float_of_scalar_width :
+        L.any_locality_mode Scalar.Width.t -> I_or_f.t = function
+      | Integral (Taggable Int8) -> Naked_int8
+      | Integral (Taggable Int16) -> Naked_int16
+      | Integral (Taggable Int) -> Naked_immediate
+      | Integral (Boxable (Int32 Any_locality_mode)) -> Naked_int32
+      | Integral (Boxable (Int64 Any_locality_mode)) -> Naked_int64
+      | Integral (Boxable (Nativeint Any_locality_mode)) -> Naked_nativeint
+      | Floating (Float32 Any_locality_mode) -> Naked_float32
+      | Floating (Float64 Any_locality_mode) -> Naked_float
+    in
+    let src = standard_int_or_float_of_scalar_width src in
+    let dst = standard_int_or_float_of_scalar_width dst in
+    Prim (Unary (Num_conv { src; dst }, arg))
+
+and static_cast ~(src : L.any_locality_mode Scalar.t)
+    ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region :
+    H.simple_or_prim =
+  if Scalar.equal Scalar.equal_any_locality_mode src
+       (Scalar.ignore_locality dst)
+  then arg
+  else static_cast0 ~src ~dst arg ~current_region
 
 let to_expr : H.simple_or_prim -> H.expr_primitive = function
   | Prim prim -> prim
   | Simple simple -> Simple simple
 
+let integral_width scalar =
+  let of_width : _ Scalar.Integral.Width.t -> I.t = function
+    | Taggable Int8 -> Naked_int8
+    | Taggable Int16 -> Naked_int16
+    | Taggable Int -> Naked_immediate
+    | Boxable (Int32 _) -> Naked_int32
+    | Boxable (Int64 _) -> Naked_int64
+    | Boxable (Nativeint _) -> Naked_nativeint
+  in
+  match (scalar : _ Scalar.Integral.t) with
+  | Value (Taggable Int) ->
+    (* Although the compiler would still work without it, we special-case tagged
+       integers since since flambda has operators that operate directly on
+       them. *)
+    I.Tagged_immediate
+  | Value (Taggable (Int8 | Int16) as width) | Naked (Taggable _ as width) ->
+    of_width width
+  | Value (Boxable _ as width) | Naked (Boxable _ as width) -> of_width width
+
+let floating_width : _ Scalar.Floating.t -> P.float_bitwidth = function
+  | Value (Float64 _) | Naked (Float64 Any_locality_mode) -> Float64
+  | Value (Float32 _) | Naked (Float32 Any_locality_mode) -> Float32
+
+let integral_scalar : I.t -> _ Scalar.t = function
+  | Tagged_immediate -> Value (Integral (Taggable Int))
+  | Naked_immediate -> Naked (Integral (Taggable Int))
+  | Naked_int8 -> Naked (Integral (Taggable Int8))
+  | Naked_int16 -> Naked (Integral (Taggable Int16))
+  | Naked_int32 -> Naked (Integral (Boxable (Int32 Any_locality_mode)))
+  | Naked_int64 -> Naked (Integral (Boxable (Int64 Any_locality_mode)))
+  | Naked_nativeint -> Naked (Integral (Boxable (Nativeint Any_locality_mode)))
+
+let floating_scalar : P.float_bitwidth -> _ Scalar.t = function
+  | Float64 -> Naked (Floating (Float64 Any_locality_mode))
+  | Float32 -> Naked (Floating (Float32 Any_locality_mode))
+
 (* Primitive conversion *)
 let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     (dbg : Debuginfo.t) ~current_region ~current_ghost_region :
     H.expr_primitive list =
-  let const width i = Simple.const_int_of_kind (I.to_kind width) i in
-  let integral_width scalar =
-    let of_width : _ Scalar.Integral.Width.t -> I.t = function
-      | Taggable Int8 -> Naked_int8
-      | Taggable Int16 -> Naked_int16
-      | Taggable Int -> Naked_immediate
-      | Boxable (Int32 _) -> Naked_int32
-      | Boxable (Nativeint _) -> Naked_nativeint
-      | Boxable (Int64 _) -> Naked_int64
-    in
-    match[@warning "-fragile-match"] (scalar : _ Scalar.Integral.t) with
-    | Value (Taggable Int) ->
-      (* Although the compiler would still work without it, we special-case
-         tagged integers since since flambda has operators that operate directly
-         on them. *)
-      I.Tagged_immediate
-    | Value width -> of_width width
-    | Naked width -> of_width width
-  in
-  let floating_width : _ Scalar.Floating.t -> P.float_bitwidth = function
-    | Value (Float64 _) | Naked (Float64 Any_locality_mode) -> Float64
-    | Value (Float32 _) | Naked (Float32 Any_locality_mode) -> Float32
-  in
-  let integral_scalar : I.t -> _ Scalar.t = function
-    | Tagged_immediate -> Value (Integral (Taggable Int))
-    | Naked_immediate -> Naked (Integral (Taggable Int))
-    | Naked_int8 -> Naked (Integral (Taggable Int8))
-    | Naked_int16 -> Naked (Integral (Taggable Int16))
-    | Naked_int32 -> Naked (Integral (Boxable (Int32 Any_locality_mode)))
-    | Naked_nativeint ->
-      Naked (Integral (Boxable (Nativeint Any_locality_mode)))
-    | Naked_int64 -> Naked (Integral (Boxable (Int64 Any_locality_mode)))
-  in
-  let floating_scalar : P.float_bitwidth -> _ Scalar.t = function
-    | Float64 -> Naked (Floating (Float64 Any_locality_mode))
-    | Float32 -> Naked (Floating (Float32 Any_locality_mode))
-  in
   let orig_args = args in
   let args =
     List.map (List.map (fun arg : H.simple_or_prim -> Simple arg)) args
@@ -1767,7 +1786,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     | Static_cast { src; dst } ->
       [to_expr (static_cast arg ~src ~dst ~current_region)]
     | Integral (outer, op) ->
-      let width = integral_width outer in
+      let width = integral_width (Scalar.Integral.ignore_locality outer) in
       let outer = Scalar.integral outer in
       let arg =
         static_cast arg ~current_region
@@ -1805,7 +1824,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
   | Pscalar (Binary binary), [[arg1]; [arg2]] -> (
     match binary with
     | Integral (outer, op) ->
-      let width = integral_width outer in
+      let width = integral_width (Scalar.Integral.ignore_locality outer) in
       let outer = Scalar.integral outer in
       let maybe_unwrap arg =
         static_cast arg ~current_region
@@ -1818,19 +1837,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         static_cast ~src:(integral_scalar width) ~dst:outer ~current_region
       in
       let result : H.expr_primitive =
-        let check_zero_division (operator : P.binary_int_arith_op) :
-            H.expr_primitive =
-          Checked
-            { validity_conditions =
-                [ Binary
-                    ( Int_comp (width, Yielding_bool Neq),
-                      arg2,
-                      Simple (const width 0) ) ];
-              primitive = Binary (Int_arith (width, operator), arg1, arg2);
-              failure = Division_by_zero;
-              dbg
-            }
-        in
         match op with
         | Add -> Binary (Int_arith (width, Add), arg1, arg2)
         | Sub -> Binary (Int_arith (width, Sub), arg1, arg2)
@@ -1840,27 +1846,25 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
         | Xor -> Binary (Int_arith (width, Xor), arg1, arg2)
         | Div Unsafe -> Binary (Int_arith (width, Div), arg1, arg2)
         | Mod Unsafe -> Binary (Int_arith (width, Mod), arg1, arg2)
-        | Div Safe -> check_zero_division Div
-        | Mod Safe -> check_zero_division Mod
+        | Div Safe -> check_zero_division width arg1 arg2 Div dbg
+        | Mod Safe -> check_zero_division width arg1 arg2 Mod dbg
       in
       [to_expr (maybe_wrap (Prim result))]
     | Shift (outer, op, rhs) ->
-      let width = integral_width outer in
+      let width = integral_width (Scalar.Integral.ignore_locality outer) in
       let outer = Scalar.integral outer in
       let arg1 =
         static_cast arg1
           ~src:(Scalar.ignore_locality outer)
           ~dst:(integral_scalar width) ~current_region
       in
-      let int_scalar =
-        Scalar.Maybe_naked.Value
-          (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
-      in
-      let naked_int_scalar =
-        Scalar.Maybe_naked.Naked
-          (Scalar.Integral.Width.Taggable Scalar.Integral.Taggable.Width.Int)
-      in
       let arg2 =
+        let int_scalar =
+          Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
+        in
+        let naked_int_scalar =
+          Scalar.naked (Scalar.Integral.Width.Taggable Int)
+        in
         let src = match rhs with Int -> Scalar.integral int_scalar in
         static_cast arg2 ~src
           ~dst:(Scalar.integral naked_int_scalar)
@@ -1961,7 +1965,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     [Unary (Unbox_number Naked_vec256, arg)]
   | Punbox_vector Boxed_vec512, [[arg]] ->
     [Unary (Unbox_number Naked_vec512, arg)]
-  | Punbox_unit, [[_arg]] -> [] (* unboxing unit produces nothing *)
   | Pbox_vector (Boxed_vec128, mode), [[arg]] ->
     [ Unary
         ( Box_number
@@ -1980,6 +1983,7 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             ( Naked_vec512,
               Alloc_mode.For_allocations.from_lambda mode ~current_region ),
           arg ) ]
+  | Punbox_unit, [[_]] -> [Unboxed_product []]
   | Pfield_computed sem, [[obj]; [field]] ->
     (* We are reinterpreting a block(/object) as a value array, so it needs to
        be opaque. *)
@@ -2735,11 +2739,8 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
             _ )
-      | Patomic_exchange_field _ | Patomic_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Ppoke _
-      | Pscalar (Binary _)
-      | Pphys_equal _ ),
+      | Patomic_load_field _ | Ppoke _ | Pphys_equal _
+      | Pscalar (Binary _) ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -2808,11 +2809,6 @@ let convert_lprim ~big_endian (prim : L.primitive) (args : Simple.t list list)
     Misc.fatal_errorf
       "[%a] should have been handled by [Closure_conversion.close_primitive]"
       Printlambda.primitive prim
-  | Patomic_load_field _, _ ->
-    Misc.fatal_errorf
-      "Closure_conversion.convert_primitive: Wrong arity for \
-       Patomic_load_field %a (%a)"
-      Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
 
 module Acc = Closure_conversion_aux.Acc
 module Expr_with_acc = Closure_conversion_aux.Expr_with_acc

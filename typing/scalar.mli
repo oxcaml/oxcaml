@@ -82,6 +82,8 @@ module Maybe_naked : sig
             Any_locality_mode)] would be unboxed *)
 end
 
+val naked : 'a -> (_, 'a) Maybe_naked.t
+
 module type S := sig
   type 'a width
 
