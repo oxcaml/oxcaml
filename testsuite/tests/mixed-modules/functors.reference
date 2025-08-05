@@ -1,0 +1,6 @@
+Test 1: no coercion in or out
+1.
+0+1
+Test 4: coercion in and out
+4.
+2*2

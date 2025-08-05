@@ -1411,7 +1411,7 @@ let rec transl_mixed_product_element_for_read
   (elt : Types.mixed_block_element) =
   match elt with
   | Value -> Value generic_value
-    (* CR jrayman: [alloc_heap] is probably not always correct *)
+    (* CR jrayman: is [alloc_heap] correct? *)
   | Float_boxed -> Float_boxed alloc_heap
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1900,8 +1900,15 @@ let find_exact_application kind ~arity args =
 let reset () =
   raise_count := 0
 
-let mod_field ?(read_semantics=Reads_agree) pos =
-  Pfield (pos, Pointer, read_semantics)
+let mod_field ?(read_semantics=Reads_agree) pos = function
+  | Module_value_only _ -> Pfield(pos, Pointer, read_semantics)
+  | Module_mixed shape ->
+    let shape =
+      transl_mixed_product_shape_for_read shape
+        ~get_value_kind:(fun _ -> generic_value)
+        ~get_mode:(fun _ -> alloc_heap)
+    in
+    Pmixedfield([pos], shape, read_semantics)
 
 let mod_setfield pos =
   Psetfield (pos, Pointer, Root_initialization)

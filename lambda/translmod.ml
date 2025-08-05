@@ -105,24 +105,13 @@ let rec apply_coercion loc strict restr arg =
         let get_field pos =
           if pos < 0 then lambda_unit
           else
-            let field_access =
-              match input_repr with
-              | Module_value_only _ -> Pfield(pos, Pointer, Reads_agree)
-              | Module_mixed shape ->
-                let shape =
-                  transl_mixed_product_shape_for_read shape
-                    ~get_value_kind:(fun _ -> generic_value)
-                    ~get_mode:(fun _ -> alloc_heap)
-                in
-                Pmixedfield([pos], shape, Reads_agree)
-            in
-            Lprim(field_access, [Lvar id], loc)
+            Lprim(mod_field pos input_repr, [Lvar id], loc)
         in
         let get_layout pos =
-          if pos < 0 then layout_module_field
+          if pos < 0 then layout_value_field
           else
             match input_repr with
-            | Module_value_only _ -> layout_module_field
+            | Module_value_only _ -> layout_value_field
             | Module_mixed shape ->
               shape.(pos) |> transl_mixed_block_element
                           |> layout_of_mixed_block_element
@@ -680,27 +669,31 @@ and transl_structure ~scopes loc
         let repr =
           module_representation_of_mixed_product_shape
             (fields |> List.rev_map (fun (_, mbe) -> mbe) |> Array.of_list)
-          |> transl_module_representation
         in
         match cc with
           Tcoerce_none ->
+            let repr = transl_module_representation repr in
             Lprim(block_of_module_representation repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
         | Tcoerce_structure
-          { input_repr=_; output_repr; pos_cc_list; id_pos_list; } ->
+          { input_repr; output_repr; pos_cc_list; id_pos_list; } ->
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
               fields;
             Format.eprintf "@]@.";*)
+            begin if not (equal_module_representation input_repr repr) then
+              fatal_error
+                "Translmod.transl_structure: module representation mismatch"
+            end;
             let v = Array.of_list (List.rev fields) in
             let get_field pos =
               if pos < 0 then lambda_unit
               else let id, _ = v.(pos) in Lvar id
             in
             let get_layout pos =
-              if pos < 0 then Lambda.layout_value_field
+              if pos < 0 then layout_value_field
               else let _, shape = v.(pos) in
                 shape |> transl_mixed_block_element
                       |> layout_of_mixed_block_element
@@ -944,6 +937,7 @@ and transl_structure ~scopes loc
                 bound_value_identifiers_and_layouts
                   ~layout_value:Jkind.(Layout.of_const
                     (Layout.Const.of_sort_const Sort.Const.for_module_field))
+
                   od.open_bound_items
               in
               let mid = Ident.create_local "open" in
