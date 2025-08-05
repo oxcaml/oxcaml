@@ -1195,6 +1195,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           cl_attributes = scl.pcl_attributes;
          }
   | Pcl_fun (l, Some default, spat, sbody) ->
+      (match l with
+      | Generic_optional _ ->
+          raise(Typetexp.Error(spat.ppat_loc, val_env,
+            Typetexp.Unsupported_generic_optional_argument "class arguments"))
+      | _ -> ());
       if Typecore.has_poly_constraint spat then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let loc = default.pexp_loc in
@@ -1336,6 +1341,12 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           when sargs <> [] ->
             (* CR generic-optional: test generic optional arguments in class
                methods *)
+            (match l with
+            | Generic_optional _ ->
+                raise(Typetexp.Error(scl'.pcl_loc, val_env,
+                  Typetexp.Unsupported_generic_optional_argument
+                    "class arguments"))
+            | _ -> ());
             let optional = Btype.is_optional l in
             let use_arg sarg l' =
               Arg (
@@ -1573,9 +1584,10 @@ let rec approx_declaration cl =
       let arg =
         match l with
         | Optional _ -> Ctype.instance var_option
-        | Generic_optional _ ->
-            Misc.fatal_error "Generic optional not supported"
           (* CR generic-optional: Handle this case *)
+        | Generic_optional _ ->
+            raise(Typetexp.Error(pat.ppat_loc, Env.empty,
+              Typetexp.Unsupported_generic_optional_argument "class arguments"))
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
@@ -1600,7 +1612,9 @@ let rec approx_description ct =
         match Btype.classify_optionality l with
         | Vanilla_optional_arg -> Ctype.instance var_option
         | Generic_optional_arg ->
-            Misc.fatal_error "Generic optional not supported"
+            raise(Typetexp.Error(ct.pcty_loc, Env.empty,
+              Typetexp.Unsupported_generic_optional_argument "class description"
+            ))
         | Required_or_position_arg ->
             Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we
