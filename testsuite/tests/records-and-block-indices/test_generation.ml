@@ -10,7 +10,22 @@ let sprintf = Printf.sprintf
 
 let failwithf fmt = Printf.ksprintf failwith fmt
 
-let interesting_type_trees : Type_structure.t Tree.t list =
+type test =
+  | Array_idx_access of { local : bool }
+  | Record_idx_access of { local : bool }
+  | Array_idx_deepening
+  | Record_idx_deepening
+  | Record_size
+  | Record_access of
+      { local : bool;
+        with_void : bool
+      }
+
+let is_idx_test = function
+  | Array_idx_access _ | Record_idx_access _ -> true
+  | _ -> false
+
+let interesting_type_trees test : Type_structure.t Tree.t list =
   (* There are many possible type trees, exponential in the size of the tree and
      the number of types we consider.
 
@@ -23,82 +38,101 @@ let interesting_type_trees : Type_structure.t Tree.t list =
     false
   in
   let open Type_structure in
-  List.concat_map
+  let interesting_type_pairs =
     [ [Int; Float];
       [Int; Int32_u];
       [Int; Int64x2_u];
       [Float; Float_u];
       [Unit_u; String]
     ]
-    ~f:(fun leaves ->
-      List.concat_map
-        (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
-        @
-        if patient
-        then
-          [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
-            Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
-            Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
-            Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
-          ]
-        else []
-        )
-        ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
-    )
-  @ List.concat_map
-      (Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:2)
-      ~f:(fun shape ->
-        Tree.enumerate ~shape
-          ~leaves:
-            ([ Int;
-               Int64;
-               Int32_u;
-               Float;
-               Int64_u;
-               Nativeint_u;
-               Unit_u;
-               Variant [[Unit_u]]
-             ]
-            @
-            if patient
-            then
-              [ Tuple ([Unit_u; Unit_u], Unboxed);
-                Tuple ([Unit_u; Int], Unboxed);
-                Tuple ([Unit_u; Int64_u], Unboxed);
-                Tuple ([Unit_u; String], Unboxed);
-                Variant
-                  [ [Unit_u];
-                    [Unit_u; Unit_u];
-                    [Tuple ([Unit_u; Unit_u], Unboxed)]
-                  ]
-              ]
-            else []
+  in
+  let interesting_large_trees : _ Tree.t list =
+    [ Branch [Leaf (); Branch [Leaf (); Branch [Leaf ()]]];
+      Branch [Leaf (); Branch [Branch [Leaf (); Leaf ()]]];
+      Branch [Branch [Branch [Leaf (); Leaf ()]; Leaf ()]];
+      Branch [Branch [Leaf (); Branch [Leaf (); Leaf ()]]]
+    ]
+  in
+  let interesting_types =
+    [ Int;
+      Int64;
+      Int32_u;
+      Float;
+      Int64_u;
+      Nativeint_u;
+      Unit_u;
+      Variant [[Unit_u]]
+    ]
+  in
+  let more_interesting_types =
+    interesting_types
+    @ [ Tuple ([Unit_u; Unit_u], Unboxed);
+        Tuple ([Unit_u; Int], Unboxed);
+        Tuple ([Unit_u; Int64_u], Unboxed);
+        Tuple ([Unit_u; String], Unboxed);
+        Variant [[Unit_u]; [Unit_u; Unit_u]; [Tuple ([Unit_u; Unit_u], Unboxed)]]
+      ]
+  in
+  let hardcoded_type_trees : _ Tree.t list =
+    (* Some particular interesting type trees *)
+    [ Branch
+        (* Mixed then all flat *)
+        [Branch [Leaf Int64; Leaf Int64_u]; Branch [Leaf Int64_u; Leaf Float_u]];
+      Branch
+        (* Mixed then all values *)
+        [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Int64; Leaf Int64]];
+      Branch
+        (* All values then mixed *)
+        [Branch [Leaf Int64; Leaf String]; Branch [Leaf Int64_u; Leaf String]];
+      Branch
+        (* All flats then mixed *)
+        [ Branch [Leaf Float32_u; Leaf Int64_u];
+          Branch [Leaf String; Leaf Int64_u]
+        ];
+      Branch
+        (* Mixed then mixed *)
+        [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Float32_u; Leaf Float]];
+      Branch
+        (* An int64x2 that would be reordered to the gap of a "sibling"
+           record *)
+        [Branch [Leaf Int64x2_u; Leaf String]; Branch [Leaf Int64; Leaf Float_u]];
+      Branch
+        (* An int64x2 that would be reordered to the gap of an inner record *)
+        [Leaf Int64x2_u; Branch [Leaf String; Leaf Float_u]]
+    ]
+  in
+  let enumerated_trees =
+    Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:2
+  in
+  let more_enumerated_trees =
+    Tree.enumerate_shapes' ~max_leaves_and_singleton_branches:3
+  in
+  let enumerated_type_trees =
+    if is_idx_test test && not patient
+    then
+      (* idx tests are more expensive *)
+      (* fewer trees and types *)
+      List.concat_map enumerated_trees ~f:(fun shape ->
+          Tree.enumerate ~shape ~leaves:interesting_types
+      )
+    else
+      (* more trees, fewer types *)
+      List.concat_map interesting_type_pairs ~f:(fun leaves ->
+          List.concat_map
+            (more_enumerated_trees
+            @ if patient then interesting_large_trees else []
             )
-    )
-  @ (* Some particular interesting trees *)
-  [ Branch
-      (* Mixed then all flat *)
-      [Branch [Leaf Int64; Leaf Int64_u]; Branch [Leaf Int64_u; Leaf Float_u]];
-    Branch
-      (* Mixed then all values *)
-      [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Int64; Leaf Int64]];
-    Branch
-      (* All values then mixed *)
-      [Branch [Leaf Int64; Leaf String]; Branch [Leaf Int64_u; Leaf String]];
-    Branch
-      (* All flats then mixed *)
-      [Branch [Leaf Float32_u; Leaf Int64_u]; Branch [Leaf String; Leaf Int64_u]];
-    Branch
-      (* Mixed then mixed *)
-      [Branch [Leaf Int64_u; Leaf Int64]; Branch [Leaf Float32_u; Leaf Float]];
-    Branch
-      (* An int64x2 that would be reordered to the gap of a "sibling" record *)
-      [Branch [Leaf Int64x2_u; Leaf String]; Branch [Leaf Int64; Leaf Float_u]];
-    Branch
-      (* An int64x2 that would be reordered to the gap of an inner record *)
-      [Leaf Int64x2_u; Branch [Leaf String; Leaf Float_u]]
-  ]
-  |> List.sort_uniq ~cmp:(Tree.compare Type_structure.compare)
+            ~f:(fun shape -> Tree.enumerate ~shape ~leaves)
+      )
+      (* fewer trees, more types *)
+      @ List.concat_map enumerated_trees ~f:(fun shape ->
+            Tree.enumerate ~shape
+              ~leaves:
+                (if patient then more_interesting_types else interesting_types)
+        )
+      @ hardcoded_type_trees
+  in
+  List.sort_uniq enumerated_type_trees ~cmp:(Tree.compare Type_structure.compare)
 
 let preamble =
   {|open Stdlib_upstream_compatible
@@ -647,19 +681,13 @@ let toplevel_unit_block f =
   line "let () = to_run ();;";
   line ""
 
-type test =
-  | Array_idx_access of { local : bool }
-  | Record_idx_access of { local : bool }
-  | Array_idx_deepening
-  | Record_idx_deepening
-  | Record_size
-  | Record_access of
-      { local : bool;
-        with_void : bool
-      }
+let is_idx_test = function
+  | Array_idx_access _ | Record_idx_access _ -> true
+  | _ -> false
 
 let main test ~bytecode =
   let types =
+    let interesting_type_trees = interesting_type_trees test in
     match test with
     | Array_idx_access _ | Array_idx_deepening ->
       List.filter_map interesting_type_trees ~f:Type_structure.array_element
