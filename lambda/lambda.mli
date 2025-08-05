@@ -1252,6 +1252,7 @@ val ignorable_product_element_kind_involves_int :
 
 (** Construction helpers *)
 
+(** A tagged immediate. *)
 val int : _ Scalar.Integral.t
 
 (** See the comment on the [Pphys_equal] primitive.
