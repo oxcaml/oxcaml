@@ -875,7 +875,8 @@ let rec print fmt t =
         (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ | ")
             print_constructor)
         constructors
-  | Variant_unboxed { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
+  | Variant_unboxed { name; variant_uid; arg_name; arg_uid; arg_shape;
+                      arg_layout } ->
     Format.fprintf fmt
       "Variant_unboxed name=%s%a arg_name=%s%a arg_shape=%a arg_layout=%a"
       name
@@ -917,18 +918,21 @@ and print_one_entry print_value ppf { field_name; field_uid; field_value } =
   in
   match field_name with
   | Some name ->
-    Format.fprintf ppf "%a%a=%a" Format.pp_print_string name print_uid_opt field_uid print_value
-      field_value
-  | None -> Format.fprintf ppf "%a%a" print_value field_value print_uid_opt field_uid
+    Format.fprintf ppf "%a%a=%a" Format.pp_print_string name print_uid_opt
+      field_uid print_value field_value
+  | None -> Format.fprintf ppf "%a%a" print_value field_value print_uid_opt
+      field_uid
 
 and print_constructor print_value ppf { name; constr_uid; kind = _; args } =
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in
   if List.length args = 0 then
-    Format.fprintf ppf "%a%a" Format.pp_print_string name print_uid_opt constr_uid
+    Format.fprintf ppf "%a%a" Format.pp_print_string name print_uid_opt
+      constr_uid
   else
-    Format.fprintf ppf "@[%a%a of @[%a@]@]" Format.pp_print_string name print_uid_opt constr_uid
+    Format.fprintf ppf "@[%a%a of @[%a@]@]" Format.pp_print_string name
+      print_uid_opt constr_uid
       (Format.pp_print_list ~pp_sep:(print_sep_string " * ")
           (print_one_entry print_value))
       args
@@ -938,7 +942,8 @@ and print_field ppf
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in
-  Format.fprintf ppf "%a%a: %a" Format.pp_print_string name print_uid_opt uid_opt print shape
+  Format.fprintf ppf "%a%a: %a" Format.pp_print_string name print_uid_opt
+    uid_opt print shape
 
 and print_record_type = function
   | Record_boxed -> "_boxed"

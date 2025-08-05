@@ -482,7 +482,8 @@ end) = struct
              type expressions (e.g., t.field is not a type).  *)
           | NVariant constrs when Shape.Item.is_constructor item ->
             let name = Shape.Item.name item in
-            (match List.find_opt (fun c -> String.equal c.name name) constrs with
+            (match List.find_opt (fun c -> String.equal c.name name)
+                constrs with
             | Some { name = _; constr_uid; kind = _; args } ->
               let has_unnamed_field =
                 List.exists (fun { field_name; _ } ->
@@ -602,7 +603,8 @@ end) = struct
             complex_constructors_map (fun (t, ly) ->
               (delay_reduce env t, ly)) constructors in
           return (NVariant dnf_constructors)
-      | Variant_unboxed { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
+      | Variant_unboxed { name; variant_uid; arg_name; arg_uid; arg_shape;
+                          arg_layout } ->
           let dnf_arg_shape = delay_reduce env arg_shape in
           return (NVariant_unboxed { name; variant_uid; arg_name; arg_uid;
                                      arg_shape = dnf_arg_shape; arg_layout })

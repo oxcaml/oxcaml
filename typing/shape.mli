@@ -346,7 +346,8 @@ val variant :
 val variant_unboxed :
   ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
   string -> string option -> t -> Layout.t -> t
-val record : ?uid:Uid.t -> record_kind -> (string * Uid.t option * t * Layout.t) list -> t
+val record : ?uid:Uid.t -> record_kind ->
+  (string * Uid.t option * t * Layout.t) list -> t
 val mutrec : ?uid:Uid.t -> t Ident.Map.t -> t
 val proj_decl : ?uid:Uid.t -> t -> Ident.t -> t
 
