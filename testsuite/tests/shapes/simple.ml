@@ -6,7 +6,7 @@
 let x = ()
 [%%expect{|
 {
- "x"[value] -> <.0>;
+ "x"[value] -> <.5>;
  }
 val x : unit = ()
 |}]
@@ -14,7 +14,7 @@ val x : unit = ()
 external y : int -> int = "%identity"
 [%%expect{|
 {
- "y"[value] -> <.2>;
+ "y"[value] -> <.7>;
  }
 external y : int -> int = "%identity"
 |}]
@@ -23,12 +23,12 @@ type t = A of foo
 and foo = Bar
 [%%expect{|
 {
- "foo"[type] -> {<.4>
-                 "Bar"[constructor] -> {<.6>};
-                 };
- "t"[type] -> {<.3>
-               "A"[constructor] -> {<.5>};
-               };
+ "foo"[type] ->
+   (Mutrec t/291 := Variant A<.10> of (Constr foo/292  );
+           foo/292 := Variant Bar<.11>;).foo/292;
+ "t"[type] ->
+   (Mutrec t/291 := Variant A<.10> of (Constr foo/292  );
+           foo/292 := Variant Bar<.11>;).t/291;
  }
 type t = A of foo
 and foo = Bar
@@ -39,7 +39,7 @@ module type S = sig
 end
 [%%expect{|
 {
- "S"[module type] -> <.8>;
+ "S"[module type] -> <.14>;
  }
 module type S = sig type t end
 |}]
@@ -47,7 +47,7 @@ module type S = sig type t end
 exception E
 [%%expect{|
 {
- "E"[extension constructor] -> {<.9>};
+ "E"[extension constructor] -> <.15>;
  }
 exception E
 |}]
@@ -55,7 +55,7 @@ exception E
 type ext = ..
 [%%expect{|
 {
- "ext"[type] -> <.10>;
+ "ext"[type] -> <.16>;
  }
 type ext = ..
 |}]
@@ -63,8 +63,8 @@ type ext = ..
 type ext += A | B
 [%%expect{|
 {
- "A"[extension constructor] -> {<.11>};
- "B"[extension constructor] -> {<.12>};
+ "A"[extension constructor] -> <.17>;
+ "B"[extension constructor] -> <.18>;
  }
 type ext += A | B
 |}]
@@ -74,8 +74,8 @@ module M = struct
 end
 [%%expect{|
 {
- "M"[module] -> {<.14>
-                 "C"[extension constructor] -> {<.13>};
+ "M"[module] -> {<.20>
+                 "C"[extension constructor] -> <.19>;
                  };
  }
 module M : sig type ext += C end
@@ -104,17 +104,12 @@ end
 [%%expect{|
 {
  "M1"[module] -> {
-                  "t"[type] -> {<.28>
-                                "C"[constructor] -> {<.29>};
-                                };
+                  "t"[type] -> Variant C<.37> of (M2<.25> . "t"[type] );
                   };
- "M2"[module] ->
-   {
-    "t"[type] -> {<.30>
-                  "T"[constructor] -> {<.31>};
+ "M2"[module] -> {
+                  "t"[type] -> Variant T<.40>;
+                  "x"[value] -> <.41>;
                   };
-    "x"[value] -> <.32>;
-    };
  }
 module rec M1 : sig type t = C of M2.t end
 and M2 : sig type t val x : t end
@@ -123,9 +118,9 @@ and M2 : sig type t val x : t end
 class c = object end
 [%%expect{|
 {
- "c"[type] -> <.34>;
- "c"[class] -> <.34>;
- "c"[class type] -> <.34>;
+ "c"[type] -> <.43>;
+ "c"[class] -> <.43>;
+ "c"[class type] -> <.43>;
  }
 class c : object  end
 |}]
@@ -133,8 +128,8 @@ class c : object  end
 class type c = object end
 [%%expect{|
 {
- "c"[type] -> <.37>;
- "c"[class type] -> <.37>;
+ "c"[type] -> <.46>;
+ "c"[class type] -> <.46>;
  }
 class type c = object  end
 |}]
@@ -142,7 +137,9 @@ class type c = object  end
 type u = t
 [%%expect{|
 {
- "u"[type] -> <.38>;
+ "u"[type] ->
+   (Mutrec t/291 := Variant A<.10> of (Constr foo/292  );
+           foo/292 := Variant Bar<.11>;).t/291;
  }
 type u = t
 |}]

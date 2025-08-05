@@ -18,12 +18,10 @@ module rec A : sig
 [%%expect{|
 {
  "A"[module] -> {
-                 "t"[type] -> {<.8>
-                               "Leaf"[constructor] -> {<.9>};
-                               };
+                 "t"[type] -> Variant Leaf<.18> of (B<.6> . "t"[type] );
                  };
  "B"[module] -> {
-                 "t"[type] -> <.10>;
+                 "t"[type] -> Predef int ();
                  };
  }
 module rec A : sig type t = Leaf of B.t end
@@ -45,8 +43,8 @@ and B : sig
 end = B
 [%%expect{|
 {
- "A"[module] -> A<.11>;
- "B"[module] -> B<.12>;
+ "A"[module] -> A<.22>;
+ "B"[module] -> B<.23>;
  }
 module rec A : sig type t = Leaf of B.t end
 and B : sig type t = int end
@@ -79,21 +77,19 @@ end = Set.Make(A)
 {
  "A"[module] ->
    {
-    "compare"[value] -> <.38>;
+    "compare"[value] -> <.61>;
     "t"[type] ->
-      {<.35>
-       "Leaf"[constructor] -> {<.36>};
-       "Node"[constructor] -> {<.37>};
-       };
+      Variant Leaf<.57> of Predef string ()
+      | Node<.58> of (ASet<.35> . "t"[type] );
     };
  "ASet"[module] ->
    {
     "compare"[value] ->
-      CU Stdlib . "Set"[module] . "Make"[module](A<.19>) . "compare"[value];
+      CU Stdlib . "Set"[module] . "Make"[module](A<.34>) . "compare"[value];
     "elt"[type] ->
-      CU Stdlib . "Set"[module] . "Make"[module](A<.19>) . "elt"[type];
+      CU Stdlib . "Set"[module] . "Make"[module](A<.34>) . "elt"[type];
     "t"[type] ->
-      CU Stdlib . "Set"[module] . "Make"[module](A<.19>) . "t"[type];
+      CU Stdlib . "Set"[module] . "Make"[module](A<.34>) . "t"[type];
     };
  }
 module rec A :
