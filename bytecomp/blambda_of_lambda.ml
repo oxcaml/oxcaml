@@ -605,6 +605,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       in
       unary (Ccall (Printf.sprintf "caml_sys_const_%s" const_name))
     | Pisint _ -> unary Isint
+    | Pgettag _ -> unary (Ccall "caml_obj_tag")
     | Pisout -> binary (Intcomp Ultint)
     | Pbintofint (bi, _) -> unary (comp_bint_primitive bi "of_int")
     | Pintofbint bi -> unary (comp_bint_primitive bi "to_int")

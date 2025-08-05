@@ -2070,13 +2070,6 @@ let get_pat_args_lazy p rem =
   | { pat_desc = Tpat_lazy arg } -> arg :: rem
   | _ -> assert false
 
-(* Inlining the tag tests before calling the primitive that works on
-   lazy blocks. This is also used in translcore.ml.
-   No other call than Obj.tag when the value has been forced before.
-*)
-
-let prim_obj_tag =
-  Lambda.simple_prim_on_values ~name:"caml_obj_tag" ~arity:1 ~alloc:false
 
 let get_mod_field modname field =
   lazy
@@ -2148,7 +2141,11 @@ let inline_lazy_force_cond arg pos loc =
           Lambda.layout_int,
           tag,
           tag_duid,
-          Lprim (Pccall prim_obj_tag, [ varg ], loc),
+          Lifthenelse
+            ( Lprim (Pisint { variant_only = false }, [ varg ], loc),
+              Lconst (Const_base (Const_int Runtimetags.int_tag)),
+              Lprim (Pgettag { variant_only = false }, [ varg ], loc),
+              Lambda.layout_int ),
           Lifthenelse
             ( (* if (tag == Obj.forward_tag) then varg.(0) else ... *)
               test_tag Obj.forward_tag,
@@ -2180,7 +2177,7 @@ let inline_lazy_force_switch arg pos loc =
         ( Lprim (Pisint { variant_only = false }, [ varg ], loc),
           varg,
           Lswitch
-            ( Lprim (Pccall prim_obj_tag, [ varg ], loc),
+            ( Lprim (Pgettag { variant_only = false }, [ varg ], loc),
               { sw_numblocks = 0;
                 sw_blocks = [];
                 sw_numconsts = 256;
@@ -2221,9 +2218,7 @@ let inline_lazy_force arg pos loc =
         ap_specialised = Default_specialise;
         ap_probe=None;
       }
-  else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
-    (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
-       caml_obj_tag and the switch on arbitrary tags *)
+  else if !Clflags.native_code then
     (* Lswitch generates compact and efficient native code *)
     inline_lazy_force_switch arg pos loc
   else

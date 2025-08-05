@@ -315,7 +315,7 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
     default_bp (fun to_ ->
         Graph.add_accessor_dep (Acc.graph acc) ~to_ Is_int ~base:name)
-  | Unary (Get_tag, arg) ->
+  | Unary (Get_tag { variant_only = true }, arg) ->
     let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
     default_bp (fun to_ ->
         Graph.add_accessor_dep (Acc.graph acc) ~to_ Get_tag ~base:name)
