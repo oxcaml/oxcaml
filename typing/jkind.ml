@@ -2636,7 +2636,7 @@ let for_float ident =
 
 let for_array_argument =
   let mod_bounds =
-    Mod_bounds.create ~locality:Locality.Const.max
+    Mod_bounds.create ~areality:Regionality.Const.max
       ~linearity:Linearity.Const.max ~portability:Portability.Const.max
       ~yielding:Yielding.Const.max ~uniqueness:Uniqueness.Const_op.max
       ~contention:Contention.Const_op.max ~statefulness:Statefulness.Const.max
