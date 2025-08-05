@@ -381,7 +381,8 @@ let unary_prim_size prim =
         | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ) ->
       array_length_size
     | Array_kind (Naked_int32s | Naked_float32s) ->
-      (* There is a dynamic check here to see the number of elements *)
+      (* There is a dynamic check here to see if the array has an odd or even
+         number of elements *)
       array_length_size + 2 (* compare + load *)
     | Float_array_opt_dynamic -> array_length_size + 3 (* a bit approximate *))
   | Bigarray_length _ -> 2 (* cadda + load *)

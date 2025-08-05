@@ -482,6 +482,27 @@ module Boxable_number = struct
     | Naked_vec256 -> Naked_number Naked_vec256
     | Naked_vec512 -> Naked_number Naked_vec512
 
+  include Container_types.Make (struct
+    type nonrec t = t
+
+    let print ppf t =
+      match t with
+      | Naked_float32 -> Format.pp_print_string ppf "Naked_float32"
+      | Naked_float -> Format.pp_print_string ppf "Naked_float"
+      | Naked_int32 -> Format.pp_print_string ppf "Naked_int32"
+      | Naked_int64 -> Format.pp_print_string ppf "Naked_int64"
+      | Naked_nativeint -> Format.pp_print_string ppf "Naked_nativeint"
+      | Naked_vec128 -> Format.pp_print_string ppf "Naked_vec128"
+      | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
+      | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
+
+    let compare = Stdlib.compare
+
+    let equal t1 t2 = compare t1 t2 = 0
+
+    let hash = Hashtbl.hash
+  end)
+
   let print_lowercase ppf t =
     match t with
     | Naked_float32 -> Format.pp_print_string ppf "naked_float32"
@@ -503,27 +524,6 @@ module Boxable_number = struct
     | Naked_vec128 -> Format.pp_print_string ppf "vec128"
     | Naked_vec256 -> Format.pp_print_string ppf "vec256"
     | Naked_vec512 -> Format.pp_print_string ppf "vec512"
-
-  include Container_types.Make (struct
-    type nonrec t = t
-
-    let print ppf t =
-      match t with
-      | Naked_float32 -> Format.pp_print_string ppf "Naked_float32"
-      | Naked_float -> Format.pp_print_string ppf "Naked_float"
-      | Naked_int32 -> Format.pp_print_string ppf "Naked_int32"
-      | Naked_int64 -> Format.pp_print_string ppf "Naked_int64"
-      | Naked_nativeint -> Format.pp_print_string ppf "Naked_nativeint"
-      | Naked_vec128 -> Format.pp_print_string ppf "Naked_vec128"
-      | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
-      | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
-
-    let compare = Stdlib.compare
-
-    let equal t1 t2 = compare t1 t2 = 0
-
-    let hash = Hashtbl.hash
-  end)
 end
 
 module With_subkind = struct
@@ -1038,9 +1038,9 @@ module With_subkind = struct
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
-      | Parrayval (Punboxedintarray (Unboxed_int8 | Unboxed_int16)) ->
+      | Parrayval
+          (Punboxedintarray (Unboxed_int8 | Unboxed_int16 | Unboxed_int)) ->
         Misc.unboxed_small_int_arrays_are_not_implemented ()
-      | Parrayval (Punboxedintarray Unboxed_int) -> Immediate_array
       | Parrayval (Punboxedintarray Unboxed_int32) -> Unboxed_int32_array
       | Parrayval (Punboxedintarray Unboxed_int64) -> Unboxed_int64_array
       | Parrayval (Punboxedintarray Unboxed_nativeint) ->

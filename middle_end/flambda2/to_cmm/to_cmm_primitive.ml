@@ -55,9 +55,9 @@ let unbox_number ~dbg kind arg =
   | Naked_vec128 -> C.unbox_vec128 dbg arg
   | Naked_vec256 -> C.unbox_vec256 dbg arg
   | Naked_vec512 -> C.unbox_vec512 dbg arg
-  | Naked_int32 -> C.unbox_int dbg Primitive.Boxed_int32 arg
-  | Naked_int64 -> C.unbox_int dbg Primitive.Boxed_int64 arg
-  | Naked_nativeint -> C.unbox_int dbg Primitive.Boxed_nativeint arg
+  | Naked_int32 -> C.unbox_int dbg Boxed_int32 arg
+  | Naked_int64 -> C.unbox_int dbg Boxed_int64 arg
+  | Naked_nativeint -> C.unbox_int dbg Boxed_nativeint arg
 
 let box_number ~dbg kind alloc_mode arg =
   let alloc_mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
@@ -67,10 +67,9 @@ let box_number ~dbg kind alloc_mode arg =
   | Naked_vec128 -> C.box_vec128 dbg alloc_mode arg
   | Naked_vec256 -> C.box_vec256 dbg alloc_mode arg
   | Naked_vec512 -> C.box_vec512 dbg alloc_mode arg
-  | Naked_int32 -> C.box_int_gen dbg Primitive.Boxed_int32 alloc_mode arg
-  | Naked_int64 -> C.box_int_gen dbg Primitive.Boxed_int64 alloc_mode arg
-  | Naked_nativeint ->
-    C.box_int_gen dbg Primitive.Boxed_nativeint alloc_mode arg
+  | Naked_int32 -> C.box_int_gen dbg Boxed_int32 alloc_mode arg
+  | Naked_int64 -> C.box_int_gen dbg Boxed_int64 alloc_mode arg
+  | Naked_nativeint -> C.box_int_gen dbg Boxed_nativeint alloc_mode arg
 
 (* Block creation and access. For these functions, [index] is a tagged
    integer. *)
@@ -693,6 +692,7 @@ let unary_int_arith_primitive _env dbg kind op arg =
        cmm_helpers... *)
     match (kind : K.Standard_int.t) with
     | Tagged_immediate ->
+      (* CR mshinwell: Why does this case arise when it did not before? *)
       C.Scalar_type.Integral.conjugate arg ~outer:tagged_immediate
         ~inner:naked_immediate ~dbg ~f:(fun arg ->
           C.bbswap Sixteen arg dbg |> C.zero_extend ~bits:16 ~dbg)
@@ -718,7 +718,8 @@ let unary_int_arith_primitive _env dbg kind op arg =
       match bits with
       | 64 -> C.sign_extend (C.bbswap Sixtyfour arg dbg) ~bits ~dbg
       | 32 -> C.sign_extend (C.bbswap Thirtytwo arg dbg) ~bits ~dbg
-      | _ -> assert false))
+      | arch_bits ->
+        Misc.fatal_errorf "Unexpected C.arch_bits value %d" arch_bits))
 
 let unary_float_arith_primitive _env dbg width op arg =
   match (width : P.float_bitwidth), (op : P.unary_float_arith_op) with

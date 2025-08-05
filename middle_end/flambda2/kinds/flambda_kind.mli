@@ -18,6 +18,9 @@
 
 module Naked_number_kind : sig
   type t =
+    (* CR mshinwell: I think we should consider renaming [Naked_immediate] to
+       [Naked_int] or (maybe better) [Naked_int31_63], to avoid confusion with
+       [Lambda.Const_naked_immediate]. *)
     | Naked_immediate
     | Naked_float32
     | Naked_float

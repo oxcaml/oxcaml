@@ -18,9 +18,8 @@ module Env = Lambda_to_flambda_env
 module L = Lambda
 module P = Flambda_primitive
 
-let int_scalar =
-  L.Scalar.Maybe_naked.Value
-    (L.Scalar.Integral.Width.Taggable L.Scalar.Integral.Taggable.Width.Int)
+let int_scalar : _ Scalar.Maybe_naked.t =
+  Value (Scalar.Integral.Width.Taggable Int)
 
 type primitive_transform_result =
   | Primitive of L.primitive * L.lambda list * L.scoped_location
@@ -137,14 +136,12 @@ let rec_catch_for_for_loop env loc ident duid start stop
   let subsequent_test : L.lambda =
     L.icmp Cne L.int (Lvar ident) (Lvar stop_ident) ~loc
   in
-  let next_value_of_counter =
+  let next_value_of_counter : L.lambda =
     match dir with
     | Upto ->
-      L.Lprim
-        (Pscalar (Unary (Integral (int_scalar, Succ))), [L.Lvar ident], loc)
+      Lprim (Pscalar (Unary (Integral (int_scalar, Succ))), [L.Lvar ident], loc)
     | Downto ->
-      L.Lprim
-        (Pscalar (Unary (Integral (int_scalar, Pred))), [L.Lvar ident], loc)
+      Lprim (Pscalar (Unary (Integral (int_scalar, Pred))), [L.Lvar ident], loc)
   in
   let lam : L.lambda =
     (* Care needs to be taken here not to cause overflow if, for an incrementing
@@ -224,7 +221,7 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     let index_duid = Lambda.debug_uid_none in
     rec_catch_for_for_loop env loc index index_duid
       (Lconst (L.const_int L.int 0))
-      (L.Lprim
+      (Lprim
          ( Pscalar (Binary (Integral (L.int, Sub))),
            [length; Lconst (L.const_int L.int 1)],
            loc ))

@@ -22,6 +22,7 @@ type unboxed_integer =
   | Unboxed_int16
   | Unboxed_int8
   | Unboxed_int
+  (* CR mshinwell: I think [Unboxed_int31_63] might be better *)
   (** We don't support an [int#] type in the stdlib. However, for consistency,
       it's important that we have naked types corresponding to all of our
       integral types.  This is also used when you write [int[@untagged]] in

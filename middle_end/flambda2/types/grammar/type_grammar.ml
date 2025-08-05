@@ -257,6 +257,23 @@ let is_obviously_bottom t =
   | Rec_info ty -> TD.is_obviously_bottom ty
   | Region ty -> TD.is_obviously_bottom ty
 
+let is_obviously_unknown t =
+  match t with
+  | Value ty -> TD.is_obviously_unknown ty
+  | Naked_immediate ty -> TD.is_obviously_unknown ty
+  | Naked_float32 ty -> TD.is_obviously_unknown ty
+  | Naked_float ty -> TD.is_obviously_unknown ty
+  | Naked_int8 ty -> TD.is_obviously_unknown ty
+  | Naked_int16 ty -> TD.is_obviously_unknown ty
+  | Naked_int32 ty -> TD.is_obviously_unknown ty
+  | Naked_int64 ty -> TD.is_obviously_unknown ty
+  | Naked_nativeint ty -> TD.is_obviously_unknown ty
+  | Naked_vec128 ty -> TD.is_obviously_unknown ty
+  | Naked_vec256 ty -> TD.is_obviously_unknown ty
+  | Naked_vec512 ty -> TD.is_obviously_unknown ty
+  | Rec_info ty -> TD.is_obviously_unknown ty
+  | Region ty -> TD.is_obviously_unknown ty
+
 let get_alias_exn t =
   match t with
   | Value ty -> TD.get_alias_exn ty
@@ -3526,40 +3543,6 @@ module Env_extension = struct
 
   let to_map t = t.equations
 end
-
-let is_obviously_bottom t =
-  match t with
-  | Value ty -> TD.is_obviously_bottom ty
-  | Naked_immediate ty -> TD.is_obviously_bottom ty
-  | Naked_float32 ty -> TD.is_obviously_bottom ty
-  | Naked_float ty -> TD.is_obviously_bottom ty
-  | Naked_int8 ty -> TD.is_obviously_bottom ty
-  | Naked_int16 ty -> TD.is_obviously_bottom ty
-  | Naked_int32 ty -> TD.is_obviously_bottom ty
-  | Naked_int64 ty -> TD.is_obviously_bottom ty
-  | Naked_nativeint ty -> TD.is_obviously_bottom ty
-  | Naked_vec128 ty -> TD.is_obviously_bottom ty
-  | Naked_vec256 ty -> TD.is_obviously_bottom ty
-  | Naked_vec512 ty -> TD.is_obviously_bottom ty
-  | Rec_info ty -> TD.is_obviously_bottom ty
-  | Region ty -> TD.is_obviously_bottom ty
-
-let is_obviously_unknown t =
-  match t with
-  | Value ty -> TD.is_obviously_unknown ty
-  | Naked_immediate ty -> TD.is_obviously_unknown ty
-  | Naked_float32 ty -> TD.is_obviously_unknown ty
-  | Naked_float ty -> TD.is_obviously_unknown ty
-  | Naked_int8 ty -> TD.is_obviously_unknown ty
-  | Naked_int16 ty -> TD.is_obviously_unknown ty
-  | Naked_int32 ty -> TD.is_obviously_unknown ty
-  | Naked_int64 ty -> TD.is_obviously_unknown ty
-  | Naked_nativeint ty -> TD.is_obviously_unknown ty
-  | Naked_vec128 ty -> TD.is_obviously_unknown ty
-  | Naked_vec256 ty -> TD.is_obviously_unknown ty
-  | Naked_vec512 ty -> TD.is_obviously_unknown ty
-  | Rec_info ty -> TD.is_obviously_unknown ty
-  | Region ty -> TD.is_obviously_unknown ty
 
 let alias_type_of (kind : K.t) name : t =
   match kind with
