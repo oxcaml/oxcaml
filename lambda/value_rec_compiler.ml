@@ -354,7 +354,8 @@ let compute_static_size lam =
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
     | Parray_element_size_in_bytes _
-    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _
+    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+    | Pidx_deepen _
     | Punbox_unit ->
         Constant
 

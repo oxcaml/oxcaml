@@ -2204,7 +2204,8 @@ let primitive_can_raise prim =
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _
+  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
   | Ppeek _ | Ppoke _ ->
     false
@@ -2410,7 +2411,8 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
   | Parray_element_size_in_bytes _ -> layout_int
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _ ->
+  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pidx_deepen _ ->
     Punboxed_int Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
   | Pufloatfield _ -> Punboxed_float Unboxed_float64

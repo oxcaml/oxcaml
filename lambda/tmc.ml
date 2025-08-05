@@ -972,7 +972,8 @@ let rec choice ctx t =
     | Psequand | Psequor
     | Ppoll
     | Ppeek _ | Ppoke _
-    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _ | Pmake_idx_array _
+    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
+    | Pmake_idx_array _
     | Pget_idx _ | Pset_idx _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
