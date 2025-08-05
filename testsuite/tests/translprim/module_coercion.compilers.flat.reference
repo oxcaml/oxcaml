@@ -17,22 +17,16 @@
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
           (%int_compare prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-
           (%eq prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-
           (%noteq prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-
           (%int_lessthan prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-
           (%int_greaterthan prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-
           (%int_lessequal prim prim))
         (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
-
           (%int_greaterequal prim prim)))
       (makeblock 0
         (function {nlocal = 0} prim[value<floatarray>] stub : int
