@@ -3701,19 +3701,6 @@ module Crossing = struct
     | Comonadic ax ->
       Modality (Comonadic (ax, Modality.Comonadic.Const.proj ax comonadic))
 
-  let print ppf t =
-    let print_atom ppf (Modality.Atom.P a) =
-      match a with
-      | Monadic (ax, Join_with c) -> Value.Monadic.Const.Per_axis.print ax ppf c
-      | Comonadic (ax, Meet_with c) ->
-        Value.Comonadic.Const.Per_axis.print ax ppf c
-    in
-    let l =
-      List.filter_map
-        (fun (Value.Axis.P ax) ->
-          let a = Modality.Const.proj ax t in
-          if Modality.Atom.is_id a then None else Some (Modality.Atom.P a))
-        Value.Axis.all
-    in
-    Format.(pp_print_list ~pp_sep:pp_print_space print_atom ppf l)
+  let print ppf { monadic; comonadic } =
+    Format.fprintf ppf "(%a;%a)" Monadic.print monadic Comonadic.print comonadic
 end

@@ -840,8 +840,5 @@ module type S = sig
       t ->
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic ->
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
-
-    (** Print the mode crossing by axis. Omit axes that do not cross. *)
-    val print : Format.formatter -> t -> unit
   end
 end

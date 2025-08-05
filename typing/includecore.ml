@@ -628,7 +628,7 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
 
 let print_unsafe_mode_crossing ppf umc =
   Format.fprintf ppf "mod %a@ %a"
-    Mode.Crossing.print umc.unsafe_mod_bounds
+    Printtyp.crossing umc.unsafe_mod_bounds
     Jkind.With_bounds.format umc.unsafe_with_bounds
 
 let report_unsafe_mode_crossing_mismatch first second ppf e =
