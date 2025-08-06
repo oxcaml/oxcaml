@@ -198,6 +198,19 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
     Some (To_jsir_env.get_function_slot_exn env move_to), env, res
+  | Project_value_slot { project_from = _; value_slot }
+    when Value_slot.is_imported value_slot ->
+    let offsets = To_jsir_env.exported_offsets env in
+    let offset, size, is_scanned =
+      match Exported_offsets.value_slot_offset offsets value_slot with
+      | None | Some Dead_value_slot ->
+        Misc.fatal_error "Encountered unknown value slot"
+      | Some (Live_value_slot { offset; size; is_scanned }) ->
+        offset, size, is_scanned
+    in
+    Format.printf "VALUE SLOT %a offset %d size %d is_scanned %b\n"
+      Value_slot.print value_slot offset size is_scanned;
+    None, env, res
   | Project_value_slot { project_from = _; value_slot } ->
     (* CR selee: This is also used to call external functions, will need to
        handle that *)
@@ -497,3 +510,9 @@ let primitive ~env ~res (prim : Flambda_primitive.t) _dbg =
   | Binary (f, x, y) -> binary ~env ~res f x y
   | Ternary (f, x, y, z) -> ternary ~env ~res f x y z
   | Variadic (f, xs) -> variadic ~env ~res f xs
+
+let extern ~env ~res symbol args =
+  let args = List.map (prim_arg ~env) args in
+  let name = Symbol.linkage_name_as_string symbol in
+  let var = Jsir.Var.fresh () in
+  var, To_jsir_result.add_instr_exn res (Let (var, Prim (Extern name, args)))

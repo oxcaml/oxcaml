@@ -1,5 +1,6 @@
 type t =
   { module_symbol : Symbol.t;
+    exported_offsets : Exported_offsets.t;
     return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
     continuations : Jsir.Addr.t Continuation.Map.t;
@@ -13,8 +14,10 @@ type t =
     traps : Continuation.t list
   }
 
-let create ~module_symbol ~return_continuation ~exn_continuation =
+let create ~module_symbol ~exported_offsets ~return_continuation
+    ~exn_continuation =
   { module_symbol;
+    exported_offsets;
     return_continuation;
     exn_continuation;
     continuations = Continuation.Map.empty;
@@ -27,14 +30,16 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     traps = []
   }
 
+let module_symbol t = t.module_symbol
+
+let exported_offsets t = t.exported_offsets
+
 let return_continuation t = t.return_continuation
 
 let exn_continuation t = t.exn_continuation
 
 let enter_function_body t ~return_continuation ~exn_continuation =
   { t with return_continuation; exn_continuation }
-
-let module_symbol t = t.module_symbol
 
 let add_continuation t cont addr =
   { t with continuations = Continuation.Map.add cont addr t.continuations }

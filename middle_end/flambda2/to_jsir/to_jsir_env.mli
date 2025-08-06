@@ -11,9 +11,16 @@ type t
 *)
 val create :
   module_symbol:Symbol.t ->
+  exported_offsets:Exported_offsets.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   t
+
+(** Symbol corresponding to the module currently compiling. *)
+val module_symbol : t -> Symbol.t
+
+(** Exported offsets for function and value slots *)
+val exported_offsets : t -> Exported_offsets.t
 
 val return_continuation : t -> Continuation.t
 
@@ -25,9 +32,6 @@ val enter_function_body :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   t
-
-(** Symbol corresponding to the module currently compiling. *)
-val module_symbol : t -> Symbol.t
 
 (** Map a Flambda2 continuation to the address of the corresponding block.
     Not to be used for continuations used as exception handlers

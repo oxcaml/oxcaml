@@ -272,17 +272,17 @@ and apply_expr ~env ~res e =
             (Set_field (param_var, 0, Non_float, var_to_pass)))
       res extra_param_vars extra_args
   in
+  let args = Apply_expr.args e in
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | None, _ | _, Effect _ -> failwith "effects not implemented yet"
     | Some callee, (Function _ | Method _) ->
-      let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
+      let args, res = To_jsir_shared.simples ~env ~res args in
       let f, res = To_jsir_shared.simple ~env ~res callee in
       (* CR selee: assume exact = false for now, JSIR seems to assume false in
          the case that we don't know *)
       apply_fn ~res ~f ~args ~exact:false
     | Some callee, C_call _ ->
-      let args, res = To_jsir_shared.simples ~env ~res (Apply_expr.args e) in
       let symbol, _coercion =
         match Simple.must_be_symbol callee with
         | None ->
@@ -291,13 +291,7 @@ and apply_expr ~env ~res e =
             Simple.print callee
         | Some (symbol, coercion) -> symbol, coercion
       in
-      let name = Symbol.linkage_name symbol |> Linkage_name.to_string in
-      let expr : Jsir.expr =
-        Prim (Extern name, List.map (fun arg : Jsir.prim_arg -> Pv arg) args)
-      in
-      let var = Jsir.Var.fresh () in
-      let res = To_jsir_result.add_instr_exn res (Let (var, expr)) in
-      var, res
+      To_jsir_primitive.extern ~env ~res symbol args
   in
   match Apply_expr.continuation e with
   | Never_returns ->
@@ -458,15 +452,50 @@ and switch ~env ~res e =
 
 and invalid ~env ~res _msg = env, res
 
-let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+let add_globals ~env ~res ~reachable_names =
+  let symbols = Name_occurrences.symbols reachable_names in
+  let extern = Symbol.external_symbols_compilation_unit () in
+  let predef = Compilation_unit.predef_exn in
+  let global_data = Jsir.Var.fresh () in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let (global_data, Prim (Extern "caml_get_global_data", [])))
+  in
+  Symbol.Set.fold
+    (fun symbol (env, res) ->
+      let unit = Symbol.compilation_unit symbol in
+      if (not (Compilation_unit.is_current unit))
+         && (not (Compilation_unit.equal unit extern))
+         && not (Compilation_unit.equal unit predef)
+      then
+        let module_name =
+          Compilation_unit.name unit |> Compilation_unit.Name.to_string
+        in
+        let var = Jsir.Var.fresh () in
+        ( To_jsir_env.add_symbol env symbol var,
+          To_jsir_result.add_instr_exn res
+            (Let
+               ( var,
+                 Prim
+                   ( Extern "caml_js_get",
+                     [ Pv global_data;
+                       Pc
+                         (NativeString
+                            (Jsir.Native_string.of_string module_name)) ] ) )) )
+      else env, res)
+    symbols (env, res)
+
+let unit ~offsets ~all_code:_ ~reachable_names flambda_unit =
   let env =
     To_jsir_env.create
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
+      ~exported_offsets:offsets
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
   let res = To_jsir_result.create () in
   let res, _addr = To_jsir_result.new_block res ~params:[] in
+  let env, res = add_globals ~env ~res ~reachable_names in
   let _env, res = expr ~env ~res (Flambda_unit.body flambda_unit) in
   let program = To_jsir_result.to_program_exn res in
   Jsir.invariant program;
