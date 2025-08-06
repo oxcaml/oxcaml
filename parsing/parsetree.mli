@@ -116,7 +116,7 @@ and core_type_desc =
                                      {{!arg_label.Labelled}[Labelled]},
             - [?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
                                      {{!arg_label.Optional}[Optional]}.
-            - [M.?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
+            - [(?l):(T1 @ M1) -> (T2 @ M2)] when [lbl] is
                             {{!arg_label.Generic_optional}[Generic_optional]}.
          *)
   | Ptyp_tuple of (string option * core_type) list

@@ -98,7 +98,9 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
-  | Unknown_generic_optional_argument_type
+  | Unknown_generic_optional_argument_type of Parsetree.core_type
+  | Generic_optional_argument_missing_option_like_annotation of Path.t
+  | Generic_optional_argument_missing_type_annotation
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -662,6 +664,21 @@ let check_arg_type styp =
     | _ -> ()
   end
 
+let extract_optional_tp_from_type_parsetree_exn env (ty : Parsetree.core_type) =
+  match ty with
+  | {ptyp_desc = Ptyp_constr ({ txt = ident_name}, [arg]);
+          ptyp_loc; _} ->
+      let path_and_decl = Env.lookup_type ~loc:ptyp_loc ident_name env in
+      let (path, decl) = path_and_decl in
+      (* Check syntactically that the type has @@option_like *)
+      if not (Builtin_attributes.has_option_like decl.type_attributes) then
+        raise (Error (ptyp_loc, env,
+          Generic_optional_argument_missing_option_like_annotation path));
+      (path_and_decl, arg)
+  | _ ->
+      raise(Error (ty.ptyp_loc, env,
+        Unknown_generic_optional_argument_type ty))
+
 let transl_label (label : Parsetree.arg_label)
     (arg_opt : Parsetree.core_type option) =
   match label, arg_opt with
@@ -679,15 +696,7 @@ let transl_label (label : Parsetree.arg_label)
                 Env.empty,
                 Unsupported_extension Generic_optional_arguments));
     | true ->
-        (* CR generic-optional: allow more module names / use path lookup *)
-        match arg with
-        | {ptyp_desc = Ptyp_constr ({ txt = Lident "option"}, [_]); _} ->
-            Generic_optional(Lident "option", l)
-        | {ptyp_desc = Ptyp_constr ({ txt = Lident "or_null"}, [_]); _} ->
-            Generic_optional(Lident "or_null", l)
-        |_ ->
-          raise (Error (arg.ptyp_loc, Env.empty,
-            Unknown_generic_optional_argument_type))
+        Generic_optional l
   )
   | Generic_optional _, None ->
       failwith "Received None for generic optional label. Check caller."
@@ -696,22 +705,27 @@ let transl_label (label : Parsetree.arg_label)
 (* Parallel to [transl_label_from_expr]. *)
 let transl_label_from_pat (label : Parsetree.arg_label)
     (pat : Parsetree.pattern) =
-  match pat with
-  (* We should only strip off the constraint node if the label translates
-     to Position, as this means the type annotation is [%call_pos] and
-    nothing more. *)
-  | {ppat_desc = Ppat_constraint (inner_pat, ty, []); _} ->
-      let label = transl_label label ty in
-      let pat = if Btype.is_position label then inner_pat else pat in
-      label, pat
-  | _ ->
-    match label with
-    | Generic_optional _ ->
-        (* If type information is not provided and we are translating a
-           generic optional, then that is an error *)
-        raise (Error (pat.ppat_loc, Env.empty,
-        Unknown_generic_optional_argument_type))
-    | _ -> transl_label label None, pat
+  match label with
+  | Generic_optional _ ->
+      (match pat with
+      | {ppat_desc = Ppat_constraint (_, Some ty, _); _} ->
+          let label = transl_label label (Some ty) in
+          label, pat
+      | _ ->
+          (* If type information is not provided and we are translating a
+            generic optional, then that is an error *)
+          raise (Error (pat.ppat_loc, Env.empty,
+          Generic_optional_argument_missing_type_annotation)))
+  | Optional _ | Labelled _ | Nolabel ->
+      match pat with
+      (* We should only strip off the constraint node if the label translates
+        to Position, as this means the type annotation is [%call_pos] and
+        nothing more. *)
+      | {ppat_desc = Ppat_constraint (inner_pat, ty, []); _} ->
+          let label = transl_label label ty in
+          let pat = if Btype.is_position label then inner_pat else pat in
+          label, pat
+      | _ -> transl_label label None, pat
 
 (* Parallel to [transl_label_from_pat]. *)
 let transl_label_from_expr (label : Parsetree.arg_label)
@@ -804,7 +818,16 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               match l with
               (* only insert option type when normal optional, but not generic
                  optional *)
-              | Generic_optional _ | Position _ | Labelled _ | Nolabel -> arg_ty
+              | Generic_optional _ ->
+                  (* Validate that generic optional arguments have an optional
+                     type *)
+                  (* CR generic-optional: This syntactic check doesn't handle
+                     type aliases.  For example, `type int_option = int option`
+                     won't be accepted even though it expands to a valid option
+                     type. *)
+                  let _ = extract_optional_tp_from_type_parsetree_exn env arg in
+                  arg_ty
+              | Position _ | Labelled _ | Nolabel -> arg_ty
               | Optional _ ->
                   if not (Btype.tpoly_is_mono arg_ty) then
                     raise
@@ -1664,9 +1687,16 @@ let report_error env ppf =
         | Optional _ -> "optional"
         | Generic_optional _ -> "generic optional"
         | Labelled _ -> assert false )
-  | Unknown_generic_optional_argument_type ->
+  | Unknown_generic_optional_argument_type ty ->
       (* CR generic-optional : Add Hint.  *)
-      fprintf ppf "Unknown generic optional argument type"
+      fprintf ppf "@[Unknown generic optional argument type:@ %a@]"
+        Pprintast.core_type ty
+  | Generic_optional_argument_missing_option_like_annotation path ->
+      fprintf ppf "@[Generic optional arguments require types with the \
+        [@@option_like] attribute.@ Type %a is not marked as option-like@]"
+        (Style.as_inline_code Printtyp.path) path
+  | Generic_optional_argument_missing_type_annotation ->
+      fprintf ppf "Generic optional arguments require a type annotation"
 
 
 let () =

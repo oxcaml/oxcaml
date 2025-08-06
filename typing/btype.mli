@@ -259,10 +259,10 @@ val backtrack: snapshot -> unit
 
 (**** Utilities for labels ****)
 
-type optional_module_path = Stdlib_option | Stdlib_or_null
-val classify_module_path : Longident.t -> optional_module_path
+type generic_optional_type_path = Path.t
 
-type optionality = Optional_arg of optional_module_path
+type optionality = Vanilla_optional_arg
+                 | Generic_optional_arg
                  | Required_or_position_arg
 (* The reason this is called [Required_or_position_arg] instead of
  [Required_arg] is that [Position] are omittable (thus not required),
@@ -271,16 +271,7 @@ type optionality = Optional_arg of optional_module_path
 val is_optional : arg_label -> bool
 val is_optional_parsetree : Parsetree.arg_label -> bool
 val classify_optionality : arg_label -> optionality
-
-(* Given a pattern, return the generic optional constructor name, underlying
-   type and the updated pattern with generic optional replaced with its
-   underlying type.
-   e.g. (x : int or_null) -> ("or_null", int, (x : int)) *)
-val extract_optional_tp_from_pattern_constraint_exn :
-  Parsetree.pattern -> label * Parsetree.core_type * Parsetree.pattern
-val classify_optionality_parsetree :
-  Parsetree.arg_label -> Parsetree.pattern -> optionality
-val get_optional_module_path_exn : arg_label -> optional_module_path
+val classify_optionality_parsetree : Parsetree.arg_label -> optionality
 val is_position : arg_label -> bool
 val is_omittable : arg_label -> bool
 val label_name : arg_label -> label

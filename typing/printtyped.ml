@@ -164,8 +164,7 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
-  | Generic_optional(path, s) ->
-      line i ppf "Generic_optional (%a, \"%s\")\n" fmt_longident_aux path s
+  | Generic_optional s -> line i ppf "Generic_optional \"%s\")\n" s
 
 let typevar_jkind ~print_quote ppf (v, l) =
   let pptv =
@@ -694,11 +693,6 @@ and binding_op i ppf x =
     fmt_location x.bop_loc;
   expression i ppf x.bop_exp
 
-and optional_module_path i ppf (x : Btype.optional_module_path) =
-  match x with
-  | Stdlib_option -> line i ppf "Stdlib.Option\n"
-  | Stdlib_or_null -> line i ppf "Stdlib.Or_null\n"
-
 and function_param i ppf x =
   let p = x.fp_arg_label in
   arg_label i ppf p;
@@ -707,13 +701,12 @@ and function_param i ppf x =
       line i ppf "Param_pat%a\n"
         fmt_partiality x.fp_partial;
       pattern (i+1) ppf pat
-  | Tparam_optional_default (pat, expr, sort, mpath) ->
+  | Tparam_optional_default (pat, expr, sort, _) ->
       line i ppf "Param_optional_default%a\n"
         fmt_partiality x.fp_partial;
       line i ppf "%a\n" Jkind.Sort.format sort;
       pattern (i+1) ppf pat;
-      expression (i+1) ppf expr;
-      optional_module_path (i+1) ppf mpath
+      expression (i+1) ppf expr
 
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 
