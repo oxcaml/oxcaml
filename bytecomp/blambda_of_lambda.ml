@@ -15,9 +15,10 @@
 open Blambda
 
 type tagged_integer = Scalar.Integral.Taggable.Width.t
-(* We represent small integers as sign-extended immediates in bytecode. Additionally,
-   all boxable integers are boxed, there are no naked integers, and there are no local
-   allocations. *)
+
+(* We represent small integers as sign-extended immediates in bytecode.
+   Additionally, all boxable integers are boxed, there are no naked integers,
+   and there are no local allocations. *)
 
 let is_nontail : Lambda.region_close -> bool = function
   | Rc_nontail -> true
@@ -58,7 +59,7 @@ let ccallf fmt = kccallf Fun.id fmt
 
 let is_immed n = Instruct.immed_min <= n && n <= Instruct.immed_max
 
-let is_const = function
+let is_representable_const_int = function
   | Const (Const_base (Const_int i)) -> is_immed i
   | _ -> false
 
@@ -187,20 +188,27 @@ let static_cast ~src ~dst x =
   | Boxed src, Boxed dst -> builtin x ~src:(Boxed src) ~dst:(Boxed dst)
   | Tagged (Int | Int16 | Int8), Boxed dst ->
     (* we don't need to sign-extend in this case because tagged small integers
-       are always represented sign-extended in bytecode *)
+       are always represented sign-extended in bytecode, and none of these
+       are narrowing conversions *)
     builtin x ~src:Int ~dst:(Boxed dst)
   | Boxed src, Tagged dst ->
+    (* this can be a narrowing conversion, so must be sign extended, in order
+       that the value is taken mod 2^31 or 2^63 as appropriate.  In addition
+       this avoids any ambiguity about whether a random boxed int32 is already
+       sign extended (on a 64-bit target). *)
     builtin x ~src:(Boxed src) ~dst:Int |> sign_extend dst
   | Tagged Int8, Tagged (Int8 | Int16 | Int)
   | Tagged Int16, Tagged (Int16 | Int)
   | Tagged Int, Tagged Int ->
     (* we don't need to sign-extend in this case because tagged small integers
-       are always represented sign-extended in bytecode *)
+       are always represented sign-extended in bytecode, and none of these are
+       narrowing conversions *)
     x
   | Tagged Int, Tagged ((Int16 | Int8) as dst)
   | Tagged Int16, Tagged (Int8 as dst) ->
-    (* we need to sign-extend here because these values are stored in full-width
-       immediates *)
+    (* we need to sign-extend for these narrowing conversions because the input
+       values are stored in full-width immediates, and we need to take them
+       modulo 2^8 or 2^16. *)
     sign_extend dst x
 
 let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
@@ -360,7 +368,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | [_] | _ :: _ :: _ :: _ -> assert false
       | [x; y] ->
         let prim = match cmp with Eq -> Intcomp Eq | Noteq -> Intcomp Neq in
-        if is_const y && not (is_const x)
+        (* Optimization for comparisons when the first argument is suitable:
+           see [Emitcode]. *)
+        if is_representable_const_int y && not (is_representable_const_int x)
         then Prim (prim, [y; x])
         else Prim (prim, [x; y]))
     | Popaque _ | Pobj_magic _ -> (
@@ -368,6 +378,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [arg] ->
         (* in bytecode we only deal with boxed+tagged floats/ints/units *)
         comp_expr arg
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Punbox_unit -> (
+      match args with
+      | [x] -> comp_expr x
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pignore -> (
       match args with
@@ -739,10 +753,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
       simd_is_not_supported ()
-    | Punbox_unit -> (
-      match args with
-      | [x] -> comp_expr x
-      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()
       then unary (Ccall "caml_reinterpret_tagged_int63_as_unboxed_int64")
@@ -865,7 +875,7 @@ and comp_binary_scalar_intrinsic op x y =
   | Icmp (size, cmp) -> (
     match Scalar.Integral.width size with
     | Taggable (Int | Int8 | Int16) ->
-      if is_const y && not (is_const x)
+      if is_representable_const_int y && not (is_representable_const_int x)
       then
         Prim
           ( Intcomp

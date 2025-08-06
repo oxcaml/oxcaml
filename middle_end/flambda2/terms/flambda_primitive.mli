@@ -353,6 +353,8 @@ type nullary_primitive =
     the immediate after untagging) and exchanges the two halves of the 16-bit
     quantity. The higher-order bits are zeroed. *)
 type unary_int_arith_op = Swap_byte_endianness
+(* CR mshinwell/jvanburen: we should consider splitting this swapping primitive
+   into two, based on the semantics *)
 
 (** Naked float unary arithmetic operations. *)
 type unary_float_arith_op =
