@@ -58,8 +58,10 @@ of an exception constructor as belonging to the capsule it originally was define
 
 When the constructor is instantiated outside the original capsule
 (i.e. in a `portable` function), its arguments are required to cross contention
-and be portable. Likewise, when pattern-matched on outside the original capsule,
-its arguments must cross portability and are marked as contended.
+and be portable. This parallels how `Capsule.Data.inject` requires its argument
+to cross contention and be portable to insert it into another capsule.
+Likewise, when pattern-matched on outside the original capsule, the constructor's arguments
+must cross portability and are marked as contended, similar to `Capsule.Data.project`.
 
 ```ocaml
 exception Foo of (unit -> unit)
@@ -93,4 +95,31 @@ let noncross () = (* can't be portable *)
   end in
   let r = ref "" in
   raise (Noncrossing ((:=) r))
+```
+
+WARNING: currently, first-class modules do not account for portability and contention
+of extension constructors defined inside them. This leads to a soundness problem:
+
+```ocaml
+module type S = sig
+    exception Exn of string ref
+end
+
+let make_s : (unit -> (module S)) Modes.Portable.t =
+    let module M = struct
+        exception Exn of string ref
+    end
+    in
+    { portable = fun () -> (module M : S) }
+
+let (foo @ portable) () =
+    let module M = (val make_s.portable ()) in
+    raise (M.Exn (ref "foo"))
+
+let (bar @ portable) f =
+    let module M = (val make_s.portable ()) in
+    try f () with
+    | M.Exn r -> print_endline !r (* [r] is uncontended despite crossing capsules *)
+
+let () = bar foo (* prints "foo" *)
 ```
