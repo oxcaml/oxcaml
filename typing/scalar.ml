@@ -91,7 +91,7 @@ module Integral = struct
         | Int16 -> Jkind_types.Sort.Const.bits16
         | Int -> Jkind_types.Sort.Const.untagged_immediate
 
-      let equal _eq (Int8 | Int16 | Int as x) y = x = y
+      let equal _eq ((Int8 | Int16 | Int) as x) y = x = y
     end
 
     include Maybe_naked.Make1 (struct
