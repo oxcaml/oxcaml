@@ -45,6 +45,9 @@ type native_repr =
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+(* CR mshinwell/ccasinghino: should we actually use
+   "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
+   additional unboxed_or_untagged_integer type? *)
 
 (* See [middle_end/semantics_of_primitives.mli] *)
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
