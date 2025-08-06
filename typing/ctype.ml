@@ -7349,3 +7349,78 @@ let constrain_decl_jkind env decl jkind =
         match decl.type_manifest with
         | None -> err
         | Some ty -> constrain_type_jkind env ty jkind
+
+let exn_constructor_crossing env lid ~args locks =
+  let vmode =
+    Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Constructor
+      None ((Mode.Value.(disallow_right min)), locks)
+  in
+  (* Exceptions cross portability and contention, so we project those axes. *)
+  let monadic =
+    vmode.mode.monadic
+    |> Mode.Value.Monadic.proj Contention
+    |> Mode.Value.Monadic.min_with Contention
+  in
+  let comonadic =
+    Mode.Value.monadic_to_comonadic_max vmode.mode.monadic
+    |> Mode.Value.Comonadic.proj Portability
+    |> Mode.Value.Comonadic.max_with Portability
+  in
+  let mode_crossing =
+    List.map (
+      fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
+        crossing_of_ty env ~modalities:ca_modalities ca_type
+    ) args
+    |> List.fold_left Mode.Crossing.join Mode.Crossing.min
+  in
+  let min_bound =
+    { monadic;
+      comonadic = Mode.Value.Comonadic.(disallow_right min) }
+  in
+  let max_bound =
+    { comonadic;
+      monadic = Mode.Value.Monadic.(disallow_left max)}
+  in
+  (mode_crossing, min_bound, max_bound)
+
+let check_constructor_crossing ~default_mode ~for_extensible_variant
+    env lid tag ~res ~args held_locks =
+  match tag with
+  | Ordinary _ | Null -> Ok default_mode
+  | Extension _ ->
+      match get_desc (expand_head env res) with
+      | Tconstr (p, _, _) when Path.same Predef.path_exn p ->
+          (* Currently, only [exn] is treated specially. *)
+          let (mode_crossing, min_bound, max_bound) =
+            exn_constructor_crossing env lid ~args held_locks
+          in
+          for_extensible_variant mode_crossing min_bound max_bound
+      | _ -> Ok default_mode
+
+let check_constructor_crossing_creation
+    env lid tag ~res ~args held_locks =
+  check_constructor_crossing
+    ~default_mode:Mode.Value.(disallow_left max)
+    ~for_extensible_variant:(fun mode_crossing min_bound max_bound ->
+      (* Creating a constructor under a lock is safe if the arguments
+         submode on the comonadic axis and cross the monadic axis. *)
+      Result.bind
+        (Mode.Value.submode
+          (Mode.Crossing.apply_left mode_crossing min_bound)
+          Mode.Value.(disallow_left min))
+        (fun () -> Ok max_bound))
+    env lid tag ~res ~args held_locks
+
+let check_constructor_crossing_destruction
+    env lid tag ~res ~args held_locks =
+  check_constructor_crossing
+    ~default_mode:Mode.Value.(disallow_right min)
+    ~for_extensible_variant:(fun mode_crossing min_bound max_bound ->
+      (* Destroying a constructor under a lock is safe if the arguments
+         submode on the monadic axis and cross the comonadic axis. *)
+      Result.bind
+        (Mode.Value.submode
+          Mode.Value.(disallow_right max)
+          (Mode.Crossing.apply_right mode_crossing max_bound))
+        (fun () -> Ok min_bound))
+    env lid tag ~res ~args held_locks

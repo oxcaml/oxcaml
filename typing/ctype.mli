@@ -793,3 +793,13 @@ val zap_modalities_to_floor_if_at_least :
   Language_extension.maturity ->
   Mode.Modality.Value.t ->
   Mode.Modality.Value.Const.t
+
+val check_constructor_crossing_creation :
+  Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> (Mode.Value.r, Mode.Value.error) result
+
+val check_constructor_crossing_destruction :
+  Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> (Mode.Value.l, Mode.Value.error) result

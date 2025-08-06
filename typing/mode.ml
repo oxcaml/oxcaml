@@ -2194,6 +2194,9 @@ module Monadic = struct
 
   let join_with ax c m = join_const (Const.min_with ax c) m
 
+  let min_with ax m =
+    Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
+
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
     let visibility = proj Visibility m |> Visibility.zap_to_legacy in
@@ -2724,6 +2727,10 @@ module Value_with (Areality : Areality) = struct
 
   let monadic_to_comonadic_min m =
     S.apply Comonadic.Obj.obj Monadic_to_comonadic_min (Monadic.disallow_left m)
+
+  let monadic_to_comonadic_max m =
+    S.apply Comonadic.Obj.obj Monadic_to_comonadic_max
+      (Monadic.disallow_right m)
 
   let meet_const c { comonadic; monadic } =
     let comonadic = Comonadic.meet_const c comonadic in

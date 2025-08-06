@@ -305,6 +305,9 @@ L151:                                                ; preds = %L1
   ret { { ptr }, { i64 } } %14
 }
 
+declare i64 @llvm.read_register.i64(metadata)
+declare void @llvm.write_register.i64(metadata, i64)
+
 @camlArray_rev__gc_roots = global { i64, i64 } { i64 0, i64 1792 }
 @camlArray_rev = global { ptr, i64 } { ptr @camlArray_rev__rev_1, i64 3063 }
 @camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }

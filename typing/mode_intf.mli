@@ -415,12 +415,22 @@ module type S = sig
            and type 'a Axis.t = (monadic, 'a) Axis.t
 
       module Const_op : Lattice with type t = Const.t
+
+      val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
+
+      val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
     end
 
-    module Comonadic :
-      Common_product
-        with type Const.t = Areality.Const.t comonadic_with
-         and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
+    module Comonadic : sig
+      include
+        Common_product
+          with type Const.t = Areality.Const.t comonadic_with
+           and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
+
+      val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
+
+      val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
+    end
 
     module Axis : sig
       (** Represents a mode axis in this product whose constant is ['a], and whose
@@ -547,6 +557,9 @@ module type S = sig
     val zap_to_legacy : lr -> Const.t
 
     val comonadic_to_monadic : ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+
+    val monadic_to_comonadic_max :
+      ('r * disallowed) Monadic.t -> (disallowed * 'r) Comonadic.t
 
     (* The following two are about the scenario where we partially apply a
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the
