@@ -617,7 +617,7 @@ and transl_module ~scopes cc rootpath mexp =
       apply_coercion loc Strict cc
         (transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->
-      let lam, _ = transl_struct ~scopes loc [] cc rootpath str in
+      let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
       lam
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
@@ -898,8 +898,6 @@ and transl_structure ~scopes loc
                 (* CR sspies: Can we find a better [debug_uid] here? *)
                 Llet(Alias, lambda_layout, id, id_duid,
                      Lprim(mod_field pos (Module_value_only (-1)), [Lvar mid],
-          (* CR jrayman: [mod_field] returns [Pfield(_,Pointer,_)]. Should
-           * it sometimes return [Pfield(_,Immediate,_)] or [Pmixedfield]? *)
                            of_location ~scopes incl.incl_loc), body),
                 repr
           in
@@ -959,9 +957,10 @@ and transl_structure ~scopes loc
                   in
                   let id_duid = Lambda.debug_uid_none in
                   (* CR sspies: Can we find a better [debug_uid] here? *)
-                  (* CR jrayman: [mod_field] is wrong *)
+                  (* CR jrayman: Find all [mod_field Value_only] and fix*)
                   Llet(Alias, lambda_layout, id, id_duid,
-                      Lprim(mod_field pos (Module_value_only (-1)), [Lvar mid],
+                      Lprim(mod_field pos (Module_value_only (-1)),
+                            [Lvar mid],
                             of_location ~scopes od.open_loc), body),
                   repr
               in
