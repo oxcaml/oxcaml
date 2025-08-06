@@ -2298,7 +2298,8 @@ let mk_is_abstract env p =
     | None -> true  (* Truly abstract - no manifest *)
     | Some _ -> false  (* Type abbreviation - has manifest *)
     end
-  | Type_variant _ | Type_record _ | Type_open | Type_record_unboxed_product _ -> false
+  | Type_variant _ | Type_record _ | Type_open | Type_record_unboxed_product _
+  -> false
 
 let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
@@ -2384,7 +2385,8 @@ and close_open_jkind ~expand_component ~is_open env jkind =
     (* CR layouts v2.8: Do better, by tracking the actual free variables and
        rounding only those variables up. *)
   then
-    let context = mk_jkind_context env (fun ty -> Some (estimate_type_jkind ~expand_component env ty)) in
+    let context = mk_jkind_context env (fun ty ->
+      Some (estimate_type_jkind ~expand_component env ty)) in
     Jkind.round_up ~context jkind |> Jkind.disallow_right
   else jkind
 

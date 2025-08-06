@@ -625,7 +625,8 @@ val type_jkind_purely : Env.t -> type_expr -> jkind_l
 val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
 
 (* Helper functions for creating jkind contexts *)
-val mk_jkind_context : Env.t -> (type_expr -> jkind_l option) -> Jkind.jkind_context
+val mk_jkind_context :
+  Env.t -> (type_expr -> jkind_l option) -> Jkind.jkind_context
 val mk_jkind_context_check_principal : Env.t -> Jkind.jkind_context
 val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
 

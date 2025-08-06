@@ -404,7 +404,8 @@ let value_kind_of_value_jkind env jkind =
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
-  let externality_upper_bound = Jkind.get_externality_upper_bound ~context jkind in
+  let externality_upper_bound =
+    Jkind.get_externality_upper_bound ~context jkind in
   match layout, externality_upper_bound with
   | Base Value, External -> Pintval
   | Base Value, External64 ->

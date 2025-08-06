@@ -2683,7 +2683,8 @@ let normalize_decl_jkinds env shapes decls =
     let normalized_jkind =
       Jkind.normalize
         ~mode:Require_best
-        ~context:(Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty)))
+        ~context:(Ctype.mk_jkind_context env (fun ty ->
+          Some (Ctype.type_jkind env ty)))
         decl.type_jkind
     in
     let decl =
