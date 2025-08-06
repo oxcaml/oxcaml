@@ -977,6 +977,10 @@ module Layout_and_axes = struct
             fuel_status = Sufficient_fuel
           }
 
+        (* Note [Abstract types in normalization]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        *)
+
         let rec check
             ({ tuple_fuel; constr; seen_row_var; fuel_status = _ } as t) ty =
           match Types.get_desc ty with

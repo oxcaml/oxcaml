@@ -626,8 +626,8 @@ val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
 
 (* Helper functions for creating jkind contexts *)
 val mk_jkind_context : Env.t -> (type_expr -> jkind_l option) -> Jkind.jkind_context
-val mk_jkind_context_principal : Env.t -> Jkind.jkind_context
-val mk_jkind_context_purely : Env.t -> Jkind.jkind_context
+val mk_jkind_context_check_principal : Env.t -> Jkind.jkind_context
+val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
 
 (* Find a type's sort (if fixed is false: constraining it to be an
    arbitrary sort variable, if needed) *)

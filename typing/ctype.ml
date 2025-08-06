@@ -2304,7 +2304,7 @@ let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
 (* This uses the forward ref - only needed inside estimate_type_jkind *)
-let mk_jkind_context_principal_ref env =
+let mk_jkind_context_check_principal_ref env =
   mk_jkind_context env (!type_jkind_purely_if_principal' env)
 
 (* We parameterize [estimate_type_jkind] by a function
@@ -2364,7 +2364,7 @@ let rec estimate_type_jkind ~expand_component env ty =
      else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
-    let context = mk_jkind_context_principal_ref env in
+    let context = mk_jkind_context_check_principal_ref env in
     estimate_type_jkind ~expand_component env ty |>
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
@@ -2425,11 +2425,11 @@ let estimate_type_jkind =
   estimate_type_jkind ~expand_component:mk_unwrapped_type_expr
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
-let mk_jkind_context_principal env =
+let mk_jkind_context_check_principal env =
   mk_jkind_context env (type_jkind_purely_if_principal env)
 
 (* For cases where we always want Some (type_jkind_purely env ty) *)
-let mk_jkind_context_purely env =
+let mk_jkind_context_always_principal env =
   mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
 
 (**** checking jkind relationships ****)
@@ -2439,7 +2439,7 @@ let mk_jkind_context_purely env =
    possible.  If true, we won't (but will still instantiate sort variables). *)
 let constrain_type_jkind ~fixed env ty jkind =
   let type_equal = !type_equal' env in
-  let context = mk_jkind_context_principal env in
+  let context = mk_jkind_context_check_principal env in
   (* The [expanded] argument says whether we've already tried [expand_head_opt].
 
      The "fuel" argument is used because we're duplicating the loop of
@@ -2708,7 +2708,7 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
        to avoid this call as in [constrain_type_jkind] *)
     let type_equal = !type_equal' env in
     let jkind1 = type_jkind env ty1 in
-    let context = mk_jkind_context_principal env in
+    let context = mk_jkind_context_check_principal env in
     let jkind1 = Jkind.round_up ~context jkind1 in
     let jkind2 = Jkind.round_up ~context jkind2 in
     (* This is strange, in that we're rounding up and then computing an
@@ -2735,7 +2735,7 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       (* Just check externality and layout, because that's what actually matters
          for upstream code. We check both for a known value and something that
          might turn out later to be value. This is the conservative choice. *)
-      let context = mk_jkind_context_principal env in
+      let context = mk_jkind_context_check_principal env in
       let ext = Jkind.get_externality_upper_bound ~context jkind in
       Jkind_axis.Externality.le ext External64 &&
       match Jkind.get_layout jkind with
@@ -5135,7 +5135,7 @@ let zap_modalities_to_floor_if_at_least level =
     else Mode.Modality.Value.zap_to_id
 
 let crossing_of_jkind env jkind =
-  let context = mk_jkind_context_principal env in
+  let context = mk_jkind_context_check_principal env in
   Jkind.get_mode_crossing ~context jkind
 
 let crossing_of_ty env ?modalities ty =
@@ -7118,7 +7118,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       try Jkind.map_type_expr (nondep_type_rec env mid) decl.type_jkind
       (* CR layouts v2.8: This should be done with a proper nondep_jkind. *)
       with Nondep_cannot_erase _ when is_covariant ->
-        let context = mk_jkind_context_principal env in
+        let context = mk_jkind_context_check_principal env in
         Jkind.round_up ~context decl.type_jkind |>
         Jkind.disallow_right
     in
@@ -7324,7 +7324,7 @@ let check_decl_jkind env decl jkind =
      and so we leave this optimization for later. *)
   let type_equal = type_equal env in
   let type_jkind_purely = type_jkind_purely env in
-  let context = mk_jkind_context_purely env in
+  let context = mk_jkind_context_always_principal env in
   (* CR layouts v2.8: When we have [layout_of], this logic should move to the
      place where [type_jkind] is set. But for now, it has to be here, because we
      want this in module inclusion but not other places (because substitutions
@@ -7377,7 +7377,7 @@ let constrain_decl_jkind env decl jkind =
   | None -> check_decl_jkind env decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
-    let context = mk_jkind_context_purely env in
+    let context = mk_jkind_context_always_principal env in
     match
       Jkind.sub_or_error ~type_equal ~context decl.type_jkind jkind
     with

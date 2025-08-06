@@ -1298,7 +1298,7 @@ let rec check_constraints_rec env loc visited ty =
         | Unification_failure err ->
           raise (Error(loc, Constraint_failed (env, err)))
         | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
-          let context = Ctype.mk_jkind_context_purely env in
+          let context = Ctype.mk_jkind_context_always_principal env in
           let violation =
             Jkind.Violation.of_ ~context
               (Not_a_subjkind (Jkind.disallow_right original_jkind,
@@ -1472,7 +1472,7 @@ let narrow_to_manifest_jkind env loc decl =
     begin match Jkind.try_allow_r decl.type_jkind with
     | None -> begin
         let type_equal = Ctype.type_equal env in
-        let context = Ctype.mk_jkind_context_purely env in
+        let context = Ctype.mk_jkind_context_always_principal env in
         match
           Jkind.sub_jkind_l ~type_equal ~context
             manifest_jkind decl.type_jkind
@@ -2061,7 +2061,7 @@ let rec update_decl_jkind env dpath decl =
     Jkind.Layout.sub new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
   with
   | Not_le reason ->
-    let context = Ctype.mk_jkind_context_purely env in
+    let context = Ctype.mk_jkind_context_always_principal env in
     raise (Error (
       decl.type_loc,
       Jkind_mismatch_of_path (
@@ -2698,7 +2698,7 @@ let normalize_decl_jkinds env shapes decls =
          the new jkind (we really only want this check here to check against the
          user-written annotation). We might be able to do a better job here and save
          some work. *)
-      let context = Ctype.mk_jkind_context_purely env in
+      let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
