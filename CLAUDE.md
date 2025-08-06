@@ -36,10 +36,10 @@ autoconf                  # Generate configure script, needs to be version 2.71
 ```
 
 Configuration is needed after changing files with extension `.in` or modifying the autoconf script.
-To avod issues with dune caching, removing the `_build/` directory may be needed after configuring.
+To avoid issues with dune caching, removing the `_build/` directory may be needed after configuring.
 By default, unless there is a good reason to omit them, the following options should be used for configuring:
 ```bash
-.configure --enable-ocamltest --enable-warn-error --enable-dev --enable-runtime5 --prefix="$(pwd)/_install"
+./configure --enable-ocamltest --enable-warn-error --enable-dev --enable-runtime5 --prefix="$(pwd)/_install"
 ```
 If previously a different install directory was used, prefer the old one over `$(pwd)/_install` for `--prefix`.
 
