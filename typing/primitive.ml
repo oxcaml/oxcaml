@@ -520,7 +520,6 @@ module Repr_check = struct
     check checks prim
 end
 
-
 (* Note: [any] here is not the same as jkind [any]. It means we allow any
    [native_repr] for the corresponding argument or return.  It's [Typedecl]'s
    responsibility to check that types in externals are representable or marked
