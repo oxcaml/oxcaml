@@ -244,43 +244,38 @@ val f : int -> string @ external_ -> t @ external_ = <fun>
 You can only allocate functions that don't close over internals.
 *)
 
-(* Byte externality vs externality. This is a really bad error mesage, by design. We
-expect users to never write byte_external, and indeed not be aware of its existence.
-In the future when bytecode is no longer supported and byte_external is deleted,
-this evil will be banished.
-*)
-let add_three  (x : float# @ byte_external) : float# @ byte_external = Float_u.add #3.0 x
+let add_three  (x : float# @ tagged_int) : float# @ tagged_int = Float_u.add #3.0 x
 [%%expect {|
-Line 1, characters 71-89:
-1 | let add_three  (x : float# @ byte_external) : float# @ byte_external = Float_u.add #3.0 x
-                                                                           ^^^^^^^^^^^^^^^^^^
-Error: This value is "external_" but expected to be "external_".
+Line 1, characters 65-83:
+1 | let add_three  (x : float# @ tagged_int) : float# @ tagged_int = Float_u.add #3.0 x
+                                                                     ^^^^^^^^^^^^^^^^^^
+Error: This value is "external_" but expected to be "tagged_int".
 |}]
 
-let add_three (x : int @ byte_external) : int @ byte_external = 3 + x
+let add_three (x : int @ tagged_int) : int @ tagged_int = 3 + x
 [%%expect {|
-val add_three : int @ external_ -> int @ external_ = <fun>
+val add_three : int @ tagged_int -> int @ tagged_int = <fun>
 |}]
 
 
-let is_not_byte_external =
-  let _ @ byte_external = #(3,4) in
+let is_not_tagged_int =
+  let _ @ tagged_int = #(3,4) in
   ()
 [%%expect {|
-Line 2, characters 26-32:
-2 |   let _ @ byte_external = #(3,4) in
-                              ^^^^^^
-Error: This value is "external_" but expected to be "external_".
+Line 2, characters 23-29:
+2 |   let _ @ tagged_int = #(3,4) in
+                           ^^^^^^
+Error: This value is "external_" but expected to be "tagged_int".
 |}]
 
 type t = #{x : int; y : int}
-let is_not_byte_external2 (x @ byte_external) (y @ byte_external)=
-  let z @ byte_external = #{x ; y} in
+let is_not_tagged_int2 (x @ tagged_int) (y @ tagged_int)=
+  let z @ tagged_int = #{x ; y} in
   z
 [%%expect {|
 type t = #{ x : int; y : int; }
-Line 3, characters 26-34:
-3 |   let z @ byte_external = #{x ; y} in
-                              ^^^^^^^^
-Error: This value is "external_" but expected to be "external_".
+Line 3, characters 23-31:
+3 |   let z @ tagged_int = #{x ; y} in
+                           ^^^^^^^^
+Error: This value is "external_" but expected to be "tagged_int".
 |}]

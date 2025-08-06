@@ -61,9 +61,8 @@ module Axis_pair = struct
       Any_axis_pair (Modal (Comonadic Externality), Externality.Const.External64)
     | "external_" ->
       Any_axis_pair (Modal (Comonadic Externality), Externality.Const.External)
-    | "byte_external" ->
-      Any_axis_pair
-        (Modal (Comonadic Externality), Externality.Const.Byte_external)
+    | "tagged_int" ->
+      Any_axis_pair (Modal (Comonadic Externality), Externality.Const.Tagged_int)
     | "yielding" ->
       Any_axis_pair (Modal (Comonadic Yielding), Yielding.Const.Yielding)
     | "unyielding" ->
@@ -467,12 +466,9 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
     | Atom (Monadic Visibility, Join_with Visibility.Const.Read) -> "read"
     | Atom (Monadic Visibility, Join_with Visibility.Const.Read_write) ->
       "read_write"
-    | Atom
-        (Comonadic Externality, Meet_with Mode.Externality.Const.Byte_external)
+    | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.Tagged_int)
       ->
-      (* We don't want to show byte_external to users, so we print external_ instead.
-         See the comment in mode.ml to understand more of the rationale behind this.*)
-      "external_"
+      "tagged_int"
     | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External) ->
       "external_"
     | Atom (Comonadic Externality, Meet_with Mode.Externality.Const.External64)

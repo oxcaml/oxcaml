@@ -100,7 +100,7 @@ module (M @ uncontended) = struct
     let x @ contended = "hello"
 end
 [%%expect{|
-module M : sig val x : string @@ contended external_ end @@ stateless
+module M : sig val x : string @@ contended tagged_int end @@ stateless
 |}]
 
 (* Testing the defaulting behaviour.
@@ -694,14 +694,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val t : [> `Foo ] @@ stateless nonportable external_ end (* at nonportable *)
+         sig val t : [> `Foo ] @@ stateless nonportable tagged_int end (* at nonportable *)
        is not included in
          sig
            val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
              portable
          end (* at nonportable *)
        Values do not match:
-         val t : [> `Foo ] @@ stateless nonportable external_ (* in a structure at nonportable *)
+         val t : [> `Foo ] @@ stateless nonportable tagged_int (* in a structure at nonportable *)
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable (* in a structure at nonportable *)
        The first is "nonportable" but the second is "portable".

@@ -1310,7 +1310,7 @@ module Const = struct
     let modality =
       Mode.Modality.Value.Const.id
       |> Mode.Modality.Value.Const.set (Comonadic Externality)
-           (Meet_with Jkind_mod_bounds.Externality.min)
+           (Meet_with Jkind_mod_bounds.Externality.External)
     in
     let with_bounds =
       With_bounds.add_modality ~relevant_for_shallow:`Irrelevant ~type_expr
@@ -1326,7 +1326,7 @@ module Const = struct
 
     (* NB: mode_crossing = true does not imply anything about externality. We
        always explicitly pass externality, since it is not always obvious if
-       types that "cross everything" should cross at external or byte_external *)
+       types that "cross everything" should cross at external or tagged_int *)
     let mk_jkind ~mode_crossing ~nullability ~separability ~externality
         (layout : Layout.Const.t) =
       let mod_bounds =
@@ -1349,7 +1349,7 @@ module Const = struct
     let any_mod_everything =
       { jkind =
           mk_jkind Any ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable ~externality:Byte_external;
+            ~separability:Maybe_separable ~externality:Tagged_int;
         name = "any mod everything"
       }
 
@@ -1367,7 +1367,7 @@ module Const = struct
     let any_non_null_mod_everything =
       { jkind =
           mk_jkind Any ~mode_crossing:true ~nullability:Non_null
-            ~separability:Separable ~externality:Byte_external;
+            ~separability:Separable ~externality:Tagged_int;
         name = "any_non_null mod everything"
       }
 
@@ -1381,7 +1381,7 @@ module Const = struct
     let value_or_null_mod_everything =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Maybe_separable ~externality:Byte_external;
+            ~separability:Maybe_separable ~externality:Tagged_int;
         name = "value_or_null mod everything"
       }
 
@@ -1461,7 +1461,7 @@ module Const = struct
     let immediate =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
-            ~separability:Non_float ~externality:Byte_external;
+            ~separability:Non_float ~externality:Tagged_int;
         name = "immediate"
       }
 
@@ -1470,7 +1470,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
-            ~separability:Non_float ~externality:Byte_external;
+            ~separability:Non_float ~externality:Tagged_int;
         name = "immediate_or_null"
       }
 
@@ -1738,7 +1738,7 @@ module Const = struct
       | Not_le -> `Invalid
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
-      (* We don't ever want to show byte_external to the user, so we just promote
+      (* We don't ever want to show tagged_int to the user, so we just promote
          our base/actual to be at least external for pretty printing. *)
       let base =
         Mod_bounds.join base (Mod_bounds.set_externality External base)

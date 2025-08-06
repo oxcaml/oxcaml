@@ -9,10 +9,10 @@ type t : word = int mallocd
 type t = int mallocd
 |}]
 
-type t : word mod byte_external = unit mallocd
+type t : word mod tagged_int = unit mallocd
 [%%expect {|
 Line 1, characters 0-46:
-1 | type t : word mod byte_external = unit mallocd
+1 | type t : word mod tagged_int = unit mallocd
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "unit mallocd" is
            word mod many unyielding stateless immutable external_

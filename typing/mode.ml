@@ -493,11 +493,7 @@ module Lattices = struct
 
   module Externality = struct
     type t =
-      (* What is byte_external? It includes types like int/bool, but excludes
-         types like #(int * int), which are external on native code systems, but
-         not when compiled with bytecode. This is necessary so we don't skip
-         [caml_modify]s for such types. *)
-      | Byte_external
+      | Tagged_int
       | External
       | External64
       | Internal
@@ -511,7 +507,7 @@ module Lattices = struct
 
       type nonrec t = t
 
-      let min = Byte_external
+      let min = Tagged_int
 
       let max = Internal
 
@@ -519,60 +515,60 @@ module Lattices = struct
 
       let le a b =
         match a, b with
-        | Byte_external, _ -> true
+        | Tagged_int, _ -> true
         | External, (External | External64 | Internal) -> true
-        | External, Byte_external -> false
+        | External, Tagged_int -> false
         | External64, (External64 | Internal) -> true
-        | External64, (Byte_external | External) -> false
+        | External64, (Tagged_int | External) -> false
         | Internal, Internal -> true
-        | Internal, (Byte_external | External | External64) -> false
+        | Internal, (Tagged_int | External | External64) -> false
 
       let equal a b =
         match a, b with
-        | Byte_external, Byte_external -> true
+        | Tagged_int, Tagged_int -> true
         | External, External -> true
         | External64, External64 -> true
         | Internal, Internal -> true
-        | Byte_external, (External | External64 | Internal)
-        | External, (Byte_external | External64 | Internal)
-        | External64, (Byte_external | External | Internal)
-        | Internal, (Byte_external | External | External64) ->
+        | Tagged_int, (External | External64 | Internal)
+        | External, (Tagged_int | External64 | Internal)
+        | External64, (Tagged_int | External | Internal)
+        | Internal, (Tagged_int | External | External64) ->
           false
 
       let join a b =
         match a, b with
-        | Byte_external, _ -> b
-        | External, Byte_external -> External
+        | Tagged_int, _ -> b
+        | External, Tagged_int -> External
         | External, _ -> b
-        | External64, (Byte_external | External) -> External64
+        | External64, (Tagged_int | External) -> External64
         | External64, _ -> b
-        | Internal, (Byte_external | External | External64 | Internal) ->
+        | Internal, (Tagged_int | External | External64 | Internal) ->
           Internal
 
       let meet a b =
         match a, b with
-        | Byte_external, (Byte_external | External | External64 | Internal) ->
-          Byte_external
-        | External, Byte_external -> Byte_external
+        | Tagged_int, (Tagged_int | External | External64 | Internal) ->
+          Tagged_int
+        | External, Tagged_int -> Tagged_int
         | External, (External | External64 | Internal) -> External
-        | External64, (External | Byte_external | External64) -> b
+        | External64, (External | Tagged_int | External64) -> b
         | External64, Internal -> External64
-        | Internal, (Byte_external | External | External64) -> b
+        | Internal, (Tagged_int | External | External64) -> b
         | Internal, Internal -> Internal
 
       let print ppf = function
-        (* We never want to show the programmer byte_external. Jane Street
+        (* We never want to show the programmer tagged_int. Jane Street
            libraries relying on externality are written with the intent of being
            used in native-compiled code, so clients should never come across
-           byte_external "in the wild". Seeing it in error messages would just
+           tagged_int "in the wild". Seeing it in error messages would just
            confuse them.
 
-           Since you *can* write byte_external in programs, this means that you
+           Since you *can* write tagged_int in programs, this means that you
            can write a program that typechecks, print it out, and then the
            printed code will fail to typecheck. But this is just something we're
            going to live with for now.
         *)
-        | Byte_external -> Format.fprintf ppf "external_"
+        | Tagged_int -> Format.fprintf ppf "tagged_int"
         | External -> Format.fprintf ppf "external_"
         | External64 -> Format.fprintf ppf "external64"
         | Internal -> Format.fprintf ppf "internal"
@@ -2003,7 +1999,7 @@ module Externality = struct
 
   include Comonadic_gen (Obj)
 
-  let byte_external = of_const Byte_external
+  let tagged_int = of_const Tagged_int
 
   let external_ = of_const External
 

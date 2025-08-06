@@ -374,7 +374,7 @@ module type S = sig
   module Externality : sig
     module Const : sig
       type t =
-        | Byte_external
+        | Tagged_int
         | External
         | External64
         | Internal
@@ -387,7 +387,7 @@ module type S = sig
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
 
-    val byte_external : lr
+    val tagged_int : lr
 
     val external_ : lr
 
