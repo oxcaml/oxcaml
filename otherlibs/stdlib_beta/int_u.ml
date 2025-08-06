@@ -85,7 +85,8 @@ let max_int () = shift_right_logical (minus_one ()) 1
 
 let min_int () = succ (max_int ())
 
-let[@inline] unsigned_to_int t = to_int t
+let[@inline] unsigned_to_int t =
+  if t < zero () then None else Some (to_int t)
 
 let[@inline] unsigned_compare n m =
   compare (sub n (min_int ())) (sub m (min_int ()))

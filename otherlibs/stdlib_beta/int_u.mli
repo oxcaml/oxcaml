@@ -140,8 +140,8 @@ external of_int : int -> int# = "%int#_of_int"
 (** [to_int t] tags [x] without changing its value *)
 external to_int : int# -> int = "%int_of_int#"
 
-(** Same as {!to_int}. *)
-val unsigned_to_int : int# -> int
+(** Same as {!to_int}, but returns None if the value is not positive. *)
+val unsigned_to_int : int# -> int option
 
 (** [to_float x] is [x] as a floating point number. *)
 external to_float : int# -> float = "%float_of_int#"

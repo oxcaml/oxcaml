@@ -25,10 +25,12 @@ let[@inline available] of_int t = t
 
 let[@inline available] to_int t = t
 
-let[@inline available] unsigned_to_int t = t
+let[@inline available] unsigned_to_int t = if t < 0 then None else Some t
 
 let[@inline available] unsigned_compare n m =
   compare (sub n min_int) (sub m min_int)
+
+external of_string : string -> int = "caml_int_of_string"
 
 let[@inline] unsigned_lt n m = sub n min_int < sub m min_int
 

@@ -3,6 +3,7 @@
    include stdlib_upstream_compatible;
 *)
 
+module Int = Stdlib_beta.Int_wrapper
 module Int_u = Stdlib_beta.Int_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 
@@ -162,9 +163,9 @@ let nonzero_integer_input
 let int_input = integer_input (module Int) Random.int Random.bits
 let int32_input = integer_input (module Int32) Random.int32 Random.bits32
 let int_input =
-  integer_input (module Int) Random.int Random.nativebits
+  integer_input (module Int) Random.int Random.bits
 let nonzero_int_input =
-  nonzero_integer_input (module Int) Random.int Random.nativebits
+  nonzero_integer_input (module Int) Random.int Random.bits
 
 let int_shift_amount_input =
   { generators = List.init Sys.int_size (fun c -> Const c)
@@ -285,8 +286,8 @@ let test_shift ?n name shift shiftu =
                      (Int_u.of_int x)
                      y))
 
-let int_u_of_int32 x = Int_u.of_int32_u (Int32_u.of_int32 x)
-let int_u_to_int32 x = Int32_u.to_int32 (Int_u.to_int32_u x)
+external int_u_of_int32 : int32 -> int# = "%int#_of_int32"
+external int_u_to_int32 : int# -> int32 = "%int32_of_int#"
 
 let () =
   test_unary     "neg"                 Int.neg                 Int_u.neg;
@@ -313,10 +314,6 @@ let () =
   test_unary_of  "unsigned_to_int"     Int.unsigned_to_int     Int_u.unsigned_to_int      (option_result (module Int));
   test_unary_to  "of_float"            Int.of_float            Int_u.of_float             float_input;
   test_unary_of  "to_float"            Int.to_float            Int_u.to_float             float_result;
-  test_unary_to  "of_int32"            (fun x -> x)32            Int_u.of_int32             int32_input;
-  test_unary_of  "to_int32"            Int.to_int32            Int_u.to_int32             int32_result;
-  test_unary_to  "of_int32_u"          (fun x -> x)32            int_u_of_int32             int32_input;
-  test_unary_of  "to_int32_u"          Int.to_int32            int_u_to_int32             int32_result;
   test_unary_to  "of_string"           Int.of_string           Int_u.of_string            int_string_input;
   test_unary_of  "to_string"           Int.to_string           Int_u.to_string            string_result;
   test_binary_of "compare"             Int.compare             Int_u.compare              int_result;
