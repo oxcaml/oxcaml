@@ -139,17 +139,16 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_float32, (Tagged_immediate | Naked_immediate) ->
       caml_to "float32" "int"
     | Naked_float32, Naked_float -> caml_of "float" "float32"
-    | Naked_float32, Naked_int32 | Naked_int32, Naked_float32 ->
-      primitive_not_supported ()
+    | Naked_float32, Naked_int32 -> caml_of "int32" "float32"
     | Naked_float32, Naked_int64 -> caml_to_bytecode "float32" "int64"
-    | Naked_float32, Naked_nativeint | Naked_nativeint, Naked_float32 ->
-      primitive_not_supported ()
+    | Naked_float32, Naked_nativeint -> caml_of "nativeint" "float32"
     | Naked_float, (Tagged_immediate | Naked_immediate) -> caml_of "int" "float"
     | Naked_float, Naked_float32 -> caml_of "float32" "float"
     | Naked_float, Naked_int32 -> caml_of "int32" "float"
     | Naked_float, Naked_int64 -> caml_of "int64" "float"
     | Naked_float, Naked_nativeint -> caml_of "nativeint" "float"
     | Naked_int32, (Tagged_immediate | Naked_immediate) -> caml_to "int32" "int"
+    | Naked_int32, Naked_float32 -> caml_of "float32" "int32"
     | Naked_int32, Naked_float -> caml_to "int32" "float"
     | Naked_int32, Naked_int64 -> caml_of "int64" "int32"
     | Naked_int32, Naked_nativeint -> caml_of "nativeint" "int32"
@@ -160,6 +159,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_int64, Naked_nativeint -> caml_to "int64" "nativeint"
     | Naked_nativeint, (Tagged_immediate | Naked_immediate) ->
       caml_to "nativeint" "int"
+    | Naked_nativeint, Naked_float32 -> caml_of "float32" "nativeint"
     | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
     | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
     | Naked_nativeint, Naked_int64 -> caml_to "nativeint" "int64")
@@ -170,7 +170,7 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Unboxed_int64_as_unboxed_float64 -> "caml_int64_float_of_bits"
       | Unboxed_float64_as_unboxed_int64 -> "caml_int64_bits_of_float"
       | Unboxed_int64_as_tagged_int63 ->
-        (* JS doesn't have tagged int63 *)
+        (* JS doesn't have tagged int63 since it's a 32-bit target *)
         primitive_not_supported ()
       | Tagged_int63_as_unboxed_int64 -> primitive_not_supported ()
     in
@@ -189,8 +189,8 @@ let unary ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | End_region _ | End_try_region _ -> no_op ~env ~res
   | Get_header ->
     (* CR selee: check [js_of_ocaml/compiler/tests_check_prim/main.output], this
-       primitive seems to be missing from jsoo *)
-    use_prim' (Extern "caml_get_header")
+       primitive ("caml_get_header") seems to be missing from jsoo *)
+    primitive_not_supported ()
   | Atomic_load _ -> use_prim' (Extern "caml_atomic_load")
   | Peek _ ->
     (* Unsupported in bytecode *)
