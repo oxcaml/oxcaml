@@ -550,13 +550,7 @@ type 'a t [@@immediate];;
 type u = U : 'a t -> u [@@unboxed];;
 [%%expect{|
 type 'a t : immediate
-Line 2, characters 0-34:
-2 | type u = U : 'a t -> u [@@unboxed];;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of the existential variable "'a".
-       You should annotate it with "[@@ocaml.boxed]".
+type u = U : 'a t -> u [@@unboxed]
 |}];;
 
 (* This could not be accepted without using a fixpoint to check unboxed declarations
