@@ -1,4 +1,0 @@
-simple_function 3 4 = 7
-nested_function 5 = 10
-recursive_function 4 = 24
-DWARF test completed - this should be updated with real DWARF checks

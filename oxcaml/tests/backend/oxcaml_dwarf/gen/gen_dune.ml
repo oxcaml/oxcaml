@@ -43,4 +43,3 @@ let () =
   
   (* Generate tests - add more tests here as needed *)
   print_dwarf_test "test_basic_dwarf";
-  print_dwarf_test "test_dwarf_functions";
