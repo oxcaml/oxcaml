@@ -1,4 +1,3 @@
-
 (* TEST
  include stdlib_beta;
  include stdlib_upstream_compatible;
@@ -19,9 +18,7 @@
  }
 *)
 open Test_smallint
-module Smallint = Stdlib_beta.Int8_u
-let min_int = -0x80
-let max_int = 0x7f
+module Smallint = Stdlib_beta.Int_u
 
 let same_int x y =
   Int.equal (Smallint.to_int x) y && Smallint.equal x (Smallint.of_int y)

@@ -4,6 +4,8 @@ let same_float x y = Int64.equal (Int64.bits_of_float x) (Int64.bits_of_float y)
 
 let phys_same x y = Obj.repr x == Obj.repr y
 
+let special_floats = Float.[infinity; nan; neg_infinity; epsilon; -0.; 0.]
+
 (** generates a random float that rounds toward zero to the same integer value *)
 let nudge rng f =
   let f_pos = Float.abs f in
@@ -26,12 +28,51 @@ let nudge rng f =
         (Int64.float_of_bits (Random.State.int64_in_range rng ~min:lo ~max:hi))
         f
 
+let test_cases ~int_size =
+  let rng = Random.State.make [| int_size |] in
+  (* sparse test cases, concentrated around 0 and the endpoints *)
+  let max_int = (1 lsl (int_size - 1)) - 1 in
+  List.init (int_size - 1) (fun size ->
+      let bit = 1 lsl size in
+      let rand () =
+        Random.State.int_in_range rng ~min:(bit lsr 1) ~max:(bit - 1)
+      in
+      [rand (); lnot (rand ()); max_int - rand (); lnot (max_int - rand ())])
+  |> List.concat |> List.sort Int.compare
+
+
+(** Generate a bunch of valid strings of integer formats *)
+let test_strings ~int_size ~f =
+  let rec int_to_binary = function
+    | 0 -> "0b0"
+    | 1 -> "0b1"
+    | i -> Printf.sprintf "%s%d" (int_to_binary (i lsr 1)) (i land 1)
+  in
+  let mask = (1 lsl int_size) - 1 in
+  let prefix_formats x ~prefix =
+    [ Printf.sprintf "%s0u%u" prefix (x land mask);
+      Printf.sprintf "%s0x%x" prefix (x land mask);
+      Printf.sprintf "%s0o%o" prefix (x land mask);
+      prefix ^ int_to_binary (x land mask) ]
+  in
+  let arbitrary_wonky_format_that_still_parses = "-0o1___2" in
+  List.iter f
+    (
+      arbitrary_wonky_format_that_still_parses
+      :: ListLabels.concat_map (test_cases ~int_size) ~f:(fun x ->
+        [Printf.sprintf "%#d" x; Printf.sprintf "%d" x]
+        @ (if x >= 0 then [Printf.sprintf "+%d" x] else [])
+        @ prefix_formats x ~prefix:""
+        @ prefix_formats x ~prefix:"+"
+        @ prefix_formats x ~prefix:"-")
+    )
+
 let run (module Smallint : Int.S) ~min_int ~max_int =
-  let size = Smallint.size in
-  assert (0 < size && size <= Int.size);
-  assert (max_int = (1 lsl (size - 1)) - 1);
+  let int_size = Smallint.size in
+  assert (0 < int_size && int_size <= Int.size);
+  assert (max_int = (1 lsl (int_size - 1)) - 1);
   assert (min_int = lnot max_int);
-  let mask = (1 lsl size) - 1 in
+  let mask = (1 lsl int_size) - 1 in
   let to_int x : int =
     let i : int = Smallint.to_int x in
     assert (phys_same i x);
@@ -48,28 +89,13 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
            (to_int x) (i land mask) i);
     x
   in
-  let rec to_binary (i : int) =
-    if i = 0
-    then "0b0"
-    else Printf.sprintf "%s%d" (to_binary (i lsr 1)) (i land 1)
-  in
-  let rng = Random.State.make [| size |] in
-  let test_cases =
-    (* sparse test cases, concentrated around 0 and the endpoints *)
-    List.init (size - 1) (fun size ->
-        let bit = 1 lsl size in
-        let rand () =
-          Random.State.int_in_range rng ~min:(bit lsr 1) ~max:(bit - 1)
-        in
-        [rand (); lnot (rand ()); max_int - rand (); lnot (max_int - rand ())])
-    |> List.concat |> List.sort Int.compare
-  in
-  let special_floats = Float.[infinity; nan; neg_infinity; epsilon; -0.; 0.] in
+  let rng = Random.State.make [| int_size |] in
+  let test_cases = test_cases ~int_size in
   let test1 f = ListLabels.iter test_cases ~f in
   let test2 f = test1 (fun x -> test1 (fun y -> f x y)) in
   let test_round_trip () =
     let test hi lo =
-      let hi = hi lsl size in
+      let hi = hi lsl int_size in
       assert (phys_same lo (to_int (of_int (hi lxor lo))))
     in
     test2 (fun hi lo ->
@@ -131,7 +157,7 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
   test_logical2 Smallint.logor Int.logor;
   test_logical2 Smallint.logxor Int.logxor;
   test_logical1 Smallint.lognot Int.lognot;
-  for shift = 0 to size - 1 do
+  for shift = 0 to int_size - 1 do
     let apply_shift f x = f x shift in
     test_logical1
       (apply_shift Smallint.shift_right)
@@ -156,17 +182,8 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
       let f = nudge rng (Int.to_float x) in
       assert (equal_logical (Smallint.of_float f) x));
   test1 (fun x -> assert (Smallint.to_string (of_int x) = Int.to_string x));
-  assert (Smallint.of_string "1___2" = of_int 12);
-  test1 (fun x ->
-    let mask = (1 lsl Smallint.size) - 1 in
-    List.iter
-      (fun s -> assert (Smallint.of_string s = of_int x))
-      [ Printf.sprintf "%d" x
-      ; Printf.sprintf "0u%u" (x land mask)
-      ; Printf.sprintf "0x%x" (x land mask)
-      ; Printf.sprintf "0o%o" (x land mask)
-      ; to_binary (x land mask)
-      ]);
+  test_strings ~int_size ~f:(fun s ->
+    assert (equal_arith (Smallint.of_string s) (int_of_string s)));
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;
   ()

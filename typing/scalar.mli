@@ -228,7 +228,6 @@ end
 type 'a scalar := 'a t
 
 module Operation : sig
-
   type 'mode info =
     { can_raise : bool;
       result : 'mode t
