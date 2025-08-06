@@ -69,6 +69,14 @@
       [Static_cast { src : any_locality_mode t; dst : 'mode t }]
       which allows casting between different scalar types, e.g., from Int8 to Int32.
       See jane/doc/scalars.md for documentation on the semantics.
+
+    In some cases, only the number of bits used in the container (e.g. a
+    machine register or stack slot) is important.  We use [Width] for this.
+    [Width.t] always represents the width of a scalar layout -- it has exactly one
+    constuctor for each bit-width of the corresponding scalar. The type
+    parameter is irrelevant within the [Width] module, that's why it's usually
+    fixed to any_locality_mode when the corresponding function is expecting a
+    simple sum type (e.g., [to_string]).
 *)
 
 type any_locality_mode = Any_locality_mode
