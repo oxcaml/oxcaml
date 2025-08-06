@@ -7371,7 +7371,7 @@ let exn_constructor_crossing env lid ~args locks =
       fun ({ca_type; ca_modalities; _} : Types.constructor_argument) ->
         crossing_of_ty env ~modalities:ca_modalities ca_type
     ) args
-    |> List.fold_left Mode.Crossing.join Mode.Crossing.bot
+    |> List.fold_left Mode.Crossing.join Mode.Crossing.min
   in
   let min_bound =
     { monadic;

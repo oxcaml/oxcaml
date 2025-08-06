@@ -1378,7 +1378,7 @@ module Const = struct
       { jkind =
           { layout = Base Value;
             mod_bounds =
-              Mod_bounds.create ~locality:Locality.Const.max
+              Mod_bounds.create ~areality:Regionality.Const.max
                 ~linearity:Linearity.Const.max
                 ~portability:Portability.Const.min ~yielding:Yielding.Const.max
                 ~uniqueness:Uniqueness.Const_op.max
