@@ -192,3 +192,147 @@ module type S2_restricted =
 module M2 : S2 @@ stateless
 module M2_restricted : S2_restricted @@ stateless
 |}]
+
+module type S2_restricted = sig
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  val g : (?x):'a t ->  unit -> 'a t * 'b t
+end
+module M2_restricted : S2_restricted = M2
+[%%expect{|
+module type S2_restricted =
+  sig
+    type 'a t = Empty | Value of 'a
+    val g : (?x):'a t -> unit -> 'a t * 'b t
+  end
+Line 8, characters 39-41:
+8 | module M2_restricted : S2_restricted = M2
+                                           ^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type 'a t = 'a M2.t = Empty | Value of 'a
+           val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+           val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+         end
+       is not included in
+         S2_restricted
+       Values do not match:
+         val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+       is not included in
+         val g : (?x):'a t -> unit -> 'a t * 'b t
+       The type "(?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t"
+       is not compatible with the type "(?x):'a t -> unit -> 'a t * 'c t"
+       Type "(?y):'b t -> unit -> 'a t * 'b t" is not compatible with type
+         "unit -> 'a t * 'c t"
+|}]
+
+type 'a t =
+  | Empty
+  | Value of 'a
+[@@option_like]
+
+module type S2 = sig
+  val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+end
+
+type 'a t2 =
+  | Empty2
+  | Value2 of 'a
+[@@option_like]
+
+module M2 : S2 = struct
+  let g (?x : 'a t2) (?y : 'b t2) () = (x, y)
+  let h (?x : 'a t2) (?y : 'b t2) () = (x, y)
+end
+
+[%%expect{|
+type 'a t = Empty | Value of 'a
+module type S2 =
+  sig
+    val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+    val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  end
+type 'a t2 = Empty2 | Value2 of 'a
+Lines 16-19, characters 17-3:
+16 | .................struct
+17 |   let g (?x : 'a t2) (?y : 'b t2) () = (x, y)
+18 |   let h (?x : 'a t2) (?y : 'b t2) () = (x, y)
+19 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val g : (?x):'a t2 -> (?y):'b t2 -> unit -> 'a t2 * 'b t2 @@
+             stateless
+           val h : (?x):'a t2 -> (?y):'b t2 -> unit -> 'a t2 * 'b t2 @@
+             stateless
+         end
+       is not included in
+         S2
+       Values do not match:
+         val g : (?x):'a t2 -> (?y):'b t2 -> unit -> 'a t2 * 'b t2 @@
+           stateless
+       is not included in
+         val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+       The type "(?x):'a t2 -> (?y):'b t2 -> unit -> 'a t2 * 'b t2"
+       is not compatible with the type
+         "(?x):'c t -> (?y):'d t -> unit -> 'c t * 'd t"
+       Type "'a t2" is not compatible with type "'c t"
+|}]
+
+module type S2 = sig
+  val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+end
+
+
+module M2 : S2 = struct
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  let g (?x : 'a t) (?y : 'b t) () = (x, y)
+  let h (?x : 'a t) (?y : 'b t) () = (x, y)
+end
+
+[%%expect{|
+module type S2 =
+  sig
+    val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+    val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  end
+Lines 7-14, characters 17-3:
+ 7 | .................struct
+ 8 |   type 'a t =
+ 9 |     | Empty
+10 |     | Value of 'a
+11 |   [@@option_like]
+12 |   let g (?x : 'a t) (?y : 'b t) () = (x, y)
+13 |   let h (?x : 'a t) (?y : 'b t) () = (x, y)
+14 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type 'a t = Empty | Value of 'a
+           val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t @@ stateless
+           val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t @@ stateless
+         end
+       is not included in
+         S2
+       Values do not match:
+         val g : (?x):'a t/1 -> (?y):'b t/1 -> unit -> 'a t/1 * 'b t/1 @@
+           stateless
+       is not included in
+         val g : (?x):'a t/2 -> (?y):'b t/2 -> unit -> 'a t/2 * 'b t/2
+       The type "(?x):'a t/1 -> (?y):'b t/1 -> unit -> 'a t/1 * 'b t/1"
+       is not compatible with the type
+         "(?x):'c t/2 -> (?y):'d t/2 -> unit -> 'c t/2 * 'd t/2"
+       Type "'a t/1" is not compatible with type "'c t/2"
+       Lines 8-11, characters 2-17:
+         Definition of type "t/1"
+       Lines 1-4, characters 0-15:
+         Definition of type "t/2"
+|}]
