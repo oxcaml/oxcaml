@@ -99,6 +99,7 @@ type error =
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
   | Unknown_generic_optional_argument_type of Parsetree.core_type
+  | Unsupported_generic_optional_argument of string
   | Generic_optional_argument_missing_option_like_annotation of Path.t
   | Generic_optional_argument_missing_type_annotation
 
@@ -1691,6 +1692,8 @@ let report_error env ppf =
       (* CR generic-optional : Add Hint.  *)
       fprintf ppf "@[Unknown generic optional argument type:@ %a@]"
         Pprintast.core_type ty
+  | Unsupported_generic_optional_argument loc ->
+      fprintf ppf "@[Generic optional arguments are not supported in %s@]" loc
   | Generic_optional_argument_missing_option_like_annotation path ->
       fprintf ppf "@[Generic optional arguments require types with the \
         [@@option_like] attribute.@ Type %a is not marked as option-like@]"
