@@ -25,15 +25,19 @@ let eqi x y = if x <> y then Printf.printf "%d <> %d\n" x y
 let eq64 x y = if x <> y then Printf.printf "%Ld <> %Ld\n" x y
 
 let eqf x y =
-  if Float.is_nan x && Float.is_nan y then ()
-  else if x <> y then Printf.printf "%f <> %f\n" x y
+  if Float.is_nan x && Float.is_nan y
+  then ()
+  else if x <> y
+  then Printf.printf "%f <> %f\n" x y
 
 external f32_to_f64 : float32 -> float = "%floatoffloat32"
 
 let eqf32 x y =
   let x, y = f32_to_f64 x, f32_to_f64 y in
-  if Float.is_nan x && Float.is_nan y then ()
-  else if x <> y then Printf.printf "%f <> %f\n" x y
+  if Float.is_nan x && Float.is_nan y
+  then ()
+  else if x <> y
+  then Printf.printf "%f <> %f\n" x y
 
 module Int = struct
   external count_leading_zeros : int -> (int[@untagged])
@@ -227,62 +231,61 @@ module Int32 = struct
 end
 
 module Float = struct
-
   external max_f64 : float -> float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_max"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external max_f32 : float32 -> float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_max"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external min_f64 : float -> float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_min"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external min_f32 : float32 -> float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_min"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external iround_f64 : float -> int64
     = "caml_vec128_unreachable" "caml_simd_cast_float64_int64"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external iround_f32 : float32 -> int64
     = "caml_vec128_unreachable" "caml_simd_cast_float32_int64"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_current_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_current"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_neg_inf_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_neg_inf"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_pos_inf_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_pos_inf"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_towards_zero_f64 : float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_round_towards_zero"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_current_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_current"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_neg_inf_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_neg_inf"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_pos_inf_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_pos_inf"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external round_towards_zero_f32 : float32 -> float32
     = "caml_vec128_unreachable" "caml_simd_float32_round_towards_zero"
-  [@@noalloc] [@@builtin] [@@unboxed]
+    [@@noalloc] [@@builtin] [@@unboxed]
 
   external float32_of_bits : int32 -> float32
     = "caml_float32_of_bits_bytecode" "caml_float32_of_bits"
@@ -331,8 +334,8 @@ module Float = struct
     eqf32 (min_f32 1.s f32_nan) f32_nan;
     eqf32 (min_f32 f32_nan f32_nan) f32_nan
 
-  (* In native code, the current mode should be half-to-even.
-     Result is unspecified for inf/nan/out-of-range values. *)
+  (* In native code, the current mode should be half-to-even. Result is
+     unspecified for inf/nan/out-of-range values. *)
   let () =
     eq64 (iround_f64 0.) 0L;
     eq64 (iround_f64 (-0.)) 0L;

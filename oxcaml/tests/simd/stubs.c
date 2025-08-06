@@ -164,7 +164,6 @@ static inline simd_int128_t vec128i_of_int64x2(simd_int64x2_t v)
 }
 
 static inline simd_float64x2_t simd_float64x2_round_near(simd_float64x2_t v)
-
 {
   return _mm_round_pd(v, 0x8);
 }
