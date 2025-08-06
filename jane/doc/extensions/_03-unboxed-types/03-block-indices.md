@@ -155,9 +155,9 @@ type c = { mutable b : b; s : string }
 ```
 
 The record `c` presents an interesting problem for block indices: the fields of
-the `b` and `a` unboxed records it contains are not actually contiguous at runtime when
-using the native code compiler. This problem is caused by the
-[mixed block represntation](01-intro.md#the-mixed-block-representation),
+its contained unboxed records `a` and `b` are not actually contiguous at runtime
+when using the native code compiler. This problem is caused by the
+[mixed block representation](01-intro.md#the-mixed-block-representation),
 which mandates that we reorder fields so that values come before unboxed types.
 
 While the layout of `c` has the shape
