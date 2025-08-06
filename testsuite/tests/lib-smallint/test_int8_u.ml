@@ -169,7 +169,9 @@ let () =
   test2 (fun x y ->
       assert (Smallint.equal (of_int x) (of_int y) = Int.equal x y));
   test2 (fun x y ->
-      assert (Smallint.compare (of_int x) (of_int y) = Int.compare x y));
+    assert (Smallint.compare (of_int x) (of_int y) = Int.compare x y));
+  test2 (fun x y ->
+      assert (Smallint.unsigned_compare (of_int x) (of_int y) = Int.unsigned_compare x y));
   test1 (fun x ->
       assert (same_float (Smallint.to_float (of_int x)) (Int.to_float x)));
   ListLabels.iter
