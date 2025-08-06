@@ -17,16 +17,20 @@ external icaml_equal : int# -> int# -> bool = "%int#_equal"
 external i32_equal : int32# -> int32# -> bool = "%int32#_equal"
 external i64_equal : int64# -> int64# -> bool = "%int64#_equal"
 external isize_equal : nativeint# -> nativeint# -> bool = "%nativeint#_equal"
+external box_float : float# -> float = "%float_of_float#"
+external box_float32 : float# -> float = "%float32_of_float32#"
 
-(* external f64_equal : float# -> float# -> bool = "%float#_equal"
- * external f32_equal : float32# -> float32# -> bool = "%float32#_equal" *)
+let f64_bits_equal x y =
+  Int64.equal (Int64.bits_of_float (box_float x)) (Int64.bits_of_float (box_float y))
+;;
+
+let f32_bits_equal x y =
+  Int32.equal (Int32.bits_of_float (box_float32 x)) (Int32.bits_of_float (box_float32 y))
+;;
+
+external f64_equal : float# -> float# -> bool = "%float#_ordered_and_equal"
+external f32_equal : float32# -> float32# -> bool = "%float32#_ordered_and_equal"
 external ( + ) : nativeint# -> nativeint# -> nativeint# = "%nativeint#_add"
-
-(* CR mshinwell for gyorsh: enable these float32 cases *)
-(*
-   external float32_u_to_float : float32# -> float32
-  = "%box_float32" [@@warning "-187"]
-*)
 
 (* The test itself starts here *)
 
@@ -65,12 +69,14 @@ let () =
   write (buf + #48n) i16;
   write (buf + #50n) i8;
   assert (i64_equal i64 (read (buf + #0n)));
-  (* assert (f64_equal f64 (read (buf + #8n))); *)
+  assert (f64_equal f64 (read (buf + #8n)));
+  assert (f64_bits_equal f64 (read (buf + #8n)));
   assert (isize_equal isize (read (buf + #16n)));
   assert (int_equal int (read (buf + #24n)));
   assert (icaml_equal icaml (read (buf + #32n)));
   assert (i32_equal i32 (read (buf + #40n)));
-  (* assert (f32_equal f32 (read (buf + #44n))); *)
+  assert (f32_equal f32 (read (buf + #44n)));
+  assert (f32_bits_equal f32 (read (buf + #44n)));
   assert (i16_equal i16 (read (buf + #48n)));
   assert (i8_equal i8 (read (buf + #50n)))
 ;;
