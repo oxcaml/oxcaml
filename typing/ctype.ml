@@ -4602,8 +4602,8 @@ let filter_arrow env t l ~force_tpoly ~generic_optional_info =
                       newty2 ~level (Tconstr(t_cons,
                         [newvar2 level arg_jkind], ref Mnil))
                   | _ ->
-                      failwith "Cannot create fresh generic optional without \
-                                existing type"))
+                      Misc.fatal_error "Cannot create fresh generic optional \
+                        without existing type"))
           | Required_or_position_arg ->
               if is_position l then
                 newty2 ~level
