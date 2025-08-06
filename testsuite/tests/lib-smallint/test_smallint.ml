@@ -151,6 +151,15 @@ let run (module Smallint : Int.S) ~min_int ~max_int =
       let f = nudge rng (Int.to_float x) in
       assert (equal_logical (Smallint.of_float f) x));
   test1 (fun x -> assert (Smallint.to_string (of_int x) = Int.to_string x));
+  assert (Smallint.of_string "1___2" = of_int 12);
+  test1 (fun x ->
+    List.iter
+      (fun s -> assert (Smallint.of_string s = of_int x))
+      [ Printf.sprintf "%d" x
+      ; Printf.sprintf "0u%u" x
+      ; Printf.sprintf "0x%x" x
+      ; Printf.sprintf "0o%o" x
+      ]);
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;
   ()

@@ -413,10 +413,10 @@ let _ = test6 ()
 module M = struct
   open Int16_u
   let[@inline never] f () = assert false
-  let g () = if Sys.opaque_identity true then (Stdlib_beta.Int16_u.of_int 16) else f ()
+  let g () = if Sys.opaque_identity true then (Stdlib_beta.Int16_u.of_int 32) else f ()
 end
 
 let test7 () =
-  print_int16u "Test 7, 16" (M.g ())
+  print_int16u "Test 7, 32" (M.g ())
 
 let _ = test7 ()

@@ -17,19 +17,25 @@ external icaml_equal : int# -> int# -> bool = "%int#_equal"
 external i32_equal : int32# -> int32# -> bool = "%int32#_equal"
 external i64_equal : int64# -> int64# -> bool = "%int64#_equal"
 external isize_equal : nativeint# -> nativeint# -> bool = "%nativeint#_equal"
-external box_float : float# -> float = "%float_of_float#"
-external box_float32 : float# -> float = "%float32_of_float32#"
+external f64_equal : float# -> float# -> bool = "%float#_ordered_and_equal"
+external f32_equal : float32# -> float32# -> bool = "%float32#_ordered_and_equal"
+external box_f64 : float# -> float = "%float_of_float#"
+external box_f32 : float32# -> float32 = "%float32_of_float32#"
+
+external float32_to_bits
+  :  (float32[@local_opt])
+  -> int32
+  = "caml_float32_to_bits_bytecode" "caml_float32_to_bits"
+[@@unboxed] [@@noalloc] [@@builtin]
 
 let f64_bits_equal x y =
-  Int64.equal (Int64.bits_of_float (box_float x)) (Int64.bits_of_float (box_float y))
+  Int64.equal (Int64.bits_of_float (box_f64 x)) (Int64.bits_of_float (box_f64 y))
 ;;
 
 let f32_bits_equal x y =
-  Int32.equal (Int32.bits_of_float (box_float32 x)) (Int32.bits_of_float (box_float32 y))
+  Int32.equal (float32_to_bits (box_f32 x)) (float32_to_bits (box_f32 y))
 ;;
 
-external f64_equal : float# -> float# -> bool = "%float#_ordered_and_equal"
-external f32_equal : float32# -> float32# -> bool = "%float32#_ordered_and_equal"
 external ( + ) : nativeint# -> nativeint# -> nativeint# = "%nativeint#_add"
 
 (* The test itself starts here *)
