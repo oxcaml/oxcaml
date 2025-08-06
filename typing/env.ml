@@ -2989,6 +2989,43 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
+(* Make the initial environment, without language extensions *)
+let initial =
+  (* We collect all the type declarations that are added to the initial
+     environment in a table. *)
+  let added_types = Ident.Tbl.create 16 in
+  let add_type_and_remember_decl (type_ident : Ident.t) decl env =
+    Ident.Tbl.add added_types type_ident decl;
+    add_type type_ident decl env ~check:false
+  in
+  let initial_env =
+    Predef.build_initial_env add_type_and_remember_decl
+      (add_extension ~check:false ~rebind:false) empty
+  in
+  (* We record the type declarations for the type shapes. *)
+  Ident.Tbl.iter (fun type_ident decl ->
+    Type_shape.add_to_type_decls (Pident type_ident) decl
+      (find_uid_of_path initial_env)
+  ) added_types;
+  initial_env
+
+let add_language_extension_types env =
+  let add ext lvl f env  =
+    match Language_extension.is_at_least ext lvl with
+    | true ->
+      (* CR-someday poechsel: Pass a correct shape here *)
+      f (add_type ?shape:None ~check:false) env
+    | false -> env
+  in
+  lazy
+    Language_extension.(env
+    |> add SIMD Stable Predef.add_simd_stable_extension_types
+    |> add SIMD Beta Predef.add_simd_beta_extension_types
+    |> add SIMD Alpha Predef.add_simd_alpha_extension_types
+    |> add Small_numbers Stable Predef.add_small_number_extension_types
+    |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
+    |> add Layouts Stable Predef.add_or_null)
+
 (* Some predefined types are part of language extensions, and we don't want to
    make them available in the initial environment if those extensions are not
    turned on.  We can't do this at startup because command line flags haven't
@@ -2997,26 +3034,7 @@ let save_signature_with_imports ~alerts sg modname cu cmi imports =
    If language extensions are adjusted after [initial] is forced, these
    environments may be inaccurate.
 *)
-let initial =
-  lazy (
-    let open Language_extension_kernel in
-    let add ext lvl f env  =
-      match Language_extension.is_at_least ext lvl with
-      | true ->
-        (* CR-someday poechsel: Pass a correct shape here *)
-        f (add_type ?shape:None ~check:false) env
-      | false -> env
-    in
-    empty
-    |> Predef.build_initial_env
-         (add_type ~check:false)
-         (add_extension ~check:false ~rebind:false)
-    |> add SIMD Stable Predef.add_simd_stable_extension_types
-    |> add SIMD Beta Predef.add_simd_beta_extension_types
-    |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-    |> add Small_numbers Stable Predef.add_small_number_extension_types
-    |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
-    |> add Layouts Stable Predef.add_or_null)
+let initial = add_language_extension_types initial
 
 (* Tracking usage *)
 
