@@ -397,6 +397,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
          ++ Cfg_with_infos.cfg_with_layout
          ++ cfg_with_layout_profile ~accumulate:true "cfg_validate_description"
               (Regalloc_validate.run cfg_description))
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ Profile.record ~accumulate:true "cfg_available_regs"
        (available_regs
           ~stack_slots:(fun x ->

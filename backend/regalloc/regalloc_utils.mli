@@ -105,8 +105,6 @@ val simplify_cfg : Cfg_with_layout.t -> Cfg_with_layout.t
 
 val save_cfg : string -> Cfg_with_layout.t -> unit
 
-val remove_prologue_if_not_required : Cfg_with_layout.t -> unit
-
 val update_live_fields : Cfg_with_layout.t -> liveness -> unit
 
 module SpillCosts : sig

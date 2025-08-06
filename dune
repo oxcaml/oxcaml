@@ -539,6 +539,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_prologue
   extra_debug
   label
   linear_utils

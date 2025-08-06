@@ -297,11 +297,11 @@ module Description : sig
       instructions within or between basic blocks.
 
       The validator checks that the register allocator does not remove
-      instructions except Prologue (whenever it's allowed to do so), and does
-      not add any new instructions except Spill and Reload. The unique IDs of
-      instructions are sufficient to determine this, and the description does
-      not need to record the block an instruction belongs to. It is possible to
-      reconstruct some information about the CFG structure from the description.
+      instructions, and does not add any new instructions except Spill and 
+      Reload. The unique IDs of instructions are sufficient to determine this, 
+      and the description does not need to record the block an instruction 
+      belongs to. It is possible to reconstruct some information about the CFG 
+      structure from the description. 
       For example, successors of a block can be reconstructed from the labels
       that appear in terminator's [desc]. It also checks that all [fun_args]
       were preassigned before allocation and that they haven't changed after. *)
@@ -707,18 +707,8 @@ end = struct
         ignore (first_instruction_id : InstructionId.t))
       (Cfg_with_layout.cfg cfg).Cfg.blocks;
     Hashtbl.iter
-      (fun id { instr; _ } ->
-        let can_be_removed =
-          match instr.Instruction.desc with
-          | Prologue ->
-            let ({ fun_contains_calls; fun_num_stack_slots; _ } : Cfg.t) =
-              Cfg_with_layout.cfg cfg
-            in
-            not
-              (Proc.prologue_required ~fun_contains_calls ~fun_num_stack_slots)
-          | _ -> false
-        in
-        if (not (Hashtbl.mem seen_ids id)) && not can_be_removed
+      (fun id _ ->
+        if not (Hashtbl.mem seen_ids id)
         then
           Regalloc_utils.fatal
             "Instruction no. %a was deleted by register allocator"

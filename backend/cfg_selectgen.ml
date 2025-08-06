@@ -1512,8 +1512,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.make_empty_block ~label:(Cfg.entry_label cfg)
         (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none)
     in
-    DLL.add_begin entry_block.body
-      (Sub_cfg.make_instr Cfg.Prologue [||] [||] Debuginfo.none);
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
     let tailrec_block =
