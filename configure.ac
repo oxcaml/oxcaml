@@ -2848,6 +2848,11 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
   [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf"],
   [oxcaml_dwarf_flags_for_compiler=""])
 
+# Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
+AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
+  [AS_IF([test x"$enable_function_sections" != "xno"],
+    [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
+
 # Enable debugging support
 # TODO: add a --disable-debug-info configure option that disables debugging
 # info for both C and OCaml
