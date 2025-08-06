@@ -68,7 +68,7 @@
     primitives. This is enabled by [Intrinsic.Unary.Static_cast]:
       [Static_cast { src : any_locality_mode t; dst : 'mode t }]
       which allows casting between different scalar types, e.g., from Int8 to Int32.
-      See scalar.md in the repo root for documentation on the semantics.
+      See jane/doc/scalars.md for documentation on the semantics.
 *)
 
 type any_locality_mode = Any_locality_mode
@@ -213,6 +213,8 @@ module Float_comparison : sig
   val negate : t -> t
 end
 
+(* CR mshinwell: Concerns have been raised that [Intrinsic] could be misleading,
+   we might consider renaming this later *)
 module Intrinsic : sig
   type 'mode info =
     { can_raise : bool;
@@ -225,7 +227,7 @@ module Intrinsic : sig
         | Neg
         | Succ  (** add 1 *)
         | Pred  (** subtract 1 *)
-        | Bswap
+        | Bswap  (** byte swap; see scalars.md for semantics *)
 
       val to_string : t -> string
     end
