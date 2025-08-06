@@ -881,6 +881,9 @@ and transl_structure ~scopes loc
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
           let mid_duid = Lambda.debug_uid_none in
+          let incl_repr =
+            module_representation_of_signature incl.incl_type
+          in
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
@@ -900,7 +903,7 @@ and transl_structure ~scopes loc
                 let id_duid = Lambda.debug_uid_none in
                 (* CR sspies: Can we find a better [debug_uid] here? *)
                 Llet(Alias, lambda_layout, id, id_duid,
-                     Lprim(mod_field pos (Module_value_only (-1)),
+                     Lprim(mod_field pos incl_repr,
                            [Lvar mid],
                            of_location ~scopes incl.incl_loc), body),
                 repr
@@ -1579,6 +1582,9 @@ let transl_store_structure ~scopes glob map prims aliases str =
             let mid = Ident.create_local "include" in
             let mid_duid = Lambda.debug_uid_none in
             let loc = of_location ~scopes incl.incl_loc in
+            let incl_repr =
+              module_representation_of_signature incl.incl_type
+            in
             let rec store_idents pos = function
               | [] -> transl_store
                         ~scopes rootpath (add_idents true ids subst) cont rem
@@ -1587,7 +1593,7 @@ let transl_store_structure ~scopes glob map prims aliases str =
                   (* CR sspies: Can we find a better [debug_uid] here? *)
                   Llet(Alias, Lambda.layout_module_field, id, id_duid,
                       (* CR jrayman: [mod_field] is wrong *)
-                      Lprim(mod_field pos (Module_value_only (-1)), [Lvar mid],
+                      Lprim(mod_field pos incl_repr, [Lvar mid],
                                                  loc),
                        Lsequence(store_ident loc id,
                                  store_idents (pos + 1) idl))
@@ -2019,12 +2025,15 @@ let transl_toplevel_item ~scopes item =
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
+      let incl_repr =
+        module_representation_of_signature incl.incl_type
+      in
       let rec set_idents pos = function
         [] ->
           lambda_unit
       | id :: ids ->
           Lsequence(toploop_setvalue id
-                      (Lprim(mod_field pos (Module_value_only (-1)),
+                      (Lprim(mod_field pos incl_repr,
                         [Lvar mid], Loc_unknown)),
                     set_idents (pos + 1) ids) in
       Llet(Strict, Lambda.layout_module, mid, mid_duid, modl, set_idents 0 ids)
