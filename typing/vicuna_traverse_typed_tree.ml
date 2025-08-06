@@ -137,6 +137,7 @@ let classify env ty : classification =
              causing some .cmi files to be unavailable.
              Maybe we should emit a warning. *)
           Any)
+    | Tquote _ | Tsplice _ -> Addr
     | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ -> Addr
     | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       (* None of these should occur in the arguments to an external function. *)
@@ -247,6 +248,7 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     if Btype.tvariant_not_immediate row then Or (Imm, Block None) else Imm
   | Tarrow _ -> Closure
   | Tobject _ -> Obj
+  | Tquote _ | Tsplice _ -> Imm
   | Tvar _ | Tunivar _ -> (
     if cannot_proceed ()
     then Value

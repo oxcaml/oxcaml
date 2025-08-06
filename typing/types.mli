@@ -223,6 +223,12 @@ and type_desc =
   | Tfield of string * field_kind * type_expr * type_expr
   (** [Tfield ("foo", field_public, t, ts)] ==> [<...; foo : t; ts>] *)
 
+  | Tquote of type_expr
+  (** [Tquote t] ==> [<[ t ]>] *)
+
+  | Tsplice of type_expr
+  (** [Tsplice t] ==> [$t] *)
+
   | Tnil
   (** [Tnil] ==> [<...; >] *)
 

@@ -50,6 +50,7 @@ and ident_string = ident_create "string"
 and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
 and ident_lexing_position = ident_create "lexing_position"
+and ident_code = ident_create "expr"
 
 and ident_or_null = ident_create "or_null"
 
@@ -94,6 +95,7 @@ and path_string = Pident ident_string
 and path_extension_constructor = Pident ident_extension_constructor
 and path_floatarray = Pident ident_floatarray
 and path_lexing_position = Pident ident_lexing_position
+and path_code = Pident ident_code
 
 and path_or_null = Pident ident_or_null
 
@@ -166,6 +168,7 @@ and type_extension_constructor =
       newgenty (Tconstr(path_extension_constructor, [], ref Mnil))
 and type_floatarray = newgenty (Tconstr(path_floatarray, [], ref Mnil))
 and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil))
+and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
@@ -493,7 +496,7 @@ let build_initial_env add_type add_extension empty_env =
        ~jkind:Jkind.Const.Builtin.immediate
   |> add_type ident_char ~jkind:Jkind.Const.Builtin.immediate
   |> add_type_with_jkind ident_exn ~kind:Type_open
-    ~jkind:(Jkind.for_non_float ~why:(Primitive ident_exn))
+       ~jkind:(Jkind.for_non_float ~why:(Primitive ident_exn))
   |> add_type ident_extension_constructor ~jkind:Jkind.Const.Builtin.immutable_data
   |> add_type_with_jkind ident_float ~jkind:(Jkind.for_float ident_float)
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_float
@@ -573,6 +576,14 @@ let build_initial_env add_type add_extension empty_env =
          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_int |>
          add_with_bounds ~modality:Mode.Modality.Value.Const.id ~type_expr:type_string)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
+  |> add_type1 ident_code
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~jkind:(fun param ->
+         Jkind.Builtin.immutable_data ~why:Tquote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Value.Const.id
+             ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])
