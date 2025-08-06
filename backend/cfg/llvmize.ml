@@ -744,6 +744,7 @@ module F = struct
     (* Do the thing *)
     let res_ident = call_func args res_type in
     (* Unpack return values (is it possible to have multiple?) *)
+    (* CR yusumez: Handle function arguments + returns uniformly with OCaml calls *)
     Array.iteri
       (fun idx reg ->
         let temp = fresh_ident t in
