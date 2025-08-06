@@ -35,7 +35,8 @@ module Extra_param_and_args : sig
       args : EPA.Extra_arg.t Apply_cont_rewrite_id.Map.t
     }
 
-  val create : name:string -> debug_uid:Flambda_debug_uid.t -> t
+  val create :
+    name:string -> debug_uid:Flambda_debug_uid.t -> Flambda_kind.t -> t
 
   val update_param_args : t -> Apply_cont_rewrite_id.t -> EPA.Extra_arg.t -> t
 end

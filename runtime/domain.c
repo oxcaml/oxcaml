@@ -661,6 +661,13 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     goto init_memprof_failure;
   }
 
+  CAMLassert(domain_state->dynamic_bindings == NULL);
+  domain_state->dynamic_bindings =
+    caml_dynamic_new_thread(parent ? parent->dynamic_bindings : NULL);
+  if (!domain_state->dynamic_bindings) {
+    goto init_dynamic_failure;
+  }
+
   CAMLassert(!interruptor_has_pending(s));
 
   domain_state->allocated_dependent_bytes = 0;
@@ -786,6 +793,9 @@ init_shared_heap_failure:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
 alloc_minor_tables_failure:
+  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  domain_state->dynamic_bindings = NULL;
+init_dynamic_failure:
   caml_memprof_delete_domain(domain_state);
 init_memprof_failure:
   domain_self = NULL;
@@ -1795,6 +1805,19 @@ void caml_interrupt_all_signal_safe(void)
     /* Early exit: if the current domain was never initialized, then
        neither have been any of the remaining ones. */
     if (interrupt_word == NULL) return;
+    interrupt_domain(&d->interruptor);
+  }
+}
+
+void caml_external_interrupt_all_signal_safe(uintnat flags)
+{
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains];
+       d++) {
+    atomic_uintnat * interrupt_word =
+      atomic_load_acquire(&d->interruptor.interrupt_word);
+    if (interrupt_word == NULL) return;
+    atomic_fetch_or(&d->state->requested_external_interrupt, flags);
     interrupt_domain(&d->interruptor);
   }
 }

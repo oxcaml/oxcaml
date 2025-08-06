@@ -1,0 +1,22 @@
+Test 1: void in closures
+Test 2: partial applications
+Test 3: over application
+Test 4: products of void
+Test 5: products with void and non-void
+Test 6: variants containing only void
+Test 7: records containing void
+Test 8: exceptions with void
+Test 9: void to left of semicolon
+Test 10: complex void patterns
+Test 11: void in recursive functions
+Test 12: void with references
+Test 13: void with lazy values
+Test 14: closures over void-void unboxed products
+Test 15: closures over void-int-void unboxed products
+Test 16: closures over variants containing only void
+Test 17: void in local closures
+Test 18: Obj.tag of records containing void
+  Obj.tag of record with void: 0
+  Obj.tag of record with multiple voids: 0
+  Obj.tag of variant containing record with void: 0
+All tests passed.

@@ -1,0 +1,48 @@
+Database:
+  marked
+  ======
+  marked(node:1).
+  
+  edge
+  ====
+  edge(node:1, node:2).
+  edge(node:2, node:5).
+  edge(node:3, node:2).
+  edge(node:4, node:2).
+  edge(node:4, node:4).
+  edge(node:5, node:4).
+
+Marked nodes:
+  - node:1
+  
+Successors of node:1 (with cursor):
+  (node:2)
+
+Successors of node:1 (direct access):
+  (node:2)
+
+Successors of node:2 (parameterized):
+  (node:5)
+
+Predecessors of node:2 (parameterized):
+  - node:1
+  - node:3
+  - node:4
+  
+Database after schedule:
+  marked
+  ======
+  marked(node:1).
+  marked(node:2).
+  marked(node:4).
+  marked(node:5).
+  
+  edge
+  ====
+  edge(node:1, node:2).
+  edge(node:2, node:5).
+  edge(node:3, node:2).
+  edge(node:4, node:2).
+  edge(node:4, node:4).
+  edge(node:5, node:4).
+

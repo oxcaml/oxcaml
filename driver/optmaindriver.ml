@@ -61,6 +61,16 @@ let main unix argv ppf ~flambda2 =
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
     Compmisc.read_clflags_from_env ();
+    (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
+       enabled *)
+    if Config.oxcaml_dwarf && 
+       !Clflags.dwarf_fission = Clflags.Fission_none &&
+       Target_system.is_macos () then
+      Clflags.dwarf_fission := Clflags.Fission_dsymutil;
+    (* Set up DWARF compression for C compiler invocations *)
+    if !Clflags.debug && !Clflags.native_code then
+      Clflags.dwarf_c_toolchain_flag := 
+        Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";

@@ -121,7 +121,7 @@ let split_direct_over_application apply
     List.compare_length_with remaining_args
       (Flambda_arity.cardinal_unarized remaining_arity)
     = 0);
-  let func_var = Variable.create "full_apply" in
+  let func_var = Variable.create "full_apply" K.value in
   let func_var_duid = Flambda_debug_uid.none in
   let result_mode = Code_metadata.result_mode callee's_code_metadata in
   let outer_apply_alloc_mode = apply_alloc_mode in
@@ -139,8 +139,8 @@ let split_direct_over_application apply
     | Alloc_local -> (
       match apply_alloc_mode with
       | Heap ->
-        let region = Variable.create "over_app_region" in
-        let ghost_region = Variable.create "over_app_ghost_region" in
+        let region = Variable.create "over_app_region" K.region in
+        let ghost_region = Variable.create "over_app_ghost_region" K.region in
         ( Some (region, ghost_region, Continuation.create ()),
           Alloc_mode.For_applications.local ~region ~ghost_region )
       | Local _ -> None, apply_alloc_mode)
@@ -186,7 +186,9 @@ let split_direct_over_application apply
       let over_application_results =
         List.mapi
           (fun i kind ->
-            let result_var = Variable.create ("result" ^ string_of_int i) in
+            let result_var =
+              Variable.create ("result" ^ string_of_int i) (KS.kind kind)
+            in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
           (Flambda_arity.unarized_components (Apply.return_arity apply))
@@ -208,15 +210,17 @@ let split_direct_over_application apply
       let handler_expr =
         Let.create
           (Bound_pattern.singleton
-             (Bound_var.create (Variable.create "unit") Flambda_debug_uid.none
-                Name_mode.normal))
+             (Bound_var.create
+                (Variable.create "unit" K.value)
+                Flambda_debug_uid.none Name_mode.normal))
           (Named.create_prim
              (Unary (End_region { ghost = false }, Simple.var region))
              (Apply.dbg apply))
           ~body:
             (Let.create
                (Bound_pattern.singleton
-                  (Bound_var.create (Variable.create "unit")
+                  (Bound_var.create
+                     (Variable.create "unit" K.value)
                      Flambda_debug_uid.none Name_mode.normal))
                (Named.create_prim
                   (Unary (End_region { ghost = true }, Simple.var ghost_region))
@@ -257,7 +261,7 @@ let split_direct_over_application apply
           (List.map
              (fun kind ->
                Bound_parameter.create
-                 (Variable.create "over_app_result")
+                 (Variable.create "over_app_result" (KS.kind kind))
                  kind Flambda_debug_uid.none)
              (Flambda_arity.unarized_components full_apply_result_arity))
       in

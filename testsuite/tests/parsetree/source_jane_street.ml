@@ -123,7 +123,7 @@ Uncaught exception: Misc.Fatal_error
 *)
 
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod separable
 type t3 : value_or_null
 type t4 : value
 type t5 : void
@@ -137,7 +137,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -927,7 +927,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)

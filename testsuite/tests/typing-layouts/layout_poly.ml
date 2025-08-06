@@ -640,34 +640,34 @@ let f (): int32# M_any.t r = id (assert false : int32# M_any.t r) *)
 (********************************************)
 (* Some primitives require layout_poly to work *)
 
-type ('a : any_non_null) t = 'a array
-external id : ('a : any_non_null). 'a t -> int = "%array_length"
+type ('a : any mod separable) t = 'a array
+external id : ('a : any mod separable). 'a t -> int = "%array_length"
 let id' x = id x
 
 [%%expect{|
-type ('a : any_non_null) t = 'a array
-Line 2, characters 14-46:
-2 | external id : ('a : any_non_null). 'a t -> int = "%array_length"
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type ('a : any mod separable) t = 'a array
+Line 2, characters 14-51:
+2 | external id : ('a : any mod separable). 'a t -> int = "%array_length"
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive "%array_length" doesn't work well with type variables of
        layout any. Consider using "[@layout_poly]".
 |}]
 
-external[@layout_poly] id : ('a : any_non_null). 'a t -> int = "%array_length"
+external[@layout_poly] id : ('a : any mod separable). 'a t -> int = "%array_length"
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any_non_null). 'a t -> int = "%array_length"
+external id : ('a : any mod separable). 'a t -> int = "%array_length"
   [@@layout_poly]
-val id' : 'a t -> int = <fun>
+val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
 |}]
 
-external id : ('a : any_non_null). 'a t -> int = "%identity"
+external id : ('a : any mod separable). 'a t -> int = "%identity"
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any_non_null). 'a t -> int = "%identity"
-val id' : 'a t -> int = <fun>
+external id : ('a : any mod separable). 'a t -> int = "%identity"
+val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
 |}]
 
 
@@ -715,34 +715,70 @@ Error: "[@layout_poly]" on this external declaration has no
 (*********************************************)
 (* Tuple array prims no longer gated to beta *)
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array =
   "%makearray_dynamic"
 [%%expect{|
-external makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array
+external makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit :
-  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit =
+  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit =
   "%arrayblit"
 [%%expect{|
 external arrayblit :
-  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit
+  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit
   = "%arrayblit" [@@layout_poly]
 |}]
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a array =
   "%makearray_dynamic_uninit"
 [%%expect{|
-external makearray_dynamic : ('a : any_non_null). int -> 'a array
+external makearray_dynamic : ('a : any mod separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit_src_immut :
-  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit =
+  ('a : any mod separable). 'a iarray -> int -> 'a array -> int -> int -> unit =
   "%arrayblit_src_immut"
 [%%expect{|
 external arrayblit_src_immut :
-  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit
+  ('a : any mod separable).
+    'a iarray -> int -> 'a array -> int -> int -> unit
   = "%arrayblit_src_immut" [@@layout_poly]
+|}]
+
+(** [@@layout_poly] handles [mod] constraints correctly. *)
+
+type ('a : any mod separable portable contended) t = 'a array
+external[@layout_poly] restricted : ('a : any mod separable portable contended).
+  'a t -> int = "%array_length"
+
+[%%expect{|
+type ('a : any mod contended portable separable) t = 'a array
+external restricted :
+  ('a : any mod contended portable separable). 'a t -> int = "%array_length"
+  [@@layout_poly]
+|}]
+
+let succeeds = restricted [| "a"; "bc" |]
+
+[%%expect{|
+val succeeds : int = 2
+|}]
+
+let fails = restricted [| fun () -> "no" |]
+
+[%%expect{|
+Line 1, characters 26-40:
+1 | let fails = restricted [| fun () -> "no" |]
+                              ^^^^^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value mod aliased immutable non_float
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of
+           value_or_null mod contended portable separable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]

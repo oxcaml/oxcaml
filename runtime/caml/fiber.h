@@ -67,6 +67,11 @@ struct stack_info {
   intnat local_sp;
   void* local_top;
   intnat local_limit;
+
+  /* Temporary dynamic binding, applying only in this fiber */
+  /* TODO: Consider making this a table of bindings */
+  value dyn;
+  value val;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -74,7 +79,7 @@ struct stack_info {
 #define Stack_base(stk) ((value*)(((char*) (stk)) + 2 * caml_plat_pagesize))
 // We can assume that mmap returns page-aligned addresses.
 #define Protected_stack_page(block) (((char*) (block)) + caml_plat_pagesize)
-#else 
+#else
 #define Stack_base(stk) ((value*)(stk + 1))
 #endif
 
@@ -281,7 +286,9 @@ void caml_scan_stack(
   struct stack_info* stack, value* v_gc_regs);
 
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
-                                          value hexn, value heff, int64_t id);
+                                          value hexn, value heff,
+                                          value dyn, value bind,
+                                          int64_t id);
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
@@ -326,6 +333,53 @@ CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 
 value caml_make_unhandled_effect_exn (value effect);
+
+
+/* We support "dynamic variables", whose value may be set in
+   three ways:
+
+   - the "initial" value, specified when the `Dynamic.t` is
+     created (with `caml_dymamic_make`);
+   - any per-thread "root" value, set with `caml_dynamic_set_root`;
+   - a "temporary" value, optionally set when a fiber is created
+     (passed to `caml_alloc_stack`).
+
+   These are in reverse order of precedence for the value read from a
+   dynamic variable (by `caml_dynamic_get`):
+
+   - First any temporary value; then
+   - any per-thread root value (including any inherited from a parent thread);
+   - finally. the initial value.
+
+   The per-thread "root" values, and a cache of looked-up values, are
+   stored in a per-thread dynamic context structure, That is
+   abstracted as a one-word (pointer) `dynamic_thread_t` value. The
+   current dynamic context is in `Caml_state->dynamic_bindings`. The
+   API here provides the rest of the runtime with all the necessary
+   operations on these (otherwise abstract) values. */
+
+typedef struct dynamic_thread_s *dynamic_thread_t;
+
+/* Create a new dynamic context, for a new thread. `parent` is NULL
+ * for the first thread; otherwise is the parent's context (from which
+ * per-thread root bindings are inherited). */
+extern dynamic_thread_t caml_dynamic_new_thread(dynamic_thread_t parent);
+
+/* Delete a dynamic context, called when a thread terminates. */
+extern void caml_dynamic_delete_thread(dynamic_thread_t);
+
+/* Switch the "current" dynamic context */
+extern void caml_dynamic_enter_thread(dynamic_thread_t);
+
+/* Flush a dynamic context's cache of binding values. Used when
+ * swtiching fibers. */
+extern void caml_dynamic_flush_thread(dynamic_thread_t);
+
+/* Apply a GC scanning action to the roots in a dynamic context. */
+extern void caml_dynamic_scan_thread_roots(dynamic_thread_t,
+                                           scanning_action,
+                                           scanning_action_flags,
+                                           void *);
 
 #endif /* CAML_INTERNALS */
 

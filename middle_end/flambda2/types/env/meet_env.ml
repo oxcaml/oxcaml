@@ -19,6 +19,8 @@ module TG = Type_grammar
 module TE = Typing_env
 module TEL = Typing_env_level
 
+type t = { typing_env : TE.t } [@@unboxed]
+
 type 'a meet_return_value =
   | Left_input
   | Right_input
@@ -26,10 +28,28 @@ type 'a meet_return_value =
   | New_result of 'a
 
 type meet_type =
-  TE.t ->
+  t ->
   Type_grammar.t ->
   Type_grammar.t ->
-  (Type_grammar.t meet_return_value * TE.t) Or_bottom.t
+  (Type_grammar.t meet_return_value * t) Or_bottom.t
+
+let create typing_env = { typing_env }
+
+let typing_env { typing_env } = typing_env
+
+let with_typing_env { typing_env = _ } typing_env = { typing_env }
+
+let use_meet_env t ~f = typing_env (f (create t))
+
+let use_meet_env_strict t ~f : _ Or_bottom.t =
+  if TE.is_bottom t
+  then Bottom
+  else
+    let t = f (create t) in
+    let tenv = typing_env t in
+    if TE.is_bottom tenv then Bottom else Ok tenv
+
+let map_typing_env t ~f = with_typing_env t (f (typing_env t))
 
 let replace_concrete_equation t name ty =
   match TG.must_be_singleton ty with
@@ -92,15 +112,20 @@ let add_concrete_equation_on_canonical ~raise_on_bottom t simple ty
          [(coerce ty coercion^-1)]. *)
       let ty = TG.apply_coercion ty (Coercion.inverse coercion) in
       (* Note: this will check that the [existing_ty] has the expected kind. *)
-      let existing_ty = TE.find t name (Some (TG.kind ty)) in
+      let existing_ty = TE.find (typing_env t) name (Some (TG.kind ty)) in
       match meet_type t ty existing_ty with
       | Bottom ->
         if raise_on_bottom
         then raise Bottom_equation
-        else TE.replace_equation t name (MTC.bottom (TG.kind ty))
+        else
+          map_typing_env t ~f:(fun t ->
+              TE.replace_equation t name (MTC.bottom (TG.kind ty)))
       | Ok ((Right_input | Both_inputs), env) -> env
-      | Ok (Left_input, env) -> replace_concrete_equation env name ty
-      | Ok (New_result ty', env) -> replace_concrete_equation env name ty')
+      | Ok (Left_input, env) ->
+        map_typing_env env ~f:(fun env -> replace_concrete_equation env name ty)
+      | Ok (New_result ty', env) ->
+        map_typing_env env ~f:(fun env ->
+            replace_concrete_equation env name ty'))
 
 let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
   (* We have demoted [demoted], which used to be canonical, to [canonical] in
@@ -109,7 +134,7 @@ let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
      We now need to record that information in the types structure, and add the
      previous type of [demoted] to [canonical] to ensure we do not lose
      information that was only stored on the type of [demoted]. *)
-  let ty_of_demoted = TE.find t demoted (Some kind) in
+  let ty_of_demoted = TE.find (typing_env t) demoted (Some kind) in
   (if Flambda_features.check_light_invariants ()
   then
     match TG.get_alias_opt ty_of_demoted with
@@ -118,7 +143,10 @@ let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
       Misc.fatal_errorf
         "Expected %a to have a concrete type, not an alias type to %a"
         Name.print demoted Simple.print alias);
-  let t = TE.replace_equation t demoted (TG.alias_type_of kind canonical) in
+  let t =
+    map_typing_env t ~f:(fun t ->
+        TE.replace_equation t demoted (TG.alias_type_of kind canonical))
+  in
   add_concrete_equation_on_canonical ~raise_on_bottom t canonical ty_of_demoted
     ~meet_type
 
@@ -135,14 +163,17 @@ let add_alias_between_canonicals ~raise_on_bottom t kind canonical_element1
   if Simple.equal canonical_element1 canonical_element2
   then t
   else
-    match TE.add_alias t ~canonical_element1 ~canonical_element2 with
+    match
+      TE.add_alias (typing_env t) ~canonical_element1 ~canonical_element2
+    with
     | Bottom -> if raise_on_bottom then raise Bottom_equation else t
     | Unknown ->
       (* Addition of aliases between names that are both in external compilation
          units failed, e.g. due to a missing .cmx file. Simply drop the
          equation. *)
       t
-    | Ok { demoted_name; canonical_element; t } ->
+    | Ok { demoted_name; canonical_element; t = typing_env } ->
+      let t = with_typing_env t typing_env in
       record_demotion ~raise_on_bottom t kind demoted_name canonical_element
         ~meet_type
 
@@ -159,12 +190,16 @@ let add_equation_on_canonical ~raise_on_bottom t simple ty ~meet_type =
   | None ->
     add_concrete_equation_on_canonical ~raise_on_bottom t simple ty ~meet_type
   | Some alias ->
-    let alias = TE.get_canonical_simple_ignoring_name_mode t alias in
+    let alias =
+      TE.get_canonical_simple_ignoring_name_mode (typing_env t) alias
+    in
     add_alias_between_canonicals ~raise_on_bottom t (TG.kind ty) simple alias
       ~meet_type
 
 let add_equation_on_simple ~raise_on_bottom t simple ty ~meet_type =
-  let canonical = TE.get_canonical_simple_ignoring_name_mode t simple in
+  let canonical =
+    TE.get_canonical_simple_ignoring_name_mode (typing_env t) simple
+  in
   add_equation_on_canonical ~raise_on_bottom t canonical ty ~meet_type
 
 let add_equation ~raise_on_bottom t name ty ~meet_type =
@@ -181,40 +216,43 @@ let add_env_extension_with_extra_variables t
     (env_extension : Typing_env_extension.With_extra_variables.t) ~meet_type =
   Typing_env_extension.With_extra_variables.fold
     ~variable:(fun var kind t ->
-      TE.add_variable_definition t var kind Name_mode.in_types)
+      map_typing_env t ~f:(fun t ->
+          TE.add_variable_definition t var kind Name_mode.in_types))
     ~equation:(fun name ty t ->
       try add_equation ~raise_on_bottom:true t name ty ~meet_type
-      with Bottom_equation -> TE.make_bottom t)
+      with Bottom_equation -> map_typing_env ~f:TE.make_bottom t)
     env_extension t
 
-let add_env_extension_from_level t level ~meet_type : TE.t =
+let add_env_extension_from_level t level ~meet_type =
   let t =
-    TEL.fold_on_defined_vars
-      (fun var kind t ->
-        TE.add_variable_definition t var kind Name_mode.in_types)
-      level t
+    map_typing_env t ~f:(fun t ->
+        TEL.fold_on_defined_vars
+          (fun var kind t ->
+            TE.add_variable_definition t var kind Name_mode.in_types)
+          level t)
   in
   let t =
     Name.Map.fold
       (fun name ty t ->
         try add_equation ~raise_on_bottom:true t name ty ~meet_type
-        with Bottom_equation -> TE.make_bottom t)
+        with Bottom_equation -> map_typing_env ~f:TE.make_bottom t)
       (TEL.equations level) t
   in
-  Variable.Map.fold
-    (fun var proj t -> TE.add_symbol_projection t var proj)
-    (TEL.symbol_projections level)
-    t
+  map_typing_env t ~f:(fun t ->
+      Variable.Map.fold
+        (fun var proj t -> TE.add_symbol_projection t var proj)
+        (TEL.symbol_projections level)
+        t)
 
 let add_equation_strict t name ty ~meet_type : _ Or_bottom.t =
-  if TE.is_bottom t
+  if TE.is_bottom (typing_env t)
   then Bottom
   else
     try Ok (add_equation ~raise_on_bottom:true t name ty ~meet_type)
     with Bottom_equation -> Bottom
 
 let add_env_extension_strict t env_extension ~meet_type : _ Or_bottom.t =
-  if TE.is_bottom t
+  if TE.is_bottom (typing_env t)
   then Bottom
   else
     try Ok (add_env_extension ~raise_on_bottom:true t env_extension ~meet_type)
@@ -225,11 +263,11 @@ let add_env_extension_maybe_bottom t env_extension ~meet_type =
 
 let add_equation t name ty ~meet_type =
   try add_equation ~raise_on_bottom:true t name ty ~meet_type
-  with Bottom_equation -> TE.make_bottom t
+  with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
 let add_env_extension t env_extension ~meet_type =
   try add_env_extension ~raise_on_bottom:true t env_extension ~meet_type
-  with Bottom_equation -> TE.make_bottom t
+  with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
 let check_params_and_types ~params ~param_types =
   if Flambda_features.check_invariants ()
@@ -249,3 +287,19 @@ let add_equations_on_params t ~params ~param_types ~meet_type =
     t
     (Bound_parameters.to_list params)
     param_types
+
+let current_scope env = TE.current_scope (typing_env env)
+
+let increment_scope env = map_typing_env env ~f:TE.increment_scope
+
+let add_definition env bound_name kind =
+  map_typing_env env ~f:(fun env -> TE.add_definition env bound_name kind)
+
+let add_symbol_projection env var symbol_projection =
+  map_typing_env env ~f:(fun env ->
+      TE.add_symbol_projection env var symbol_projection)
+
+let cut env ~cut_after = TE.cut (typing_env env) ~cut_after
+
+let cut_as_extension env ~cut_after =
+  TE.cut_as_extension (typing_env env) ~cut_after

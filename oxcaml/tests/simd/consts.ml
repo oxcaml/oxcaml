@@ -3,42 +3,6 @@ open Utils
 
 [@@@ocaml.warning "-unused-module"]
 
-external int64x2_low_int64 : int64x2 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
-
-external int64x2_high_int64 : int64x2 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
-
-external int32x4_low_int64 : int32x4 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
-
-external int32x4_high_int64 : int32x4 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
-
-external int16x8_low_int64 : int16x8 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
-
-external int16x8_high_int64 : int16x8 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
-
-external int8x16_low_int64 : int8x16 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
-
-external int8x16_high_int64 : int8x16 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
-
-external float32x4_low_int64 : float32x4 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
-
-external float32x4_high_int64 : float32x4 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
-
-external float64x2_low_int64 : float64x2 -> int64 = "" "vec128_low_int64"
-  [@@noalloc] [@@unboxed]
-
-external float64x2_high_int64 : float64x2 -> int64 = "" "vec128_high_int64"
-  [@@noalloc] [@@unboxed]
-
 module Float32x4 = struct
   type t = float32x4
 

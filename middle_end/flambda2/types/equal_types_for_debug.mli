@@ -24,7 +24,12 @@
    {b Note}: The functions operating on levels treat all variables defined by
    the levels as existentials. *)
 
+type config
+
+val create_config : ?ignore_alloc_mode:bool -> unit -> config
+
 val equal_type :
+  ?config:config ->
   meet_type:Meet_env.meet_type ->
   Typing_env.t ->
   Type_grammar.t ->
@@ -32,6 +37,7 @@ val equal_type :
   bool
 
 val equal_env_extension :
+  ?config:config ->
   meet_type:Meet_env.meet_type ->
   Typing_env.t ->
   Typing_env_extension.t ->
@@ -39,6 +45,7 @@ val equal_env_extension :
   bool
 
 val names_with_non_equal_types_env_extension :
+  ?config:config ->
   meet_type:Meet_env.meet_type ->
   Typing_env.t ->
   Typing_env_extension.t ->
@@ -46,6 +53,7 @@ val names_with_non_equal_types_env_extension :
   Name.Set.t
 
 val equal_level_ignoring_name_mode :
+  ?config:config ->
   meet_type:Meet_env.meet_type ->
   Typing_env.t ->
   Typing_env_level.t ->
@@ -53,6 +61,7 @@ val equal_level_ignoring_name_mode :
   bool
 
 val names_with_non_equal_types_level_ignoring_name_mode :
+  ?config:config ->
   meet_type:Meet_env.meet_type ->
   Typing_env.t ->
   Typing_env_level.t ->

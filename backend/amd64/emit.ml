@@ -43,11 +43,52 @@ module D = Asm_targets.Asm_directives
 module S = Asm_targets.Asm_symbol
 module L = Asm_targets.Asm_label
 
+(* Name of current function *)
+let function_name = ref ""
+
+(* Keep the name of the current block section to get back to it after emitting
+   data. *)
+let current_basic_block_section = ref ""
+
 module I = struct
   include I
 
-  let simd simd args =
-    Arch.Extension.require_instruction simd;
+  exception Extension_disabled of string
+
+  let () =
+    Printexc.register_printer (function
+      | Extension_disabled msg -> Some ("extension disabled: " ^ msg)
+      | _ -> None)
+
+  let require_vec256 () =
+    if not (Arch.Extension.enabled_vec256 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 256-bit register whilst emitting %s, but AVX is not \
+               enabled."
+              !function_name))
+
+  let require_vec512 () =
+    if not (Arch.Extension.enabled_vec512 ())
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found 512-bit register whilst emitting %s, but AVX512F is not \
+               enabled."
+              !function_name))
+
+  let simd (simd : Simd_instrs.instr) args =
+    if not (Arch.Extension.enabled_instruction simd)
+    then
+      raise
+        (Extension_disabled
+           (Printf.sprintf
+              "found '%s' whilst emitting %s, but %s is not enabled."
+              simd.mnemonic !function_name
+              (Amd64_simd_defs.exts_to_string simd.ext)));
     I.simd simd args
 end
 
@@ -80,10 +121,10 @@ let register_name typ r : X86_ast.arg =
   | Int | Val | Addr -> Reg64 int_reg_name.(r)
   | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     Regf ymm_reg_name.(r - 100)
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     Regf zmm_reg_name.(r - 100)
 
 let phys_rax = phys_reg Int 0
@@ -299,13 +340,6 @@ let emit_named_text_section ?(suffix = "") func_name =
       D.unsafe_set_internal_section_ref Text)
   else D.text ()
 
-(* Name of current function *)
-let function_name = ref ""
-
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
-
 let emit_function_or_basic_block_section_name () =
   let suffix =
     if String.length !current_basic_block_section = 0
@@ -337,10 +371,10 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
   | Float -> REAL8
   | Vec128 -> VEC128
   | Vec256 ->
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     VEC256
   | Vec512 ->
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
   | Int | Addr | Val -> QWORD
@@ -444,11 +478,11 @@ let must_save_simd_regs live =
     live;
   if !v512
   then (
-    Arch.Extension.require_vec512 ();
+    I.require_vec512 ();
     Save_zmm)
   else if !v256
   then (
-    Arch.Extension.require_vec256 ();
+    I.require_vec256 ();
     Save_ymm)
   else Save_xmm
 
@@ -1210,6 +1244,7 @@ module Address_sanitizer : sig
   (** Implements [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping]. *)
   val emit_sanitize :
     ?dependencies:X86_ast.arg array ->
+    instr:instruction ->
     address:X86_ast.arg ->
     Cmm.memory_chunk ->
     memory_access ->
@@ -1258,21 +1293,28 @@ end = struct
       | I64 | I128 | I256 | I512 -> false
   end
 
-  let mov_address src dest =
-    match (src : X86_ast.arg) with
-    | Mem
-        { scale = 1;
-          base = None;
-          sym = None;
-          displ = 0;
-          idx;
-          arch = _;
-          typ = _
-        } ->
+  let mov_address ~offset src dest =
+    match (src : X86_ast.arg), offset with
+    | ( Mem
+          { scale = 1;
+            base = None;
+            sym = None;
+            displ = 0;
+            idx;
+            arch = _;
+            typ = _
+          },
+        0 ) ->
       I.mov (Reg64 idx) dest
-    | Mem _ | Mem64_RIP _ | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _
-    | Reg32 _ | Reg64 _ | Regf _ ->
-      I.lea src dest
+    | Mem mem, offset ->
+      I.lea (Mem { mem with displ = mem.displ + offset }) dest
+    | Mem64_RIP (ty, sym, displ), offset ->
+      I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
+    | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+        | Regf _ ),
+        offset ) ->
+      I.lea src dest;
+      if offset <> 0 then I.add (int offset) dest
 
   let[@inline always] is_stack_16_byte_aligned () =
     (* Yes, sadly this does result in materially better assembly than
@@ -1280,7 +1322,8 @@ end = struct
        https://github.com/oxcaml/oxcaml/issues/2187 *)
     !stack_offset land 15 = 0
 
-  let asan_report_function memory_chunk_size memory_access : X86_ast.arg =
+  let asan_report_function simd_regs memory_chunk_size memory_access :
+      X86_ast.arg =
     let chunk_size = Memory_chunk_size.to_bytes_log2 memory_chunk_size in
     let access =
       match memory_access with
@@ -1290,24 +1333,58 @@ end = struct
     let index = (chunk_size lsl 1) + access in
     (* We take extra care to structure our code such that these are statically
        allocated as manifest constants in a flat array. *)
-    match index with
-    | 0 -> Sym "caml_asan_report_load1_noabort"
-    | 1 -> Sym "caml_asan_report_store1_noabort"
-    | 2 -> Sym "caml_asan_report_load2_noabort"
-    | 3 -> Sym "caml_asan_report_store2_noabort"
-    | 4 -> Sym "caml_asan_report_load4_noabort"
-    | 5 -> Sym "caml_asan_report_store4_noabort"
-    | 6 -> Sym "caml_asan_report_load8_noabort"
-    | 7 -> Sym "caml_asan_report_store8_noabort"
-    | 8 -> Sym "caml_asan_report_load16_noabort"
-    | 9 -> Sym "caml_asan_report_store16_noabort"
-    | _ ->
-      (* CR-soon mslater: this is wrong, 32/64-byte operations should be routed
-         to [__asan_report_load_n_noabort]. Also, unaligned 16-byte operations
-         need a second check that the last byte's address is valid. *)
-      if access = 0
-      then Sym "caml_asan_report_load16_noabort"
-      else Sym "caml_asan_report_store16_noabort"
+    match simd_regs with
+    | Save_xmm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort"
+      | 1 -> Sym "caml_asan_report_store1_noabort"
+      | 2 -> Sym "caml_asan_report_load2_noabort"
+      | 3 -> Sym "caml_asan_report_store2_noabort"
+      | 4 -> Sym "caml_asan_report_load4_noabort"
+      | 5 -> Sym "caml_asan_report_store4_noabort"
+      | 6 -> Sym "caml_asan_report_load8_noabort"
+      | 7 -> Sym "caml_asan_report_store8_noabort"
+      | 8 -> Sym "caml_asan_report_load16_noabort"
+      | 9 -> Sym "caml_asan_report_store16_noabort"
+      | 10 -> Sym "caml_asan_report_load32_noabort"
+      | 11 -> Sym "caml_asan_report_store32_noabort"
+      | 12 -> Sym "caml_asan_report_load64_noabort"
+      | 13 -> Sym "caml_asan_report_store64_noabort"
+      | _ -> assert false)
+    | Save_ymm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort_avx"
+      | 1 -> Sym "caml_asan_report_store1_noabort_avx"
+      | 2 -> Sym "caml_asan_report_load2_noabort_avx"
+      | 3 -> Sym "caml_asan_report_store2_noabort_avx"
+      | 4 -> Sym "caml_asan_report_load4_noabort_avx"
+      | 5 -> Sym "caml_asan_report_store4_noabort_avx"
+      | 6 -> Sym "caml_asan_report_load8_noabort_avx"
+      | 7 -> Sym "caml_asan_report_store8_noabort_avx"
+      | 8 -> Sym "caml_asan_report_load16_noabort_avx"
+      | 9 -> Sym "caml_asan_report_store16_noabort_avx"
+      | 10 -> Sym "caml_asan_report_load32_noabort_avx"
+      | 11 -> Sym "caml_asan_report_store32_noabort_avx"
+      | 12 -> Sym "caml_asan_report_load64_noabort_avx"
+      | 13 -> Sym "caml_asan_report_store64_noabort_avx"
+      | _ -> assert false)
+    | Save_zmm -> (
+      match index with
+      | 0 -> Sym "caml_asan_report_load1_noabort_avx512"
+      | 1 -> Sym "caml_asan_report_store1_noabort_avx512"
+      | 2 -> Sym "caml_asan_report_load2_noabort_avx512"
+      | 3 -> Sym "caml_asan_report_store2_noabort_avx512"
+      | 4 -> Sym "caml_asan_report_load4_noabort_avx512"
+      | 5 -> Sym "caml_asan_report_store4_noabort_avx512"
+      | 6 -> Sym "caml_asan_report_load8_noabort_avx512"
+      | 7 -> Sym "caml_asan_report_store8_noabort_avx512"
+      | 8 -> Sym "caml_asan_report_load16_noabort_avx512"
+      | 9 -> Sym "caml_asan_report_store16_noabort_avx512"
+      | 10 -> Sym "caml_asan_report_load32_noabort_avx512"
+      | 11 -> Sym "caml_asan_report_store32_noabort_avx512"
+      | 12 -> Sym "caml_asan_report_load64_noabort_avx512"
+      | 13 -> Sym "caml_asan_report_store64_noabort_avx512"
+      | _ -> assert false)
 
   (* CR-soon ksvetlitski: find a way to accomplish this without breaking the
      abstraction barrier of [X86_ast]. *)
@@ -1326,8 +1403,8 @@ end = struct
      [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#mapping].
      I'd recommend reading that first for reference before touching this
      function. *)
-  let emit_sanitize ?(dependencies = [||]) ~address
-      (memory_chunk : Cmm.memory_chunk) (memory_access : memory_access) =
+  let emit_shadow_check ?(dependencies = [||]) ?(offset = 0) ~address ~report
+      (memory_chunk : Cmm.memory_chunk) =
     let[@inline always] need_to_save_register register =
       uses_register register address
       || Array.exists (uses_register register) dependencies
@@ -1343,7 +1420,7 @@ end = struct
        You could do this at the end of the prologue if you wanted to; the point
        is just that you have to do this before you modify the contents of any
        registers (other than [rsp]). *)
-    mov_address address rdi;
+    mov_address ~offset address rdi;
     let need_to_save_r11 = need_to_save_register R11 in
     if need_to_save_r11 then push r11;
     let need_to_save_r10 =
@@ -1391,12 +1468,13 @@ end = struct
         (* [push rax] is a single-byte instruction, as opposed to something like
            [push 0] which is a 2-byte instruction. *)
         push rax;
-      (* The asan report wrappers use a special calling convention via the C
-         attribute [__attribute__((preserve_all))] so that all registers except
-         for [r11] (which is clobbered) are callee-saved, in order to minimize
-         the amount of spilling we have to do here. [address] is already in
-         [rdi], and this function accepts just a single argument. *)
-      I.call (asan_report_function memory_chunk_size memory_access);
+      (* Pass base address to report function. *)
+      if offset <> 0 then I.add (int (-offset)) rdi;
+      (* The asan report wrappers preserve all registers except for [r11] (which
+         is clobbered), in order to minimize the amount of spilling we have to
+         do here. [address] is already in [rdi], and this function accepts just
+         a single argument. *)
+      I.call report;
       if need_to_align_stack then pop rax
     in
     D.define_label asan_check_succeded_label;
@@ -1404,8 +1482,8 @@ end = struct
     if need_to_save_r11 then pop r11;
     if need_to_save_rdi then pop rdi
 
-  let[@inline always] emit_sanitize ?dependencies ~address memory_chunk
-      memory_access =
+  let[@inline always] emit_sanitize ?dependencies ~instr ~address
+      (memory_chunk : Cmm.memory_chunk) memory_access =
     (* Checking [Config.with_address_sanitizer] is redundant, but we do it
        because it's a compile-time constant, so it enables the compiler to
        completely optimize-out the AddressSanitizer code when the compiler was
@@ -1417,8 +1495,30 @@ end = struct
          on the grounds that the backing memory for freshly allocated records is
          provided directly by the runtime and guaranteed to be safe to use. *)
       | Store_initialize -> ()
-      | Load | Store_modify ->
-        emit_sanitize ?dependencies ~address memory_chunk memory_access
+      | Load | Store_modify -> (
+        let report =
+          asan_report_function
+            (must_save_simd_regs instr.live)
+            (Memory_chunk_size.of_memory_chunk memory_chunk)
+            memory_access
+        in
+        match memory_chunk with
+        | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
+        | Double | Onetwentyeight_aligned ->
+          emit_shadow_check ?dependencies ~address ~report memory_chunk
+        | Onetwentyeight_unaligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:15 ~address ~report
+            Byte_unsigned
+        | Twofiftysix_unaligned | Twofiftysix_aligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:31 ~address ~report
+            Byte_unsigned
+        | Fivetwelve_unaligned | Fivetwelve_aligned ->
+          emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
+          emit_shadow_check ?dependencies ~offset:63 ~address ~report
+            Byte_unsigned)
 end
 
 let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
@@ -1437,7 +1537,7 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     | Sixtyfour | Word -> X86_ast.QWORD, arg instr src_index
   in
   let dst = addressing addr typ instr first_memory_arg_index in
-  Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address:dst
+  Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr ~address:dst
     Thirtytwo_unsigned Store_modify;
   match op with
   | Fetch_and_add ->
@@ -1474,15 +1574,18 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then movss (arg i 0) (res i 0)
-  | V128_of_v128 -> if distinct then movpd ~unaligned:false (arg i 0) (res i 0)
-  | V256_of_v256 ->
+  | V128_of_vec (Vec128 | Vec256) ->
+    if distinct then movpd ~unaligned:false (argX i 0) (res i 0)
+  | V256_of_vec Vec128 ->
+    if distinct then movpd ~unaligned:false (arg i 0) (resX i 0)
+  | V256_of_vec Vec256 ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct
     then
       if Reg.is_stack i.arg.(0)
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
-  | V512_of_v512 ->
+  | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
   | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
@@ -1634,15 +1737,15 @@ let emit_simd (op : Simd.operation) instr =
       emit_simd_instr seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestz | Vptestz ->
+    | Ptestz | Vptestz_X | Vptestz_Y ->
       emit_simd_instr seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestc | Vptestc ->
+    | Ptestc | Vptestc_X | Vptestc_Y ->
       emit_simd_instr seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
-    | Ptestnzc | Vptestnzc ->
+    | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
       emit_simd_instr seq.instr imm instr;
       I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
@@ -1815,7 +1918,7 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Load { memory_chunk; addressing_mode; _ }) -> (
     let[@inline always] load ~dest data_type instruction =
       let address = addressing addressing_mode data_type i 0 in
-      Address_sanitizer.emit_sanitize ~address memory_chunk Load;
+      Address_sanitizer.emit_sanitize ~address ~instr:i memory_chunk Load;
       instruction address dest
     in
     match memory_chunk with
@@ -1850,8 +1953,8 @@ let emit_instr ~first ~fallthrough i =
     let[@inline always] store data_type arg_func instruction =
       let address = addressing addr data_type i 1 in
       let src = arg_func i 0 in
-      Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address chunk
-        memory_access;
+      Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
+        chunk memory_access;
       instruction src address
     in
     match chunk with
@@ -1872,8 +1975,8 @@ let emit_instr ~first ~fallthrough i =
       let src = arg i 0 in
       sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
       let address = addressing addr REAL4 i 1 in
-      Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~address
-        chunk memory_access;
+      Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
+        ~address chunk memory_access;
       movss xmm15 address
     | Single { reg = Float32 } -> store REAL4 arg movss
     | Double -> store REAL8 arg movsd)
@@ -1883,8 +1986,8 @@ let emit_instr ~first ~fallthrough i =
     let memory_access : Address_sanitizer.memory_access =
       if is_modify then Store_modify else Store_initialize
     in
-    Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~address Word_int
-      memory_access;
+    Address_sanitizer.emit_sanitize ~dependencies:[| src |] ~instr:i ~address
+      Word_int memory_access;
     I.mov src address
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assert (n <= (Config.max_young_wosize + 1) * Arch.size_addr);
@@ -2039,13 +2142,13 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Specific (Ifloatarithmem (Float64, op, addr))) ->
     let address = addressing addr REAL8 i 1 in
     let dest = res i 0 in
-    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address Double
-      Load;
+    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~instr:i ~address
+      Double Load;
     instr_for_floatarithmem Float64 op (arg i 0) address dest
   | Lop (Specific (Ifloatarithmem (Float32, op, addr))) ->
     let address = addressing addr REAL4 i 1 in
     let dest = res i 0 in
-    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~address
+    Address_sanitizer.emit_sanitize ~dependencies:[| dest |] ~instr:i ~address
       (Single { reg = Float32 })
       Load;
     instr_for_floatarithmem Float32 op (arg i 0) address dest
@@ -2062,7 +2165,7 @@ let emit_instr ~first ~fallthrough i =
        to do this earlier, based on previous experience with similar things, but
        maybe the change should be left for later. mshinwell: The current
        situation is fine for now. *)
-    if Arch.Extension.enabled LZCNT
+    if Arch.Extension.enabled BMI
     then I.lzcnt (arg i 0) (res i 0)
     else if arg_is_non_zero
     then (
@@ -2147,7 +2250,7 @@ let emit_instr ~first ~fallthrough i =
     let address = addressing addressing_mode VEC128 i 1 in
     Address_sanitizer.emit_sanitize
       ~dependencies:[| res i 0 |]
-      ~address Onetwentyeight_unaligned Store_modify;
+      ~instr:i ~address Onetwentyeight_unaligned Store_modify;
     emit_simd_instr_with_memory_arg op i address
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
@@ -2155,7 +2258,7 @@ let emit_instr ~first ~fallthrough i =
     let address = addressing addr QWORD i 0 in
     (* This isn't really a [Load] or a [Store], but it is closer to [Store]
        semantically. *)
-    Address_sanitizer.emit_sanitize ~address Word_val Store_modify;
+    Address_sanitizer.emit_sanitize ~instr:i ~address Word_val Store_modify;
     I.cldemote address
   | Lop (Specific (Iprefetch { is_write; locality; addr })) ->
     let address = addressing addr QWORD i 0 in
@@ -2171,7 +2274,7 @@ let emit_instr ~first ~fallthrough i =
 
        On these grounds I would consider prefetching invalid addresses to
        usually be a bug, and so we do sanitize such accesses. *)
-    Address_sanitizer.emit_sanitize ~address Word_val memory_access;
+    Address_sanitizer.emit_sanitize ~instr:i ~address Word_val memory_access;
     let locality : X86_ast.prefetch_temporal_locality_hint =
       match locality with
       | Nonlocal -> Nta
@@ -2308,8 +2411,9 @@ let emit_instr ~first ~fallthrough i =
       ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~fallthrough i =
-  try emit_instr ~first ~fallthrough i
-  with exn ->
+  try emit_instr ~first ~fallthrough i with
+  | I.Extension_disabled _ as exn -> raise exn
+  | exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
@@ -2323,11 +2427,12 @@ let rec emit_all ~first ~fallthrough i =
   | Lcondbranch3 (_, _, _)
   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
     ->
-    (try emit_instr ~first ~fallthrough i
-     with exn ->
-       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-         Printlinear.instr i;
-       raise exn);
+    (try emit_instr ~first ~fallthrough i with
+    | I.Extension_disabled _ as exn -> raise exn
+    | exn ->
+      Format.eprintf "Exception whilst emitting instruction:@ %a\n"
+        Printlinear.instr i;
+      raise exn);
     emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
 
 let all_functions = ref []

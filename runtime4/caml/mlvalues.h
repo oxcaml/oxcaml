@@ -506,6 +506,19 @@ CAMLextern void caml_Store_double_val (value,double);
 /* Arrays of floating-point numbers. */
 #define Double_array_tag 254
 
+/* Unboxed array tags (for mixed blocks) 
+   These must stay in sync with Cmm_helpers.Unboxed_array_tags */
+#define Unboxed_product_array_tag 0
+#define Unboxed_int64_array_tag 1
+#define Unboxed_int32_array_even_tag 2
+#define Unboxed_int32_array_odd_tag 3
+#define Unboxed_float32_array_even_tag 4
+#define Unboxed_float32_array_odd_tag 5
+#define Unboxed_vec128_array_tag 6
+#define Unboxed_vec256_array_tag 7
+#define Unboxed_vec512_array_tag 8
+#define Unboxed_nativeint_array_tag 9
+
 /* The [_flat_field] macros are for [floatarray] values and float-only records.
 */
 #define Double_flat_field(v,i) Double_val((value)((double *)(v) + (i)))
@@ -622,7 +635,8 @@ CAMLextern value caml_set_oo_id(value obj);
  */
 #define Assert_mixed_block_layout_v1 _Static_assert(0, "")
 #define Assert_mixed_block_layout_v2 _Static_assert(0, "")
-#define Assert_mixed_block_layout_v3 _Static_assert(1, "")
+#define Assert_mixed_block_layout_v3 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v4 _Static_assert(1, "")
 
 /* Header for out-of-heap blocks. */
 

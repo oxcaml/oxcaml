@@ -237,7 +237,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
           List.length
             (Flambda_arity.unarize (Code_metadata.params_arity code_metadata))
         in
-        let always_used = Variable.create "always_used" in
+        let always_used = Variable.create "always_used" Flambda_kind.value in
         Graph.add_use t.deps (Code_id_or_name.var always_used);
         for i = 0 to num_direct_params - 1 do
           Graph.add_coconstructor_dep t.deps
@@ -291,7 +291,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
             code_dep.return;
           Graph.add_constructor_dep t.deps ~from:call_witness Code_of_closure
             ~base:(Code_id_or_name.name name);
-          let untuple_var = Variable.create "untuple_var" in
+          let untuple_var = Variable.create "untuple_var" Flambda_kind.value in
           Graph.add_coconstructor_dep t.deps
             ~from:(Code_id_or_name.var untuple_var)
             (Param (Indirect_code_pointer, 0))
@@ -329,7 +329,7 @@ let record_set_of_closure_deps ~get_code_metadata ~le_monde_exterieur t =
                       ~base:func)
                   code_dep.return
               | _ :: _ ->
-                let v = Variable.create "partial_apply" in
+                let v = Variable.create "partial_apply" Flambda_kind.value in
                 Graph.add_constructor_dep t.deps ~from:(Code_id_or_name.var v)
                   (Apply (Indirect_code_pointer, Normal 0))
                   ~base:func;

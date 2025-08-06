@@ -10,6 +10,26 @@
    (cat "unbox_types.ml" "utils.ml"))))
 
 (rule
+ (targets utils256.ml)
+ (deps unbox_types.ml)
+ (enabled_if
+  (<> %{architecture} "amd64"))
+ (action
+  (with-stdout-to
+   utils256.ml
+   (echo ""))))
+
+(rule
+ (targets utils256_u.ml)
+ (deps unbox_types.ml utils256.ml)
+ (action
+  (with-stdout-to
+   utils256_u.ml
+   (progn
+    (echo "module Utils = Utils_u\n")
+    (cat "utils256.ml")))))
+
+(rule
  (targets builtins_u.ml)
  (deps unbox_types.ml builtins.ml)
  (action
@@ -21,9 +41,13 @@
  (name simd_test_builtins)
  (wrapped false)
  (libraries stdlib_stable stdlib_upstream_compatible)
+ (flags
+  (:standard -extension simd_beta))
  (modules
   utils
   utils_u
+  utils256
+  utils256_u
   float32_reference
   float64_reference
   builtins

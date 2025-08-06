@@ -114,6 +114,7 @@ module type Compiler_options = sig
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit
+  val _llvm_backend : unit -> unit
   val _no_keep_docs : unit -> unit
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit

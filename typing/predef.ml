@@ -476,7 +476,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_array
        ~variance:Variance.full
        ~separability:Separability.Ind
-       ~param_jkind:(Jkind.Builtin.any_non_null ~why:Array_type_argument)
+       ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
@@ -485,7 +485,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_type1 ident_iarray
        ~variance:Variance.covariant
        ~separability:Separability.Ind
-       ~param_jkind:(Jkind.Builtin.any_non_null ~why:Array_type_argument)
+       ~param_jkind:Jkind.for_array_argument
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds
@@ -626,18 +626,6 @@ let add_simd_stable_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float64x2 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
-
-(* CR-soon mslater:
-  Remaining work before these can be moved to stable:
-    - Correct ASAN checks for 32/64 byte memory chunks
-    - Correct TSAN save/restore SIMD registers
-  Not strictly required for stable, but will be necessary:
-    - Align Vec256 stack slots on the OCaml stack
-    - AVX & AVX2 intrinsics (tests: see ops.ml, ocaml_simd_sse)
-*)
-let add_simd_beta_extension_types add_type env =
-  let _, add_type = mk_add_type add_type in
-  env
   |> add_type ident_int8x32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_int16x16 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -650,6 +638,8 @@ let add_simd_beta_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_float64x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
+
+let add_simd_beta_extension_types _add_type env = env
 
 let add_simd_alpha_extension_types add_type env =
   let _, add_type = mk_add_type add_type in

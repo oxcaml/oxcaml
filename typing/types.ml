@@ -18,13 +18,25 @@
 open Allowance
 open Asttypes
 
+type atomic =
+  | Nonatomic
+  | Atomic
+
 type mutability =
   | Immutable
-  | Mutable of Mode.Value.Comonadic.lr
+  | Mutable of
+      { mode : Mode.Value.Comonadic.lr
+      ; atomic : atomic
+      }
 
 let is_mutable = function
   | Immutable -> false
   | Mutable _ -> true
+
+let is_atomic = function
+  | Immutable -> false
+  | Mutable { atomic = Atomic; mode = _ } -> true
+  | Mutable { atomic = Nonatomic; mode = _ } -> false
 
 (** Takes [m0] which is the parameter of [let mutable], returns the
     mode of new values in future writes. *)
@@ -36,7 +48,7 @@ let mutable_mode m0 : _ Mode.Value.t =
 (* Type expressions for the core language *)
 
 module Jkind_mod_bounds = struct
-  module Locality = Mode.Locality.Const
+  module Areality = Mode.Regionality.Const
   module Linearity = Mode.Linearity.Const
   module Uniqueness = Mode.Uniqueness.Const_op
   module Portability = Mode.Portability.Const
@@ -49,7 +61,7 @@ module Jkind_mod_bounds = struct
   module Separability = Jkind_axis.Separability
 
   type t = {
-    locality: Locality.t;
+    areality: Areality.t;
     linearity: Linearity.t;
     uniqueness: Uniqueness.t;
     portability: Portability.t;
@@ -62,7 +74,7 @@ module Jkind_mod_bounds = struct
     separability: Separability.t;
   }
 
-  let[@inline] locality t = t.locality
+  let[@inline] areality t = t.areality
   let[@inline] linearity t = t.linearity
   let[@inline] uniqueness t = t.uniqueness
   let[@inline] portability t = t.portability
@@ -75,7 +87,7 @@ module Jkind_mod_bounds = struct
   let[@inline] separability t = t.separability
 
   let[@inline] create
-      ~locality
+      ~areality
       ~linearity
       ~uniqueness
       ~portability
@@ -87,7 +99,7 @@ module Jkind_mod_bounds = struct
       ~nullability
       ~separability =
     {
-      locality;
+      areality;
       linearity;
       uniqueness;
       portability;
@@ -100,7 +112,7 @@ module Jkind_mod_bounds = struct
       separability;
     }
 
-  let[@inline] set_locality locality t = { t with locality }
+  let[@inline] set_areality areality t = { t with areality }
   let[@inline] set_linearity linearity t = { t with linearity }
   let[@inline] set_uniqueness uniqueness t = { t with uniqueness }
   let[@inline] set_portability portability t = { t with portability }
@@ -116,10 +128,10 @@ module Jkind_mod_bounds = struct
     let open Jkind_axis.Axis_set in
     (* a little optimization *)
     if is_empty max_axes then t else
-    let locality =
+    let areality =
       if mem max_axes (Modal (Comonadic Areality))
-      then Locality.max
-      else t.locality
+      then Areality.max
+      else t.areality
     in
     let linearity =
       if mem max_axes (Modal (Comonadic Linearity))
@@ -172,7 +184,7 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     {
-      locality;
+      areality;
       linearity;
       uniqueness;
       portability;
@@ -189,10 +201,10 @@ module Jkind_mod_bounds = struct
     let open Jkind_axis.Axis_set in
     (* a little optimization *)
     if is_empty min_axes then t else
-    let locality =
+    let areality =
       if mem min_axes (Modal (Comonadic Areality))
-      then Locality.min
-      else t.locality
+      then Areality.min
+      else t.areality
     in
     let linearity =
       if mem min_axes (Modal (Comonadic Linearity))
@@ -245,7 +257,7 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     {
-      locality;
+      areality;
       linearity;
       uniqueness;
       portability;
@@ -261,7 +273,7 @@ module Jkind_mod_bounds = struct
   let[@inline] is_max_within_set t axes =
     let open Jkind_axis.Axis_set in
     (not (mem axes (Modal (Comonadic Areality))) ||
-     Locality.(le max (locality t))) &&
+     Areality.(le max (areality t))) &&
     (not (mem axes (Modal (Comonadic Linearity))) ||
      Linearity.(le max (linearity t))) &&
     (not (mem axes (Modal (Monadic Uniqueness))) ||
@@ -284,7 +296,7 @@ module Jkind_mod_bounds = struct
      Separability.(le max (separability t)))
 
   let max =
-      { locality = Locality.max;
+      { areality = Areality.max;
         linearity = Linearity.max;
         uniqueness = Uniqueness.max;
         portability = Portability.max;
@@ -300,7 +312,7 @@ module Jkind_mod_bounds = struct
 
 
   let debug_print ppf
-        { locality;
+        { areality;
           linearity;
           uniqueness;
           portability;
@@ -311,11 +323,11 @@ module Jkind_mod_bounds = struct
           externality;
           nullability;
           separability } =
-    Format.fprintf ppf "@[{ locality = %a;@ linearity = %a;@ uniqueness = %a;@ \
+    Format.fprintf ppf "@[{ areality = %a;@ linearity = %a;@ uniqueness = %a;@ \
       portability = %a;@ contention = %a;@ yielding = %a;@ statefulness = %a;@ \
       visibility = %a;@ externality = %a;@ \
       nullability = %a;@ separability = %a }@]"
-      Locality.print locality
+      Areality.print areality
       Linearity.print linearity
       Uniqueness.print uniqueness
       Portability.print portability
@@ -665,6 +677,7 @@ and mixed_block_element =
   | Vec512
   | Word
   | Product of mixed_product_shape
+  | Void
 
 and mixed_product_shape = mixed_block_element array
 
@@ -989,11 +1002,12 @@ let rec equal_mixed_block_element e1 e2 =
   | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
   | ( Value | Float64 | Float32 | Float_boxed | Word | Bits8 | Bits16 | Bits32
-    | Bits64 | Vec128 | Vec256 | Vec512 | Product _ ), _
+    | Bits64 | Vec128 | Vec256 | Vec512 | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
@@ -1002,6 +1016,7 @@ let rec compare_mixed_block_element e1 e2 =
   | Float64, Float64 | Float32, Float32
   | Word, Word | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
@@ -1029,6 +1044,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
+  | Void, _ -> -1
+  | _, Void -> 1
 
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
@@ -1186,6 +1203,7 @@ let rec mixed_block_element_to_string = function
     ^ (String.concat ", "
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
+  | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
   | Value -> "value"
@@ -1205,6 +1223,7 @@ let mixed_block_element_to_lowercase_string = function
     ^ (String.concat ", "
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
+  | Void -> "void"
 
 (**** Definitions for backtracking ****)
 

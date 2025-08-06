@@ -65,10 +65,10 @@ struct
 
   let data = Bytes.of_string test_data
 
-  let first = 0x1f1e1d1c1b1a1918L
-  let second = 0x1716151413121110L
-  let third = 0x0f0e0d0c0b0a0908L
-  let fourth = 0x0706050403020100L
+  let first = 0x0706050403020100L
+  let second = 0x0f0e0d0c0b0a0908L
+  let third = 0x1716151413121110L
+  let fourth = 0x1f1e1d1c1b1a1918L
 
   (* Getters *)
 
@@ -78,9 +78,9 @@ struct
     let v = get_int8x32_unaligned_unsafe data 0 in
     eq first second third fourth (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
     let v = get_int8x32_unaligned data 8 in
-    eq fourth first second third (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
+    eq second third fourth first (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
     let v = get_int8x32_unaligned_unsafe data 8 in
-    eq fourth first second third (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
+    eq second third fourth first (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
   ;;
 
   let () =
@@ -236,10 +236,10 @@ struct
 
   let data = test_data
 
-  let first = 0x1f1e1d1c1b1a1918L
-  let second = 0x1716151413121110L
-  let third = 0x0f0e0d0c0b0a0908L
-  let fourth = 0x0706050403020100L
+  let first = 0x0706050403020100L
+  let second = 0x0f0e0d0c0b0a0908L
+  let third = 0x1716151413121110L
+  let fourth = 0x1f1e1d1c1b1a1918L
 
   (* Getters *)
 
@@ -249,9 +249,9 @@ struct
     let v = get_int8x32_unaligned_unsafe data 0 in
     eq first second third fourth (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
     let v = get_int8x32_unaligned data 8 in
-    eq fourth first second third (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
+    eq second third fourth first (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
     let v = get_int8x32_unaligned_unsafe data 8 in
-    eq fourth first second third (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
+    eq second third fourth first (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
   ;;
 
   let () =
@@ -367,10 +367,10 @@ open struct
     (* Data is allocated off-heap, and will always be 16-byte aligned. *)
     let data = bigstring_of_string test_data
 
-    let first = 0x1f1e1d1c1b1a1918L
-    let second = 0x1716151413121110L
-    let third = 0x0f0e0d0c0b0a0908L
-    let fourth = 0x0706050403020100L
+    let first = 0x0706050403020100L
+    let second = 0x0f0e0d0c0b0a0908L
+    let third = 0x1716151413121110L
+    let fourth = 0x1f1e1d1c1b1a1918L
 
     (* Getters *)
 
@@ -380,9 +380,9 @@ open struct
       let v = get_int8x32_unaligned_unsafe data 0 in
       eq first second third fourth (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
       let v = get_int8x32_unaligned data 8 in
-      eq fourth first second third (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
+      eq second third fourth first (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
       let v = get_int8x32_unaligned_unsafe data 8 in
-      eq fourth first second third (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
+      eq second third fourth first (int8x32_first_int64 v) (int8x32_second_int64 v) (int8x32_third_int64 v) (int8x32_fourth_int64 v);
     ;;
 
     let () =
@@ -659,8 +659,8 @@ end) = struct
     [@@noalloc] [@@unboxed] [@@builtin]
 
   let f64x4 a b c d =
-    float64x4_of_int64s (Int64.bits_of_float d) (Int64.bits_of_float c)
-                        (Int64.bits_of_float b) (Int64.bits_of_float a)
+    float64x4_of_int64s (Int64.bits_of_float a) (Int64.bits_of_float b)
+                        (Int64.bits_of_float c) (Int64.bits_of_float d)
 
   let f32x8 a b c d e f g h =
     let pack_pair x y =
@@ -668,7 +668,7 @@ end) = struct
       let y_bits = Int64.of_int32 (Float32.to_bits y) in
       Int64.logor (Int64.logand x_bits 0xFFFFFFFFL) (Int64.shift_left y_bits 32)
     in
-    float32x8_of_int64s (pack_pair g h) (pack_pair e f) (pack_pair c d) (pack_pair a b)
+    float32x8_of_int64s (pack_pair a b) (pack_pair c d) (pack_pair e f) (pack_pair g h)
 
   let float_array () = [| 0.0; 1.0; 2.0; 3.0; 4.0 |]
   let float_iarray () = [: 0.0; 1.0; 2.0; 3.0; 4.0 :]
@@ -1127,14 +1127,14 @@ module Int_arrays (Primitives : sig
 end) = struct
   open Primitives
 
-  let i64x4 x y z w = int64x4_of_int64s w z y x
+  let i64x4 x y z w = int64x4_of_int64s x y z w
 
   let i32x8 x0 x1 x2 x3 x4 x5 x6 x7 =
     let pack a b c d = Int64.(logor (shift_left (of_int32 b) 32) (of_int32 a)),
                        Int64.(logor (shift_left (of_int32 d) 32) (of_int32 c)) in
     let l1, l2 = pack x0 x1 x2 x3 in
     let l3, l4 = pack x4 x5 x6 x7 in
-    int32x8_of_int64s l4 l3 l2 l1
+    int32x8_of_int64s l1 l2 l3 l4
 
   let tag i = Int64.(add (shift_left i 1) 1L)
   let int_array () = [| 0; 1; 2; 3; 4 |]

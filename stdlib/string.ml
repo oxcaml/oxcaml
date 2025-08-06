@@ -18,6 +18,8 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
+type t = string
+
 (* String operations, based on byte sequence operations *)
 
 (* WARNING: Some functions in this file are duplicated in bytes.ml for
@@ -26,9 +28,10 @@ open! Stdlib
    These functions have a "duplicated" comment above their definition.
 *)
 
-external length : string -> int @@ portable = "%string_length"
-external get : string -> int -> char @@ portable = "%string_safe_get"
-external unsafe_get : string -> int -> char @@ portable = "%string_unsafe_get"
+external length : (t[@local_opt]) -> int @@ portable = "%string_length"
+external get : (t[@local_opt]) -> int -> char @@ portable = "%string_safe_get"
+external unsafe_get :
+  (t[@local_opt]) -> int -> char @@ portable = "%string_unsafe_get"
 external unsafe_blit : string -> int ->  bytes -> int -> int -> unit @@ portable
                      = "caml_blit_string" [@@noalloc]
 
@@ -223,7 +226,8 @@ let ends_with ~suffix s =
     else aux (i + 1)
   in diff >= 0 && aux 0
 
-external seeded_hash : int -> string -> int @@ portable = "caml_string_hash" [@@noalloc]
+external seeded_hash :
+  int -> (t[@local_opt]) -> int @@ portable = "caml_string_hash" [@@noalloc]
 let hash x = seeded_hash 0 x
 
 (* duplicated in bytes.ml *)
@@ -238,10 +242,11 @@ let split_on_char sep s =
   done;
   sub s 0 !j :: !r
 
-type t = string
-
-let compare (x: t) (y: t) = Stdlib.compare x y
-external equal : string -> string -> bool @@ portable = "caml_string_equal" [@@noalloc]
+external compare :
+  (t[@local_opt]) -> (t[@local_opt]) -> int @@ portable = "%compare"
+external equal :
+  (t[@local_opt]) -> (t[@local_opt]) -> bool @@ portable =
+  "caml_string_equal" [@@noalloc]
 
 (** {1 Iterators} *)
 

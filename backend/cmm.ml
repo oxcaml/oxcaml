@@ -300,6 +300,11 @@ type float_width =
   | Float64
   | Float32
 
+type vector_width =
+  | Vec128
+  | Vec256
+  | Vec512
+
 type memory_chunk =
   | Byte_unsigned
   | Byte_signed
@@ -327,9 +332,9 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  | V128_of_v128
-  | V256_of_v256
-  | V512_of_v512
+  | V128_of_vec of vector_width
+  | V256_of_vec of vector_width
+  | V512_of_vec of vector_width
 
 type static_cast =
   | Float_of_int of float_width
@@ -802,6 +807,13 @@ let equal_float_width left right =
   | Float32, Float32 -> true
   | (Float32 | Float64), _ -> false
 
+let equal_vector_width left right =
+  match left, right with
+  | Vec128, Vec128 -> true
+  | Vec256, Vec256 -> true
+  | Vec512, Vec512 -> true
+  | (Vec128 | Vec256 | Vec512), _ -> false
+
 let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
     =
   match left, right with
@@ -813,12 +825,13 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | Int64_of_float, Int64_of_float -> true
   | Float32_of_int32, Float32_of_int32 -> true
   | Int32_of_float32, Int32_of_float32 -> true
-  | V128_of_v128, V128_of_v128 -> true
-  | V256_of_v256, V256_of_v256 -> true
-  | V512_of_v512, V512_of_v512 -> true
+  | V128_of_vec w1, V128_of_vec w2
+  | V256_of_vec w1, V256_of_vec w2
+  | V512_of_vec w1, V512_of_vec w2 ->
+    equal_vector_width w1 w2
   | ( ( Int_of_value | Value_of_int | Float_of_float32 | Float32_of_float
       | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | V128_of_v128 | V256_of_v256 | V512_of_v512 ),
+      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
       _ ) ->
     false
 

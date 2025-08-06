@@ -3,10 +3,11 @@
 
 module type Element_intf = Test_gen_u_array.Element_intf
 
-type 'a elem =
+type ('a : value_or_null) elem =
   | Number : { ops : (module Element_intf with type t = 'a) } -> 'a elem
-  | Option : 'a elem -> ('a option) elem
-  | Tup2 : 'a1 elem * 'a2 elem -> ('a1 * 'a2) elem
+  | Option : ('a : value_or_null) . 'a elem -> ('a option) elem
+  | Or_null : 'a elem -> ('a or_null) elem
+  | Tup2 : ('a1 : value_or_null) ('a2 : value_or_null) . 'a1 elem * 'a2 elem -> ('a1 * 'a2) elem
   | Tup3 : 'a1 elem * 'a2 elem * 'a3 elem -> ('a1 * 'a2 * 'a3) elem
   | Tup4 : 'a1 elem * 'a2 elem * 'a3 elem * 'a4 elem
       -> ('a1 * 'a2 * 'a3 * 'a4) elem

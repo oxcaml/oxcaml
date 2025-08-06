@@ -174,10 +174,15 @@ module Axis = struct
       | Externality : Externality.t t
       | Nullability : Nullability.t t
       | Separability : Separability.t t
+
+    let get (type a) : a t -> (module Axis_ops with type t = a) = function
+      | Externality -> (module Externality)
+      | Nullability -> (module Nullability)
+      | Separability -> (module Separability)
   end
 
   type 'a t =
-    | Modal : 'a Mode.Alloc.Axis.t -> 'a t
+    | Modal : 'a Mode.Value.Axis.t -> 'a t
     | Nonmodal : 'a Nonmodal.t -> 'a t
 
   type packed = Pack : 'a t -> packed [@@unboxed]
@@ -197,10 +202,8 @@ module Axis = struct
 
   let get (type a) : a t -> (module Axis_ops with type t = a) = function
     | Modal axis ->
-      (module Accent_lattice ((val Mode.Alloc.Const.lattice_of_axis axis)))
-    | Nonmodal Externality -> (module Externality)
-    | Nonmodal Nullability -> (module Nullability)
-    | Nonmodal Separability -> (module Separability)
+      (module Accent_lattice ((val Mode.Value.Const.lattice_of_axis axis)))
+    | Nonmodal axis -> Nonmodal.get axis
 
   let all =
     [ Pack (Modal (Comonadic Areality));
@@ -216,7 +219,7 @@ module Axis = struct
       Pack (Nonmodal Separability) ]
 
   let name (type a) : a t -> string = function
-    | Modal axis -> Format.asprintf "%a" Mode.Alloc.Axis.print axis
+    | Modal axis -> Format.asprintf "%a" Mode.Value.Axis.print axis
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
     | Nonmodal Separability -> "separability"

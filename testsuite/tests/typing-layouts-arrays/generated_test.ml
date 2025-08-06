@@ -16,31 +16,31 @@ module List = ListLabels
 module String = StringLabels
 
 external[@layout_poly] makearray_dynamic_uninit_local :
-  ('a : any_non_null) . int -> 'a array @ local =
+  ('a : any mod separable) . int -> 'a array @ local =
   "%makearray_dynamic_uninit"
 
 external[@layout_poly] makearray_dynamic_uninit :
-  ('a : any_non_null) . int -> 'a array =
+  ('a : any mod separable) . int -> 'a array =
   "%makearray_dynamic_uninit"
 
 external[@layout_poly] makearray_dynamic_local :
-  ('a : any_non_null) . int -> 'a -> 'a array @ local =
+  ('a : any mod separable) . int -> 'a -> 'a array @ local =
   "%makearray_dynamic"
 
 external[@layout_poly] makearray_dynamic :
-  ('a : any_non_null) . int -> 'a -> 'a array =
+  ('a : any mod separable) . int -> 'a -> 'a array =
   "%makearray_dynamic"
 
 external[@layout_poly] get :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a =
   "%array_safe_get"
 
 external[@layout_poly] set :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
   "%array_safe_set"
 
 external[@layout_poly] unsafe_blit :
-  ('a : any_non_null) . ('a array[@local_opt]) -> (int[@local_opt]) -> ('a array[@local_opt]) -> (int[@local_opt]) -> (int[@local_opt]) -> unit =
+  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> ('a array[@local_opt]) -> (int[@local_opt]) -> (int[@local_opt]) -> unit =
   "%arrayblit"
 
 let failwithf fmt = Printf.ksprintf failwith fmt

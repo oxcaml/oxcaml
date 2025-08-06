@@ -1,79 +1,7 @@
 open Stdlib
-open Utils
+open Utils256
 
 [@@@ocaml.warning "-unused-module"]
-
-external int64x4_word0_int64 : int64x4 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
-
-external int64x4_word1_int64 : int64x4 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
-
-external int64x4_word2_int64 : int64x4 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
-
-external int64x4_word3_int64 : int64x4 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
-
-external int32x8_word0_int64 : int32x8 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
-
-external int32x8_word1_int64 : int32x8 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
-
-external int32x8_word2_int64 : int32x8 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
-
-external int32x8_word3_int64 : int32x8 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
-
-external int16x16_word0_int64 : int16x16 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
-
-external int16x16_word1_int64 : int16x16 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
-
-external int16x16_word2_int64 : int16x16 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
-
-external int16x16_word3_int64 : int16x16 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
-
-external int8x32_word0_int64 : int8x32 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
-
-external int8x32_word1_int64 : int8x32 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
-
-external int8x32_word2_int64 : int8x32 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
-
-external int8x32_word3_int64 : int8x32 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
-
-external float32x8_word0_int64 : float32x8 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
-
-external float32x8_word1_int64 : float32x8 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
-
-external float32x8_word2_int64 : float32x8 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
-
-external float32x8_word3_int64 : float32x8 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
-
-external float64x4_word0_int64 : float64x4 -> int64 = "" "vec256_fourth_int64"
-  [@@noalloc] [@@unboxed]
-
-external float64x4_word1_int64 : float64x4 -> int64 = "" "vec256_third_int64"
-  [@@noalloc] [@@unboxed]
-
-external float64x4_word2_int64 : float64x4 -> int64 = "" "vec256_second_int64"
-  [@@noalloc] [@@unboxed]
-
-external float64x4_word3_int64 : float64x4 -> int64 = "" "vec256_first_int64"
-  [@@noalloc] [@@unboxed]
 
 module Float32x8 = struct
   type t = float32x8
@@ -99,14 +27,14 @@ module Float32x8 = struct
   let () =
     let v1 = const1 1.s in
     let v2 = const1 2.s in
-    let w0_1 = float32x8_word0_int64 v1 in
-    let w1_1 = float32x8_word1_int64 v1 in
-    let w2_1 = float32x8_word2_int64 v1 in
-    let w3_1 = float32x8_word3_int64 v1 in
-    let w0_2 = float32x8_word0_int64 v2 in
-    let w1_2 = float32x8_word1_int64 v2 in
-    let w2_2 = float32x8_word2_int64 v2 in
-    let w3_2 = float32x8_word3_int64 v2 in
+    let w0_1 = float32x8_first_int64 v1 in
+    let w1_1 = float32x8_second_int64 v1 in
+    let w2_1 = float32x8_third_int64 v1 in
+    let w3_1 = float32x8_fourth_int64 v1 in
+    let w0_2 = float32x8_first_int64 v2 in
+    let w1_2 = float32x8_second_int64 v2 in
+    let w2_2 = float32x8_third_int64 v2 in
+    let w3_2 = float32x8_fourth_int64 v2 in
     eq4 w0_1 w1_1 w2_1 w3_1 0x3f8000003f800000L 0x3f8000003f800000L
       0x3f8000003f800000L 0x3f8000003f800000L;
     eq4 w0_2 w1_2 w2_2 w3_2 0x4000000040000000L 0x4000000040000000L
@@ -118,14 +46,14 @@ module Float32x8 = struct
   let () =
     let v1 = const8 1.s 2.s 3.s 4.s 5.s 6.s 7.s 8.s in
     let v2 = const8 9.s 10.s 11.s 12.s 13.s 14.s 15.s 16.s in
-    let w0_1 = float32x8_word0_int64 v1 in
-    let w1_1 = float32x8_word1_int64 v1 in
-    let w2_1 = float32x8_word2_int64 v1 in
-    let w3_1 = float32x8_word3_int64 v1 in
-    let w0_2 = float32x8_word0_int64 v2 in
-    let w1_2 = float32x8_word1_int64 v2 in
-    let w2_2 = float32x8_word2_int64 v2 in
-    let w3_2 = float32x8_word3_int64 v2 in
+    let w0_1 = float32x8_first_int64 v1 in
+    let w1_1 = float32x8_second_int64 v1 in
+    let w2_1 = float32x8_third_int64 v1 in
+    let w3_1 = float32x8_fourth_int64 v1 in
+    let w0_2 = float32x8_first_int64 v2 in
+    let w1_2 = float32x8_second_int64 v2 in
+    let w2_2 = float32x8_third_int64 v2 in
+    let w3_2 = float32x8_fourth_int64 v2 in
     eq4 w0_1 w1_1 w2_1 w3_1 0x400000003f800000L 0x4080000040400000L
       0x40c0000040a00000L 0x4100000040e00000L;
     eq4 w0_2 w1_2 w2_2 w3_2 0x4120000041100000L 0x4140000041300000L
@@ -151,14 +79,14 @@ module Float64x4 = struct
   let () =
     let v1 = const1 1. in
     let v2 = const1 2. in
-    let w0_1 = float64x4_word0_int64 v1 in
-    let w1_1 = float64x4_word1_int64 v1 in
-    let w2_1 = float64x4_word2_int64 v1 in
-    let w3_1 = float64x4_word3_int64 v1 in
-    let w0_2 = float64x4_word0_int64 v2 in
-    let w1_2 = float64x4_word1_int64 v2 in
-    let w2_2 = float64x4_word2_int64 v2 in
-    let w3_2 = float64x4_word3_int64 v2 in
+    let w0_1 = float64x4_first_int64 v1 in
+    let w1_1 = float64x4_second_int64 v1 in
+    let w2_1 = float64x4_third_int64 v1 in
+    let w3_1 = float64x4_fourth_int64 v1 in
+    let w0_2 = float64x4_first_int64 v2 in
+    let w1_2 = float64x4_second_int64 v2 in
+    let w2_2 = float64x4_third_int64 v2 in
+    let w3_2 = float64x4_fourth_int64 v2 in
     eq4 w0_1 w1_1 w2_1 w3_1 0x3ff0000000000000L 0x3ff0000000000000L
       0x3ff0000000000000L 0x3ff0000000000000L;
     eq4 w0_2 w1_2 w2_2 w3_2 0x4000000000000000L 0x4000000000000000L
@@ -170,14 +98,14 @@ module Float64x4 = struct
   let () =
     let v1 = const4 1. 2. 3. 4. in
     let v2 = const4 5. 6. 7. 8. in
-    let w0_1 = float64x4_word0_int64 v1 in
-    let w1_1 = float64x4_word1_int64 v1 in
-    let w2_1 = float64x4_word2_int64 v1 in
-    let w3_1 = float64x4_word3_int64 v1 in
-    let w0_2 = float64x4_word0_int64 v2 in
-    let w1_2 = float64x4_word1_int64 v2 in
-    let w2_2 = float64x4_word2_int64 v2 in
-    let w3_2 = float64x4_word3_int64 v2 in
+    let w0_1 = float64x4_first_int64 v1 in
+    let w1_1 = float64x4_second_int64 v1 in
+    let w2_1 = float64x4_third_int64 v1 in
+    let w3_1 = float64x4_fourth_int64 v1 in
+    let w0_2 = float64x4_first_int64 v2 in
+    let w1_2 = float64x4_second_int64 v2 in
+    let w2_2 = float64x4_third_int64 v2 in
+    let w3_2 = float64x4_fourth_int64 v2 in
     eq4 w0_1 w1_1 w2_1 w3_1 0x3ff0000000000000L 0x4000000000000000L
       0x4008000000000000L 0x4010000000000000L;
     eq4 w0_2 w1_2 w2_2 w3_2 0x4014000000000000L 0x4018000000000000L
@@ -202,10 +130,10 @@ module Int64x4 = struct
 
   let[@inline always] check1 i =
     let v = const1 i in
-    let w0 = int64x4_word0_int64 v in
-    let w1 = int64x4_word1_int64 v in
-    let w2 = int64x4_word2_int64 v in
-    let w3 = int64x4_word3_int64 v in
+    let w0 = int64x4_first_int64 v in
+    let w1 = int64x4_second_int64 v in
+    let w2 = int64x4_third_int64 v in
+    let w3 = int64x4_fourth_int64 v in
     eq4 w0 w1 w2 w3 i i i i;
     let _i = low_to v in
     eq _i 0L i 0L
@@ -221,10 +149,10 @@ module Int64x4 = struct
 
   let[@inline always] check4 i j k l =
     let v = const4 i j k l in
-    let w0 = int64x4_word0_int64 v in
-    let w1 = int64x4_word1_int64 v in
-    let w2 = int64x4_word2_int64 v in
-    let w3 = int64x4_word3_int64 v in
+    let w0 = int64x4_first_int64 v in
+    let w1 = int64x4_second_int64 v in
+    let w2 = int64x4_third_int64 v in
+    let w3 = int64x4_fourth_int64 v in
     eq4 w0 w1 w2 w3 i j k l;
     let _i = low_to v in
     eq _i 0L i 0L
@@ -256,10 +184,10 @@ module Int32x8 = struct
   let[@inline always] check1 i =
     let i64 = Int64.(logor (shift_left (i32 i) 32) (i32 i)) in
     let v = const1 i in
-    let w0 = int32x8_word0_int64 v in
-    let w1 = int32x8_word1_int64 v in
-    let w2 = int32x8_word2_int64 v in
-    let w3 = int32x8_word3_int64 v in
+    let w0 = int32x8_first_int64 v in
+    let w1 = int32x8_second_int64 v in
+    let w2 = int32x8_third_int64 v in
+    let w3 = int32x8_fourth_int64 v in
     eq4 w0 w1 w2 w3 i64 i64 i64 i64;
     let _i = low_to v in
     eql _i 0l i 0l
@@ -275,10 +203,10 @@ module Int32x8 = struct
 
   let[@inline always] check8 a b c d e f g h =
     let v = const8 a b c d e f g h in
-    let w0 = int32x8_word0_int64 v in
-    let w1 = int32x8_word1_int64 v in
-    let w2 = int32x8_word2_int64 v in
-    let w3 = int32x8_word3_int64 v in
+    let w0 = int32x8_first_int64 v in
+    let w1 = int32x8_second_int64 v in
+    let w2 = int32x8_third_int64 v in
+    let w3 = int32x8_fourth_int64 v in
     let ab = Int64.(logor (shift_left (i32 b) 32) (i32 a)) in
     let cd = Int64.(logor (shift_left (i32 d) 32) (i32 c)) in
     let ef = Int64.(logor (shift_left (i32 f) 32) (i32 e)) in
@@ -335,10 +263,10 @@ module Int16x16 = struct
     let i64 = Int64.(logor (shift_left i64 16) i64) in
     let i64 = Int64.(logor (shift_left i64 32) i64) in
     let v = const1 i in
-    let w0 = int16x16_word0_int64 v in
-    let w1 = int16x16_word1_int64 v in
-    let w2 = int16x16_word2_int64 v in
-    let w3 = int16x16_word3_int64 v in
+    let w0 = int16x16_first_int64 v in
+    let w1 = int16x16_second_int64 v in
+    let w2 = int16x16_third_int64 v in
+    let w3 = int16x16_fourth_int64 v in
     eq4 w0 w1 w2 w3 i64 i64 i64 i64;
     let _i = low_to v in
     eqi _i 0 i 0
@@ -375,10 +303,10 @@ module Int16x16 = struct
           (logor (shift_left (i16 n) 16) (i16 m)))
     in
     let v = const16 a b c d e f g h i j k l m n o p in
-    let _w0 = int16x16_word0_int64 v in
-    let _w1 = int16x16_word1_int64 v in
-    let _w2 = int16x16_word2_int64 v in
-    let _w3 = int16x16_word3_int64 v in
+    let _w0 = int16x16_first_int64 v in
+    let _w1 = int16x16_second_int64 v in
+    let _w2 = int16x16_third_int64 v in
+    let _w3 = int16x16_fourth_int64 v in
     eq4 _w0 _w1 _w2 _w3 w0 w1 w2 w3;
     let _a = low_to v in
     eqi _a 0 a 0
@@ -448,10 +376,10 @@ module Int8x32 = struct
     let i64 = Int64.(logor (shift_left i64 16) i64) in
     let i64 = Int64.(logor (shift_left i64 32) i64) in
     let v = const1 i in
-    let w0 = int8x32_word0_int64 v in
-    let w1 = int8x32_word1_int64 v in
-    let w2 = int8x32_word2_int64 v in
-    let w3 = int8x32_word3_int64 v in
+    let w0 = int8x32_first_int64 v in
+    let w1 = int8x32_second_int64 v in
+    let w2 = int8x32_third_int64 v in
+    let w3 = int8x32_fourth_int64 v in
     eq4 w0 w1 w2 w3 i64 i64 i64 i64;
     let _i = low_to v in
     eqi _i 0 i 0
@@ -520,10 +448,10 @@ module Int8x32 = struct
       const32 a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd ee
         ff
     in
-    let _w0 = int8x32_word0_int64 v in
-    let _w1 = int8x32_word1_int64 v in
-    let _w2 = int8x32_word2_int64 v in
-    let _w3 = int8x32_word3_int64 v in
+    let _w0 = int8x32_first_int64 v in
+    let _w1 = int8x32_second_int64 v in
+    let _w2 = int8x32_third_int64 v in
+    let _w3 = int8x32_fourth_int64 v in
     eq4 _w0 _w1 _w2 _w3 w0 w1 w2 w3;
     let _a = low_to v in
     eqi _a 0 a 0

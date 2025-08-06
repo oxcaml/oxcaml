@@ -35,8 +35,8 @@ module Extra_param_and_args = struct
       args : EPA.Extra_arg.t Apply_cont_rewrite_id.Map.t
     }
 
-  let create ~name ~debug_uid =
-    { param = Variable.create name;
+  let create ~name ~debug_uid kind =
+    { param = Variable.create name kind;
       param_debug_uid = debug_uid;
       args = Apply_cont_rewrite_id.Map.empty
     }

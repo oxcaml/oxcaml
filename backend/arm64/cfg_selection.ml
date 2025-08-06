@@ -114,7 +114,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
   | arg -> Iindexed 0, arg
 
 let select_addressing chunk exp : addressing_mode * Cmm.expression =
-  if !Oxcaml_flags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
   then Iindexed 0, exp
   else select_addressing' chunk exp
 
@@ -222,7 +222,7 @@ let select_operation
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after :
     Cfg_selectgen_target_intf.select_operation_result =
-  if !Oxcaml_flags.llvm_backend
+  if !Clflags.llvm_backend
   then Use_default
   else select_operation' ~generic_select_condition op args dbg ~label_after
 

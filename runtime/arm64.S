@@ -209,6 +209,13 @@ G(name):
 #define Cstack_prev(reg)        [reg, #16]
 #define Cstack_async_exn_handler(reg) [reg, #24]
 
+/* struct dynamic_thread_s */
+/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
+#define Dynamic_cache            0 /* offset of cache in dynamic_thread_t */
+#define Dynamic_binding_size     (2*8) /* dyn, val */
+#define Dynamic_binding_var      0 /* offset of var within a single binding */
+#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
+
 /* struct stack_handler */
 #define Handler_value(reg)      [reg]
 #define Handler_exception(reg)  [reg, #8]
@@ -344,6 +351,20 @@ G(name):
     /* Reload new allocation pointer & exn handler */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
         ldr     TRAP_PTR, Caml_state(exn_handler)
+.endm
+
+/* Flush the per-thread cache of dynamic binding values. */
+
+.macro FLUSH_DYNAMIC_CACHE
+        ldr     TMP, Caml_state(dynamic_bindings)
+        str     xzr, [TMP, (Dynamic_cache + 0*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 1*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 2*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 3*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 4*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)]
 .endm
 
 #if defined(WITH_THREAD_SANITIZER) /* { */
@@ -1154,6 +1175,7 @@ L(do_perform):
         CFI_ADJUST(-16)
 #endif
         SWITCH_OCAML_STACKS x2, x10
+        FLUSH_DYNAMIC_CACHE
     /*  we have to null the Handler_parent after the switch because
         the Handler_parent is needed to unwind the stack for backtraces */
         str     xzr, Handler_parent(x9) /* Set parent of performer to NULL */
@@ -1245,6 +1267,7 @@ FUNCTION(caml_resume)
         ldr     x9, Caml_state(current_stack)
         str     x9, Handler_parent(x8)
         SWITCH_OCAML_STACKS x9, x0
+        FLUSH_DYNAMIC_CACHE
         mov     x0, x2
         br      x4
 1:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
@@ -1311,6 +1334,7 @@ FUNCTION(caml_runstack)
         mov     TRAP_PTR, x9
     /* Switch to the new stack */
         mov     sp, x9
+        FLUSH_DYNAMIC_CACHE
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3+3+2,       \
@@ -1352,6 +1376,7 @@ L(frame_runstack):
         CFI_RESTORE_STATE
         CFI_REMEMBER_STATE
         CFI_DEF_CFA_REGISTER(DW_REG_x21)
+        FLUSH_DYNAMIC_CACHE
         ldr     TMP, Caml_state(c_stack)
         mov     sp, TMP
         bl      G(caml_free_stack)

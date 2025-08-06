@@ -1,0 +1,24 @@
+Test 1: equality, comparison, hashing, and marshalling
+  Equality vh1 = vh2: true
+  Physical equality vh1 == vh2: true
+  Comparison vh1 <= vh2: true
+  Comparison vh1 >= vh2: true
+  Compare vh1 vh2: 0
+  Hash vh1: 129913994
+  Hash vh2: 129913994
+  Equality pv1 = pv2: failed (compare: mixed block value)
+  Compare pv1 pv2: failed (compare: mixed block value)
+  Equality r1 = r2: failed (compare: mixed block value)
+  Compare r1 r2: failed (compare: mixed block value)
+  Marshalling void_holder succeeded, equality: true
+  Marshalling variant_with_void failed: Invalid_argument("output_value: mixed block")
+  Marshalling record_with_void failed: Invalid_argument("output_value: mixed block")
+  Unboxed products with void: cannot test equality/comparison/hashing
+  (These operations are not supported on unboxed types containing void)
+Test 2: higher-order functions with void arguments/returns
+Test 3: object methods with void arguments/returns
+Test 4: local continuations with void arguments/returns
+Test 5: loopification with void arguments/returns
+Test 6: void in polymorphic functions
+Test 7: stack-allocating blocks containing voids
+All extended tests completed.

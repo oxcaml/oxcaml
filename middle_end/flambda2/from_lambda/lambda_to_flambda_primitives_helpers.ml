@@ -335,7 +335,9 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       ~handler_params:Bound_parameters.empty ~handler:primitive_handler_expr
       ~body ~is_exn_handler:false ~is_cold:false
   | If_then_else (cond, ifso, ifnot, result_kinds) ->
-    let cond_result = Variable.create "cond_result" in
+    let cond_result =
+      Variable.create "cond_result" Flambda_kind.naked_immediate
+    in
     let cond_result_duid = Flambda_debug_uid.none in
     let cond_result_pat =
       Bound_var.create cond_result cond_result_duid Name_mode.normal
@@ -345,7 +347,10 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
     let join_point_cont = Continuation.create () in
     let result_vars =
       List.map
-        (fun _ -> Variable.create "if_then_else_result", Flambda_debug_uid.none)
+        (fun k ->
+          ( Variable.create "if_then_else_result"
+              (Flambda_kind.With_subkind.kind k),
+            Flambda_debug_uid.none ))
         result_kinds
     in
     let result_params =
@@ -379,8 +384,11 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       @@ fun acc ifso_or_ifnot ->
       let result_vars =
         List.map
-          (fun _ -> Variable.create (name ^ "_result"), Flambda_debug_uid.none)
-          ifso_or_ifnot
+          (fun k ->
+            ( Variable.create (name ^ "_result")
+                (Flambda_kind.With_subkind.kind k),
+              Flambda_debug_uid.none ))
+          result_kinds
       in
       let result_pats =
         List.map
@@ -424,8 +432,9 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
           (fun acc nameds ->
             let named = must_be_singleton_named nameds in
             let pat =
-              Bound_var.create (Variable.create "seq") Flambda_debug_uid.none
-                Name_mode.normal
+              Bound_var.create
+                (Variable.create "seq" Flambda_kind.value)
+                Flambda_debug_uid.none Name_mode.normal
               |> Bound_pattern.singleton
             in
             Let_with_acc.create acc pat named ~body))
@@ -448,7 +457,8 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
     let cont acc (nameds : Named.t list) =
       let vars =
         List.map
-          (fun _ -> Variable.create "prim", Flambda_debug_uid.none)
+          (fun named ->
+            Variable.create "prim" (Named.kind named), Flambda_debug_uid.none)
           nameds
       in
       let vars' =

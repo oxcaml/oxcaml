@@ -537,8 +537,10 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
     let free_vars = Backend_var.Set.union exn_free_vars extra_free_vars in
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
     let cmm = C.raise_prim raise_kind exn ~extra_args:extra dbg in
-    let cmm, free_vars = wrap cmm free_vars in
-    cmm, free_vars, res
+    let cmm, free_vars, symbol_inits =
+      wrap cmm free_vars Env.Symbol_inits.empty
+    in
+    cmm, free_vars, symbol_inits, res
   | [] ->
     Misc.fatal_errorf "Exception continuation %a has no arguments:@ \n%a"
       Continuation.print exn_handler Apply_cont.print apply
@@ -560,8 +562,10 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     let args = C.remove_skipped_args args types in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-    let cmm, free_vars = wrap (C.cexit cont args trap_actions) free_vars in
-    cmm, free_vars, res
+    let cmm, free_vars, symbol_inits =
+      wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty
+    in
+    cmm, free_vars, symbol_inits, res
   else
     Misc.fatal_errorf "Types (%a) do not match arguments of@ %a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
@@ -581,14 +585,18 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
     match Apply_cont.trap_action apply with
     | None ->
-      let cmm, free_vars = wrap return_value free_vars in
-      cmm, free_vars, res
+      let cmm, free_vars, symbol_inits =
+        wrap return_value free_vars Env.Symbol_inits.empty
+      in
+      cmm, free_vars, symbol_inits, res
     | Some (Pop { exn_handler; _ }) ->
       let cont = Env.get_cmm_continuation env exn_handler in
-      let cmm, free_vars =
-        wrap (C.trap_return return_value [Cmm.Pop cont]) free_vars
+      let cmm, free_vars, symbol_inits =
+        wrap
+          (C.trap_return return_value [Cmm.Pop cont])
+          free_vars Env.Symbol_inits.empty
       in
-      cmm, free_vars, res
+      cmm, free_vars, symbol_inits, res
     | Some (Push _) ->
       Misc.fatal_errorf
         "Return continuation %a should not be applied with a Push trap action"
@@ -604,12 +612,15 @@ let invalid env res ~message =
     Env.flush_delayed_lets ~mode:Branching_point env res
   in
   let cmm_invalid, res = C.invalid res ~message in
-  let cmm, free_vars = wrap cmm_invalid Backend_var.Set.empty in
-  cmm, free_vars, res
+  let cmm, free_vars, symbol_inits =
+    wrap cmm_invalid Backend_var.Set.empty Env.Symbol_inits.empty
+  in
+  cmm, free_vars, symbol_inits, res
 
 (* The main set of translation functions for expressions *)
 
-let rec expr env res e : Cmm.expression * Backend_var.Set.t * To_cmm_result.t =
+let rec expr env res e :
+    Cmm.expression * Backend_var.Set.t * Env.Symbol_inits.t * To_cmm_result.t =
   match Expr.descr e with
   | Let e' -> let_expr env res e'
   | Let_cont e' -> let_cont env res e'
@@ -695,11 +706,11 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     let wrap, env, res =
       Env.flush_delayed_lets ~mode:Flush_everything env res
     in
-    let cmm, free_vars, res =
+    let cmm, free_vars, symbol_inits, res =
       let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
     in
-    let cmm, free_vars = wrap cmm free_vars in
-    cmm, free_vars, res
+    let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+    cmm, free_vars, symbol_inits, res
   | Singleton v, Prim (p, dbg) ->
     let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
   | Set_of_closures bound_vars, Set_of_closures soc ->
@@ -718,10 +729,12 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       let wrap, env, res =
         Env.flush_delayed_lets ~mode:Branching_point env res
       in
-      let body, body_free_vars, res = expr env res body in
+      let body, body_free_vars, symbol_inits, res = expr env res body in
       let free_vars = Backend_var.Set.union free_vars body_free_vars in
-      let cmm, free_vars = wrap (C.sequence cmm body) free_vars in
-      cmm, free_vars, res)
+      let cmm, free_vars, symbol_inits =
+        wrap (C.sequence cmm body) free_vars symbol_inits
+      in
+      cmm, free_vars, symbol_inits, res)
   | Singleton _, Rec_info _ -> expr env res body
   | Singleton _, (Set_of_closures _ | Static_consts _)
   | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
@@ -783,26 +796,29 @@ and let_cont_not_inlined env res k handler body =
   let wrap, env, res = Env.flush_delayed_lets ~mode:Branching_point env res in
   let is_exn_handler = Continuation_handler.is_exn_handler handler in
   let is_cold = Continuation_handler.is_cold handler in
-  let vars, arity, handler, free_vars_of_handler, res =
+  let vars, arity, handler, free_vars_of_handler, handler_symbol_inits, res =
     continuation_handler env res handler
   in
   let catch_id, env =
     Env.add_jump_cont env k ~param_types:(List.map snd vars)
   in
-  let cmm, free_vars, res =
+  let cmm, free_vars, symbol_inits, res =
     (* Exception continuations are translated specially -- these will be reached
        via the raising of exceptions, whereas other continuations are reached
        using a normal jump. *)
     if is_exn_handler
     then
       let_cont_exn_handler env res k body vars handler free_vars_of_handler
-        ~catch_id arity
+        handler_symbol_inits ~catch_id arity
     else
       (* CR mshinwell: fix debuginfo *)
       (* CR gbury: once we get proper debuginfo here, remember to apply
          Env.add_inlined_debuginfo to it *)
       let dbg = Debuginfo.none in
-      let body, free_vars_of_body, res = expr env res body in
+      let body, free_vars_of_body, body_symbol_inits, res = expr env res body in
+      let symbol_inits =
+        Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits
+      in
       let free_vars =
         Backend_var.Set.union free_vars_of_body
           (C.remove_vars_with_machtype free_vars_of_handler vars)
@@ -813,15 +829,16 @@ and let_cont_not_inlined env res k handler body =
                 (C.remove_skipped_params vars)
                 handler is_cold ],
         free_vars,
+        symbol_inits,
         res )
   in
-  let cmm, free_vars = wrap cmm free_vars in
-  cmm, free_vars, res
+  let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+  cmm, free_vars, symbol_inits, res
 
 (* Exception continuations are translated using delayed Ctrywith blocks. The
    exception handler parts of these blocks are identified by the [catch_id]s. *)
 and let_cont_exn_handler env res k body vars handler free_vars_of_handler
-    ~catch_id arity =
+    handler_symbol_inits ~catch_id arity =
   let exn_var, extra_params =
     match vars with
     | (v, _) :: rest -> v, rest
@@ -840,7 +857,12 @@ and let_cont_exn_handler env res k body vars handler free_vars_of_handler
       extra_params
   in
   let env_body = Env.add_exn_handler env k arity in
-  let body, free_vars_of_body, res = expr env_body res body in
+  let body, free_vars_of_body, body_symbol_inits, res =
+    expr env_body res body
+  in
+  let symbol_inits =
+    Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits
+  in
   let free_vars =
     Backend_var.Set.union free_vars_of_body
       (C.remove_vars_with_machtype free_vars_of_handler vars)
@@ -852,6 +874,7 @@ and let_cont_exn_handler env res k body vars handler free_vars_of_handler
   ( C.trywith ~dbg ~body ~exn_var ~extra_args:extra_params
       ~handler_cont:catch_id ~handler (),
     free_vars,
+    symbol_inits,
     res )
 
 and let_cont_rec env res invariant_params conts body =
@@ -885,9 +908,15 @@ and let_cont_rec env res invariant_params conts body =
   let conts_to_handlers, res =
     Continuation.Lmap.fold
       (fun k handler (conts_to_handlers, res) ->
-        let vars, _arity, handler, free_vars_of_handler, res =
+        let vars, _arity, handler, free_vars_of_handler, symbol_inits, res =
           continuation_handler env res handler
         in
+        (* It should be an flambda2 invariant that symbols are bound at
+           top-level, and the handler of a loop is clearly not top-level *)
+        if not (Env.Symbol_inits.is_empty symbol_inits)
+        then
+          Format.eprintf "Found leftover symbol inits in the body of a loop: %a"
+            Env.Symbol_inits.print symbol_inits;
         ( Continuation.Map.add k
             (invariant_vars @ vars, handler, free_vars_of_handler)
             conts_to_handlers,
@@ -899,7 +928,7 @@ and let_cont_rec env res invariant_params conts body =
   (* CR gbury: once we get proper debuginfo here, remember to apply
      Env.add_inlined_debuginfo to it *)
   let dbg = Debuginfo.none in
-  let body, free_vars_of_body, res = expr env res body in
+  let body, free_vars_of_body, symbol_inits, res = expr env res body in
   (* Setup the Cmm handlers for the Ccatch *)
   let handlers, free_vars =
     Continuation.Map.fold
@@ -915,16 +944,22 @@ and let_cont_rec env res invariant_params conts body =
       conts_to_handlers ([], free_vars_of_body)
   in
   let cmm = C.create_ccatch ~rec_flag:true ~body ~handlers in
-  let cmm, free_vars = wrap cmm free_vars in
-  cmm, free_vars, res
+  let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+  cmm, free_vars, symbol_inits, res
 
 and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
       let arity = Bound_parameters.arity params in
       let env, vars = C.continuation_bound_parameters env params in
-      let expr, free_vars_of_handler, res = expr env res handler in
-      vars, arity, expr, free_vars_of_handler, res)
+      let expr, free_vars_of_handler, symbol_inits, res =
+        expr env res handler
+      in
+      let expr, free_vars_of_handler, symbol_inits =
+        Env.place_symbol_inits ~params:vars expr free_vars_of_handler
+          symbol_inits
+      in
+      vars, arity, expr, free_vars_of_handler, symbol_inits, res)
 
 and apply_expr env res apply =
   let call, free_vars, env, res, effs = translate_apply env res apply in
@@ -952,8 +987,10 @@ and apply_expr env res apply =
   | Never_returns ->
     (* Case 1 *)
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-    let cmm, free_vars = wrap call free_vars in
-    cmm, free_vars, res
+    let cmm, free_vars, symbol_inits =
+      wrap call free_vars Env.Symbol_inits.empty
+    in
+    cmm, free_vars, symbol_inits, res
   | Return k -> (
     match Env.get_continuation env k with
     | Return { param_types } ->
@@ -966,8 +1003,10 @@ and apply_expr env res apply =
         let wrap, _, res =
           Env.flush_delayed_lets ~mode:Branching_point env res
         in
-        let cmm, free_vars = wrap call free_vars in
-        cmm, free_vars, res
+        let cmm, free_vars, symbol_inits =
+          wrap call free_vars Env.Symbol_inits.empty
+        in
+        cmm, free_vars, symbol_inits, res
       else
         Misc.fatal_errorf
           "Types (%a) do not match arguments for the return cont of@ %a"
@@ -976,8 +1015,10 @@ and apply_expr env res apply =
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
       let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-      let cmm, free_vars = wrap (C.cexit cont [call] []) free_vars in
-      cmm, free_vars, res
+      let cmm, free_vars, symbol_inits =
+        wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
+      in
+      cmm, free_vars, symbol_inits, res
     | Inline
         { handler_params;
           handler_body = body;
@@ -1021,7 +1062,13 @@ and apply_expr env res apply =
         let env =
           Env.set_inlined_debuginfo env handler_body_inlined_debuginfo
         in
-        let expr, free_vars_of_handler, res = expr env res body in
+        let expr, free_vars_of_handler, handler_symbol_inits, res =
+          expr env res body
+        in
+        let expr, free_vars_of_handler, symbol_inits =
+          Env.place_symbol_inits ~params:params_with_machtype expr
+            free_vars_of_handler handler_symbol_inits
+        in
         (* we know the handler can't be cold, or it wouldn't have been
            inlined. *)
         let handler =
@@ -1036,8 +1083,8 @@ and apply_expr env res apply =
             (C.remove_vars_with_machtype free_vars_of_handler
                params_with_machtype)
         in
-        let cmm, free_vars = wrap expr free_vars in
-        cmm, free_vars, res))
+        let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
+        cmm, free_vars, symbol_inits, res))
 
 and apply_cont env res apply_cont =
   let dbg_with_inlined =
@@ -1157,10 +1204,13 @@ and switch env res switch =
   in
   let make_arm ~must_tag_discriminant env res (d, action) =
     let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
-    let cmm_action, action_free_vars, res = apply_cont env res action in
+    let cmm_action, action_free_vars, action_symbol_inits, res =
+      apply_cont env res action
+    in
     ( ( d,
         cmm_action,
         action_free_vars,
+        action_symbol_inits,
         Env.add_inlined_debuginfo env (Apply_cont.debuginfo action) ),
       res )
   in
@@ -1176,22 +1226,27 @@ and switch env res switch =
        before creating an if-then-else, introducing an indirection that might
        prevent some optimizations performed by Selectgen/Emit when the condition
        is inlined in the if-then-else. Instead we use [C.ite]. *)
-    | (0, else_, else_free_vars, else_dbg), (_, then_, then_free_vars, then_dbg)
-    | (_, then_, then_free_vars, then_dbg), (0, else_, else_free_vars, else_dbg)
-      ->
+    | ( (0, else_, else_free_vars, else_inits, else_dbg),
+        (_, then_, then_free_vars, then_inits, then_dbg) )
+    | ( (_, then_, then_free_vars, then_inits, then_dbg),
+        (0, else_, else_free_vars, else_inits, else_dbg) ) ->
       let free_vars =
         Backend_var.Set.union scrutinee_free_vars
           (Backend_var.Set.union else_free_vars then_free_vars)
       in
-      let cmm, free_vars =
-        wrap (C.ite ~dbg scrutinee ~then_dbg ~then_ ~else_dbg ~else_) free_vars
+      (* See comment below about symbol inits and branches *)
+      let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
+      let cmm, free_vars, symbol_inits =
+        wrap
+          (C.ite ~dbg scrutinee ~then_dbg ~then_ ~else_dbg ~else_)
+          free_vars symbol_inits
       in
-      cmm, free_vars, res
+      cmm, free_vars, symbol_inits, res
     (* Similar case to the previous but none of the arms match 0, so we have to
        generate an equality test, and make sure it is inside the condition to
        ensure Selectgen and Emit can take advantage of it. *)
-    | ( (x, if_x, if_x_free_vars, if_x_dbg),
-        (_, if_not, if_not_free_vars, if_not_dbg) ) ->
+    | ( (x, if_x, if_x_free_vars, if_x_symbol_inits, if_x_dbg),
+        (_, if_not, if_not_free_vars, if_not_symbol_inits, if_not_dbg) ) ->
       let free_vars =
         Backend_var.Set.union scrutinee_free_vars
           (Backend_var.Set.union if_x_free_vars if_not_free_vars)
@@ -1201,8 +1256,12 @@ and switch env res switch =
           (C.eq ~dbg (C.int ~dbg x) scrutinee)
           ~then_dbg:if_x_dbg ~then_:if_x ~else_dbg:if_not_dbg ~else_:if_not
       in
-      let cmm, free_vars = wrap expr free_vars in
-      cmm, free_vars, res)
+      (* See comment below about symbol inits and branches *)
+      let symbol_inits =
+        Env.Symbol_inits.merge if_x_symbol_inits if_not_symbol_inits
+      in
+      let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
+      cmm, free_vars, symbol_inits, res)
   (* General case *)
   | n ->
     (* transl_switch_clambda expects an [index] array such that index.(d) is the
@@ -1212,20 +1271,32 @@ and switch env res switch =
     let unreachable, res = C.invalid res ~message:"unreachable switch case" in
     let cases = Array.make (n + 1) unreachable in
     let index = Array.make (m + 1) n in
-    let _, res, free_vars =
+    let _, res, free_vars, symbol_inits =
       Targetint_31_63.Map.fold
-        (fun discriminant action (i, res, free_vars) ->
-          let (d, cmm_action, action_free_vars, _dbg), res =
+        (fun discriminant action (i, res, free_vars, symbol_inits) ->
+          let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res
+              =
             make_arm ~must_tag_discriminant env res (discriminant, action)
+          in
+          (* Note about symbol inits and branches: symbol allocation can occur
+             in branches of a switch/ite, e.g. if there are two branches and one
+             of them raises, then the other one can be considered at unit
+             top-level and allow for symbols to be defined; after inlining of
+             continuation by to_cmm, this means it is expected that there can be
+             some symbol inits in branches of a switch (although we'd expect at
+             most one branch to have some). Therefore we want to correctly
+             handle and propagate up symbol inits that come from branches. *)
+          let symbol_inits =
+            Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
           cases.(i) <- cmm_action;
           index.(d) <- i;
-          i + 1, res, free_vars)
+          i + 1, res, free_vars, symbol_inits)
         arms
-        (0, res, scrutinee_free_vars)
+        (0, res, scrutinee_free_vars, Env.Symbol_inits.empty)
     in
     (* CR-someday poechsel: Put a more precise value kind here *)
     let expr = C.transl_switch_clambda dbg scrutinee index cases in
-    let cmm, free_vars = wrap expr free_vars in
-    cmm, free_vars, res
+    let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
+    cmm, free_vars, symbol_inits, res

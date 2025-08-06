@@ -27,6 +27,10 @@ exception Error of error
 
 module Seq = Simd.Seq
 
+let instr instr ?i args = Some (Simd.instruction instr i, args)
+
+let seq seq ?i args = Some (Simd.sequence seq i, args)
+
 let sse_or_avx sse vex ?i args =
   let sse_or_avx = if Arch.Extension.enabled AVX then vex else sse in
   Some (Simd.instruction sse_or_avx i, args)
@@ -145,7 +149,7 @@ let select_operation_sse ~dbg op args =
     sse_or_avx unpcklps vunpcklps_X_X_Xm128 args
   | "caml_sse_vec128_movemask_32" -> sse_or_avx movmskps vmovmskps_r64_X args
   | "caml_sse_vec128_shuffle_32" ->
-    let i, args = extract_constant args ~max:0xff op in
+    let i, args = extract_constant args ~max:255 op in
     sse_or_avx shufps vshufps_X_X_Xm128 ~i args
   | _ -> None
 
@@ -214,7 +218,7 @@ let select_operation_sse2 ~dbg op args =
   | "caml_sse2_int16x8_cmpgt" -> sse_or_avx pcmpgtw vpcmpgtw_X_X_Xm128 args
   | "caml_sse2_int32x4_cmpgt" -> sse_or_avx pcmpgtd vpcmpgtd_X_X_Xm128 args
   | "caml_sse2_float64x2_cmp" ->
-    let i, args = extract_constant args ~max:0x1f op in
+    let i, args = extract_constant args ~max:31 op in
     sse_or_avx cmppd vcmppd_X_X_Xm128 ~i args
   | "caml_sse2_cvt_int32x4_float64x2" ->
     sse_or_avx cvtdq2pd vcvtdq2pd_X_Xm64 args
@@ -520,9 +524,10 @@ let select_operation_sse41 ~dbg op args =
       sse_or_avx phminposuw vphminposuw args
     | "caml_sse41_int32x4_mul_even" -> sse_or_avx pmuldq vpmuldq_X_X_Xm128 args
     | "caml_sse41_int32x4_mul_low" -> sse_or_avx pmulld vpmulld_X_X_Xm128 args
-    | "caml_sse41_vec128_testz" -> seq_or_avx Seq.ptestz Seq.vptestz args
-    | "caml_sse41_vec128_testc" -> seq_or_avx Seq.ptestc Seq.vptestc args
-    | "caml_sse41_vec128_testnzc" -> seq_or_avx Seq.ptestnzc Seq.vptestnzc args
+    | "caml_sse41_vec128_testz" -> seq_or_avx Seq.ptestz Seq.vptestz_X args
+    | "caml_sse41_vec128_testc" -> seq_or_avx Seq.ptestc Seq.vptestc_X args
+    | "caml_sse41_vec128_testnzc" ->
+      seq_or_avx Seq.ptestnzc Seq.vptestnzc_X args
     | _ -> None
 
 let select_operation_sse42 ~dbg:_ op args =
@@ -577,6 +582,291 @@ let select_operation_sse42 ~dbg:_ op args =
       seq_or_avx Seq.pcmpistrz Seq.vpcmpistrz ~i args
     | _ -> None
 
+let select_operation_avx ~dbg:_ op args =
+  if not (Arch.Extension.enabled AVX)
+  then None
+  else
+    match op with
+    | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
+    | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
+    | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
+    | "caml_avx_float64x4_addsub" -> instr vaddsubpd_Y_Y_Ym256 args
+    | "caml_avx_vec256_and" -> instr vandps_Y_Y_Ym256 args
+    | "caml_avx_vec256_andnot" -> instr vandnps_Y_Y_Ym256 args
+    | "caml_avx_vec256_blend_64" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vblendpd_Y_Y_Ym256 ~i args
+    | "caml_avx_vec256_blend_32" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vblendps_Y_Y_Ym256 ~i args
+    | "caml_avx_vec256_blendv_64" -> instr vblendvpd_Y_Y_Ym256_Y args
+    | "caml_avx_vec256_blendv_32" -> instr vblendvps_Y_Y_Ym256_Y args
+    | "caml_avx_vec256_broadcast_128" -> instr vbroadcastf128 args
+    | "caml_avx_vec256_broadcast_64" -> instr vbroadcastsd_Y_X args
+    | "caml_avx_vec256_broadcast_32" -> instr vbroadcastss_Y_X args
+    | "caml_avx_vec128_broadcast_32" -> instr vbroadcastss_X_X args
+    | "caml_avx_float64x4_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_Y_Y_Ym256 ~i args
+    | "caml_avx_float32x8_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_Y_Y_Ym256 ~i args
+    | "caml_avx_cvt_int32x4_float64x4" -> instr vcvtdq2pd_Y_Xm128 args
+    | "caml_avx_cvt_int32x8_float32x8" -> instr vcvtdq2ps_Y_Ym256 args
+    | "caml_avx_cvt_float64x4_int32x4" -> instr vcvtpd2dq_X_Ym256 args
+    | "caml_avx_cvt_float64x4_float32x4" -> instr vcvtpd2ps_X_Ym256 args
+    | "caml_avx_cvt_float32x8_int32x8" -> instr vcvtps2dq_Y_Ym256 args
+    | "caml_avx_cvt_float32x4_float64x4" -> instr vcvtps2pd_Y_Xm128 args
+    | "caml_avx_cvtt_float64x4_int32x4" -> instr vcvttpd2dq_X_Ym256 args
+    | "caml_avx_cvtt_float32x8_int32x8" -> instr vcvttps2dq_Y_Ym256 args
+    | "caml_avx_float64x4_div" -> instr vdivpd_Y_Y_Ym256 args
+    | "caml_avx_float32x8_div" -> instr vdivps_Y_Y_Ym256 args
+    | "caml_avx_float32x4x2_dp" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdpps_Y_Y_Ym256 ~i args
+    | "caml_avx_vec256_extract_128" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf128 ~i args
+    | "caml_avx_float64x2x2_hadd" -> instr vhaddpd_Y_Y_Ym256 args
+    | "caml_avx_float32x4x2_hadd" -> instr vhaddps_Y_Y_Ym256 args
+    | "caml_avx_float64x2x2_hsub" -> instr vhsubpd_Y_Y_Ym256 args
+    | "caml_avx_float32x4x2_hsub" -> instr vhsubps_Y_Y_Ym256 args
+    | "caml_avx_vec256_insert_128" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf128 ~i args
+    | "caml_avx_float64x4_max" -> instr vmaxpd_Y_Y_Ym256 args
+    | "caml_avx_float32x8_max" -> instr vmaxps_Y_Y_Ym256 args
+    | "caml_avx_float64x4_min" -> instr vminpd_Y_Y_Ym256 args
+    | "caml_avx_float32x8_min" -> instr vminps_Y_Y_Ym256 args
+    | "caml_avx_vec256_dup_even_64" -> instr vmovddup_Y_Ym256 args
+    | "caml_avx_vec256_dup_odd_32" -> instr vmovshdup_Y_Ym256 args
+    | "caml_avx_vec256_dup_even_32" -> instr vmovsldup_Y_Ym256 args
+    | "caml_avx_vec256_movemask_64" -> instr vmovmskpd_r64_Y args
+    | "caml_avx_vec256_movemask_32" -> instr vmovmskps_r64_Y args
+    | "caml_avx_float64x4_mul" -> instr vmulpd_Y_Y_Ym256 args
+    | "caml_avx_float32x8_mul" -> instr vmulps_Y_Y_Ym256 args
+    | "caml_avx_vec256_or" -> instr vorps_Y_Y_Ym256 args
+    | "caml_avx_vec128_permute_64" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vpermilpd_X_Xm128 ~i args
+    | "caml_avx_vec128x2_permute_64" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpermilpd_Y_Ym256 ~i args
+    | "caml_avx_vec128_permute_32" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilps_X_Xm128 ~i args
+    | "caml_avx_vec128x2_permute_32" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilps_Y_Ym256 ~i args
+    | "caml_avx_vec256_permute2_128" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vperm2f128 ~i args
+    | "caml_avx_vec128_permutev_64" -> instr vpermilpd_X_X_Xm128 args
+    | "caml_avx_vec128x2_permutev_64" -> instr vpermilpd_Y_Y_Ym256 args
+    | "caml_avx_vec128_permutev_32" -> instr vpermilps_X_X_Xm128 args
+    | "caml_avx_vec128x2_permutev_32" -> instr vpermilps_Y_Y_Ym256 args
+    | "caml_avx_float32x8_rcp" -> instr vrcpps_Y_Ym256 args
+    | "caml_avx_float64x4_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      check_float_rounding i;
+      instr vroundpd_Y_Ym256 ~i args
+    | "caml_avx_float32x8_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      check_float_rounding i;
+      instr vroundps_Y_Ym256 ~i args
+    | "caml_avx_float32x8_rsqrt" -> instr vrsqrtps_Y_Ym256 args
+    | "caml_avx_vec128x2_shuffle_64" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vshufpd_Y_Y_Ym256 ~i args
+    | "caml_avx_vec128x2_shuffle_32" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufps_Y_Y_Ym256 ~i args
+    | "caml_avx_float64x4_sqrt" -> instr vsqrtpd_Y_Ym256 args
+    | "caml_avx_float32x8_sqrt" -> instr vsqrtps_Y_Ym256 args
+    | "caml_avx_float64x4_sub" -> instr vsubpd_Y_Y_Ym256 args
+    | "caml_avx_float32x8_sub" -> instr vsubps_Y_Y_Ym256 args
+    | "caml_avx_vec256_testz" -> seq Seq.vptestz_Y args
+    | "caml_avx_vec256_testc" -> seq Seq.vptestc_Y args
+    | "caml_avx_vec256_testnzc" -> seq Seq.vptestnzc_Y args
+    | "caml_avx_vec128x2_interleave_high_64" -> instr vunpckhpd_Y_Y_Ym256 args
+    | "caml_avx_vec128x2_interleave_high_32" -> instr vunpckhps_Y_Y_Ym256 args
+    | "caml_avx_vec128x2_interleave_low_64" -> instr vunpcklpd_Y_Y_Ym256 args
+    | "caml_avx_vec128x2_interleave_low_32" -> instr vunpcklps_Y_Y_Ym256 args
+    | "caml_avx_vec256_xor" -> instr vxorps_Y_Y_Ym256 args
+    | "caml_avx_zeroall" -> instr vzeroall args
+    | "caml_avx_zeroupper" -> instr vzeroupper args
+    | _ -> None
+
+let select_operation_avx2 ~dbg:_ op args =
+  if not (Arch.Extension.enabled AVX2)
+  then None
+  else
+    match op with
+    | "caml_avx2_int8x32_abs" -> instr vpabsb_Y_Ym256 args
+    | "caml_avx2_int16x16_abs" -> instr vpabsw_Y_Ym256 args
+    | "caml_avx2_int32x8_abs" -> instr vpabsd_Y_Ym256 args
+    | "caml_avx2_int8x32_add" -> instr vpaddb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_add" -> instr vpaddw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_add" -> instr vpaddd_Y_Y_Ym256 args
+    | "caml_avx2_int64x4_add" -> instr vpaddq_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_add_saturating" -> instr vpaddsb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_add_saturating" -> instr vpaddsw_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_add_saturating_unsigned" ->
+      instr vpaddusb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_add_saturating_unsigned" ->
+      instr vpaddusw_Y_Y_Ym256 args
+    | "caml_avx_vec128x2_align_right_bytes" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vpalignr_Y_Y_Ym256 ~i args
+    | "caml_avx2_int8x32_avg_unsigned" -> instr vpavgb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_avg_unsigned" -> instr vpavgw_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_blend_16" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpblendw_Y_Y_Ym256 ~i args
+    | "caml_avx2_vec256_blendv_8" -> instr vpblendvb_Y_Y_Ym256_Y args
+    | "caml_avx2_vec128_broadcast_8" -> instr vpbroadcastb_X_Xm8 args
+    | "caml_avx2_vec256_broadcast_8" -> instr vpbroadcastb_Y_Xm8 args
+    | "caml_avx2_vec128_broadcast_16" -> instr vpbroadcastw_X_Xm16 args
+    | "caml_avx2_vec256_broadcast_16" -> instr vpbroadcastw_Y_Xm16 args
+    | "caml_avx2_vec128x2_shift_left_bytes" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpslldq_Y_Y ~i args
+    | "caml_avx2_vec128x2_shift_right_bytes" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpsrldq_Y_Y ~i args
+    | "caml_avx2_int8x32_cmpeq" -> instr vpcmpeqb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_cmpeq" -> instr vpcmpeqw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_cmpeq" -> instr vpcmpeqd_Y_Y_Ym256 args
+    | "caml_avx2_int64x4_cmpeq" -> instr vpcmpeqq_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_cmpgt" -> instr vpcmpgtb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_cmpgt" -> instr vpcmpgtw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_cmpgt" -> instr vpcmpgtd_Y_Y_Ym256 args
+    | "caml_avx2_int64x4_cmpgt" -> instr vpcmpgtq_Y_Y_Ym256 args
+    | "caml_avx2_cvtsx_int16x8_int32x8" -> instr vpmovsxwd_Y_Xm128 args
+    | "caml_avx2_cvtsx_int16x8_int64x4" -> instr vpmovsxwq_Y_Xm64 args
+    | "caml_avx2_cvtsx_int32x4_int64x4" -> instr vpmovsxdq_Y_Xm128 args
+    | "caml_avx2_cvtsx_int8x16_int16x16" -> instr vpmovsxbw_Y_Xm128 args
+    | "caml_avx2_cvtsx_int8x16_int32x8" -> instr vpmovsxbd_Y_Xm64 args
+    | "caml_avx2_cvtsx_int8x16_int64x4" -> instr vpmovsxbq_Y_Xm32 args
+    | "caml_avx2_cvtzx_int16x8_int32x8" -> instr vpmovzxwd_Y_Xm128 args
+    | "caml_avx2_cvtzx_int16x8_int64x4" -> instr vpmovzxwq_Y_Xm64 args
+    | "caml_avx2_cvtzx_int32x4_int64x4" -> instr vpmovzxdq_Y_Xm128 args
+    | "caml_avx2_cvtzx_int8x16_int16x16" -> instr vpmovzxbw_Y_Xm128 args
+    | "caml_avx2_cvtzx_int8x16_int32x8" -> instr vpmovzxbd_Y_Xm64 args
+    | "caml_avx2_cvtzx_int8x16_int64x4" -> instr vpmovzxbq_Y_Xm32 args
+    | "caml_avx2_int16x8x2_hadd" -> instr vphaddw_Y_Y_Ym256 args
+    | "caml_avx2_int32x4x2_hadd" -> instr vphaddd_Y_Y_Ym256 args
+    | "caml_avx2_int16x8x2_hadd_saturating" -> instr vphaddsw_Y_Y_Ym256 args
+    | "caml_avx2_int16x8x2_hsub" -> instr vphsubw_Y_Y_Ym256 args
+    | "caml_avx2_int32x4x2_hsub" -> instr vphsubd_Y_Y_Ym256 args
+    | "caml_avx2_int16x8x2_hsub_saturating" -> instr vphsubsw_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_mul_hadd_int32x8" -> instr vpmaddwd_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_mul_unsigned_hadd_saturating_int16x16" ->
+      instr vpmaddubsw_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_max" -> instr vpmaxsb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_max" -> instr vpmaxsw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_max" -> instr vpmaxsd_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_max_unsigned" -> instr vpmaxub_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_max_unsigned" -> instr vpmaxuw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_max_unsigned" -> instr vpmaxud_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_min" -> instr vpminsb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_min" -> instr vpminsw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_min" -> instr vpminsd_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_min_unsigned" -> instr vpminub_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_min_unsigned" -> instr vpminuw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_min_unsigned" -> instr vpminud_Y_Y_Ym256 args
+    | "caml_avx2_vec256_movemask_8" -> instr vpmovmskb_r64_Y args
+    | "caml_avx2_int8x16x2_multi_sad_unsigned" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr vmpsadbw_Y_Y_Ym256 ~i args
+    | "caml_avx2_int32x8_mul_even" -> instr vpmuldq_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_mul_even_unsigned" -> instr vpmuludq_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_mul_high" -> instr vpmulhw_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_mul_high_unsigned" -> instr vpmulhuw_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_mul_round" -> instr vpmulhrsw_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_mul_low" -> instr vpmullw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_mul_low" -> instr vpmulld_Y_Y_Ym256 args
+    | "caml_avx2_cvt_int16x16_int8x32_saturating" ->
+      instr vpacksswb_Y_Y_Ym256 args
+    | "caml_avx2_cvt_int32x8_int16x16_saturating" ->
+      instr vpackssdw_Y_Y_Ym256 args
+    | "caml_avx2_cvt_int16x16_int8x32_saturating_unsigned" ->
+      instr vpackuswb_Y_Y_Ym256 args
+    | "caml_avx2_cvt_int32x8_int16x16_saturating_unsigned" ->
+      instr vpackusdw_Y_Y_Ym256 args
+    | "caml_avx2_vec256_permute_64" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermpd ~i args
+    | "caml_avx2_vec256_permutev_32" -> instr vpermps args
+    | "caml_avx2_int8x32_sad_unsigned" -> instr vpsadbw_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_shuffle_8" -> instr vpshufb_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_shuffle_high_16" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufhw_Y_Ym256 ~i args
+    | "caml_avx2_vec128x2_shuffle_low_16" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshuflw_Y_Ym256 ~i args
+    | "caml_avx2_int8x32_mulsign" -> instr vpsignb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_mulsign" -> instr vpsignw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_mulsign" -> instr vpsignd_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_sll" -> instr vpsllw_Y_Y_Xm128 args
+    | "caml_avx2_int32x8_sll" -> instr vpslld_Y_Y_Xm128 args
+    | "caml_avx2_int64x4_sll" -> instr vpsllq_Y_Y_Xm128 args
+    | "caml_avx2_int16x16_slli" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpsllw_Y_Y ~i args
+    | "caml_avx2_int32x8_slli" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vpslld_Y_Y ~i args
+    | "caml_avx2_int64x4_slli" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr vpsllq_Y_Y ~i args
+    | "caml_avx2_int32x4_sllv" -> instr vpsllvd_X_X_Xm128 args
+    | "caml_avx2_int32x8_sllv" -> instr vpsllvd_Y_Y_Ym256 args
+    | "caml_avx2_int64x2_sllv" -> instr vpsllvq_X_X_Xm128 args
+    | "caml_avx2_int64x4_sllv" -> instr vpsllvq_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_sra" -> instr vpsraw_Y_Y_Xm128 args
+    | "caml_avx2_int32x8_sra" -> instr vpsrad_Y_Y_Xm128 args
+    | "caml_avx2_int16x16_srai" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpsraw_Y_Y ~i args
+    | "caml_avx2_int32x8_srai" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vpsrad_Y_Y ~i args
+    | "caml_avx2_int32x4_srav" -> instr vpsravd_X_X_Xm128 args
+    | "caml_avx2_int32x8_srav" -> instr vpsravd_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_srl" -> instr vpsrlw_Y_Y_Xm128 args
+    | "caml_avx2_int32x8_srl" -> instr vpsrld_Y_Y_Xm128 args
+    | "caml_avx2_int64x4_srl" -> instr vpsrlq_Y_Y_Xm128 args
+    | "caml_avx2_int16x16_srli" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpsrlw_Y_Y ~i args
+    | "caml_avx2_int32x8_srli" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vpsrld_Y_Y ~i args
+    | "caml_avx2_int64x4_srli" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr vpsrlq_Y_Y ~i args
+    | "caml_avx2_int32x4_srlv" -> instr vpsrlvd_X_X_Xm128 args
+    | "caml_avx2_int32x8_srlv" -> instr vpsrlvd_Y_Y_Ym256 args
+    | "caml_avx2_int64x2_srlv" -> instr vpsrlvq_X_X_Xm128 args
+    | "caml_avx2_int64x4_srlv" -> instr vpsrlvq_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_sub" -> instr vpsubb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_sub" -> instr vpsubw_Y_Y_Ym256 args
+    | "caml_avx2_int32x8_sub" -> instr vpsubd_Y_Y_Ym256 args
+    | "caml_avx2_int64x4_sub" -> instr vpsubq_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_sub_saturating" -> instr vpsubsb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_sub_saturating" -> instr vpsubsw_Y_Y_Ym256 args
+    | "caml_avx2_int8x32_sub_saturating_unsigned" ->
+      instr vpsubusb_Y_Y_Ym256 args
+    | "caml_avx2_int16x16_sub_saturating_unsigned" ->
+      instr vpsubusw_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_interleave_high_8" -> instr vpunpckhbw_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_interleave_high_16" -> instr vpunpckhwd_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_interleave_low_8" -> instr vpunpcklbw_Y_Y_Ym256 args
+    | "caml_avx2_vec128x2_interleave_low_16" -> instr vpunpcklwd_Y_Y_Ym256 args
+    | _ -> None
+
 let select_simd_instr ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
@@ -590,6 +880,8 @@ let select_simd_instr ~dbg op args =
   |> or_else select_operation_ssse3
   |> or_else select_operation_sse41
   |> or_else select_operation_sse42
+  |> or_else select_operation_avx
+  |> or_else select_operation_avx2
 
 let select_operation_cfg ~dbg op args =
   select_simd_instr ~dbg op args
@@ -639,8 +931,8 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
     | Sequence
         { id =
             ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
-            | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz
-            | Vptestc | Vptestnzc );
+            | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
+            | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
           instr
         } ->
       instr

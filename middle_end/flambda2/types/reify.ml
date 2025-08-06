@@ -425,33 +425,15 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
        *         function_types_with_value_slots Value_slot.Map.empty
        *     in
        *     Lift_set_of_closures { function_slot; function_types; value_slots } *)
-    | Naked_immediate (Ok (Naked_immediates imms)) -> (
-      match Targetint_31_63.Set.get_singleton imms with
-      | None -> try_canonical_simple ()
-      | Some i -> Simple (Simple.const (Reg_width_const.naked_immediate i)))
-    | Naked_immediate (Ok (Is_int scrutinee_ty)) -> (
-      match Provers.meet_is_int_variant_only env scrutinee_ty with
-      | Known_result true -> Simple Simple.untagged_const_true
-      | Known_result false -> Simple Simple.untagged_const_false
-      | Need_meet -> try_canonical_simple ()
-      | Invalid -> Invalid)
-    | Naked_immediate (Ok (Get_tag block_ty)) -> (
-      match Provers.prove_get_tag env block_ty with
-      | Proved tags -> (
-        let is =
-          Tag.Set.fold
-            (fun tag is ->
-              Targetint_31_63.Set.add (Tag.to_targetint_31_63 tag) is)
-            tags Targetint_31_63.Set.empty
-        in
+    | Naked_immediate (Ok head) -> (
+      match
+        Provers.meet_naked_immediates env
+          (TG.create_from_head_naked_immediate head)
+      with
+      | Known_result is -> (
         match Targetint_31_63.Set.get_singleton is with
         | None -> try_canonical_simple ()
         | Some i -> Simple (Simple.const (Reg_width_const.naked_immediate i)))
-      | Unknown -> try_canonical_simple ())
-    | Naked_immediate (Ok (Is_null scrutinee_ty)) -> (
-      match Provers.meet_is_null env scrutinee_ty with
-      | Known_result true -> Simple Simple.untagged_const_true
-      | Known_result false -> Simple Simple.untagged_const_false
       | Need_meet -> try_canonical_simple ()
       | Invalid -> Invalid)
     | Naked_float32 (Ok fs) -> (

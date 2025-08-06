@@ -1,34 +1,41 @@
 let failmsg = ref (fun () -> ())
 
+let failure () =
+  !failmsg ();
+  print_endline ""
+
 let eq lv hv l h =
   if l <> lv
   then Printf.printf "low: actual = 0x%016Lx <> 0x%016Lx = expected\n" lv l;
   if h <> hv
   then Printf.printf "high: actual = 0x%016Lx <> 0x%016Lx = expected\n" hv h;
-  if l <> lv || h <> hv then !failmsg ()
+  if l <> lv || h <> hv then failure ()
 
 let eql lv hv l h =
   if l <> lv then Printf.printf "%016lx <> %016lx\n" lv l;
   if h <> hv then Printf.printf "%016lx <> %016lx\n" hv h;
-  if l <> lv || h <> hv then !failmsg ()
+  if l <> lv || h <> hv then failure ()
 
 let eqi lv hv l h =
   if l <> lv
-  then Printf.printf "low:  expected = %016x <> %016x = actual\n" lv l;
+  then Printf.printf "low:  actual = 0x%016x <> 0x%016x = expected\n" lv l;
   if h <> hv
-  then Printf.printf "high: expected = %016x <> %016x = actual\n" hv h;
-  if l <> lv || h <> hv then !failmsg ()
+  then Printf.printf "high: actual = 0x%016x <> 0x%016x = expected\n" hv h;
+  if l <> lv || h <> hv then failure ()
+
+let eq64 a b =
+  if a <> b then Printf.printf "actual = 0x%016Lx <> 0x%016Lx = expected\n" a b
 
 let eqf lv hv l h =
   if l <> lv then Printf.printf "%f <> %f\n" l lv;
   if h <> hv then Printf.printf "%f <> %f\n" h hv;
-  if l <> lv || h <> hv then !failmsg ()
+  if l <> lv || h <> hv then failure ()
 
 let eqf32 lv hv l h =
   let f32 = Stdlib_stable.Float32.to_float in
   if l <> lv then Printf.printf "%f <> %f\n" (f32 l) (f32 lv);
   if h <> hv then Printf.printf "%f <> %f\n" (f32 h) (f32 hv);
-  if l <> lv || h <> hv then !failmsg ()
+  if l <> lv || h <> hv then failure ()
 
 let eq4 w0v w1v w2v w3v w0 w1 w2 w3 =
   if w0 <> w0v
@@ -39,14 +46,14 @@ let eq4 w0v w1v w2v w3v w0 w1 w2 w3 =
   then Printf.printf "word2: actual = 0x%016Lx <> 0x%016Lx = expected\n" w2v w2;
   if w3 <> w3v
   then Printf.printf "word3: actual = 0x%016Lx <> 0x%016Lx = expected\n" w3v w3;
-  if w0 <> w0v || w1 <> w1v || w2 <> w2v || w3 <> w3v then !failmsg ()
+  if w0 <> w0v || w1 <> w1v || w2 <> w2v || w3 <> w3v then failure ()
 
 external abort : unit -> unit = "caml_test_abort" [@@noalloc]
 
 let eqf' lv l =
   let fail = lv <> l && not (Float.is_nan lv && Float.is_nan l) in
   if fail then Printf.printf "expected = %f <> %f = actual\n" l lv;
-  if fail then !failmsg ();
+  if fail then failure ();
   (* if fail then abort (); *)
   ()
 
@@ -142,10 +149,6 @@ let eq_float64x2 ~result ~expect =
   eqf' lv l;
   eqf' hv h;
   ()
-
-let to_float64x2 f0 f1 =
-  let v0, v1 = Int64.bits_of_float f0, Int64.bits_of_float f1 in
-  float64x2_of_int64s v0 v1
 
 let () =
   (failmsg := fun () -> Printf.printf "basic_checks!");
@@ -445,6 +448,10 @@ end
 module Float64 = struct
   include Float64_reference
 
+  let to_float64x2 f0 f1 =
+    let v0, v1 = Int64.bits_of_float f0, Int64.bits_of_float f1 in
+    float64x2_of_int64s v0 v1
+
   module Tests = struct
     let () =
       (failmsg := fun () -> Printf.printf "Float64!");
@@ -514,14 +521,15 @@ module Int32s = struct
     = "caml_vec128_unreachable" "int32_su16"
     [@@noalloc]
 
-  let of_int32s a b c d =
+  let to_int64 a b =
     let a = Int64.of_int32 a |> Int64.logand 0xffffffffL in
     let b = Int64.of_int32 b |> Int64.logand 0xffffffffL in
-    let c = Int64.of_int32 c |> Int64.logand 0xffffffffL in
-    let d = Int64.of_int32 d |> Int64.logand 0xffffffffL in
-    int32x4_of_int64s
-      Int64.(logor (shift_left b 32) a)
-      Int64.(logor (shift_left d 32) c)
+    Int64.(logor (shift_left b 32) a)
+
+  let to_int32x4 a b c d =
+    let ab = to_int64 a b in
+    let cd = to_int64 c d in
+    int32x4_of_int64s ab cd
 
   let check_ints f =
     let open Int32 in
@@ -652,22 +660,19 @@ module Int16 = struct
     = "caml_vec128_unreachable" "int16_su8"
     [@@noalloc]
 
-  let of_ints a b c d e f g h =
+  let to_int64 a b c d =
     let a = Int64.of_int a |> Int64.logand 0xffffL in
     let b = Int64.of_int b |> Int64.logand 0xffffL in
     let c = Int64.of_int c |> Int64.logand 0xffffL in
     let d = Int64.of_int d |> Int64.logand 0xffffL in
-    let e = Int64.of_int e |> Int64.logand 0xffffL in
-    let f = Int64.of_int f |> Int64.logand 0xffffL in
-    let g = Int64.of_int g |> Int64.logand 0xffffL in
-    let h = Int64.of_int h |> Int64.logand 0xffffL in
     let low = Int64.(logor (shift_left b 16) a) in
     let high = Int64.(logor (shift_left d 16) c) in
-    let _low = Int64.(logor (shift_left high 32) low) in
-    let low = Int64.(logor (shift_left f 16) e) in
-    let high = Int64.(logor (shift_left h 16) g) in
-    let _high = Int64.(logor (shift_left high 32) low) in
-    int16x8_of_int64s _low _high
+    Int64.(logor (shift_left high 32) low)
+
+  let to_int16x8 a b c d e f g h =
+    let low = to_int64 a b c d in
+    let high = to_int64 e f g h in
+    int16x8_of_int64s low high
 
   let max_int = 0x7fff
 
@@ -775,7 +780,7 @@ module Int8 = struct
     = "caml_vec128_unreachable" "int8_zxi64"
     [@@noalloc]
 
-  let of_ints a b c d e f g h =
+  let to_int64 a b c d e f g h =
     let a = Int64.of_int a |> Int64.logand 0xffL in
     let b = Int64.of_int b |> Int64.logand 0xffL in
     let c = Int64.of_int c |> Int64.logand 0xffL in
@@ -790,7 +795,10 @@ module Int8 = struct
     let hg = Int64.(logor (shift_left h 8) g) in
     let dcba = Int64.(logor (shift_left dc 16) ba) in
     let hgfe = Int64.(logor (shift_left hg 16) fe) in
-    let i = Int64.(logor (shift_left hgfe 32) dcba) in
+    Int64.(logor (shift_left hgfe 32) dcba)
+
+  let to_int8x16 a b c d e f g h =
+    let i = to_int64 a b c d e f g h in
     int8x16_of_int64s i i
 
   let check_ints f =

@@ -6,6 +6,6 @@
   (run ./gen/gen_dune.exe)))
 
 (rule
- (alias runtest)
+ (alias runtest-llvm)
  (action
   (diff dune.inc dune.inc.gen)))

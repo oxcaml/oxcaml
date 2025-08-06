@@ -21,7 +21,7 @@ One-time setup (you can also use other 4.14.x releases):
 ```
 $ opam switch 4.14.1  # or "opam switch create 4.14.1" if you haven't got that switch already
 $ eval $(opam env)
-$ opam install dune.3.15.2 menhir.20231231
+$ opam install dune.3.15.3 menhir.20231231
 ```
 
 You probably then want to fork the `oxcaml/oxcaml` repo to your own Github org.

@@ -41,6 +41,9 @@ type upstream_compat_warning =
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
       on an external declaration with float# is missing. *)
+  | Immediate_void_variant
+      (* example: [type t = A of void] is immediate, but
+         not after erasure, which boxes void, so it can't be erased. *)
 
 type name_out_of_scope_warning =
   | Name of string
@@ -136,6 +139,7 @@ type t =
     { axis : string;
       overriden_by : string;
     } (* 213 *)
+  | Atomic_float_record_boxed               (* 214 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -227,6 +231,7 @@ let number = function
   | Unboxing_impossible -> 210
   | Mod_by_top _ -> 211
   | Modal_axis_specified_twice _ -> 213
+  | Atomic_float_record_boxed -> 214
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -612,6 +617,11 @@ let descriptions = [
   { number = 211;
     names = ["mod-by-top"];
     description = "Including the top-most element of an axis in a kind's modifiers is a no-op.";
+    since = since 4 14 };
+  { number = 214;
+    names = ["atomic-float-record-boxed"];
+    description = "Record contains atomic float fields, preventing the flat\n\
+                   float record optimization.";
     since = since 4 14 };
 ]
 
@@ -1244,6 +1254,11 @@ let message = function
       "[@unboxed] attribute must be added to external declaration \n\
        argument type with layout %s for upstream compatibility."
       layout
+  | Incompatible_with_upstream Immediate_void_variant ->
+      "This variant is immediate \n\
+       because all its constructors have all-void arguments, but after \n\
+       erasure for upstream compatibility, void is no longer zero-width, \n\
+       so it won't be immediate."
   | Unerasable_position_argument -> "this position argument cannot be erased."
   | Unnecessarily_partial_tuple_pattern ->
       "This tuple pattern\n\
@@ -1279,6 +1294,12 @@ let message = function
     Printf.sprintf
       "This %s is overriden by %s later."
       axis overriden_by
+  | Atomic_float_record_boxed ->
+    Printf.sprintf
+      "This record contains atomic\n\
+       float fields, which prevents the float record optimization. The\n\
+       fields of this record will be boxed instead of being\n\
+       represented as a flat float array."
 ;;
 
 let nerrors = ref 0

@@ -93,6 +93,18 @@ let compile_file ?output ?(opt="") ?stable_name name =
     | Some stable when Config.c_has_debug_prefix_map ->
       Printf.sprintf " -fdebug-prefix-map=%s=%s" name stable
     | Some _ | None -> "" in
+  let debug_flags =
+    if !Clflags.debug && Config.ccomp_type <> "msvc" then
+      (* DWARF compression is only configured for native code compilation.
+         The dwarf_c_toolchain_flag is set in optmaindriver.ml and will be
+         empty when compiling C files from bytecode tools like ocamlc. *)
+      let compression_flag = 
+        if !Clflags.native_code then !Clflags.dwarf_c_toolchain_flag else ""
+      in
+      "-g" ^ compression_flag
+    else
+      ""
+  in
   let exit =
     command
       (Printf.sprintf
@@ -111,7 +123,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
           | None -> ""
           | Some o -> Printf.sprintf "%s%s" Config.c_output_obj o)
          opt
-         (if !Clflags.debug && Config.ccomp_type <> "msvc" then "-g" else "")
+         debug_flags
          (String.concat " " (List.rev !Clflags.all_ccopts))
          (quote_prefixed ~response_files:true "-I"
             (List.map (Misc.expand_directory Config.standard_library)
@@ -190,7 +202,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
           (quote_files ~response_files:true (remove_Wl files))
           extra
       else
-        Printf.sprintf "%s -o %s %s %s %s %s %s"
+        Printf.sprintf "%s -o %s %s %s %s %s %s %s"
           (match !Clflags.c_compiler, mode with
           | Some cc, _ -> cc
           | None, Exe -> Config.mkexe
@@ -204,6 +216,7 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
            else
              quote_prefixed ~response_files:true "-L"
                (Load_path.get_path_list ()))
+          !Clflags.dwarf_c_toolchain_flag
           (String.concat " " (List.rev !Clflags.all_ccopts))
           (quote_files ~response_files:true files)
           extra

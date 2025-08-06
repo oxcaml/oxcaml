@@ -100,6 +100,11 @@ let float_comparison = function
   | CFge -> ">="
   | CFnge -> "!>="
 
+let vector_width = function
+  | Vec128 -> "vec128"
+  | Vec256 -> "vec256"
+  | Vec512 -> "vec512"
+
 let vec128_name = function
   | Int8x16 -> "int8x16"
   | Int16x8 -> "int16x8"
@@ -215,9 +220,9 @@ let to_string msg =
     ppf msg
 
 let reinterpret_cast : Cmm.reinterpret_cast -> string = function
-  | V128_of_v128 -> "vec128 as vec128"
-  | V256_of_v256 -> "vec256 as vec256"
-  | V512_of_v512 -> "vec512 as vec512"
+  | V128_of_vec w -> Printf.sprintf "%s as vec128" (vector_width w)
+  | V256_of_vec w -> Printf.sprintf "%s as vec256" (vector_width w)
+  | V512_of_vec w -> Printf.sprintf "%s as vec512" (vector_width w)
   | Value_of_int -> "int as value"
   | Int_of_value -> "value as int"
   | Float32_of_float -> "float as float32"

@@ -151,6 +151,31 @@ let make_decisions ~continuation_arg_types denv params params_types :
   ( denv,
     { decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid = invalids } )
 
+let make_decisions ~continuation_arg_types denv params params_types =
+  Profile.record_call_with_counters ~accumulate:true
+    ~counter_f:(fun (_, ({ decisions; _ } : Decisions.t)) ->
+      let counters = Profile.Counters.create () in
+      List.fold_left
+        (fun counters (_, (decision : U.decision)) ->
+          match decision with
+          | Unbox _ ->
+            (* For reference: how many times did we suceed? *)
+            Profile.Counters.incr "unbox" counters
+          | Do_not_unbox
+              ( Not_beneficial | Incomplete_parameter_type
+              | Not_enough_information_at_use | All_fields_invalid ) ->
+            Profile.Counters.incr "do_not_unbox" counters
+          | Do_not_unbox Max_depth_exceeded ->
+            (* Should be rare, but interesting to know if it's not. *)
+            Profile.Counters.incr "max_depth_exceeded" counters
+          | Do_not_unbox (Not_of_kind_value | Unboxing_not_requested) ->
+            (* Not interesting to count these -- we can't do better and we
+               probably didn't even try. *)
+            counters)
+        counters decisions)
+    "make_unboxing_decisions"
+    (fun () -> make_decisions ~continuation_arg_types denv params params_types)
+
 let compute_extra_params_and_args
     ({ decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid } :
       Decisions.t) ~arg_types_by_use_id existing_extra_params_and_args =

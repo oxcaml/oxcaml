@@ -43,6 +43,7 @@ type upstream_compat_warning =
   | Immediate_erasure of string
   | Non_value_sort of string
   | Unboxed_attribute of string
+  | Immediate_void_variant
 
 type name_out_of_scope_warning =
   | Name of string
@@ -143,6 +144,7 @@ type t =
       axis : string;
       overriden_by : string;
     }                                       (* 213 *)
+  | Atomic_float_record_boxed               (* 214 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

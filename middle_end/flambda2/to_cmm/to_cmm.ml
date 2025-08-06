@@ -75,7 +75,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       ~return_continuation_arity:[] ~trans_prim:To_cmm_primitive.trans_prim
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
-  let ret_var = Variable.create "*ret*" in
+  let ret_var = Variable.create "*ret*" Flambda_kind.value in
   let ret_var_duid = Flambda_debug_uid.none in
   let _env, return_cont_params =
     (* The environment is dropped because the handler for the dummy continuation
@@ -99,9 +99,14 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     R.create ~reachable_names
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
-  let body, body_free_vars, res =
+  let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
   in
+  if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits)
+  then
+    Misc.fatal_errorf
+      "Did not find where to place the following symbol initializations: %a"
+      To_cmm_env.Symbol_inits.print body_symbol_inits;
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var
   in

@@ -76,7 +76,7 @@ let register_const0 acc constant name =
   match Static_const.Map.find constant (Acc.shareable_constants acc) with
   | exception Not_found ->
     (* Create a variable to ensure uniqueness of the symbol. *)
-    let var = Variable.create name in
+    let var = Variable.create name K.value in
     let acc, symbol =
       manufacture_symbol acc
         (* CR mshinwell: this Variable.rename looks to be redundant *)
@@ -404,7 +404,7 @@ module Inlining = struct
     let inlined_debuginfo =
       Inlined_debuginfo.create ~called_code_id ~apply_dbg
     in
-    let inlined_dbg_var = Variable.create "inlined_dbg" in
+    let inlined_dbg_var = Variable.create "inlined_dbg" K.value in
     let inlined_dbg_var_duid = Flambda_debug_uid.none in
     Let_with_acc.create acc
       (Bound_pattern.singleton
@@ -753,13 +753,15 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
           when Stdlib.( = ) src src_kind && Stdlib.( = ) dst dst_kind -> (
           match args with
           | [arg] ->
-            let result = Variable.create "reinterpreted" in
+            let prim = P.Unary (Reinterpret_64_bit_word op, arg) in
+            let result =
+              Variable.create "reinterpreted" (P.result_kind' prim)
+            in
             let result_duid = Flambda_debug_uid.none in
             let result' =
               Bound_var.create result result_duid Name_mode.normal
             in
             let bindable = Bound_pattern.singleton result' in
-            let prim = P.Unary (Reinterpret_64_bit_word op, arg) in
             let acc, return_result =
               Apply_cont_with_acc.create acc return_continuation
                 ~args:[Simple.var result]
@@ -808,13 +810,14 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         | None -> fun args acc -> call (arg :: args) acc
         | Some named ->
           fun args acc ->
-            let unboxed_arg = Variable.create "unboxed" in
+            let prim = P.Unary (named, arg) in
+            let unboxed_arg = Variable.create "unboxed" (P.result_kind' prim) in
             let unboxed_arg_duid = Flambda_debug_uid.none in
             let unboxed_arg' =
               VB.create unboxed_arg unboxed_arg_duid Name_mode.normal
             in
             let acc, body = call (Simple.var unboxed_arg :: args) acc in
-            let named = Named.create_prim (Unary (named, arg)) dbg in
+            let named = Named.create_prim prim dbg in
             Let_with_acc.create acc
               (Bound_pattern.singleton unboxed_arg')
               named ~body)
@@ -1716,7 +1719,7 @@ let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
 let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     Expr_with_acc.t =
   let scrutinee = find_simple_from_id env scrutinee in
-  let untagged_scrutinee = Variable.create "untagged" in
+  let untagged_scrutinee = Variable.create "untagged" K.naked_immediate in
   let untagged_scrutinee_duid = Flambda_debug_uid.none in
   (* CR sspies: We should probably have something like a phantom let here, even
      though the target variable isn't user-visible. Then in the debugger, if
@@ -1762,7 +1765,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
              Simple.const (Reg_width_const.naked_immediate case) ))
         condition_dbg
     in
-    let comparison_result = Variable.create "eq" in
+    let comparison_result = Variable.create "eq" K.naked_immediate in
     let comparison_result_duid = Flambda_debug_uid.none in
     let comparison_result' =
       VB.create comparison_result comparison_result_duid Name_mode.normal
@@ -1847,18 +1850,23 @@ let variables_for_unboxing boxed_variable_name (k : Function_decl.unboxing_kind)
   | Fields_of_block_with_tag_zero kinds ->
     List.mapi
       (fun i kind ->
-        ( Variable.create (boxed_variable_name ^ "_field_" ^ Int.to_string i),
+        ( Variable.create
+            (boxed_variable_name ^ "_field_" ^ Int.to_string i)
+            (Flambda_kind.With_subkind.kind kind),
           Flambda_debug_uid.none,
           kind ))
       kinds
   | Unboxed_number bn ->
-    [ ( Variable.create (boxed_variable_name ^ "_unboxed"),
+    [ ( Variable.create
+          (boxed_variable_name ^ "_unboxed")
+          (Flambda_kind.Boxable_number.unboxed_kind bn),
         Flambda_debug_uid.none,
         Flambda_kind.With_subkind.naked_of_boxable_number bn ) ]
   | Unboxed_float_record num_fields ->
     List.init num_fields (fun i ->
         ( Variable.create
-            (boxed_variable_name ^ "_floatfield_" ^ Int.to_string i),
+            (boxed_variable_name ^ "_floatfield_" ^ Int.to_string i)
+            K.naked_float,
           Flambda_debug_uid.none,
           Flambda_kind.With_subkind.naked_float ))
 
@@ -1992,7 +2000,7 @@ let compute_body_of_unboxed_function acc my_region my_closure
       let unboxed_return_continuation =
         Continuation.create ~sort:Return ~name:"unboxed_return" ()
       in
-      let boxed_variable = Variable.create "boxed_result" in
+      let boxed_variable = Variable.create "boxed_result" K.value in
       let boxed_variable_duid = Flambda_debug_uid.none in
       let return =
         match Flambda_arity.unarized_components return with
@@ -2042,7 +2050,7 @@ let compute_body_of_unboxed_function acc my_region my_closure
           (List.map (fun (_, _, kind) -> kind) vars_with_kinds),
         unboxed_return_continuation )
   in
-  let my_unboxed_closure = Variable.create "my_unboxed_closure" in
+  let my_unboxed_closure = Variable.create "my_unboxed_closure" K.value in
   let acc, unboxed_body =
     Let_with_acc.create acc
       (Bound_pattern.singleton
@@ -2080,22 +2088,22 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
      starting with 'main_' refers to the version with unboxed return/params. *)
   let main_function_slot = unboxed_function_slot in
   let main_name = Function_slot.name unboxed_function_slot in
-  let main_closure = Variable.create main_name in
+  let main_closure = Variable.create main_name K.value in
   let main_closure_duid = Flambda_debug_uid.none in
   let return_continuation = Continuation.create () in
   let exn_continuation = Continuation.create () in
-  let my_closure = Variable.create "my_closure" in
+  let my_closure = Variable.create "my_closure" K.value in
   let my_region =
     if contains_no_escaping_local_allocs
     then None
-    else Some (Variable.create "my_region")
+    else Some (Variable.create "my_region" K.region)
   in
   let my_ghost_region =
     if contains_no_escaping_local_allocs
     then None
-    else Some (Variable.create "my_ghost_region")
+    else Some (Variable.create "my_ghost_region" K.region)
   in
-  let my_depth = Variable.create "my_depth" in
+  let my_depth = Variable.create "my_depth" K.rec_info in
   let rec unbox_params params params_unboxing =
     match params, params_unboxing with
     | [], [] -> [], [], fun body free_names_of_body -> body, free_names_of_body
@@ -2204,13 +2212,16 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         Bound_parameters.create
           (List.map
              (fun kind ->
-               let var = Variable.create "unboxed_return" in
+               let var =
+                 Variable.create "unboxed_return"
+                   (Flambda_kind.With_subkind.kind kind)
+               in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
              (Flambda_arity.unarized_components result_arity_main_code))
       in
       let handler, free_names_of_handler =
-        let boxed_return = Variable.create "boxed_return" in
+        let boxed_return = Variable.create "boxed_return" K.value in
         let boxed_return_duid = Flambda_debug_uid.none in
         let return_apply_cont =
           Apply_cont.create return_continuation
@@ -2347,7 +2358,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     match Exn_continuation.extra_args exn_continuation with
     | [] -> true
     | _ :: _ -> false);
-  let my_closure = Variable.create "my_closure" in
+  let my_closure = Variable.create "my_closure" K.value in
   let recursive = Function_decl.recursive decl in
   (* Mark function available for loopify only if it is a single recursive
      function *)
@@ -2364,8 +2375,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let my_region = Function_decl.my_region decl in
   let my_ghost_region = Function_decl.my_ghost_region decl in
   let function_slot = Function_decl.function_slot decl in
-  let my_depth = Variable.create "my_depth" in
-  let next_depth = Variable.create "next_depth" in
+  let my_depth = Variable.create "my_depth" K.rec_info in
+  let next_depth = Variable.create "next_depth" K.rec_info in
   let next_depth_duid = Flambda_debug_uid.none in
   let our_let_rec_ident = Function_decl.let_rec_ident decl in
   let is_curried =
@@ -2388,7 +2399,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let (value_slots_to_bind : Value_slot.t Variable.Map.t), vars_for_idents =
     Ident.Map.fold
       (fun id value_slot (value_slots_to_bind, vars_for_idents) ->
-        let var = Variable.create_with_same_name_as_ident id in
+        let var =
+          Variable.create_with_same_name_as_ident id
+            (Value_slot.kind value_slot)
+        in
         ( Variable.Map.add var value_slot value_slots_to_bind,
           Ident.Map.add id var vars_for_idents ))
       value_slots_from_idents
@@ -2426,7 +2440,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
               (* my_closure is already bound *)
             else
               let variable =
-                Variable.create_with_same_name_as_ident let_rec_ident
+                Variable.create_with_same_name_as_ident let_rec_ident K.value
               in
               let function_slot =
                 Ident.Map.find let_rec_ident function_slots_from_idents
@@ -3060,7 +3074,7 @@ let close_let_rec acc env ~function_declarations
         (fun function_slot fun_vars_map ->
           let fun_var =
             VB.create
-              (Variable.create "generated")
+              (Variable.create "generated" K.value)
               Flambda_debug_uid.none Name_mode.normal
           in
           Function_slot.Map.add function_slot fun_var fun_vars_map)
@@ -3240,7 +3254,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
 let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
     ~remaining_arity ~result_mode =
   let wrapper_cont = Continuation.create () in
-  let returned_func = Variable.create "func" in
+  let returned_func = Variable.create "func" K.value in
   let returned_func_duid = Flambda_debug_uid.none in
   (* See comments in [Simplify_common.split_direct_over_application] about this
      code for handling local allocations. *)
@@ -3252,8 +3266,10 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   let needs_region =
     match apply.mode, (result_mode : Lambda.locality_mode) with
     | Alloc_heap, Alloc_local ->
-      let over_app_region = Variable.create "over_app_region" in
-      let over_app_ghost_region = Variable.create "over_app_ghost_region" in
+      let over_app_region = Variable.create "over_app_region" K.region in
+      let over_app_ghost_region =
+        Variable.create "over_app_ghost_region" K.region
+      in
       Some (over_app_region, over_app_ghost_region, Continuation.create ())
     | Alloc_heap, Alloc_heap | Alloc_local, _ -> None
   in
@@ -3304,7 +3320,11 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       let over_application_results =
         List.mapi
           (fun i kind ->
-            let result_var = Variable.create ("result" ^ string_of_int i) in
+            let result_var =
+              Variable.create
+                ("result" ^ string_of_int i)
+                (Flambda_kind.With_subkind.kind kind)
+            in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
           (Flambda_arity.unarized_components apply.return_arity)
@@ -3321,8 +3341,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         let acc, body =
           Let_with_acc.create acc
             (Bound_pattern.singleton
-               (Bound_var.create (Variable.create "unit") Flambda_debug_uid.none
-                  Name_mode.normal))
+               (Bound_var.create
+                  (Variable.create "unit" K.value)
+                  Flambda_debug_uid.none Name_mode.normal))
             (Named.create_prim
                (Unary (End_region { ghost = true }, Simple.var ghost_region))
                apply_dbg)
@@ -3330,8 +3351,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         in
         Let_with_acc.create acc
           (Bound_pattern.singleton
-             (Bound_var.create (Variable.create "unit") Flambda_debug_uid.none
-                Name_mode.normal))
+             (Bound_var.create
+                (Variable.create "unit" K.value)
+                Flambda_debug_uid.none Name_mode.normal))
           (Named.create_prim
              (Unary (End_region { ghost = false }, Simple.var region))
              apply_dbg)
@@ -3634,7 +3656,7 @@ let bind_code_and_sets_of_closures all_code sets_of_closures acc body =
 
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~module_block_size_in_words ~return_cont ~module_symbol =
-  let module_block_var = Variable.create "module_block" in
+  let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
   let load_fields_body acc =
@@ -3652,7 +3674,11 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     let field_vars =
       List.init module_block_size_in_words (fun pos ->
           let pos_str = string_of_int pos in
-          pos, Variable.create ("field_" ^ pos_str), Flambda_debug_uid.none)
+          ( pos,
+            Variable.create ("field_" ^ pos_str) K.value
+            (* CR mixed-modules: Find the right kind from the module block
+               shape *),
+            Flambda_debug_uid.none ))
     in
     let acc, body =
       let static_const : Static_const.t =

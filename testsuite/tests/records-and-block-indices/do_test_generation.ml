@@ -61,4 +61,36 @@
       reference = "${test_source_directory}/generated_${test_name}_bytecode_test.ml";
       check-program-output;
     }}
+  { test_name = "record_access_with_void";
+    {
+      arguments = "native ${test_name}";
+      output = "${test_source_directory}/generated_${test_name}_native_test.ml.corrected";
+      run;
+      output = "${test_source_directory}/generated_${test_name}_native_test.ml.corrected";
+      reference = "${test_source_directory}/generated_${test_name}_native_test.ml";
+      check-program-output;
+    }{
+      arguments = "bytecode ${test_name}";
+      output = "${test_source_directory}/generated_${test_name}_bytecode_test.ml.corrected";
+      run;
+      output = "${test_source_directory}/generated_${test_name}_bytecode_test.ml.corrected";
+      reference = "${test_source_directory}/generated_${test_name}_bytecode_test.ml";
+      check-program-output;
+    }}
+  { test_name = "record_access_with_void_local";
+    {
+      arguments = "native ${test_name}";
+      output = "${test_source_directory}/generated_${test_name}_native_test.ml.corrected";
+      run;
+      output = "${test_source_directory}/generated_${test_name}_native_test.ml.corrected";
+      reference = "${test_source_directory}/generated_${test_name}_native_test.ml";
+      check-program-output;
+    }{
+      arguments = "bytecode ${test_name}";
+      output = "${test_source_directory}/generated_${test_name}_bytecode_test.ml.corrected";
+      run;
+      output = "${test_source_directory}/generated_${test_name}_bytecode_test.ml.corrected";
+      reference = "${test_source_directory}/generated_${test_name}_bytecode_test.ml";
+      check-program-output;
+    }}
 *)

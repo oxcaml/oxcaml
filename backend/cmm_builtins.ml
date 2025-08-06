@@ -315,13 +315,31 @@ let transl_vec_builtin name args dbg _typ_res =
   match name with
   (* Vector casts (no-ops) *)
   | "caml_vec128_cast" ->
-    let op = Creinterpret_cast V128_of_v128 in
+    let op = Creinterpret_cast (V128_of_vec Vec128) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_vec256_cast" ->
-    let op = Creinterpret_cast V256_of_v256 in
+    let op = Creinterpret_cast (V256_of_vec Vec256) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_vec512_cast" ->
-    let op = Creinterpret_cast V512_of_v512 in
+    let op = Creinterpret_cast (V512_of_vec Vec512) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec256_low_of_vec128" ->
+    let op = Creinterpret_cast (V256_of_vec Vec128) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec256_low_to_vec128" ->
+    let op = Creinterpret_cast (V128_of_vec Vec256) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_of_vec128" ->
+    let op = Creinterpret_cast (V512_of_vec Vec128) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_to_vec128" ->
+    let op = Creinterpret_cast (V128_of_vec Vec512) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_of_vec256" ->
+    let op = Creinterpret_cast (V512_of_vec Vec256) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_vec512_low_to_vec256" ->
+    let op = Creinterpret_cast (V256_of_vec Vec512) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   (* Scalar casts. These leave the top bits of the vector unspecified. *)
   | "caml_float64x2_low_of_float" ->

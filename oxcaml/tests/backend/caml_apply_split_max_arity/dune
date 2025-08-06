@@ -28,7 +28,7 @@
    (with-outputs-to
     t.output
     (bash
-     "readelf -sW ./t.exe | grep \" caml_apply[0-9]\\{1,3\\}\" | sed \"s/.*caml_//\" | sed \"s/L\\$//\" | sort | uniq"))
+     "readelf -sW ./t.exe | grep \" caml_apply[0-9]\\{1,3\\}\" | sed \"s/.*caml_apply//\" | sed \"s/L\\$//\" | sort -n | tail -1"))
    (with-outputs-to
     stack.output
     (run ./stack.exe)))))

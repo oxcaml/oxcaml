@@ -149,6 +149,7 @@ let configuration_variables () =
   p_bool "multidomain" multidomain;
   p_bool "poll_insertion" poll_insertion;
   p_bool "ox" oxcaml;
+  p_bool "oxcaml_dwarf" oxcaml_dwarf;
 ]
 
 let print_config_value oc = function

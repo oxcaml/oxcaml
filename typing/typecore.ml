@@ -245,6 +245,7 @@ type error =
   | Probe_name_undefined of string
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
+  | Atomic_in_pattern of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -582,7 +583,7 @@ let mode_lazy expected_mode =
   let mode_crossing =
     Crossing.of_bounds {
       comonadic = {
-        Alloc.Comonadic.Const.max with
+        Value.Comonadic.Const.max with
         (* The thunk is evaluated only once, so we only require it to be [once],
           even if the [lazy] is [many]. *)
         linearity = Many;
@@ -590,7 +591,7 @@ let mode_lazy expected_mode =
           only require it to be [nonportable], even if the [lazy] is [portable].
           *)
         portability = Portable };
-      monadic = Alloc.Monadic.Const.min }
+      monadic = Value.Monadic.Const.min }
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -1026,7 +1027,7 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
 let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
-  | Mutable m0 ->
+  | Mutable { mode = m0; _ } ->
       let m0 = m0 |> mutable_mode |> Value.disallow_right in
       let m0 = match ty with
       | Some ty -> cross_left env ty ?modalities m0
@@ -1042,7 +1043,8 @@ let mutvar_mode ~loc ~env m0 exp_mode =
   let mode = mode_default m in
   let modalities = Typemode.let_mutable_modalities m0 in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
-  check_construct_mutability ~loc ~env (Mutable m0) ~modalities mode;
+  check_construct_mutability ~loc ~env
+    (Mutable { mode = m0; atomic = Nonatomic}) ~modalities mode;
   m |> Value.disallow_right
 
 (** The [expected_mode] of the record when projecting a mutable field. *)
@@ -1840,7 +1842,7 @@ let solve_Ppat_array ~refine loc env mutability expected_ty =
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let jkind, arg_sort = Jkind.of_new_legacy_sort_var ~why:Array_element in
+  let jkind, arg_sort = Jkind.for_array_element_sort () in
   let ty_elt = newgenvar jkind in
   let expected_ty = generic_instance expected_ty in
   unify_pat_types_refine ~refine
@@ -2673,6 +2675,17 @@ let as_comp_pattern
 let components_have_label (labeled_components : (string option * 'a) list) =
   List.exists (function Some _, _ -> true | _ -> false) labeled_components
 
+let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
+  (* Pattern-matching under atomic record fields is not allowed. We
+     still allow wildcard patterns, so that it is valid to list all
+     record fields exhaustively. *)
+  let wildcard pat = match pat.pat_desc with
+    | Tpat_any -> true
+    | _ -> false
+  in
+  if Types.is_atomic label.lbl_mut && not (wildcard pat) then
+    raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -2846,6 +2859,7 @@ and type_pat_aux
       let make_record_pat
             (lbl_pat_list : (_ * rep gen_label_description * _) list) =
         check_recordpat_labels loc lbl_pat_list closed record_form;
+        List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
           | Legacy -> Tpat_record (lbl_pat_list, closed)
           | Unboxed_product ->
@@ -3119,7 +3133,11 @@ and type_pat_aux
   | Ppat_array (mut, spl) ->
       let mut =
         match mut with
-        | Mutable -> Mutable Value.Comonadic.legacy
+        | Mutable  -> Mutable {
+          mode = Value.Comonadic.legacy;
+          (* CR aspsmith: Revisit once we support atomic arrays *)
+          atomic = Nonatomic
+        }
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -6267,7 +6285,7 @@ and type_expect_
               match mixed.(label.lbl_pos) with
               | Float_boxed -> true
               | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
-              | Vec128 | Vec256 | Vec512 | Word
+              | Vec128 | Vec256 | Vec512 | Word | Void
               | Product _ ->
                 false
             end
@@ -6334,7 +6352,8 @@ and type_expect_
       in
       let (label_loc, label, newval) =
         match label.lbl_mut with
-        | Mutable m0 ->
+        | Mutable { mode = m0; atomic } ->
+          ignore atomic;  (* CR aspsmith: TODO *)
           submode ~loc:record.exp_loc ~env rmode mode_mutate_mutable;
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
@@ -6356,7 +6375,11 @@ and type_expect_
   | Pexp_array(mut, sargl) ->
       let mutability =
         match mut with
-        | Mutable -> Mutable Value.Comonadic.legacy
+        | Mutable -> Mutable {
+          mode = Value.Comonadic.legacy;
+          (* CR aspsmith: Revisit once we support atomic arrays *)
+          atomic = Nonatomic;
+        }
         | Immutable ->
             Language_extension.assert_enabled ~loc Immutable_arrays ();
             Immutable
@@ -9763,7 +9786,7 @@ and type_generic_array
   in
   let modalities = Typemode.transl_modalities ~maturity:Stable mutability [] in
   let argument_mode = mode_modality modalities array_mode in
-  let jkind, elt_sort = Jkind.of_new_legacy_sort_var ~why:Array_element in
+  let jkind, elt_sort = Jkind.for_array_element_sort () in
   let ty = newgenvar jkind in
   let to_unify = type_ ty in
   with_explanation explanation (fun () ->
@@ -10019,10 +10042,15 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.list_argument_jkind
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
-          | Mutable   -> Predef.type_array, Mutable Value.Comonadic.legacy
-          | Immutable ->
-              Language_extension.assert_enabled ~loc Immutable_arrays ();
-              Predef.type_iarray, Immutable
+        | Mutable   ->
+          Predef.type_array, Mutable {
+            mode = Value.Comonadic.legacy;
+            (* CR aspsmith: Revisit once we support atomic arrays *)
+            atomic = Nonatomic
+          }
+        | Immutable ->
+          Language_extension.assert_enabled ~loc Immutable_arrays ();
+          Predef.type_iarray, Immutable
         in
         (Array_comprehension mut : comprehension_type),
         container_type,
@@ -11115,6 +11143,13 @@ let report_error ~loc env =
     let name = Language_extension.to_string ext in
     Location.errorf ~loc
         "Extension %s must be enabled to use this feature." name
+  | Atomic_in_pattern lid ->
+      Location.errorf ~loc
+        "Atomic fields (here %a) are forbidden in patterns,@ \
+         as it is difficult to reason about when the atomic read@ \
+         will happen during pattern matching:@ the field may be read@ \
+         zero, one or several times depending on the patterns around it."
+        (Style.as_inline_code longident) lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"

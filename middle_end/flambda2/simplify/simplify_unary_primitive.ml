@@ -745,7 +745,9 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
            can become unused. This might have the effect of moving a projection
            earlier in the event that it already exists later, but this is
            probably fine: this operation isn't that common. *)
-        let contents_var = Variable.create "obj_dup_contents" in
+        let contents_var =
+          Variable.create "obj_dup_contents" (T.kind contents_ty)
+        in
         let contents_var_duid = Flambda_debug_uid.none in
         let contents_expr =
           Named.create_prim (Unary (Unbox_number boxable_number, arg)) dbg

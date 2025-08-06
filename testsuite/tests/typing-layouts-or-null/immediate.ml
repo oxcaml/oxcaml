@@ -68,7 +68,7 @@ type ('a : value_or_null) accept_value_or_null
 
 type should_work = t_immediate_or_null accept_value_or_null
 [%%expect{|
-type 'a accept_value_or_null
+type ('a : value_or_null) accept_value_or_null
 type should_work = t_immediate_or_null accept_value_or_null
 |}]
 
