@@ -4577,8 +4577,6 @@ let filter_arrow env t l ~force_tpoly ~generic_optional_info =
           match classify_optionality l with
           | Vanilla_optional_arg ->
               newty2 ~level
-                (* CR layouts v5: Change the Jkind.Builtin.value when option can
-                  hold non-values. *)
                 (Tconstr(Predef.path_option,
                         [newvar2 level Predef.option_argument_jkind],
                         ref Mnil))

@@ -890,6 +890,7 @@ let extract_optional_tp_from_pattern_constraint_exn env pat = match pat with
         Typetexp.extract_optional_tp_from_type_parsetree_exn env ty
       in
       (path_and_decl, arg,
+      (* CR generic-optional: Look at the constructor for the underlying modes*)
       {pat with
         Parsetree.ppat_desc = Ppat_constraint (under_pat, Some arg, modes)})
   | _ -> Misc.fatal_error "Missing type annotation"
@@ -8475,7 +8476,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
            (* CR layouts v5: relax value requirement *)
            unify_exp env arg
              (type_option(newvar Predef.option_argument_jkind))
-           (* We always infer the vanilla option argument, even potentially
+           (* We always infer the vanilla option argument, even if potentially
              an application may be of some generic optional type *)
        | Generic_optional _ ->
            Misc.fatal_error

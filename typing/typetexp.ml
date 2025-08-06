@@ -705,22 +705,27 @@ let transl_label (label : Parsetree.arg_label)
 (* Parallel to [transl_label_from_expr]. *)
 let transl_label_from_pat (label : Parsetree.arg_label)
     (pat : Parsetree.pattern) =
-  match pat with
-  (* We should only strip off the constraint node if the label translates
-     to Position, as this means the type annotation is [%call_pos] and
-    nothing more. *)
-  | {ppat_desc = Ppat_constraint (inner_pat, ty, []); _} ->
-      let label = transl_label label ty in
-      let pat = if Btype.is_position label then inner_pat else pat in
-      label, pat
-  | _ ->
-    match label with
-    | Generic_optional _ ->
-        (* If type information is not provided and we are translating a
-           generic optional, then that is an error *)
-        raise (Error (pat.ppat_loc, Env.empty,
-        Generic_optional_argument_missing_type_annotation))
-    | _ -> transl_label label None, pat
+  match label with
+  | Generic_optional _ ->
+      (match pat with
+      | {ppat_desc = Ppat_constraint (_, Some ty, _); _} ->
+          let label = transl_label label (Some ty) in
+          label, pat
+      | _ ->
+          (* If type information is not provided and we are translating a
+            generic optional, then that is an error *)
+          raise (Error (pat.ppat_loc, Env.empty,
+          Generic_optional_argument_missing_type_annotation)))
+  | Optional _ | Labelled _ | Nolabel ->
+      match pat with
+      (* We should only strip off the constraint node if the label translates
+        to Position, as this means the type annotation is [%call_pos] and
+        nothing more. *)
+      | {ppat_desc = Ppat_constraint (inner_pat, ty, []); _} ->
+          let label = transl_label label ty in
+          let pat = if Btype.is_position label then inner_pat else pat in
+          label, pat
+      | _ -> transl_label label None, pat
 
 (* Parallel to [transl_label_from_pat]. *)
 let transl_label_from_expr (label : Parsetree.arg_label)

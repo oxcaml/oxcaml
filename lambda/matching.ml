@@ -4496,14 +4496,18 @@ let for_optional_arg_default ~(path : Btype.generic_optional_type_path)
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
   let supplied_or_default =
-    if Path.same path Predef.path_or_null then
-      transl_match_on_or_null
-        default_arg_layout
-        (Lvar param)
-        Loc_unknown
-        ~if_null:default_arg
-        ~if_this:(Lvar param)
-    else transl_match_on_option
+    (* CR generic-optional: Handle [@@or_null_reexport], which will have a
+       different path *)
+    match Path.same path Predef.path_or_null with
+    | true ->
+        transl_match_on_or_null
+          default_arg_layout
+          (Lvar param)
+          Loc_unknown
+          ~if_null:default_arg
+          ~if_this:(Lvar param)
+    | false ->
+        transl_match_on_option
           default_arg_layout
           (Lvar param)
           Loc_unknown

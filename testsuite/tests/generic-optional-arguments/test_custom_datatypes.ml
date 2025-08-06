@@ -107,3 +107,88 @@ val v : int = 3
 val v : int = 3
 val v : int = 2
 |}]
+
+(* Option-like types in modules *)
+module My_option = struct
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+end
+
+let h (?x : 'a My_option.t) () = x
+let v1 = h ()
+let v2 = h ~x:42 ()
+
+[%%expect{|
+module My_option : sig type 'a t = Empty | Value of 'a end @@ stateless
+val h : (?x):'a My_option.t -> unit -> 'a My_option.t = <fun>
+val v1 : 'a My_option.t = My_option.Empty
+val v2 : int My_option.t = My_option.Value 42
+|}]
+
+(* Checking structure against signature tests *)
+module type S1 = sig
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  val f : (?x):'a t -> unit -> 'a t
+end
+
+module M1 : S1 = struct
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  let f (?x : 'a t) () = x
+end
+
+[%%expect{|
+module type S1 =
+  sig type 'a t = Empty | Value of 'a val f : (?x):'a t -> unit -> 'a t end
+module M1 : S1 @@ stateless
+|}]
+
+(* Signature subsumption test *)
+
+module type S2 = sig
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+end
+
+module type S2_restricted = sig
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+end
+module M2 : S2 = struct
+  type 'a t =
+    | Empty
+    | Value of 'a
+  [@@option_like]
+  let g (?x : 'a t) (?y : 'b t) () = (x, y)
+  let h (?x : 'a t) (?y : 'b t) () = (x, y)
+end
+module M2_restricted : S2_restricted = M2
+[%%expect{|
+module type S2 =
+  sig
+    type 'a t = Empty | Value of 'a
+    val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+    val h : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  end
+module type S2_restricted =
+  sig
+    type 'a t = Empty | Value of 'a
+    val g : (?x):'a t -> (?y):'b t -> unit -> 'a t * 'b t
+  end
+module M2 : S2 @@ stateless
+module M2_restricted : S2_restricted @@ stateless
+|}]
