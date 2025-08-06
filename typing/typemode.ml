@@ -390,18 +390,21 @@ let untransl_modality (a : Modality.t) : Parsetree.modality loc =
   in
   { txt = Modality s; loc = Location.none }
 
-(* For now, mutable implies legacy modalities for both comonadic axes and
-   monadic axes. In the future, implications on the comonadic axes will be
-   removed. The implications on the monadic axes will stay. Implied modalities
-   can be overriden. *)
-(* CR zqian: decouple mutable and comonadic modalities *)
+(* For now, mutable implies:
+   1. [global] and [unyielding]. This is for compatibility with existing code
+      and will be removed in the future.
+   2. [many]. This is to remedy the coarse treatment of modalities in the
+      uniqueness analysis.
+      See [https://github.com/oxcaml/oxcaml/pull/4415#discussion_r2250801078].
+   3. legacy modalities for all monadic axes. This will stay in the future.
+
+   Implied modalities can be overriden. *)
+(* CR zqian: remove [1] and [2] *)
 let mutable_implied_modalities ~for_mutable_variable (mut : Types.mutability) =
   let comonadic : Modality.t list =
     [ Atom (Comonadic Areality, Meet_with Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
-      Atom (Comonadic Portability, Meet_with Portability.Const.legacy);
-      Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-      Atom (Comonadic Statefulness, Meet_with Statefulness.Const.legacy) ]
+      Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy) ]
   in
   let monadic : Modality.t list =
     [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
