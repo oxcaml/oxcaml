@@ -125,8 +125,8 @@ runtest: compiler
 runtest-llvm: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvm $(ws_main)
 
-runtest-dwarf: boot-compiler
-	TEST_OXCAML_DWARF=true RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest oxcaml/tests/backend/oxcaml_dwarf $(ws_main)
+runtest-dwarf: compiler
+	TEST_OXCAML_DWARF=true RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest oxcaml/tests/backend/oxcaml_dwarf $(ws_main) --force
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file

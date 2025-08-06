@@ -12,13 +12,20 @@ let () =
    (= %{env:TEST_OXCAML_DWARF=false} "true")
    (<> %{env:OXCAML_LLDB=} "")))|}
   in
+  let enabled_if_without_lldb =
+    {|(enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{env:TEST_OXCAML_DWARF=false} "true")
+   (= %{env:OXCAML_LLDB=} "")))|}
+  in
   let buf = Buffer.create 1000 in
-  
   (* Function to generate rules for executable tests that produce output *)
   let print_dwarf_test name =
     let subst = function
       | "enabled_if" -> enabled_if
       | "enabled_if_with_lldb" -> enabled_if_with_lldb
+      | "enabled_if_without_lldb" -> enabled_if_without_lldb
       | "name" -> name
       | "filter" -> "filter.sh"
       | _ -> assert false
@@ -38,11 +45,20 @@ let () =
  (deps ${name}.exe ${name}.lldb ${filter})
  (action
   (progn
-   (bash "sed 's/^(lldb) //' ${name}.lldb > ${name}_clean.lldb")
+   (bash "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' ${name}.lldb > ${name}_clean.lldb")
    (with-outputs-to ${name}.output.corrected
     (pipe-outputs
      (run %{env:OXCAML_LLDB=lldb} -s ${name}_clean.lldb ./${name}.exe)
      (run sh ./${filter}))))))
+
+(rule
+ ${enabled_if_without_lldb}
+ (targets ${name}.output.corrected)
+ (deps ${name}.exe)
+ (action
+  (progn
+   (echo "ERROR: OXCAML_LLDB environment variable not set.\nDWARF tests require a custom LLDB build. Please set OXCAML_LLDB to the path of your custom LLDB binary.\nExample: export OXCAML_LLDB=/path/to/custom/lldb")
+   (bash "exit 1"))))
 
 (rule
  (alias runtest)
@@ -52,7 +68,5 @@ let () =
 |};
     Buffer.output_buffer Out_channel.stdout buf
   in
-  
-  
   (* Generate tests - add more tests here as needed *)
-  print_dwarf_test "test_basic_dwarf";
+  print_dwarf_test "test_basic_dwarf"
