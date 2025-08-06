@@ -82,6 +82,8 @@ external to_float : int16# -> float = "%float_of_int16#"
 
 let[@inline] to_string t = Int.to_string (to_int t)
 
+let[@inline] of_string s = of_int16 (Int16.of_string s)
+
 let max_int () = shift_right_logical (minus_one ()) 1
 
 let min_int () = succ (max_int ())

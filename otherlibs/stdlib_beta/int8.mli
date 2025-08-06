@@ -149,6 +149,23 @@ external of_float : float -> int8 = "%int8_of_float"
 (** [to_string x] is the written representation of [x] in decimal. *)
 val to_string : int8 -> string
 
+(** Convert the given string to an 8-bit integer.
+    The string is read in decimal (by default, or if the string
+    begins with [0u]) or in hexadecimal, octal or binary if the
+    string begins with [0x], [0o] or [0b] respectively.
+
+    The [0u] prefix reads the input as an unsigned integer in the range
+    [[0, 2*Int8.max_int+1]].  If the input exceeds {!Int8.max_int}
+    it is converted to the signed integer
+    [Int8.min_int + input - Int8.max_int - 1].
+
+    The [_] (underscore) character can appear anywhere in the string
+    and is ignored.
+    @raise Failure if the given string is not
+    a valid representation of an integer, or if the integer represented
+    exceeds the range of integers representable in type [int8]. *)
+external of_string : string -> int8 = "caml_int8_of_string"
+
 (** A seeded hash function for ints, with the same output value as
     {!Hashtbl.seeded_hash}. This function allows this module to be passed as
     argument to the functor {!Hashtbl.MakeSeeded}. *)

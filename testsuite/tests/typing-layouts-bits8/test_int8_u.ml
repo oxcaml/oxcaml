@@ -293,7 +293,7 @@ let () =
   test_unary_of  "to_int"              Int8.to_int              Int8_u.to_int               int_result;
   test_unary_to  "of_float"            Int8.of_float            Int8_u.of_float             float_input;
   test_unary_of  "to_float"            Int8.to_float            Int8_u.to_float             float_result;
-  (* test_unary_to  "of_string"           Int8.of_string           Int8_u.of_string            int8_string_input; *)
+  test_unary_to  "of_string"           Int8.of_string           Int8_u.of_string            int8_string_input;
   test_unary_of  "to_string"           Int8.to_string           Int8_u.to_string            string_result;
   test_binary_of "compare"             Int8.compare             Int8_u.compare              int_result;
   test_binary_of "unsigned_compare"    Int8.unsigned_compare    Int8_u.unsigned_compare     int_result;
