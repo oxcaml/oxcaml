@@ -1,0 +1,81 @@
+(setglobal Test_non_value_constructors!
+  (let
+    (print_int32u/283 =
+       (function {nlocal = 0} prefix/285 x/286[unboxed_int32] : int
+         (apply (field_imm 1 (global Stdlib__Printf!))
+           [0: [2: 0 [11: ": " [5: 0 0 0 [12: '\n' 0]]]] "%s: %ld\n"]
+           prefix/285 (box_int32 x/286)))
+     print_int32u_bits32_option/363 =
+       (function {nlocal = 0} prefix/365
+         x/366[(consts (0)) (non_consts ([0: bits32]))] : int
+         (if x/366
+           (apply (field_imm 1 (global Stdlib__Printf!))
+             [0:
+              [2: 0 [11: ": Some32 " [5: 0 0 0 [12: '\n' 0]]]]
+              "%s: Some32 %ld\n"]
+             prefix/365 (box_int32 (mixedfield 0  (bits32) x/366)))
+           (apply (field_imm 1 (global Stdlib__Printf!))
+             [0: [2: 0 [11: ": None32\n" 0]] "%s: None32\n"] prefix/365)))
+     test/368 =
+       (function {nlocal = 0} param/387[int] : int
+         (region
+           (let
+             (f/370 =
+                (function[L] {nlocal = 2}
+                  x/372[(consts (0)) (non_consts ([0: bits32]))]
+                  param/373[int]
+                  [(consts (0)) (non_consts ([0: bits32]))]x/372)
+              v/374 =[(consts (0)) (non_consts ([0: bits32]))]
+                (apply f/370 0 0))
+             (seq (apply print_int32u_bits32_option/363 "v1=None" v/374)
+               (let
+                 (v/375 =[(consts (0)) (non_consts ([0: bits32]))]
+                    (apply f/370
+                      (makeheapmixedblock 0 Immutable (bits32) #3l) 0))
+                 (seq (apply print_int32u_bits32_option/363 "v2=3l" v/375)
+                   (let
+                     (v/376 =[(consts (0)) (non_consts ([0: bits32]))]
+                        (apply f/370
+                          (makeheapmixedblock 0 Immutable (bits32) #3l) 0))
+                     (seq
+                       (apply print_int32u_bits32_option/363 "v3=3l" v/376)
+                       (let
+                         (v/377 =[(consts (0)) (non_consts ([0: bits32]))]
+                            (apply f/370 0 0))
+                         (seq
+                           (apply print_int32u_bits32_option/363 "v4=None"
+                             v/377)
+                           (let
+                             (g/378 =
+                                (function[L] {nlocal = 2}
+                                  *bits32_option*x/382[L][(consts (0))
+                                                          (non_consts (
+                                                          [0: bits32]))]
+                                  param/381[int] : unboxed_int32
+                                  (if *bits32_option*x/382
+                                    (field_imm 0 *bits32_option*x/382) #2l))
+                              v/383 =[unboxed_int32] (apply g/378 0 0))
+                             (seq (apply print_int32u/283 "v5=2l" v/383)
+                               (let
+                                 (v/384 =[unboxed_int32]
+                                    (apply g/378
+                                      (makelocalmixedblock 0 Immutable (bits32)
+                                        #3l)
+                                      0))
+                                 (seq (apply print_int32u/283 "v6=3l" v/384)
+                                   (let
+                                     (v/385 =[unboxed_int32]
+                                        (apply g/378
+                                          (makelocalmixedblock 0 Immutable (bits32)
+                                            #3l)
+                                          0))
+                                     (seq
+                                       (apply print_int32u/283 "v7=3l" v/385)
+                                       (let
+                                         (v/386 =[unboxed_int32]
+                                            (apply g/378 0 0))
+                                         (seq
+                                           (apply print_int32u/283 "v8=2l"
+                                             v/386)
+                                           0)))))))))))))))))))
+    (makeblock 0 print_int32u/283 print_int32u_bits32_option/363 test/368)))
